@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = require('chai');
-const path = require('path');
-const stylelint = require('stylelint');
+import {assert} from 'chai';
+import path from 'node:path';
+import stylelint from 'stylelint';
 
 const configBase = {
   config: {
-    plugins: [path.resolve(__dirname, '../lib/use_theme_colors.mjs')],
+    plugins: [path.resolve(import.meta.dirname, '../lib/use_theme_colors.mjs')],
     rules: {'plugin/use_theme_colors': [true]},
   },
-  // Remove once we use a ESM test runner
-  quietDeprecationWarnings: true,
 };
 
 async function lintAndGetWarnings(code) {
@@ -25,7 +23,8 @@ async function lintAndGetWarnings(code) {
   return warnings;
 }
 
-const EXPECTED_ERROR_MESSAGE = 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css';
+const EXPECTED_ERROR_MESSAGE =
+    'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css (plugin/use_theme_colors)';
 
 describe('use_theme_colors', () => {
   beforeEach(() => {
@@ -293,7 +292,7 @@ describe('use_theme_colors', () => {
         column: 7,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
         fix: undefined,
       },
@@ -304,7 +303,7 @@ describe('use_theme_colors', () => {
         endLine: 2,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
         fix: undefined,
       },
@@ -336,7 +335,7 @@ describe('use_theme_colors', () => {
         endLine: 1,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
         fix: undefined,
       },
@@ -387,7 +386,7 @@ describe('use_theme_colors', () => {
         line: 1,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
       },
     ]);
@@ -467,7 +466,7 @@ describe('use_theme_colors', () => {
         line: 2,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
       },
     ]);
@@ -487,7 +486,7 @@ describe('use_theme_colors', () => {
         line: 2,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
       },
     ]);
@@ -507,7 +506,7 @@ describe('use_theme_colors', () => {
         line: 2,
         rule: 'plugin/use_theme_colors',
         severity: 'error',
-        text: 'All CSS color declarations should use a variable defined in ui/legacy/themeColors.css',
+        text: EXPECTED_ERROR_MESSAGE,
         url: undefined,
       },
     ]);

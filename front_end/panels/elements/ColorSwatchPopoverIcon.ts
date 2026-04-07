@@ -6,14 +6,14 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import type * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import type {Icon} from '../../ui/kit/kit.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type {StylePropertiesSection} from './StylePropertiesSection.js';
 import type {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
-import type {StylesSidebarPane} from './StylesSidebarPane.js';
+import type {StylesContainer} from './StylesContainer.js';
 
 const UIStrings = {
   /**
@@ -33,14 +33,14 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 interface BezierPopoverIconParams {
   treeElement: StylePropertyTreeElement;
   swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
-  swatch: IconButton.Icon.Icon;
+  swatch: Icon;
   bezierText: HTMLElement;
 }
 
 export class BezierPopoverIcon {
   private treeElement: StylePropertyTreeElement;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
-  private readonly swatch: IconButton.Icon.Icon;
+  private readonly swatch: Icon;
   private readonly bezierText: HTMLElement;
   private readonly boundBezierChanged: (event: Common.EventTarget.EventTargetEvent<string>) => void;
   private readonly boundOnScroll: (event: Event) => void;
@@ -89,7 +89,7 @@ export class BezierPopoverIcon {
     }
 
     this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.parentPane().setEditingStyle(true);
+    this.treeElement.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
@@ -118,7 +118,7 @@ export class BezierPopoverIcon {
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
     void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.parentPane().setEditingStyle(false);
+    this.treeElement.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
   }
 }
@@ -200,7 +200,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
       return;
     }
 
-    const color = this.swatch.getColor();
+    const color = this.swatch.color;
     if (!color) {
       return;
     }
@@ -218,7 +218,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     }
 
     this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.parentPane().setEditingStyle(true);
+    this.treeElement.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
@@ -297,7 +297,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
     void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.parentPane().setEditingStyle(false);
+    this.treeElement.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
 
     UI.Context.Context.instance().setFlavor(ColorSwatchPopoverIcon, null);
@@ -370,7 +370,7 @@ export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrappe
     }
 
     this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.parentPane().setEditingStyle(true);
+    this.treeElement.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
@@ -399,7 +399,7 @@ export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrappe
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
     void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.parentPane().setEditingStyle(false);
+    this.treeElement.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
   }
 }
@@ -408,7 +408,7 @@ export class FontEditorSectionManager {
   private readonly treeElementMap: Map<string, StylePropertyTreeElement>;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   private readonly section: StylePropertiesSection;
-  private parentPane: StylesSidebarPane|null;
+  private stylesContainer: StylesContainer|null;
   private fontEditor: InlineEditor.FontEditor.FontEditor|null;
   private scrollerElement: Element|null;
   private readonly boundFontChanged:
@@ -423,7 +423,7 @@ export class FontEditorSectionManager {
 
     this.section = section;
 
-    this.parentPane = null;
+    this.stylesContainer = null;
 
     this.fontEditor = null;
 
@@ -514,12 +514,12 @@ export class FontEditorSectionManager {
     }
   }
 
-  async showPopover(iconElement: Element, parentPane: StylesSidebarPane): Promise<void> {
+  async showPopover(iconElement: Element, stylesContainer: StylesContainer): Promise<void> {
     if (this.swatchPopoverHelper.isShowing()) {
       this.swatchPopoverHelper.hide(true);
       return;
     }
-    this.parentPane = parentPane;
+    this.stylesContainer = stylesContainer;
     const propertyValueMap = this.createPropertyValueMap();
     this.fontEditor = new InlineEditor.FontEditor.FontEditor(propertyValueMap);
     this.fontEditor.addEventListener(InlineEditor.FontEditor.Events.FONT_CHANGED, this.boundFontChanged);
@@ -530,7 +530,7 @@ export class FontEditorSectionManager {
       this.scrollerElement.addEventListener('scroll', this.boundOnScroll, false);
     }
 
-    this.parentPane.setEditingStyle(true);
+    this.stylesContainer.setEditingStyle(true);
   }
 
   private onScroll(): void {
@@ -546,8 +546,8 @@ export class FontEditorSectionManager {
       this.fontEditor.removeEventListener(InlineEditor.FontEditor.Events.FONT_CHANGED, this.boundFontChanged);
     }
     this.fontEditor = null;
-    if (this.parentPane) {
-      this.parentPane.setEditingStyle(false);
+    if (this.stylesContainer) {
+      this.stylesContainer.setEditingStyle(false);
     }
     this.section.resetToolbars();
     this.section.onpopulate();

@@ -4,10 +4,12 @@
 
 import * as Formatter from '../../entrypoints/formatter_worker/formatter_worker.js';
 import * as Protocol from '../../generated/protocol.js';
+import type * as FormatterModels from '../../models/formatter/formatter.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
+import {stringifyFrame} from '../../testing/StackTraceHelpers.js';
 import * as ScopesCodec from '../../third_party/source-map-scopes-codec/source-map-scopes-codec.js';
 import * as Platform from '../platform/platform.js';
 
@@ -63,33 +65,20 @@ describe('SourceMapScopesInfo', () => {
       assert.deepEqual(info.findInlinedFunctions(0, 7), {
         originalFunctionName: 'foo',
         inlinedFunctions: [
-          {name: 'baz', callsite: {sourceIndex: 0, line: 35, column: 0}},
-          {name: 'bar', callsite: {sourceIndex: 0, line: 15, column: 0}},
+          {name: 'baz', callsite: {sourceIndex: 0, line: 35, column: 0, sourceURL: undefined}},
+          {name: 'bar', callsite: {sourceIndex: 0, line: 15, column: 0, sourceURL: undefined}},
         ],
       });
     });
   });
 
-  describeWithMockConnection('expandCallFrame', () => {
-    function setUpCallFrame(generatedPausedPosition: {line: number, column: number}, name: string) {
-      const target = createTarget();
-      const callFrame = new SDK.DebuggerModel.CallFrame(
-          target.model(SDK.DebuggerModel.DebuggerModel)!, sinon.createStubInstance(SDK.Script.Script), {
-            callFrameId: '0' as Protocol.Debugger.CallFrameId,
-            location: {
-              lineNumber: generatedPausedPosition.line,
-              columnNumber: generatedPausedPosition.column,
-              scriptId: '0' as Protocol.Runtime.ScriptId,
-            },
-            functionName: name,
-            scopeChain: [],
-            this: {type: Protocol.Runtime.RemoteObjectType.Undefined},
-            url: '',
-          },
-          undefined, name);
+  describeWithEnvironment('translateCallSite', () => {
+    it('throws for an outlined frame', () => {
+      const builder = new ScopeInfoBuilder().startRange(0, 0, {isStackFrame: true, isHidden: true}).endRange(0, 10);
+      const info = new SourceMapScopesInfo(sinon.createStubInstance(SDK.SourceMap.SourceMap), builder.build());
 
-      return callFrame;
-    }
+      assert.throws(() => info.translateCallSite(0, 5));
+    });
 
     it('does nothing for frames that don\'t contain inlined code', () => {
       //
@@ -109,11 +98,17 @@ describe('SourceMapScopesInfo', () => {
       // 9:
       // 10: outer();
 
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`index.js`, urlString`index.js.map`, encodeSourceMap([
+                                                      '0:18 => index.ts:1:7',
+                                                      '1:23 => index.ts:6:9',
+                                                      '2:1 => index.ts:10:5',
+                                                    ]));
+
       const builder = new ScopeInfoBuilder();
       builder.startScope(0, 0, {kind: 'global', key: 'global'})
-          .startScope(0, 14, {kind: 'function', key: 'inner', name: 'inner'})
+          .startScope(0, 14, {kind: 'function', key: 'inner', name: 'inner', isStackFrame: true})
           .endScope(2, 1)
-          .startScope(4, 14, {kind: 'function', key: 'outer', name: 'outer'})
+          .startScope(4, 14, {kind: 'function', key: 'outer', name: 'outer', isStackFrame: true})
           .startScope(5, 12, {kind: 'block', key: 'block'})
           .endScope(7, 3)
           .endScope(8, 1)
@@ -128,33 +123,27 @@ describe('SourceMapScopesInfo', () => {
           .endRange(1, 27)
           .endRange(3, 0);
 
-      const info = new SourceMapScopesInfo(sinon.createStubInstance(SDK.SourceMap.SourceMap), builder.build());
+      const info = new SourceMapScopesInfo(sourceMap, builder.build());
 
       {
-        const callFrame = setUpCallFrame({line: 0, column: 13}, 'n');  // Pause on 'print'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(0, 18);  // Pause on 'print'.
 
-        assert.lengthOf(expandedFrames, 1);
-        assert.strictEqual(expandedFrames[0].functionName, 'inner');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
+        assert.lengthOf(translatedFrames, 1);
+        assert.strictEqual(stringifyFrame(translatedFrames[0]), 'at inner (index.ts:1:7)');
       }
 
       {
-        const callFrame = setUpCallFrame({line: 1, column: 22}, 'm');  // Pause on 'n()'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(1, 23);  // Pause on 'n()'.
 
-        assert.lengthOf(expandedFrames, 1);
-        assert.strictEqual(expandedFrames[0].functionName, 'outer');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
+        assert.lengthOf(translatedFrames, 1);
+        assert.strictEqual(stringifyFrame(translatedFrames[0]), 'at outer (index.ts:6:9)');
       }
 
       {
-        const callFrame = setUpCallFrame({line: 2, column: 0}, '');  // Pause on 'm()'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(2, 1);  // Pause on 'm()'.
 
-        assert.lengthOf(expandedFrames, 1);
-        assert.strictEqual(expandedFrames[0].functionName, '');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
+        assert.lengthOf(translatedFrames, 1);
+        assert.strictEqual(stringifyFrame(translatedFrames[0]), 'at <anonymous> (index.ts:10:5)');
       }
     });
 
@@ -176,11 +165,17 @@ describe('SourceMapScopesInfo', () => {
       // 9:
       // 10: outer();
 
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`index.js`, urlString`index.js.map`, encodeSourceMap([
+                                                      '0:14 => index.ts:5:5',
+                                                      '0:26 => index.ts:1:7',
+                                                      '1:1 => index.ts:10:5',
+                                                    ]));
+
       const builder = new ScopeInfoBuilder();
       builder.startScope(0, 0, {kind: 'global', key: 'global'})
-          .startScope(0, 14, {kind: 'function', name: 'inner', key: 'inner'})
+          .startScope(0, 14, {kind: 'function', name: 'inner', key: 'inner', isStackFrame: true})
           .endScope(2, 1)
-          .startScope(4, 14, {kind: 'function', name: 'outer', key: 'outer'})
+          .startScope(4, 14, {kind: 'function', name: 'outer', key: 'outer', isStackFrame: true})
           .startScope(5, 12, {kind: 'block', key: 'block'})
           .endScope(7, 3)
           .endScope(8, 1)
@@ -189,41 +184,33 @@ describe('SourceMapScopesInfo', () => {
       builder.startRange(0, 0, {scopeKey: 'global'})
           .startRange(0, 10, {scopeKey: 'outer', isStackFrame: true})
           .startRange(0, 21, {scopeKey: 'block'})
-          .startRange(0, 22, {scopeKey: 'inner', callSite: {sourceIndex: 0, line: 6, column: 4}})
+          .startRange(0, 22, {scopeKey: 'inner', callSite: {sourceIndex: 0, line: 6, column: 8}})
           .endRange(0, 36)
           .endRange(0, 37)
           .endRange(0, 38)
           .endRange(2, 0);
 
-      const info = new SourceMapScopesInfo(sinon.createStubInstance(SDK.SourceMap.SourceMap), builder.build());
+      const info = new SourceMapScopesInfo(sourceMap, builder.build());
 
       {
-        const callFrame = setUpCallFrame({line: 0, column: 22}, 'm');  // Pause on 'print'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(0, 26);  // Pause on 'print'.
 
-        assert.lengthOf(expandedFrames, 2);
-        assert.strictEqual(expandedFrames[0].functionName, 'inner');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
-        assert.strictEqual(expandedFrames[1].functionName, 'outer');
-        assert.strictEqual(expandedFrames[1].inlineFrameIndex, 1);
+        assert.lengthOf(translatedFrames, 2);
+        assert.deepEqual(translatedFrames.map(stringifyFrame), ['at inner (index.ts:1:7)', 'at outer (index.ts:6:8)']);
       }
 
       {
-        const callFrame = setUpCallFrame({line: 0, column: 13}, 'm');  // Pause on 'if'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(0, 14);  // Pause on 'if'.
 
-        assert.lengthOf(expandedFrames, 1);
-        assert.strictEqual(expandedFrames[0].functionName, 'outer');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
+        assert.lengthOf(translatedFrames, 1);
+        assert.strictEqual(stringifyFrame(translatedFrames[0]), 'at outer (index.ts:5:5)');
       }
 
       {
-        const callFrame = setUpCallFrame({line: 1, column: 0}, 'm');  // Pause on 'm'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(1, 1);  // Pause on 'm'.
 
-        assert.lengthOf(expandedFrames, 1);
-        assert.strictEqual(expandedFrames[0].functionName, '');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
+        assert.lengthOf(translatedFrames, 1);
+        assert.strictEqual(stringifyFrame(translatedFrames[0]), 'at <anonymous> (index.ts:10:5)');
       }
     });
 
@@ -245,38 +232,39 @@ describe('SourceMapScopesInfo', () => {
       // 9:
       // 10: outer();
 
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`index.js`, urlString`index.js.map`, encodeSourceMap([
+                                                      '0:5 => index.ts:1:7',
+                                                    ]));
+
       const builder = new ScopeInfoBuilder();
       builder.startScope(0, 0, {kind: 'global', key: 'global'})
-          .startScope(0, 14, {kind: 'function', name: 'inner', key: 'inner'})
+          .startScope(0, 14, {kind: 'function', name: 'inner', key: 'inner', isStackFrame: true})
           .endScope(2, 1)
-          .startScope(4, 14, {kind: 'function', name: 'outer', key: 'outer'})
+          .startScope(4, 14, {kind: 'function', name: 'outer', key: 'outer', isStackFrame: true})
           .startScope(5, 12, {kind: 'block', key: 'block'})
           .endScope(7, 3)
           .endScope(8, 1)
           .endScope(11, 0);
 
       builder.startRange(0, 0, {scopeKey: 'global'})
-          .startRange(0, 0, {scopeKey: 'outer', callSite: {sourceIndex: 0, line: 10, column: 0}})
+          .startRange(0, 0, {scopeKey: 'outer', callSite: {sourceIndex: 0, line: 10, column: 5}})
           .startRange(0, 0, {scopeKey: 'block'})
-          .startRange(0, 0, {scopeKey: 'inner', callSite: {sourceIndex: 0, line: 6, column: 4}})
+          .startRange(0, 0, {scopeKey: 'inner', callSite: {sourceIndex: 0, line: 6, column: 9}})
           .endRange(0, 14)
           .endRange(0, 14)
           .endRange(0, 14)
           .endRange(1, 0);
 
-      const info = new SourceMapScopesInfo(sinon.createStubInstance(SDK.SourceMap.SourceMap), builder.build());
+      const info = new SourceMapScopesInfo(sourceMap, builder.build());
 
       {
-        const callFrame = setUpCallFrame({line: 0, column: 0}, '');  // Pause on 'print'.
-        const expandedFrames = info.expandCallFrame(callFrame);
+        const translatedFrames = info.translateCallSite(0, 5);  // Pause on 'print'.
 
-        assert.lengthOf(expandedFrames, 3);
-        assert.strictEqual(expandedFrames[0].functionName, 'inner');
-        assert.strictEqual(expandedFrames[0].inlineFrameIndex, 0);
-        assert.strictEqual(expandedFrames[1].functionName, 'outer');
-        assert.strictEqual(expandedFrames[1].inlineFrameIndex, 1);
-        assert.strictEqual(expandedFrames[2].functionName, '');
-        assert.strictEqual(expandedFrames[2].inlineFrameIndex, 2);
+        assert.deepEqual(translatedFrames.map(stringifyFrame), [
+          'at inner (index.ts:1:7)',
+          'at outer (index.ts:6:9)',
+          'at <anonymous> (index.ts:10:5)',
+        ]);
       }
     });
   });
@@ -757,24 +745,298 @@ describe('SourceMapScopesInfo', () => {
 
       const sourceMapJSON = encodeSourceMap([
         '0:10 => original.js:0:10@foo',  // function f() => function foo()
-        '0:44 => original.js:5:9@bar',   // function b() => function bar()
+        '0:33 => original.js:3:0',       // end of f
+        '0:44 => original2.js:5:9@bar',  // function b() => function bar()
+        '0:57 => original2.js:7:0',      // end of b
       ]);
       const sourceMap = new SDK.SourceMap.SourceMap(urlString`compiled.js`, urlString`compiled.js.map`, sourceMapJSON);
 
       const info = SourceMapScopesInfo.createFromAst(sourceMap, ast, new TextUtils.Text.Text(generatedCode));
 
-      // Check function name for a position at the beginning of the function name mapping.
-      assert.strictEqual(info.findOriginalFunctionName({line: 0, column: 10}), 'foo');
+      // Check function name/scope for a position at the beginning of the function name mapping,
+      // and for a position at the beginning of the function name mapping.
+      for (const column of [10, 25]) {
+        assert.strictEqual(info.findOriginalFunctionName({line: 0, column}), 'foo');
 
-      // Check function name for a position inside the function body.
-      assert.strictEqual(info.findOriginalFunctionName({line: 0, column: 25}), 'foo');
+        const {scope, url} = info.findOriginalFunctionScope({line: 0, column}) ?? {};
+        assert.strictEqual(url, 'original.js');
+        assert.isOk(scope);
+        assert.strictEqual(scope.name, 'foo');
+        assert.strictEqual(scope.start.line, 0);
+        assert.strictEqual(scope.start.column, 10);
+        assert.strictEqual(scope.end.line, 3);
+        assert.strictEqual(scope.end.column, 0);
+      }
 
-      // Check function name for the second function.
-      assert.strictEqual(info.findOriginalFunctionName({line: 0, column: 44}), 'bar');
-      assert.strictEqual(info.findOriginalFunctionName({line: 0, column: 52}), 'bar');
+      // Check function name/scope for the second function.
+      for (const column of [44, 52]) {
+        assert.strictEqual(info.findOriginalFunctionName({line: 0, column}), 'bar');
+
+        const {scope, url} = info.findOriginalFunctionScope({line: 0, column}) ?? {};
+        assert.strictEqual(url, 'original2.js');
+        assert.isOk(scope);
+        assert.strictEqual(scope.name, 'bar');
+        assert.strictEqual(scope.start.line, 5);
+        assert.strictEqual(scope.start.column, 9);
+        assert.strictEqual(scope.end.line, 7);
+        assert.strictEqual(scope.end.column, 0);
+      }
 
       // Check a position in the global scope.
       assert.isNull(info.findOriginalFunctionName({line: 0, column: 38}));  // Between the two functions
+      assert.isNull(info.findOriginalFunctionScope({line: 0, column: 38}));
+    });
+
+    it('handles nested scopes across multiple original files', () => {
+      // Generated:
+      // main.js: function outer() { function inner() { console.log('hi'); } }
+      // util.js: function util() {}
+      const generatedCode = `function outer() { function inner() { console.log('hi'); } } function util() {}`;
+
+      const ast = Formatter.ScopeParser.parseScopes(generatedCode)?.export();
+
+      const sourceMapJSON = encodeSourceMap([
+        // main.js
+        '0:14 => main.js:0:14@outer',  // outer start
+        '0:33 => main.js:0:33@inner',  // inner start (inside outer)
+        '0:58 => main.js:0:58',        // inner end
+        '0:60 => main.js:0:60',        // outer end
+
+        // utils.js
+        '0:74 => utils.js:0:14@util',  // util start
+        '0:79 => utils.js:0:18',       // util end
+      ]);
+
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`compiled.js`, urlString`compiled.js.map`, sourceMapJSON);
+      const info = SourceMapScopesInfo.createFromAst(sourceMap, ast!, new TextUtils.Text.Text(generatedCode));
+
+      // Test inner scope.
+      for (let i = 33; i < 58; i++) {
+        const result = info.findOriginalFunctionScope({line: 0, column: i});
+        assert.isOk(result);
+        assert.strictEqual(result.url, 'main.js');
+        assert.strictEqual(result.scope.name, 'inner');
+        assert.strictEqual(result.scope.parent?.name, 'outer');
+      }
+
+      // Test scope from second file.
+      for (let i = 74; i < 79; i++) {
+        const result = info.findOriginalFunctionScope({line: 0, column: i});
+        assert.isOk(result);
+        assert.strictEqual(result.url, 'utils.js');
+        assert.strictEqual(result.scope.name, 'util');
+        assert.isUndefined(result.scope.parent?.name);
+      }
+    });
+
+    it('discards scopes where start and end map to different source files', () => {
+      const generatedCode = `function bad() { }`;
+      const ast = Formatter.ScopeParser.parseScopes(generatedCode)?.export();
+
+      const sourceMapJSON = encodeSourceMap([
+        // The start maps to file A.
+        '0:12 => fileA.js:0:12@bad',
+        // The end maps to a different file.
+        '0:18 => fileB.js:0:0',
+      ]);
+
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`compiled.js`, urlString`compiled.js.map`, sourceMapJSON);
+      const info = SourceMapScopesInfo.createFromAst(sourceMap, ast!, new TextUtils.Text.Text(generatedCode));
+
+      // Although the AST found a function, the source map is invalid.
+      for (let i = 0; i < 20; i++) {
+        const result = info.findOriginalFunctionScope({line: 0, column: i});
+        assert.isNull(result, 'Should not return a scope when source files mismatch');
+      }
+    });
+
+    it('inserts scopes correctly when an inner AST node maps to a larger scope than its parent', () => {
+      // Scenario:
+      //
+      // AST: In the generated code, 'wrapper' encompasses 'big'
+      // Original: According to the source map, 'big' actually encompasses 'wrapper'
+      //
+      // This may be a contrived and unlikely example, but the point is to ensure
+      // that the children scopes are kept in the correct order no matter what the
+      // mappings are.
+
+      const generatedCode = `function wrapper() { function big() { } }`;
+      const ast = Formatter.ScopeParser.parseScopes(generatedCode)?.export();
+
+      const sourceMapJSON = encodeSourceMap([
+        // 'wrapper' maps to a small range in original.js
+        '0:16 => original.js:10:16@wrapper',
+
+        // 'big' maps to a huge enclosing range in original.js
+        '0:33 => original.js:0:0@big',
+        '0:39 => original.js:100:0',  // big ends way later
+
+        '0:41 => original.js:11:0',  // wrapper ends
+      ]);
+
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`compiled.js`, urlString`compiled.js.map`, sourceMapJSON);
+      const info = SourceMapScopesInfo.createFromAst(sourceMap, ast!, new TextUtils.Text.Text(generatedCode));
+
+      // Check 'big'.
+      const big = info.findOriginalFunctionScope({line: 0, column: 33});
+      assert.isOk(big);
+      assert.strictEqual(big.url, 'original.js');
+      assert.strictEqual(big.scope.name, 'big');
+      assert.strictEqual(big.scope.start.line, 0);
+      assert.strictEqual(big.scope.end.line, 100);
+      assert.isNotEmpty(big.scope.children, 'The outer scope should have adopted the inner scope');
+      assert.strictEqual(big.scope.children[0].name, 'wrapper');
+
+      // Check 'wrapper'.
+      const wrapper = info.findOriginalFunctionScope({line: 0, column: 16});
+      assert.isOk(wrapper);
+      assert.strictEqual(wrapper.url, 'original.js');
+      assert.strictEqual(wrapper.scope.name, 'wrapper');
+      assert.isEmpty(wrapper.scope.children);
+    });
+
+    it('does not throw RangeError for deep nesting in createFromAst', () => {
+      const depth = 5000;
+      const root = new Formatter.ScopeParser.Scope(0, depth * 2, null, 1 /* BLOCK */);
+      let current = root;
+      for (let i = 1; i < depth; i++) {
+        current = new Formatter.ScopeParser.Scope(i, depth * 2 - i, current, 1 /* BLOCK */);
+      }
+
+      const mappings: string[] = [];
+      for (let i = 0; i < depth; i++) {
+        mappings.push(`0:${i} => original.js:${i}:0`);
+      }
+
+      const sourceMapJSON = encodeSourceMap(mappings);
+      const sourceMap = new SDK.SourceMap.SourceMap(urlString`compiled.js`, urlString`compiled.js.map`, sourceMapJSON);
+
+      const info = SourceMapScopesInfo.createFromAst(
+          sourceMap, root as unknown as FormatterModels.FormatterWorkerPool.ScopeTreeNode,
+          new TextUtils.Text.Text(' '.repeat(depth * 2)));
+      assert.isOk(info);
+    });
+  });
+
+  describe('isOutlinedFrame', () => {
+    it('returns false for a global scope', () => {
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo =
+          new SourceMapScopesInfo(sourceMap, new ScopeInfoBuilder().startRange(0, 0).endRange(0, 20).build());
+
+      assert.isFalse(scopeInfo.isOutlinedFrame(0, 10));
+    });
+
+    it('returns false for a non-hidden function', () => {
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startRange(0, 0)
+              .startRange(0, 10, {isStackFrame: true})
+              .endRange(0, 20)
+              .endRange(0, 30)
+              .build());
+
+      assert.isFalse(scopeInfo.isOutlinedFrame(0, 15));
+    });
+
+    it('returns true for a hidden function', () => {
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startRange(0, 0)
+              .startRange(0, 10, {isStackFrame: true, isHidden: true})
+              .endRange(0, 20)
+              .endRange(0, 30)
+              .build());
+
+      assert.isTrue(scopeInfo.isOutlinedFrame(0, 15));
+    });
+
+    it('returns true for a block scope in a hidden function', () => {
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startRange(0, 0)
+              .startRange(0, 10, {isStackFrame: true, isHidden: true})
+              .startRange(0, 20)
+              .endRange(0, 30)
+              .endRange(0, 40)
+              .endRange(0, 50)
+              .build());
+
+      assert.isTrue(scopeInfo.isOutlinedFrame(0, 25));
+    });
+  });
+
+  describe('hasInlinedFrames', () => {
+    it('returns false for a function scope', () => {
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startRange(0, 0)
+              .startRange(0, 10, {isStackFrame: true})
+              .endRange(0, 20)
+              .endRange(0, 30)
+              .build());
+
+      assert.isFalse(scopeInfo.hasInlinedFrames(0, 15));
+    });
+
+    it('returns true for an inlined range', () => {
+      // 'bar' gets inlined into 'foo'.
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startScope(0, 0, {isStackFrame: true, key: 'fn-foo', name: 'foo'})
+              .endScope(9, 0)
+              .startScope(10, 0, {isStackFrame: true, key: 'fn-bar', name: 'bar'})
+              .endScope(19, 0)
+              .startRange(0, 0, {isStackFrame: true, scopeKey: 'fn-foo'})
+              .startRange(0, 10, {scopeKey: 'fn-bar', callSite: {sourceIndex: 0, line: 5, column: 2}})
+              .endRange(0, 20)
+              .endRange(0, 30)
+              .build());
+
+      assert.isTrue(scopeInfo.hasInlinedFrames(0, 15));
+    });
+
+    it('returns true for an inlined function with a block scope', () => {
+      // 'bar' with a block scope gets inlined into 'foo'.
+      const sourceMap = sinon.createStubInstance(SDK.SourceMap.SourceMap);
+      const scopeInfo = new SourceMapScopesInfo(
+          sourceMap,
+          new ScopeInfoBuilder()
+              .startScope(0, 0, {isStackFrame: true, key: 'fn-foo', name: 'foo'})
+              .endScope(9, 0)
+              .startScope(10, 0, {isStackFrame: true, key: 'fn-bar', name: 'bar'})
+              .startScope(15, 10, {key: 'block-bar'})
+              .endScope(18, 4)
+              .endScope(19, 0)
+              .startRange(0, 0, {isStackFrame: true, scopeKey: 'fn-foo'})
+              .startRange(0, 10, {scopeKey: 'fn-bar', callSite: {sourceIndex: 0, line: 5, column: 2}})
+              .startRange(0, 15, {scopeKey: 'block-bar'})
+              .endRange(0, 19)
+              .endRange(0, 20)
+              .endRange(0, 30)
+              .build());
+
+      assert.isTrue(scopeInfo.hasInlinedFrames(0, 18));
+    });
+  });
+
+  describe('isEmpty', () => {
+    it('returns true if all original scopes are null', () => {
+      const scopeInfo =
+          new SourceMapScopesInfo(sinon.createStubInstance(SDK.SourceMap.SourceMap), {scopes: [], ranges: []});
+      scopeInfo.addOriginalScopes([null, null]);
+
+      assert.isTrue(scopeInfo.isEmpty());
     });
   });
 });

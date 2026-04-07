@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
-import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
 import * as Trace from '../../../models/trace/trace.js';
@@ -255,10 +255,10 @@ describeWithEnvironment('ThreadAppender', function() {
     const anonymousCall = threadAppenders[0].titleForEvent(entry);
     assert.strictEqual(anonymousCall, '(anonymous)');
     const originalName = cpuProfileNode.functionName;
-    cpuProfileNode.setFunctionName('new-resolved-function-name');
+    cpuProfileNode.setOriginalFunctionName('new-resolved-function-name');
     assert.strictEqual(threadAppenders[0].titleForEvent(entry), 'new-resolved-function-name');
     // Reset the value for future tests.
-    cpuProfileNode.setFunctionName(originalName);
+    cpuProfileNode.setOriginalFunctionName(originalName);
   });
 
   function getDefaultInfo() {
@@ -379,6 +379,7 @@ describeWithEnvironment('ThreadAppender', function() {
         resourceMapping,
         targetManager,
         ignoreListManager,
+        workspace,
       });
     });
     afterEach(() => {
@@ -492,6 +493,7 @@ describeWithEnvironment('ThreadAppender', function() {
         resourceMapping,
         targetManager,
         ignoreListManager,
+        workspace,
       });
     });
     afterEach(() => {
@@ -512,7 +514,7 @@ describeWithEnvironment('ThreadAppender', function() {
       assert.strictEqual(unknownEventIndex, -1);
 
       // Now enable the experiment and make sure the event is appended to the timeline data this time
-      Root.Runtime.experiments.enableForTest('timeline-show-all-events');
+      Common.Settings.Settings.instance().moduleSetting('timeline-show-all-events').set(true);
       const finalTimelineData = await renderThreadAppendersFromTrace(this, fileName);
       const finalFlamechartData = finalTimelineData.flameChartData;
       unknownEventIndex = finalTimelineData.entryData.findIndex(entry => {
@@ -521,7 +523,7 @@ describeWithEnvironment('ThreadAppender', function() {
       assert.isAbove(unknownEventIndex, -1);
       assert.exists(finalFlamechartData.entryStartTimes);
       assert.exists(finalFlamechartData.entryTotalTimes);
-      Root.Runtime.experiments.disableForTest('timeline-show-all-events');
+      Common.Settings.Settings.instance().moduleSetting('timeline-show-all-events').set(false);
     });
   });
   describe('AuctionWorklet threads', () => {
@@ -537,6 +539,7 @@ describeWithEnvironment('ThreadAppender', function() {
         resourceMapping,
         targetManager,
         ignoreListManager,
+        workspace,
       });
     });
 

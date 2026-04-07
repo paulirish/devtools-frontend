@@ -7,6 +7,9 @@
  * Re-generate with: npm run generate-protocol-resources.
  */
 
+
+import type * as Protocol from './protocol.js'
+
 /**
  * Mappings from protocol event and command names to the types required for them.
  */
@@ -114,6 +117,10 @@ export namespace ProtocolMapping {
      */
     'DOM.attributeModified': [Protocol.DOM.AttributeModifiedEvent];
     /**
+     * Fired when `Element`'s adoptedStyleSheets are modified.
+     */
+    'DOM.adoptedStyleSheetsModified': [Protocol.DOM.AdoptedStyleSheetsModifiedEvent];
+    /**
      * Fired when `Element`'s attribute is removed.
      */
     'DOM.attributeRemoved': [Protocol.DOM.AttributeRemovedEvent];
@@ -158,6 +165,10 @@ export namespace ProtocolMapping {
      */
     'DOM.scrollableFlagUpdated': [Protocol.DOM.ScrollableFlagUpdatedEvent];
     /**
+     * Fired when a node's ad related state changes.
+     */
+    'DOM.adRelatedStateUpdated': [Protocol.DOM.AdRelatedStateUpdatedEvent];
+    /**
      * Fired when a node's starting styles changes.
      */
     'DOM.affectedByStartingStylesFlagUpdated': [Protocol.DOM.AffectedByStartingStylesFlagUpdatedEvent];
@@ -191,6 +202,12 @@ export namespace ProtocolMapping {
      * Notification sent after the virtual time budget for the current VirtualTimePolicy has run out.
      */
     'Emulation.virtualTimeBudgetExpired': [];
+    /**
+     * Fired when a page calls screen.orientation.lock() or screen.orientation.unlock()
+     * while device emulation is enabled. This allows the DevTools frontend to update the
+     * emulated device orientation accordingly.
+     */
+    'Emulation.screenOrientationLockChanged': [Protocol.Emulation.ScreenOrientationLockChangedEvent];
     'FedCm.dialogShown': [Protocol.FedCm.DialogShownEvent];
     /**
      * Triggered when a dialog is closed, either by user action, JS abort,
@@ -233,6 +250,10 @@ export namespace ProtocolMapping {
      * Fired when debugging target has reloaded after crash
      */
     'Inspector.targetReloadedAfterCrash': [];
+    /**
+     * Fired on worker targets when main worker script and any imported scripts have been evaluated.
+     */
+    'Inspector.workerScriptLoaded': [];
     'LayerTree.layerPainted': [Protocol.LayerTree.LayerPaintedEvent];
     'LayerTree.layerTreeDidChange': [Protocol.LayerTree.LayerTreeDidChangeEvent];
     /**
@@ -369,6 +390,8 @@ export namespace ProtocolMapping {
      * Fired when data is received from tcp direct socket stream.
      */
     'Network.directTCPSocketChunkReceived': [Protocol.Network.DirectTCPSocketChunkReceivedEvent];
+    'Network.directUDPSocketJoinedMulticastGroup': [Protocol.Network.DirectUDPSocketJoinedMulticastGroupEvent];
+    'Network.directUDPSocketLeftMulticastGroup': [Protocol.Network.DirectUDPSocketLeftMulticastGroupEvent];
     /**
      * Fired upon direct_socket.UDPSocket creation.
      */
@@ -424,30 +447,20 @@ export namespace ProtocolMapping {
      */
     'Network.policyUpdated': [];
     /**
-     * Fired once when parsing the .wbn file has succeeded.
-     * The event contains the information about the web bundle contents.
-     */
-    'Network.subresourceWebBundleMetadataReceived': [Protocol.Network.SubresourceWebBundleMetadataReceivedEvent];
-    /**
-     * Fired once when parsing the .wbn file has failed.
-     */
-    'Network.subresourceWebBundleMetadataError': [Protocol.Network.SubresourceWebBundleMetadataErrorEvent];
-    /**
-     * Fired when handling requests for resources within a .wbn file.
-     * Note: this will only be fired for resources that are requested by the webpage.
-     */
-    'Network.subresourceWebBundleInnerResponseParsed': [Protocol.Network.SubresourceWebBundleInnerResponseParsedEvent];
-    /**
-     * Fired when request for resources within a .wbn file failed.
-     */
-    'Network.subresourceWebBundleInnerResponseError': [Protocol.Network.SubresourceWebBundleInnerResponseErrorEvent];
-    /**
      * Is sent whenever a new report is added.
      * And after 'enableReportingApi' for all existing reports.
      */
     'Network.reportingApiReportAdded': [Protocol.Network.ReportingApiReportAddedEvent];
     'Network.reportingApiReportUpdated': [Protocol.Network.ReportingApiReportUpdatedEvent];
     'Network.reportingApiEndpointsChangedForOrigin': [Protocol.Network.ReportingApiEndpointsChangedForOriginEvent];
+    /**
+     * Triggered when the initial set of device bound sessions is added.
+     */
+    'Network.deviceBoundSessionsAdded': [Protocol.Network.DeviceBoundSessionsAddedEvent];
+    /**
+     * Triggered when a device bound session event occurs.
+     */
+    'Network.deviceBoundSessionEventOccurred': [Protocol.Network.DeviceBoundSessionEventOccurredEvent];
     /**
      * Fired when the node should be inspected. This happens after call to `setInspectMode` or when
      * user manually inspects an element.
@@ -461,6 +474,14 @@ export namespace ProtocolMapping {
      * Fired when user asks to capture screenshot of some area on the page.
      */
     'Overlay.screenshotRequested': [Protocol.Overlay.ScreenshotRequestedEvent];
+    /**
+     * Fired when user asks to show the Inspect panel.
+     */
+    'Overlay.inspectPanelShowRequested': [Protocol.Overlay.InspectPanelShowRequestedEvent];
+    /**
+     * Fired when user asks to restore the Inspected Element floating window.
+     */
+    'Overlay.inspectedElementWindowRestored': [Protocol.Overlay.InspectedElementWindowRestoredEvent];
     /**
      * Fired when user cancels the inspect mode.
      */
@@ -633,6 +654,118 @@ export namespace ProtocolMapping {
     'ServiceWorker.workerRegistrationUpdated': [Protocol.ServiceWorker.WorkerRegistrationUpdatedEvent];
     'ServiceWorker.workerVersionUpdated': [Protocol.ServiceWorker.WorkerVersionUpdatedEvent];
     /**
+     * Fired when |SCardEstablishContext| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaa1b8970169fd4883a6dc4a8f43f19b67
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardestablishcontext
+     */
+    'SmartCardEmulation.establishContextRequested': [Protocol.SmartCardEmulation.EstablishContextRequestedEvent];
+    /**
+     * Fired when |SCardReleaseContext| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga6aabcba7744c5c9419fdd6404f73a934
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardreleasecontext
+     */
+    'SmartCardEmulation.releaseContextRequested': [Protocol.SmartCardEmulation.ReleaseContextRequestedEvent];
+    /**
+     * Fired when |SCardListReaders| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardlistreadersa
+     */
+    'SmartCardEmulation.listReadersRequested': [Protocol.SmartCardEmulation.ListReadersRequestedEvent];
+    /**
+     * Fired when |SCardGetStatusChange| is called. Timeout is specified in milliseconds.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga33247d5d1257d59e55647c3bb717db24
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardgetstatuschangea
+     */
+    'SmartCardEmulation.getStatusChangeRequested': [Protocol.SmartCardEmulation.GetStatusChangeRequestedEvent];
+    /**
+     * Fired when |SCardCancel| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaacbbc0c6d6c0cbbeb4f4debf6fbeeee6
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardcancel
+     */
+    'SmartCardEmulation.cancelRequested': [Protocol.SmartCardEmulation.CancelRequestedEvent];
+    /**
+     * Fired when |SCardConnect| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga4e515829752e0a8dbc4d630696a8d6a5
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardconnecta
+     */
+    'SmartCardEmulation.connectRequested': [Protocol.SmartCardEmulation.ConnectRequestedEvent];
+    /**
+     * Fired when |SCardDisconnect| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga4be198045c73ec0deb79e66c0ca1738a
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scarddisconnect
+     */
+    'SmartCardEmulation.disconnectRequested': [Protocol.SmartCardEmulation.DisconnectRequestedEvent];
+    /**
+     * Fired when |SCardTransmit| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga9a2d77242a271310269065e64633ab99
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardtransmit
+     */
+    'SmartCardEmulation.transmitRequested': [Protocol.SmartCardEmulation.TransmitRequestedEvent];
+    /**
+     * Fired when |SCardControl| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gac3454d4657110fd7f753b2d3d8f4e32f
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardcontrol
+     */
+    'SmartCardEmulation.controlRequested': [Protocol.SmartCardEmulation.ControlRequestedEvent];
+    /**
+     * Fired when |SCardGetAttrib| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaacfec51917255b7a25b94c5104961602
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardgetattrib
+     */
+    'SmartCardEmulation.getAttribRequested': [Protocol.SmartCardEmulation.GetAttribRequestedEvent];
+    /**
+     * Fired when |SCardSetAttrib| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga060f0038a4ddfd5dd2b8fadf3c3a2e4f
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardsetattrib
+     */
+    'SmartCardEmulation.setAttribRequested': [Protocol.SmartCardEmulation.SetAttribRequestedEvent];
+    /**
+     * Fired when |SCardStatus| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gae49c3c894ad7ac12a5b896bde70d0382
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardstatusa
+     */
+    'SmartCardEmulation.statusRequested': [Protocol.SmartCardEmulation.StatusRequestedEvent];
+    /**
+     * Fired when |SCardBeginTransaction| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardbegintransaction
+     */
+    'SmartCardEmulation.beginTransactionRequested': [Protocol.SmartCardEmulation.BeginTransactionRequestedEvent];
+    /**
+     * Fired when |SCardEndTransaction| is called.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gae8742473b404363e5c587f570d7e2f3b
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardendtransaction
+     */
+    'SmartCardEmulation.endTransactionRequested': [Protocol.SmartCardEmulation.EndTransactionRequestedEvent];
+    /**
      * A cache's contents have been modified.
      */
     'Storage.cacheStorageContentUpdated': [Protocol.Storage.CacheStorageContentUpdatedEvent];
@@ -677,10 +810,6 @@ export namespace ProtocolMapping {
     'Storage.sharedStorageWorkletOperationExecutionFinished': [Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent];
     'Storage.storageBucketCreatedOrUpdated': [Protocol.Storage.StorageBucketCreatedOrUpdatedEvent];
     'Storage.storageBucketDeleted': [Protocol.Storage.StorageBucketDeletedEvent];
-    'Storage.attributionReportingSourceRegistered': [Protocol.Storage.AttributionReportingSourceRegisteredEvent];
-    'Storage.attributionReportingTriggerRegistered': [Protocol.Storage.AttributionReportingTriggerRegisteredEvent];
-    'Storage.attributionReportingReportSent': [Protocol.Storage.AttributionReportingReportSentEvent];
-    'Storage.attributionReportingVerboseDebugReportSent': [Protocol.Storage.AttributionReportingVerboseDebugReportSentEvent];
     /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
@@ -797,6 +926,22 @@ export namespace ProtocolMapping {
      * Triggered when a credential is used in a webauthn assertion.
      */
     'WebAuthn.credentialAsserted': [Protocol.WebAuthn.CredentialAssertedEvent];
+    /**
+     * Event fired when new tools are added.
+     */
+    'WebMCP.toolsAdded': [Protocol.WebMCP.ToolsAddedEvent];
+    /**
+     * Event fired when tools are removed.
+     */
+    'WebMCP.toolsRemoved': [Protocol.WebMCP.ToolsRemovedEvent];
+    /**
+     * Event fired when a tool invocation starts.
+     */
+    'WebMCP.toolInvoked': [Protocol.WebMCP.ToolInvokedEvent];
+    /**
+     * Event fired when a tool invocation completes or fails.
+     */
+    'WebMCP.toolResponded': [Protocol.WebMCP.ToolRespondedEvent];
     /**
      * Fired when breakpoint is resolved to an actual script and location.
      * Deprecated in favor of `resolvedBreakpoints` in the `scriptParsed` event.
@@ -1035,14 +1180,6 @@ export namespace ProtocolMapping {
      */
     'Audits.enable': {
       paramsType: [];
-      returnType: void;
-    };
-    /**
-     * Runs the contrast check for the target page. Found issues are reported
-     * using Audits.issueAdded event.
-     */
-    'Audits.checkContrast': {
-      paramsType: [Protocol.Audits.CheckContrastRequest?];
       returnType: void;
     };
     /**
@@ -1449,6 +1586,8 @@ export namespace ProtocolMapping {
      * to the provided property syntax, the value is parsed using combined
      * syntax as if null `propertyName` was provided. If the value cannot be
      * resolved even then, return the provided value without any changes.
+     * Note: this function currently does not resolve CSS random() function,
+     * it returns unmodified random() function parts.`
      */
     'CSS.resolveValues': {
       paramsType: [Protocol.CSS.ResolveValuesRequest];
@@ -1603,6 +1742,13 @@ export namespace ProtocolMapping {
       returnType: Protocol.CSS.SetSupportsTextResponse;
     };
     /**
+     * Modifies the expression of a navigation at-rule.
+     */
+    'CSS.setNavigationText': {
+      paramsType: [Protocol.CSS.SetNavigationTextRequest];
+      returnType: Protocol.CSS.SetNavigationTextResponse;
+    };
+    /**
      * Modifies the expression of a scope at-rule.
      */
     'CSS.setScopeText': {
@@ -1741,6 +1887,13 @@ export namespace ProtocolMapping {
     'Cast.stopCasting': {
       paramsType: [Protocol.Cast.StopCastingRequest];
       returnType: void;
+    };
+    /**
+     * Returns all entries in the CrashReportContext across all frames in the page.
+     */
+    'CrashReportContext.getEntries': {
+      paramsType: [];
+      returnType: Protocol.CrashReportContext.GetEntriesResponse;
     };
     /**
      * Collects class names for the node with given id and all of it's child nodes.
@@ -2632,7 +2785,8 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Returns device's screen configuration.
+     * Returns device's screen configuration. In headful mode, the physical screens configuration is returned,
+     * whereas in headless mode, a virtual headless screen configuration is provided instead.
      */
     'Emulation.getScreenInfos': {
       paramsType: [];
@@ -2646,10 +2800,27 @@ export namespace ProtocolMapping {
       returnType: Protocol.Emulation.AddScreenResponse;
     };
     /**
+     * Updates specified screen parameters. Only supported in headless mode.
+     */
+    'Emulation.updateScreen': {
+      paramsType: [Protocol.Emulation.UpdateScreenRequest];
+      returnType: Protocol.Emulation.UpdateScreenResponse;
+    };
+    /**
      * Remove screen from the device. Only supported in headless mode.
      */
     'Emulation.removeScreen': {
       paramsType: [Protocol.Emulation.RemoveScreenRequest];
+      returnType: void;
+    };
+    /**
+     * Set primary screen. Only supported in headless mode.
+     * Note that this changes the coordinate system origin to the top-left
+     * of the new primary screen, updating the bounds and work areas
+     * of all existing screens accordingly.
+     */
+    'Emulation.setPrimaryScreen': {
+      paramsType: [Protocol.Emulation.SetPrimaryScreenRequest];
       returnType: void;
     };
     /**
@@ -2674,6 +2845,15 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Runs an extension default action.
+     * Available if the client is connected using the --remote-debugging-pipe
+     * flag and the --enable-unsafe-extension-debugging flag is set.
+     */
+    'Extensions.triggerAction': {
+      paramsType: [Protocol.Extensions.TriggerActionRequest];
+      returnType: void;
+    };
+    /**
      * Installs an unpacked extension from the filesystem similar to
      * --load-extension CLI flags. Returns extension ID once the extension
      * has been installed. Available if the client is connected using the
@@ -2683,6 +2863,15 @@ export namespace ProtocolMapping {
     'Extensions.loadUnpacked': {
       paramsType: [Protocol.Extensions.LoadUnpackedRequest];
       returnType: Protocol.Extensions.LoadUnpackedResponse;
+    };
+    /**
+     * Gets a list of all unpacked extensions.
+     * Available if the client is connected using the --remote-debugging-pipe flag
+     * and the --enable-unsafe-extension-debugging flag is set.
+     */
+    'Extensions.getExtensions': {
+      paramsType: [];
+      returnType: Protocol.Extensions.GetExtensionsResponse;
     };
     /**
      * Uninstalls an unpacked extension (others not supported) from the profile.
@@ -3252,21 +3441,6 @@ export namespace ProtocolMapping {
       returnType: Protocol.Memory.GetSamplingProfileResponse;
     };
     /**
-     * Returns enum representing if IP Proxy of requests is available
-     * or reason it is not active.
-     */
-    'Network.getIPProtectionProxyStatus': {
-      paramsType: [];
-      returnType: Protocol.Network.GetIPProtectionProxyStatusResponse;
-    };
-    /**
-     * Sets bypass IP Protection Proxy boolean.
-     */
-    'Network.setIPProtectionProxyBypassEnabled': {
-      paramsType: [Protocol.Network.SetIPProtectionProxyBypassEnabledRequest];
-      returnType: void;
-    };
-    /**
      * Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
      */
     'Network.setAcceptedEncodings': {
@@ -3349,7 +3523,9 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Activates emulation of network conditions for individual requests using URL match patterns.
+     * Activates emulation of network conditions for individual requests using URL match patterns. Unlike the deprecated
+     * Network.emulateNetworkConditions this method does not affect `navigator` state. Use Network.overrideNetworkState to
+     * explicitly modify `navigator` behavior.
      */
     'Network.emulateNetworkConditionsByRule': {
       paramsType: [Protocol.Network.EmulateNetworkConditionsByRuleRequest];
@@ -3367,6 +3543,15 @@ export namespace ProtocolMapping {
      */
     'Network.enable': {
       paramsType: [Protocol.Network.EnableRequest?];
+      returnType: void;
+    };
+    /**
+     * Configures storing response bodies outside of renderer, so that these survive
+     * a cross-process navigation.
+     * If maxTotalBufferSize is not set, durable messages are disabled.
+     */
+    'Network.configureDurableMessages': {
+      paramsType: [Protocol.Network.ConfigureDurableMessagesRequest?];
       returnType: void;
     };
     /**
@@ -3528,6 +3713,20 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Sets up tracking device bound sessions and fetching of initial set of sessions.
+     */
+    'Network.enableDeviceBoundSessions': {
+      paramsType: [Protocol.Network.EnableDeviceBoundSessionsRequest];
+      returnType: void;
+    };
+    /**
+     * Fetches the schemeful site for a specific origin.
+     */
+    'Network.fetchSchemefulSite': {
+      paramsType: [Protocol.Network.FetchSchemefulSiteRequest];
+      returnType: Protocol.Network.FetchSchemefulSiteResponse;
+    };
+    /**
      * Fetches the resource and returns the content.
      */
     'Network.loadNetworkResource': {
@@ -3677,6 +3876,10 @@ export namespace ProtocolMapping {
     };
     'Overlay.setShowContainerQueryOverlays': {
       paramsType: [Protocol.Overlay.SetShowContainerQueryOverlaysRequest];
+      returnType: void;
+    };
+    'Overlay.setShowInspectedElementAnchor': {
+      paramsType: [Protocol.Overlay.SetShowInspectedElementAnchorRequest];
       returnType: void;
     };
     /**
@@ -4282,6 +4485,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Get the annotated page content for the main frame.
+     * This is an experimental command that is subject to change.
+     */
+    'Page.getAnnotatedPageContent': {
+      paramsType: [Protocol.Page.GetAnnotatedPageContentRequest?];
+      returnType: Protocol.Page.GetAnnotatedPageContentResponse;
+    };
+    /**
      * Disable collecting and reporting metrics.
      */
     'Performance.disable': {
@@ -4409,6 +4620,151 @@ export namespace ProtocolMapping {
     };
     'ServiceWorker.updateRegistration': {
       paramsType: [Protocol.ServiceWorker.UpdateRegistrationRequest];
+      returnType: void;
+    };
+    /**
+     * Enables the |SmartCardEmulation| domain.
+     */
+    'SmartCardEmulation.enable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Disables the |SmartCardEmulation| domain.
+     */
+    'SmartCardEmulation.disable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardEstablishContext| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaa1b8970169fd4883a6dc4a8f43f19b67
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardestablishcontext
+     */
+    'SmartCardEmulation.reportEstablishContextResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportEstablishContextResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardReleaseContext| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga6aabcba7744c5c9419fdd6404f73a934
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardreleasecontext
+     */
+    'SmartCardEmulation.reportReleaseContextResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportReleaseContextResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardListReaders| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardlistreadersa
+     */
+    'SmartCardEmulation.reportListReadersResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportListReadersResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardGetStatusChange| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga33247d5d1257d59e55647c3bb717db24
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardgetstatuschangea
+     */
+    'SmartCardEmulation.reportGetStatusChangeResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportGetStatusChangeResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the result of a |SCardBeginTransaction| call.
+     * On success, this creates a new transaction object.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardbegintransaction
+     */
+    'SmartCardEmulation.reportBeginTransactionResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportBeginTransactionResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a call that returns only a result code.
+     * Used for: |SCardCancel|, |SCardDisconnect|, |SCardSetAttrib|, |SCardEndTransaction|.
+     *
+     * This maps to:
+     * 1. SCardCancel
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaacbbc0c6d6c0cbbeb4f4debf6fbeeee6
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardcancel
+     *
+     * 2. SCardDisconnect
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga4be198045c73ec0deb79e66c0ca1738a
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scarddisconnect
+     *
+     * 3. SCardSetAttrib
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga060f0038a4ddfd5dd2b8fadf3c3a2e4f
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardsetattrib
+     *
+     * 4. SCardEndTransaction
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gae8742473b404363e5c587f570d7e2f3b
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardendtransaction
+     */
+    'SmartCardEmulation.reportPlainResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportPlainResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardConnect| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga4e515829752e0a8dbc4d630696a8d6a5
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardconnecta
+     */
+    'SmartCardEmulation.reportConnectResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportConnectResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a call that sends back data on success.
+     * Used for |SCardTransmit|, |SCardControl|, and |SCardGetAttrib|.
+     *
+     * This maps to:
+     * 1. SCardTransmit
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#ga9a2d77242a271310269065e64633ab99
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardtransmit
+     *
+     * 2. SCardControl
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gac3454d4657110fd7f753b2d3d8f4e32f
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardcontrol
+     *
+     * 3. SCardGetAttrib
+     *    PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gaacfec51917255b7a25b94c5104961602
+     *    Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardgetattrib
+     */
+    'SmartCardEmulation.reportDataResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportDataResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports the successful result of a |SCardStatus| call.
+     *
+     * This maps to:
+     * PC/SC Lite: https://pcsclite.apdu.fr/api/group__API.html#gae49c3c894ad7ac12a5b896bde70d0382
+     * Microsoft: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardstatusa
+     */
+    'SmartCardEmulation.reportStatusResult': {
+      paramsType: [Protocol.SmartCardEmulation.ReportStatusResultRequest];
+      returnType: void;
+    };
+    /**
+     * Reports an error result for the given request.
+     */
+    'SmartCardEmulation.reportError': {
+      paramsType: [Protocol.SmartCardEmulation.ReportErrorRequest];
       returnType: void;
     };
     /**
@@ -4641,43 +4997,12 @@ export namespace ProtocolMapping {
       returnType: Protocol.Storage.RunBounceTrackingMitigationsResponse;
     };
     /**
-     * https://wicg.github.io/attribution-reporting-api/
-     */
-    'Storage.setAttributionReportingLocalTestingMode': {
-      paramsType: [Protocol.Storage.SetAttributionReportingLocalTestingModeRequest];
-      returnType: void;
-    };
-    /**
-     * Enables/disables issuing of Attribution Reporting events.
-     */
-    'Storage.setAttributionReportingTracking': {
-      paramsType: [Protocol.Storage.SetAttributionReportingTrackingRequest];
-      returnType: void;
-    };
-    /**
-     * Sends all pending Attribution Reports immediately, regardless of their
-     * scheduled report time.
-     */
-    'Storage.sendPendingAttributionReports': {
-      paramsType: [];
-      returnType: Protocol.Storage.SendPendingAttributionReportsResponse;
-    };
-    /**
      * Returns the effective Related Website Sets in use by this profile for the browser
      * session. The effective Related Website Sets will not change during a browser session.
      */
     'Storage.getRelatedWebsiteSets': {
       paramsType: [];
       returnType: Protocol.Storage.GetRelatedWebsiteSetsResponse;
-    };
-    /**
-     * Returns the list of URLs from a page and its embedded resources that match
-     * existing grace period URL pattern rules.
-     * https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period
-     */
-    'Storage.getAffectedUrlsForThirdPartyCookieMetadata': {
-      paramsType: [Protocol.Storage.GetAffectedUrlsForThirdPartyCookieMetadataRequest];
-      returnType: Protocol.Storage.GetAffectedUrlsForThirdPartyCookieMetadataResponse;
     };
     'Storage.setProtectedAudienceKAnonymity': {
       paramsType: [Protocol.Storage.SetProtectedAudienceKAnonymityRequest];
@@ -4848,6 +5173,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Gets the targetId of the DevTools page target opened for the given target
+     * (if any).
+     */
+    'Target.getDevToolsTarget': {
+      paramsType: [Protocol.Target.GetDevToolsTargetRequest];
+      returnType: Protocol.Target.GetDevToolsTargetResponse;
+    };
+    /**
      * Opens a DevTools window for the target.
      */
     'Target.openDevTools': {
@@ -4881,6 +5214,13 @@ export namespace ProtocolMapping {
     'Tracing.getCategories': {
       paramsType: [];
       returnType: Protocol.Tracing.GetCategoriesResponse;
+    };
+    /**
+     * Return a descriptor for all available tracing categories.
+     */
+    'Tracing.getTrackEventDescriptor': {
+      paramsType: [];
+      returnType: Protocol.Tracing.GetTrackEventDescriptorResponse;
     };
     /**
      * Record a clock sync marker in the trace.
@@ -5018,6 +5358,21 @@ export namespace ProtocolMapping {
      */
     'WebAuthn.setCredentialProperties': {
       paramsType: [Protocol.WebAuthn.SetCredentialPropertiesRequest];
+      returnType: void;
+    };
+    /**
+     * Enables the WebMCP domain, allowing events to be sent. Enabling the domain will trigger a toolsAdded event for
+     * all currently registered tools.
+     */
+    'WebMCP.enable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Disables the WebMCP domain.
+     */
+    'WebMCP.disable': {
+      paramsType: [];
       returnType: void;
     };
     /**

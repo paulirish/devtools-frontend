@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as AiAssistance from '../../models/ai_assistance/ai_assistance.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Spinners from '../../ui/components/spinners/spinners.js';
+import {createIcon} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Snippets from '../snippets/snippets.js';
@@ -179,7 +179,8 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   private authoredNode?: NavigatorGroupTreeNode;
   private deployedNode?: NavigatorGroupTreeNode;
   private navigatorGroupByFolderSetting: Common.Settings.Setting<boolean>;
-  private navigatorGroupByAuthoredExperiment?: string;
+  private navigatorJustMyCodeSetting: Common.Settings.Setting<boolean>;
+  private navigatorGroupByAuthoredSetting?: Common.Settings.Setting<boolean>;
   #workspace!: Workspace.Workspace.WorkspaceImpl;
   private groupByFrame?: boolean;
   private groupByAuthored?: boolean;
@@ -216,8 +217,12 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
 
     this.navigatorGroupByFolderSetting = Common.Settings.Settings.instance().moduleSetting('navigator-group-by-folder');
     this.navigatorGroupByFolderSetting.addChangeListener(this.groupingChanged.bind(this));
+    this.navigatorJustMyCodeSetting = Common.Settings.Settings.instance().moduleSetting('navigator-just-my-code');
+    this.navigatorJustMyCodeSetting.addChangeListener(this.groupingChanged.bind(this));
     if (enableAuthoredGrouping) {
-      this.navigatorGroupByAuthoredExperiment = Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING;
+      this.navigatorGroupByAuthoredSetting =
+          Common.Settings.Settings.instance().moduleSetting('navigator-group-by-authored');
+      this.navigatorGroupByAuthoredSetting.addChangeListener(this.groupingChanged.bind(this));
     }
 
     Workspace.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.ignoreListChanged.bind(this));
@@ -457,7 +462,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   }
 
   private addUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.JUST_MY_CODE) &&
+    if (this.navigatorJustMyCodeSetting.get() &&
         Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
             uiSourceCode)) {
       return;
@@ -819,9 +824,9 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     }
     if (this.scriptsTree.selectedTreeElement) {
       // If the tree outline is being marked as "being edited" (i.e. we're renaming a file
-      // or chosing the name for a new snippet), we shall not proceed with revealing here,
+      // or choosing the name for a new snippet), we shall not proceed with revealing here,
       // as that will steal focus from the input widget and thus cancel editing. The
-      // test/e2e/snippets/breakpoint_test.ts exercises this.
+      // test/e2e/snippets/breakpoint.test.ts exercises this.
       if (UI.UIUtils.isBeingEdited(this.scriptsTree.selectedTreeElement.treeOutline?.element)) {
         return null;
       }
@@ -1188,7 +1193,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   }
 
   private ignoreListChanged(): void {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.JUST_MY_CODE)) {
+    if (this.navigatorJustMyCodeSetting.get()) {
       this.groupingChanged();
     } else {
       this.rootNode.updateTitleRecursive();
@@ -1199,8 +1204,8 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     this.groupByFrame = true;
     this.groupByDomain = this.navigatorGroupByFolderSetting.get();
     this.groupByFolder = this.groupByDomain;
-    if (this.navigatorGroupByAuthoredExperiment) {
-      this.groupByAuthored = Root.Runtime.experiments.isEnabled(this.navigatorGroupByAuthoredExperiment);
+    if (this.navigatorGroupByAuthoredSetting) {
+      this.groupByAuthored = this.navigatorGroupByAuthoredSetting.get();
     } else {
       this.groupByAuthored = false;
     }
@@ -1287,7 +1292,7 @@ export class NavigatorFolderTreeElement extends UI.TreeOutline.TreeElement {
       iconType = 'folder-asterisk';
     }
 
-    const icon = IconButton.Icon.create(iconType);
+    const icon = createIcon(iconType);
     this.setLeadingIcons([icon]);
   }
 
@@ -1426,7 +1431,8 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
     const action = UI.ActionRegistry.ActionRegistry.instance().getAction('drjones.sources-floating-button');
     if (!this.aiButtonContainer) {
       this.aiButtonContainer = this.listItemElement.createChild('span', 'ai-button-container');
-      const floatingButton = Buttons.FloatingButton.create('smart-assistant', action.title(), 'ask-ai');
+      const icon = AiAssistance.AiUtils.getIconName();
+      const floatingButton = Buttons.FloatingButton.create(icon, action.title(), 'ask-ai');
       floatingButton.addEventListener('click', ev => {
         ev.stopPropagation();
         this.navigatorView.sourceSelected(this.uiSourceCode, false);
@@ -1912,7 +1918,7 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
   }
 
   override wasPopulated(): void {
-    if (!this.treeElement || this.treeElement.node !== this) {
+    if (this.treeElement?.node !== this) {
       return;
     }
     this.addChildrenRecursive();

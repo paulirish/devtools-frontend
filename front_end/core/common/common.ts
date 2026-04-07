@@ -15,13 +15,11 @@ import * as EventTarget from './EventTarget.js';
 import * as Gzip from './Gzip.js';
 import * as JavaScriptMetaData from './JavaScriptMetaData.js';
 import * as Lazy from './Lazy.js';
-import * as Linkifier from './Linkifier.js';
 import * as MapWithDefault from './MapWithDefault.js';
 import * as Mutex from './Mutex.js';
 import * as ObjectWrapper from './Object.js';
 import * as ParsedURL from './ParsedURL.js';
 import * as Progress from './Progress.js';
-import * as QueryParamHandler from './QueryParamHandler.js';
 import * as ResolverBase from './ResolverBase.js';
 import * as ResourceType from './ResourceType.js';
 import * as ReturnToPanel from './ReturnToPanel.js';
@@ -31,11 +29,12 @@ import * as SegmentedRange from './SegmentedRange.js';
 import * as SettingRegistration from './SettingRegistration.js';
 import * as Settings from './Settings.js';
 import * as SimpleHistoryManager from './SimpleHistoryManager.js';
+import * as Srcset from './Srcset.js';
 import * as StringOutputStream from './StringOutputStream.js';
 import * as TextDictionary from './TextDictionary.js';
 import * as Throttler from './Throttler.js';
 import * as Trie from './Trie.js';
-import * as Worker from './Worker.js';
+import * as VersionController from './VersionController.js';
 
 /*
  * This is re-exported here because we moved UIString into platform from
@@ -57,13 +56,11 @@ export {
   Gzip,
   JavaScriptMetaData,
   Lazy,
-  Linkifier,
   MapWithDefault,
   Mutex,
   ObjectWrapper,
   ParsedURL,
   Progress,
-  QueryParamHandler,
   ResolverBase,
   ResourceType,
   ReturnToPanel,
@@ -73,9 +70,10 @@ export {
   SettingRegistration,
   Settings,
   SimpleHistoryManager,
+  Srcset,
   StringOutputStream,
   TextDictionary,
   Throttler,
   Trie,
-  Worker,
+  VersionController,
 };

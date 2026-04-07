@@ -1,15 +1,15 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
+import '../../../ui/kit/kit.js';
 import '../../../ui/components/tooltips/tooltips.js';
 import '../../../ui/components/buttons/buttons.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as Root from '../../../core/root/root.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
@@ -32,7 +32,7 @@ const UIStrings = {
   /**
    * @description Text for the include script content option.
    */
-  includeScriptContent: 'Include script content',
+  includeResourceContent: 'Include resource content',
   /**
    * @description Text for the include script source maps option.
    */
@@ -46,13 +46,17 @@ const UIStrings = {
    */
   shouldCompress: 'Compress with gzip',
   /**
+   * @description Text for the explanation link
+   */
+  explanation: 'Explanation',
+  /**
    * @description Text for the save trace button
    */
   saveButtonTitle: 'Save',
   /**
-   * @description Text shown in the information pop-up next to the "Include script content" option.
+   * @description Text shown in the information pop-up next to the "Include resource content" option.
    */
-  scriptContentPrivacyInfo: 'Includes the full content of all loaded scripts (except extensions).',
+  resourceContentPrivacyInfo: 'Includes the full content of all loaded HTML, CSS, and scripts (except extensions).',
   /**
    * @description Text shown in the information pop-up next to the "Include script sourcemaps" option.
    */
@@ -68,7 +72,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface ExportTraceOptionsData {
   onExport: (config: {
-    includeScriptContent: boolean,
+    includeResourceContent: boolean,
     includeSourceMaps: boolean,
     addModifications: boolean,
     shouldCompress: boolean,
@@ -81,30 +85,30 @@ export type ExportTraceDialogState = Dialogs.Dialog.DialogState;
 export interface ExportTraceOptionsState {
   dialogState: ExportTraceDialogState;
   includeAnnotations: boolean;
-  includeScriptContent: boolean;
+  includeResourceContent: boolean;
   includeSourceMaps: boolean;
   shouldCompress: boolean;
   displayAnnotationsCheckbox?: boolean;
-  displayScriptContentCheckbox?: boolean;
+  displayResourceContentCheckbox?: boolean;
   displaySourceMapsCheckbox?: boolean;
 }
 
-type CheckboxId = 'annotations'|'script-content'|'script-source-maps'|'compress-with-gzip';
-const checkboxesWithInfoDialog = new Set<CheckboxId>(['script-content', 'script-source-maps']);
+type CheckboxId = 'annotations'|'resource-content'|'script-source-maps'|'compress-with-gzip';
+const checkboxesWithInfoDialog = new Set<CheckboxId>(['resource-content', 'script-source-maps']);
 
 export class ExportTraceOptions extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: ExportTraceOptionsData|null = null;
 
   static readonly #includeAnnotationsSettingString: string = 'export-performance-trace-include-annotations';
-  static readonly #includeScriptContentSettingString: string = 'export-performance-trace-include-scripts';
+  static readonly #includeResourceContentSettingString: string = 'export-performance-trace-include-resources';
   static readonly #includeSourceMapsSettingString: string = 'export-performance-trace-include-sourcemaps';
   static readonly #shouldCompressSettingString: string = 'export-performance-trace-should-compress';
 
   #includeAnnotationsSetting: Common.Settings.Setting<boolean> = Common.Settings.Settings.instance().createSetting(
       ExportTraceOptions.#includeAnnotationsSettingString, true, Common.Settings.SettingStorageType.SESSION);
-  #includeScriptContentSetting: Common.Settings.Setting<boolean> = Common.Settings.Settings.instance().createSetting(
-      ExportTraceOptions.#includeScriptContentSettingString, false, Common.Settings.SettingStorageType.SESSION);
+  #includeResourceContentSetting: Common.Settings.Setting<boolean> = Common.Settings.Settings.instance().createSetting(
+      ExportTraceOptions.#includeResourceContentSettingString, false, Common.Settings.SettingStorageType.SESSION);
   #includeSourceMapsSetting: Common.Settings.Setting<boolean> = Common.Settings.Settings.instance().createSetting(
       ExportTraceOptions.#includeSourceMapsSettingString, false, Common.Settings.SettingStorageType.SESSION);
   #shouldCompressSetting: Common.Settings.Setting<boolean> = Common.Settings.Settings.instance().createSetting(
@@ -113,7 +117,7 @@ export class ExportTraceOptions extends HTMLElement {
   #state: ExportTraceOptionsState = {
     dialogState: Dialogs.Dialog.DialogState.COLLAPSED,
     includeAnnotations: this.#includeAnnotationsSetting.get(),
-    includeScriptContent: this.#includeScriptContentSetting.get(),
+    includeResourceContent: this.#includeResourceContentSetting.get(),
     includeSourceMaps: this.#includeSourceMapsSetting.get(),
     shouldCompress: this.#shouldCompressSetting.get(),
   };
@@ -122,10 +126,10 @@ export class ExportTraceOptions extends HTMLElement {
       /* title*/ i18nString(UIStrings.includeAnnotations), /* checked*/ this.#state.includeAnnotations,
       /* subtitle*/ undefined,
       /* jslogContext*/ 'timeline.export-trace-options.annotations-checkbox');
-  #includeScriptContentCheckbox = UI.UIUtils.CheckboxLabel.create(
-      /* title*/ i18nString(UIStrings.includeScriptContent), /* checked*/ this.#state.includeScriptContent,
+  #includeResourceContentCheckbox = UI.UIUtils.CheckboxLabel.create(
+      /* title*/ i18nString(UIStrings.includeResourceContent), /* checked*/ this.#state.includeResourceContent,
       /* subtitle*/ undefined,
-      /* jslogContext*/ 'timeline.export-trace-options.script-content-checkbox');
+      /* jslogContext*/ 'timeline.export-trace-options.resource-content-checkbox');
   #includeSourceMapsCheckbox = UI.UIUtils.CheckboxLabel.create(
       /* title*/ i18nString(UIStrings.includeSourcemap), /* checked*/ this.#state.includeSourceMaps,
       /* subtitle*/ undefined,
@@ -143,7 +147,7 @@ export class ExportTraceOptions extends HTMLElement {
   set state(state: ExportTraceOptionsState) {
     this.#state = state;
     this.#includeAnnotationsSetting.set(state.includeAnnotations);
-    this.#includeScriptContentSetting.set(state.includeScriptContent);
+    this.#includeResourceContentSetting.set(state.includeResourceContent);
     this.#includeSourceMapsSetting.set(state.includeSourceMaps);
     this.#shouldCompressSetting.set(state.shouldCompress);
 
@@ -155,18 +159,12 @@ export class ExportTraceOptions extends HTMLElement {
   }
 
   updateContentVisibility(options: {annotationsExist: boolean}): void {
-    const showIncludeScriptContentCheckbox =
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES);
-    const showIncludeSourceMapCheckbox =
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_COMPILED_SOURCES);
-
-    const newState = Object.assign({}, this.#state, {
+    this.state = {
+      ...this.#state,
       displayAnnotationsCheckbox: options.annotationsExist,
-      displayScriptContentCheckbox: showIncludeScriptContentCheckbox,
-      displaySourceMapsCheckbox: showIncludeSourceMapCheckbox
-    });
-
-    this.state = newState;
+      displayResourceContentCheckbox: true,
+      displaySourceMapsCheckbox: true
+    };
   }
 
   #scheduleRender(): void {
@@ -181,11 +179,11 @@ export class ExportTraceOptions extends HTMLElement {
         newState.includeAnnotations = checked;
         break;
       }
-      case this.#includeScriptContentCheckbox: {
-        newState.includeScriptContent = checked;
+      case this.#includeResourceContentCheckbox: {
+        newState.includeResourceContent = checked;
 
         // if the `Include Script` is checked off, cascade the change to `Include Script Source`
-        if (!newState.includeScriptContent) {
+        if (!newState.includeResourceContent) {
           newState.includeSourceMaps = false;
         }
 
@@ -209,8 +207,8 @@ export class ExportTraceOptions extends HTMLElement {
       return i18nString(UIStrings.moreInfoLabel) + ' ' + i18nString(UIStrings.sourceMapsContentPrivacyInfo);
     }
 
-    if (checkboxId === 'script-content') {
-      return i18nString(UIStrings.moreInfoLabel) + ' ' + i18nString(UIStrings.scriptContentPrivacyInfo);
+    if (checkboxId === 'resource-content') {
+      return i18nString(UIStrings.moreInfoLabel) + ' ' + i18nString(UIStrings.resourceContentPrivacyInfo);
     }
 
     return '';
@@ -225,7 +223,7 @@ export class ExportTraceOptions extends HTMLElement {
         'change', this.#checkboxOptionChanged.bind(this, checkboxWithLabel, !checked), false);
 
     // Disable the includeSourceMapsSetting when the includeScriptContentSetting is also disabled.
-    this.#includeSourceMapsCheckbox.disabled = !this.#state.includeScriptContent;
+    this.#includeSourceMapsCheckbox.disabled = !this.#state.includeResourceContent;
 
     // clang-format off
       return html`
@@ -258,7 +256,7 @@ export class ExportTraceOptions extends HTMLElement {
     >
       <div class="info-tooltip-container">
       <p>
-        ${checkboxId === 'script-content' ? i18nString(UIStrings.scriptContentPrivacyInfo) : Lit.nothing}
+        ${checkboxId === 'resource-content' ? i18nString(UIStrings.resourceContentPrivacyInfo) : Lit.nothing}
         ${checkboxId === 'script-source-maps' ? i18nString(UIStrings.sourceMapsContentPrivacyInfo) : Lit.nothing}
       </p>
       </div>
@@ -293,13 +291,22 @@ export class ExportTraceOptions extends HTMLElement {
           ${this.#state.displayAnnotationsCheckbox ? this.#renderCheckbox('annotations', this.#includeAnnotationsCheckbox,
             i18nString(UIStrings.includeAnnotations),
             this.#state.includeAnnotations): ''}
-          ${this.#state.displayScriptContentCheckbox ? this.#renderCheckbox('script-content', this.#includeScriptContentCheckbox,
-            i18nString(UIStrings.includeScriptContent), this.#state.includeScriptContent): ''}
-          ${this.#state.displayScriptContentCheckbox && this.#state.displaySourceMapsCheckbox ? this.#renderCheckbox(
+          ${this.#state.displayResourceContentCheckbox ? this.#renderCheckbox('resource-content', this.#includeResourceContentCheckbox,
+            i18nString(UIStrings.includeResourceContent), this.#state.includeResourceContent): ''}
+          ${this.#state.displayResourceContentCheckbox && this.#state.displaySourceMapsCheckbox ? this.#renderCheckbox(
             'script-source-maps',
             this.#includeSourceMapsCheckbox, i18nString(UIStrings.includeSourcemap), this.#state.includeSourceMaps): ''}
           ${this.#renderCheckbox('compress-with-gzip', this.#shouldCompressCheckbox, i18nString(UIStrings.shouldCompress), this.#state.shouldCompress)}
-          <div class='export-trace-options-row'><div class='export-trace-blank'></div><devtools-button
+          <div class='export-trace-options-row export-trace-options-row-last'>
+            <div class="export-trace-explanation">
+              <devtools-link
+                href="https://developer.chrome.com/docs/devtools/performance/save-trace"
+                class=devtools-link
+                .jslogContext=${'save-trace-explanation'}>
+                  ${i18nString(UIStrings.explanation)}
+              </devtools-link>
+            </div>
+            <devtools-button
                   class="setup-button"
                   data-export-button
                   @click=${this.#onExportClick.bind(this)}
@@ -309,8 +316,8 @@ export class ExportTraceOptions extends HTMLElement {
                   } as Buttons.Button.ButtonData}
                 >${i18nString(UIStrings.saveButtonTitle)}</devtools-button>
                 </div>
-          ${this.#state.displayScriptContentCheckbox ? this.#renderInfoTooltip('script-content') : Lit.nothing}
-          ${this.#state.displayScriptContentCheckbox && this.#state.displaySourceMapsCheckbox ? this.#renderInfoTooltip('script-source-maps') : Lit.nothing}
+          ${this.#state.displayResourceContentCheckbox ? this.#renderInfoTooltip('resource-content') : Lit.nothing}
+          ${this.#state.displayResourceContentCheckbox && this.#state.displaySourceMapsCheckbox ? this.#renderInfoTooltip('script-source-maps') : Lit.nothing}
         </div>
       </devtools-button-dialog>
     `;
@@ -325,7 +332,7 @@ export class ExportTraceOptions extends HTMLElement {
   async #onExportCallback(): Promise<void> {
     // Calls passed onExport function with current settings.
     await this.#data?.onExport({
-      includeScriptContent: this.#state.includeScriptContent,
+      includeResourceContent: this.#state.includeResourceContent,
       includeSourceMaps: this.#state.includeSourceMaps,
       // Note: this also includes track configuration ...
       addModifications: this.#state.includeAnnotations,

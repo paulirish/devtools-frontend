@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../../ui/components/icon_button/icon_button.js';
+import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
@@ -140,7 +140,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: ViewOutput, target: HTML
                   @keydown=${(event: Event) => onKeyDown(recording.storageName, event)}
                   @click=${(event: Event) => onOpenClick(recording.storageName, event)}
                   jslog=${VisualLogging.item()
-                    .track({ click: true })
+                    .track({ click: true, resize: true })
                     .context('recording')}>
                   <div class="icon">
                     <devtools-icon name="flow">

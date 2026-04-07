@@ -24,7 +24,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
@@ -68,15 +68,15 @@ const UIStrings = {
   /**
    * @description A context menu item in the Data Grid of a data grid
    */
-  sortByString: 'Sort By',
+  sortByString: 'Sort by',
   /**
    * @description A context menu item in data grids to reset the columns to their default weight
    */
-  resetColumns: 'Reset Columns',
+  resetColumns: 'Reset columns',
   /**
    * @description A context menu item in data grids to list header options.
    */
-  headerOptions: 'Header Options',
+  headerOptions: 'Header options',
   /**
    * @description Text to refresh the page
    */
@@ -368,7 +368,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
   announceSelectedGridNode(): void {
     // Only alert if the datagrid has focus
-    if (this.element === Platform.DOMUtilities.deepActiveElement(this.element.ownerDocument) &&
+    if (this.element === UI.DOMUtilities.deepActiveElement(this.element.ownerDocument) &&
         this.selectedNode?.existingElement()) {
       // Update the expand/collapse state for the current selected node
       let expandText;
@@ -466,7 +466,8 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       cell.createChild('div', 'sort-order-icon-container').appendChild(icon);
 
       if (column.title) {
-        UI.ARIAUtils.setLabel(cell, i18nString(UIStrings.sortableColumn));
+        const columnLabel = `${column.title} - ${i18nString(UIStrings.sortableColumn)}`;
+        UI.ARIAUtils.setLabel(cell, columnLabel);
       }
     }
   }
@@ -1237,7 +1238,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       nextSelectedNode.select();
     }
 
-    const activeElement = (Platform.DOMUtilities.deepActiveElement(this.element.ownerDocument) as HTMLElement | null);
+    const activeElement = (UI.DOMUtilities.deepActiveElement(this.element.ownerDocument) as HTMLElement | null);
     if (handled && this.element !== activeElement && !this.element.contains(activeElement)) {
       // crbug.com/1005449, crbug.com/1329956
       // navigational or delete keys pressed but current DataGrid panel has lost focus;
@@ -1678,6 +1679,8 @@ export const enum Events {
   OPENED_NODE = 'OpenedNode',
   SORTING_CHANGED = 'SortingChanged',
   PADDING_CHANGED = 'PaddingChanged',
+  EXPANDED_NODE = 'ExpandedNode',
+  COLLAPSED_NODE = 'CollapsedNode',
 }
 
 export interface EventTypes<T> {
@@ -1686,6 +1689,8 @@ export interface EventTypes<T> {
   [Events.OPENED_NODE]: DataGridNode<T>;
   [Events.SORTING_CHANGED]: void;
   [Events.PADDING_CHANGED]: void;
+  [Events.EXPANDED_NODE]: DataGridNode<T>;
+  [Events.COLLAPSED_NODE]: DataGridNode<T>;
 }
 
 export enum Order {
@@ -1761,8 +1766,10 @@ export class DataGridNode<T> {
 
   protected createElement(): HTMLElement {
     this.elementInternal = document.createElement('tr');
-    this.elementInternal.setAttribute(
-        'jslog', `${VisualLogging.tableRow().track({keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space'})}`);
+    this.elementInternal.setAttribute('jslog', `${VisualLogging.tableRow().track({
+                                        resize: true,
+                                        keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space'
+                                      })}`);
     this.elementInternal.classList.add('data-grid-data-grid-node');
     if (this.dataGrid) {
       this.dataGrid.elementToDataGridNode.set(this.elementInternal, this);
@@ -2226,6 +2233,7 @@ export class DataGridNode<T> {
     for (let i = 0; i < this.children.length; ++i) {
       this.children[i].revealed = false;
     }
+    this.dataGrid?.dispatchEventToListeners(Events.COLLAPSED_NODE, this);
   }
 
   collapseRecursively(): void {
@@ -2283,6 +2291,7 @@ export class DataGridNode<T> {
     }
 
     this.expandedInternal = true;
+    this.dataGrid?.dispatchEventToListeners(Events.EXPANDED_NODE, this);
   }
 
   expandRecursively(): void {
@@ -2341,7 +2350,7 @@ export class DataGridNode<T> {
   }
 
   deselect(supressDeselectedEvent?: boolean): void {
-    if (!this.dataGrid || this.dataGrid.selectedNode !== this || !this.selected) {
+    if (this.dataGrid?.selectedNode !== this || !this.selected) {
       return;
     }
 
@@ -2543,7 +2552,7 @@ export interface Parameters {
   refreshCallback?: (() => void);
 }
 export interface ColumnDescriptor {
-  id: Lowercase<string>;
+  id: string;
   title?: Common.UIString.LocalizedString;
   titleDOMFragment?: DocumentFragment|null;
   sortable: boolean;

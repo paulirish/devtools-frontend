@@ -5,12 +5,17 @@
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 
-devtools_module("stack_trace") {
-  sources = [ "StackTrace.ts" ]
+devtools_foundation_module("stack_trace") {
+  sources = [
+    "ErrorStackParser.ts",
+    "StackTrace.ts",
+  ]
 
   deps = [
     "../../core/common:bundle",
+    "../../core/platform:bundle",
     "../../core/sdk:bundle",
+    "../../generated:protocol",
     "../workspace:bundle",
   ]
 }
@@ -23,7 +28,7 @@ devtools_entrypoint("bundle") {
   visibility = [ "*" ]
 }
 
-devtools_module("stack_trace_impl") {
+devtools_foundation_module("stack_trace_impl") {
   sources = [
     "StackTraceImpl.ts",
     "StackTraceModel.ts",
@@ -32,6 +37,7 @@ devtools_module("stack_trace_impl") {
 
   deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/sdk:bundle",
     "../../generated",
   ]
@@ -46,16 +52,18 @@ devtools_entrypoint("impl") {
   #            If you have a use-case where you need access to stack trace internals,
   #            consult one of the OWNERS before drilling holes.
   visibility = [
-    ":unittests",
+    ":*",
     "../bindings",
     "../bindings:unittests",
   ]
 }
 
-ts_library("unittests") {
+devtools_foundation_module("unittests") {
   testonly = true
 
   sources = [
+    "ErrorStackParser.test.ts",
+    "StackTrace.test.ts",
     "StackTraceImpl.test.ts",
     "StackTraceModel.test.ts",
     "Trie.test.ts",
@@ -64,6 +72,7 @@ ts_library("unittests") {
   deps = [
     ":bundle",
     ":impl",
+    "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
     "../../testing",

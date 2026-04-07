@@ -1,7 +1,7 @@
 // Copyright 2015 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -10,6 +10,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import {Link} from '../../ui/kit/kit.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -227,17 +228,8 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
     othersView.show(othersDiv);
     const othersSection = othersView.appendSection(i18nString(UIStrings.serviceWorkersFromOtherOrigins));
     const othersSectionRow = othersSection.appendRow();
-    const seeOthers =
-        UI.Fragment
-            .html`<a class="devtools-link" role="link" tabindex="0" href="chrome://serviceworker-internals" target="_blank" style="display: inline; cursor: pointer;">${
-                i18nString(UIStrings.seeAllRegistrations)}</a>`;
-    seeOthers.setAttribute('jslog', `${VisualLogging.link('view-all').track({click: true})}`);
-    self.onInvokeElement(seeOthers, event => {
-      const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
-      rootTarget &&
-          void rootTarget.targetAgent().invoke_createTarget({url: 'chrome://serviceworker-internals?devtools'});
-      event.consume(true);
-    });
+    const seeOthers = Link.create(
+        'chrome://serviceworker-internals', i18nString(UIStrings.seeAllRegistrations), undefined, 'view-all');
     othersSectionRow.appendChild(seeOthers);
 
     this.toolbar.appendToolbarItem(
@@ -708,9 +700,9 @@ export class Section {
         this.routerField = this.wrapWidget(this.section.appendField(title));
       }
       if (!this.routerField.lastElementChild) {
-        this.routerField.appendChild(this.routerView);
+        this.routerView.show(this.routerField);
       }
-      this.routerView.update(active.routerRules);
+      this.routerView.rules = active.routerRules;
     } else {
       // If no active worker or no registered rules, remove the field.
       this.section.removeField(title);

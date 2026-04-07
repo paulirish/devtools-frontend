@@ -10,18 +10,19 @@ import * as ContextFlavorListener from './ContextFlavorListener.js';
 import * as ContextMenu from './ContextMenu.js';
 import * as Dialog from './Dialog.js';
 import * as DockController from './DockController.js';
+import * as DOMUtilities from './DOMUtilities.js';
 import * as DropTarget from './DropTarget.js';
 import * as EmptyWidget from './EmptyWidget.js';
 import * as FilterBar from './FilterBar.js';
 import * as FilterSuggestionBuilder from './FilterSuggestionBuilder.js';
 import * as ForwardedInputEventHandler from './ForwardedInputEventHandler.js';
-import * as Fragment from './Fragment.js';
 import * as GlassPane from './GlassPane.js';
 import * as Infobar from './Infobar.js';
 import * as InplaceEditor from './InplaceEditor.js';
 import inspectorCommonStyles from './inspectorCommon.css.js';
 import * as InspectorView from './InspectorView.js';
 import * as KeyboardShortcut from './KeyboardShortcut.js';
+import * as LinkContextMenuProvider from './LinkContextMenuProvider.js';
 import * as ListControl from './ListControl.js';
 import * as ListModel from './ListModel.js';
 import * as ListWidget from './ListWidget.js';
@@ -33,7 +34,6 @@ import * as ReportView from './ReportView.js';
 import * as ResizerWidget from './ResizerWidget.js';
 import * as RootView from './RootView.js';
 import * as SearchableView from './SearchableView.js';
-import * as SettingsUI from './SettingsUI.js';
 import * as ShortcutRegistry from './ShortcutRegistry.js';
 import * as SoftContextMenu from './SoftContextMenu.js';
 import * as SoftDropDown from './SoftDropDown.js';
@@ -42,7 +42,6 @@ import * as SuggestBox from './SuggestBox.js';
 import * as TabbedPane from './TabbedPane.js';
 import * as TargetCrashedScreen from './TargetCrashedScreen.js';
 import * as TextPrompt from './TextPrompt.js';
-import * as ThrottledWidget from './ThrottledWidget.js';
 import * as Toolbar from './Toolbar.js';
 import * as Tooltip from './Tooltip.js';
 import * as TreeOutline from './Treeoutline.js';
@@ -50,8 +49,6 @@ import * as UIUtils from './UIUtils.js';
 import * as View from './View.js';
 import * as ViewManager from './ViewManager.js';
 import * as Widget from './Widget.js';
-import * as XElement from './XElement.js';
-import * as XLink from './XLink.js';
 import * as ZoomManager from './ZoomManager.js';
 
 export {
@@ -63,18 +60,19 @@ export {
   ContextMenu,
   Dialog,
   DockController,
+  DOMUtilities,
   DropTarget,
   EmptyWidget,
   FilterBar,
   FilterSuggestionBuilder,
   ForwardedInputEventHandler,
-  Fragment,
   GlassPane,
   Infobar,
   InplaceEditor,
   inspectorCommonStyles,
   InspectorView,
   KeyboardShortcut,
+  LinkContextMenuProvider,
   ListControl,
   ListModel,
   ListWidget,
@@ -86,7 +84,6 @@ export {
   ResizerWidget,
   RootView,
   SearchableView,
-  SettingsUI,
   ShortcutRegistry,
   SoftContextMenu,
   SoftDropDown,
@@ -95,7 +92,6 @@ export {
   TabbedPane,
   TargetCrashedScreen,
   TextPrompt,
-  ThrottledWidget,
   Toolbar,
   Tooltip,
   TreeOutline,
@@ -103,7 +99,5 @@ export {
   View,
   ViewManager,
   Widget,
-  XElement,
-  XLink,
-  ZoomManager,
+  ZoomManager
 };

@@ -42,6 +42,7 @@ export const SORT_ORDER_PAGE_LOAD_MARKERS: Readonly<Record<string, number>> = {
   [Trace.Types.Events.Name.MARK_FIRST_PAINT]: 2,
   [Trace.Types.Events.Name.MARK_DOM_CONTENT]: 3,
   [Trace.Types.Events.Name.MARK_LCP_CANDIDATE]: 4,
+  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION]: 5,
 };
 
 export class TimingsTrackAppender implements TrackAppender {
@@ -80,17 +81,19 @@ export class TimingsTrackAppender implements TrackAppender {
         timeStamp =>
             !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInConsoleTimeStamp(timeStamp).devtoolsObj);
     const consoleTimings = this.#parsedTrace.data.UserTimings.consoleTimings;
-    if (extensionMarkersAreEmpty && performanceMarks.length === 0 && performanceMeasures.length === 0 &&
-        timestampEvents.length === 0 && consoleTimings.length === 0) {
+
+    // The order below is deliberate. Visually its easier to process marks when they decorate the bottom of their associated measure.
+    // Therefore, we want COMPLETE events (measures) to be before INSTANT events (marks), (when they share a timestamp).
+    const allTimings = [...performanceMeasures, ...consoleTimings, ...timestampEvents, ...performanceMarks].sort(
+        (a, b) => a.ts - b.ts);
+
+    if (extensionMarkersAreEmpty && allTimings.length === 0) {
       return trackStartLevel;
     }
-    // TODO(paulirish): these 5 sets of events should be merged and sorted by start time. This would allow for a denser packing.
+
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel = this.#appendExtensionsAtLevel(trackStartLevel);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMarks, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMeasures, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(timestampEvents, newLevel, this);
-    return this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    const newLevel = this.#appendExtensionsAtLevel(trackStartLevel);
+    return this.#compatibilityBuilder.appendEventsAtLevel(allTimings, newLevel, this);
   }
 
   /**
@@ -159,6 +162,7 @@ export class TimingsTrackAppender implements TrackAppender {
 
   /**
    * Gets the style for a page load marker event.
+   * TODO(paulirish): Unify with trace/Styles.ts markerDetailsForEvent. Currently only color is read, the rest is ignored.
    */
   markerStyleForPageLoadEvent(markerEvent: Trace.Types.Events.PageLoadEvent): TimelineMarkerStyle {
     const tallMarkerDashStyle = [6, 4];
@@ -180,7 +184,7 @@ export class TimingsTrackAppender implements TrackAppender {
       color = '#1A6937';
       title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP;
     }
-    if (Trace.Types.Events.isLargestContentfulPaintCandidate(markerEvent)) {
+    if (Trace.Types.Events.isAnyLargestContentfulPaintCandidate(markerEvent)) {
       color = '#1A3422';
       title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP;
     }
@@ -280,6 +284,7 @@ export class TimingsTrackAppender implements TrackAppender {
           event,
           this.#parsedTrace.data.Meta.traceBounds,
           this.#parsedTrace.data.Meta.navigationsByNavigationId,
+          this.#parsedTrace.data.Meta.softNavigationsById,
           this.#parsedTrace.data.Meta.navigationsByFrameId,
       );
       info.formattedTime = getDurationString(timeOfEvent);

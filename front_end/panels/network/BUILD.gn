@@ -11,7 +11,6 @@ import("../visibility.gni")
 generate_css("css_files") {
   sources = [
     "binaryResourceView.css",
-    "blockedURLsPane.css",
     "eventSourceMessagesView.css",
     "networkConfigView.css",
     "networkLogView.css",
@@ -19,7 +18,9 @@ generate_css("css_files") {
     "networkPanel.css",
     "networkTimingTable.css",
     "networkWaterfallColumn.css",
+    "requestConditionsDrawer.css",
     "requestCookiesView.css",
+    "requestDeviceBoundSessionsView.css",
     "requestHTMLView.css",
     "requestHeadersTree.css",
     "requestInitiatorView.css",
@@ -32,10 +33,9 @@ generate_css("css_files") {
   ]
 }
 
-devtools_module("network") {
+devtools_ui_module("network") {
   sources = [
     "BinaryResourceView.ts",
-    "BlockedURLsPane.ts",
     "EventSourceMessagesView.ts",
     "NetworkConfigView.ts",
     "NetworkDataGridNode.ts",
@@ -48,8 +48,11 @@ devtools_module("network") {
     "NetworkPanel.ts",
     "NetworkSearchScope.ts",
     "NetworkWaterfallColumn.ts",
+    "RequestConditionsDrawer.ts",
     "RequestCookiesView.ts",
+    "RequestDeviceBoundSessionsView.ts",
     "RequestHTMLView.ts",
+    "RequestHeadersView.ts",
     "RequestInitiatorView.ts",
     "RequestPayloadView.ts",
     "RequestPreviewView.ts",
@@ -58,6 +61,7 @@ devtools_module("network") {
     "ResourceChunkView.ts",
     "ResourceDirectSocketChunkView.ts",
     "ResourceWebSocketFrameView.ts",
+    "ShowMoreDetailsWidget.ts",
     "SignedExchangeInfoView.ts",
   ]
 
@@ -68,14 +72,19 @@ devtools_module("network") {
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../generated:protocol",
+    "../../models/annotations:bundle",
     "../../models/bindings:bundle",
     "../../models/har:bundle",
     "../../models/issues_manager:bundle",
     "../../models/logs:bundle",
     "../../models/network_time_calculator:bundle",
+    "../../models/persistence:bundle",
+    "../../models/stack_trace:bundle",
     "../../models/text_utils:bundle",
     "../../models/trace:bundle",
     "../../models/workspace:bundle",
+    "../../panels/common:bundle",
     "../../panels/elements:bundle",
     "../../panels/linear_memory_inspector:bundle",
     "../../panels/mobile_throttling:bundle",
@@ -84,18 +93,25 @@ devtools_module("network") {
     "../../panels/utils:bundle",
     "../../services/tracing:bundle",
     "../../third_party/chromium/client-variations:bundle",
+    "../../ui/components/adorners:bundle",
     "../../ui/components/buttons:bundle",
     "../../ui/components/expandable_list:bundle",
-    "../../ui/components/icon_button:bundle",
+    "../../ui/components/legacy_wrapper:bundle",
+    "../../ui/components/render_coordinator:bundle",
+    "../../ui/components/tooltips:bundle",
+    "../../ui/i18n:bundle",
+    "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/cookie_table:bundle",
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/perf_ui:bundle",
+    "../../ui/legacy/components/settings_ui:bundle",
     "../../ui/legacy/components/source_frame:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/legacy/theme_support:bundle",
     "../../ui/lit:bundle",
+    "../../ui/visual_logging:bundle",
     "../settings/emulation/components:bundle",
     "./components:bundle",
     "./forward:bundle",
@@ -132,6 +148,7 @@ devtools_entrypoint("meta") {
     "../../core/i18n:bundle",
     "../../core/sdk:bundle",
     "../../models/workspace:bundle",
+    "../../panels/common:bundle",
     "../../ui/legacy:bundle",
     "./forward:bundle",
   ]
@@ -142,11 +159,10 @@ devtools_entrypoint("meta") {
   ]
 }
 
-ts_library("unittests") {
+devtools_ui_module("unittests") {
   testonly = true
 
   sources = [
-    "BlockedURLsPane.test.ts",
     "NetworkConfigView.test.ts",
     "NetworkDataGridNode.test.ts",
     "NetworkItemView.test.ts",
@@ -154,13 +170,18 @@ ts_library("unittests") {
     "NetworkOverview.test.ts",
     "NetworkPanel.test.ts",
     "NetworkSearchScope.test.ts",
+    "RequestConditionsDrawer.test.ts",
     "RequestCookiesView.test.ts",
+    "RequestDeviceBoundSessionsView.test.ts",
     "RequestHTMLView.test.ts",
+    "RequestHeadersView.test.ts",
+    "RequestInitiatorView.test.ts",
     "RequestPayloadView.test.ts",
     "RequestPreviewView.test.ts",
     "RequestResponseView.test.ts",
     "RequestTimingView.test.ts",
     "ResourceDirectSocketChunkView.test.ts",
+    "ShowMoreDetailsWidget.test.ts",
   ]
 
   deps = [

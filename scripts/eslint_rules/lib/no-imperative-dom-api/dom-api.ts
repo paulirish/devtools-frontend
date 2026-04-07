@@ -68,12 +68,12 @@ export const domApi: RuleCreator = {
         if (isIdentifier(property, 'setAttribute')) {
           const attribute = firstArg;
           const value = secondArg;
-          if (attribute.type === 'Literal' && value && value.type !== 'SpreadElement' && attribute.value) {
+          if (attribute?.type === 'Literal' && value && value.type !== 'SpreadElement' && attribute.value) {
             domFragment.attributes.push({key: attribute.value.toString(), value});
             return true;
           }
         }
-        if (isIdentifier(property, 'appendChild')) {
+        if (isIdentifier(property, 'appendChild') && firstArg) {
           domFragment.appendChild(firstArg, sourceCode);
           return true;
         }
@@ -81,7 +81,7 @@ export const domApi: RuleCreator = {
           if (secondArg) {
             const index = domFragment.children.indexOf(DomFragment.getOrCreate(secondArg, sourceCode));
             domFragment.insertChildAt(secondArg, index, sourceCode);
-          } else {
+          } else if (firstArg) {
             domFragment.appendChild(firstArg, sourceCode);
           }
           return true;
@@ -130,12 +130,27 @@ export const domApi: RuleCreator = {
         if (isIdentifier(node.object, 'document') && isIdentifier(node.property, 'createElement') &&
             node.parent.type === 'CallExpression' && node.parent.callee === node) {
           const domFragment = DomFragment.getOrCreate(node.parent, sourceCode);
-          if (node.parent.arguments.length >= 1 && node.parent.arguments[0].type === 'Literal') {
-            domFragment.tagName = String(node.parent.arguments[0].value);
+          if (node.parent.arguments.length >= 1) {
+            if (node.parent.arguments[0].type === 'Literal') {
+              domFragment.tagName = String(node.parent.arguments[0].value);
+            } else {
+              const varName = sourceCode.getText(node.parent.arguments[0]);
+              domFragment.tagName = '${' + varName + '}';
+            }
+          }
+        } else if (
+            isIdentifier(node.object, 'document') && isIdentifier(node.property, 'createTextNode') &&
+            node.parent.type === 'CallExpression' && node.parent.callee === node) {
+          const domFragment = DomFragment.getOrCreate(node.parent, sourceCode);
+          if (node.parent.arguments.length >= 1) {
+            if (node.parent.arguments[0].type === 'Literal') {
+              domFragment.expression = '`' + String(node.parent.arguments[0].value) + '`';
+            } else {
+              domFragment.expression = '`${' + sourceCode.getText(node.parent.arguments[0]) + '}`';
+            }
           }
         }
       },
-
     };
   }
 };

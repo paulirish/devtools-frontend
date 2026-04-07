@@ -1,17 +1,19 @@
 // Copyright 2018 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Geometry from '../../models/geometry/geometry.js';
-import type * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 
-import {RuntimeSettings} from './LighthouseController.js';
+import {getRuntimeSettings} from './LighthouseController.js';
 import lighthouseDialogStyles from './lighthouseDialog.css.js';
 import type {LighthousePanel} from './LighthousePanel.js';
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -31,6 +33,15 @@ const UIStrings = {
    * @description Status text in Lighthouse splash screen while an audit is being performed
    */
   auditingYourWebPage: 'Auditing your web page',
+  /**
+   * @description Status text in Lighthouse splash screen while an AI assistant is performing an audit
+   * @example {github.com} PH1
+   */
+  aiAuditingS: 'AI assistance is auditing {PH1}',
+  /**
+   * @description Status text in Lighthouse splash screen while an AI assistant is performing an audit
+   */
+  aiAuditingYourWebPage: 'AI assistance is auditing your web page',
   /**
    * @description Status text in Lighthouse splash screen while an audit is being performed, and cancellation to take effect
    */
@@ -151,26 +162,110 @@ const str_ = i18n.i18n.registerUIStrings('panels/lighthouse/LighthouseStatusView
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
+export interface ViewInput {
+  statusHeader: string;
+  statusText: string;
+  progressBarClass: string;
+  progressBarValue: number;
+  progressBarTotal: number;
+  cancelButtonVisible: boolean;
+  onCancel: () => void;
+  bugReport?: {
+    error: Error,
+    auditURL: string,
+    knownBugPattern?: boolean,
+  };
+}
+
+export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElement|DocumentFragment): void => {
+  const {
+    statusHeader,
+    statusText,
+    progressBarClass,
+    progressBarValue,
+    progressBarTotal,
+    cancelButtonVisible,
+    onCancel,
+    bugReport,
+  } = input;
+
+  const renderBugReportBody = (err: Error, auditURL: string): Lit.TemplateResult => {
+    const chromeVersion = navigator.userAgent.match(/Chrome\/(\S+)/) || ['', 'Unknown'];
+    // @ts-expect-error Lighthouse sets `friendlyMessage` on certain
+    // important errors such as PROTOCOL_TIMEOUT.
+    const errorMessage = err.friendlyMessage || err.message;
+    const issueBody = `
+${errorMessage}
+\`\`\`
+Channel: DevTools
+Initial URL: ${auditURL}
+Chrome Version: ${chromeVersion[1]}
+Stack Trace: ${err.stack}
+\`\`\`
+`;
+    return html`
+      <p>${i18nString(UIStrings.ifThisIssueIsReproduciblePlease)}</p>
+      <code class="monospace">${issueBody.trim()}</code>
+    `;
+  };
+
+  // clang-format off
+  Lit.render(html`
+    <div class="lighthouse-view vbox">
+      <span class="header">${statusHeader}</span>
+      <div class="lighthouse-status vbox">
+        <div class="lighthouse-progress-wrapper">
+          <div
+            class="lighthouse-progress-bar ${progressBarClass}"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax=${progressBarTotal}
+            aria-valuenow=${progressBarValue}
+            aria-valuetext=${statusText}
+          ></div>
+        </div>
+        <div class="lighthouse-status-text" role="status">
+          ${bugReport ? html`
+            <p>${i18nString(UIStrings.ahSorryWeRanIntoAnError)}</p>
+            ${bugReport.knownBugPattern ? html`
+              <p>${i18nString(UIStrings.tryToNavigateToTheUrlInAFresh)}</p>
+            ` : renderBugReportBody(bugReport.error, bugReport.auditURL)}
+          ` : statusText}
+        </div>
+      </div>
+      <div class="lighthouse-action-buttons">
+        <devtools-button
+          .variant=${Buttons.Button.Variant.TONAL}
+          .jslogContext=${'lighthouse.cancel'}
+          @click=${onCancel}
+          style=${Lit.Directives.styleMap({visibility: cancelButtonVisible ? 'visible' : 'hidden'})}
+        >${i18nString(UIStrings.cancel)}</devtools-button>
+      </div>
+    </div>
+  `, target);
+  // clang-format on
+};
+
 export class StatusView {
   private readonly panel: LighthousePanel;
-  private statusHeader: Element|null;
-  private progressBar: Element|null;
-  private statusText: Element|null;
-  private cancelButton: Buttons.Button.Button|null;
   private inspectedURL: string;
   private textChangedAt: number;
   private fastFactsQueued: Common.UIString.LocalizedString[];
   private currentPhase: StatusPhase|null;
   private scheduledFastFactTimeout: number|null;
-  private readonly dialog: UI.Dialog.Dialog;
+  private dialogRoot: ShadowRoot|null = null;
+  readonly dialog: UI.Dialog.Dialog;
+
+  private statusHeader: string;
+  private statusText: string;
+  private progressBarClass: string;
+  private progressBarValue: number;
+  private cancelButtonVisible: boolean;
+  private isAIControlled: boolean;
+  private bugReport: {error: Error, auditURL: string, knownBugPattern?: boolean}|null;
 
   constructor(panel: LighthousePanel) {
     this.panel = panel;
-
-    this.statusHeader = null;
-    this.progressBar = null;
-    this.statusText = null;
-    this.cancelButton = null;
 
     this.inspectedURL = '';
     this.textChangedAt = 0;
@@ -182,43 +277,37 @@ export class StatusView {
     this.dialog.setDimmed(true);
     this.dialog.setCloseOnEscape(false);
     this.dialog.setOutsideClickCallback(event => event.consume(true));
+
+    this.statusHeader = '';
+    this.statusText = '';
+    this.progressBarClass = '';
+    this.progressBarValue = 0;
+    this.cancelButtonVisible = true;
+    this.isAIControlled = false;
+    this.bugReport = null;
+
     this.render();
   }
 
   private render(): void {
-    const dialogRoot =
-        UI.UIUtils.createShadowRootWithCoreStyles(this.dialog.contentElement, {cssFile: lighthouseDialogStyles});
-    const lighthouseViewElement = dialogRoot.createChild('div', 'lighthouse-view vbox');
-
-    const cancelButton = UI.UIUtils.createTextButton(i18nString(UIStrings.cancel), this.cancel.bind(this), {
-      jslogContext: 'lighthouse.cancel',
-    });
-    const fragment = UI.Fragment.Fragment.build`
-  <span $="status-header" class="header">Auditing your web page…</span>
-  <div class="lighthouse-status vbox" $="status-view">
-  <div class="lighthouse-progress-wrapper" $="progress-wrapper">
-  <div class="lighthouse-progress-bar" $="progress-bar"></div>
-  </div>
-  <div class="lighthouse-status-text" $="status-text"></div>
-  </div>
-  <div class="lighthouse-action-buttons">
-  ${cancelButton}
-  </div>
-  `;
-
-    lighthouseViewElement.appendChild(fragment.element());
-
-    this.statusHeader = fragment.$('status-header');
-    this.progressBar = fragment.$('progress-bar');
-    this.statusText = fragment.$('status-text');
-    // Use StatusPhases array index as progress bar value
-    UI.ARIAUtils.markAsProgressBar(this.progressBar, 0, StatusPhases.length - 1);
-    this.cancelButton = cancelButton;
-    UI.ARIAUtils.markAsStatus(this.statusText);
-
-    this.dialog.setDefaultFocusedElement(cancelButton);
-    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_WIDTH_MAX_HEIGHT);
-    this.dialog.setMaxContentSize(new Geometry.Size(500, 400));
+    if (!this.dialogRoot) {
+      this.dialogRoot =
+          UI.UIUtils.createShadowRootWithCoreStyles(this.dialog.contentElement, {cssFile: lighthouseDialogStyles});
+      this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_WIDTH_MAX_HEIGHT);
+      this.dialog.setMaxContentSize(new Geometry.Size(500, 400));
+    }
+    DEFAULT_VIEW(
+        {
+          statusHeader: this.statusHeader,
+          statusText: this.statusText,
+          progressBarClass: this.progressBarClass,
+          progressBarValue: this.progressBarValue,
+          progressBarTotal: StatusPhases.length - 1,
+          cancelButtonVisible: this.cancelButtonVisible,
+          onCancel: this.cancel.bind(this),
+          bugReport: this.bugReport || undefined,
+        },
+        {}, this.dialogRoot);
   }
 
   private reset(): void {
@@ -229,24 +318,37 @@ export class StatusView {
     this.fastFactsQueued = FastFacts.map(lazyString => lazyString());
     this.currentPhase = null;
     this.scheduledFastFactTimeout = null;
+    this.bugReport = null;
+    this.statusText = '';
+    this.progressBarValue = 0;
+    this.cancelButtonVisible = true;
   }
 
   show(dialogRenderElement: Element): void {
     this.reset();
     this.updateStatus(i18nString(UIStrings.loading));
 
-    const parsedURL = Common.ParsedURL.ParsedURL.fromString(this.inspectedURL);
-    const pageHost = parsedURL?.host;
-    const statusHeader =
-        pageHost ? i18nString(UIStrings.auditingS, {PH1: pageHost}) : i18nString(UIStrings.auditingYourWebPage);
+    const statusHeader = this.getStatusHeader();
     this.renderStatusHeader(statusHeader);
     this.dialog.show(dialogRenderElement);
+    this.render();
+  }
+
+  private getStatusHeader(): string {
+    const parsedURL = Common.ParsedURL.ParsedURL.fromString(this.inspectedURL);
+    const pageHost = parsedURL?.host;
+
+    if (this.isAIControlled) {
+      return pageHost ? i18nString(UIStrings.aiAuditingS, {PH1: pageHost}) :
+                        i18nString(UIStrings.aiAuditingYourWebPage);
+    }
+
+    return pageHost ? i18nString(UIStrings.auditingS, {PH1: pageHost}) : i18nString(UIStrings.auditingYourWebPage);
   }
 
   private renderStatusHeader(statusHeader?: string): void {
-    if (this.statusHeader) {
-      this.statusHeader.textContent = `${statusHeader}…`;
-    }
+    this.statusHeader = `${statusHeader}…`;
+    this.render();
   }
 
   hide(): void {
@@ -255,12 +357,16 @@ export class StatusView {
     }
   }
 
+  setAIControlled(isAIControlled: boolean): void {
+    this.isAIControlled = isAIControlled;
+  }
+
   setInspectedURL(url = ''): void {
     this.inspectedURL = url;
   }
 
   updateStatus(message: string|null): void {
-    if (!message || !this.statusText) {
+    if (!message) {
       return;
     }
 
@@ -281,11 +387,9 @@ export class StatusView {
       this.scheduleFastFactCheck();
       this.resetProgressBarClasses();
 
-      if (this.progressBar) {
-        this.progressBar.classList.add(nextPhase.progressBarClass);
-        const nextPhaseIndex = StatusPhases.indexOf(nextPhase);
-        UI.ARIAUtils.setProgressBarValue(this.progressBar, nextPhaseIndex, text);
-      }
+      this.progressBarClass = nextPhase.progressBarClass;
+      this.progressBarValue = StatusPhases.indexOf(nextPhase);
+      this.render();
     }
   }
 
@@ -298,8 +402,8 @@ export class StatusView {
       return phase.message();
     }
 
-    const deviceTypeSetting = RuntimeSettings.find(item => item.setting.name === 'lighthouse.device-type');
-    const throttleSetting = RuntimeSettings.find(item => item.setting.name === 'lighthouse.throttling');
+    const deviceTypeSetting = getRuntimeSettings().find(item => item.setting.name === 'lighthouse.device-type');
+    const throttleSetting = getRuntimeSettings().find(item => item.setting.name === 'lighthouse.throttling');
     const deviceType = deviceTypeSetting ? deviceTypeSetting.setting.get() : '';
     const throttling = throttleSetting ? throttleSetting.setting.get() : '';
     const match = LoadingMessages.find(item => {
@@ -314,9 +418,8 @@ export class StatusView {
   }
 
   private resetProgressBarClasses(): void {
-    if (this.progressBar) {
-      this.progressBar.className = 'lighthouse-progress-bar';
-    }
+    this.progressBarClass = '';
+    this.render();
   }
 
   private scheduleFastFactCheck(): void {
@@ -348,11 +451,9 @@ export class StatusView {
   }
 
   private commitTextChange(text: string): void {
-    if (!this.statusText) {
-      return;
-    }
     this.textChangedAt = performance.now();
-    this.statusText.textContent = text;
+    this.statusText = text;
+    this.render();
   }
 
   renderBugReport(err: Error): void {
@@ -362,53 +463,25 @@ export class StatusView {
     }
 
     this.resetProgressBarClasses();
+    this.progressBarClass = 'errored';
+    this.statusText = '';
 
-    if (this.progressBar) {
-      this.progressBar.classList.add('errored');
-    }
-
-    if (this.statusText) {
-      this.commitTextChange('');
-      UI.UIUtils.createTextChild(this.statusText.createChild('p'), i18nString(UIStrings.ahSorryWeRanIntoAnError));
-      if (KnownBugPatterns.some(pattern => pattern.test(err.message))) {
-        const message = i18nString(UIStrings.tryToNavigateToTheUrlInAFresh);
-        UI.UIUtils.createTextChild(this.statusText.createChild('p'), message);
-      } else {
-        this.renderBugReportBody(err, this.inspectedURL);
-      }
-    }
+    this.bugReport = {
+      error: err,
+      auditURL: this.inspectedURL,
+      knownBugPattern: KnownBugPatterns.some(pattern => pattern.test(err.message)),
+    };
+    this.render();
   }
 
   renderText(statusHeader: string, text: string): void {
-    this.renderStatusHeader(statusHeader);
+    this.statusHeader = `${statusHeader}…`;
     this.commitTextChange(text);
   }
 
   toggleCancelButton(show: boolean): void {
-    if (this.cancelButton) {
-      this.cancelButton.style.visibility = show ? 'visible' : 'hidden';
-    }
-  }
-
-  private renderBugReportBody(err: Error, auditURL: string): void {
-    const chromeVersion = navigator.userAgent.match(/Chrome\/(\S+)/) || ['', 'Unknown'];
-    // @ts-expect-error Lighthouse sets `friendlyMessage` on certain
-    // important errors such as PROTOCOL_TIMEOUT.
-    const errorMessage = err.friendlyMessage || err.message;
-    const issueBody = `
-${errorMessage}
-\`\`\`
-Channel: DevTools
-Initial URL: ${auditURL}
-Chrome Version: ${chromeVersion[1]}
-Stack Trace: ${err.stack}
-\`\`\`
-`;
-    if (this.statusText) {
-      UI.UIUtils.createTextChild(
-          this.statusText.createChild('p'), i18nString(UIStrings.ifThisIssueIsReproduciblePlease));
-      UI.UIUtils.createTextChild(this.statusText.createChild('code', 'monospace'), issueBody.trim());
-    }
+    this.cancelButtonVisible = show;
+    this.render();
   }
 }
 

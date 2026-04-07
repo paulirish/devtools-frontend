@@ -1,8 +1,9 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
+import type * as Common from '../../../../core/common/common.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as LinearMemoryInspectorComponents from '../../../../panels/linear_memory_inspector/components/components.js';
 import * as UI from '../../legacy.js';
@@ -22,19 +23,18 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
 
   constructor() {
     super();
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent) =>
-            this.#memoryRequested(event));
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryInspector.AddressChangedEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryInspector.AddressChangedEvent) => {
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.MEMORY_REQUEST, this.#memoryRequested, this);
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.ADDRESS_CHANGED,
+        (event: Common.EventTarget.EventTargetEvent<number>) => {
           this.#address = event.data;
         });
     this.#inspector.show(this.contentElement);
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refreshData();
   }
 
@@ -60,7 +60,7 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
     this.#inspector.hideValueInspector = true;
   }
 
-  #memoryRequested(event: LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent): void {
+  #memoryRequested(event: Common.EventTarget.EventTargetEvent<{start: number, end: number, address: number}>): void {
     // TODO(szuend): The following lines are copied from `LinearMemoryInspectorController`. We can't reuse them
     // as depending on a module in `panels/` from a component is a layering violation.
 
@@ -100,6 +100,7 @@ export class StreamingContentHexView extends LinearMemoryInspectorView {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.#updateMemoryFromContentData();
     this.#streamingContentData.addEventListener(
         TextUtils.StreamingContentData.Events.CHUNK_ADDED, this.#updateMemoryFromContentData, this);

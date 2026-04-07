@@ -38,7 +38,7 @@ export function normalizePath(path: string): string {
   return normalizedPath;
 }
 
-export function schemeIs(url: Platform.DevToolsPath.UrlString, scheme: string): boolean {
+export function schemeIs(url: Platform.DevToolsPath.UrlString|URL, scheme: string): boolean {
   try {
     return (new URL(url)).protocol === scheme;
   } catch {
@@ -57,33 +57,23 @@ type BrandedPathString =
     Platform.DevToolsPath.UrlString|Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.EncodedPathString;
 
 export class ParsedURL {
-  isValid: boolean;
+  isValid = false;
   url: string;
-  scheme: string;
-  user: string;
-  host: string;
-  port: string;
-  path: string;
-  queryParams: string;
-  fragment: string;
-  folderPathComponents: string;
-  lastPathComponent: string;
+  scheme = '';
+  user = '';
+  host = '';
+  port = '';
+  path = '';
+  queryParams = '';
+  fragment = '';
+  folderPathComponents = '';
+  lastPathComponent = '';
   readonly blobInnerScheme: string|undefined;
   #displayName?: string;
   #dataURLDisplayName?: string;
 
   constructor(url: string) {
-    this.isValid = false;
     this.url = url;
-    this.scheme = '';
-    this.user = '';
-    this.host = '';
-    this.port = '';
-    this.path = '';
-    this.queryParams = '';
-    this.fragment = '';
-    this.folderPathComponents = '';
-    this.lastPathComponent = '';
 
     const isBlobUrl = this.url.startsWith('blob:');
     const urlToMatch = isBlobUrl ? url.substring(5) : url;
@@ -330,6 +320,9 @@ export class ParsedURL {
   }
 
   static extractName(url: string): string {
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
     let index = url.lastIndexOf('/');
     const pathAndQuery = index !== -1 ? url.substr(index + 1) : url;
     index = pathAndQuery.indexOf('?');
@@ -399,8 +392,8 @@ export class ParsedURL {
 
   static splitLineAndColumn(string: string): {
     url: Platform.DevToolsPath.UrlString,
-    lineNumber: (number|undefined),
-    columnNumber: (number|undefined),
+    lineNumber?: number,
+    columnNumber?: number,
   } {
     // Only look for line and column numbers in the path to avoid matching port numbers.
     const beforePathMatch = string.match(ParsedURL.urlRegex());
@@ -511,7 +504,7 @@ export class ParsedURL {
     return this.scheme === 'data';
   }
 
-  extractDataUrlMimeType(): {type: string|undefined, subtype: string|undefined} {
+  extractDataUrlMimeType(): {type?: string, subtype?: string|undefined} {
     const regexp = /^data:((?<type>\w+)\/(?<subtype>\w+))?(;base64)?,/;
     const match = this.url.match(regexp);
     return {

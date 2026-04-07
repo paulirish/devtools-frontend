@@ -17,6 +17,14 @@ import {BidiDeserializer} from './Deserializer.js';
 export function createEvaluationError(
   details: Bidi.Script.ExceptionDetails,
 ): unknown {
+  if (details.exception.type === 'object' && !('value' in details.exception)) {
+    // Heuristic detecting a platform object was thrown. WebDriver BiDi serializes
+    // platform objects without value. If so, throw a generic error with the actual
+    // exception's message, as there is no way to restore the original exception's
+    // constructor.
+    return new Error(details.text);
+  }
+
   if (details.exception.type !== 'error') {
     return BidiDeserializer.deserialize(details.exception);
   }
@@ -73,4 +81,21 @@ export function rewriteNavigationError(
     }
     throw error;
   };
+}
+
+/**
+ * @internal
+ */
+export function rewriteEvaluationError(error: unknown): never {
+  if (error instanceof Error) {
+    if (
+      error.message.includes('ExecutionContext was destroyed') ||
+      error.message.includes('Inspected target navigated or closed')
+    ) {
+      throw new Error(
+        'Execution context was destroyed, most likely because of a navigation.',
+      );
+    }
+  }
+  throw error;
 }

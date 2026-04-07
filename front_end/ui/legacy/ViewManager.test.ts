@@ -5,6 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import type {EventTargetEvent} from '../../core/common/EventTarget.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Root from '../../core/root/root.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 
 import * as UI from './legacy.js';
@@ -94,7 +95,8 @@ describeWithEnvironment('ViewManager', () => {
       });
     }
 
-    viewManager = UI.ViewManager.ViewManager.instance({forceNew: true});
+    viewManager = UI.ViewManager.ViewManager.instance(
+        {forceNew: true, universe: {context: new Root.DevToolsContext.WritableDevToolsContext()}});
     locationResolver.createLocation(UI.ViewManager.ViewLocationValues.PANEL, true, 'view-1');
     locationResolver.createLocation(UI.ViewManager.ViewLocationValues.DRAWER_VIEW, false, undefined);
   });
@@ -178,6 +180,23 @@ describeWithEnvironment('ViewManager', () => {
   });
 
   describe('createTabbedLocation', () => {
+    it('respects custom location visibility predicate', async () => {
+      let locationIsVisible = false;
+      const tabbedLocation = viewManager.createTabbedLocation(
+          () => {}, 'visibility-test-location', false, true, undefined, () => locationIsVisible);
+
+      const view = new UI.View.SimpleView({
+        title: i18n.i18n.lockedString('Visibility test view'),
+        viewId: 'visibility-test-view',
+      });
+
+      await tabbedLocation.showView(view);
+      assert.isFalse(tabbedLocation.isViewVisible(view), 'view should not be visible when location predicate is false');
+
+      locationIsVisible = true;
+      assert.isTrue(tabbedLocation.isViewVisible(view), 'view should be visible when location predicate is true');
+    });
+
     it('remembers closeable views in the `closeable-tabs` setting', async () => {
       const tabbedLocation = viewManager.createTabbedLocation(() => {}, '');
 

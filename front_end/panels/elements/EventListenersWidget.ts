@@ -39,8 +39,7 @@ import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as EventListeners from '../event_listeners/event_listeners.js';
 
-const {bindToSetting} = UI.SettingsUI;
-const {bindToAction} = UI.UIUtils;
+const {bindToAction, bindToSetting} = UI.UIUtils;
 
 const UIStrings = {
   /**
@@ -78,6 +77,7 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/EventListenersWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const {widget} = UI.Widget;
 let eventListenersWidgetInstance: EventListenersWidget;
 
 interface ViewInput {
@@ -106,8 +106,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
       <devtools-toolbar class="event-listener-toolbar" role="presentation">
         <devtools-button ${bindToAction(input.refreshEventListenersActionName)}></devtools-button>
         <devtools-checkbox title=${i18nString(UIStrings.showListenersOnTheAncestors)}
-          ${bindToSetting(input.showForAncestorsSetting)}
-          jslog=${VisualLogging.toggle('show-event-listeners-for-ancestors').track({ change: true })}>
+          ${bindToSetting(input.showForAncestorsSetting)}>
           ${i18nString(UIStrings.ancestors)}
         </devtools-checkbox>
         <select class="dispatch-filter"
@@ -121,21 +120,20 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
             </option>`)}
         </select>
         <devtools-checkbox title=${i18nString(UIStrings.resolveEventListenersBoundWith)}
-          ${bindToSetting(input.showFrameworkListenersSetting)}
-          jslog=${VisualLogging.toggle('show-frameowkr-listeners').track({ change: true })}>
+          ${bindToSetting(input.showFrameworkListenersSetting)}>
           ${i18nString(UIStrings.frameworkListeners)}
         </devtools-checkbox>
       </devtools-toolbar>
-      <devtools-widget .widgetConfig=${UI.Widget.widgetConfig(EventListeners.EventListenersView.EventListenersView, {
+      ${widget(EventListeners.EventListenersView.EventListenersView, {
         changeCallback: input.onEventListenersViewChange,
         objects: input.eventListenerObjects,
         filter: input.filter,
-      })}></devtools-widget>
+      })}
     </div>`, target);
   // clang-format on
 };
 
-export class EventListenersWidget extends UI.ThrottledWidget.ThrottledWidget {
+export class EventListenersWidget extends UI.Widget.VBox {
   private showForAncestorsSetting: Common.Settings.Setting<boolean>;
   private readonly dispatchFilterBySetting: Common.Settings.Setting<string>;
   private readonly showFrameworkListenersSetting: Common.Settings.Setting<boolean>;
@@ -147,19 +145,19 @@ export class EventListenersWidget extends UI.ThrottledWidget.ThrottledWidget {
     this.#view = view;
     this.showForAncestorsSetting =
         Common.Settings.Settings.instance().moduleSetting('show-event-listeners-for-ancestors');
-    this.showForAncestorsSetting.addChangeListener(this.update.bind(this));
+    this.showForAncestorsSetting.addChangeListener(this.requestUpdate.bind(this));
 
     this.dispatchFilterBySetting =
         Common.Settings.Settings.instance().createSetting('event-listener-dispatch-filter-type', DispatchFilterBy.All);
-    this.dispatchFilterBySetting.addChangeListener(this.update.bind(this));
+    this.dispatchFilterBySetting.addChangeListener(this.requestUpdate.bind(this));
 
     this.showFrameworkListenersSetting =
         Common.Settings.Settings.instance().createSetting('show-frameowkr-listeners', true);
     this.showFrameworkListenersSetting.setTitle(i18nString(UIStrings.frameworkListeners));
-    this.showFrameworkListenersSetting.addChangeListener(this.update.bind(this));
+    this.showFrameworkListenersSetting.addChangeListener(this.requestUpdate.bind(this));
 
-    UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.update, this);
-    this.update();
+    UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.requestUpdate.bind(this));
+    this.requestUpdate();
   }
 
   static instance(opts: {
@@ -173,7 +171,7 @@ export class EventListenersWidget extends UI.ThrottledWidget.ThrottledWidget {
     return eventListenersWidgetInstance;
   }
 
-  override async doUpdate(): Promise<void> {
+  override async performUpdate(): Promise<void> {
     const dispatchFilter = this.dispatchFilterBySetting.get();
     const showPassive = dispatchFilter === DispatchFilterBy.All || dispatchFilter === DispatchFilterBy.Passive;
     const showBlocking = dispatchFilter === DispatchFilterBy.All || dispatchFilter === DispatchFilterBy.Blocking;
@@ -186,7 +184,7 @@ export class EventListenersWidget extends UI.ThrottledWidget.ThrottledWidget {
       onDispatchFilterTypeChange: (value: string) => {
         this.dispatchFilterBySetting.set(value);
       },
-      onEventListenersViewChange: this.update.bind(this),
+      onEventListenersViewChange: this.requestUpdate.bind(this),
       dispatchFilters: [
         {name: i18nString(UIStrings.all), value: DispatchFilterBy.All},
         {name: i18nString(UIStrings.passive), value: DispatchFilterBy.Passive},
@@ -279,7 +277,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'elements.refresh-event-listeners': {
-        EventListenersWidget.instance().update();
+        EventListenersWidget.instance().requestUpdate();
         return true;
       }
     }

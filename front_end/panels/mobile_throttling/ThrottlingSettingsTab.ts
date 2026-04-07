@@ -1,16 +1,15 @@
 // Copyright 2017 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
-import '../../ui/components/cards/cards.js';
+import '../../ui/kit/kit.js';
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import type * as Cards from '../../ui/components/cards/cards.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import {type Card, createIcon} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
@@ -198,7 +197,7 @@ function createComputePressurePromise(): Promise<{state: string}> {
 }
 
 export class CPUThrottlingCard {
-  element: Cards.Card.Card;
+  element: Card;
 
   private readonly setting: Common.Settings.Setting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>;
   private computePressurePromise?: ReturnType<typeof createComputePressurePromise>;
@@ -352,7 +351,7 @@ export class CPUThrottlingCard {
   private createTextWithIcon(text: string, icon: string): HTMLElement {
     const el = document.createElement('div');
     el.classList.add('text-with-icon');
-    el.append(IconButton.Icon.create(icon));
+    el.append(createIcon(icon));
     el.append(text);
     return el;
   }
@@ -736,7 +735,9 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
         const errorMessage = i18nString(UIStrings.profileNameCharactersLengthMust, {PH1: maxLength});
         return {valid, errorMessage};
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
 
     function throughputValidator(
@@ -754,7 +755,9 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
             {PH1: String(throughput), PH2: minThroughput, PH3: maxThroughput});
         return {valid, errorMessage};
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
 
     function latencyValidator(_item: SDK.NetworkManager.Conditions, _index: number, input: UI.ListWidget.EditorControl):
@@ -768,7 +771,9 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
         const errorMessage = i18nString(UIStrings.latencyMustBeAnIntegerBetweenSms, {PH1: minLatency, PH2: maxLatency});
         return {valid, errorMessage};
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
 
     function packetLossValidator(
@@ -784,7 +789,9 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
             i18nString(UIStrings.packetLossMustBeAnIntegerBetweenSpct, {PH1: minPacketLoss, PH2: maxPacketLoss});
         return {valid, errorMessage};
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
 
     function packetQueueLengthValidator(
@@ -798,13 +805,17 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
         const errorMessage = i18nString(UIStrings.packetQueueLengthMustBeAnIntegerGreaterOrEqualToZero);
         return {valid, errorMessage};
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
 
     function packetReorderingValidator(
         _item: SDK.NetworkManager.Conditions, _index: number,
         _input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
-      return {valid: true, errorMessage: undefined};
+      return {
+        valid: true,
+      };
     }
   }
 }

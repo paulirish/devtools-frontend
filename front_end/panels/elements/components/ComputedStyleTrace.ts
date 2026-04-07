@@ -1,10 +1,11 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../ui/legacy/legacy.js';
+import type * as Lit from '../../../ui/lit/lit.js';
 import {html, render} from '../../../ui/lit/lit.js';
 
 import computedStyleTraceStyles from './computedStyleTrace.css.js';
@@ -13,7 +14,7 @@ export interface ComputedStyleTraceData {
   selector: string;
   active: boolean;
   onNavigateToSource: (event?: Event) => void;
-  ruleOriginNode?: Node;
+  ruleOriginNode?: Lit.LitTemplate;
 }
 
 export class ComputedStyleTrace extends HTMLElement {
@@ -22,7 +23,11 @@ export class ComputedStyleTrace extends HTMLElement {
   #selector = '';
   #active = false;
   #onNavigateToSource: ((event?: Event) => void) = () => {};
-  #ruleOriginNode?: Node;
+  #ruleOriginNode?: Lit.LitTemplate;
+
+  connectedCallback(): void {
+    this.#render();
+  }
 
   set data(data: ComputedStyleTraceData) {
     this.#selector = data.selector;

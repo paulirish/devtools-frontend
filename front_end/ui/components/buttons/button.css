@@ -83,6 +83,10 @@ button {
     border: none;
     overflow: hidden;
 
+    devtools-icon {
+      color: var(--override-button-icon-color, var(--icon-default));
+    }
+
     &.small {
       --button-height: var(--sys-size-9);
       --button-width: var(--sys-size-9);
@@ -181,8 +185,8 @@ button {
     padding-left: var(--sys-size-4);
 
     devtools-icon {
-      width: var(--sys-size-9);
-      height: var(--sys-size-9);
+      width: var(--sys-size-8);
+      height: var(--sys-size-8);
       margin-right: var(--sys-size-2);
     }
   }
@@ -352,5 +356,11 @@ button {
 
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media(forced-colors: active) {
+  .toggled devtools-icon {
+    background-color: canvas;
   }
 }

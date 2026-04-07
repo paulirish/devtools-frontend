@@ -1,7 +1,7 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import type * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -55,7 +55,7 @@ export class ClickEvent extends Event {
 export class ColorSwatch extends HTMLElement {
   private readonly shadow = this.attachShadow({mode: 'open'});
   private tooltip: string = i18nString(UIStrings.shiftclickToChangeColorFormat);
-  private color: Common.Color.Color|null = null;
+  #color: Common.Color.Color|null = null;
   private readonly = false;
 
   constructor(tooltip?: string) {
@@ -77,13 +77,17 @@ export class ColorSwatch extends HTMLElement {
     }
 
     this.readonly = readonly;
-    if (this.color) {
-      this.renderColor(this.color);
+    if (this.#color) {
+      this.renderColor(this.#color);
     }
   }
 
-  getColor(): Common.Color.Color|null {
-    return this.color;
+  set color(color: Common.Color.Color) {
+    this.renderColor(color);
+  }
+
+  get color(): Common.Color.Color|null {
+    return this.#color;
   }
 
   get anchorBox(): AnchorBox|null {
@@ -92,7 +96,7 @@ export class ColorSwatch extends HTMLElement {
   }
 
   getText(): string|undefined {
-    return this.color?.getAuthoredText() ?? this.color?.asString();
+    return this.#color?.getAuthoredText() ?? this.#color?.asString();
   }
 
   /**
@@ -100,7 +104,7 @@ export class ColorSwatch extends HTMLElement {
    * @param color The color object or string to use for this swatch.
    */
   renderColor(color: Common.Color.Color): void {
-    this.color = color;
+    this.#color = color;
 
     const colorSwatchClasses = Lit.Directives.classMap({
       'color-swatch': true,
@@ -157,11 +161,11 @@ export class ColorSwatch extends HTMLElement {
   }
 
   private showFormatPicker(e: Event): void {
-    if (!this.color) {
+    if (!this.#color) {
       return;
     }
 
-    const contextMenu = new ColorPicker.FormatPickerContextMenu.FormatPickerContextMenu(this.color);
+    const contextMenu = new ColorPicker.FormatPickerContextMenu.FormatPickerContextMenu(this.#color);
     void contextMenu.show(e, color => {
       this.dispatchEvent(new ColorFormatChangedEvent(color));
     });

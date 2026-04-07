@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import type {TSESTree} from '@typescript-eslint/utils';
-import * as path from 'path';
+import * as path from 'node:path';
 
 import {isModuleScope} from './utils/l10n-helper.ts';
 import {createRule} from './utils/ruleCreator.ts';
@@ -91,7 +91,7 @@ export default createRule<Options, MessageIds>({
         // Do nothing if there are no arguments or the first argument is not a string literal we
         // can check.
         const firstArgument = node.arguments[0];
-        if (node.arguments.length === 0 || !firstArgument || firstArgument.type !== 'Literal' ||
+        if (node.arguments.length === 0 || firstArgument?.type !== 'Literal' ||
             typeof firstArgument.value !== 'string') {
           return;
         }

@@ -20,6 +20,7 @@ devtools_module("trace") {
 
   deps = [
     "../../core/common:bundle",
+    "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
@@ -49,9 +50,11 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../mcp/*",
     "../../../test/interactions/*",
     "../../core/sdk:unittests",
     "../../legacy_test_runner/*",
+    "../../models/lighthouse/*",
     "../../panels/lighthouse/*",
     "../../panels/network/*",
     "../../panels/recorder/*",
@@ -60,7 +63,7 @@ devtools_entrypoint("bundle") {
     "../../services/tracing/*",
     "../../testing/*",
     "../../ui/components/docs/*",
-    "../../ui/legacy/components/utils/*",
+    "../../ui/legacy/*",
     "../ai_assistance/*",
     "../live-metrics/*",
     "../trace_source_maps_resolver/*",

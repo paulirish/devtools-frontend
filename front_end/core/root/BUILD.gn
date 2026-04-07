@@ -7,7 +7,11 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 
 devtools_module("root") {
-  sources = [ "Runtime.ts" ]
+  sources = [
+    "DevToolsContext.ts",
+    "ExperimentNames.ts",
+    "Runtime.ts",
+  ]
 
   deps = [ "../../core/platform:bundle" ]
 }
@@ -21,6 +25,14 @@ devtools_entrypoint("bundle") {
 }
 
 ts_library("unittests") {
+  testonly = true
+
+  sources = [ "Runtime.browser.test.ts" ]
+
+  deps = [ ":bundle" ]
+}
+
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "Runtime.test.ts" ]

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/kit/kit.js';
 import '../../../ui/legacy/components/data_grid/data_grid.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -97,9 +98,11 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
           <div class="empty-state-header">${i18nString(UIStrings.noEvents)}</div>
           <div class="empty-state-description">
             <span>${i18nString(UIStrings.sharedStorageDescription)}</span>
-            ${
-          UI.XLink.XLink.create(
-              SHARED_STORAGE_EXPLANATION_URL, i18nString(UIStrings.learnMore), 'x-link', undefined, 'learn-more')}
+            <devtools-link
+              class="devtools-link"
+              href=${SHARED_STORAGE_EXPLANATION_URL}
+              .jslogContext=${'learn-more'}
+            >${i18nString(UIStrings.learnMore)}</devtools-link>
           </div>
         </div>`
       : html`

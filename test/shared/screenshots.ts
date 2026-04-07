@@ -6,16 +6,16 @@
 // no-console disabled here as this is a test runner and expects to output to the console
 
 import {assert} from 'chai';
-import * as childProcess from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as childProcess from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type * as puppeteer from 'puppeteer-core';
 
 import {SOURCE_ROOT} from '../conductor/paths.js';
 import {platform} from '../conductor/platform.js';
+import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
 import {ScreenshotError} from '../conductor/screenshot-error.js';
 import {TestConfig} from '../conductor/test_config.js';
-import {getBrowserAndPages} from '../shared/helper.js';
 
 /**
  * The goldens screenshot folder is always taken from the source directory (NOT

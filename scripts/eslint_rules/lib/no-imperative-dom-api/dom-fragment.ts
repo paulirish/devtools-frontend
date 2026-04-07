@@ -16,6 +16,20 @@ type Identifier = TSESTree.Identifier;
 type SourceCode = TSESLint.SourceCode;
 type Scope = TSESLint.Scope.Scope;
 
+const VOID_ELEMENTS = new Set([
+  'area',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'param',
+  'source',
+  'track',
+]);
+
 const domFragments = new Map<Node|ClassMember|Variable, DomFragment>();
 
 export class DomFragment {
@@ -30,7 +44,8 @@ export class DomFragment {
   textContent?: Node|string;
   children: DomFragment[] = [];
   parent?: DomFragment;
-  expression?: string;
+  nextSiblings: DomFragment[] = [];
+  expression?: string|((indent: number) => string);
   widgetClass?: Node;
   replacer?: (fixer: TSESLint.RuleFixer, template: string) => TSESLint.RuleFix;
   initializer?: Node;
@@ -106,12 +121,13 @@ export class DomFragment {
     components.push(`\n${' '.repeat(indent)}`);
     let lineLength = indent;
     if (this.expression && !this.tagName) {
-      if (this.expression.startsWith('`') && this.expression.endsWith('`')) {
-        components.push(this.expression.slice(1, -1).trim());
+      let expression = this.expression instanceof Function ? this.expression(indent) : this.expression;
+      if (expression.startsWith('`') && expression.endsWith('`')) {
+        components.push(expression.slice(1, -1).trim());
       } else {
-        const expression = (this.references.every(r => r.processed) && this.initializer) ?
-            sourceCode.getText(this.initializer) :
-            this.expression;
+        if (this.references.every(r => r.processed) && this.initializer) {
+          expression = sourceCode.getText(this.initializer);
+        }
         components.push('${', expression, '}');
       }
 
@@ -237,8 +253,11 @@ export class DomFragment {
       }
       components.push(`\n${' '.repeat(indent)}`);
     }
-    if (this.tagName && this.tagName !== 'input') {
+    if (this.tagName && !VOID_ELEMENTS.has(this.tagName)) {
       components.push('</', this.tagName, '>');
+    }
+    for (const nextSibling of this.nextSiblings) {
+      components.push(...nextSibling.toTemplateLiteral(sourceCode, indent));
     }
     return components;
   }
@@ -251,6 +270,9 @@ export class DomFragment {
     const child = DomFragment.getOrCreate(node, sourceCode);
     this.children.splice(index, 0, child);
     child.parent = this;
+    for (const nextSibling of child.nextSiblings) {
+      nextSibling.parent = this;
+    }
     if (processed) {
       for (const reference of child.references) {
         if (reference.node === node) {
@@ -260,9 +282,19 @@ export class DomFragment {
     }
     return child;
   }
+
+  appendSibling(node: Node, sourceCode: SourceCode): DomFragment {
+    const sibling = DomFragment.getOrCreate(node, sourceCode);
+    this.nextSiblings.push(sibling);
+    sibling.parent = this.parent;
+    return sibling;
+  }
 }
 
-function getEnclosingVariable(node: Node, sourceCode: SourceCode): Variable|null {
+function getEnclosingVariable(node: Node|undefined, sourceCode: SourceCode): Variable|null {
+  if (!node) {
+    return null;
+  }
   if (node.type === 'Identifier') {
     let scope: Scope|null = sourceCode.getScope(node);
     const variableName = node.name;

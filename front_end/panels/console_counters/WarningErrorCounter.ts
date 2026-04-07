@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/components/icon_button/icon_button.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -10,8 +12,10 @@ import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import type * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as IssueCounter from '../../ui/components/issue_counter/issue_counter.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {html, nothing, render} from '../../ui/lit/lit.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+
+const {html, nothing, render} = Lit;
 
 const UIStrings = {
   /**
@@ -68,14 +72,8 @@ const DEFAULT_VIEW: View = (input, _output, target) => {
     accessibleName: consoleTitle,
     compact,
     groups: [
-      {
-        iconName: 'cross-circle-filled',
-        text: countToText(errors)
-      },
-      {
-        iconName: 'warning-filled',
-        text: countToText(warnings)
-      },
+      {iconName: 'cross-circle-filled', text: countToText(errors)},
+      {iconName: 'warning-filled', text: countToText(warnings)},
     ],
   };
 
@@ -93,21 +91,25 @@ const DEFAULT_VIEW: View = (input, _output, target) => {
 
   render(
       html`<div class="status-buttons"
-         ><icon-button
+         >${
+          errors + warnings ? html`<icon-button
             .data=${iconData}
             title=${consoleTitle}
-            class=${'small' + warnings || errors ? nothing as unknown as string : 'hidden'}
+            class=${'small'}
             jslog=${VisualLogging.counter('console').track({
-        click: true
-      })}
-         ></icon-button><devtools-issue-counter
-            class=${'main-toolbar' + (issues ? '' : ' hidden')}
+            click: true
+          })}
+         ></icon-button>` :
+                              nothing}${
+          issues ? html`<devtools-issue-counter
+            class=${'main-toolbar'}
             title=${issuesTitle}
             .data=${issueCounterData}
             jslog=${VisualLogging.counter('issue').track({
-        click: true
-      })}
-         ></devtools-issue-counter></div>`,
+            click: true
+          })}
+         ></devtools-issue-counter>` :
+                   nothing}</div>`,
       target);
 };
 
@@ -193,12 +195,11 @@ export class WarningErrorCounter implements UI.Toolbar.Provider {
         document.createElement('devtools-widget') as UI.Widget.WidgetElement<WarningErrorCounterWidget>;
     const toolbarItem = new UI.Toolbar.ToolbarItemWithCompactLayout(widgetElement);
     toolbarItem.setVisible(false);
-    widgetElement.widgetConfig = UI.Widget.widgetConfig(e => {
-      const widget = new WarningErrorCounterWidget(e, toolbarItem.setVisible.bind(toolbarItem));
-      toolbarItem.addEventListener(
-          UI.Toolbar.ToolbarItemWithCompactLayoutEvents.COMPACT_LAYOUT_UPDATED, widget.onSetCompactLayout, widget);
-      return widget;
-    });
+
+    const widget = new WarningErrorCounterWidget(widgetElement, toolbarItem.setVisible.bind(toolbarItem));
+    toolbarItem.addEventListener(
+        UI.Toolbar.ToolbarItemWithCompactLayoutEvents.COMPACT_LAYOUT_UPDATED, widget.onSetCompactLayout, widget);
+
     this.toolbarItem = toolbarItem;
   }
 

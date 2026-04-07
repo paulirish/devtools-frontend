@@ -43,13 +43,17 @@ const UIStrings = {
    */
   captureAsyncStackTraces: 'Capture async stack traces',
   /**
-   * @description Text of a setting that  turn on the measuring rulers when hover over a target
+   * @description Text of a setting that turn on the measuring rulers when hover over a target
+   */
+  rulersOnHover: 'Rulers on hover',
+  /**
+   * @description Text of an option that turn on the measuring rulers when hover over a target through the Command Menu
    */
   showRulersOnHover: 'Show rulers on hover',
   /**
    * @description Text of a setting that do turn off the measuring rulers when hover over a target
    */
-  doNotShowRulersOnHover: 'Do not show rulers on hover',
+  doNotShowRulersOnHover: 'Don\'t show rulers on hover',
   /**
    * @description Title of a setting that turns on grid area name labels
    */
@@ -99,19 +103,19 @@ const UIStrings = {
    */
   showLineNames: 'Show line names',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   showPaintFlashingRectangles: 'Show paint flashing rectangles',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   hidePaintFlashingRectangles: 'Hide paint flashing rectangles',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   showLayoutShiftRegions: 'Show layout shift regions',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   hideLayoutShiftRegions: 'Hide layout shift regions',
   /**
@@ -119,31 +123,31 @@ const UIStrings = {
    */
   highlightAdFrames: 'Highlight ad frames',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   doNotHighlightAdFrames: 'Do not highlight ad frames',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   showLayerBorders: 'Show layer borders',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   hideLayerBorders: 'Hide layer borders',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   showFramesPerSecondFpsMeter: 'Show frames per second (FPS) meter',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   hideFramesPerSecondFpsMeter: 'Hide frames per second (FPS) meter',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   showScrollPerformanceBottlenecks: 'Show scroll performance bottlenecks',
   /**
-   * @description Title of a setting under the Rendering category that can be invoked through the Command Menu
+   * @description Title of an option under the Rendering category that can be invoked through the Command Menu
    */
   hideScrollPerformanceBottlenecks: 'Hide scroll performance bottlenecks',
   /**
@@ -314,6 +318,14 @@ const UIStrings = {
    */
   enableAvifFormat: 'Enable `AVIF` format',
   /**
+   * @description Title of a setting that disables JPEG XL format
+   */
+  disableJpegXlFormat: 'Disable `JPEG XL` format',
+  /**
+   * @description Title of a setting that enables JPEG XL format
+   */
+  enableJpegXlFormat: 'Enable `JPEG XL` format',
+  /**
    * @description Title of a setting that disables WebP format
    */
   disableWebpFormat: 'Disable `WebP` format',
@@ -353,51 +365,47 @@ const UIStrings = {
   /**
    * @description Label of a checkbox in the DevTools settings UI.
    */
-  enableRemoteFileLoading:
-      'Allow `DevTools` to load resources, such as source maps, from remote file paths. Disabled by default for security reasons.',
+  enableRemoteFileLoading: 'Allow loading remote file path resources in DevTools',
+  /**
+   * @description Tooltip text for a setting that controls whether external resource can be loaded in DevTools.
+   */
+  remoteFileLoadingInfo: 'Example resource are source maps. Disabled by default for security reasons.',
   /**
    * @description Tooltip text for a setting that controls the network cache. Disabling the network cache can simulate the network connections of users that are visiting a page for the first time.
    */
   networkCacheExplanation:
       'Disabling the network cache will simulate a network experience similar to a first time visitor.',
+  /**
+   * @description Setting under the Sources category to toggle usage of JavaScript source maps.
+   */
+  javaScriptSourceMaps: 'JavaScript source maps',
+  /**
+   * @description Title of an option under the Sources category that can be invoked through the Command Menu
+   */
+  enableJavaScriptSourceMaps: 'Enable JavaScript source maps',
+  /**
+   * @description Title of an option under the Sources category that can be invoked through the Command Menu
+   */
+  disableJavaScriptSourceMaps: 'Disable JavaScript source maps',
+  /**
+   * @description Title of a setting under the Sources category
+   */
+  cssSourceMaps: 'CSS source maps',
+  /**
+   * @description Title of an option under the Sources category that can be invoked through the Command Menu
+   */
+  enableCssSourceMaps: 'Enable CSS source maps',
+  /**
+   * @description Title of an option under the Sources category that can be invoked through the Command Menu
+   */
+  disableCssSourceMaps: 'Disable CSS source maps',
+  /**
+   * @description Title of a setting under the Console category in Settings
+   */
+  logXmlhttprequests: 'Log XMLHttpRequests',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/sdk-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
-
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'skip-stack-frames-pattern',
-  settingType: Common.Settings.SettingType.REGEX,
-  defaultValue: '/node_modules/|^node:',
-});
-
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'skip-content-scripts',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
-});
-
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'automatically-ignore-list-known-third-party-scripts',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
-});
-
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'skip-anonymous-scripts',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
-});
-
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'enable-ignore-listing',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
-});
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.CONSOLE,
@@ -497,7 +505,7 @@ Common.Settings.registerSettingExtension({
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.ELEMENTS,
   storageType: Common.Settings.SettingStorageType.SYNCED,
-  title: i18nLazyString(UIStrings.showRulersOnHover),
+  title: i18nLazyString(UIStrings.rulersOnHover),
   settingName: 'show-metrics-rulers',
   settingType: Common.Settings.SettingType.BOOLEAN,
   options: [
@@ -1078,6 +1086,24 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.RENDERING,
+  settingName: 'jpeg-xl-format-disabled',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  storageType: Common.Settings.SettingStorageType.SESSION,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.disableJpegXlFormat),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.enableJpegXlFormat),
+    },
+  ],
+  defaultValue: false,
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.RENDERING,
   settingName: 'webp-format-disabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
   storageType: Common.Settings.SettingStorageType.SESSION,
@@ -1158,6 +1184,56 @@ Common.Settings.registerSettingExtension({
   storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.enableRemoteFileLoading),
   settingName: 'network.enable-remote-file-loading',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
+  learnMore: {
+    tooltip: i18nLazyString(UIStrings.remoteFileLoadingInfo),
+  }
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+  title: i18nLazyString(UIStrings.javaScriptSourceMaps),
+  settingName: 'js-source-maps-enabled',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.enableJavaScriptSourceMaps),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.disableJavaScriptSourceMaps),
+    },
+  ],
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+  title: i18nLazyString(UIStrings.cssSourceMaps),
+  settingName: 'css-source-maps-enabled',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.enableCssSourceMaps),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.disableCssSourceMaps),
+    },
+  ],
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.CONSOLE,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+  title: i18nLazyString(UIStrings.logXmlhttprequests),
+  settingName: 'monitoring-xhr-enabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: false,
 });

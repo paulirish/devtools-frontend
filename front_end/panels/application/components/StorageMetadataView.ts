@@ -1,10 +1,12 @@
 // Copyright 2017 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import '../../../ui/components/report_view/report_view.js';
+import '../../../ui/kit/kit.js';
 
+import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
@@ -12,11 +14,10 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as Lit from '../../../ui/lit/lit.js';
+import {html, type LitTemplate, nothing, render, type TemplateResult} from '../../../ui/lit/lit.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import storageMetadataViewStyle from './storageMetadataView.css.js';
-
-const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -115,12 +116,17 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/StorageMetadataView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+export class StorageBucketRevealInfo {
+  constructor(public bucketInfo: Protocol.Storage.StorageBucketInfo) {
+  }
+}
+
 export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #storageBucketsModel?: SDK.StorageBucketsModel.StorageBucketsModel;
   #storageKey: SDK.StorageKeyManager.StorageKey|null = null;
   #storageBucket: Protocol.Storage.StorageBucketInfo|null = null;
-  #showOnlyBucket = true;
+  #showOnlyBucket = false;
 
   setStorageKey(storageKey: string): void {
     this.#storageKey = SDK.StorageKeyManager.parseStorageKey(storageKey);
@@ -147,10 +153,8 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
     return RenderCoordinator.write('StorageMetadataView render', async () => {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      Lit.render(html`
-        <style>
-          ${storageMetadataViewStyle}
-        </style>
+      render(html`
+        <style>${storageMetadataViewStyle}</style>
         <devtools-report .data=${{reportTitle: this.getTitle() ?? i18nString(UIStrings.loading)}}>
           ${await this.renderReportContent()}
         </devtools-report>`, this.#shadow, {host: this});
@@ -167,17 +171,17 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
     return this.#storageBucketsModel ? `${bucketName} - ${origin}` : origin;
   }
 
-  key(content: string|Lit.TemplateResult): Lit.TemplateResult {
+  key(content: string|TemplateResult): TemplateResult {
     return html`<devtools-report-key>${content}</devtools-report-key>`;
   }
 
-  value(content: string|Lit.TemplateResult): Lit.TemplateResult {
+  value(content: string|TemplateResult): TemplateResult {
     return html`<devtools-report-value>${content}</devtools-report-value>`;
   }
 
-  async renderReportContent(): Promise<Lit.LitTemplate> {
+  async renderReportContent(): Promise<LitTemplate> {
     if (!this.#storageKey) {
-      return Lit.nothing;
+      return nothing;
     }
     const origin = this.#storageKey.origin;
     const ancestorChainHasCrossSite =
@@ -196,46 +200,64 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return html`
+  return html`
         ${(isIframeOrEmbedded) ?
           html`${this.key(i18nString(UIStrings.origin))}
             ${this.value(html`<div class="text-ellipsis" title=${origin}>${origin}</div>`)}`
-          : Lit.nothing}
-        ${(topLevelSite || topLevelSiteIsOpaque) ? this.key(i18nString(UIStrings.topLevelSite)) : Lit.nothing}
-        ${topLevelSite ? this.value(topLevelSite) : Lit.nothing}
-        ${topLevelSiteIsOpaque ? this.value(i18nString(UIStrings.opaque)) : Lit.nothing}
-        ${thirdPartyReason ? html`${this.key(i18nString(UIStrings.isThirdParty))}${this.value(thirdPartyReason)}` : Lit.nothing}
+          : nothing}
+        ${(topLevelSite || topLevelSiteIsOpaque) ?
+          this.key(i18nString(UIStrings.topLevelSite)) : nothing}
+        ${topLevelSite ? this.value(topLevelSite) : nothing}
+        ${topLevelSiteIsOpaque ? this.value(i18nString(UIStrings.opaque)) : nothing}
+        ${thirdPartyReason ?  html`
+          ${this.key(i18nString(UIStrings.isThirdParty))}${this.value(thirdPartyReason)}` : nothing}
         ${hasNonce || topLevelSiteIsOpaque ?
-        this.key(i18nString(UIStrings.isOpaque)) : Lit.nothing}
-        ${hasNonce ? this.value(i18nString(UIStrings.yes)) : Lit.nothing}
+          this.key(i18nString(UIStrings.isOpaque)) : nothing}
+        ${hasNonce ? this.value(i18nString(UIStrings.yes)) : nothing}
         ${topLevelSiteIsOpaque ?
-        this.value(i18nString(UIStrings.yesBecauseTopLevelIsOpaque)) : Lit.nothing}
-        ${this.#storageBucket ? this.#renderStorageBucketInfo() : Lit.nothing}
-        ${this.#storageBucketsModel ? this.#renderBucketControls() : Lit.nothing}`;
+          this.value(i18nString(UIStrings.yesBecauseTopLevelIsOpaque)) : nothing}
+        ${this.#storageBucket ? this.#renderStorageBucketInfo() : nothing}
+        ${this.#storageBucketsModel ? this.#renderBucketControls() : nothing}`;
     // clang-format on
   }
 
-  #renderStorageBucketInfo(): Lit.LitTemplate {
+  #renderStorageBucketInfo(): LitTemplate {
     if (!this.#storageBucket) {
       throw new Error('Should not call #renderStorageBucketInfo if #bucket is null.');
     }
     const {bucket: {name}, persistent, durability, quota} = this.#storageBucket;
     const isDefault = !name;
 
-    if (!this.#showOnlyBucket) {
+    const renderBucketName = (): TemplateResult => {
       if (isDefault) {
-        return html`
-          ${this.key(i18nString(UIStrings.bucketName))}
-          ${this.value(html`<span class="default-bucket">default</span>`)}`;
+        return html`<span class="default-bucket">${i18nString(UIStrings.defaultBucket)}</span>`;
       }
+      if (!this.#showOnlyBucket) {
+        return html`${name}`;
+      }
+      const revealBucket = (e: Event): void => {
+        e.preventDefault();
+        void Common.Revealer.reveal(
+            new StorageBucketRevealInfo(this.#storageBucket as Protocol.Storage.StorageBucketInfo));
+      };
+      return html`<devtools-link
+        @click=${revealBucket}
+        title=${name}
+        jslog=${VisualLogging.action('storage-bucket').track({
+        click: true
+      })}
+      >${name}</devtools-link>`;
+    };
+
+    if (this.#showOnlyBucket) {
       return html`
         ${this.key(i18nString(UIStrings.bucketName))}
-        ${this.value(name)}`;
+        ${this.value(renderBucketName())}`;
     }
     // clang-format off
     return html`
       ${this.key(i18nString(UIStrings.bucketName))}
-      ${this.value(name || html`<span class="default-bucket">default</span>`)}
+      ${this.value(renderBucketName())}
       ${this.key(i18nString(UIStrings.persistent))}
       ${this.value(persistent ? i18nString(UIStrings.yes) : i18nString(UIStrings.no))}
       ${this.key(i18nString(UIStrings.durability))}
@@ -260,18 +282,17 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
     return (new Date(expiration * 1000)).toLocaleString();
   }
 
-  #renderBucketControls(): Lit.TemplateResult {
+  #renderBucketControls(): TemplateResult {
     // clang-format off
-    return html`
-      <devtools-report-divider></devtools-report-divider>
-      <devtools-report-section>
-        <devtools-button
-          aria-label=${i18nString(UIStrings.deleteBucket)}
-          .variant=${Buttons.Button.Variant.OUTLINED}
-          @click=${this.#deleteBucket}>
-          ${i18nString(UIStrings.deleteBucket)}
-        </devtools-button>
-      </devtools-report-section>`;
+  return html`
+    <devtools-report-divider></devtools-report-divider>
+    <devtools-report-section>
+      <devtools-button aria-label=${i18nString(UIStrings.deleteBucket)}
+                       .variant=${Buttons.Button.Variant.OUTLINED}
+                       @click=${this.#deleteBucket}>
+        ${i18nString(UIStrings.deleteBucket)}
+      </devtools-button>
+    </devtools-report-section>`;
     // clang-format on
   }
 

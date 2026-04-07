@@ -9,17 +9,18 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import type {ForcedReflowInsightModel} from '../../../../models/trace/insights/ForcedReflow.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../../ui/legacy/components/utils/utils.js';
+import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
-import {createLimitedRows, renderOthersLabel, type TableData, type TableDataRow} from './Table.js';
+import {createLimitedRows, renderOthersLabel, Table, type TableDataRow} from './Table.js';
 
 const {UIStrings, i18nString, createOverlayForEvents} = Trace.Insights.Models.ForcedReflow;
 
 const {html, nothing} = Lit;
+const {widget} = UI.Widget;
 
 export class ForcedReflow extends BaseInsightComponent<ForcedReflowInsightModel> {
-  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-forced-reflow`;
   override internalName = 'forced-reflow';
 
   protected override hasAskAiSupport(): boolean {
@@ -41,7 +42,7 @@ export class ForcedReflow extends BaseInsightComponent<ForcedReflowInsightModel>
   }
 
   #linkifyUrl(callFrame: Trace.Types.Events.CallFrame|Protocol.Runtime.CallFrame|null): Lit.LitTemplate {
-    const style = 'display: flex; gap: 4px; padding: 4px 0; overflow: hidden; white-space: nowrap';
+    const style = 'display: flex; gap: 4px; overflow: hidden; white-space: nowrap';
     if (!callFrame) {
       return html`<div style=${style}>${i18nString(UIStrings.unattributed)}</div>`;
     }
@@ -86,8 +87,8 @@ export class ForcedReflow extends BaseInsightComponent<ForcedReflowInsightModel>
     return html`
       ${topLevelFunctionCallData ? html`
         <div class="insight-section">
-          <devtools-performance-table
-            .data=${{
+          ${widget(Table, {
+           data: {
               insight: this,
               headers: [i18nString(UIStrings.topTimeConsumingFunctionCall), i18nString(UIStrings.totalReflowTime)],
               rows: [{
@@ -97,27 +98,17 @@ export class ForcedReflow extends BaseInsightComponent<ForcedReflowInsightModel>
                 ],
                 overlays: createOverlayForEvents(topLevelFunctionCallData.topLevelFunctionCallEvents, 'INFO'),
               }],
-            } as TableData}>
-          </devtools-performance-table>
+            }})}
         </div>
       ` : nothing}
       <div class="insight-section">
-        <devtools-performance-table
-          .data=${{
+        ${widget(Table, {
+           data: {
             insight: this,
-            headers: [i18nString(UIStrings.relatedStackTrace)],
+            headers: [i18nString(UIStrings.reflowCallFrames)],
             rows,
-        } as TableData}>
-        </devtools-performance-table>
+        }})}
       </div>`;
     // clang-format on
   }
 }
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-performance-forced-reflow': ForcedReflow;
-  }
-}
-
-customElements.define('devtools-performance-forced-reflow', ForcedReflow);

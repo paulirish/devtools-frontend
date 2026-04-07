@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as HeapSnapshotModel from '../../models/heap_snapshot_model/heap_snapshot_model.js';
+import type * as PlatformApi from '../../core/platform/api/api.js';
+import * as HeapSnapshotModel from '../../models/heap_snapshot/heap_snapshot.js';
 
 // We mirror what heap_snapshot_worker.ts does, but we can't use it here as we'd have a
 // cyclic GN dependency otherwise.
@@ -33,11 +34,12 @@ export class HeapSnapshotWorkerDispatcher {
     this.#postMessage({eventName: name, data});
   }
 
-  async dispatchMessage({data, ports}:
-                            {data: HeapSnapshotModel.HeapSnapshotModel.WorkerCommand, ports: readonly MessagePort[]}):
-      Promise<void> {
-    const response: DispatcherResponse =
-        {callId: data.callId, result: null, error: undefined, errorCallStack: undefined, errorMethodName: undefined};
+  async dispatchMessage({data, ports}: PlatformApi.HostRuntime
+                            .WorkerMessageEvent<HeapSnapshotModel.HeapSnapshotModel.WorkerCommand>): Promise<void> {
+    const response: DispatcherResponse = {
+      callId: data.callId,
+      result: null,
+    };
     try {
       switch (data.disposition) {
         case 'createLoader':

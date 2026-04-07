@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../kit/kit.js';
+import '../../../components/highlighting/highlighting.js';
+
 import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Diff from '../../../../third_party/diff/diff.js';
-import * as IconButton from '../../../components/icon_button/icon_button.js';
+import {html, nothing, type TemplateResult} from '../../../lit/lit.js';
 import * as UI from '../../legacy.js';
 
 import {FilteredListWidget, Provider, registerProvider} from './FilteredListWidget.js';
@@ -17,7 +20,7 @@ const UIStrings = {
   /**
    * @description Message to display if a setting change requires a reload of DevTools
    */
-  oneOrMoreSettingsHaveChanged: 'One or more settings have changed which requires a reload to take effect',
+  settingsChangedReloadDevTools: 'Settings changed. To apply, reload DevTools.',
   /**
    * @description Text in Command Menu of the Command Menu
    */
@@ -119,7 +122,7 @@ export class CommandMenu {
 
         if (reloadRequired) {
           UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning(
-              i18nString(UIStrings.oneOrMoreSettingsHaveChanged));
+              i18nString(UIStrings.settingsChangedReloadDevTools));
         }
       },
       availableHandler,
@@ -153,7 +156,6 @@ export class CommandMenu {
       jslogContext: action.id(),
       executeHandler: action.execute.bind(action),
       userActionCode,
-      availableHandler: undefined,
       isPanelOrDrawer: panelOrDrawer,
     });
   }
@@ -188,7 +190,6 @@ export class CommandMenu {
       jslogContext: id,
       executeHandler,
       userActionCode,
-      availableHandler: undefined,
       isPanelOrDrawer: panelOrDrawer,
       featurePromotionId,
     });
@@ -201,7 +202,7 @@ export class CommandMenu {
         locations.set(name, category);
       }
     }
-    const views = UI.ViewManager.getRegisteredViewExtensions();
+    const views = UI.ViewManager.ViewManager.instance().getRegisteredViewExtensions();
     for (const view of views) {
       const viewLocation = view.location();
       const category = viewLocation && locations.get(viewLocation);
@@ -273,7 +274,7 @@ export class CommandMenuProvider extends Provider {
   private commands: Command[];
 
   constructor(commandsForTest: Command[] = []) {
-    super('command');
+    super();
     this.commands = commandsForTest;
   }
 
@@ -340,37 +341,26 @@ export class CommandMenuProvider extends Provider {
     return score;
   }
 
-  override renderItem(itemIndex: number, query: string, titleElement: Element, subtitleElement: Element): void {
+  override renderItem(itemIndex: number, query: string): TemplateResult {
     const command = this.commands[itemIndex];
-
-    titleElement.removeChildren();
-    const icon = IconButton.Icon.create(categoryIcons[command.category]);
-    titleElement.parentElement?.parentElement?.insertBefore(icon, titleElement.parentElement);
-    UI.UIUtils.createTextChild(titleElement, command.title);
-    FilteredListWidget.highlightRanges(titleElement, query, true);
-
-    if (command.featurePromotionId) {
-      const badge = UI.UIUtils.maybeCreateNewBadge(command.featurePromotionId);
-      if (badge) {
-        titleElement.parentElement?.insertBefore(badge, subtitleElement);
-      }
-    }
-
-    subtitleElement.textContent = command.shortcut;
-
+    const badge = command.featurePromotionId ? UI.UIUtils.maybeCreateNewBadge(command.featurePromotionId) : undefined;
     const deprecationWarning = command.deprecationWarning;
-    if (deprecationWarning) {
-      const deprecatedTagElement = titleElement.parentElement?.createChild('span', 'deprecated-tag');
-      if (deprecatedTagElement) {
-        deprecatedTagElement.textContent = i18nString(UIStrings.deprecated);
-        deprecatedTagElement.title = deprecationWarning;
-      }
-    }
-    const tagElement = titleElement.parentElement?.parentElement?.createChild('span', 'tag');
-    if (!tagElement) {
-      return;
-    }
-    tagElement.textContent = command.category;
+    // clang-format off
+    return html`
+      <devtools-icon name=${categoryIcons[command.category]}></devtools-icon>
+      <div>
+        <devtools-highlight type="markup" ranges=${FilteredListWidget.getHighlightRanges(command.title, query, true)}>
+          ${command.title}
+        </devtools-highlight>
+        ${badge ?? nothing}
+        <div>${command.shortcut}</div>
+        ${deprecationWarning ? html`
+          <span class="deprecated-tag" title=${deprecationWarning}>
+            ${i18nString(UIStrings.deprecated)}
+          </span>` : nothing}
+      </div>
+      <span class="tag">${command.category}</span>`;
+    // clang-format on
   }
 
   override jslogContextAt(itemIndex: number): string {
@@ -467,4 +457,5 @@ registerProvider({
   helpTitle: () => i18nString(UIStrings.runCommand),
   titlePrefix: () => i18nString(UIStrings.run),
   titleSuggestion: () => i18nString(UIStrings.command),
+  jslogContext: 'command',
 });

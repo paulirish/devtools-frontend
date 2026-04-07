@@ -1,7 +1,7 @@
 // Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -13,7 +13,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
-// eslint-disable-next-line rulesdir/es-modules-import
+// eslint-disable-next-line @devtools/es-modules-import
 import emptyWidgetStyles from '../../ui/legacy/emptyWidget.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -304,7 +304,16 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    * Called when the `Toggle Record` button is clicked.
    */
   toggleRecording(): void {
-    this.model.setRecording(!this.recordButton.isToggled(), this.serviceName);
+    const isRecording = !this.recordButton.isToggled();
+    this.model.setRecording(isRecording, this.serviceName);
+    const featureName = BackgroundServiceView.getUIString(this.serviceName).toLowerCase();
+
+    if (isRecording) {
+      UI.ARIAUtils.LiveAnnouncer.alert(
+          i18nString(UIStrings.recordingSActivity, {PH1: featureName}) + ' ' +
+          i18nString(UIStrings.devtoolsWillRecordAllSActivity, {PH1: featureName}));
+      this.preview?.focus();
+    }
   }
 
   /**
@@ -375,20 +384,18 @@ export class BackgroundServiceView extends UI.Widget.VBox {
   }
 
   private createDataGrid(): DataGrid.DataGrid.DataGridImpl<EventData> {
-    const columns = ([
-      {id: 'id', title: '#', weight: 1},
-      {id: 'timestamp', title: i18nString(UIStrings.timestamp), weight: 7},
-      {id: 'event-name', title: i18nString(UIStrings.event), weight: 8},
-      {id: 'origin', title: i18nString(UIStrings.origin), weight: 8},
-      {id: 'storage-key', title: i18nString(UIStrings.storageKey), weight: 8},
-      {id: 'sw-scope', title: i18nString(UIStrings.swScope), weight: 4},
-      {id: 'instance-id', title: i18nString(UIStrings.instanceId), weight: 8},
-    ] as DataGrid.DataGrid.ColumnDescriptor[]);
+    const columns: DataGrid.DataGrid.ColumnDescriptor[] = [
+      {id: 'id', title: '#' as Common.UIString.LocalizedString, weight: 1, sortable: false},
+      {id: 'timestamp', title: i18nString(UIStrings.timestamp), weight: 7, sortable: false},
+      {id: 'event-name', title: i18nString(UIStrings.event), weight: 8, sortable: false},
+      {id: 'origin', title: i18nString(UIStrings.origin), weight: 8, sortable: false},
+      {id: 'storage-key', title: i18nString(UIStrings.storageKey), weight: 8, sortable: false},
+      {id: 'sw-scope', title: i18nString(UIStrings.swScope), weight: 4, sortable: false},
+      {id: 'instance-id', title: i18nString(UIStrings.instanceId), weight: 8, sortable: false},
+    ];
     const dataGrid = new DataGrid.DataGrid.DataGridImpl({
       displayName: i18nString(UIStrings.backgroundServices),
       columns,
-      refreshCallback: undefined,
-      deleteCallback: undefined,
     });
     dataGrid.setStriped(true);
 
@@ -508,7 +515,7 @@ export class BackgroundServiceView extends UI.Widget.VBox {
           {jslogContext: 'start-recording', variant: Buttons.Button.Variant.TONAL});
       emptyWidget.contentElement.appendChild(button);
     }
-
+    emptyWidget.setDefaultFocusedElement(emptyWidget.contentElement);
     this.preview = emptyWidget;
     this.preview.show(this.previewPanel.contentElement);
   }

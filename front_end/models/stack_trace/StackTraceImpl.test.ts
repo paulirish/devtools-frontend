@@ -5,7 +5,7 @@
 import {protocolCallFrame, stringifyFragment} from '../../testing/StackTraceHelpers.js';
 
 // TODO(crbug.com/444191656): Expose a `testing` bundle.
-// eslint-disable-next-line rulesdir/es-modules-import
+// eslint-disable-next-line @devtools/es-modules-import
 import * as StackTraceImpl from './stack_trace_impl.js';
 
 describe('FragmentImpl', () => {
@@ -71,6 +71,10 @@ describe('FragmentImpl', () => {
       const fragment = FragmentImpl.getOrCreate(node);
 
       assert.strictEqual(stringifyFragment(fragment), 'at foo (foo.ts:1:0)');
+    });
+
+    it('handles empty fragments correctly', () => {
+      assert.lengthOf(FragmentImpl.EMPTY_FRAGMENT.frames, 0);
     });
   });
 });

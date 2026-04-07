@@ -5,12 +5,13 @@
 // WARNING: don't use this rollup plugin outside of inspector_overlay.
 // See README for special constraints the overlay has.
 
-module.exports = function loadCSS() {
+// eslint-disable-next-line import/no-default-export
+export default function loadCSS() {
   return {
     name: 'loadCSS',
     /**
-     * @param code
-     * @param id
+     * @param code {string}
+     * @param id {string}
      */
     transform(code, id) {
       if (id.endsWith('.css')) {
@@ -20,10 +21,10 @@ module.exports = function loadCSS() {
             style.replaceSync(${JSON.stringify(code)});
             export default style;
           `,
-          map: null
+          map: null,
         };
       }
       return;
-    }
+    },
   };
-};
+}

@@ -53,7 +53,7 @@ if (import.meta.url.endsWith(process?.argv[1])) {
 
 function cli() {
   const filename = process.argv.at(2);
-  if (!filename) throw new Error('Provide filename');
+  if (!filename) {throw new Error('Provide filename');}
 
   const issues = analyzeInspectorIssues(filename);
   console.log(issues);

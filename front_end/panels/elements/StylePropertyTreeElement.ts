@@ -1,8 +1,8 @@
 // Copyright 2018 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-imperative-dom-api */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -10,12 +10,13 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Tooltips from '../../ui/components/tooltips/tooltips.js';
+import {createIcon, Icon} from '../../ui/kit/kit.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -44,18 +45,17 @@ import {
   URLRenderer
 } from './PropertyRenderer.js';
 import {StyleEditorWidget} from './StyleEditorWidget.js';
-import type {StylePropertiesSection} from './StylePropertiesSection.js';
+import type {ActiveAiSuggestionProperty, StylePropertiesSection} from './StylePropertiesSection.js';
 import {getCssDeclarationAsJavascriptProperty} from './StylePropertyUtils.js';
-import {
-  CSSPropertyPrompt,
-  REGISTERED_PROPERTY_SECTION_NAME,
-  StylesSidebarPane,
-} from './StylesSidebarPane.js';
+import type {StylesContainer} from './StylesContainer.js';
+import {CSSPropertyPrompt, REGISTERED_PROPERTY_SECTION_NAME} from './StylesSidebarPane.js';
 
 const {html, nothing, render, Directives: {classMap}} = Lit;
 const ASTUtils = SDK.CSSPropertyParser.ASTUtils;
 const FlexboxEditor = ElementsComponents.StylePropertyEditor.FlexboxEditor;
 const GridEditor = ElementsComponents.StylePropertyEditor.GridEditor;
+const GridLanesEditor = ElementsComponents.StylePropertyEditor.GridLanesEditor;
+const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
@@ -100,6 +100,14 @@ const UIStrings = {
    */
   viewComputedValue: 'View computed value',
   /**
+   * @description Tooltip text for a style property overridden by an animation.
+   */
+  overriddenByAnimation: 'Overridden by animation styles.',
+  /**
+   * @description Link text in the tooltip to open the Animations panel.
+   */
+  openAnimationsPanel: 'Open Animations panel',
+  /**
    * @description Title of the button that opens the flexbox editor in the Styles panel.
    */
   flexboxEditorButton: 'Open `flexbox` editor',
@@ -107,6 +115,10 @@ const UIStrings = {
    * @description Title of the button that opens the CSS Grid editor in the Styles panel.
    */
   gridEditorButton: 'Open `grid` editor',
+  /**
+   * @description Title of the button that opens the CSS Grid Lanes editor in the Styles panel.
+   */
+  gridLanesEditorButton: 'Open `grid-lanes` editor',
   /**
    * @description A context menu item in Styles panel to copy CSS declaration as JavaScript property.
    */
@@ -147,10 +159,10 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/StylePropertyTreeElement.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const parentMap = new WeakMap<StylesSidebarPane, StylePropertyTreeElement>();
+const parentMap = new WeakMap<StylesContainer, StylePropertyTreeElement>();
 
 interface StylePropertyTreeElementParams {
-  stylesPane: StylesSidebarPane;
+  stylesContainer: StylesContainer;
   section: StylePropertiesSection;
   matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   property: SDK.CSSProperty.CSSProperty;
@@ -165,7 +177,8 @@ export class EnvFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatch
   // clang-format on
   constructor(
       readonly treeElement: StylePropertyTreeElement|null,
-      readonly matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, readonly computedStyles: Map<string, string>) {
+      readonly matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, readonly computedStyles: Map<string, string>,
+      readonly computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null) {
     super();
   }
   override render(match: SDK.CSSPropertyParserMatchers.EnvFunctionMatch, context: RenderingContext): Node[] {
@@ -182,7 +195,8 @@ export class EnvFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatch
 
     const span = document.createElement('span');
     const func =
-        this.treeElement?.getTracingTooltip('env', match.node, this.matchedStyles, this.computedStyles, context) ??
+        this.treeElement?.getTracingTooltip(
+            'env', match.node, this.matchedStyles, this.computedStyles, this.computedStyleExtraFields, context) ??
         'env';
     const valueClass = classMap({'inactive-value': !match.varNameIsValid});
     const fallbackClass = classMap({'inactive-value': match.varNameIsValid});
@@ -196,35 +210,68 @@ export class EnvFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatch
   }
 }
 // clang-format off
-export class FlexGridRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.FlexGridMatch) {
+export class FlexGridRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.FlexGridGridLanesMatch) {
   // clang-format on
   readonly #treeElement: StylePropertyTreeElement|null;
-  readonly #stylesPane: StylesSidebarPane;
-  constructor(stylesPane: StylesSidebarPane, treeElement: StylePropertyTreeElement|null) {
+  readonly #stylesContainer: StylesContainer;
+  constructor(stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
   }
 
-  override render(match: SDK.CSSPropertyParserMatchers.FlexGridMatch, context: RenderingContext): Node[] {
+  override render(match: SDK.CSSPropertyParserMatchers.FlexGridGridLanesMatch, context: RenderingContext): Node[] {
     const children = Renderer.render(ASTUtils.siblings(ASTUtils.declValue(match.node)), context).nodes;
     if (!this.#treeElement?.editable()) {
       return children;
     }
     const key =
         `${this.#treeElement.section().getSectionIdx()}_${this.#treeElement.section().nextEditorTriggerButtonIdx}`;
+
+    function getEditorClass(layoutType: SDK.CSSPropertyParserMatchers.LayoutType): typeof FlexboxEditor|
+        typeof GridEditor|typeof GridLanesEditor {
+      switch (layoutType) {
+        case SDK.CSSPropertyParserMatchers.LayoutType.FLEX:
+          return FlexboxEditor;
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID:
+          return GridEditor;
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID_LANES:
+          return GridLanesEditor;
+      }
+    }
+
+    function getButtonTitle(layoutType: SDK.CSSPropertyParserMatchers.LayoutType): string {
+      switch (layoutType) {
+        case SDK.CSSPropertyParserMatchers.LayoutType.FLEX:
+          return i18nString(UIStrings.flexboxEditorButton);
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID:
+          return i18nString(UIStrings.gridEditorButton);
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID_LANES:
+          return i18nString(UIStrings.gridLanesEditorButton);
+      }
+    }
+
+    function getSwatchType(layoutType: SDK.CSSPropertyParserMatchers.LayoutType): Host.UserMetrics.SwatchType {
+      switch (layoutType) {
+        case SDK.CSSPropertyParserMatchers.LayoutType.FLEX:
+          return Host.UserMetrics.SwatchType.FLEX;
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID:
+          return Host.UserMetrics.SwatchType.GRID;
+        case SDK.CSSPropertyParserMatchers.LayoutType.GRID_LANES:
+          return Host.UserMetrics.SwatchType.GRID_LANES;
+      }
+    }
+
     const button = StyleEditorWidget.createTriggerButton(
-        this.#stylesPane, this.#treeElement.section(), match.isFlex ? FlexboxEditor : GridEditor,
-        match.isFlex ? i18nString(UIStrings.flexboxEditorButton) : i18nString(UIStrings.gridEditorButton), key);
+        this.#stylesContainer, this.#treeElement.section(), getEditorClass(match.layoutType),
+        getButtonTitle(match.layoutType), key);
     button.tabIndex = -1;
-    button.setAttribute(
-        'jslog', `${VisualLogging.showStyleEditor().track({click: true}).context(match.isFlex ? 'flex' : 'grid')}`);
+    button.setAttribute('jslog', `${VisualLogging.showStyleEditor().track({click: true}).context(match.layoutType)}`);
     this.#treeElement.section().nextEditorTriggerButtonIdx++;
     button.addEventListener('click', () => {
-      Host.userMetrics.swatchActivated(
-          match.isFlex ? Host.UserMetrics.SwatchType.FLEX : Host.UserMetrics.SwatchType.GRID);
+      Host.userMetrics.swatchActivated(getSwatchType(match.layoutType));
     });
-    const helper = this.#stylesPane.swatchPopoverHelper();
+    const helper = this.#stylesContainer.swatchPopoverHelper();
     if (helper.isShowing(StyleEditorWidget.instance()) && StyleEditorWidget.instance().getTriggerKey() === key) {
       helper.setAnchorElement(button);
     }
@@ -236,11 +283,11 @@ export class FlexGridRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
 export class CSSWideKeywordRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.CSSWideKeywordMatch) {
   // clang-format on
   readonly #treeElement: StylePropertyTreeElement|null;
-  readonly #stylesPane: StylesSidebarPane;
-  constructor(stylesPane: StylesSidebarPane, treeElement: StylePropertyTreeElement|null) {
+  readonly #stylesContainer: StylesContainer;
+  constructor(stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.CSSWideKeywordMatch, context: RenderingContext): Node[] {
@@ -254,7 +301,7 @@ export class CSSWideKeywordRenderer extends rendererBase(SDK.CSSPropertyParserMa
       text: match.text,
       tooltip: resolvedProperty ? undefined : {title: i18nString(UIStrings.sIsNotDefined, {PH1: match.text})},
       isDefined: Boolean(resolvedProperty),
-      onLinkActivate: () => resolvedProperty && this.#stylesPane.jumpToDeclaration(resolvedProperty),
+      onLinkActivate: () => resolvedProperty && this.#stylesContainer.jumpToDeclaration(resolvedProperty),
       jslogContext: 'css-wide-keyword-link',
     };
 
@@ -262,7 +309,7 @@ export class CSSWideKeywordRenderer extends rendererBase(SDK.CSSPropertyParserMa
         SDK.CSSMetadata.cssMetadata().isCustomProperty(resolvedProperty.name)) {
       const color = Common.Color.parse(context.matchedResult.getComputedText(match.node));
       if (color) {
-        return [new ColorRenderer(this.#stylesPane, this.#treeElement).renderColorSwatch(color, swatch), swatch];
+        return [new ColorRenderer(this.#stylesContainer, this.#treeElement).renderColorSwatch(color, swatch), swatch];
       }
     }
 
@@ -273,18 +320,21 @@ export class CSSWideKeywordRenderer extends rendererBase(SDK.CSSPropertyParserMa
 // clang-format off
 export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.VariableMatch) {
   // clang-format on
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #treeElement: StylePropertyTreeElement|null;
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   readonly #computedStyles: Map<string, string>;
+  readonly #computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null;
   constructor(
-      stylesPane: StylesSidebarPane, treeElement: StylePropertyTreeElement|null,
-      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, computedStyles: Map<string, string>) {
+      stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null,
+      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, computedStyles: Map<string, string>,
+      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
     this.#matchedStyles = matchedStyles;
     this.#computedStyles = computedStyles;
+    this.#computedStyleExtraFields = computedStyleExtraFields;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.VariableMatch, context: RenderingContext): Node[] {
@@ -305,7 +355,8 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
             {name: declaration.name, value: declaration.value ?? ''},
             substitution.cachedParsedValue(declaration.declaration, this.#matchedStyles, this.#computedStyles),
             getPropertyRenderers(
-                declaration.name, declaration.style, this.#stylesPane, this.#matchedStyles, null, this.#computedStyles),
+                declaration.name, declaration.style, this.#stylesContainer, this.#matchedStyles, null,
+                this.#computedStyles, this.#computedStyleExtraFields),
             substitution);
         cssControls.forEach((value, key) => value.forEach(control => context.addControl(key, control)));
         return nodes;
@@ -317,10 +368,10 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
 
     const renderedFallback = match.fallback ? Renderer.render(match.fallback, context) : undefined;
 
-    const varCall =
-        this.#treeElement?.getTracingTooltip('var', match.node, this.#matchedStyles, this.#computedStyles, context);
+    const varCall = this.#treeElement?.getTracingTooltip(
+        'var', match.node, this.#matchedStyles, this.#computedStyles, this.#computedStyleExtraFields, context);
     const tooltipContents =
-        this.#stylesPane.getVariablePopoverContents(this.#matchedStyles, match.name, variableValue ?? null);
+        this.#stylesContainer.getVariablePopoverContents(this.#matchedStyles, match.name, variableValue ?? null);
     const tooltipId = this.#treeElement?.getTooltipId('custom-property-var');
     const tooltip = tooltipId ? {tooltipId} : undefined;
     // clang-format off
@@ -354,7 +405,7 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
       return [varSwatch];
     }
 
-    const colorSwatch = new ColorRenderer(this.#stylesPane, this.#treeElement).renderColorSwatch(color, varSwatch);
+    const colorSwatch = new ColorRenderer(this.#stylesContainer, this.#treeElement).renderColorSwatch(color, varSwatch);
     context.addControl('color', colorSwatch);
 
     if (fromFallback) {
@@ -372,12 +423,12 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     Host.userMetrics.swatchActivated(Host.UserMetrics.SwatchType.VAR_LINK);
 
     if (typeof variable === 'string') {
-      this.#stylesPane.jumpToProperty(variable) ||
-          this.#stylesPane.jumpToProperty('initial-value', variable, REGISTERED_PROPERTY_SECTION_NAME);
+      this.#stylesContainer.jumpToProperty(variable) ||
+          this.#stylesContainer.jumpToProperty('initial-value', variable, REGISTERED_PROPERTY_SECTION_NAME);
     } else if (variable.declaration instanceof SDK.CSSProperty.CSSProperty) {
-      this.#stylesPane.revealProperty(variable.declaration);
+      this.#stylesContainer.revealProperty(variable.declaration);
     } else if (variable.declaration instanceof SDK.CSSMatchedStyles.CSSRegisteredProperty) {
-      this.#stylesPane.jumpToProperty('initial-value', variable.name, REGISTERED_PROPERTY_SECTION_NAME);
+      this.#stylesContainer.jumpToProperty('initial-value', variable.name, REGISTERED_PROPERTY_SECTION_NAME);
     }
   }
 }
@@ -385,18 +436,21 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
 // clang-format off
 export class AttributeRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.AttributeMatch) {
   // clang-format on
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #treeElement: StylePropertyTreeElement|null;
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   readonly #computedStyles: Map<string, string>;
+  readonly #computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null;
   constructor(
-      stylesPane: StylesSidebarPane, treeElement: StylePropertyTreeElement|null,
-      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, computedStyles: Map<string, string>) {
+      stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null,
+      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, computedStyles: Map<string, string>,
+      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
     this.#matchedStyles = matchedStyles;
     this.#computedStyles = computedStyles;
+    this.#computedStyleExtraFields = computedStyleExtraFields;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.AttributeMatch, context: RenderingContext): Node[] {
@@ -435,7 +489,8 @@ export class AttributeRenderer extends rendererBase(SDK.CSSPropertyParserMatcher
             .renderValueNodes(
                 {name: '--property', value: match.substitutionText}, matching,
                 getPropertyRenderers(
-                    '--property', match.style, this.#stylesPane, this.#matchedStyles, null, this.#computedStyles),
+                    '--property', match.style, this.#stylesContainer, this.#matchedStyles, null, this.#computedStyles,
+                    this.#computedStyleExtraFields),
                 substitution)
             .nodes;
       }
@@ -443,8 +498,8 @@ export class AttributeRenderer extends rendererBase(SDK.CSSPropertyParserMatcher
 
     const renderedFallback = match.fallback ? Renderer.render(match.fallback, context) : undefined;
 
-    const attrCall =
-        this.#treeElement?.getTracingTooltip('attr', match.node, this.#matchedStyles, this.#computedStyles, context);
+    const attrCall = this.#treeElement?.getTracingTooltip(
+        'attr', match.node, this.#matchedStyles, this.#computedStyles, this.#computedStyleExtraFields, context);
     const tooltipId = attributeMissing ? undefined : this.#treeElement?.getTooltipId('custom-attribute');
     const tooltip = tooltipId ? {tooltipId} : undefined;
     // clang-format off
@@ -472,7 +527,7 @@ export class AttributeRenderer extends rendererBase(SDK.CSSPropertyParserMatcher
       return [varSwatch];
     }
 
-    const colorSwatch = new ColorRenderer(this.#stylesPane, this.#treeElement).renderColorSwatch(color, varSwatch);
+    const colorSwatch = new ColorRenderer(this.#stylesContainer, this.#treeElement).renderColorSwatch(color, varSwatch);
     context.addControl('color', colorSwatch);
 
     if (fromFallback) {
@@ -570,11 +625,11 @@ export class RelativeColorChannelRenderer extends rendererBase(SDK.CSSPropertyPa
 export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ColorMatch) {
   // clang-format on
   readonly #treeElement: StylePropertyTreeElement|null;
-  readonly #stylesPane: StylesSidebarPane;
-  constructor(stylesPane: StylesSidebarPane, treeElement: StylePropertyTreeElement|null) {
+  readonly #stylesContainer: StylesContainer;
+  constructor(stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
   }
 
   #getValueChild(match: SDK.CSSPropertyParserMatchers.ColorMatch, context: RenderingContext): {
@@ -598,7 +653,7 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
         html`${
             this.#treeElement?.getTracingTooltip(
                 func, match.node, this.#treeElement.matchedStyles(), this.#treeElement.getComputedStyles() ?? new Map(),
-                renderingContext) ??
+                this.#treeElement.getComputedStyleExtraFields(), renderingContext) ??
             func}${nodes}`,
         valueChild);
 
@@ -631,7 +686,7 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
         const colorText = document.createElement('span');
         colorText.textContent = displayColor.asString();
         const swatch =
-            new ColorRenderer(this.#stylesPane, null)
+            new ColorRenderer(this.#stylesContainer, null)
                 .renderColorSwatch(
                     displayColor.isGamutClipped() ? color : (displayColor.nickname() ?? displayColor), colorText);
         swatch.addEventListener(InlineEditor.ColorSwatch.ColorChangedEvent.eventName, ev => {
@@ -653,10 +708,10 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
         context.ast.text(match.node.getChild('Callee')).match(/^(hsla?|hwba?)/)) {
       const [angle] = cssControls.get('angle') ?? [];
       if (angle instanceof InlineEditor.CSSAngle.CSSAngle) {
-        angle.updateProperty(swatch.getColor()?.asString() ?? '');
+        angle.updateProperty(swatch.color?.asString() ?? '');
         angle.addEventListener(InlineEditor.InlineEditorUtils.ValueChangedEvent.eventName, ev => {
           const hue = Common.Color.parseHueNumeric(ev.data.value);
-          const color = swatch.getColor();
+          const color = swatch.color;
           if (!hue || !color) {
             return;
           }
@@ -665,7 +720,7 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
           } else if (color.is(Common.Color.Format.HWB) || color.is(Common.Color.Format.HWBA)) {
             swatch.setColor(new Common.Color.HWB(hue, color.w, color.b, color.alpha));
           }
-          angle.updateProperty(swatch.getColor()?.asString() ?? '');
+          angle.updateProperty(swatch.color?.asString() ?? '');
         });
       }
     }
@@ -701,7 +756,7 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
       swatch.addEventListener(InlineEditor.ColorSwatch.ColorFormatChangedEvent.eventName, onColorFormatChanged);
 
       const swatchIcon =
-          new ColorSwatchPopoverIcon(treeElement, treeElement.parentPane().swatchPopoverHelper(), swatch);
+          new ColorSwatchPopoverIcon(treeElement, treeElement.stylesContainer().swatchPopoverHelper(), swatch);
       swatchIcon.addEventListener(ColorSwatchPopoverIconEvents.COLOR_CHANGED, ev => {
         valueChild.textContent = ev.data.getAuthoredText() ?? ev.data.asString();
         swatch.setColor(ev.data);
@@ -715,8 +770,8 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
   }
 
   async #addColorContrastInfo(swatchIcon: ColorSwatchPopoverIcon): Promise<void> {
-    const cssModel = this.#stylesPane.cssModel();
-    const node = this.#stylesPane.node();
+    const cssModel = this.#stylesContainer.cssModel();
+    const node = this.#stylesContainer.node();
     if (!cssModel || typeof node?.id === 'undefined') {
       return;
     }
@@ -729,14 +784,14 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
 export class LightDarkColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.LightDarkColorMatch) {
   // clang-format on
   readonly #treeElement: StylePropertyTreeElement|null;
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   constructor(
-      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      stylesContainer: StylesContainer, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
       treeElement: StylePropertyTreeElement|null) {
     super();
     this.#treeElement = treeElement;
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
     this.#matchedStyles = matchedStyles;
   }
 
@@ -762,7 +817,8 @@ export class LightDarkColorRenderer extends rendererBase(SDK.CSSPropertyParserMa
 
     // Pass an undefined color here to insert a placeholder swatch that will be filled in from the async
     // applyColorScheme below.
-    const colorSwatch = new ColorRenderer(this.#stylesPane, this.#treeElement).renderColorSwatch(undefined, content);
+    const colorSwatch =
+        new ColorRenderer(this.#stylesContainer, this.#treeElement).renderColorSwatch(undefined, content);
     context.addControl('color', colorSwatch);
     void this.applyColorScheme(match, context, colorSwatch, light, dark, lightControls, darkControls);
 
@@ -775,6 +831,9 @@ export class LightDarkColorRenderer extends rendererBase(SDK.CSSPropertyParserMa
       lightControls: SDK.CSSPropertyParser.CSSControlMap,
       darkControls: SDK.CSSPropertyParser.CSSControlMap): Promise<void> {
     const activeColor = await this.#activeColor(match);
+    if (context.signal?.aborted) {
+      return;
+    }
     if (!activeColor) {
       return;
     }
@@ -815,7 +874,7 @@ export class LightDarkColorRenderer extends rendererBase(SDK.CSSPropertyParserMa
       return match.light;
     }
 
-    switch (await this.#stylesPane.cssModel()?.colorScheme()) {
+    switch (await this.#stylesContainer.cssModel()?.colorScheme()) {
       case SDK.CSSModel.ColorScheme.DARK:
         return match.dark;
       case SDK.CSSModel.ColorScheme.LIGHT:
@@ -829,18 +888,21 @@ export class LightDarkColorRenderer extends rendererBase(SDK.CSSPropertyParserMa
 // clang-format off
 export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ColorMixMatch) {
   // clang-format on
-  readonly #pane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   readonly #computedStyles: Map<string, string>;
+  readonly #computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null;
   readonly #treeElement: StylePropertyTreeElement|null;
 
   constructor(
-      pane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      computedStyles: Map<string, string>, treeElement: StylePropertyTreeElement|null) {
+      stylesContainer: StylesContainer, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      computedStyles: Map<string, string>, computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null,
+      treeElement: StylePropertyTreeElement|null) {
     super();
-    this.#pane = pane;
+    this.#stylesContainer = stylesContainer;
     this.#matchedStyles = matchedStyles;
     this.#computedStyles = computedStyles;
+    this.#computedStyleExtraFields = computedStyleExtraFields;
     this.#treeElement = treeElement;
   }
 
@@ -876,7 +938,8 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     render(
         html`${
             this.#treeElement?.getTracingTooltip(
-                'color-mix', match.node, this.#matchedStyles, this.#computedStyles, context) ??
+                'color-mix', match.node, this.#matchedStyles, this.#computedStyles, this.#computedStyleExtraFields,
+                context) ??
             'color-mix'}(${Renderer.render(match.space, childRenderingContexts[0]).nodes}, ${color1.nodes}, ${
             color2.nodes})`,
         contentChild);
@@ -894,19 +957,22 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     const color2Text = match.color2.map(color => context.matchedResult.getComputedText(color)).join(' ');
     const colorMixText = `color-mix(${space}, ${color1Text}, ${color2Text})`;
 
-    const nodeId = this.#pane.node()?.id;
+    const nodeId = this.#stylesContainer.node()?.id;
     if (nodeId !== undefined && childTracingContexts) {
       const evaluation = context.tracing?.applyEvaluation(childTracingContexts, () => {
         const initialColor = Common.Color.parse('#000') as Common.Color.Color;
         const colorText = document.createElement('span');
         colorText.textContent = initialColor.asString();
-        const swatch = new ColorRenderer(this.#pane, null).renderColorSwatch(initialColor, colorText);
+        const swatch = new ColorRenderer(this.#stylesContainer, null).renderColorSwatch(initialColor, colorText);
         swatch.addEventListener(InlineEditor.ColorSwatch.ColorChangedEvent.eventName, ev => {
           colorText.textContent = ev.data.color.asString();
         });
         context.addControl('color', swatch);
         const asyncEvalCallback = async(): Promise<boolean> => {
-          const results = await this.#pane.cssModel()?.resolveValues(undefined, nodeId, colorMixText);
+          const results = await this.#stylesContainer.cssModel()?.resolveValues(undefined, nodeId, colorMixText);
+          if (context.signal?.aborted) {
+            return false;
+          }
           if (results) {
             const color = Common.Color.parse(results[0]);
             if (color) {
@@ -966,6 +1032,46 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
 }
 
 // clang-format off
+export class ContrastColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ContrastColorMatch) {
+  // clang-format on
+  readonly #treeElement: StylePropertyTreeElement|null;
+  readonly #stylesContainer: StylesContainer;
+  constructor(stylesContainer: StylesContainer, treeElement: StylePropertyTreeElement|null) {
+    super();
+    this.#treeElement = treeElement;
+    this.#stylesContainer = stylesContainer;
+  }
+
+  override render(match: SDK.CSSPropertyParserMatchers.ContrastColorMatch, context: RenderingContext): Node[] {
+    const content = document.createElement('span');
+    content.appendChild(document.createTextNode('contrast-color('));
+    const param = content.appendChild(document.createElement('span'));
+    content.appendChild(document.createTextNode(')'));
+    Renderer.renderInto(match.color, context, param);
+
+    if (context.matchedResult.hasUnresolvedSubstitutions(match.node)) {
+      return [content];
+    }
+
+    const colorText = context.matchedResult.getComputedText(match.node);
+    const fakeSpan = document.body.appendChild(document.createElement('span'));
+    fakeSpan.style.color = colorText;
+    const resolvedColorText = window.getComputedStyle(fakeSpan).color;
+    fakeSpan.remove();
+
+    const color = Common.Color.parse(resolvedColorText);
+    if (!color) {
+      return [content];
+    }
+
+    const colorSwatch = new ColorRenderer(this.#stylesContainer, this.#treeElement).renderColorSwatch(color, content);
+    context.addControl('color', colorSwatch);
+
+    return [colorSwatch, content];
+  }
+}
+
+// clang-format off
 export class AngleRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.AngleMatch) {
   // clang-format on
   readonly #treeElement: StylePropertyTreeElement|null;
@@ -986,7 +1092,8 @@ export class AngleRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.An
     cssAngle.data = {
       angleText,
       containingPane:
-          (this.#treeElement.parentPane().element.enclosingNodeOrSelfWithClass('style-panes-wrapper') as HTMLElement),
+          (this.#treeElement.stylesContainer().element.enclosingNodeOrSelfWithClass('style-panes-wrapper') as
+           HTMLElement),
     };
     cssAngle.append(valueElement);
 
@@ -998,13 +1105,13 @@ export class AngleRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.An
       }
 
       if (data.open) {
-        treeElement.parentPane().hideAllPopovers();
-        treeElement.parentPane().activeCSSAngle = cssAngle;
+        treeElement.stylesContainer().hideAllPopovers();
+        treeElement.stylesContainer().activeCSSAngle = cssAngle;
         Host.userMetrics.swatchActivated(Host.UserMetrics.SwatchType.ANGLE);
       }
 
       section.element.classList.toggle('has-open-popover', data.open);
-      treeElement.parentPane().setEditingStyle(data.open);
+      treeElement.stylesContainer().setEditingStyle(data.open);
 
       // Commit the value as a major change after the angle popover is closed.
       if (!data.open) {
@@ -1028,11 +1135,11 @@ export class AngleRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.An
 export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.LinkableNameMatch) {
   // clang-format on
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
-  readonly #stylesPane: StylesSidebarPane;
-  constructor(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, stylesSidebarPane: StylesSidebarPane) {
+  readonly #stylesContainer: StylesContainer;
+  constructor(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, stylesContainer: StylesContainer) {
     super();
     this.#matchedStyles = matchedStyles;
-    this.#stylesPane = stylesSidebarPane;
+    this.#stylesContainer = stylesContainer;
   }
 
   #getLinkData(match: SDK.CSSPropertyParserMatchers.LinkableNameMatch):
@@ -1050,8 +1157,9 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
         return {
           jslogContext: 'css-font-palette',
           metric: null,
-          ruleBlock: '@font-palette-values',
-          isDefined: this.#matchedStyles.fontPaletteValuesRule()?.name().text === match.text,
+          ruleBlock: '@font-*',
+          isDefined: Boolean(this.#matchedStyles.atRules().find(
+              ar => ar.type() === 'font-palette-values' && ar.name()?.text === match.text)),
         };
       case SDK.CSSPropertyParserMatchers.LinkableNameProperties.POSITION_TRY:
       case SDK.CSSPropertyParserMatchers.LinkableNameProperties.POSITION_TRY_FALLBACKS:
@@ -1073,7 +1181,11 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
       isDefined,
       onLinkActivate: (): void => {
         metric && Host.userMetrics.swatchActivated(metric);
-        this.#stylesPane.jumpToSectionBlock(`${ruleBlock} ${match.text}`);
+        if (match.propertyName === SDK.CSSPropertyParserMatchers.LinkableNameProperties.FONT_PALETTE) {
+          this.#stylesContainer.jumpToFontPaletteDefinition(match.text);
+        } else {
+          this.#stylesContainer.jumpToSectionBlock(`${ruleBlock} ${match.text}`);
+        }
       },
       jslogContext,
     };
@@ -1083,7 +1195,7 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
       const el = document.createElement('span');
       el.appendChild(swatch);
 
-      const node = this.#stylesPane.node();
+      const node = this.#stylesContainer.node();
       if (node) {
         const animationModel = node.domModel().target().model(SDK.AnimationModel.AnimationModel);
         void animationModel?.getAnimationGroupForAnimation(match.text, node.id).then(maybeAnimationGroup => {
@@ -1091,7 +1203,7 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
             return;
           }
 
-          const icon = IconButton.Icon.create('animation', 'open-in-animations-panel');
+          const icon = createIcon('animation', 'open-in-animations-panel');
           icon.setAttribute('jslog', `${VisualLogging.link('open-in-animations-panel').track({click: true})}`);
           icon.setAttribute('role', 'button');
           icon.setAttribute('title', i18nString(UIStrings.jumpToAnimationsPanel));
@@ -1126,8 +1238,8 @@ export class BezierRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.B
             context.matchedResult.getComputedText(match.node))) {
       return nodes;
     }
-    const swatchPopoverHelper = this.#treeElement.parentPane().swatchPopoverHelper();
-    const icon = IconButton.Icon.create('bezier-curve-filled', 'bezier-swatch-icon');
+    const swatchPopoverHelper = this.#treeElement.stylesContainer().swatchPopoverHelper();
+    const icon = createIcon('bezier-curve-filled', 'bezier-swatch-icon');
     icon.setAttribute('jslog', `${VisualLogging.showStyleEditor('bezier')}`);
     icon.tabIndex = -1;
     icon.addEventListener('click', () => {
@@ -1136,18 +1248,23 @@ export class BezierRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.B
     const bezierText = document.createElement('span');
     bezierText.append(...nodes);
     new BezierPopoverIcon({treeElement: this.#treeElement, swatchPopoverHelper, swatch: icon, bezierText});
-    return [icon, bezierText];
+    const iconAndTextContainer = document.createElement('span');
+    iconAndTextContainer.classList.add('bezier-icon-and-text');
+    iconAndTextContainer.append(icon);
+    iconAndTextContainer.append(bezierText);
+    return [iconAndTextContainer];
   }
 }
 
 // clang-format off
 export class AutoBaseRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.AutoBaseMatch) {
-  readonly #computedStyle: Map<string, string>;
+  readonly #computedStyleExtraFields : Protocol.CSS.ComputedStyleExtraFields|null;
   // clang-format on
 
-  constructor(computedStyle: Map<string, string>) {
+  constructor(
+      computedStyle: Map<string, string>, computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null) {
     super();
-    this.#computedStyle = computedStyle;
+    this.#computedStyleExtraFields = computedStyleExtraFields;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.AutoBaseMatch, context: RenderingContext): Node[] {
@@ -1161,8 +1278,9 @@ export class AutoBaseRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     Renderer.renderInto(match.auto, context, auto);
     Renderer.renderInto(match.base, context, base);
 
-    const activeAppearance = this.#computedStyle.get('appearance');
-    if (activeAppearance?.startsWith('base')) {
+    // TODO(crbug.com/475522248): Consider cases with nested elements which
+    // support base appearance and ensure the logic matches StyleAdjuster in blink.
+    if (this.#computedStyleExtraFields?.isAppearanceBase) {
       auto.classList.add('inactive-value');
     } else {
       base.classList.add('inactive-value');
@@ -1419,7 +1537,8 @@ export class ShadowRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.S
           properties.push({value, source, propertyType: ShadowPropertyType.INSET, expansionContext});
         } else if (
             match instanceof SDK.CSSPropertyParserMatchers.ColorMatch ||
-            match instanceof SDK.CSSPropertyParserMatchers.ColorMixMatch) {
+            match instanceof SDK.CSSPropertyParserMatchers.ColorMixMatch ||
+            match instanceof SDK.CSSPropertyParserMatchers.ContrastColorMatch) {
           if (properties.find(({propertyType}) => propertyType === ShadowPropertyType.COLOR)) {
             return null;
           }
@@ -1463,7 +1582,7 @@ export class ShadowRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.S
       const contents = document.createElement('span');
       model.renderContents(contents);
       const popoverHelper = new ShadowSwatchPopoverHelper(
-          this.#treeElement, this.#treeElement.parentPane().swatchPopoverHelper(), swatch);
+          this.#treeElement, this.#treeElement.stylesContainer().swatchPopoverHelper(), swatch);
       const treeElement = this.#treeElement;
       popoverHelper.addEventListener(ShadowEvents.SHADOW_CHANGED, () => {
         model.renderContents(contents);
@@ -1504,11 +1623,17 @@ export class GridTemplateRenderer extends rendererBase(SDK.CSSPropertyParserMatc
 
     const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
     const container = document.createDocumentFragment();
-    for (const line of match.lines) {
-      const value = Renderer.render(line, context);
-      const lineBreak = UI.Fragment.html`<br /><span class='styles-clipboard-only'>${indent.repeat(2)}</span>`;
-      container.append(lineBreak, ...value.nodes);
-    }
+
+    const template = html`
+      ${match.lines.map(line => {
+      const lines = Renderer.render(line, context).nodes;
+      return html`
+        <span class='styles-clipboard-only'>${indent.repeat(2)}</span>
+        ${lines}`;
+    })}
+    `;
+
+    render(template, container);
     return [container];
   }
 }
@@ -1526,8 +1651,8 @@ export const SHORTHANDS_FOR_PERCENTAGES = new Set([
 ]);
 
 async function resolveValues(
-    stylesPane: StylesSidebarPane, propertyName: string, match: SDK.CSSPropertyParser.Match, context: RenderingContext,
-    ...values: string[]): Promise<string[]|null|undefined> {
+    stylesContainer: StylesContainer, propertyName: string, match: SDK.CSSPropertyParser.Match,
+    context: RenderingContext, ...values: string[]): Promise<string[]|null|undefined> {
   // We want to resolve values against the original property we're tracing and not the property we're substituting,
   // so try to look up the original name.
   propertyName = context.tracing?.propertyName ?? context.matchedResult.ast.propertyName ?? propertyName;
@@ -1536,24 +1661,24 @@ async function resolveValues(
       (context.tracing?.expandPercentagesInShorthands ?? context.matchedResult.getLonghandValuesCount() > 1)) {
     propertyName = context.getComputedLonghandName(match.node) ?? propertyName;
   }
-  const nodeId = stylesPane.node()?.id;
+  const nodeId = stylesContainer.node()?.id;
   if (nodeId === undefined) {
     return null;
   }
 
-  return (await stylesPane.cssModel()?.resolveValues(propertyName, nodeId, ...values)) ??
-      (await stylesPane.cssModel()?.resolveValues(undefined, nodeId, ...values));
+  return (await stylesContainer.cssModel()?.resolveValues(propertyName, nodeId, ...values)) ??
+      (await stylesContainer.cssModel()?.resolveValues(undefined, nodeId, ...values));
 }
 
 // clang-format off
 export class LengthRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.LengthMatch) {
   // clang-format on
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #treeElement: StylePropertyTreeElement|null;
   readonly #propertyName: string;
-  constructor(stylesPane: StylesSidebarPane, propertyName: string, treeElement: StylePropertyTreeElement|null) {
+  constructor(stylesContainer: StylesContainer, propertyName: string, treeElement: StylePropertyTreeElement|null) {
     super();
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
     this.#treeElement = treeElement;
     this.#propertyName = propertyName;
   }
@@ -1563,9 +1688,8 @@ export class LengthRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.L
     valueElement.tabIndex = -1;
     valueElement.textContent = match.text;
 
-    if (!context.tracing) {
-      void this.#attachPopover(valueElement, match, context);
-    }
+    const tooltip = this.#getTooltip(valueElement, match, context);
+
     const evaluation = context.tracing?.applyEvaluation([], () => {
       return {
         placeholder: [valueElement],
@@ -1573,12 +1697,20 @@ export class LengthRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.L
       };
     });
 
-    return evaluation ?? [valueElement];
+    if (evaluation) {
+      return evaluation;
+    }
+
+    return tooltip ? [valueElement, tooltip] : [valueElement];
   }
 
   async #applyEvaluation(
       valueElement: HTMLElement, match: SDK.CSSPropertyParser.Match, context: RenderingContext): Promise<boolean> {
-    const pixelValue = await resolveValues(this.#stylesPane, this.#propertyName, match, context, match.text);
+    const pixelValue = await resolveValues(this.#stylesContainer, this.#propertyName, match, context, match.text);
+
+    if (context.signal?.aborted) {
+      return false;
+    }
 
     if (pixelValue?.[0] && pixelValue?.[0] !== match.text) {
       valueElement.textContent = pixelValue[0];
@@ -1588,43 +1720,50 @@ export class LengthRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.L
     return false;
   }
 
-  async #attachPopover(
-      valueElement: HTMLElement, match: SDK.CSSPropertyParser.Match, context: RenderingContext): Promise<void> {
-    const pixelValue = await resolveValues(this.#stylesPane, this.#propertyName, match, context, match.text);
+  #getTooltip(valueElement: HTMLElement, match: SDK.CSSPropertyParser.Match, context: RenderingContext):
+      Tooltips.Tooltip.Tooltip|undefined {
+    const tooltipId = this.#treeElement?.getTooltipId('length');
+    if (!tooltipId) {
+      return undefined;
+    }
+    valueElement.setAttribute('aria-details', tooltipId);
+    const tooltip = new Tooltips.Tooltip.Tooltip(
+        {anchor: valueElement, variant: 'rich', id: tooltipId, jslogContext: 'length-popover'});
+    tooltip.addEventListener('beforetoggle', () => this.getTooltipValue(tooltip, match, context), {once: true});
+    return tooltip;
+  }
+
+  async getTooltipValue(
+      tooltip: Tooltips.Tooltip.Tooltip, match: SDK.CSSPropertyParser.Match, context: RenderingContext): Promise<void> {
+    const pixelValue = await resolveValues(this.#stylesContainer, this.#propertyName, match, context, match.text);
+    if (context.signal?.aborted) {
+      return;
+    }
     if (!pixelValue) {
       return;
     }
-
-    const tooltipId = this.#treeElement?.getTooltipId('length');
-    if (tooltipId) {
-      valueElement.setAttribute('aria-details', tooltipId);
-      const tooltip = new Tooltips.Tooltip.Tooltip(
-          {anchor: valueElement, variant: 'rich', id: tooltipId, jslogContext: 'length-popover'});
-      tooltip.appendChild(document.createTextNode(pixelValue[0]));
-      valueElement.insertAdjacentElement('afterend', tooltip);
-    }
-    this.popOverAttachedForTest();
-  }
-
-  popOverAttachedForTest(): void {
+    tooltip.appendChild(document.createTextNode(pixelValue[0]));
   }
 }
 
 // clang-format off
 export class BaseFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.BaseFunctionMatch) {
   // clang-format on
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   readonly #matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   readonly #computedStyles: Map<string, string>;
+  readonly #computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null;
   readonly #treeElement: StylePropertyTreeElement|null;
   readonly #propertyName: string;
   constructor(
-      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      computedStyles: Map<string, string>, propertyName: string, treeElement: StylePropertyTreeElement|null) {
+      stylesContainer: StylesContainer, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      computedStyles: Map<string, string>, computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null,
+      propertyName: string, treeElement: StylePropertyTreeElement|null) {
     super();
     this.#matchedStyles = matchedStyles;
     this.#computedStyles = computedStyles;
-    this.#stylesPane = stylesPane;
+    this.#computedStyleExtraFields = computedStyleExtraFields;
+    this.#stylesContainer = stylesContainer;
     this.#treeElement = treeElement;
     this.#propertyName = propertyName;
   }
@@ -1642,7 +1781,8 @@ export class BaseFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
     render(
         html`${
             this.#treeElement?.getTracingTooltip(
-                match.func, match.node, this.#matchedStyles, this.#computedStyles, context) ??
+                match.func, match.node, this.#matchedStyles, this.#computedStyles, this.#computedStyleExtraFields,
+                context) ??
             match.func}(${renderedArgs.map((arg, idx) => idx === 0 ? [arg] : [html`, `, arg]).flat()})`,
         span);
 
@@ -1671,7 +1811,10 @@ export class BaseFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
       }
       return null;
     });
-    const evaled = await resolveValues(this.#stylesPane, this.#propertyName, match, context, value);
+    const evaled = await resolveValues(this.#stylesContainer, this.#propertyName, match, context, value);
+    if (context.signal?.aborted) {
+      return false;
+    }
     if (!evaled?.[0] || evaled[0] === value) {
       return false;
     }
@@ -1687,7 +1830,10 @@ export class BaseFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
     // function calls and normalizes all units to px.
     const values = match.args.map(arg => context.matchedResult.getComputedTextRange(arg[0], arg[arg.length - 1]));
     values.unshift(context.matchedResult.getComputedText(match.node));
-    const evaledArgs = await resolveValues(this.#stylesPane, this.#propertyName, match, context, ...values);
+    const evaledArgs = await resolveValues(this.#stylesContainer, this.#propertyName, match, context, ...values);
+    if (context.signal?.aborted) {
+      return;
+    }
     if (!evaledArgs) {
       return;
     }
@@ -1714,16 +1860,16 @@ export class CustomFunctionRenderer extends BaseFunctionRenderer {
 // clang-format off
 export class AnchorFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.AnchorFunctionMatch) {
   // clang-format on
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
 
   static async decorateAnchorForAnchorLink(
-      stylesPane: StylesSidebarPane, container: HTMLElement,
+      stylesContainer: StylesContainer, container: HTMLElement,
       {identifier, needsSpace}: {identifier?: string, needsSpace?: boolean}): Promise<void> {
     if (identifier) {
       render(html`${identifier}`, container, {host: container});
     }
 
-    const anchorNode = await stylesPane.node()?.getAnchorBySpecifier(identifier) ?? undefined;
+    const anchorNode = await stylesContainer.node()?.getAnchorBySpecifier(identifier) ?? undefined;
 
     if (!identifier && !anchorNode) {
       return;
@@ -1780,16 +1926,16 @@ export class AnchorFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMa
     }
   }
 
-  constructor(stylesPane: StylesSidebarPane) {
+  constructor(stylesContainer: StylesContainer) {
     super();
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.AnchorFunctionMatch, context: RenderingContext): Node[] {
     const content = document.createElement('span');
     if (match.node.name === 'VariableName') {
       // Link an anchor double-dashed ident to its matching anchor element.
-      void AnchorFunctionRenderer.decorateAnchorForAnchorLink(this.#stylesPane, content, {identifier: match.text});
+      void AnchorFunctionRenderer.decorateAnchorForAnchorLink(this.#stylesContainer, content, {identifier: match.text});
     } else {
       // The matcher passes a 'CallExpression' node with a functionName
       // ('anchor' or 'anchor-size') if the arguments need to have an implicit
@@ -1800,7 +1946,7 @@ export class AnchorFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMa
       const args = ASTUtils.children(match.node.getChild('ArgList'));
       const remainingArgs = args.splice(1);
       void AnchorFunctionRenderer.decorateAnchorForAnchorLink(
-          this.#stylesPane, swatchContainer, {needsSpace: remainingArgs.length > 1});
+          this.#stylesContainer, swatchContainer, {needsSpace: remainingArgs.length > 1});
       Renderer.renderInto(remainingArgs, context, content);
     }
     return [content];
@@ -1809,17 +1955,17 @@ export class AnchorFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMa
 
 // clang-format off
 export class PositionAnchorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.PositionAnchorMatch) {
-  readonly #stylesPane: StylesSidebarPane;
+  readonly #stylesContainer: StylesContainer;
   // clang-format on
 
-  constructor(stylesPane: StylesSidebarPane) {
+  constructor(stylesContainer: StylesContainer) {
     super();
-    this.#stylesPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.PositionAnchorMatch): Node[] {
     const content = document.createElement('span');
-    void AnchorFunctionRenderer.decorateAnchorForAnchorLink(this.#stylesPane, content, {identifier: match.text});
+    void AnchorFunctionRenderer.decorateAnchorForAnchorLink(this.#stylesContainer, content, {identifier: match.text});
     return [content];
   }
 }
@@ -1857,35 +2003,39 @@ export class PositionTryRenderer extends rendererBase(SDK.CSSPropertyParserMatch
 }
 
 export function getPropertyRenderers(
-    propertyName: string, style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, stylesPane: StylesSidebarPane,
+    propertyName: string, style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, stylesContainer: StylesContainer,
     matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, treeElement: StylePropertyTreeElement|null,
-    computedStyles: Map<string, string>): Array<MatchRenderer<SDK.CSSPropertyParser.Match>> {
+    computedStyles: Map<string, string>, computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null):
+    Array<MatchRenderer<SDK.CSSPropertyParser.Match>> {
   return [
-    new VariableRenderer(stylesPane, treeElement, matchedStyles, computedStyles),
-    new ColorRenderer(stylesPane, treeElement),
-    new ColorMixRenderer(stylesPane, matchedStyles, computedStyles, treeElement),
-    new URLRenderer(style.parentRule, stylesPane.node()),
+    new VariableRenderer(stylesContainer, treeElement, matchedStyles, computedStyles, computedStyleExtraFields),
+    new ColorRenderer(stylesContainer, treeElement),
+    new ColorMixRenderer(stylesContainer, matchedStyles, computedStyles, computedStyleExtraFields, treeElement),
+    new ContrastColorRenderer(stylesContainer, treeElement),
+    new URLRenderer(style.parentRule, stylesContainer.node()),
     new AngleRenderer(treeElement),
-    new LinkableNameRenderer(matchedStyles, stylesPane),
+    new LinkableNameRenderer(matchedStyles, stylesContainer),
     new BezierRenderer(treeElement),
     new StringRenderer(),
     new ShadowRenderer(treeElement),
-    new CSSWideKeywordRenderer(stylesPane, treeElement),
-    new LightDarkColorRenderer(stylesPane, matchedStyles, treeElement),
+    new CSSWideKeywordRenderer(stylesContainer, treeElement),
+    new LightDarkColorRenderer(stylesContainer, matchedStyles, treeElement),
     new GridTemplateRenderer(),
     new LinearGradientRenderer(),
-    new AnchorFunctionRenderer(stylesPane),
-    new PositionAnchorRenderer(stylesPane),
-    new FlexGridRenderer(stylesPane, treeElement),
-    new EnvFunctionRenderer(treeElement, matchedStyles, computedStyles),
+    new AnchorFunctionRenderer(stylesContainer),
+    new PositionAnchorRenderer(stylesContainer),
+    new FlexGridRenderer(stylesContainer, treeElement),
+    new EnvFunctionRenderer(treeElement, matchedStyles, computedStyles, computedStyleExtraFields),
     new PositionTryRenderer(matchedStyles),
-    new LengthRenderer(stylesPane, propertyName, treeElement),
-    new MathFunctionRenderer(stylesPane, matchedStyles, computedStyles, propertyName, treeElement),
-    new CustomFunctionRenderer(stylesPane, matchedStyles, computedStyles, propertyName, treeElement),
-    new AutoBaseRenderer(computedStyles),
+    new LengthRenderer(stylesContainer, propertyName, treeElement),
+    new MathFunctionRenderer(
+        stylesContainer, matchedStyles, computedStyles, computedStyleExtraFields, propertyName, treeElement),
+    new CustomFunctionRenderer(
+        stylesContainer, matchedStyles, computedStyles, computedStyleExtraFields, propertyName, treeElement),
+    new AutoBaseRenderer(computedStyles, computedStyleExtraFields),
     new BinOpRenderer(),
     new RelativeColorChannelRenderer(treeElement),
-    new AttributeRenderer(stylesPane, treeElement, matchedStyles, computedStyles),
+    new AttributeRenderer(stylesContainer, treeElement, matchedStyles, computedStyles, computedStyleExtraFields),
   ];
 }
 
@@ -1895,7 +2045,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   property: SDK.CSSProperty.CSSProperty;
   readonly #inherited: boolean;
   #overloaded: boolean;
-  #parentPane: StylesSidebarPane;
+  #stylesContainer: StylesContainer;
   #parentSection: StylePropertiesSection;
   isShorthand: boolean;
   private readonly applyStyleThrottler = new Common.Throttler.Throttler(0);
@@ -1903,19 +2053,20 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   private expandedDueToFilter = false;
   valueElement: HTMLElement|null = null;
   nameElement: HTMLElement|null = null;
-  private expandElement: IconButton.Icon.Icon|null = null;
+  private expandElement: Icon|null = null;
   private originalPropertyText = '';
   private hasBeenEditedIncrementally = false;
   private prompt: CSSPropertyPrompt|null = null;
   private lastComputedValue: string|null = null;
   private computedStyles: Map<string, string>|null = null;
   private parentsComputedStyles: Map<string, string>|null = null;
+  private computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null = null;
   private contextForTest!: Context|undefined;
   #gridNames: Set<string>|undefined = undefined;
   #tooltipKeyCounts = new Map<string, number>();
 
   constructor(
-      {stylesPane, section, matchedStyles, property, isShorthand, inherited, overloaded, newProperty}:
+      {stylesContainer, section, matchedStyles, property, isShorthand, inherited, overloaded, newProperty}:
           StylePropertyTreeElementParams,
   ) {
     // Pass an empty title, the title gets made later in onattach.
@@ -1927,7 +2078,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.#inherited = inherited;
     this.#overloaded = overloaded;
     this.selectable = false;
-    this.#parentPane = stylesPane;
+    this.#stylesContainer = stylesContainer;
     this.#parentSection = section;
     this.isShorthand = isShorthand;
     this.newProperty = newProperty;
@@ -1935,17 +2086,20 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       this.listItemElement.textContent = '';
     }
 
-    this.property.addEventListener(SDK.CSSProperty.Events.LOCAL_VALUE_UPDATED, () => {
-      this.updateTitle();
-    });
+    this.property.addEventListener(SDK.CSSProperty.Events.LOCAL_VALUE_UPDATED, this.updateTitle, this);
+  }
+
+  override onunbind(): void {
+    this.property.removeEventListener(SDK.CSSProperty.Events.LOCAL_VALUE_UPDATED, this.updateTitle, this);
+    super.onunbind();
   }
 
   async gridNames(): Promise<Set<string>> {
     if (!SDK.CSSMetadata.cssMetadata().isGridNameAwareProperty(this.name)) {
       return new Set();
     }
-    for (let node = this.#parentPane.node()?.parentNode; node; node = node?.parentNode) {
-      const style = await this.#parentPane.cssModel()?.getComputedStyle(node.id);
+    for (let node = this.#stylesContainer.node()?.parentNode; node; node = node?.parentNode) {
+      const style = await this.#stylesContainer.cssModel()?.getComputedStyle(node.id);
       const display = style?.get('display');
       const isGrid = display === 'grid' || display === 'inline-grid';
       if (!isGrid) {
@@ -2018,6 +2172,14 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     return this.computedStyles;
   }
 
+  setComputedStyleExtraFields(computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null): void {
+    this.computedStyleExtraFields = computedStyleExtraFields;
+  }
+
+  getComputedStyleExtraFields(): Protocol.CSS.ComputedStyleExtraFields|null {
+    return this.computedStyleExtraFields;
+  }
+
   setParentsComputedStyles(parentsComputedStyles: Map<string, string>|null): void {
     this.parentsComputedStyles = parentsComputedStyles;
   }
@@ -2031,7 +2193,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   updateFilter(): boolean {
-    const regex = this.#parentPane.filterRegex();
+    const regex = this.#stylesContainer.filterRegex();
     const matches = regex !== null && (regex.test(this.property.name) || regex.test(this.property.value));
     this.listItemElement.classList.toggle('filter-match', matches);
 
@@ -2062,6 +2224,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   renderedPropertyText(): string {
+    if (!this.#isConnected()) {
+      return '';
+    }
     if (!this.nameElement || !this.valueElement) {
       return '';
     }
@@ -2079,7 +2244,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       this.listItemElement.classList.remove('implicit');
     }
 
-    const hasIgnorableError = !this.property.parsedOk && StylesSidebarPane.ignoreErrorsForProperty(this.property);
+    const hasIgnorableError = !this.property.parsedOk && this.property.ignoreErrors();
     if (hasIgnorableError) {
       this.listItemElement.classList.add('has-ignorable-error');
     } else {
@@ -2106,11 +2271,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   node(): SDK.DOMModel.DOMNode|null {
-    return this.#parentPane.node();
+    return this.#stylesContainer.node();
   }
 
-  parentPane(): StylesSidebarPane {
-    return this.#parentPane;
+  stylesContainer(): StylesContainer {
+    return this.#stylesContainer;
   }
 
   section(): StylePropertiesSection {
@@ -2127,9 +2292,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
 
-    this.#parentPane.setUserOperation(true);
+    this.#stylesContainer.setUserOperation(true);
     const success = await this.property.setDisabled(disabled);
-    this.#parentPane.setUserOperation(false);
+    this.#stylesContainer.setUserOperation(false);
 
     if (!success) {
       return;
@@ -2151,7 +2316,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return staticLonghandProperties;
     }
 
-    const parsedLonghands = await this.#parentPane.cssModel()?.agent.invoke_getLonghandProperties(
+    const parsedLonghands = await this.#stylesContainer.cssModel()?.agent.invoke_getLonghandProperties(
         {shorthandName: this.property.name, value: parsedProperty});
     if (!parsedLonghands || parsedLonghands.getError()) {
       return staticLonghandProperties;
@@ -2192,7 +2357,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       }
 
       const item = new StylePropertyTreeElement({
-        stylesPane: this.#parentPane,
+        stylesContainer: this.#stylesContainer,
         section: this.#parentSection,
         matchedStyles: this.#matchedStyles,
         property,
@@ -2212,7 +2377,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     this.listItemElement.addEventListener('mousedown', event => {
       if (event.button === 0) {
-        parentMap.set(this.#parentPane, this);
+        parentMap.set(this.#stylesContainer, this);
       }
     }, false);
     this.listItemElement.addEventListener('mouseup', this.mouseUp.bind(this));
@@ -2287,16 +2452,17 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.#tooltipKeyCounts.clear();
     this.updateState();
     if (this.isExpandable()) {
-      this.expandElement = IconButton.Icon.create('triangle-right', 'expand-icon');
+      this.expandElement = createIcon('triangle-right', 'expand-icon');
       this.expandElement.setAttribute('jslog', `${VisualLogging.expand().track({click: true})}`);
     }
 
     const renderers = this.property.parsedOk ?
         getPropertyRenderers(
-            this.name, this.style, this.#parentPane, this.#matchedStyles, this, this.getComputedStyles() ?? new Map()) :
+            this.name, this.style, this.#stylesContainer, this.#matchedStyles, this,
+            this.getComputedStyles() ?? new Map(), this.getComputedStyleExtraFields()) :
         [];
 
-    if (Root.Runtime.experiments.isEnabled('font-editor') && this.property.parsedOk) {
+    if (Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.FONT_EDITOR) && this.property.parsedOk) {
       renderers.push(new FontRenderer(this));
     }
     this.listItemElement.removeChildren();
@@ -2316,7 +2482,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     if (this.property.name.startsWith('--') &&
         !(this.property.ownerStyle.parentRule instanceof SDK.CSSRule.CSSFunctionRule)) {
-      const contents = this.#parentPane.getVariablePopoverContents(
+      const contents = this.#stylesContainer.getVariablePopoverContents(
           this.matchedStyles(), this.property.name,
           this.#matchedStyles.computeCSSVariable(this.style, this.property.name)?.value ?? null);
       const tooltipId = this.getTooltipId('custom-property-decl');
@@ -2349,7 +2515,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
           return;
         }
 
-        const cssProperty = this.#parentPane.webCustomData?.findCssProperty(this.name);
+        const cssProperty = this.#stylesContainer.webCustomData?.findCssProperty(this.name);
         if (!cssProperty) {
           event.consume(true);
           return;
@@ -2361,8 +2527,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     if (this.valueElement) {
-      const lineBreakValue =
-          this.valueElement.firstElementChild && this.valueElement.firstElementChild.tagName === 'BR';
+      const lineBreakValue = this.valueElement.firstElementChild?.tagName === 'BR';
       const separator = lineBreakValue ? ':' : ': ';
       this.listItemElement.createChild('span', 'styles-name-value-separator').textContent = separator;
       if (this.expandElement) {
@@ -2380,13 +2545,14 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     if (this.property.parsedOk) {
       this.updateAuthoringHint();
+      this.updateAnimationOverrideHint();
     } else {
       // Avoid having longhands under an invalid shorthand.
       this.listItemElement.classList.add('not-parsed-ok');
       // Add a separate exclamation mark IMG element with a tooltip.
       this.listItemElement.insertBefore(
           this.createExclamationMark(
-              this.property, this.#parentPane.getVariableParserError(this.matchedStyles(), this.property.name)),
+              this.property, this.#stylesContainer.getVariableParserError(this.matchedStyles(), this.property.name)),
           this.listItemElement.firstChild);
 
       // When the property is valid but the property value is invalid,
@@ -2485,7 +2651,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         if (!registeredFunction) {
           return;
         }
-        this.#parentPane.jumpToFunctionDefinition(registeredFunction);
+        this.#stylesContainer.jumpToFunctionDefinition(registeredFunction);
       },
     };
     return swatch;
@@ -2493,7 +2659,8 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
   getTracingTooltip(
       functionName: string, node: CodeMirror.SyntaxNode, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      computedStyles: Map<string, string>, context: RenderingContext): Lit.TemplateResult {
+      computedStyles: Map<string, string>, computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null,
+      context: RenderingContext): Lit.TemplateResult {
     if (context.tracing || !context.property) {
       return html`${functionName}`;
     }
@@ -2501,7 +2668,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const expandPercentagesInShorthands = context.matchedResult.getLonghandValuesCount() > 1;
     const shorthandPositionOffset = context.matchedResult.getComputedLonghandName(node);
     const {property} = context;
-    const stylesPane = this.parentPane();
+    const stylesContainer = this.stylesContainer();
     const tooltipId = this.getTooltipId(`${functionName}-trace`);
     // clang-format off
     return html`
@@ -2518,7 +2685,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
                   ?.showTrace(
                     property, text, matchedStyles, computedStyles,
                     getPropertyRenderers(property.name,
-                      property.ownerStyle, stylesPane, matchedStyles, null, computedStyles),
+                      property.ownerStyle, stylesContainer, matchedStyles, null, computedStyles, computedStyleExtraFields),
                     expandPercentagesInShorthands, shorthandPositionOffset, this.openedViaHotkey);
               }
             }}
@@ -2541,7 +2708,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
                 e.consume(true);
               }
             }}
-            .widgetConfig=${UI.Widget.widgetConfig(CSSValueTraceView)}>
+            ${widget(CSSValueTraceView)}>
           </devtools-widget>
         </devtools-tooltip>`;
     // clang-format on
@@ -2580,7 +2747,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
 
-    const cssModel = this.#parentPane.cssModel();
+    const cssModel = this.#stylesContainer.cssModel();
     const fontFaces = cssModel?.fontFaces() || [];
 
     const localName = this.node()?.localName();
@@ -2591,7 +2758,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       if (hint) {
         const wrapper = document.createElement('span');
         wrapper.classList.add('hint-wrapper');
-        const hintIcon = new IconButton.Icon.Icon();
+        const hintIcon = new Icon();
         hintIcon.name = 'info';
         hintIcon.classList.add('hint', 'small');
         hintIcon.tabIndex = -1;
@@ -2609,9 +2776,63 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     }
   }
 
+  updateAnimationOverrideHint(): void {
+    const existingElement = this.listItemElement.querySelector('.animation-override-hint-wrapper');
+    if (existingElement) {
+      existingElement?.remove();
+    }
+
+    if (!this.overriddenByAnimation() || UI.ViewManager.ViewManager.instance().isViewVisible('animations')) {
+      return;
+    }
+
+    const wrapper = document.createElement('span');
+    wrapper.classList.add('animation-override-hint-wrapper', 'hint-wrapper');
+    const hintIcon = new Icon();
+    hintIcon.name = 'info';
+    hintIcon.classList.add('hint', 'small');
+    hintIcon.tabIndex = -1;
+
+    wrapper.append(hintIcon);
+    this.listItemElement.append(wrapper);
+
+    const tooltipId = this.getTooltipId('animation-override-hint');
+    hintIcon.setAttribute('aria-details', tooltipId);
+
+    const tooltip = new Tooltips.Tooltip.Tooltip({
+      anchor: hintIcon,
+      variant: 'rich',
+      padding: 'large',
+      id: tooltipId,
+      jslogContext: 'elements.css-animation-hint'
+    });
+    const message = i18nString(UIStrings.overriddenByAnimation);
+    const content = document.createElement('div');
+    content.classList.add('animation-override-hint');
+    content.textContent = message;
+
+    const link = document.createElement('devtools-link');
+    link.textContent = i18nString(UIStrings.openAnimationsPanel);
+    link.jslogContext = 'open-in-animations-panel';
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      void UI.ViewManager.ViewManager.instance().showView('animations');
+    });
+
+    content.appendChild(document.createTextNode(' '));
+    content.appendChild(link);
+    tooltip.appendChild(content);
+
+    this.listItemElement.appendChild(tooltip);
+  }
+
+  private overriddenByAnimation(): boolean {
+    return this.#matchedStyles.isPropertyOverriddenByAnimation(this.property);
+  }
+
   private mouseUp(event: MouseEvent): void {
-    const activeTreeElement = parentMap.get(this.#parentPane);
-    parentMap.delete(this.#parentPane);
+    const activeTreeElement = parentMap.get(this.#stylesContainer);
+    parentMap.delete(this.#stylesContainer);
     if (!activeTreeElement) {
       return;
     }
@@ -2660,7 +2881,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   private handleContextMenuEvent(context: Context, event: Event): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (this.property.parsedOk && this.parent?.root) {
-      const sectionIndex = this.#parentPane.focusedSectionIndex();
+      const sectionIndex = this.#stylesContainer.focusedSectionIndex();
       contextMenu.defaultSection().appendCheckboxItem(
           i18nString(UIStrings.togglePropertyAndContinueEditing), async () => {
             if (this.treeOutline) {
@@ -2669,7 +2890,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
               this.editingCancelled(context);
               await this.toggleDisabled(!this.property.disabled);
               event.consume();
-              this.#parentPane.continueEditingElement(sectionIndex, propertyIndex);
+              this.#stylesContainer.continueEditingElement(sectionIndex, propertyIndex);
             }
           }, {checked: !this.property.disabled, jslogContext: 'toggle-property-and-continue-editing'});
     }
@@ -2706,7 +2927,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     }, {jslogContext: 'copy-value'});
 
     contextMenu.headerSection().appendItem(i18nString(UIStrings.copyRule), () => {
-      const ruleText = StylesSidebarPane.formatLeadingProperties(this.#parentSection).ruleText;
+      const ruleText = this.#parentSection.formatLeadingProperties().ruleText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(ruleText);
     }, {jslogContext: 'copy-rule'});
 
@@ -2715,7 +2936,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         {jslogContext: 'copy-css-declaration-as-js'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllDeclarations), () => {
-      const allDeclarationText = StylesSidebarPane.formatLeadingProperties(this.#parentSection).allDeclarationText;
+      const allDeclarationText = this.#parentSection.formatLeadingProperties().allDeclarationText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allDeclarationText);
     }, {jslogContext: 'copy-all-declarations'});
 
@@ -2746,8 +2967,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const regex = new RegExp(propertyNamePattern, 'i');
     await computedStyleWidget.filterComputedStyles(regex);
 
-    computedStyleWidget.input.setValue(this.property.name);
-    computedStyleWidget.input.element.focus();
+    computedStyleWidget.filterText = this.property.name;
   }
 
   private copyCssDeclarationAsJs(): void {
@@ -2884,7 +3104,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     this.originalPropertyText = this.property.propertyText || '';
 
-    this.#parentPane.setEditingStyle(true);
+    this.#stylesContainer.setEditingStyle(true);
     selectedElement.parentElement?.scrollIntoViewIfNeeded(false);
 
     this.prompt = new CSSPropertyPrompt(this, context.isEditingName, Array.from(this.#gridNames ?? []));
@@ -3027,7 +3247,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private async applyFreeFlowStyleTextEdit(context: Context): Promise<void> {
-    if (!this.prompt || !this.#parentPane.node()) {
+    if (!this.prompt || !this.#stylesContainer.node()) {
       return;
     }
 
@@ -3042,7 +3262,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
     // Prevent destructive side-effects during live-edit. crbug.com/433889
-    const parentNode = this.#parentPane.node();
+    const parentNode = this.#stylesContainer.node();
     if (parentNode) {
       const isPseudo = Boolean(parentNode.pseudoType());
       if (isPseudo) {
@@ -3083,7 +3303,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       editedElement.parentElement.classList.remove('child-editing');
     }
 
-    this.#parentPane.setEditingStyle(false);
+    this.#stylesContainer.setEditingStyle(false);
   }
 
   editingCancelled(context: Context): void {
@@ -3098,6 +3318,21 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     // This should happen last, as it clears the info necessary to restore the property value after [Page]Up/Down changes.
     this.editingEnded(context);
+  }
+
+  async commitAiSuggestion(fullText: string): Promise<void> {
+    const isEditingName = UI.UIUtils.isBeingEdited(this.nameElement);
+    const context = {
+      expanded: this.expanded,
+      hasChildren: this.isExpandable(),
+      isEditingName,
+      originalProperty: this.property,
+      previousContent: isEditingName ? this.name : this.value
+    };
+
+    this.removePrompt();
+    this.editingEnded(context);
+    await this.applyStyleText(fullText, true);
   }
 
   private async applyOriginalStyle(context: Context): Promise<void> {
@@ -3195,7 +3430,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         this: StylePropertyTreeElement, alreadyNew: boolean, valueChanged: boolean,
         section: StylePropertiesSection): void {
       if (!moveDirection) {
-        this.#parentPane.resetFocus();
+        this.#stylesContainer.resetFocus();
         return;
       }
 
@@ -3279,13 +3514,24 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     if (this.prompt) {
       this.prompt.detach();
       this.prompt = null;
+      this.#clearGhostTextInValue();
     }
   }
 
   styleTextAppliedForTest(): void {
   }
 
+  // If the item isn't connected to the DOM, then reading its innerText will
+  // also include any invisible text (e.g. sources, styles), so we don't want
+  // to do that.
+  #isConnected(): boolean {
+    return this.listItemElement.isConnected;
+  }
+
   applyStyleText(styleText: string, majorChange: boolean, property?: SDK.CSSProperty.CSSProperty|null): Promise<void> {
+    if (!this.#isConnected()) {
+      return Promise.resolve();
+    }
     return this.applyStyleThrottler.schedule(this.innerApplyStyleText.bind(this, styleText, majorChange, property));
   }
 
@@ -3293,6 +3539,10 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       styleText: string, majorChange: boolean, property?: SDK.CSSProperty.CSSProperty|null): Promise<void> {
     // this.property might have been nulled at the end of the last innerApplyStyleText.
     if (!this.treeOutline || !this.property) {
+      return;
+    }
+
+    if (!this.#isConnected()) {
       return;
     }
 
@@ -3309,8 +3559,8 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
 
-    const currentNode = this.#parentPane.node();
-    this.#parentPane.setUserOperation(true);
+    const currentNode = this.#stylesContainer.node();
+    this.#stylesContainer.setUserOperation(true);
 
     styleText += Platform.StringUtilities.findUnclosedCssQuote(styleText);
     styleText += ')'.repeat(Platform.StringUtilities.countUnmatchedLeftParentheses(styleText));
@@ -3332,7 +3582,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       majorChange = false;
       success = await this.property.setText(this.originalPropertyText, majorChange, overwriteProperty);
     }
-    this.#parentPane.setUserOperation(false);
+    this.#stylesContainer.setUserOperation(false);
 
     // TODO: using this.property.index to access its containing StyleDeclaration's property will result in
     // off-by-1 errors when the containing StyleDeclaration's respective property has already been deleted.
@@ -3379,7 +3629,75 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   override isEventWithinDisclosureTriangle(event: Event): boolean {
     return event.target === this.expandElement;
   }
+
+  renderActiveAiSuggestion(activeAiSuggestion: ActiveAiSuggestionProperty): void {
+    if (!this.prompt) {
+      return;
+    }
+    const isEditingName = UI.UIUtils.isBeingEdited(this.nameElement);
+    if (isEditingName) {
+      this.prompt.applySuggestion({text: activeAiSuggestion.name}, true);
+      this.#showGhostTextInValue(activeAiSuggestion.value);
+    } else {
+      // Only has ghost text for one field - name part or value part
+      const currentSuggestedText = isEditingName ? activeAiSuggestion.name : activeAiSuggestion.value;
+      this.prompt.applySuggestion({text: currentSuggestedText}, true);
+    }
+  }
+
+  clearActiveAiSuggestion(): void {
+    this.#clearGhostTextInValue();
+  }
+
+  #showGhostTextInValue(text: string): void {
+    if (!this.valueElement) {
+      return;
+    }
+    this.#clearGhostTextInValue();
+    this.valueElement.createChild('span', 'ghost-value-prediction').textContent = text;
+  }
+
+  #clearGhostTextInValue(): void {
+    if (!this.valueElement) {
+      return;
+    }
+    const ghostElement = this.valueElement.querySelector('.ghost-value-prediction');
+    ghostElement?.remove();
+  }
 }
+
+export class GhostStylePropertyTreeElement extends StylePropertyTreeElement {
+  constructor(
+      stylesContainer: StylesContainer, section: StylePropertiesSection,
+      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, property: SDK.CSSProperty.CSSProperty) {
+    super({
+      stylesContainer,
+      section,
+      matchedStyles,
+      property,
+      isShorthand: false,
+      inherited: false,
+      overloaded: false,
+      newProperty: false,
+    });
+  }
+
+  override onattach(): void {
+    this.listItemElement.classList.add('ghost-row');
+    this.updateTitle();
+  }
+
+  override updateTitle(): void {
+    this.listItemElement.removeChildren();
+    this.nameElement = Renderer.renderNameElement(this.name);
+    this.listItemElement.appendChild(this.nameElement);
+    this.listItemElement.createChild('span', 'styles-name-value-separator').textContent = ': ';
+    this.valueElement = this.listItemElement.createChild('span');
+    this.valueElement.textContent = this.value;
+    this.listItemElement.createChild('span', 'styles-semicolon').textContent = ';';
+  }
+}
+
 export interface Context {
   expanded: boolean;
   hasChildren: boolean;

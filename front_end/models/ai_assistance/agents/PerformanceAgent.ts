@@ -8,9 +8,13 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
 import * as Tracing from '../../../services/tracing/tracing.js';
+import * as Annotations from '../../annotations/annotations.js';
+import * as Logs from '../../logs/logs.js';
+import * as SourceMapScopes from '../../source_map_scopes/source_map_scopes.js';
+import * as TextUtils from '../../text_utils/text_utils.js';
 import * as Trace from '../../trace/trace.js';
-import {ConversationType} from '../AiHistoryStorage.js';
 import {
   PerformanceInsightFormatter,
 } from '../data_formatters/PerformanceInsightFormatter.js';
@@ -21,9 +25,12 @@ import {AgentFocus} from '../performance/AIContext.js';
 
 import {
   AiAgent,
+  type AiWidget,
   type ContextResponse,
   ConversationContext,
+  type ConversationSuggestion,
   type ConversationSuggestions,
+  type FunctionCallHandlerResult,
   type ParsedResponse,
   type RequestOptions,
   type ResponseData,
@@ -32,17 +39,13 @@ import {
 
 const UIStringsNotTranslated = {
   /**
-   *@description Shown when the agent is investigating a trace
-   */
-  analyzingTrace: 'Analyzing trace',
-  /**
    * @description Shown when the agent is investigating network activity
    */
-  networkActivitySummary: 'Investigating network activity…',
+  networkActivitySummary: 'Investigating network activity',
   /**
    * @description Shown when the agent is investigating main thread activity
    */
-  mainThreadActivity: 'Investigating main thread activity…',
+  mainThreadActivity: 'Investigating main thread activity',
 } as const;
 const lockedString = i18n.i18n.lockedString;
 
@@ -52,6 +55,19 @@ const lockedString = i18n.i18n.lockedString;
  * chrome_preambles.gcl). Sync local changes with the server-side.
  */
 
+const greenDevAdditionalAnnotationsFunction = `
+- CRITICAL: You also have access to functions called addElementAnnotation and addNeworkRequestAnnotation,
+which should be used to highlight elements and network requests (respectively).`;
+
+const greenDevAdditionalAnnotationsGuidelines = `
+- CRITICAL: Each time an element or a network request is mentioned, you MUST ALSO call the functions
+  addElementAnnotation (for an element) or addNeworkRequestAnnotation (for a network request).
+- CRITICAL: Don't add more than one annotation per element or network request.
+- These functions should be called as soon as you identify the entity that needs to be highlighted.
+- In addition to this, the addElementAnnotation function should always be called for the LCP element, if known.
+- The annotationMessage should be descriptive and relevant to why the element or network request is being highlighted.
+`;
+
 /**
  * Preamble clocks in at ~1341 tokens.
  *   The prose is around 4.5 chars per token.
@@ -59,15 +75,19 @@ const lockedString = i18n.i18n.lockedString;
  *
  * Check token length in https://aistudio.google.com/
  */
-const preamble = `You are an assistant, expert in web performance and highly skilled with Chrome DevTools.
+const buildPreamble = (): string => {
+  const annotationsEnabled = Annotations.AnnotationRepository.annotationsEnabled();
+  return `You are an assistant, expert in web performance and highly skilled with Chrome DevTools.
 
 Your primary goal is to provide actionable advice to web developers about their web page by using the Chrome Performance Panel and analyzing a trace. You may need to diagnose problems yourself, or you may be given direction for what to focus on by the user.
 
 You will be provided a summary of a trace: some performance metrics; the most critical network requests; a bottom-up call graph summary; and a brief overview of available insights. Each insight has information about potential performance issues with the page.
 
-Don't mention anything about an insight without first getting more data about it by calling \`getInsightDetails\`.
+Always call getInsightDetails to gather more data on an insight or the actual LCP element BEFORE mentioning any specific details about them.
 
-You have many functions available to learn more about the trace. Use these to confirm hypotheses, or to further explore the trace when diagnosing performance issues.
+You have functions available to learn more about the trace. Use these to confirm hypotheses, or to further explore the trace when diagnosing performance issues.
+
+${annotationsEnabled ? greenDevAdditionalAnnotationsFunction : ''}
 
 You will be given bounds representing a time range within the trace. Bounds include a min and a max time in microseconds. max is always bigger than min in a bounds.
 
@@ -86,28 +106,50 @@ Note: if the user asks a specific question about the trace (such as "What is my 
 
 ### Step 1: Determine a performance problem to investigate
 
+- If the trace summary indicates that the main performance metrics (LCP, INP, CLS) are all within good thresholds, acknowledge this to the user. In this case, let the user know that they can try recording a trace with mobile emulation and throttling options and show them how.
 - With help from the user, determine what performance problem to focus on.
-- If the user is not specific about what problem to investigate, help them by doing a high-level investigation yourself. Present to the user a few options with 1-sentence summaries. Mention what performance metrics each option impacts. Call as many functions and confirm the data thoroughly: never present an option without being certain it is a real performance issue. Don't suggest solutions yet.
-- Rank the options from most impactful to least impactful, and present them to the user in that order.
-- Don't present more than 5 options.
+- If the user is not specific about what problem to investigate, help them by doing a investigation yourself focus on performance improvements for better LCP, INP and CLS. Present to the user options with 1-sentence summaries. Mention what performance metrics each option impacts. Call as many functions and confirm the data thoroughly: never present an option without being certain it is a real performance issue.
+- Focus on identifying the problem in Step 1 and save solution suggestions for Step 2.
 - Once a performance problem has been identified for investigation, move on to step 2.
+
+#### Response Structure
+
+- Rank the options from most impactful to least impactful, and present them to the user in that order.
+- Limit the number of performance problem options presented to the user to a maximum of 2.
 
 ### Step 2: Suggest solutions
 
-- Suggest possible solutions to remedy the identified performance problem. Be as specific as possible, using data from the trace via the provided functions to back up everything you say. You should prefer specific solutions, but absent any specific solution you may suggest general solutions (such as from an insight's documentation links).
+- Suggest solutions to remedy the identified performance problem. Be as specific as possible, using data from the trace via the provided functions to back up everything you say. You should prefer specific solutions, but absent any specific solution you may suggest general solutions (such as from an insight's documentation links).
+- If you are unsure, be honest and present information that can be helpful for further investigation.
 - A good first step to discover solutions is to consider the insights, but you should also validate all potential advice by analyzing the trace until you are confident about the root cause of a performance issue.
+
+#### Response Structure
+
+- If available, point out the root cause(s) of the problem.
+  - Example: "**Root Cause**: The page is slow because of [reason]."
+  - Example: "**Root Causes**:"
+    - [Reason 1]
+    - [Reason 2]
+- if applicable, list actionable solution suggestion(s) in order of impact:
+  - Example: "**Suggestion**: [Suggestion 1]
+  - Example: "**Suggestions**:"
+    - [Suggestion 1]
+    - [Suggestion 2]
 
 ## Guidelines
 
 - Use the provided functions to get detailed performance data. Prioritize functions that provide context relevant to the performance issue being investigated.
 - Before finalizing your advice, look over it and validate using any relevant functions. If something seems off, refine the advice before giving it to the user.
-- Do not rely on assumptions or incomplete information. Use the provided functions to get more data when needed.
-- Use the track summary functions to get high-level detail about portions of the trace. For the \`bounds\` parameter, default to using the bounds of the trace. Never specifically ask the user for a bounds. You can use more narrow bounds (such as the bounds relevant to a specific insight) when appropriate. Narrow the bounds given functions when possible.
+- Base your analysis and advice solely on the data retrieved through the provided functions. Always use the provided functions to gather sufficient data when needed.
+- Use absolute microsecond timestamps for any function that requires a \`min\` and \`max\` bounds. These timestamps can be found in the trace summary or within the details of an insight.
+- Example: If the trace bounds are {min: 1000, max: 5000} and you want to investigate a specific interaction that happened between 2000 and 3000, you should call \`getMainThreadTrackSummary({min: 2000, max: 3000})\`.
 - Use \`getEventByKey\` to get data on a specific trace event. This is great for root-cause analysis or validating any assumptions.
 - Provide clear, actionable recommendations. Avoid technical jargon unless necessary, and explain any technical terms used.
 - If you see a generic task like "Task", "Evaluate script" or "(anonymous)" in the main thread activity, try to look at its children to see what actual functions are executed and refer to those. When referencing the main thread activity, be as specific as you can. Ensure you identify to the user relevant functions and which script they were defined in. Avoid referencing "Task", "Evaluate script" and "(anonymous)" nodes if possible and instead focus on their children.
 - Structure your response using markdown headings and bullet points for improved readability.
 - Be direct and to the point. Avoid unnecessary introductory phrases or filler content. Focus on delivering actionable advice efficiently.
+
+${annotationsEnabled ? greenDevAdditionalAnnotationsGuidelines : ''}
 
 ## Strict Constraints
 
@@ -124,26 +166,52 @@ Adhere to the following critical requirements:
 - Do not mention that you are an AI, or refer to yourself in the third person. You are simulating a performance expert.
 - If asked about sensitive topics (religion, race, politics, sexuality, gender, etc.), respond with: "My expertise is limited to website performance analysis. I cannot provide information on that topic.".
 - Do not provide answers on non-web-development topics, such as legal, financial, medical, or personal advice.
+- Use the precision of Strunk & White, the brevity of Hemingway, and the simple clarity of Vonnegut. Don't add repeated information, and keep the whole answer short.
 `;
+};
 
 const extraPreambleWhenNotExternal = `Additional notes:
 
 When referring to a trace event that has a corresponding \`eventKey\`, annotate your output using markdown link syntax. For example:
 - When referring to an event that is a long task: [Long task](#r-123)
 - When referring to a URL for which you know the eventKey of: [https://www.example.com](#s-1827)
-- Never show the eventKey (like "eventKey: s-1852"); instead, use a markdown link as described above.
+- Never show the eventKey (like "eventKey: s-1852") in your running text. When using markdown links, the URL must be only the hash (e.g., \`#s-1852\`), never \`eventKey: s-1852\`.
 
-When asking the user to make a choice between multiple options, output a list of choices at the end of your text response. The format is \`SUGGESTIONS: ["suggestion1", "suggestion2", "suggestion3"]\`. This MUST start on a newline, and be a single line.
+When asking the user to make a choice between options, output a list of choices at the end of your text response. The format is \`SUGGESTIONS: ["suggestion1", "suggestion2", "suggestion3"]\`. This MUST start on a newline, and be a single line.
 `;
 
-const extraPreambleWhenFreshTrace = `Additional notes:
+const buildExtraPreambleWhenFreshTrace = (): string => {
+  const annotationsEnabled = Annotations.AnnotationRepository.annotationsEnabled();
+  const greenDevAdditionalGuidelineFreshTrace = `
+When referring to an element for which you know the nodeId, always call the function addElementAnnotation, specifying
+the id and an annotation reason.
+When referring to a network request for which you know the eventKey for, always call the function
+addNetworkRequestAnnotation, specifying the id and an annotation reason.
+- CRITICAL: Each time you add an annotating link you MUST ALSO call the function addElementAnnotation.
+- CRITICAL: Each time you describe an element or network request as being problematic you MUST call the function
+addElementAnnotation and specify an annotation reason.
+- CRITICAL: Each time you describe a network request as being problematic you MUST call the function
+addNetworkRequestAnnotation and specify an annotation reason.
+- CRITICAL: If you spot ANY of the following problems:
+  - Render-blocking elements/network requests.
+  - Significant long task (especially on main thread).
+  - Layout shifts (e.g. due to unsized images).
+  ... then you MUST call addNetworkRequestAnnotation for ALL network requests and addaddElementAnnotation for all
+  elements described in your conclusion.
+`;
+
+  const extraPreambleWhenFreshTrace = `Additional notes:
 
 When referring to an element for which you know the nodeId, annotate your output using markdown link syntax:
 - For example, if nodeId is 23: [LCP element](#node-23)
 - This link will reveal the element in the Elements panel
 - Never mention node or nodeId when referring to the element, and especially not in the link text.
 - When referring to the LCP, it's useful to also mention what the LCP element is via its nodeId. Use the markdown link syntax to do so.
-`;
+
+${annotationsEnabled ? greenDevAdditionalGuidelineFreshTrace : ''}`;
+
+  return extraPreambleWhenFreshTrace;
+};
 
 enum ScorePriority {
   REQUIRED = 3,
@@ -174,8 +242,13 @@ export class PerformanceTraceContext extends ConversationContext<AgentFocus> {
   }
 
   override getOrigin(): string {
-    const {min, max} = this.#focus.parsedTrace.data.Meta.traceBounds;
-    return `trace-${min}-${max}`;
+    try {
+      const url = new URL(this.#focus.parsedTrace.data.Meta.mainFrameURL);
+      return url.origin;
+    } catch {
+      const {min, max} = this.#focus.parsedTrace.data.Meta.traceBounds;
+      return `trace-${min}-${max}`;
+    }
   }
 
   override getItem(): AgentFocus {
@@ -185,7 +258,7 @@ export class PerformanceTraceContext extends ConversationContext<AgentFocus> {
   override getTitle(): string {
     const focus = this.#focus;
 
-    let url = focus.insightSet?.url;
+    let url = focus.primaryInsightSet?.url;
     if (!url) {
       url = new URL(focus.parsedTrace.data.Meta.mainFrameURL);
     }
@@ -226,32 +299,46 @@ export class PerformanceTraceContext extends ConversationContext<AgentFocus> {
     const suggestions: ConversationSuggestions =
         [{title: 'What performance issues exist with my page?', jslogContext: 'performance-default'}];
 
-    if (focus.insightSet) {
-      const lcp = focus.insightSet ? Trace.Insights.Common.getLCP(focus.insightSet) : null;
-      const cls = focus.insightSet ? Trace.Insights.Common.getCLS(focus.insightSet) : null;
-      const inp = focus.insightSet ? Trace.Insights.Common.getINP(focus.insightSet) : null;
+    const insightSet = focus.primaryInsightSet;
+    if (insightSet) {
+      const lcp = Trace.Insights.Common.getLCP(insightSet);
+      const cls = Trace.Insights.Common.getCLS(insightSet);
+      const inp = Trace.Insights.Common.getINP(insightSet);
 
       const ModelHandlers = Trace.Handlers.ModelHandlers;
       const GOOD = Trace.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.GOOD;
 
+      const poorMetrics = new Set<Trace.Insights.Types.InsightKeys>();
+
       if (lcp && ModelHandlers.PageLoadMetrics.scoreClassificationForLargestContentfulPaint(lcp.value) !== GOOD) {
         suggestions.push({title: 'How can I improve LCP?', jslogContext: 'performance-default'});
+        poorMetrics.add(Trace.Insights.Types.InsightKeys.LCP_BREAKDOWN);
+        poorMetrics.add(Trace.Insights.Types.InsightKeys.LCP_DISCOVERY);
       }
       if (inp && ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(inp.value) !== GOOD) {
         suggestions.push({title: 'How can I improve INP?', jslogContext: 'performance-default'});
+        poorMetrics.add(Trace.Insights.Types.InsightKeys.INP_BREAKDOWN);
       }
       if (cls && ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(cls.value) !== GOOD) {
         suggestions.push({title: 'How can I improve CLS?', jslogContext: 'performance-default'});
+        poorMetrics.add(Trace.Insights.Types.InsightKeys.CLS_CULPRITS);
       }
 
-      // Add up to 3 suggestions from the top failing insights.
-      const top3FailingInsightSuggestions =
-          Object.values(focus.insightSet.model)
-              .filter(model => model.state !== 'pass')
-              .map(model => new PerformanceInsightFormatter(focus, model).getSuggestions().at(-1))
-              .filter(suggestion => !!suggestion)
-              .slice(0, 3);
-      suggestions.push(...top3FailingInsightSuggestions);
+      // Add up to 4 suggestions total (including those already added) from the top failing insights
+      // that aren't already covered by CWV suggestions.
+      const additionalSuggestionsRequired = Math.max(0, 4 - suggestions.length);
+      if (additionalSuggestionsRequired > 0) {
+        const failingInsightSuggestions =
+            Object.values(insightSet.model)
+                .filter(model => {
+                  return model.state !== 'pass' &&
+                      !poorMetrics.has(model.insightKey as Trace.Insights.Types.InsightKeys);
+                })
+                .map(model => new PerformanceInsightFormatter(focus, model).getSuggestions().at(-1))
+                .filter((suggestion): suggestion is ConversationSuggestion => !!suggestion)
+                .slice(0, additionalSuggestionsRequired);
+        suggestions.push(...failingInsightSuggestions);
+      }
     }
 
     return suggestions;
@@ -269,7 +356,6 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
   #formatter: PerformanceTraceFormatter|null = null;
   #lastEventForEnhancedQuery: Trace.Types.Events.Event|undefined;
   #lastInsightForEnhancedQuery: Trace.Insights.Types.InsightModel|undefined;
-  #hasShownAnalyzeTraceContext = false;
 
   /**
    * Cache of all function calls made by the agent. This allows us to include (as a
@@ -289,7 +375,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     metadata: {source: 'devtools', score: ScorePriority.CRITICAL}
   };
   #freshTraceExtraPreambleFact: Host.AidaClient.RequestFact = {
-    text: extraPreambleWhenFreshTrace,
+    text: buildExtraPreambleWhenFreshTrace(),
     metadata: {source: 'devtools', score: ScorePriority.CRITICAL}
   };
   #networkDataDescriptionFact: Host.AidaClient.RequestFact = {
@@ -302,15 +388,43 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
   };
   #traceFacts: Host.AidaClient.RequestFact[] = [];
 
+  /**
+   * These facts do not contain page data, they are static instructions to the
+   * LLM, so we don't need to add them to the disclosure.
+   */
+  #factsToNeverDisclose = new Set<Host.AidaClient.RequestFact>([
+    this.#callFrameDataDescriptionFact,
+    this.#networkDataDescriptionFact,
+    this.#freshTraceExtraPreambleFact,
+    this.#notExternalExtraPreambleFact,
+  ]);
+
+  /**
+   * When we enhance the query with additional information, we need to know it
+   * so we can show it in the disclosure UI. This is cleared and then populated
+   * on each prompt.
+   */
+  #additionalSelectionsForQuery: string[] = [];
+
+  /**
+   * The CWV widget is shown when we analyze the trace summary, but we don't
+   * want to show it on every single "Analyzing data..." pill, as we show one
+   * after every prompt. So we make sure for a given Insight Set (which is based on navigation)
+   * we only show it once.
+   */
+  #hasShownWidgetForInsightSet = new WeakSet<Trace.Insights.Types.InsightSet>();
+
   get preamble(): string {
-    return preamble;
+    return buildPreamble();
   }
 
   get clientFeature(): Host.AidaClient.ClientFeature {
     return Host.AidaClient.ClientFeature.CHROME_PERFORMANCE_FULL_AGENT;
   }
   get userTier(): string|undefined {
-    return Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
+    return Boolean(Root.Runtime.hostConfig.devToolsGreenDevUi?.enabled) ?
+        'TESTERS' :
+        Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
   }
   get options(): RequestOptions {
     const temperature = Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.temperature;
@@ -322,32 +436,45 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     };
   }
 
-  getConversationType(): ConversationType {
-    return ConversationType.PERFORMANCE;
-  }
-
   async *
       handleContextDetails(context: ConversationContext<AgentFocus>|null): AsyncGenerator<ContextResponse, void, void> {
     if (!context) {
       return;
     }
 
-    if (this.#hasShownAnalyzeTraceContext) {
-      return;
+    const contextDisclosure: string[] = [];
+
+    for (const fact of this.currentFacts()) {
+      if (this.#factsToNeverDisclose.has(fact)) {
+        continue;
+      }
+      contextDisclosure.push(fact.text);
+    }
+    contextDisclosure.push(...this.#additionalSelectionsForQuery);
+
+    const widgets: AiWidget[] = [];
+    const primaryInsightSet = context.getItem().primaryInsightSet;
+    if (primaryInsightSet && !this.#hasShownWidgetForInsightSet.has(primaryInsightSet)) {
+      widgets.push({
+        name: 'CORE_VITALS',
+        data: {
+          parsedTrace: context.getItem().parsedTrace,
+          insightSetKey: primaryInsightSet.id,
+        },
+      });
+      this.#hasShownWidgetForInsightSet.add(primaryInsightSet);
     }
 
     yield {
       type: ResponseType.CONTEXT,
-      title: lockedString(UIStringsNotTranslated.analyzingTrace),
       details: [
         {
-          title: 'Trace',
-          text: this.#formatter?.formatTraceSummary() ?? '',
+          title: 'Trace details',
+          text: contextDisclosure.join('\n'),
         },
       ],
+      widgets,
     };
-
-    this.#hasShownAnalyzeTraceContext = true;
   }
 
   #callTreeContextSet = new WeakSet();
@@ -379,12 +506,23 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     //    - Group 3: The link destination, e.g., "url"
     // 2. (https?:\/\/[^\s<>()]+): Captures a standalone URL.
     //    - Group 4: The standalone URL, e.g., "https://google.com"
-    const urlRegex = /(\[(.*?)\]\((.*?)\))|(https?:\/\/[^\s<>()]+)/g;
+    const urlRegex = /(\[(.*?)\][ \t]*\((.*?)\))|(https?:\/\/[^\s<>()]+)/g;
 
     return response.replace(urlRegex, (match, markdownLink, linkText, linkDest, standaloneUrlText) => {
       if (markdownLink) {
         if (linkDest.startsWith('#')) {
           return match;
+        }
+
+        const eventKeyMatch = linkDest.match(/eventKey:\s*([^\s,)]+)/);
+        if (eventKeyMatch) {
+          const eventKey = eventKeyMatch[1];
+          return `[${linkText}](#${eventKey})`;
+        }
+
+        const event = focus.lookupEvent(linkDest as Trace.Types.File.SerializableKey);
+        if (event) {
+          return `[${linkText}](#${linkDest})`;
         }
       }
 
@@ -476,6 +614,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
       }
     }
 
+    this.#additionalSelectionsForQuery = selected;
     if (!selected.length) {
       return query;
     }
@@ -493,10 +632,10 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     // Clear any previous facts in case the user changed the active context.
     this.clearFacts();
     if (options.selected && focus) {
-      this.#addFacts(options.selected);
+      await this.#addFacts(options.selected);
     }
 
-    return yield* super.run(initialQuery, options);
+    yield* super.run(initialQuery, options);
   }
 
   #createFactForTraceSummary(): void {
@@ -513,12 +652,12 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
         {text: `Trace summary:\n${text}`, metadata: {source: 'devtools', score: ScorePriority.REQUIRED}});
   }
 
-  #createFactForCriticalRequests(): void {
+  async #createFactForCriticalRequests(): Promise<void> {
     if (!this.#formatter) {
       return;
     }
 
-    const text = this.#formatter.formatCriticalRequests();
+    const text = await this.#formatter.formatCriticalRequests();
     if (!text) {
       return;
     }
@@ -529,12 +668,13 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     });
   }
 
-  #createFactForMainThreadBottomUpSummary(): void {
+  async #createFactForMainThreadBottomUpSummary(): Promise<void> {
     if (!this.#formatter) {
       return;
     }
 
-    const text = this.#formatter.formatMainThreadBottomUpSummary();
+    const formatter = this.#formatter;
+    const text = await formatter.formatMainThreadBottomUpSummary();
     if (!text) {
       return;
     }
@@ -545,12 +685,12 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     });
   }
 
-  #createFactForThirdPartySummary(): void {
+  async #createFactForThirdPartySummary(): Promise<void> {
     if (!this.#formatter) {
       return;
     }
 
-    const text = this.#formatter.formatThirdPartySummary();
+    const text = await this.#formatter.formatThirdPartySummary();
     if (!text) {
       return;
     }
@@ -561,12 +701,12 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     });
   }
 
-  #createFactForLongestTasks(): void {
+  async #createFactForLongestTasks(): Promise<void> {
     if (!this.#formatter) {
       return;
     }
 
-    const text = this.#formatter.formatLongestTasks();
+    const text = await this.#formatter.formatLongestTasks();
     if (!text) {
       return;
     }
@@ -577,7 +717,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     });
   }
 
-  #addFacts(context: PerformanceTraceContext): void {
+  async #addFacts(context: PerformanceTraceContext): Promise<void> {
     const focus = context.getItem();
 
     if (!context.external) {
@@ -593,12 +733,26 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     this.addFact(this.#networkDataDescriptionFact);
 
     if (!this.#traceFacts.length) {
+      const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+      if (!target) {
+        throw new Error('missing target');
+      }
+
       this.#formatter = new PerformanceTraceFormatter(focus);
+      this.#formatter.resolveFunctionCode =
+          async (url: Platform.DevToolsPath.UrlString, line: number, column: number) => {
+        if (!target) {
+          return null;
+        }
+
+        return await SourceMapScopes.FunctionCodeResolver.getFunctionCodeFromLocation(
+            target, url, line, column, {contextLength: 200, contextLineLength: 5, appendProfileData: true});
+      };
       this.#createFactForTraceSummary();
-      this.#createFactForCriticalRequests();
-      this.#createFactForMainThreadBottomUpSummary();
-      this.#createFactForThirdPartySummary();
-      this.#createFactForLongestTasks();
+      await this.#createFactForCriticalRequests();
+      await this.#createFactForMainThreadBottomUpSummary();
+      await this.#createFactForThirdPartySummary();
+      await this.#createFactForLongestTasks();
     }
 
     for (const fact of this.#traceFacts) {
@@ -625,41 +779,111 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
 
   #declareFunctions(context: PerformanceTraceContext): void {
     const focus = context.getItem();
-    const {parsedTrace, insightSet} = focus;
+    const {parsedTrace} = focus;
+    const processedNodeIds = new Set<Protocol.DOM.BackendNodeId>();
 
-    this.declareFunction<{insightName: string}, {details: string}>('getInsightDetails', {
+    this.declareFunction<{insightSetId: string, insightName: string}, {details: string}>('getInsightDetails', {
       description:
-          'Returns detailed information about a specific insight. Use this before commenting on any specific issue to get more information.',
+          'Returns detailed information about a specific insight of an insight set. Use this before commenting on any specific issue to get more information.',
       parameters: {
         type: Host.AidaClient.ParametersTypes.OBJECT,
         description: '',
         nullable: false,
         properties: {
+          insightSetId: {
+            type: Host.AidaClient.ParametersTypes.STRING,
+            description:
+                'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
+            nullable: false,
+          },
           insightName: {
             type: Host.AidaClient.ParametersTypes.STRING,
-            description: 'The name of the insight. Only use the insight names given in the Available Insights list.',
+            description: 'The name of the insight. Only use the insight names given in the "Available insights" list.',
             nullable: false,
           }
         },
+        required: ['insightSetId', 'insightName']
       },
       displayInfoFromArgs: params => {
         return {
-          title: lockedString(`Investigating insight ${params.insightName}…`),
-          action: `getInsightDetails('${params.insightName}')`
+          title: lockedString(`Investigating insight ${params.insightName}`),
+          action: `getInsightDetails('${params.insightSetId}', '${params.insightName}')`
         };
       },
       handler: async params => {
         debugLog('Function call: getInsightDetails', params);
-        const insight = insightSet?.model[params.insightName as keyof Trace.Insights.Types.InsightModels];
+        const insightSet = parsedTrace.insights?.get(params.insightSetId);
+        if (!insightSet) {
+          const valid = ([...parsedTrace.insights?.values() ?? []])
+                            .map(
+                                insightSet => `id: ${insightSet.id}, url: ${insightSet.url}, bounds: ${
+                                    this.#formatter?.serializeBounds(insightSet.bounds)}`)
+                            .join('; ');
+          return {error: `Invalid insight set id. Valid insight set ids are: ${valid}`};
+        }
+
+        const insight = insightSet.model[params.insightName as keyof Trace.Insights.Types.InsightModels];
         if (!insight) {
-          return {error: 'No insight available'};
+          const valid = Object.keys(insightSet.model).join(', ');
+          return {error: `No insight available. Valid insight names are: ${valid}`};
         }
 
         const details = new PerformanceInsightFormatter(focus, insight).formatInsight();
 
-        const key = `getInsightDetails('${params.insightName}')`;
+        const widgets: AiWidget[] = [];
+        if (Trace.Insights.Models.LCPDiscovery.isLCPDiscoveryInsight(insight) ||
+            Trace.Insights.Models.LCPBreakdown.isLCPBreakdownInsight(insight)) {
+          const lcpMetric = Trace.Insights.Common.getLCP(insightSet);
+          const lcpEvent = lcpMetric?.event;
+          if (lcpEvent && Trace.Types.Events.isAnyLargestContentfulPaintCandidate(lcpEvent)) {
+            const nodeId = lcpEvent.args.data?.nodeId;
+            // We want to show only one DOM tree widget per walkthrough per node.
+            // We do want to show the widget for the same node again, if it's within a new walkthrough.
+            if (nodeId && !processedNodeIds.has(nodeId)) {
+              const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+              const domModel = target?.model(SDK.DOMModel.DOMModel);
+              if (domModel) {
+                const nodeMap = await domModel.pushNodesByBackendIdsToFrontend(new Set([nodeId]));
+                const node = nodeMap?.get(nodeId);
+                if (node) {
+                  const snapshot = await node.takeSnapshot();
+                  let networkRequest;
+                  const lcpSyntheticRequest = insight.lcpRequest;
+                  if (lcpSyntheticRequest) {
+                    networkRequest = {
+                      url: lcpSyntheticRequest.args.data.url,
+                      size: lcpSyntheticRequest.args.data.decodedBodyLength ??
+                          lcpSyntheticRequest.args.data.encodedDataLength ?? 0,
+                      resourceType: lcpSyntheticRequest.args.data.resourceType,
+                      mimeType: lcpSyntheticRequest.args.data.mimeType ?? '',
+                      imageUrl: await this.#getNetworkRequestImageData(lcpSyntheticRequest),
+                    };
+                  }
+                  widgets.push({
+                    name: 'DOM_TREE',
+                    data: {
+                      root: snapshot,
+                      networkRequest,
+                    },
+                  });
+                  processedNodeIds.add(nodeId);
+                }
+              }
+            }
+          }
+          if (params.insightName === 'LCPBreakdown') {
+            widgets.push({
+              name: 'LCP_BREAKDOWN',
+              data: {
+                lcpData: insight as Trace.Insights.Models.LCPBreakdown.LCPBreakdownInsightModel,
+              },
+            });
+          }
+        }
+
+        const key = `getInsightDetails('${params.insightSetId}', '${params.insightName}')`;
         this.#cacheFunctionResult(focus, key, details);
-        return {result: {details}};
+        return {result: {details}, widgets};
       },
     });
 
@@ -677,9 +901,10 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           }
         },
+        required: ['eventKey']
       },
       displayInfoFromArgs: params => {
-        return {title: lockedString('Looking at trace event…'), action: `getEventByKey('${params.eventKey}')`};
+        return {title: lockedString('Looking at trace event'), action: `getEventByKey('${params.eventKey}')`};
       },
       handler: async params => {
         debugLog('Function call: getEventByKey', params);
@@ -698,13 +923,11 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     });
 
     const createBounds =
-        (min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro): Trace.Types.Timing.TraceWindowMicro|null => {
-          if (min > max) {
-            return null;
-          }
+        (min?: Trace.Types.Timing.Micro, max?: Trace.Types.Timing.Micro): Trace.Types.Timing.TraceWindowMicro|null => {
+          const {min: bMin, max: bMax} = parsedTrace.data.Meta.traceBounds;
+          const clampedMin = Math.max(min ?? bMin, bMin);
+          const clampedMax = Math.min(max ?? bMax, bMax);
 
-          const clampedMin = Math.max(min ?? 0, parsedTrace.data.Meta.traceBounds.min);
-          const clampedMax = Math.min(max ?? Number.POSITIVE_INFINITY, parsedTrace.data.Meta.traceBounds.max);
           if (clampedMin > clampedMax) {
             return null;
           }
@@ -713,7 +936,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
               clampedMin as Trace.Types.Timing.Micro, clampedMax as Trace.Types.Timing.Micro);
         };
 
-    this.declareFunction<{min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro}, {
+    this.declareFunction<{min?: Trace.Types.Timing.Micro, max?: Trace.Types.Timing.Micro}, {
       summary: string,
     }>('getMainThreadTrackSummary', {
       description:
@@ -725,20 +948,25 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
         properties: {
           min: {
             type: Host.AidaClient.ParametersTypes.INTEGER,
-            description: 'The minimum time of the bounds, in microseconds',
-            nullable: false,
+            description: `The minimum time of the bounds, in microseconds (the current trace starts at ${
+                parsedTrace.data.Meta.traceBounds.min})`,
+            nullable: true,
           },
           max: {
             type: Host.AidaClient.ParametersTypes.INTEGER,
-            description: 'The maximum time of the bounds, in microseconds',
-            nullable: false,
+            description: `The maximum time of the bounds, in microseconds (the current trace ends at ${
+                parsedTrace.data.Meta.traceBounds.max})`,
+            nullable: true,
           },
         },
+        required: []
       },
       displayInfoFromArgs: args => {
+        const min = args.min ?? parsedTrace.data.Meta.traceBounds.min;
+        const max = args.max ?? parsedTrace.data.Meta.traceBounds.max;
         return {
           title: lockedString(UIStringsNotTranslated.mainThreadActivity),
-          action: `getMainThreadTrackSummary({min: ${args.min}, max: ${args.max}})`
+          action: `getMainThreadTrackSummary({min: ${min}, max: ${max}})`
         };
       },
       handler: async args => {
@@ -753,7 +981,8 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
           return {error: 'invalid bounds'};
         }
 
-        const summary = this.#formatter.formatMainThreadTrackSummary(bounds);
+        const formatter = this.#formatter;
+        const summary = await formatter.formatMainThreadTrackSummary(bounds);
         if (this.#isFunctionResponseTooLarge(summary)) {
           return {
             error:
@@ -766,13 +995,34 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
 
         const key = `getMainThreadTrackSummary({min: ${bounds.min}, max: ${bounds.max}})`;
         this.#cacheFunctionResult(focus, key, summary);
-        return {result: {summary}};
+        const widgets: AiWidget[] = [];
+        widgets.push({
+          name: 'TIMELINE_RANGE_SUMMARY',
+          data: {
+            parsedTrace,
+            bounds,
+            track: 'main',
+          },
+        });
+
+        widgets.push({
+          name: 'BOTTOM_UP_TREE',
+          data: {
+            bounds,
+            parsedTrace,
+          },
+        });
+
+        return {
+          result: {summary},
+          widgets,
+        };
       },
 
     });
 
     this.declareFunction<
-        {min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro}, {summary: string}>('getNetworkTrackSummary', {
+        {min?: Trace.Types.Timing.Micro, max?: Trace.Types.Timing.Micro}, {summary: string}>('getNetworkTrackSummary', {
       description: 'Returns a summary of the network for the given bounds.',
       parameters: {
         type: Host.AidaClient.ParametersTypes.OBJECT,
@@ -781,20 +1031,25 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
         properties: {
           min: {
             type: Host.AidaClient.ParametersTypes.INTEGER,
-            description: 'The minimum time of the bounds, in microseconds',
-            nullable: false,
+            description: `The minimum time of the bounds, in microseconds (the current trace starts at ${
+                parsedTrace.data.Meta.traceBounds.min})`,
+            nullable: true,
           },
           max: {
             type: Host.AidaClient.ParametersTypes.INTEGER,
-            description: 'The maximum time of the bounds, in microseconds',
-            nullable: false,
+            description: `The maximum time of the bounds, in microseconds (the current trace ends at ${
+                parsedTrace.data.Meta.traceBounds.max})`,
+            nullable: true,
           },
         },
+        required: []
       },
       displayInfoFromArgs: args => {
+        const min = args.min ?? parsedTrace.data.Meta.traceBounds.min;
+        const max = args.max ?? parsedTrace.data.Meta.traceBounds.max;
         return {
           title: lockedString(UIStringsNotTranslated.networkActivitySummary),
-          action: `getNetworkTrackSummary({min: ${args.min}, max: ${args.max}})`
+          action: `getNetworkTrackSummary({min: ${min}, max: ${max}})`
         };
       },
       handler: async args => {
@@ -822,7 +1077,9 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
 
         const key = `getNetworkTrackSummary({min: ${bounds.min}, max: ${bounds.max}})`;
         this.#cacheFunctionResult(focus, key, summary);
-        return {result: {summary}};
+        return {
+          result: {summary},
+        };
       },
 
     });
@@ -840,9 +1097,10 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['eventKey']
       },
       displayInfoFromArgs: args => {
-        return {title: lockedString('Looking at call tree…'), action: `getDetailedCallTree('${args.eventKey}')`};
+        return {title: lockedString('Looking at call tree'), action: `getDetailedCallTree('${args.eventKey}')`};
       },
       handler: async args => {
         debugLog('Function call: getDetailedCallTree');
@@ -857,60 +1115,217 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
         }
 
         const tree = AICallTree.fromEvent(event, parsedTrace);
-        const callTree = tree ? this.#formatter.formatCallTree(tree) : 'No call tree found';
+        if (!tree) {
+          return {error: 'No call tree found'};
+        }
+
+        const formatter = this.#formatter;
+        const callTree = await formatter.formatCallTree(tree);
 
         const key = `getDetailedCallTree(${args.eventKey})`;
         this.#cacheFunctionResult(focus, key, callTree);
-        return {result: {callTree}};
+
+        const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMicroSeconds(event);
+        const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(startTime, endTime);
+
+        const widgets: AiWidget[] = [{
+          name: 'BOTTOM_UP_TREE',
+          data: {
+            bounds,
+            parsedTrace,
+          },
+        }];
+
+        return {result: {callTree}, widgets};
       },
 
     });
 
-    const isFresh = Tracing.FreshRecording.Tracker.instance().recordingIsFresh(parsedTrace);
-    const hasScriptContents =
-        parsedTrace.metadata.enhancedTraceVersion && parsedTrace.data.Scripts.scripts.some(s => s.content);
-
-    if (isFresh || hasScriptContents) {
-      this.declareFunction<{url: string}, {content: string}>('getResourceContent', {
-        description: 'Returns the content of the resource with the given url. Only use this for text resource types.',
+    if (Annotations.AnnotationRepository.annotationsEnabled()) {
+      this.declareFunction<{
+        elementId: string,
+        annotationMessage: string,
+      }>('addElementAnnotation', {
+        description:
+            'Adds a visual annotation in the Elements panel, attached to a node with the specific UID provided. Use it to highlight nodes in the Elements panel and provide contextual suggestions to the user related to their queries.',
         parameters: {
           type: Host.AidaClient.ParametersTypes.OBJECT,
           description: '',
           nullable: false,
           properties: {
-            url: {
+            elementId: {
               type: Host.AidaClient.ParametersTypes.STRING,
-              description: 'The url for the resource.',
+              description: 'The UID of the element to annotate.',
+              nullable: false,
+            },
+            annotationMessage: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'The message the annotation should show to the user.',
+              nullable: false,
+            },
+
+          },
+          required: ['elementId', 'annotationMessage']
+        },
+        handler: async params => {
+          return await this.addElementAnnotation(params.elementId, params.annotationMessage);
+        },
+      });
+
+      this.declareFunction<{
+        eventKey: string,
+        annotationMessage: string,
+      }>('addNetworkRequestAnnotation', {
+        description:
+            'Adds a visual annotation in the Network panel, attached to the request with the specific UID provided. ' +
+            'Use it to highlight requests in the Network panel and provide contextual suggestions to the user ' +
+            'related to their queries.',
+        parameters: {
+          type: Host.AidaClient.ParametersTypes.OBJECT,
+          description: '',
+          nullable: false,
+          properties: {
+            eventKey: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'The event key of the network request to annotate.',
+              nullable: false,
+            },
+            annotationMessage: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'The message the annotation should show to the user.',
               nullable: false,
             },
           },
+          required: ['eventKey', 'annotationMessage']
         },
-        displayInfoFromArgs: args => {
-          return {title: lockedString('Looking at resource content…'), action: `getResourceContent('${args.url}')`};
+        handler: async params => {
+          return await this.addNetworkRequestAnnotation(params.eventKey, params.annotationMessage);
         },
-        handler: async args => {
-          debugLog('Function call: getResourceContent');
-
-          const url = args.url as Platform.DevToolsPath.UrlString;
-          const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(url);
-          if (!resource) {
-            if (!resource) {
-              return {error: 'Resource not found'};
-            }
-          }
-
-          const content = await resource.requestContentData();
-          if ('error' in content) {
-            return {error: `Could not get resource content: ${content.error}`};
-          }
-
-          const key = `getResourceContent(${args.url})`;
-          this.#cacheFunctionResult(focus, key, content.text);
-          return {result: {content: content.text}};
-        },
-
       });
     }
+
+    this.declareFunction<{scriptUrl: string, line: number, column: number}, {result: string}>('getFunctionCode', {
+      description:
+          'Returns the code for a function defined at the given location. The result is annotated with the runtime performance of each line of code.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          scriptUrl: {
+            type: Host.AidaClient.ParametersTypes.STRING,
+            description: 'The url of the function.',
+            nullable: false,
+          },
+          line: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The line number where the function is defined.',
+            nullable: false,
+          },
+          column: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The column number where the function is defined.',
+            nullable: false,
+          },
+        },
+        required: ['scriptUrl', 'line', 'column']
+      },
+      displayInfoFromArgs: args => {
+        return {
+          title: lockedString('Looking up function code'),
+          action: `getFunctionCode('${args.scriptUrl}', ${args.line}, ${args.column})`
+        };
+      },
+      handler: async args => {
+        debugLog('Function call: getFunctionCode');
+
+        if (args.line === undefined) {
+          return {error: 'Missing arg: line'};
+        }
+
+        if (args.column === undefined) {
+          return {error: 'Missing arg: column'};
+        }
+
+        if (!this.#formatter) {
+          throw new Error('missing formatter');
+        }
+
+        const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+        if (!target) {
+          throw new Error('missing target');
+        }
+
+        const url = args.scriptUrl as Platform.DevToolsPath.UrlString;
+        const code = await this.#formatter.resolveFunctionCodeAtLocation(url, args.line, args.column);
+        if (!code) {
+          return {error: 'Could not find code'};
+        }
+
+        const result = this.#formatter.formatFunctionCode(code);
+
+        const key = `getFunctionCode('${args.scriptUrl}', ${args.line}, ${args.column})`;
+        this.#cacheFunctionResult(focus, key, result);
+        return {result: {result}};
+      },
+    });
+
+    const isFresh = Tracing.FreshRecording.Tracker.instance().recordingIsFresh(parsedTrace);
+    const isTraceApp = Root.Runtime.Runtime.isTraceApp();
+
+    this.declareFunction<{url: string}, {content: string}>('getResourceContent', {
+      description:
+          'Returns the content of the resource with the given url. Only use this for text resource types. This function is helpful for getting script contents in order to further analyze main thread activity and suggest code improvements. When analyzing the main thread activity, always call this function to get more detail. Always call this function when asked to provide specifics about what is happening in the code. Never ask permission to call this function, just do it.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          url: {
+            type: Host.AidaClient.ParametersTypes.STRING,
+            description: 'The url for the resource.',
+            nullable: false,
+          },
+        },
+        required: ['url']
+      },
+      displayInfoFromArgs: args => {
+        return {title: lockedString('Looking at resource content'), action: `getResourceContent('${args.url}')`};
+      },
+      handler: async args => {
+        debugLog('Function call: getResourceContent');
+
+        const url = args.url as Platform.DevToolsPath.UrlString;
+        let content: string|undefined;
+
+        // First check parsedTrace.data.Scripts.
+        // Then, check ResourceTreeModel, but only when it is valid. Don't want to
+        // use if viewing a loaded trace from DevTools attached to an unrelated
+        // page.
+        const script = parsedTrace.data.Scripts.scripts.find(script => script.url === url);
+        if (script?.content !== undefined) {
+          content = script.content;
+        } else if (isFresh || isTraceApp) {
+          const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(url);
+          if (!resource) {
+            return {error: 'Resource not found'};
+          }
+
+          const data = await resource.requestContentData();
+          if ('error' in data) {
+            return {error: `Could not get resource content: ${data.error}`};
+          }
+
+          content = data.text;
+        } else {
+          return {error: 'Resource not found'};
+        }
+
+        const key = `getResourceContent(${args.url})`;
+        this.#cacheFunctionResult(focus, key, content);
+        return {result: {content}};
+      },
+    });
 
     if (!context.external) {
       this.declareFunction<{eventKey: string}, {success: boolean}>('selectEventByKey', {
@@ -927,9 +1342,10 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
               nullable: false,
             }
           },
+          required: ['eventKey']
         },
         displayInfoFromArgs: params => {
-          return {title: lockedString('Selecting event…'), action: `selectEventByKey('${params.eventKey}')`};
+          return {title: lockedString('Selecting event'), action: `selectEventByKey('${params.eventKey}')`};
         },
         handler: async params => {
           debugLog('Function call: selectEventByKey', params);
@@ -944,5 +1360,66 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
         },
       });
     }
+  }
+
+  async addElementAnnotation(elementId: string, annotationMessage: string):
+      Promise<FunctionCallHandlerResult<unknown>> {
+    if (!Annotations.AnnotationRepository.annotationsEnabled()) {
+      console.warn('Received agent request to add element annotation with annotations disabled');
+      return {error: 'Annotations are not currently enabled'};
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`AI AGENT EVENT: Performance Agent adding annotation for element ${elementId}: '${annotationMessage}'`);
+    Annotations.AnnotationRepository.instance().addElementsAnnotation(annotationMessage, elementId);
+    return {result: {success: true}};
+  }
+
+  async addNetworkRequestAnnotation(eventKey: string, annotationMessage: string):
+      Promise<FunctionCallHandlerResult<unknown>> {
+    if (!Annotations.AnnotationRepository.annotationsEnabled()) {
+      console.warn('Received agent request to add network request annotation with annotations disabled');
+      return {error: 'Annotations are not currently enabled'};
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+        `AI AGENT EVENT: Performance Agent adding annotation for network request ${eventKey}: '${annotationMessage}'`);
+
+    let requestId = undefined;
+    const focus = this.context?.getItem();
+    if (focus) {
+      const event = focus.lookupEvent(eventKey as Trace.Types.File.SerializableKey);
+      if (event && Trace.Types.Events.isSyntheticNetworkRequest(event)) {
+        requestId = event.args.data.requestId;
+      }
+    }
+
+    if (!requestId) {
+      console.warn('Unable to lookup requestId for request with event key', eventKey);
+    }
+
+    Annotations.AnnotationRepository.instance().addNetworkRequestAnnotation(annotationMessage, requestId);
+    return {result: {success: true}};
+  }
+
+  async #getNetworkRequestImageData(lcpRequest: Trace.Types.Events.SyntheticNetworkRequest): Promise<string|undefined> {
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const networkManager = target?.model(SDK.NetworkManager.NetworkManager);
+    if (!target || !networkManager) {
+      return undefined;
+    }
+
+    const networkLog = Logs.NetworkLog.NetworkLog.instance();
+    const requestId = lcpRequest.args.data.requestId;
+    const sdkRequest = networkLog.requestByManagerAndId(networkManager, requestId);
+
+    if (sdkRequest?.contentType().isImage()) {
+      const contentData = await sdkRequest.requestContentData();
+      if (!TextUtils.ContentData.ContentData.isError(contentData)) {
+        return contentData.asDataUrl() ?? undefined;
+      }
+    }
+    return undefined;
   }
 }

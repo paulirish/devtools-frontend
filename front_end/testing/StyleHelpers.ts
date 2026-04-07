@@ -14,7 +14,7 @@ import {
 export function getMatchedStylesWithStylesheet(payload: {
   cssModel: SDK.CSSModel.CSSModel,
   origin: Protocol.CSS.StyleSheetOrigin,
-  styleSheetId: Protocol.CSS.StyleSheetId,
+  styleSheetId: Protocol.DOM.StyleSheetId,
   getEnvironmentVariablesCallback?: ProtocolCommandHandler<'CSS.getEnvironmentVariables'>,
 }&Partial<Protocol.CSS.CSSStyleSheetHeader>&Partial<SDK.CSSMatchedStyles.CSSMatchedStylesPayload>):
     Promise<SDK.CSSMatchedStyles.CSSMatchedStyles> {
@@ -41,7 +41,7 @@ export function getMatchedStylesWithBlankRule(payload: {
   selector?: string,
   range?: Protocol.CSS.SourceRange,
   origin?: Protocol.CSS.StyleSheetOrigin,
-  styleSheetId?: Protocol.CSS.StyleSheetId,
+  styleSheetId?: Protocol.DOM.StyleSheetId,
   getEnvironmentVariablesCallback?: ProtocolCommandHandler<'CSS.getEnvironmentVariables'>,
 }&Partial<SDK.CSSMatchedStyles.CSSMatchedStylesPayload>) {
   return getMatchedStylesWithProperties({properties: {}, ...payload});
@@ -50,7 +50,7 @@ export function getMatchedStylesWithBlankRule(payload: {
 export function createCSSStyle(
     cssProperties: Protocol.CSS.CSSProperty[],
     range?: Protocol.CSS.SourceRange,
-    styleSheetId = '0' as Protocol.CSS.StyleSheetId,
+    styleSheetId = '0' as Protocol.DOM.StyleSheetId,
     ): Protocol.CSS.CSSStyle {
   return {
     cssProperties,
@@ -73,7 +73,7 @@ export function ruleMatch(
     options: {
       range?: Protocol.CSS.SourceRange,
       origin?: Protocol.CSS.StyleSheetOrigin,
-      styleSheetId?: Protocol.CSS.StyleSheetId,
+      styleSheetId?: Protocol.DOM.StyleSheetId,
       /** Matches all selectors if undefined */
       matchingSelectorsIndexes?: number[],
       nestingSelectors?: string[],
@@ -110,10 +110,10 @@ export function getMatchedStylesWithProperties(payload: {
   selector?: string,
   range?: Protocol.CSS.SourceRange,
   origin?: Protocol.CSS.StyleSheetOrigin,
-  styleSheetId?: Protocol.CSS.StyleSheetId,
+  styleSheetId?: Protocol.DOM.StyleSheetId,
   getEnvironmentVariablesCallback?: ProtocolCommandHandler<'CSS.getEnvironmentVariables'>,
 }&Partial<SDK.CSSMatchedStyles.CSSMatchedStylesPayload>) {
-  const styleSheetId = payload.styleSheetId ?? '0' as Protocol.CSS.StyleSheetId;
+  const styleSheetId = payload.styleSheetId ?? '0' as Protocol.DOM.StyleSheetId;
   const range = payload.range;
   const origin = payload.origin ?? Protocol.CSS.StyleSheetOrigin.Regular;
   const matchedPayload = [ruleMatch(payload.selector ?? 'div', payload.properties, {range, origin, styleSheetId})];
@@ -122,7 +122,8 @@ export function getMatchedStylesWithProperties(payload: {
 
 export function getMatchedStyles(
     payload: Partial<SDK.CSSMatchedStyles.CSSMatchedStylesPayload> = {},
-    getEnvironmentVariablesCallback: ProtocolCommandHandler<'CSS.getEnvironmentVariables'> = () => ({})) {
+    getEnvironmentVariablesCallback: ProtocolCommandHandler<'CSS.getEnvironmentVariables'> = () =>
+        ({environmentVariables: {}})) {
   clearMockConnectionResponseHandler('CSS.getEnvironmentVariables');
   setMockConnectionResponseHandler('CSS.getEnvironmentVariables', getEnvironmentVariablesCallback);
   let node = payload.node;
@@ -149,7 +150,7 @@ export function getMatchedStyles(
     positionTryRules: [],
     propertyRules: [],
     cssPropertyRegistrations: [],
-    fontPaletteValuesRule: undefined,
+    atRules: [],
     activePositionFallbackIndex: -1,
     animationStylesPayload: [],
     transitionsStylePayload: null,
@@ -157,4 +158,30 @@ export function getMatchedStyles(
     functionRules: [],
     ...payload,
   });
+}
+
+/**
+ * For some unit tests we need a DOM Node but it has to have a "real" DOM
+ * Model and CSS Model attached because code calls those methods and expect
+ * to find the actual models.
+ */
+export function createStubbedDomNodeWithModels(opts: {nodeId: number} = {
+  nodeId: 1
+}): {
+  node: SDK.DOMModel.DOMNode,
+  domModel: SDK.DOMModel.DOMModel,
+  cssModel: SDK.CSSModel.CSSModel,
+} {
+  const target = sinon.createStubInstance(SDK.Target.Target);
+  const cssModel = sinon.createStubInstance(SDK.CSSModel.CSSModel, {
+    target,
+  });
+  const domModel = sinon.createStubInstance(SDK.DOMModel.DOMModel, {
+    cssModel,
+  });
+  const node = sinon.createStubInstance(SDK.DOMModel.DOMNode, {
+    domModel,
+  });
+  node.id = opts.nodeId as Protocol.DOM.NodeId;
+  return {cssModel, domModel, node};
 }

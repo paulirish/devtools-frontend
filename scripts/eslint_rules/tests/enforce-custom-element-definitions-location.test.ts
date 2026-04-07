@@ -1,21 +1,19 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import {dirname, join} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {join} from 'node:path';
 
 import rule from '../lib/enforce-custom-element-definitions-location.ts';
 
 import {RuleTester} from './utils/RuleTester.ts';
 
-// @ts-expect-error
-const rootFrontendDirectory = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'front_end');
+const rootFrontendDirectory = join(import.meta.dirname, '..', '..', '..', 'front_end');
 
 new RuleTester().run('enforce-custom-element-definitions-location', rule, {
   valid: [
     {
       code: 'class Foo extends HTMLElement {}',
-      filename: 'front_end/ui/components/foo/Foo.ts',
+      filename: 'front_end/ui/kit/foo/Foo.ts',
       options: [{rootFrontendDirectory}],
     },
     {
@@ -49,6 +47,18 @@ new RuleTester().run('enforce-custom-element-definitions-location', rule, {
     {
       code: 'class Foo extends HTMLElement {}',
       filename: 'front_end/models/bindings/Bindings.ts',
+      errors: [{messageId: 'definitionInWrongFolder'}],
+      options: [{rootFrontendDirectory}],
+    },
+    {
+      code: 'class Foo extends HTMLElement {}',
+      filename: 'front_end/ui/components/Icon.ts',
+      errors: [{messageId: 'definitionInWrongFolder'}],
+      options: [{rootFrontendDirectory}],
+    },
+    {
+      code: 'class Foo extends HTMLElement {}',
+      filename: 'front_end/ui/components/icon/Icon.ts',
       errors: [{messageId: 'definitionInWrongFolder'}],
       options: [{rootFrontendDirectory}],
     },

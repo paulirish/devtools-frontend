@@ -1,9 +1,9 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
-import './OriginMap.js';
+import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
@@ -11,12 +11,13 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as Input from '../../../ui/components/input/input.js';
+import * as uiI18n from '../../../ui/i18n/i18n.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import fieldSettingsDialogStyles from './fieldSettingsDialog.css.js';
-import type {OriginMap} from './OriginMap.js';
+import {OriginMap} from './OriginMap.js';
 
 const UIStrings = {
   /**
@@ -94,6 +95,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/FieldSettin
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const {html, nothing, Directives: {ifDefined}} = Lit;
+const {widget, widgetRef} = UI.Widget;
 
 export class ShowDialog extends Event {
   static readonly eventName = 'showdialog';
@@ -308,11 +310,8 @@ export class FieldSettingsDialog extends HTMLElement {
     // clang-format off
     return html`
       <div class="origin-mapping-description">${i18nString(UIStrings.mapDevelopmentOrigins)}</div>
-      <devtools-origin-map
-        on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
-          this.#originMap = node as OriginMap;
-        })}
-      ></devtools-origin-map>
+      <devtools-widget ${widget(OriginMap)} ${widgetRef(OriginMap, el => { this.#originMap = el; })}>
+      </devtools-widget>
       <div class="origin-mapping-button-section">
         <devtools-button
           @click=${() => this.#originMap?.startCreation()}
@@ -321,7 +320,7 @@ export class FieldSettingsDialog extends HTMLElement {
             title: i18nString(UIStrings.new),
             iconName: 'plus',
           } as Buttons.Button.ButtonData}
-          jslogContext=${'new-origin-mapping'}
+          jslogContext="new-origin-mapping"
         >${i18nString(UIStrings.new)}</devtools-button>
       </div>
     `;
@@ -329,10 +328,6 @@ export class FieldSettingsDialog extends HTMLElement {
   }
 
   #render = (): void => {
-    const linkEl =
-        UI.XLink.XLink.create('https://developer.chrome.com/docs/crux', i18n.i18n.lockedString('Chrome UX Report'));
-    const descriptionEl = i18n.i18n.getFormatLocalizedString(str_, UIStrings.fetchAggregated, {PH1: linkEl});
-
     // clang-format off
     const output = html`
       <style>${fieldSettingsDialogStyles}</style>
@@ -346,12 +341,25 @@ export class FieldSettingsDialog extends HTMLElement {
         .jslogContext=${'timeline.field-data.settings'}
         .expectedMutationsSelector=${'.timeline-settings-pane option'}
         .dialogTitle=${i18nString(UIStrings.configureFieldData)}
-        on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
-          this.#dialog = node as Dialogs.Dialog.Dialog;
+        ${Lit.Directives.ref(el => {
+          if (el instanceof HTMLElement) {
+            this.#dialog = el as Dialogs.Dialog.Dialog;
+          }
         })}
       >
         <div class="content">
-          <div>${descriptionEl}</div>
+          <div>
+            ${uiI18n.getFormatLocalizedStringTemplate(
+              str_,
+              UIStrings.fetchAggregated,
+              {
+                PH1: html`<devtools-link
+                  href="https://developer.chrome.com/docs/crux"
+                  >${i18n.i18n.lockedString('Chrome UX Report')}</devtools-link
+                >`,
+              },
+            )}
+          </div>
           <div class="privacy-disclosure">
             <h3 class="section-title">${i18nString(UIStrings.privacyDisclosure)}</h3>
             <div>${i18nString(UIStrings.whenPerformanceIsShown)}</div>

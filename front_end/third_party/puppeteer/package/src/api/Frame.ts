@@ -15,7 +15,6 @@ import type {
   WaitTimeoutOptions,
 } from '../api/Page.js';
 import type {Accessibility} from '../cdp/Accessibility.js';
-import type {DeviceRequestPrompt} from '../cdp/DeviceRequestPrompt.js';
 import type {PuppeteerLifeCycleEvent} from '../cdp/LifecycleWatcher.js';
 import {EventEmitter, type EventType} from '../common/EventEmitter.js';
 import {getQueryHandlerAndSelector} from '../common/GetQueryHandler.js';
@@ -33,6 +32,7 @@ import {assert} from '../util/assert.js';
 import {throwIfDisposed} from '../util/decorators.js';
 
 import type {CDPSession} from './CDPSession.js';
+import type {DeviceRequestPrompt} from './DeviceRequestPrompt.js';
 import type {KeyboardTypeOptions} from './Input.js';
 import {
   FunctionLocator,
@@ -557,7 +557,7 @@ export abstract class Frame extends EventEmitter<FrameEvents> {
   async $<Selector extends string>(
     selector: Selector,
   ): Promise<ElementHandle<NodeFor<Selector>> | null> {
-    // eslint-disable-next-line rulesdir/use-using -- This is cached.
+    // eslint-disable-next-line @puppeteer/use-using -- This is cached.
     const document = await this.#document();
     return await document.$(selector);
   }
@@ -589,7 +589,7 @@ export abstract class Frame extends EventEmitter<FrameEvents> {
     selector: Selector,
     options?: QueryOptions,
   ): Promise<Array<ElementHandle<NodeFor<Selector>>>> {
-    // eslint-disable-next-line rulesdir/use-using -- This is cached.
+    // eslint-disable-next-line @puppeteer/use-using -- This is cached.
     const document = await this.#document();
     return await document.$$(selector, options);
   }
@@ -642,7 +642,7 @@ export abstract class Frame extends EventEmitter<FrameEvents> {
     ...args: Params
   ): Promise<Awaited<ReturnType<Func>>> {
     pageFunction = withSourcePuppeteerURLIfNone(this.$eval.name, pageFunction);
-    // eslint-disable-next-line rulesdir/use-using -- This is cached.
+    // eslint-disable-next-line @puppeteer/use-using -- This is cached.
     const document = await this.#document();
     return await document.$eval(selector, pageFunction, ...args);
   }
@@ -685,17 +685,15 @@ export abstract class Frame extends EventEmitter<FrameEvents> {
   async $$eval<
     Selector extends string,
     Params extends unknown[],
-    Func extends EvaluateFuncWith<
-      Array<NodeFor<Selector>>,
-      Params
-    > = EvaluateFuncWith<Array<NodeFor<Selector>>, Params>,
+    Func extends EvaluateFuncWith<Array<NodeFor<Selector>>, Params> =
+      EvaluateFuncWith<Array<NodeFor<Selector>>, Params>,
   >(
     selector: Selector,
     pageFunction: string | Func,
     ...args: Params
   ): Promise<Awaited<ReturnType<Func>>> {
     pageFunction = withSourcePuppeteerURLIfNone(this.$$eval.name, pageFunction);
-    // eslint-disable-next-line rulesdir/use-using -- This is cached.
+    // eslint-disable-next-line @puppeteer/use-using -- This is cached.
     const document = await this.#document();
     return await document.$$eval(selector, pageFunction, ...args);
   }
@@ -775,7 +773,7 @@ export abstract class Frame extends EventEmitter<FrameEvents> {
    * ```
    *
    * @param pageFunction - the function to evaluate in the frame context.
-   * @param options - options to configure the polling method and timeout.
+   * @param options - options to configure the polling method, timeout and signal.
    * @param args - arguments to pass to the `pageFunction`.
    * @returns the promise which resolve when the `pageFunction` returns a truthy value.
    */

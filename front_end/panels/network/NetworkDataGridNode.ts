@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -42,13 +42,14 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as AiAssistance from '../../models/ai_assistance/ai_assistance.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
 import type * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import {createIcon} from '../../ui/kit/kit.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -217,6 +218,11 @@ const UIStrings = {
   servedFromNetwork: '{PH1} transferred over network, resource size: {PH2}',
   /**
    * @description Cell title in Network Data Grid Node of the Network panel
+   * @example {Fast 4G} PH1
+   */
+  wasThrottled: 'Request was throttled ({PH1})',
+  /**
+   * @description Cell title in Network Data Grid Node of the Network panel
    * @example {4 B} PH1
    * @example {10 B} PH2
    */
@@ -318,9 +324,26 @@ const UIStrings = {
    */
   initialPriorityToolTip: '{PH1}, Initial priority: {PH2}',
   /**
-   * @description Tooltip to explain why the request has an IPP icon
+   * @description Text in Network Data Grid Node of the Network panel. Noun. Refers to a render-blocking resource.
    */
-  responseIsIpProtectedToolTip: 'This request was sent through IP Protection proxies.',
+  blocking: 'Blocking',
+  /**
+   * @description Text in Network Data Grid Node of the Network panel. Noun. Refers to a resource that blocks the parser from starting to parse the document.
+   */
+  inBodyParserBlocking: 'In-body parser blocking',
+  /**
+   * @description Text in Network Data Grid Node of the Network panel. Noun. Refers to a non-blocking resource.
+   */
+  nonBlocking: 'Non-blocking',
+  /**
+   * @description Text in Network Data Grid Node of the Network panel. Noun. Refers to a non-blocking resource.
+   */
+  nonBlockingDynamic: 'Non-blocking dynamic',
+  /**
+   * @description Text in Network Data Grid Node of the Network panel. Noun. Refers to a potentially blocking resource.
+   */
+  potentiallyBlocking: 'Potentially blocking',
+
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkDataGridNode.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -585,6 +608,8 @@ export class NetworkRequestNode extends NetworkNode {
   private isOnInitiatedPathInternal: boolean;
   private linkifiedInitiatorAnchor?: HTMLElement;
 
+  private static readonly requestNumberByRequest = new WeakMap<SDK.NetworkRequest.NetworkRequest, number>();
+
   constructor(parentView: NetworkLogViewInterface, request: SDK.NetworkRequest.NetworkRequest) {
     super(parentView);
     this.initiatorCell = null;
@@ -593,6 +618,21 @@ export class NetworkRequestNode extends NetworkNode {
     this.selectable = true;
     this.isOnInitiatorPathInternal = false;
     this.isOnInitiatedPathInternal = false;
+  }
+
+  private static requestNumber(request: SDK.NetworkRequest.NetworkRequest): number {
+    const cachedRequestNumber = NetworkRequestNode.requestNumberByRequest.get(request);
+    if (cachedRequestNumber !== undefined) {
+      return cachedRequestNumber;
+    }
+
+    const requestNumber = Logs.NetworkLog.NetworkLog.instance().requests().indexOf(request) + 1;
+    if (requestNumber > 0) {
+      NetworkRequestNode.requestNumberByRequest.set(request, requestNumber);
+      return requestNumber;
+    }
+
+    return 0;
   }
 
   static NameComparator(a: NetworkNode, b: NetworkNode): number {
@@ -642,6 +682,18 @@ export class NetworkRequestNode extends NetworkNode {
     }
     return (aRequest.transferSize - bRequest.transferSize) || (aRequest.resourceSize - bRequest.resourceSize) ||
         aRequest.identityCompare(bRequest);
+  }
+
+  static RequestNumberComparator(a: NetworkNode, b: NetworkNode): number {
+    const aRequest = a.requestOrFirstKnownChildRequest();
+    const bRequest = b.requestOrFirstKnownChildRequest();
+    if (!aRequest || !bRequest) {
+      return !aRequest ? -1 : 1;
+    }
+
+    const aRequestNumber = NetworkRequestNode.requestNumber(aRequest);
+    const bRequestNumber = NetworkRequestNode.requestNumber(bRequest);
+    return (aRequestNumber - bRequestNumber) || aRequest.identityCompare(bRequest);
   }
 
   static TypeComparator(a: NetworkNode, b: NetworkNode): number {
@@ -769,6 +821,25 @@ export class NetworkRequestNode extends NetworkNode {
       return -1;
     }
     return aRequest.identityCompare(bRequest);
+  }
+
+  static RenderBlockingComparator(a: NetworkNode, b: NetworkNode): number {
+    const aRequest = a.requestOrFirstKnownChildRequest();
+    const bRequest = b.requestOrFirstKnownChildRequest();
+    if (!aRequest || !bRequest) {
+      return !aRequest ? -1 : 1;
+    }
+    const order = [
+      Protocol.Network.RenderBlockingBehavior.InBodyParserBlocking,
+      Protocol.Network.RenderBlockingBehavior.Blocking,
+      Protocol.Network.RenderBlockingBehavior.PotentiallyBlocking,
+      Protocol.Network.RenderBlockingBehavior.NonBlocking,
+      Protocol.Network.RenderBlockingBehavior.NonBlockingDynamic,
+      undefined,
+    ];
+    const aOrder = order.indexOf(aRequest.renderBlockingBehavior());
+    const bOrder = order.indexOf(bRequest.renderBlockingBehavior());
+    return aOrder - bOrder;
   }
 
   static RequestPropertyComparator(propertyName: string, a: NetworkNode, b: NetworkNode): number {
@@ -953,6 +1024,10 @@ export class NetworkRequestNode extends NetworkNode {
     return this.requestInternal.resourceType() === Common.ResourceType.resourceTypes.Prefetch;
   }
 
+  throttlingConditions(): SDK.NetworkManager.AppliedNetworkConditions|undefined {
+    return SDK.NetworkManager.MultitargetNetworkManager.instance().appliedRequestConditions(this.requestInternal);
+  }
+
   override isWarning(): boolean {
     return this.isFailed() && this.isPrefetch();
   }
@@ -961,13 +1036,14 @@ export class NetworkRequestNode extends NetworkNode {
     return this.isFailed() && !this.isPrefetch();
   }
 
-  override createCells(element: Element): void {
+  override createCells(trElement: HTMLElement): void {
     this.initiatorCell = null;
 
-    element.classList.toggle('network-warning-row', this.isWarning());
-    element.classList.toggle('network-error-row', this.isError());
-    element.classList.toggle('network-navigation-row', this.isNavigationRequestInternal);
-    super.createCells(element);
+    trElement.classList.toggle('network-throttled-row', Boolean(this.throttlingConditions()?.urlPattern));
+    trElement.classList.toggle('network-warning-row', this.isWarning());
+    trElement.classList.toggle('network-error-row', this.isError());
+    trElement.classList.toggle('network-navigation-row', this.isNavigationRequestInternal);
+    super.createCells(trElement);
     this.updateBackgroundColor();
   }
 
@@ -998,6 +1074,11 @@ export class NetworkRequestNode extends NetworkNode {
       }
       case 'url': {
         this.renderPrimaryCell(cell, columnId, this.requestInternal.url());
+        break;
+      }
+      case 'request-number': {
+        const requestNumber = NetworkRequestNode.requestNumber(this.requestInternal);
+        this.setTextAndTitle(cell, requestNumber ? String(requestNumber) : '');
         break;
       }
       case 'method': {
@@ -1040,6 +1121,10 @@ export class NetworkRequestNode extends NetworkNode {
       }
       case 'is-ad-related': {
         this.setTextAndTitle(cell, this.requestInternal.isAdRelated().toLocaleString());
+        break;
+      }
+      case 'render-blocking': {
+        this.renderRenderBlockingCell(cell);
         break;
       }
       case 'cookies': {
@@ -1165,15 +1250,9 @@ export class NetworkRequestNode extends NetworkNode {
       cell.addEventListener('focus', () => this.parentView().resetFocus());
 
       // render icons
-      if (this.requestInternal.isIpProtectionUsed()) {
-        const ippIcon = IconButton.Icon.create('shield', 'icon');
-        ippIcon.title = i18nString(UIStrings.responseIsIpProtectedToolTip);
-        ippIcon.style.color = 'var(--sys-color-on-surface-subtle);';
-        cell.appendChild(ippIcon);
-      }
 
       const iconElement = PanelUtils.getIconForNetworkRequest(this.requestInternal);
-      // eslint-disable-next-line rulesdir/no-lit-render-outside-of-view
+      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
       render(iconElement, cell);
 
       // render Ask AI button
@@ -1349,6 +1428,29 @@ export class NetworkRequestNode extends NetworkNode {
     }
   }
 
+  private renderRenderBlockingCell(cell: HTMLElement): void {
+    switch (this.requestInternal.renderBlockingBehavior()) {
+      case Protocol.Network.RenderBlockingBehavior.Blocking:
+        UI.UIUtils.createTextChild(cell, i18nString(UIStrings.blocking));
+        break;
+      case Protocol.Network.RenderBlockingBehavior.InBodyParserBlocking:
+        UI.UIUtils.createTextChild(cell, i18nString(UIStrings.inBodyParserBlocking));
+        break;
+      case Protocol.Network.RenderBlockingBehavior.NonBlocking:
+        UI.UIUtils.createTextChild(cell, i18nString(UIStrings.nonBlocking));
+        break;
+      case Protocol.Network.RenderBlockingBehavior.NonBlockingDynamic:
+        UI.UIUtils.createTextChild(cell, i18nString(UIStrings.nonBlockingDynamic));
+        break;
+      case Protocol.Network.RenderBlockingBehavior.PotentiallyBlocking:
+        UI.UIUtils.createTextChild(cell, i18nString(UIStrings.potentiallyBlocking));
+        break;
+      default:
+        UI.UIUtils.createTextChild(cell, '');
+        break;
+    }
+  }
+
   #getLinkifierMetric(): Host.UserMetrics.Action|undefined {
     if (this.requestInternal.resourceType().isStyleSheet()) {
       return Host.UserMetrics.Action.StyleSheetInitiatorLinkClicked;
@@ -1425,7 +1527,7 @@ export class NetworkRequestNode extends NetworkNode {
       case SDK.NetworkRequest.InitiatorType.PREFLIGHT: {
         cell.appendChild(document.createTextNode(i18nString(UIStrings.preflight)));
         if (initiator.initiatorRequest) {
-          const icon = IconButton.Icon.create('arrow-up-down-circle');
+          const icon = createIcon('arrow-up-down-circle');
           const link = Components.Linkifier.Linkifier.linkifyRevealable(
               initiator.initiatorRequest, icon, undefined, i18nString(UIStrings.selectTheRequestThatTriggered),
               'trailing-link-icon', 'initator-request');
@@ -1505,6 +1607,16 @@ export class NetworkRequestNode extends NetworkNode {
   }
 
   private renderTimeCell(cell: HTMLElement): void {
+    const throttlingConditions = this.throttlingConditions();
+    if (throttlingConditions?.urlPattern) {
+      const throttlingConditionsTitle = typeof throttlingConditions.conditions.title === 'string' ?
+          throttlingConditions.conditions.title :
+          throttlingConditions.conditions.title();
+      const icon = createIcon('watch');
+      icon.title = i18nString(UIStrings.wasThrottled, {PH1: throttlingConditionsTitle});
+      icon.addEventListener('click', () => void Common.Revealer.reveal(throttlingConditions));
+      cell.append(icon);
+    }
     if (this.requestInternal.duration > 0) {
       this.setTextAndTitle(cell, i18n.TimeUtilities.secondsToString(this.requestInternal.duration));
       this.appendSubtitle(
@@ -1536,11 +1648,16 @@ export class NetworkRequestNode extends NetworkNode {
       const action = UI.ActionRegistry.ActionRegistry.instance().getAction('drjones.network-floating-button');
       const aiButtonContainer = document.createElement('span');
       aiButtonContainer.classList.add('ai-button-container');
-      const floatingButton = Buttons.FloatingButton.create('smart-assistant', action.title(), 'ask-ai');
+      const icon = AiAssistance.AiUtils.getIconName();
+      const floatingButton = Buttons.FloatingButton.create(icon, action.title(), 'ask-ai');
       floatingButton.addEventListener('click', ev => {
         ev.stopPropagation();
         this.select();
         void action.execute();
+      }, {capture: true});
+      // We need this as else the images get open under it.
+      floatingButton.addEventListener('dblclick', ev => {
+        ev.stopPropagation();
       }, {capture: true});
       floatingButton.addEventListener('mousedown', ev => {
         ev.stopPropagation();

@@ -100,6 +100,33 @@ sudo sysctl -p
 You may also need to pay attention to the values of `max_queued_events` and `max_user_instances`
 if you encounter any errors.
 
+### Using a `.env` file for default script options
+
+Many scripts, like `npm run build` and `npm start`, accept command-line flags to configure their behavior (e.g., `-t <target>`, `--browser=<name>`).
+
+To avoid typing these flags every time, you can set your preferred defaults in a .env file at the root of the devtools-frontend directory.
+
+The `.env.template` file lists all supported variables. Copy it to `.env` to get started.
+
+```bash
+cp .env.template .env
+```
+
+As mentioned earlier, you might create a fast build target. Instead of always typing `npm run build -- -t fast-build`, to remove the flag repetition you simple run `npm run build` you can set the following variable in your `.env` file:
+
+```shell
+DEVTOOLS_TARGET=fast-build
+```
+
+Another example - by default running `npm start` auto-opens DevTools for new Tabs.
+You may want to disable this so fewer pop-up happen while debugging, usually done via `--no-open` flag. Or with `.env` set the following value:
+
+```shell
+DEVTOOLS_AUTO_OPEN_DEVTOOLS=false
+```
+
+To use `.env` file from other script, refer to the helper in `scripts/env-utils.mjs`. That should provide the necessary helper to work with the config, and make maintenance simpler.
+
 ### Update to latest
 
 To update to latest tip of tree version:
@@ -223,19 +250,19 @@ This works with Chromium 79 or later.
 To run on **Mac**:
 
 ```bash
-<path-to-devtools-frontend>./third_party/chrome/chrome-mac/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing --disable-infobars --disable-features=MediaRouter --custom-devtools-frontend=file://$(realpath out/Default/gen/front_end) --use-mock-keychain
+<path-to-devtools-frontend>./third_party/chrome/chrome-mac-{arm64|x64}/chrome-mac-{arm64|x64}/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing --disable-infobars --disable-features=MediaRouter --custom-devtools-frontend=file://$(realpath out/Default/gen/front_end) --use-mock-keychain
 ```
 
 To run on **Linux**:
 
 ```bash
-<path-to-devtools-frontend>./third_party/chrome/chrome-linux/chrome --disable-infobars --custom-devtools-frontend=file://$(realpath out/Default/gen/front_end)
+<path-to-devtools-frontend>./third_party/chrome/chrome-linux/chrome-linux64/chrome --disable-infobars --custom-devtools-frontend=file://$(realpath out/Default/gen/front_end)
 ```
 
 To run on **Windows**:
 
 ```bash
-<path-to-devtools-frontend>\third_party\chrome\chrome-win\chrome.exe --disable-infobars --custom-devtools-frontend="<path-to-devtools-frontend>\out\Default\gen\front_end"
+<path-to-devtools-frontend>\third_party\chrome\chrome-win\chrome-win64\chrome.exe --disable-infobars --custom-devtools-frontend="<path-to-devtools-frontend>\out\Default\gen\front_end"
 ```
 
 Note that `$(realpath out/Default/gen/front_end)` expands to the absolute path to build artifacts for DevTools frontend.
@@ -340,6 +367,15 @@ out/Default/chrome --custom-devtools-frontend=file://$(realpath out/Default/gen/
 
 afterwards, which can be quite a bit faster than building and linking the full
 Chromium binary.
+
+Alternatively you can use `npm start` from the DevTools sub folder (`third_party/devtools-frontend/src/`) with the browser set to `chromium`.
+This will tell the command that you are in a Chromium checkout and try to find the correct browser executable path to resolve.
+Or alternately you can use a `.env` file, see [set up here](#using-a-env-file-for-default-script-options).
+
+```bash
+cd third_party/devtools-frontend/src/
+npm start -- --browser=chromium
+```
 
 ### Testing
 

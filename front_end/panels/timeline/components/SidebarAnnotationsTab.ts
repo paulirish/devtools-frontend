@@ -1,7 +1,8 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+
+import '../../../ui/components/settings/settings.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -383,22 +384,22 @@ function renderTutorial(): Lit.LitTemplate {
   return html`<div class="annotation-tutorial-container">
     ${i18nString(UIStrings.annotationGetStarted)}
       <div class="tutorial-card">
-        <div class="tutorial-image"><img src=${entryLabelImageUrl}></img></div>
+        <div class="tutorial-image"><img src=${entryLabelImageUrl}></div>
         <div class="tutorial-title">${i18nString(UIStrings.entryLabelTutorialTitle)}</div>
         <div class="tutorial-description">${i18nString(UIStrings.entryLabelTutorialDescription)}</div>
       </div>
       <div class="tutorial-card">
-        <div class="tutorial-image"><img src=${diagramImageUrl}></img></div>
+        <div class="tutorial-image"><img src=${diagramImageUrl}></div>
         <div class="tutorial-title">${i18nString(UIStrings.entryLinkTutorialTitle)}</div>
         <div class="tutorial-description">${i18nString(UIStrings.entryLinkTutorialDescription)}</div>
       </div>
       <div class="tutorial-card">
-        <div class="tutorial-image"><img src=${timeRangeImageUrl}></img></div>
+        <div class="tutorial-image"><img src=${timeRangeImageUrl}></div>
         <div class="tutorial-title">${i18nString(UIStrings.timeRangeTutorialTitle)}</div>
         <div class="tutorial-description">${i18nString(UIStrings.timeRangeTutorialDescription)}</div>
       </div>
       <div class="tutorial-card">
-        <div class="tutorial-image"><img src=${deleteAnnotationImageUrl}></img></div>
+        <div class="tutorial-image"><img src=${deleteAnnotationImageUrl}></div>
         <div class="tutorial-title">${i18nString(UIStrings.deleteAnnotationTutorialTitle)}</div>
         <div class="tutorial-description">${i18nString(UIStrings.deleteAnnotationTutorialDescription)}</div>
       </div>
@@ -423,7 +424,7 @@ export const DEFAULT_VIEW: (input: SidebarAnnotationsTabViewInput, output: objec
                   @mouseout=${() => (annotation.type === 'ENTRY_LABEL') ? input.onAnnotationHoverOut() : null}
                   aria-label=${label}
                   tabindex="0"
-                  jslog=${VisualLogging.item(`timeline.annotation-sidebar.annotation-${jslogForAnnotation(annotation)}`).track({click: true})}
+                  jslog=${VisualLogging.item(`timeline.annotation-sidebar.annotation-${jslogForAnnotation(annotation)}`).track({click: true, resize: true})}
                 >
                   <div class="annotation">
                     ${renderAnnotationIdentifier(annotation, input.annotationEntryToColorMap)}
@@ -448,5 +449,5 @@ export const DEFAULT_VIEW: (input: SidebarAnnotationsTabViewInput, output: objec
             </setting-checkbox>`
     }
     </span>`,
-  target, {host: target});
+  target);
 };

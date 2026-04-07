@@ -12,8 +12,8 @@ import {
   isBlockContainer,
   isFlexContainer,
   isGridContainer,
+  isGridLanesContainer,
   isInlineElement,
-  isMasonryContainer,
   isMulticolContainer,
   isPossiblyReplacedElement,
 } from './CSSRuleValidatorHelper.js';
@@ -85,6 +85,20 @@ const UIStrings = {
    */
   flexGridContainerPropertyRuleFix:
       'Try setting the {PROPERTY_NAME} on the container element or use {ALTERNATIVE_PROPERTY_NAME} instead.',
+  /**
+   * @description The messages shown in the Style pane when the user hovers over a position-anchor declaration that has no affect on a non-anchor-positioned element.
+   * @example {relative} POSITION
+   */
+  invalidAnchorPositioning:
+      'An anchor was defined but the element was not anchor-positioned but positioned "{POSITION}".',
+  /**
+   * @description The messages shown in the Style pane when the user hovers over a position-anchor declaration that has no affect on a non-anchor-positioned element.
+   */
+  invalidAnchorPositioningFix: 'Set position to either "fixed" or "absolute".',
+  /**
+   * @description The messages shown in the Style pane when the user hovers over a position-anchor declaration that has no affect on hidden element.
+   */
+  unusedAnchorPositioning: 'An anchor was defined but the element is hidden.',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/CSSRuleValidator.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -145,7 +159,7 @@ export class AlignContentValidator extends CSSRuleValidator {
     }
     const isFlex = isFlexContainer(computedStyles);
     if (!isFlex && !isBlockContainer(computedStyles) && !isGridContainer(computedStyles) &&
-        !isMasonryContainer(computedStyles)) {
+        !isGridLanesContainer(computedStyles)) {
       const reasonPropertyDeclaration = buildPropertyDefinitionText('display', computedStyles?.get('display'));
       const affectedPropertyDeclarationCode = buildPropertyName('align-content');
 
@@ -257,7 +271,7 @@ export class GridContainerValidator extends CSSRuleValidator {
   }
 
   getHint(propertyName: string, computedStyles?: Map<string, string>): Hint|undefined {
-    if (isGridContainer(computedStyles) || isMasonryContainer(computedStyles)) {
+    if (isGridContainer(computedStyles) || isGridLanesContainer(computedStyles)) {
       return;
     }
     const reasonPropertyDeclaration = buildPropertyDefinitionText('display', computedStyles?.get('display'));
@@ -293,7 +307,7 @@ export class GridItemValidator extends CSSRuleValidator {
     if (!parentComputedStyles) {
       return;
     }
-    if (isGridContainer(parentComputedStyles) || isMasonryContainer(parentComputedStyles)) {
+    if (isGridContainer(parentComputedStyles) || isGridLanesContainer(parentComputedStyles)) {
       return;
     }
     const reasonPropertyDeclaration = buildPropertyDefinitionText('display', parentComputedStyles?.get('display'));
@@ -358,13 +372,13 @@ export class FlexGridValidator extends CSSRuleValidator {
       return;
     }
 
-    if (isFlexContainer(computedStyles) || isGridContainer(computedStyles) || isMasonryContainer(computedStyles)) {
+    if (isFlexContainer(computedStyles) || isGridContainer(computedStyles) || isGridLanesContainer(computedStyles)) {
       return;
     }
 
     if (parentComputedStyles &&
         (isFlexContainer(parentComputedStyles) || isGridContainer(parentComputedStyles) ||
-         isMasonryContainer(parentComputedStyles))) {
+         isGridLanesContainer(parentComputedStyles))) {
       const reasonContainerDisplayName = buildPropertyValue(parentComputedStyles.get('display') as string);
       const reasonPropertyName = buildPropertyName(propertyName);
       const reasonAlternativePropertyName = buildPropertyName('justify-self');
@@ -414,7 +428,7 @@ export class MulticolFlexGridValidator extends CSSRuleValidator {
     }
 
     if (isMulticolContainer(computedStyles) || isFlexContainer(computedStyles) || isGridContainer(computedStyles) ||
-        isMasonryContainer(computedStyles)) {
+        isGridLanesContainer(computedStyles)) {
       return;
     }
 
@@ -547,6 +561,29 @@ export class ZIndexValidator extends CSSRuleValidator {
   }
 }
 
+export class PositionAnchorValidator extends CSSRuleValidator {
+  constructor() {
+    super(['position-anchor']);
+  }
+
+  override getHint(propertyName: string, computedStyles?: Map<string, string>): Hint|undefined {
+    const position = computedStyles?.get('position') ?? 'static';
+    const display = computedStyles?.get('display');
+
+    if (position !== 'absolute' && position !== 'fixed') {
+      return new Hint(
+          i18nString(UIStrings.invalidAnchorPositioning, {POSITION: position}),
+          i18nString(UIStrings.invalidAnchorPositioningFix));
+    }
+
+    if (display === 'none') {
+      return new Hint(i18nString(UIStrings.unusedAnchorPositioning, {POSITION: position}), null);
+    }
+
+    return undefined;
+  }
+}
+
 /**
  * Validates if CSS width/height are having an effect on an element.
  * See "Applies to" in https://www.w3.org/TR/css-sizing-3/#propdef-width.
@@ -659,6 +696,7 @@ const CSS_RULE_VALIDATORS = [
   MulticolFlexGridValidator,
   PaddingValidator,
   PositionValidator,
+  PositionAnchorValidator,
   SizingValidator,
   ZIndexValidator,
 ];

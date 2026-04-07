@@ -11,6 +11,7 @@ ts_library("testing") {
   sources = [
     "AiAssistanceHelpers.ts",
     "ConsoleHelpers.ts",
+    "ConsoleInsightHelpers.ts",
     "ContextMenuHelpers.ts",
     "Cookies.ts",
     "DOMHelpers.ts",
@@ -22,30 +23,31 @@ ts_library("testing") {
     "FileManagerHelpers.ts",
     "InsightHelpers.ts",
     "LanguagePluginHelpers.ts",
+    "LocaleHelpers.ts",
+    "MockCDPConnection.ts",
     "MockConnection.ts",
     "MockExecutionContext.ts",
     "MockIssuesManager.ts",
     "MockIssuesModel.ts",
     "MockNetworkLog.ts",
-    "MockScopeChain.test.ts",
     "MockScopeChain.ts",
-    "MockSettingStorage.ts",
-    "MutationHelpers.test.ts",
     "MutationHelpers.ts",
     "NetworkHelpers.ts",
     "OverridesHelpers.ts",
     "PersistenceHelpers.ts",
     "PropertyParser.ts",
     "ResourceTreeHelpers.ts",
-    "SnapshotTester.test.ts",
+    "RuntimeHelpers.ts",
+    "SettingsHelpers.ts",
     "SnapshotTester.ts",
-    "SourceMapEncoder.test.ts",
     "SourceMapEncoder.ts",
     "SourceMapHelpers.ts",
     "StackTraceHelpers.ts",
     "StorageItemsViewHelpers.ts",
     "StubIssue.ts",
     "StyleHelpers.ts",
+    "TargetHelpers.ts",
+    "TestUniverse.ts",
     "TraceHelpers.ts",
     "TraceLoader.ts",
     "TrackAsyncOperations.ts",
@@ -55,6 +57,8 @@ ts_library("testing") {
     "VisualLoggingHelpers.ts",
     "test_setup.ts",
   ]
+
+  data_deps = [ "../core/i18n/locales" ]
 
   deps = [
     "../../extension-api",
@@ -68,6 +72,7 @@ ts_library("testing") {
     "../entrypoints/inspector_main:meta",
     "../entrypoints/main:bundle",
     "../entrypoints/shell",
+    "../foundation:bundle",
     "../generated:protocol",
     "../models/bindings:bundle",
     "../models/extensions:bundle",
@@ -77,7 +82,10 @@ ts_library("testing") {
     "../models/trace:bundle",
     "../models/trace_source_maps_resolver:bundle",
     "../models/workspace:bundle",
+    "../panels/common:bundle",
+    "../panels/console:bundle",
     "../panels/elements:meta",
+    "../panels/explain:bundle",
     "../panels/sensors:meta",
     "../panels/timeline:bundle",
     "../services/trace_bounds:bundle",
@@ -89,4 +97,17 @@ ts_library("testing") {
     "../ui/lit:bundle",
     "../ui/visual_logging:testing",
   ]
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [
+    "MockScopeChain.test.ts",
+    "MutationHelpers.test.ts",
+    "SnapshotTester.test.ts",
+    "SourceMapEncoder.test.ts",
+  ]
+
+  deps = [ ":testing" ]
 }

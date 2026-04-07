@@ -19,7 +19,7 @@ import {
 } from '../../testing/MockConnection.js';
 import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
 import {createFileSystemFileForPersistenceTests} from '../../testing/PersistenceHelpers.js';
-import {getInitializedResourceTreeModel} from '../../testing/ResourceTreeHelpers.js';
+import {getInitializedResourceTreeModel, setMockResourceTree} from '../../testing/ResourceTreeHelpers.js';
 import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
 import {setupPageResourceLoaderForSourceMap} from '../../testing/SourceMapHelpers.js';
 import {
@@ -97,6 +97,7 @@ describeWithMockConnection('BreakpointManager', () => {
       resourceMapping,
       targetManager,
       ignoreListManager,
+      workspace,
     });
     backend = new MockProtocolBackend();
     target = createTarget();
@@ -104,10 +105,16 @@ describeWithMockConnection('BreakpointManager', () => {
 
     // Wait for the resource tree model to load; otherwise, our uiSourceCodes could be asynchronously
     // invalidated during the test.
+    setMockResourceTree(false);
     await getInitializedResourceTreeModel(target);
 
-    breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
-        {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+    breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
+      forceNew: true,
+      targetManager,
+      workspace,
+      debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance()
+    });
   });
 
   async function uiSourceCodeFromScript(debuggerModel: SDK.DebuggerModel.DebuggerModel, script: SDK.Script.Script):
@@ -303,7 +310,7 @@ describeWithMockConnection('BreakpointManager', () => {
         clearMockConnectionResponseHandler('Debugger.setBreakpointByUrl');
         setMockConnectionResponseHandler('Debugger.setBreakpointByUrl', request => {
           res(request);
-          return {};
+          return {} as Protocol.Debugger.SetBreakpointByUrlResponse;
         });
       });
 
@@ -359,11 +366,11 @@ describeWithMockConnection('BreakpointManager', () => {
       clearMockConnectionResponseHandler('Debugger.setBreakpointByUrl');
       const requests = new Map<string, Protocol.Debugger.SetBreakpointByUrlRequest>();
       setMockConnectionResponseHandler('Debugger.setBreakpointByUrl', request => {
-        requests.set(request.url, request);
+        requests.set(request.url ?? '', request);
         if (requests.size === 2) {
           res(requests);
         }
-        return {};
+        return {} as Protocol.Debugger.SetBreakpointByUrlResponse;
       });
     });
 
@@ -389,7 +396,7 @@ describeWithMockConnection('BreakpointManager', () => {
   });
 
   it('allows awaiting the restoration of breakpoints', async () => {
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assert.exists(debuggerModel);
 
@@ -418,7 +425,7 @@ describeWithMockConnection('BreakpointManager', () => {
     assert.exists(modelBreakpoint);
 
     // Make sure that we do not have a linked script yet.
-    // eslint-disable-next-line rulesdir/no-assert-equal-boolean-null-undefined
+    // eslint-disable-next-line @devtools/no-assert-equal-boolean-null-undefined
     assert.strictEqual(modelBreakpoint.currentState, null);
 
     // Now await restoring the breakpoint.
@@ -433,11 +440,11 @@ describeWithMockConnection('BreakpointManager', () => {
     // Clean up.
     await breakpoint.remove(false);
     Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.disableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
   });
 
   it('allows awaiting on scheduled update in debugger', async () => {
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
 
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assert.exists(debuggerModel);
@@ -478,7 +485,7 @@ describeWithMockConnection('BreakpointManager', () => {
   });
 
   it('allows awaiting on removal of breakpoint in debugger', async () => {
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
 
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assert.exists(debuggerModel);
@@ -709,8 +716,13 @@ describeWithMockConnection('BreakpointManager', () => {
       isLogpoint: false,
     }];
     Common.Settings.Settings.instance().createLocalSetting('breakpoints', breakpoints).set(breakpoints);
-    Breakpoints.BreakpointManager.BreakpointManager.instance(
-        {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+    Breakpoints.BreakpointManager.BreakpointManager.instance({
+      forceNew: true,
+      targetManager,
+      workspace,
+      debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance()
+    });
 
     // Create a new target and make sure that the backend receives setBreakpointByUrl request
     // from breakpoint manager.
@@ -746,8 +758,13 @@ describeWithMockConnection('BreakpointManager', () => {
       }],
     }];
     Common.Settings.Settings.instance().createLocalSetting('breakpoints', breakpoints).set(breakpoints);
-    Breakpoints.BreakpointManager.BreakpointManager.instance(
-        {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+    Breakpoints.BreakpointManager.BreakpointManager.instance({
+      forceNew: true,
+      targetManager,
+      workspace,
+      debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance()
+    });
 
     // Create a new target and make sure that the backend receives setBreakpointByUrl request
     // from breakpoint manager.
@@ -770,8 +787,13 @@ describeWithMockConnection('BreakpointManager', () => {
     assert.exists(debuggerModel);
     const breakpoints: Breakpoints.BreakpointManager.BreakpointStorageState[] = [];
     const setting = Common.Settings.Settings.instance().createLocalSetting('breakpoints', breakpoints);
-    Breakpoints.BreakpointManager.BreakpointManager.instance(
-        {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+    Breakpoints.BreakpointManager.BreakpointManager.instance({
+      forceNew: true,
+      targetManager,
+      workspace,
+      debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance()
+    });
 
     // Add script with source map.
     setupPageResourceLoaderForSourceMap(sourceMapContent);
@@ -864,6 +886,7 @@ describeWithMockConnection('BreakpointManager', () => {
         targetManager,
         workspace,
         debuggerWorkspaceBinding,
+        settings: Common.Settings.Settings.instance(),
         restoreInitialBreakpointCount: expectedBreakpointLines.length,
       });
       target = createTarget();
@@ -877,13 +900,18 @@ describeWithMockConnection('BreakpointManager', () => {
     beforeEach(() => {
       const targetManager = SDK.TargetManager.TargetManager.instance();
       const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
-      breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
-          {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+      Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+      breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
+        forceNew: true,
+        targetManager,
+        workspace,
+        debuggerWorkspaceBinding,
+        settings: Common.Settings.Settings.instance()
+      });
     });
 
     afterEach(() => {
-      Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+      Root.Runtime.experiments.disableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
     });
 
     async function testBreakpointMovedOnInstrumentationBreak(
@@ -1130,8 +1158,8 @@ describeWithMockConnection('BreakpointManager', () => {
       function dispatchDocumentOpened() {
         dispatchEvent(target, 'Page.documentOpened', {
           frame: {
-            id: 'main',
-            loaderId: 'foo',
+            id: 'main' as Protocol.Page.FrameId,
+            loaderId: 'foo' as Protocol.Network.LoaderId,
             url: URL_HTML,
             domainAndRegistry: 'example.com',
             securityOrigin: 'https://example.com/',
@@ -1541,7 +1569,7 @@ describeWithMockConnection('BreakpointManager', () => {
   });
 
   it('Breakpoint does not keep file system source code alive after file system removal', async () => {
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
     const breakpointLine = 0;
     const resolvedBreakpointLine = 1;
 
@@ -1592,7 +1620,7 @@ describeWithMockConnection('BreakpointManager', () => {
     assert.isEmpty(breakpointManager.breakpointLocationsForUISourceCode(fileSystemUiSourceCode));
     assert.lengthOf(breakpointManager.storage.breakpointItems(fileSystemUiSourceCode.url()), 1);
 
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    Root.Runtime.experiments.disableForTest(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
   });
 
   it('Breakpoints are set only into network project', async () => {

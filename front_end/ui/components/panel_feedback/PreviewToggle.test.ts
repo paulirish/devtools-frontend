@@ -6,12 +6,13 @@ import * as Root from '../../../core/root/root.js';
 import {
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
-import {describeWithLocale} from '../../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import * as PanelFeedback from './panel_feedback.js';
 
-describeWithLocale('Preview toggle', () => {
+describe('Preview toggle', () => {
+  setupLocaleHooks();
   it('calls out correctly to enable experiment', async () => {
     const isEnabledStub = sinon.stub(Root.Runtime.experiments, 'isEnabled');
     isEnabledStub.callsFake(() => false);
@@ -24,7 +25,7 @@ describeWithLocale('Preview toggle', () => {
       name: 'toggle name',
       helperText: 'more about this toggle',
       feedbackURL: 'https://feedbackurl.com',
-      experiment: 'testExperiment' as Root.Runtime.ExperimentName,
+      experiment: 'testExperiment' as Root.ExperimentNames.ExperimentName,
       onChangeCallback: spy,
     };
 
@@ -37,7 +38,7 @@ describeWithLocale('Preview toggle', () => {
     checkbox.click();
     sinon.assert.callCount(setEnabledStub, 1);
     assert.isTrue(
-        setEnabledStub.firstCall.calledWith('testExperiment', true),
+        setEnabledStub.firstCall.calledWith('testExperiment' as Root.ExperimentNames.ExperimentName, true),
         'experiments.setEnabled was not called with the correct experiment');
     sinon.assert.callCount(spy, 1);
     assert.isTrue(spy.firstCall.firstArg);
@@ -55,7 +56,7 @@ describeWithLocale('Preview toggle', () => {
       name: 'toggle name',
       helperText: 'more about this toggle',
       feedbackURL: 'https://feedbackurl.com',
-      experiment: 'testExperiment' as Root.Runtime.ExperimentName,
+      experiment: 'testExperiment' as Root.ExperimentNames.ExperimentName,
       onChangeCallback: spy,
     };
 
@@ -67,7 +68,7 @@ describeWithLocale('Preview toggle', () => {
     checkbox.click();
     sinon.assert.callCount(setEnabledStub, 1);
     assert.isTrue(
-        setEnabledStub.firstCall.calledWith('testExperiment', false),
+        setEnabledStub.firstCall.calledWith('testExperiment' as Root.ExperimentNames.ExperimentName, false),
         'experiments.setEnabled was not called with the correct experiment');
     sinon.assert.callCount(spy, 1);
     assert.isFalse(spy.firstCall.firstArg);

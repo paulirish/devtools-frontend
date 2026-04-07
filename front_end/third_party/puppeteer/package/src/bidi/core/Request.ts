@@ -6,7 +6,7 @@
 
 import * as Bidi from 'webdriver-bidi-protocol';
 
-import {ProtocolError} from '../../common/Errors.js';
+import {ProtocolError, UnsupportedOperation} from '../../common/Errors.js';
 import {EventEmitter} from '../../common/EventEmitter.js';
 import {inertIfDisposed} from '../../util/decorators.js';
 import {DisposableStack, disposeSymbol} from '../../util/disposable.js';
@@ -24,6 +24,9 @@ export class Request extends EventEmitter<{
   authenticate: void;
   /** Emitted when the request succeeds. */
   success: Bidi.Network.ResponseData;
+  /** Analog of WebDriver BiDi event `network.responseStarted`. Emitted when a
+   * response is received. */
+  response: Bidi.Network.ResponseData;
   /** Emitted when the request fails. */
   error: string;
 }> {
@@ -37,6 +40,7 @@ export class Request extends EventEmitter<{
   }
 
   #responseContentPromise: Promise<Uint8Array<ArrayBufferLike>> | null = null;
+  #requestBodyPromise: Promise<string> | null = null;
   #error?: string;
   #redirect?: Request;
   #response?: Bidi.Network.ResponseData;
@@ -118,6 +122,18 @@ export class Request extends EventEmitter<{
       this.emit('error', this.#error);
       this.dispose();
     });
+    sessionEmitter.on('network.responseStarted', event => {
+      if (
+        event.context !== this.#browsingContext.id ||
+        event.request.request !== this.id ||
+        this.#event.redirectCount !== event.redirectCount
+      ) {
+        return;
+      }
+      this.#response = event.response;
+      this.#event.request.timings = event.request.timings;
+      this.emit('response', this.#response);
+    });
     sessionEmitter.on('network.responseCompleted', event => {
       if (
         event.context !== this.#browsingContext.id ||
@@ -153,7 +169,14 @@ export class Request extends EventEmitter<{
     return this.#event.request.request;
   }
   get initiator(): Bidi.Network.Initiator | undefined {
-    return this.#event.initiator;
+    return {
+      ...this.#event.initiator,
+      // Initiator URL is not specified in BiDi.
+      // @ts-expect-error non-standard property.
+      url: this.#event.request['goog:resourceInitiator']?.url,
+      // @ts-expect-error non-standard property.
+      stack: this.#event.request['goog:resourceInitiator']?.stack,
+    };
   }
   get method(): string {
     return this.#event.request.method;
@@ -195,8 +218,7 @@ export class Request extends EventEmitter<{
   }
 
   get hasPostData(): boolean {
-    // @ts-expect-error non-standard attribute.
-    return this.#event.request['goog:hasPostData'] ?? false;
+    return (this.#event.request.bodySize ?? 0) > 0;
   }
 
   async continueRequest({
@@ -237,6 +259,29 @@ export class Request extends EventEmitter<{
     });
   }
 
+  async fetchPostData(): Promise<string | undefined> {
+    if (!this.hasPostData) {
+      return undefined;
+    }
+    if (!this.#requestBodyPromise) {
+      this.#requestBodyPromise = (async () => {
+        const data = await this.#session.send('network.getData', {
+          dataType: Bidi.Network.DataType.Request,
+          request: this.id,
+        });
+        if (data.result.bytes.type === 'string') {
+          return data.result.bytes.value;
+        }
+
+        // TODO: support base64 response.
+        throw new UnsupportedOperation(
+          `Collected request body data of type ${data.result.bytes.type} is not supported`,
+        );
+      })();
+    }
+    return await this.#requestBodyPromise;
+  }
+
   async getResponseContent(): Promise<Uint8Array> {
     if (!this.#responseContentPromise) {
       this.#responseContentPromise = (async () => {
@@ -258,7 +303,7 @@ export class Request extends EventEmitter<{
             )
           ) {
             throw new ProtocolError(
-              'Could not load body for this request. This might happen if the request is a preflight request.',
+              'Could not load response body for this request. This might happen if the request is a preflight request.',
             );
           }
 

@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import {hideBin} from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 
-import type {Conversation, EvalFileOutput, ProcessedQuery} from './types';
+import type {Conversation, EvalFileOutput, ProcessedQuery} from './types.js';
 
 /** Note: non-exhaustive. **/
 export interface RawOutput {
@@ -80,6 +80,7 @@ export function convertRawOutputToEval(opts: RawToEvalOptions): EvalFileOutput {
             assert.ok(modelData, 'No inferenceOptionMetadata');
             const processed: Conversation = {
               id,
+              autoRunExampleId: exampleIdFromInput,
               chromeVersion,
               explanation: exampleMetadata?.explanation ?? '',
               model: {
@@ -94,13 +95,14 @@ export function convertRawOutputToEval(opts: RawToEvalOptions): EvalFileOutput {
                 continue;
               }
 
-              const responseText = aidaResponse.explanation?.trim() ?? undefined;
+              const responseText = aidaResponse.explanation?.trim();
 
               const query: ProcessedQuery = {
                 request: {
                   prompt: request.current_message.parts[0].text,
                   functionCallResponse: request.current_message.parts[0].functionResponse?.name,
-                  availableFunctionNames: request.function_declarations.map(dec => dec.name),
+                  availableFunctionNames:
+                      request.function_declarations ? request.function_declarations.map(dec => dec.name) : [],
                 },
                 response: {
                   rpcGlobalId: aidaResponse.metadata.rcpGlobalId ?? '',
@@ -128,9 +130,7 @@ export function convertRawOutputToEval(opts: RawToEvalOptions): EvalFileOutput {
   return finalOutput;
 }
 
-const isBeingRunOnCommandLine = process.argv[1] === import.meta.url.replace('file://', '');
-
-if (isBeingRunOnCommandLine) {
+if (import.meta.main) {
   const userArgs =
       yargs(hideBin(process.argv))
           .option('file', {type: 'string', demandOption: true, description: 'The raw JSON file from Auto Run.'})

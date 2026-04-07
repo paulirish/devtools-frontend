@@ -1,21 +1,23 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import '../../../ui/components/icon_button/icon_button.js';
+import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
+import * as SDK from '../../../core/sdk/sdk.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as TimelineUtils from '../utils/utils.js';
 
 import networkRequestTooltipStyles from './networkRequestTooltip.css.js';
 import {colorForNetworkRequest, networkResourceCategory} from './Utils.js';
 
-const {html} = Lit;
+const {html, nothing, Directives: {classMap, ifDefined}} = Lit;
+const {widget} = UI.Widget;
 
 const MAX_URL_LENGTH = 60;
 
@@ -45,40 +47,104 @@ const UIStrings = {
    */
   waitingOnMainThread: 'Waiting on main thread',
   /**
-   * @description Text that refers to a network request is render blocking
+   * @description Text that refers to a network request is render-blocking
    */
-  renderBlocking: 'Render blocking',
+  renderBlocking: 'Render-blocking',
   /**
    * @description Text to refer to the list of redirects.
    */
   redirects: 'Redirects',
+  /**
+   * @description Cell title in Network Data Grid Node of the Network panel
+   * @example {Fast 4G} PH1
+   */
+  wasThrottled: 'Request was throttled ({PH1})',
 } as const;
+
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/NetworkRequestTooltip.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export interface NetworkTooltipData {
-  networkRequest: Trace.Types.Events.SyntheticNetworkRequest|null;
-  entityMapper: Trace.EntityMapper.EntityMapper|null;
+interface ViewInput {
+  networkRequest: Trace.Types.Events.SyntheticNetworkRequest;
+  entityMapper?: Trace.EntityMapper.EntityMapper;
+  throttlingTitle?: string;
 }
 
-export class NetworkRequestTooltip extends HTMLElement {
-  readonly #shadow = this.attachShadow({mode: 'open'});
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
-  #data: NetworkTooltipData = {networkRequest: null, entityMapper: null};
+export const DEFAULT_VIEW: View = (input, output, target) => {
+  const {
+    networkRequest,
+    entityMapper,
+    throttlingTitle,
+  } = input;
 
-  connectedCallback(): void {
-    this.#render();
+  const chipStyle = {
+    backgroundColor: `${colorForNetworkRequest(networkRequest)}`,
+  };
+  const url = new URL(networkRequest.args.data.url);
+  const entity = entityMapper ? entityMapper.entityForEvent(networkRequest) : null;
+  const originWithEntity = TimelineUtils.Helpers.formatOriginWithEntity(url, entity, true);
+
+  const redirectsHtml = NetworkRequestTooltip.renderRedirects(networkRequest);
+
+  // clang-format off
+  Lit.render(html`
+    <style>${networkRequestTooltipStyles}</style>
+    <div class="performance-card">
+      <div class="url">${Platform.StringUtilities.trimMiddle(url.href.replace(url.origin, ''), MAX_URL_LENGTH)}</div>
+      <div class="url url--host">${originWithEntity}</div>
+
+      <div class="divider"></div>
+      <div class="network-category">
+        <span class="network-category-chip" style=${Lit.Directives.styleMap(chipStyle)}>
+        </span>${networkResourceCategory(networkRequest)}
+      </div>
+      <div class="priority-row">${i18nString(UIStrings.priority)}: ${NetworkRequestTooltip.renderPriorityValue(networkRequest)}</div>
+      ${throttlingTitle ? html`
+        <div class="throttled-row">
+          ${i18nString(UIStrings.wasThrottled, {PH1: throttlingTitle})}
+        </div>` : nothing}
+      ${Trace.Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(networkRequest) ?
+        html`<div class="render-blocking"> ${i18nString(UIStrings.renderBlocking)} </div>` :  Lit.nothing
+      }
+      <div class="divider"></div>
+
+      ${NetworkRequestTooltip.renderTimings(networkRequest)}
+
+      ${redirectsHtml ? html `
+        <div class="divider"></div>
+        ${redirectsHtml}
+      ` : Lit.nothing}
+    </div>
+  `, target);
+  // clang-format on
+};
+
+export class NetworkRequestTooltip extends UI.Widget.Widget {
+  static createWidgetElement(
+      request: Trace.Types.Events.SyntheticNetworkRequest,
+      entityMapper?: Trace.EntityMapper.EntityMapper): Lit.LitTemplate {
+    return html`${widget(NetworkRequestTooltip, {networkRequest: request, entityMapper})}`;
   }
 
-  set data(data: NetworkTooltipData) {
-    if (this.#data.networkRequest === data.networkRequest) {
-      return;
-    }
-    if (this.#data.entityMapper === data.entityMapper) {
-      return;
-    }
-    this.#data = {networkRequest: data.networkRequest, entityMapper: data.entityMapper};
-    this.#render();
+  #view: View;
+  #networkRequest?: Trace.Types.Events.SyntheticNetworkRequest;
+  #entityMapper?: Trace.EntityMapper.EntityMapper;
+
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element, {useShadowDom: true});
+    this.#view = view;
+  }
+
+  set networkRequest(networkRequest: Trace.Types.Events.SyntheticNetworkRequest) {
+    this.#networkRequest = networkRequest;
+    this.requestUpdate();
+  }
+
+  set entityMapper(entityMapper: Trace.EntityMapper.EntityMapper|undefined) {
+    this.#entityMapper = entityMapper;
+    this.requestUpdate();
   }
 
   static renderPriorityValue(networkRequest: Trace.Types.Events.SyntheticNetworkRequest): Lit.TemplateResult {
@@ -106,6 +172,16 @@ export class NetworkRequestTooltip extends HTMLElement {
       backgroundColor: color,
     };
 
+    const sdkNetworkRequest = SDK.TraceObject.RevealableNetworkRequest.create(networkRequest);
+    const wasThrottled = sdkNetworkRequest &&
+        SDK.NetworkManager.MultitargetNetworkManager.instance().appliedRequestConditions(
+            sdkNetworkRequest.networkRequest);
+    const throttledTitle = wasThrottled ? i18nString(UIStrings.wasThrottled, {
+      PH1: typeof wasThrottled.conditions.title === 'string' ? wasThrottled.conditions.title :
+                                                               wasThrottled.conditions.title()
+    }) :
+                                          undefined;
+
     // The outside spans are transparent with a border on the outside edge.
     // The inside spans are 1px tall rectangles, vertically centered, with background color.
     //                   |
@@ -114,9 +190,20 @@ export class NetworkRequestTooltip extends HTMLElement {
     const leftWhisker = html`<span class="whisker-left"> <span class="horizontal"></span> </span>`;
     const rightWhisker = html`<span class="whisker-right"> <span class="horizontal"></span> </span>`;
 
+    const classes = classMap({
+      ['timings-row timings-row--duration']: true,
+      throttled: Boolean(wasThrottled?.urlPattern),
+    });
     return html`
-      <div class="timings-row timings-row--duration">
-        <span class="indicator"></span>
+      <div
+        class=${classes}
+        title=${ifDefined(throttledTitle)}>
+        ${
+        wasThrottled?.urlPattern ? html`<devtools-icon
+          class=indicator
+          name=watch
+          ></devtools-icon>` :
+                                   html`<span class="indicator"></span>`}
         ${i18nString(UIStrings.duration)}
          <span class="time"> ${i18n.TimeUtilities.formatMicroSecondsTime(networkRequest.dur)} </span>
       </div>
@@ -160,54 +247,27 @@ export class NetworkRequestTooltip extends HTMLElement {
     return null;
   }
 
-  #render(): void {
-    if (!this.#data.networkRequest) {
+  override performUpdate(): void {
+    if (!this.#networkRequest) {
       return;
     }
-    const chipStyle = {
-      backgroundColor: `${colorForNetworkRequest(this.#data.networkRequest)}`,
+
+    // TODO(crbug.com/466124088): Seems broken.
+    const sdkNetworkRequest = SDK.TraceObject.RevealableNetworkRequest.create(this.#networkRequest);
+    const networkConditions = sdkNetworkRequest &&
+        SDK.NetworkManager.MultitargetNetworkManager.instance().appliedRequestConditions(
+            sdkNetworkRequest.networkRequest);
+    let throttlingTitle: string|undefined = undefined;
+    if (networkConditions) {
+      throttlingTitle = typeof networkConditions.conditions.title === 'string' ? networkConditions.conditions.title :
+                                                                                 networkConditions.conditions.title();
+    }
+
+    const input: ViewInput = {
+      networkRequest: this.#networkRequest,
+      entityMapper: this.#entityMapper,
+      throttlingTitle,
     };
-    const url = new URL(this.#data.networkRequest.args.data.url);
-    const entity = (this.#data.entityMapper) ? this.#data.entityMapper.entityForEvent(this.#data.networkRequest) : null;
-    const originWithEntity = TimelineUtils.Helpers.formatOriginWithEntity(url, entity, true);
-
-    const redirectsHtml = NetworkRequestTooltip.renderRedirects(this.#data.networkRequest);
-
-    // clang-format off
-    const output = html`
-      <style>${networkRequestTooltipStyles}</style>
-      <div class="performance-card">
-        <div class="url">${Platform.StringUtilities.trimMiddle(url.href.replace(url.origin, ''), MAX_URL_LENGTH)}</div>
-        <div class="url url--host">${originWithEntity}</div>
-
-        <div class="divider"></div>
-        <div class="network-category">
-          <span class="network-category-chip" style=${Lit.Directives.styleMap(chipStyle)}>
-          </span>${networkResourceCategory(this.#data.networkRequest)}
-        </div>
-        <div class="priority-row">${i18nString(UIStrings.priority)}: ${NetworkRequestTooltip.renderPriorityValue(this.#data.networkRequest)}</div>
-        ${Trace.Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(this.#data.networkRequest) ?
-          html`<div class="render-blocking"> ${i18nString(UIStrings.renderBlocking)} </div>` :  Lit.nothing
-        }
-        <div class="divider"></div>
-
-        ${NetworkRequestTooltip.renderTimings(this.#data.networkRequest)}
-
-        ${redirectsHtml ? html `
-          <div class="divider"></div>
-          ${redirectsHtml}
-        ` : Lit.nothing}
-      </div>
-    `;
-    // clang-format on
-    Lit.render(output, this.#shadow, {host: this});
+    this.#view(input, undefined, this.contentElement);
   }
 }
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-performance-network-request-tooltip': NetworkRequestTooltip;
-  }
-}
-
-customElements.define('devtools-performance-network-request-tooltip', NetworkRequestTooltip);

@@ -576,6 +576,19 @@ export function getStackTraceTopCallFrameInEventPayload(event: Types.Events.Even
   }
 }
 
+export function rawCallFrameForEntry(entry: Types.Events.Event): Protocol.Runtime.CallFrame|null {
+  if (Types.Events.isProfileCall(entry)) {
+    return entry.callFrame;
+  }
+
+  const topCallFrame = getStackTraceTopCallFrameInEventPayload(entry);
+  if (topCallFrame) {
+    return topCallFrame as Protocol.Runtime.CallFrame;
+  }
+
+  return null;
+}
+
 /**
  * Given a 1-based call frame creates a 0-based one.
  */
@@ -601,10 +614,7 @@ function getRawLineAndColumnNumbersForEvent(event: Types.Events.Event): {
   columnNumber?: number,
 } {
   if (!event.args?.data) {
-    return {
-      lineNumber: undefined,
-      columnNumber: undefined,
-    };
+    return {};
   }
   let lineNumber: number|undefined = undefined;
   let columnNumber: number|undefined = undefined;

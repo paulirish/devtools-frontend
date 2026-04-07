@@ -562,10 +562,8 @@ export abstract class ElementHandle<
   async $$eval<
     Selector extends string,
     Params extends unknown[],
-    Func extends EvaluateFuncWith<
-      Array<NodeFor<Selector>>,
-      Params
-    > = EvaluateFuncWith<Array<NodeFor<Selector>>, Params>,
+    Func extends EvaluateFuncWith<Array<NodeFor<Selector>>, Params> =
+      EvaluateFuncWith<Array<NodeFor<Selector>>, Params>,
   >(
     selector: Selector,
     pageFunction: Func | string,
@@ -1521,7 +1519,7 @@ export abstract class ElementHandle<
     } = {},
   ): Promise<boolean> {
     await this.assertConnectedElement();
-    // eslint-disable-next-line rulesdir/use-using -- Returns `this`.
+    // eslint-disable-next-line @puppeteer/use-using -- Returns `this`.
     const handle = await this.#asSVGElementHandle();
     using target = handle && (await handle.#getOwnerSVGElement());
     return await ((target ?? this) as ElementHandle<Element>).evaluate(

@@ -7,14 +7,17 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as EmulationModel from '../../models/emulation/emulation.js';
 import {createTarget, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
 
 import * as CrUXManager from './crux-manager.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-function mockResponse(scopes: {pageScope: CrUXManager.PageScope, deviceScope: CrUXManager.DeviceScope}|null = null):
-    CrUXManager.CrUXResponse {
+export function mockResponse(
+    scopes: {pageScope: CrUXManager.PageScope, deviceScope: CrUXManager.DeviceScope}|null =
+        null): CrUXManager.CrUXResponse {
   return {
     record: {
       key: {},
@@ -52,28 +55,34 @@ async function triggerMicroTaskQueue(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0));
 }
 
-describeWithMockConnection('CrUXManager', () => {
+describe('CrUXManager', () => {
   let cruxManager: CrUXManager.CrUXManager;
   let target: SDK.Target.Target;
   let resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel;
   let mockFetch: sinon.SinonStub;
   let mockConsoleError: sinon.SinonStub;
 
+  setupRuntimeHooks();
+  setupSettingsHooks();
+  setupLocaleHooks();
+
   beforeEach(async () => {
+    SDK.TargetManager.TargetManager.instance({forceNew: true});
     const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     target = createTarget({parentTarget: tabTarget});
+    target.setInspectedURL(urlString`https://example.com/inspected`);
     resourceTreeModel =
         target.model(SDK.ResourceTreeModel.ResourceTreeModel) as SDK.ResourceTreeModel.ResourceTreeModel;
     cruxManager = CrUXManager.CrUXManager.instance({forceNew: true});
-    mockFetch = sinon.stub(window, 'fetch');
+    mockFetch = sinon.stub(globalThis, 'fetch');
     mockConsoleError = sinon.stub(console, 'error');
     EmulationModel.DeviceModeModel.DeviceModeModel.instance({forceNew: true});
   });
 
   afterEach(() => {
-    mockFetch.restore();
-    mockConsoleError.restore();
-    cruxManager.getConfigSetting().set({enabled: false});
+    mockFetch?.restore();
+    mockConsoleError?.restore();
+    cruxManager?.getConfigSetting().set({enabled: false});
   });
 
   describe('storing the user consent', () => {
@@ -87,6 +96,7 @@ describeWithMockConnection('CrUXManager', () => {
         syncedStorage: dummyStorage,
         globalStorage,
         localStorage: dummyStorage,
+        settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       });
       const manager = CrUXManager.CrUXManager.instance({forceNew: true});
       manager.getConfigSetting().set({enabled: true});
@@ -102,6 +112,7 @@ describeWithMockConnection('CrUXManager', () => {
         syncedStorage: dummyStorage,
         globalStorage: dummyStorage,
         localStorage: dummyStorage,
+        settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       });
       const manager = CrUXManager.CrUXManager.instance({forceNew: true});
       manager.getConfigSetting().set({enabled: true});
@@ -144,6 +155,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-PHONE': mockResponse(),
         'url-TABLET': null,
         warnings: [],
+        normalizedUrl: 'https://example.com/',
       });
 
       assert.deepEqual(fetchBodies, [
@@ -259,6 +271,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-PHONE': null,
         'url-TABLET': null,
         warnings: [],
+        normalizedUrl: 'https://example.com/',
       });
     });
 
@@ -350,6 +363,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-PHONE': mockResponse({pageScope: 'url', deviceScope: 'PHONE'}),
         'url-TABLET': null,
         warnings: [],
+        normalizedUrl: '',
       });
     });
 
@@ -526,6 +540,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-PHONE': null,
         'url-TABLET': null,
         warnings: [],
+        normalizedUrl: '',
       });
     });
 

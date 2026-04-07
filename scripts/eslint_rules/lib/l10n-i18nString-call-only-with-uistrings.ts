@@ -27,7 +27,7 @@ function isArgumentValid(argument: Argument|undefined): boolean {
 }
 
 export default createRule({
-  name: 'l10n-i18nstring-call-only-with-uistrings',
+  name: 'l10n-i18nString-call-only-with-uistrings',
   meta: {
     type: 'problem',
     docs: {
@@ -38,8 +38,7 @@ export default createRule({
       invalidArgument:
           'Calling i18nString/i18nLazyString requires a UIStrings member as the first argument (e.g., UIStrings.someString).',
     },
-    schema: [],          // no options
-    fixable: undefined,  // Rule is not automatically fixable
+    schema: [],
   },
   defaultOptions: [],
   create: function(context) {

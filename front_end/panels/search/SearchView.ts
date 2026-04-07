@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import '../../ui/legacy/legacy.js';
-import '../../ui/components/icon_button/icon_button.js';
+import '../../ui/kit/kit.js';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -107,7 +107,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/search/SearchView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {ref, live} = Directives;
-const {widgetConfig, widgetRef} = UI.Widget;
+const {widget, widgetRef} = UI.Widget;
 
 export interface SearchViewInput {
   query: string;
@@ -246,13 +246,12 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
       </div>
       <div class="search-results" @keydown=${onPanelKeyDown}>
         ${searchResults.length
-           ? html`<devtools-widget .widgetConfig=${widgetConfig(SearchResultsPane, {searchResults, searchConfig})}
+           ? html`<devtools-widget ${widget(SearchResultsPane, {searchResults, searchConfig})}
             ${widgetRef(SearchResultsPane, w => {
               output.showAllMatches = () => void w.showAllMatches();
               output.collapseAllResults = () => void w.collapseAllResults(); })}>
             </devtools-widget>`
-           : html`<devtools-widget .widgetConfig=${widgetConfig(UI.EmptyWidget.EmptyWidget, {header, text})}>
-                  </devtools-widget>`}
+           : widget(UI.EmptyWidget.EmptyWidget, {header, text})}
       </div>
       <div class="search-toolbar-summary" @keydown=${onPanelKeyDown}>
         <div class="search-message">${searchMessage}</div>
@@ -542,6 +541,7 @@ export class SearchView extends UI.Widget.VBox {
   }
 
   override willHide(): void {
+    super.willHide();
     this.#stopSearch();
   }
 

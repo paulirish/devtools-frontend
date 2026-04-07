@@ -3,16 +3,72 @@
 // found in the LICENSE file.
 
 import * as UI from '../../../front_end/ui/legacy/legacy.js';
+import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget, registerActions, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
-import {spyCall} from '../../testing/ExpectStubCall.js';
-import {describeWithMockConnection, setMockConnectionResponseHandler} from '../../testing/MockConnection.js';
+import * as Workspace from '../../models/workspace/workspace.js';
+import {assertScreenshot, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {createTarget, registerActions} from '../../testing/EnvironmentHelpers.js';
+import {describeWithMockConnection, dispatchEvent} from '../../testing/MockConnection.js';
 
 import * as Elements from './elements.js';
+
+function getBaseViewInput(): Elements.ElementsTreeElement.ViewInput {
+  return {
+    node: null,
+    isClosingTag: false,
+    expanded: false,
+    isExpandable: false,
+    isXMLMimeType: false,
+    updateRecord: null,
+    onHighlightSearchResults: () => {},
+    onExpand: () => {},
+    containerAdornerActive: false,
+    showContainerAdorner: false,
+    showFlexAdorner: false,
+    flexAdornerActive: false,
+    showGridAdorner: false,
+    showGridLanesAdorner: false,
+    showMediaAdorner: false,
+    showPopoverAdorner: false,
+    showTopLayerAdorner: false,
+    gridAdornerActive: false,
+    popoverAdornerActive: false,
+    isSubgrid: false,
+    showViewSourceAdorner: false,
+    showScrollAdorner: false,
+    showScrollSnapAdorner: false,
+    scrollSnapAdornerActive: false,
+    showSlotAdorner: false,
+    showStartingStyleAdorner: false,
+    startingStyleAdornerActive: false,
+    onStartingStyleAdornerClick: () => {},
+    onSlotAdornerClick: () => {},
+    topLayerIndex: -1,
+    onViewSourceAdornerClick: () => {},
+    onGutterClick: () => {},
+    onContainerAdornerClick: () => {},
+    onFlexAdornerClick: () => {},
+    onGridAdornerClick: () => {},
+    onMediaAdornerClick: () => {},
+    onPopoverAdornerClick: () => {},
+    onScrollSnapAdornerClick: () => {},
+    onTopLayerAdornerClick: () => {},
+    isHovered: false,
+    isSelected: false,
+    showAiButton: false,
+    onAiButtonClick: () => {},
+    decorations: [],
+    descendantDecorations: [],
+    decorationsTooltip: '',
+    indent: 0,
+    adTooltipId: '',
+  };
+}
 
 describe('ElementsTreeElement', () => {
   describe('convertUnicodeCharsToHTMLEntities', () => {
@@ -47,102 +103,169 @@ describe('ElementsTreeElement', () => {
       assert.deepEqual(result.entityRanges, expected.entityRanges);
     });
   });
+
+  it('renders gutter decorations correctly', async () => {
+    const target = document.createElement('div');
+    target.style.width = '100px';
+    target.style.height = '20px';
+    const style = document.createElement('style');
+    // FIXME: styles are currently external to ElementsTreeElement.
+    style.innerText = Elements.ElementsTreeOutline.elementsTreeOutlineStyles;
+    target.append(style);
+    renderElementIntoDOM(target, {
+      includeCommonStyles: true,
+    });
+    const decorations = [
+      {title: 'Decoration 1', color: 'red'},
+      {title: 'Decoration 2', color: 'blue'},
+    ];
+    const descendantDecorations = [
+      {title: 'Descendant 1', color: 'green'},
+    ];
+    Elements.ElementsTreeElement.DEFAULT_VIEW(
+        {
+          ...getBaseViewInput(),
+          decorations,
+          descendantDecorations,
+          decorationsTooltip: 'Title',
+          indent: 20,
+        },
+        {}, target);
+    await assertScreenshot('elements/gutter_decorations.png');
+  });
 });
 
 describeWithMockConnection('ElementsTreeElement', () => {
-  let nodeIdCounter = 0;
-  function getTreeElement(model: SDK.DOMModel.DOMModel, treeOutline: Elements.ElementsTreeOutline.ElementsTreeOutline) {
-    const node = new SDK.DOMModel.DOMNode(model);
-    node.id = nodeIdCounter++ as Protocol.DOM.NodeId;
-    model.registerNode(node);
-    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
-    node.setAttributesPayload(['popover', 'manual']);
-    treeOutline.bindTreeElement(treeElement);
-    return treeElement;
-  }
-
-  async function getAdorner(treeElement: Elements.ElementsTreeElement.ElementsTreeElement) {
-    await treeElement.updateStyleAdorners();
-    const {tagTypeContext} = treeElement;
-    const adorners = 'adorners' in tagTypeContext ? tagTypeContext.adorners : undefined;
-    assert.exists(adorners);
-    assert.lengthOf(adorners, 1);
-    const {value} = adorners.values().next();
-    assert.exists(value);
-    assert.strictEqual(value.name, 'popover');
-    return value;
-  }
-
-  beforeEach(() => {
-    updateHostConfig({devToolsAllowPopoverForcing: {enabled: true}});
-    setMockConnectionResponseHandler('CSS.enable', () => ({}));
-    setMockConnectionResponseHandler('CSS.getComputedStyleForNode', () => ({}));
-  });
-  it('popoverAdorner supports force-opening popovers', async () => {
-    const model = new SDK.DOMModel.DOMModel(createTarget());
-
-    const responseHandlerStub = sinon.stub<[Protocol.DOM.ForceShowPopoverRequest]>();
-    setMockConnectionResponseHandler('DOM.forceShowPopover', responseHandlerStub);
-
-    const treeElement = getTreeElement(model, new Elements.ElementsTreeOutline.ElementsTreeOutline());
-    const adorner = await getAdorner(treeElement);
-    adorner.dispatchEvent(new MouseEvent('click'));
-    sinon.assert.calledOnce(responseHandlerStub);
-    assert.isTrue(responseHandlerStub.args[0][0].enable);
-    assert.strictEqual(responseHandlerStub.args[0][0].nodeId, treeElement.node().id);
-
-    adorner.dispatchEvent(new MouseEvent('click'));
-    sinon.assert.calledTwice(responseHandlerStub);
-    assert.isFalse(responseHandlerStub.args[1][0].enable);
-    assert.strictEqual(responseHandlerStub.args[1][0].nodeId, treeElement.node().id);
-  });
-
-  it('popoverAdorner gets toggled off when a popover is force-closed by another forceShowPopover call', async () => {
-    const model = new SDK.DOMModel.DOMModel(createTarget());
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
-    const treeElement1 = getTreeElement(model, treeOutline);
-    const treeElement2 = getTreeElement(model, treeOutline);
-
-    const adorner1 = await getAdorner(treeElement1);
-    const adorner2 = await getAdorner(treeElement2);
-
-    setMockConnectionResponseHandler(
-        'DOM.forceShowPopover', () => ({nodeIds: adorner2.isActive() ? [treeElement2.node().id] : []}));
-
-    adorner2.dispatchEvent(new MouseEvent('click'));
-    assert.isTrue(adorner2.isActive());
-
-    const toggleStub = spyCall(adorner2, 'toggle');
-
-    adorner1.dispatchEvent(new MouseEvent('click'));
-    await toggleStub;
-    assert.isTrue(adorner1.isActive());
-    assert.isFalse(adorner2.isActive());
-  });
-});
-
-describeWithMockConnection('ElementsTreeElement ', () => {
   const DEFAULT_LAYOUT_PROPERTIES = {
     isFlex: false,
     isGrid: false,
     isSubgrid: false,
-    isMasonry: false,
-    isContainer: false,
+    isGridLanes: false,
+    containerType: undefined,
     hasScroll: false,
   };
 
   beforeEach(() => {
-    updateHostConfig({
-      devToolsAiSubmenuPrompts: {
-        enabled: true,
-      },
-    });
-
     registerActions([{
       actionId: 'freestyler.element-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
       category: UI.ActionRegistration.ActionCategory.GLOBAL,
     }]);
+  });
+
+  describe('Ad Adorner Tooltip', () => {
+    let target: SDK.Target.Target;
+
+    beforeEach(() => {
+      const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
+      const targetManager = SDK.TargetManager.TargetManager.instance();
+      const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
+      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+        forceNew: true,
+        resourceMapping: new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace),
+        targetManager,
+        ignoreListManager,
+        workspace,
+      });
+
+      target = createTarget();
+    });
+
+    it('renders fallback tooltip when no provenance is available', () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW(
+          {
+            ...getBaseViewInput(),
+            adTooltipId: 'ad-tooltip-test',
+            target,
+            adProvenance: {},
+          },
+          {}, domTarget);
+
+      const adorners = domTarget.querySelectorAll('devtools-adorner');
+      const adorner = Array.from(adorners).find(a => a.name === 'ad');
+      assert.exists(adorner);
+      const tooltip = domTarget.querySelector('devtools-tooltip');
+      assert.exists(tooltip);
+      assert.strictEqual(
+          tooltip.querySelector('.ad-provenance-tooltip-title')?.textContent, 'No provenance data is available');
+    });
+
+    it('renders filter list rule', () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW(
+          {
+            ...getBaseViewInput(),
+            adTooltipId: 'ad-tooltip-test',
+            target,
+            adProvenance: {filterlistRule: '||ads.com^'},
+          },
+          {}, domTarget);
+
+      const tooltip = domTarget.querySelector('devtools-tooltip');
+      assert.exists(tooltip);
+      const title = tooltip.querySelector('.ad-provenance-tooltip-title');
+      const content = tooltip.querySelector('.ad-provenance-tooltip-content');
+      assert.strictEqual(title?.textContent, 'Filter list rule');
+      assert.strictEqual(content?.textContent, '||ads.com^');
+    });
+
+    it('renders script ancestry with root script rules', async () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+
+      // Mock the script parsing event so the Linkifier knows about this scriptId.
+      const scriptId = '123' as Protocol.Runtime.ScriptId;
+      const debuggerId = '' as Protocol.Runtime.UniqueDebuggerId;
+
+      const scriptParsedEvent: Protocol.Debugger.ScriptParsedEvent = {
+        scriptId,
+        url: 'https://www.example.com/ad-script.js',
+        startLine: 0,
+        startColumn: 0,
+        endLine: 10,
+        endColumn: 10,
+        executionContextId: 1234 as Protocol.Runtime.ExecutionContextId,
+        hash: '',
+        buildId: '',
+      };
+      dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent);
+
+      // Render the view.
+      Elements.ElementsTreeElement.DEFAULT_VIEW(
+          {
+            ...getBaseViewInput(),
+            adTooltipId: 'ad-tooltip-test',
+            target,
+            adProvenance: {
+              adScriptAncestry: {
+                ancestryChain: [{scriptId, debuggerId, name: ''}],
+                rootScriptFilterlistRule: '/ad-script.$script',
+              },
+            },
+          },
+          {}, domTarget);
+
+      // Wait for the asynchronous Linkifier to render the script name.
+      await raf();
+
+      const tooltip = domTarget.querySelector('devtools-tooltip');
+      assert.exists(tooltip);
+
+      const titles = Array.from(tooltip.querySelectorAll('.ad-provenance-tooltip-title')).map(el => el.textContent);
+      assert.deepEqual(titles, ['Creator ad script ancestry', 'Root script filter list rule']);
+
+      // Assert that the Linkifier correctly resolved the script URL to a short name.
+      const link = tooltip.querySelector('.devtools-link');
+      assert.exists(link);
+      assert.strictEqual(link.textContent?.trim(), 'ad-script.js:1');
+
+      const contents =
+          Array.from(tooltip.querySelectorAll('.ad-provenance-tooltip-content')).map(el => el.textContent?.trim());
+      assert.include(contents[1], '/ad-script.$script');
+    });
   });
 
   async function getContextMenuForElementWithLayoutProperties(layoutProperties: SDK.CSSModel.LayoutProperties|null):
@@ -156,6 +279,9 @@ describeWithMockConnection('ElementsTreeElement ', () => {
     sinon.stub(cssModel, 'getLayoutPropertiesFromComputedStyle').resolves(layoutProperties);
 
     const node = new SDK.DOMModel.DOMNode(domModel);
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
     const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
     const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
     treeElement.treeOutline = treeOutline;
@@ -215,13 +341,143 @@ describeWithMockConnection('ElementsTreeElement ', () => {
   });
 
   it('shows container submenu items', async () => {
-    const contextMenu =
-        await getContextMenuForElementWithLayoutProperties({...DEFAULT_LAYOUT_PROPERTIES, isContainer: true});
+    const contextMenu = await getContextMenuForElementWithLayoutProperties(
+        {...DEFAULT_LAYOUT_PROPERTIES, containerType: 'inline-size'});
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
     assert.deepEqual(
         debugWithAiItem?.subItems?.map(item => item.label),
         ['Start a chat', 'Explain container queries', 'Explain container types', 'Explain container context']);
+  });
+  it('updates when persistent overlay state changes', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+    const node = new SDK.DOMModel.DOMNode(domModel);
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
+    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+
+    // Simulate binding to the tree
+    treeElement.onbind();
+
+    const performUpdateSpy = sinon.spy(treeElement, 'performUpdate');
+
+    // Trigger event
+    node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.GRID_OVERLAY_STATE_CHANGED, {enabled: true});
+
+    sinon.assert.calledOnce(performUpdateSpy);
+
+    // Simulate unbinding
+    treeElement.onunbind();
+    performUpdateSpy.resetHistory();
+
+    // Trigger event again
+    node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.GRID_OVERLAY_STATE_CHANGED, {enabled: false});
+
+    sinon.assert.notCalled(performUpdateSpy);
+  });
+
+  it('updates when persistent scroll snap overlay state changes', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+    const node = new SDK.DOMModel.DOMNode(domModel);
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
+    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+
+    // Simulate binding to the tree
+    treeElement.onbind();
+
+    const performUpdateSpy = sinon.spy(treeElement, 'performUpdate');
+
+    // Trigger event
+    node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.SCROLL_SNAP_OVERLAY_STATE_CHANGED, {enabled: true});
+
+    sinon.assert.calledOnce(performUpdateSpy);
+
+    // Simulate unbinding
+    treeElement.onunbind();
+    performUpdateSpy.resetHistory();
+
+    // Trigger event again
+    node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.SCROLL_SNAP_OVERLAY_STATE_CHANGED, {enabled: false});
+
+    sinon.assert.notCalled(performUpdateSpy);
+  });
+
+  it('initializes the slot adorner if the node has an assigned slot', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+    const node = new SDK.DOMModel.DOMNode(domModel);
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
+    const shortcut = {
+      deferredNode: {
+        resolve: (callback: (node: SDK.DOMModel.DOMNode) => void) => {
+          callback(node);
+        },
+        resolvePromise: () => Promise.resolve(node),
+        backendNodeId: () => 1,
+        highlight: () => {},
+      },
+    } as unknown as SDK.DOMModel.DOMNodeShortcut;
+    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+
+    sinon.stub(node, 'hasAssignedSlot').returns(true);
+    sinon.stub(node, 'assignedSlot').value(shortcut);
+
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    // Simulate binding to the tree
+    treeElement.onbind();
+
+    treeElement.performUpdate();
+
+    const adorner = treeElement.listItemElement.querySelector('devtools-adorner');
+    assert.exists(adorner);
+    assert.strictEqual(adorner.name, 'slot');
+  });
+
+  it('renders STARTING_STYLE adorner when enabled', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+    const cssModel = target.model(SDK.CSSModel.CSSModel);
+    assert.exists(cssModel);
+    const node = new SDK.DOMModel.DOMNode(domModel);
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
+    node.id = 1 as Protocol.DOM.NodeId;
+
+    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+
+    sinon.stub(node, 'affectedByStartingStyles').returns(true);
+
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    treeElement.onbind();
+    treeElement.performUpdate();
+
+    const adorner = treeElement.listItemElement.querySelector('.starting-style');
+    assert.exists(adorner);
+
+    const forceSpy = sinon.spy(cssModel, 'forceStartingStyle');
+    (adorner as HTMLElement).click();
+    sinon.assert.calledWith(forceSpy, node, true);
+
+    (adorner as HTMLElement).click();
+    sinon.assert.calledWith(forceSpy, node, false);
   });
 });
 
@@ -262,6 +518,18 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
       nodeName: '#text',
       localName: '',
       nodeValue: text,
+      childNodeCount: 0,
+    };
+  }
+
+  function createProcessingInstructionPayload(target: string, nodeValue: string): Protocol.DOM.Node {
+    return {
+      nodeId: ++nodeId as Protocol.DOM.NodeId,
+      backendNodeId: ++nodeId as Protocol.DOM.BackendNodeId,
+      nodeType: Node.PROCESSING_INSTRUCTION_NODE,
+      nodeName: target,
+      localName: '',
+      nodeValue,
       childNodeCount: 0,
     };
   }
@@ -427,6 +695,103 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     assert.strictEqual(await highlights, 2);
   });
 
+  it('highlights changing processing instruction node content', async () => {
+    const piPayload = createProcessingInstructionPayload('pi-target', 'pi-data');
+    const piNode = SDK.DOMModel.DOMNode.create(domModel, textTestNode.ownerDocument, false, piPayload);
+    textTestNode.setChildrenPayload([piPayload]);
+    piNode.parentNode = textTestNode;
+    const piTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(piNode);
+    textTestTreeElement.appendChild(piTreeElement);
+
+    const highlights = waitForHighlights(textTestTreeElement);
+    domModel.characterDataModified(piNode.id, 'Changed');
+    assert.strictEqual(await highlights, 1);
+  });
+
+  it('edits a processing instruction node', async () => {
+    const piPayload = createProcessingInstructionPayload('pi-target', 'pi-data');
+    const piNode = SDK.DOMModel.DOMNode.create(domModel, textTestNode.ownerDocument, false, piPayload);
+    textTestNode.setChildrenPayload([piPayload]);
+    piNode.parentNode = textTestNode;
+
+    const setNodeValueSpy = sinon.spy(piNode, 'setNodeValue');
+    sinon.stub(SDK.OverlayModel.OverlayModel, 'hideDOMNodeHighlight');
+
+    const piTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(piNode);
+    assert.exists(piTreeElement);
+    textTestTreeElement.appendChild(piTreeElement);
+
+    await textTestTreeElement.onpopulate();
+
+    treeOutline.selectDOMNode(piNode, true);
+
+    const piElementDOM =
+        piTreeElement.listItemElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
+    assert.exists(piElementDOM);
+
+    // Start editing by calling ondblclick
+    const event = new MouseEvent('dblclick', {bubbles: true, cancelable: true});
+    Object.defineProperty(event, 'target', {value: piElementDOM});
+    assert.isFalse(piTreeElement.ondblclick(event));
+
+    assert.isTrue(piTreeElement.isEditing());
+
+    assert.strictEqual(piElementDOM.textContent, 'pi-data');
+
+    // The inplace editor is now active on piElementDOM.
+    piElementDOM.textContent = 'New Data';
+
+    // The commit is triggered by blur or enter.
+    piElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
+
+    assert.isFalse(piTreeElement.isEditing());
+
+    sinon.assert.calledOnce(setNodeValueSpy);
+    sinon.assert.calledWith(setNodeValueSpy, 'New Data');
+  });
+
+  it('edits a processing instruction node without data', async () => {
+    const piPayload = createProcessingInstructionPayload('pi-target', '');
+    const piNode = SDK.DOMModel.DOMNode.create(domModel, textTestNode.ownerDocument, false, piPayload);
+    textTestNode.setChildrenPayload([piPayload]);
+    piNode.parentNode = textTestNode;
+
+    const setNodeValueSpy = sinon.spy(piNode, 'setNodeValue');
+    sinon.stub(SDK.OverlayModel.OverlayModel, 'hideDOMNodeHighlight');
+
+    const piTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(piNode);
+    assert.exists(piTreeElement);
+    textTestTreeElement.appendChild(piTreeElement);
+
+    await textTestTreeElement.onpopulate();
+
+    treeOutline.selectDOMNode(piNode, true);
+
+    const piElementDOM =
+        piTreeElement.listItemElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
+    assert.exists(piElementDOM);
+
+    // Start editing by calling ondblclick
+    const event = new MouseEvent('dblclick', {bubbles: true, cancelable: true});
+    Object.defineProperty(event, 'target', {value: piElementDOM});
+    assert.isFalse(piTreeElement.ondblclick(event));
+
+    assert.isTrue(piTreeElement.isEditing());
+
+    assert.strictEqual(piElementDOM.textContent, '');
+
+    // The inplace editor is now active on piElementDOM.
+    piElementDOM.textContent = 'New Data';
+
+    // The commit is triggered by blur or enter.
+    piElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
+
+    assert.isFalse(piTreeElement.isEditing());
+
+    sinon.assert.calledOnce(setNodeValueSpy);
+    sinon.assert.calledWith(setNodeValueSpy, 'New Data');
+  });
+
   it('does not highlight when panel is hidden', async () => {
     treeOutline.setVisible(false);
     attrTestNode.setAttribute('attrFoo', 'bar');
@@ -439,5 +804,235 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     attrTestNode.setAttribute('attrFoo', 'baz');
     domModel.dispatchEventToListeners(SDK.DOMModel.Events.AttrModified, {node: attrTestNode, name: 'attrFoo'});
     assert.strictEqual(await highlights, 1);
+  });
+
+  it('edits a text node', async () => {
+    const longText = 'This is a long text that is longer than 80 characters to ensure that the text node is ' +
+        'not rendered inline and the parent element is expandable.';
+    const textNodePayload = createTextNodePayload(longText);
+    const textNode = SDK.DOMModel.DOMNode.create(domModel, textTestNode.ownerDocument, false, textNodePayload);
+    textTestNode.setChildrenPayload([textNodePayload]);
+    textNode.parentNode = textTestNode;
+
+    const setNodeValueSpy = sinon.spy(textNode, 'setNodeValue');
+    sinon.stub(SDK.OverlayModel.OverlayModel, 'hideDOMNodeHighlight');
+
+    const textNodeTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(textNode);
+    assert.exists(textNodeTreeElement);
+    textTestTreeElement.appendChild(textNodeTreeElement);
+
+    await textTestTreeElement.onpopulate();
+
+    treeOutline.selectDOMNode(textNode, true);
+
+    const textElementDOM = textNodeTreeElement.listItemElement.querySelector('.webkit-html-text-node') as HTMLElement;
+    assert.exists(textElementDOM);
+
+    // Start editing by calling ondblclick
+    const event = new MouseEvent('dblclick', {bubbles: true, cancelable: true});
+    Object.defineProperty(event, 'target', {value: textElementDOM});
+    assert.isFalse(textNodeTreeElement.ondblclick(event));
+
+    assert.isTrue(textNodeTreeElement.isEditing());
+
+    assert.strictEqual(textElementDOM.textContent, longText);
+
+    // The inplace editor is now active on textElementDOM.
+    textElementDOM.textContent = 'New Text';
+
+    // The commit is triggered by blur or enter.
+    textElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
+
+    assert.isFalse(textNodeTreeElement.isEditing());
+
+    sinon.assert.calledOnce(setNodeValueSpy);
+    sinon.assert.calledWith(setNodeValueSpy, 'New Text');
+  });
+});
+
+describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
+  let target: SDK.Target.Target;
+  let domModel: SDK.DOMModel.DOMModel;
+  let treeOutline: Elements.ElementsTreeOutline.ElementsTreeOutline;
+  let node: SDK.DOMModel.DOMNode;
+  let treeElement: Elements.ElementsTreeElement.ElementsTreeElement;
+
+  beforeEach(() => {
+    target = createTarget();
+    domModel = target.model(SDK.DOMModel.DOMModel)!;
+    node = new SDK.DOMModel.DOMNode(domModel);
+    node.id = 1 as Protocol.DOM.NodeId;
+    sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+    sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+    sinon.stub(node, 'nodeName').returns('DIV');
+    sinon.stub(node, 'adProvenance').returns({} as Protocol.Network.AdProvenance);
+    sinon.stub(node, 'isMediaNode').returns(true);
+
+    treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline(
+        /* omitRootDOMNode */ false, /* selectEnabled */ true, /* hideGutter */ false, /* maxTreeDepth */ 2,
+        /* enableContextMenu */ false, /* showComments */ false, /* showAIButton */ false, /* disableEdits */ true);
+    treeOutline.wireToDOMModel(domModel);
+
+    treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+  });
+
+  it('Ask AI button is not present', async () => {
+    const parentNode = SDK.DOMModel.DOMNode.create(domModel, null, false, {
+      nodeId: 2 as Protocol.DOM.NodeId,
+      backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'DIV',
+        localName: 'div',
+        nodeValue: '',
+        childNodeCount: 0,
+        attributes: [],
+      } as Protocol.DOM.Node],
+      attributes: [],
+    });
+    const snapshot = await parentNode.takeSnapshot();
+    const nodeSnapshot = snapshot.children()?.[0];
+    assert.exists(nodeSnapshot);
+
+    treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline(
+        /* omitRootDOMNode */ false, /* selectEnabled */ true, /* hideGutter */ false, /* maxTreeDepth */ 2,
+        /* enableContextMenu */ false, /* showComments */ false, /* showAIButton */ false, /* disableEdits */ true);
+    treeOutline.wireToDOMModel(domModel);
+
+    treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(nodeSnapshot);
+    treeElement.treeOutline = treeOutline;
+
+    treeElement.hovered = true;
+    treeElement.select();
+
+    // Mock the action availability
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
+    sinon.stub(actionRegistry, 'hasAction').withArgs('freestyler.elements-floating-button').returns(true);
+    sinon.stub(actionRegistry, 'getAction').withArgs('freestyler.elements-floating-button').returns({
+      title: () => 'Ask AI',
+      execute: () => {},
+    } as unknown as UI.ActionRegistration.Action);
+
+    treeElement.performUpdate();
+
+    const aiButton = treeElement.listItemElement.querySelector('devtools-floating-button');
+    assert.isNull(aiButton, 'Ask AI button should not be present in snapshot mode');
+  });
+
+  describe('Adorners', () => {
+    let cssModel: SDK.CSSModel.CSSModel;
+
+    beforeEach(() => {
+      cssModel = target.model(SDK.CSSModel.CSSModel)!;
+      assert.exists(cssModel);
+      // Mocks for various adorners
+      sinon.stub(cssModel, 'getLayoutPropertiesFromComputedStyle').resolves({
+        containerType: 'inline-size',
+        isFlex: true,
+        isGrid: true,
+        isGridLanes: true,
+        hasScroll: true,
+        isSubgrid: true,
+      } as SDK.CSSModel.LayoutProperties);
+
+      sinon.stub(node, 'attributes').returns([{name: 'popover', value: ''}] as SDK.DOMModel.Attribute[]);
+      sinon.stub(node, 'topLayerIndex').returns(1);
+      sinon.stub(node, 'affectedByStartingStyles').returns(true);
+
+      const slot = {
+        deferredNode: {
+          resolve: (callback: (node: SDK.DOMModel.DOMNode) => void) => {
+            callback(node);
+          },
+          resolvePromise: () => Promise.resolve(node),
+          backendNodeId: () => 1,
+          highlight: () => {},
+        },
+      } as unknown as SDK.DOMModel.DOMNodeShortcut;
+      sinon.stub(node, 'hasAssignedSlot').returns(true);
+      sinon.stub(node, 'assignedSlot').value(slot);
+    });
+
+    it('media adorner click is no-op', () => {
+      treeElement.updateAdorners();
+      treeElement.performUpdate();
+
+      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const mediaAdorner = Array.from(adorners).find(a => a.name === 'media');
+      assert.exists(mediaAdorner);
+
+      const viewManager = UI.ViewManager.ViewManager.instance();
+      const showViewSpy = sinon.spy(viewManager, 'showView');
+
+      mediaAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.notCalled(showViewSpy);
+    });
+
+    it('popover adorner click is no-op', () => {
+      // Force allow popover for test
+      const originalDevToolsAllowPopoverForcing = Root.Runtime.hostConfig.devToolsAllowPopoverForcing;
+      Root.Runtime.hostConfig.devToolsAllowPopoverForcing = {enabled: true};
+
+      treeElement.updateAdorners();
+      treeElement.performUpdate();
+
+      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const popoverAdorner = Array.from(adorners).find(a => a.name === 'popover');
+      assert.exists(popoverAdorner);
+
+      const agentSpy = sinon.spy(domModel.agent, 'invoke_forceShowPopover');
+      popoverAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.notCalled(agentSpy);
+
+      // Restore
+      Root.Runtime.hostConfig.devToolsAllowPopoverForcing = originalDevToolsAllowPopoverForcing;
+    });
+
+    it('top-layer adorner click is no-op', () => {
+      treeElement.updateAdorners();
+      treeElement.performUpdate();
+
+      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const topLayerAdorner = Array.from(adorners).find(a => a.name === 'top-layer');
+      assert.exists(topLayerAdorner);
+
+      const revealSpy = sinon.spy(treeElement.treeOutline!, 'revealInTopLayer');
+      topLayerAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.notCalled(revealSpy);
+    });
+
+    it('starting-style adorner click is no-op', () => {
+      treeElement.updateAdorners();
+      treeElement.performUpdate();
+
+      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const startingStyleAdorner = Array.from(adorners).find(a => a.name === 'starting-style');
+      assert.exists(startingStyleAdorner);
+
+      const forceStartingStyleSpy = sinon.spy(cssModel, 'forceStartingStyle');
+      startingStyleAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.notCalled(forceStartingStyleSpy);
+    });
+
+    it('slot adorner click works', () => {
+      treeElement.updateAdorners();
+      treeElement.performUpdate();
+
+      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const slotAdorner = Array.from(adorners).find(a => a.name === 'slot');
+      assert.exists(slotAdorner);
+
+      const revealSpy = sinon.spy(Common.Revealer.RevealerRegistry.instance(), 'reveal');
+      slotAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.called(revealSpy);
+    });
   });
 });

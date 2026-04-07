@@ -1,12 +1,13 @@
 // Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import * as StackTrace from '../../models/stack_trace/stack_trace.js';
+import {Icon} from '../../ui/kit/kit.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -31,11 +32,11 @@ const UIStrings = {
   /**
    * @description A context menu item in the Network Log View Columns of the Network panel
    */
-  responseHeaders: 'Response Headers',
+  responseHeaders: 'Response headers',
   /**
    * @description A context menu item in the Network Log View Columns of the Network panel
    */
-  requestHeaders: 'Request Headers',
+  requestHeaders: 'Request headers',
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
@@ -43,19 +44,19 @@ const UIStrings = {
   /**
    * @description Text for the start time of an activity
    */
-  startTime: 'Start Time',
+  startTime: 'Start time',
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
-  responseTime: 'Response Time',
+  responseTime: 'Response time',
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
-  endTime: 'End Time',
+  endTime: 'End time',
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
-  totalDuration: 'Total Duration',
+  totalDuration: 'Total duration',
   /**
    * @description Text for the latency of a task
    */
@@ -72,6 +73,10 @@ const UIStrings = {
    * @description Text in Timeline UIUtils of the Performance panel
    */
   url: 'Url',
+  /**
+   * @description Column header in the Network log view of the Network panel
+   */
+  requestNumber: 'Request #',
   /**
    * @description Text for one or a group of functions
    */
@@ -99,7 +104,7 @@ const UIStrings = {
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
-  remoteAddress: 'Remote Address',
+  remoteAddress: 'Remote address',
   /**
    * @description Text that refers to some types
    */
@@ -115,7 +120,7 @@ const UIStrings = {
   /**
    * @description Column header in the Network log view of the Network panel
    */
-  initiatorAddressSpace: 'Initiator Address Space',
+  initiatorAddressSpace: 'Initiator address space',
   /**
    * @description Text for web cookies
    */
@@ -147,11 +152,15 @@ const UIStrings = {
   /**
    * @description Text in Network Log View Columns of the Network panel
    */
-  remoteAddressSpace: 'Remote Address Space',
+  remoteAddressSpace: 'Remote address space',
   /**
    * @description Text to show whether a request is ad-related
    */
   isAdRelated: 'Is Ad-Related',
+  /**
+   * @description Text in Network Log View Columns of the Network panel
+   */
+  renderBlocking: 'Render-blocking',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkLogViewColumns.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -181,7 +190,7 @@ export class NetworkLogViewColumns {
   private waterfallScroller!: HTMLElement;
   private waterfallScrollerContent!: HTMLDivElement;
   private waterfallHeaderElement!: HTMLElement;
-  private waterfallColumnSortIcon!: IconButton.Icon.Icon;
+  private waterfallColumnSortIcon!: Icon;
   private activeWaterfallSortId!: string;
   private popoverHelper?: UI.PopoverHelper.PopoverHelper;
   private hasScrollerTouchStarted?: boolean;
@@ -227,13 +236,13 @@ export class NetworkLogViewColumns {
     const title = columnConfig.title instanceof Function ? columnConfig.title() : columnConfig.title;
     return {
       id: columnConfig.id,
-      title,
+      title: title as Common.UIString.LocalizedString,
       sortable: columnConfig.sortable,
       align: columnConfig.align,
       nonSelectable: columnConfig.nonSelectable,
       weight: columnConfig.weight,
       allowInSortByEvenWhenHidden: columnConfig.allowInSortByEvenWhenHidden,
-    } as DataGrid.DataGrid.ColumnDescriptor;
+    };
   }
 
   wasShown(): void {
@@ -276,8 +285,6 @@ export class NetworkLogViewColumns {
     this.#dataGrid = new DataGrid.SortableDataGrid.SortableDataGrid<NetworkNode>(({
       displayName: (i18nString(UIStrings.networkLog) as string),
       columns: this.columns.map(NetworkLogViewColumns.convertToDataGridDescriptor),
-      deleteCallback: undefined,
-      refreshCallback: undefined,
     }));
     this.dataGridScroller = (this.#dataGrid.scrollContainer as HTMLDivElement);
 
@@ -405,7 +412,8 @@ export class NetworkLogViewColumns {
 
   private createWaterfallHeader(): void {
     this.waterfallHeaderElement = this.waterfallColumn.contentElement.createChild('div', 'network-waterfall-header');
-    this.waterfallHeaderElement.setAttribute('jslog', `${VisualLogging.tableHeader('waterfall').track({click: true})}`);
+    this.waterfallHeaderElement.setAttribute(
+        'jslog', `${VisualLogging.tableHeader('waterfall').track({click: true, resize: true})}`);
     this.waterfallHeaderElement.addEventListener('click', waterfallHeaderClicked.bind(this));
     this.waterfallHeaderElement.addEventListener('contextmenu', event => {
       const contextMenu = new UI.ContextMenu.ContextMenu(event);
@@ -415,7 +423,7 @@ export class NetworkLogViewColumns {
     this.waterfallHeaderElement.createChild('div', 'hover-layer');
     const innerElement = this.waterfallHeaderElement.createChild('div');
     innerElement.textContent = i18nString(UIStrings.waterfall);
-    this.waterfallColumnSortIcon = new IconButton.Icon.Icon();
+    this.waterfallColumnSortIcon = new Icon();
     this.waterfallColumnSortIcon.className = 'sort-order-icon';
     this.waterfallHeaderElement.createChild('div', 'sort-order-icon-container')
         .appendChild(this.waterfallColumnSortIcon);
@@ -876,20 +884,30 @@ export class NetworkLogViewColumns {
     if (!request) {
       return null;
     }
+    let descriptor: Common.EventTarget.EventDescriptor|undefined = undefined;
     return {
       box: anchor.boxInWindow(),
       show: async (popover: UI.GlassPane.GlassPane) => {
-        this.popupLinkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, () => {
-          popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
-        });
-        const content = RequestInitiatorView.createStackTracePreview((request), this.popupLinkifier, false);
+        const content = await RequestInitiatorView.createStackTracePreview((request), this.popupLinkifier, false);
         if (!content) {
           return false;
         }
-        content.show(popover.contentElement);
+        descriptor = content.stackTrace?.addEventListener(StackTrace.StackTrace.Events.UPDATED, async () => {
+          await content.preview.updateComplete;
+          popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
+        });
+        content.preview.show(popover.contentElement);
+        await content.preview.updateComplete.then(() => {
+          popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
+        });
         return true;
       },
-      hide: this.popupLinkifier.reset.bind(this.popupLinkifier),
+      hide: () => {
+        this.popupLinkifier.reset();
+        if (descriptor) {
+          Common.EventTarget.removeEventListeners([descriptor]);
+        }
+      },
     };
   }
 
@@ -977,6 +995,12 @@ const DEFAULT_COLUMNS = [
     hideable: true,
     hideableGroup: 'path',
     sortingFunction: NetworkRequestNode.RequestURLComparator,
+  },
+  {
+    id: 'request-number',
+    title: i18nLazyString(UIStrings.requestNumber),
+    align: DataGrid.DataGrid.Align.RIGHT,
+    sortingFunction: NetworkRequestNode.RequestNumberComparator,
   },
   {
     id: 'method',
@@ -1192,6 +1216,11 @@ const DEFAULT_COLUMNS = [
     title: i18nLazyString(UIStrings.isAdRelated),
     sortingFunction: NetworkRequestNode.IsAdRelatedComparator,
   },
+  {
+    id: 'render-blocking',
+    title: i18nLazyString(UIStrings.renderBlocking),
+    sortingFunction: NetworkRequestNode.RenderBlockingComparator,
+  },
   // This header is a placeholder to let datagrid know that it can be sorted by this column, but never shown.
   {
     id: 'waterfall',
@@ -1222,7 +1251,7 @@ export interface Descriptor {
   hideableGroup: string|null;
   nonSelectable: boolean;
   sortable: boolean;
-  align?: string|null;
+  align?: DataGrid.DataGrid.Align|null;
   isResponseHeader: boolean;
   isRequestHeader: boolean;
   sortingFunction: (arg0: NetworkNode, arg1: NetworkNode) => number | undefined;

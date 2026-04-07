@@ -40,32 +40,22 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 83,
-  header: 'What\'s new in DevTools 142',
+  version: 147,
+  header: 'What\'s new in DevTools 147',
   markdownLinks: [
     {
-      key: 'perf-ai-agent',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-142/#perf-ai-agent',
+      key: 'ai-assistance',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#ai-assistance',
     },
     {
-      key: 'ai-code-completion',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-142/#ai-code-completion',
+      key: 'mcp-server',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#mcp-server',
     },
     {
-      key: 'gdp',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-142/#gdp',
-    },
-    {
-      key: 'ai-main-button',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-142/#ai-main-button',
-    },
+      key: 'code-generation',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#code-generation',
+    }
   ],
-  videoLinks: [
-    {
-      description: 'See past highlights from Chrome 141',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-141' as Platform.DevToolsPath.UrlString,
-      type: VideoType.WHATS_NEW,
-    },
-  ],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-142/',
+  videoLinks: [],
+  link: 'https://developer.chrome.com/blog/new-in-devtools-147/',
 };

@@ -7,7 +7,6 @@ import './emulation/emulation-meta.js';
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
-import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Settings from './settings.js';
@@ -25,6 +24,14 @@ const UIStrings = {
    * @description Text in Settings Screen of the Settings
    */
   experiments: 'Experiments',
+  /**
+   * @description Text in Settings Screen of the Settings
+   */
+  greenDevProtoTypes: 'GreenDev',
+  /**
+   * @description Command for showing the GreenDev tab in the Settings Screen
+   */
+  showGreenDev: 'Show GreenDev',
   /**
    * @description Title of Ignore list settings
    */
@@ -117,7 +124,7 @@ UI.ViewManager.registerViewExtension({
   order: 2,
   async loadView() {
     const Settings = await loadSettingsModule();
-    return LegacyWrapper.LegacyWrapper.legacyWrapper(UI.Widget.VBox, new Settings.AISettingsTab.AISettingsTab());
+    return new Settings.AISettingsTab.AISettingsTab();
   },
   iconName: 'button-magic',
   settings: ['console-insights-enabled'],
@@ -134,7 +141,7 @@ UI.ViewManager.registerViewExtension({
   title: i18nLazyString(UIStrings.experiments),
   commandPrompt: i18nLazyString(UIStrings.showExperiments),
   order: 3,
-  experiment: Root.Runtime.ExperimentName.ALL,
+  experiment: Root.ExperimentNames.ExperimentName.ALL,
   async loadView() {
     const Settings = await loadSettingsModule();
     return new Settings.SettingsScreen.ExperimentsSettingsTab();
@@ -153,6 +160,22 @@ UI.ViewManager.registerViewExtension({
     return new Settings.FrameworkIgnoreListSettingsTab.FrameworkIgnoreListSettingsTab();
   },
   iconName: 'clear-list',
+});
+
+UI.ViewManager.registerViewExtension({
+  location: UI.ViewManager.ViewLocationValues.SETTINGS_VIEW,
+  id: 'greendev-prototypes',
+  title: i18nLazyString(UIStrings.greenDevProtoTypes),
+  commandPrompt: i18nLazyString(UIStrings.showGreenDev),
+  order: 101,
+  async loadView() {
+    const Settings = await loadSettingsModule();
+    return new Settings.SettingsScreen.GreenDevSettingsTab();
+  },
+  iconName: 'experiment',
+  condition: config => {
+    return Boolean(config?.devToolsGreenDevUi?.enabled);
+  },
 });
 
 UI.ViewManager.registerViewExtension({
@@ -254,9 +277,9 @@ Common.Revealer.registerRevealer({
     return [
       Common.Settings.Setting,
       Root.Runtime.Experiment,
+      Root.Runtime.HostExperiment,
     ];
   },
-  destination: undefined,
   async loadRevealer() {
     const Settings = await loadSettingsModule();
     return new Settings.SettingsScreen.Revealer();
@@ -266,11 +289,9 @@ Common.Revealer.registerRevealer({
 UI.ContextMenu.registerItem({
   location: UI.ContextMenu.ItemLocation.MAIN_MENU_FOOTER,
   actionId: 'settings.shortcuts',
-  order: undefined,
 });
 
 UI.ContextMenu.registerItem({
   location: UI.ContextMenu.ItemLocation.MAIN_MENU_HELP_DEFAULT,
   actionId: 'settings.documentation',
-  order: undefined,
 });

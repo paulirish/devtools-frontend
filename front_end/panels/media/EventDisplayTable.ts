@@ -1,8 +1,9 @@
 // Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
+import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
@@ -116,8 +117,6 @@ export class PlayerEventsView extends UI.Widget.VBox {
     const datagrid = new DataGrid.DataGrid.DataGridImpl({
       displayName: i18nString(UIStrings.eventDisplay),
       columns: gridColumnDescs,
-      deleteCallback: undefined,
-      refreshCallback: undefined,
     });
     datagrid.asWidget().contentElement.classList.add('no-border-top-datagrid');
     return datagrid;
@@ -158,10 +157,10 @@ export class PlayerEventsView extends UI.Widget.VBox {
   private static convertToGridDescriptor(columnConfig: EventDisplayColumnConfig): DataGrid.DataGrid.ColumnDescriptor {
     return {
       id: columnConfig.id,
-      title: columnConfig.title,
+      title: columnConfig.title as Common.UIString.LocalizedString,
       sortable: columnConfig.sortable,
       weight: columnConfig.weight || 0,
       sort: DataGrid.DataGrid.Order.Ascending,
-    } as DataGrid.DataGrid.ColumnDescriptor;
+    };
   }
 }

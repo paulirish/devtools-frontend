@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no-imperative-dom-api */
-
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Geometry from '../../models/geometry/geometry.js';
+import * as uiI18n from '../../ui/i18n/i18n.js';
+import {Link} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import layers3DViewStyles from './layers3DView.css.js';
@@ -24,6 +25,9 @@ import {
   Type,
 } from './LayerViewHost.js';
 import {Events as TransformControllerEvents, TransformController} from './TransformController.js';
+
+const {html, render, Directives: {ref}} = Lit;
+const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
@@ -85,12 +89,69 @@ const uniformSamplerLocations = new Map<WebGLProgram, WebGLUniformLocation|null>
 
 const imageForTexture = new Map<WebGLTexture, HTMLImageElement>();
 
+export interface ViewInput {
+  panelToolbar: UI.Toolbar.Toolbar;
+  onDoubleClick: (event: Event) => void;
+  onMouseDown: (event: Event) => void;
+  onMouseUp: (event: Event) => void;
+  onMouseMove: (event: Event) => void;
+  onContextMenu: (event: Event) => void;
+  error?: 'missing-root'|'webgl-disabled';
+}
+
+export interface ViewOutput {
+  canvasElement?: HTMLCanvasElement;
+}
+
+export const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLElement): void => {
+  // clang-format off
+  render(html`<style>
+      ${layers3DViewStyles}
+    </style>
+    ${input.panelToolbar}
+    ${input.error === 'missing-root' ? html`<div>${widget(UI.EmptyWidget.EmptyWidget, {
+      header: i18nString(UIStrings.noLayerInformation),
+      text: i18nString(UIStrings.layerExplanation)
+    })}</div>` : Lit.nothing}
+    ${input.error === 'webgl-disabled' ? html`<div>${widget(UI.EmptyWidget.EmptyWidget, {
+      header: i18nString(UIStrings.cantDisplayLayers),
+      text: i18nString(UIStrings.webglSupportIsDisabledInYour),
+      extraElements: [
+        uiI18n.getFormatLocalizedString(
+          str_, UIStrings.checkSForPossibleReasons,
+          {
+            PH1: Link.create('about:gpu', undefined, undefined, 'about-gpu')
+          }
+        )
+      ],
+    })}</div>` : Lit.nothing}
+    <canvas
+      tabindex="0"
+      jslog=${VisualLogging.canvas('layers').track({
+        click: true,
+        drag: true
+      })}
+      aria-label=${i18nString(UIStrings.dLayersView)}
+      @dblclick=${input.onDoubleClick}
+      @mousedown=${input.onMouseDown}
+      @mouseup=${input.onMouseUp}
+      @mouseleave=${input.onMouseMove}
+      @mousemove=${input.onMouseMove}
+      @contextmenu=${input.onContextMenu}
+      ${ref(el => {
+        if (!el) {
+          return;
+        }
+        output.canvasElement = el as HTMLCanvasElement;
+      })}></canvas>`,
+      target);
+  // clang-format onn
+};
+
 export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements LayerView {
-  private failBanner: UI.EmptyWidget.EmptyWidget;
   private readonly layerViewHost: LayerViewHost;
   private transformController: TransformController;
-  private canvasElement: HTMLCanvasElement;
   private lastSelection: Record<string, Selection|null>;
   private layerTree: SDK.LayerTreeBase.LayerTreeBase|null;
   private readonly textureManager: LayerTextureManager;
@@ -110,22 +171,19 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private dimensionsForAutoscale?: {width: number, height: number};
   private needsUpdate?: boolean;
   private updateScheduled?: boolean;
-  private panelToolbar?: UI.Toolbar.Toolbar;
+  private panelToolbar: UI.Toolbar.Toolbar;
   private showSlowScrollRectsSetting?: Common.Settings.Setting<boolean>;
   private showPaintsSetting?: Common.Settings.Setting<boolean>;
   private mouseDownX?: number;
   private mouseDownY?: number;
 
-  constructor(layerViewHost: LayerViewHost) {
-    super({
-      jslog: `${VisualLogging.pane('layers-3d-view')}`,
-      useShadowDom: true,
-    });
-    this.registerRequiredCSS(layers3DViewStyles);
+  #view: typeof DEFAULT_VIEW;
+  #error?: 'missing-root' | 'webgl-disabled';
+  #canvasElement!: HTMLCanvasElement;
 
-    this.contentElement.classList.add('layers-3d-view');
-    this.failBanner = new UI.EmptyWidget.EmptyWidget(
-        i18nString(UIStrings.noLayerInformation), i18nString(UIStrings.layerExplanation));
+  constructor(layerViewHost: LayerViewHost, view = DEFAULT_VIEW) {
+    super({jslog: `${VisualLogging.pane('layers-3d-view')}`, useShadowDom: true, classes: ['layers-3d-view']});
+    this.#view = view;
 
     this.layerViewHost = layerViewHost;
     this.layerViewHost.registerView(this);
@@ -134,25 +192,24 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.transformController =
         new TransformController(this.contentElement, false, false /* preventDefaultOnMouseDown */);
 
-    this.transformController.addEventListener(TransformControllerEvents.TRANSFORM_CHANGED, this.update, this);
+    this.transformController.addEventListener(TransformControllerEvents.TRANSFORM_CHANGED, this.updateData, this);
+    this.panelToolbar = this.transformController.toolbar();
+    this.showPaintsSetting = this.createVisibilitySetting(
+        i18nString(UIStrings.paints), 'frame-viewer-show-paints', false, this.panelToolbar);
+    this.showSlowScrollRectsSetting = this.createVisibilitySetting(
+        i18nString(UIStrings.slowScrollRects), 'frame-viewer-show-slow-scroll-rects', true, this.panelToolbar);
+    this.showPaintsSetting.addChangeListener(this.updatePaints, this);
+    Common.Settings.Settings.instance()
+      .moduleSetting('frame-viewer-chrome-window')
+        .addChangeListener(this.updateData, this);
 
-    this.initToolbar();
-    this.canvasElement = this.contentElement.createChild('canvas');
-    this.canvasElement.tabIndex = 0;
-    this.canvasElement.addEventListener('dblclick', this.onDoubleClick.bind(this), false);
-    this.canvasElement.addEventListener('mousedown', this.onMouseDown.bind(this), false);
-    this.canvasElement.addEventListener('mouseup', this.onMouseUp.bind(this), false);
-    this.canvasElement.addEventListener('mouseleave', this.onMouseMove.bind(this), false);
-    this.canvasElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
-    this.canvasElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
-    this.canvasElement.setAttribute('jslog', `${VisualLogging.canvas('layers').track({click: true, drag: true})}`);
-    UI.ARIAUtils.setLabel(this.canvasElement, i18nString(UIStrings.dLayersView));
+    this.performUpdate();
 
     this.lastSelection = {};
     this.layerTree = null;
     this.updateScheduled = false;
 
-    this.textureManager = new LayerTextureManager(this.update.bind(this));
+    this.textureManager = new LayerTextureManager(this.updateData.bind(this));
 
     this.chromeTextures = [];
 
@@ -161,7 +218,25 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.snapshotLayers = new Map();
     this.layerViewHost.setLayerSnapshotMap(this.snapshotLayers);
 
-    this.layerViewHost.showInternalLayersSetting().addChangeListener(this.update, this);
+    this.layerViewHost.showInternalLayersSetting().addChangeListener(this.updateData, this);
+  }
+
+  override performUpdate(): void {
+    const output: ViewOutput = {};
+    this.#view(
+        {
+          panelToolbar: this.panelToolbar,
+          onDoubleClick: this.onDoubleClick.bind(this),
+          onMouseDown: this.onMouseDown.bind(this),
+          onMouseUp: this.onMouseUp.bind(this),
+          onMouseMove: this.onMouseMove.bind(this),
+          onContextMenu: this.onContextMenu.bind(this),
+          error: this.#error,
+        },
+        output, this.contentElement);
+    if (output.canvasElement) {
+      this.#canvasElement = output.canvasElement;
+    }
   }
 
   setLayerTree(layerTree: SDK.LayerTreeBase.LayerTreeBase|null): void {
@@ -171,38 +246,42 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     if (this.showPaints()) {
       this.textureManager.setLayerTree(layerTree);
     }
-    this.update();
+    this.updateData();
   }
 
   showImageForLayer(layer: SDK.LayerTreeBase.Layer, imageURL?: string): void {
     if (!imageURL) {
       this.layerTexture = null;
-      this.update();
+      this.updateData();
       return;
     }
     void UI.UIUtils.loadImage(imageURL).then(image => {
       const texture = image && LayerTextureManager.createTextureForImage(this.gl || null, image);
       this.layerTexture = texture ? {layer, texture} : null;
-      this.update();
+      this.updateData();
     });
   }
 
   override onResize(): void {
+    this.performUpdate();
     this.resizeCanvas();
-    this.update();
+    this.updateData();
   }
 
   override willHide(): void {
+    super.willHide();
     this.textureManager.suspend();
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.textureManager.resume();
     if (!this.needsUpdate) {
       return;
     }
+    this.performUpdate();
     this.resizeCanvas();
-    this.update();
+    this.updateData();
   }
 
   updateLayerSnapshot(layer: SDK.LayerTreeBase.Layer): void {
@@ -211,7 +290,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   private setOutline(type: OutlineType, selection: Selection|null): void {
     this.lastSelection[type] = selection;
-    this.update();
+    this.updateData();
   }
 
   hoverObject(selection: Selection|null): void {
@@ -297,8 +376,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 
   private resizeCanvas(): void {
-    this.canvasElement.width = this.canvasElement.offsetWidth * window.devicePixelRatio;
-    this.canvasElement.height = this.canvasElement.offsetHeight * window.devicePixelRatio;
+    this.#canvasElement.width = this.#canvasElement.offsetWidth * window.devicePixelRatio;
+    this.#canvasElement.height = this.#canvasElement.offsetHeight * window.devicePixelRatio;
   }
 
   private updateTransformAndConstraints(): void {
@@ -307,8 +386,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     const viewport = this.layerTree ? this.layerTree.viewportSize() : null;
     const baseWidth = viewport ? viewport.width : dimensionsForAutoscale.width;
     const baseHeight = viewport ? viewport.height : dimensionsForAutoscale.height;
-    const canvasWidth = this.canvasElement.width;
-    const canvasHeight = this.canvasElement.height;
+    const canvasWidth = this.#canvasElement.width;
+    const canvasHeight = this.#canvasElement.height;
     const paddingX = canvasWidth * paddingFraction;
     const paddingY = canvasHeight * paddingFraction;
     const scaleX = (canvasWidth - 2 * paddingX) / baseWidth;
@@ -357,7 +436,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     const glProjectionMatrix = new WebKitCSSMatrix()
                                    .scale(1, -1, -1)
                                    .translate(-1, -1, 0)
-                                   .scale(2 / this.canvasElement.width, 2 / this.canvasElement.height, 1 / 1000000)
+                                   .scale(2 / this.#canvasElement.width, 2 / this.#canvasElement.height, 1 / 1000000)
                                    .multiply(this.projectionMatrix);
 
     if (this.shaderProgram) {
@@ -413,10 +492,10 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 
   private initGLIfNecessary(): WebGLRenderingContext|null {
-    if (this.gl) {
+    if (this.gl && this.gl.canvas === this.#canvasElement) {
       return this.gl;
     }
-    this.gl = this.initGL(this.canvasElement);
+    this.gl = this.initGL(this.#canvasElement);
     if (!this.gl) {
       return null;
     }
@@ -653,7 +732,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       return;
     }
 
-    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frame-viewer-hide-chrome-window').get() &&
+    const drawChrome = Common.Settings.Settings.instance().moduleSetting('frame-viewer-chrome-window').get() &&
         this.chromeTextures.length >= 3 && this.chromeTextures.indexOf(undefined) < 0;
     const z = (this.maxDepth + 1) * LayerSpacing;
     const borderWidth = Math.ceil(ViewportBorderWidth * this.scale);
@@ -722,7 +801,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     }
   }
 
-  update(): void {
+  updateData(): void {
     if (!this.isShowing()) {
       this.needsUpdate = true;
       return;
@@ -735,26 +814,27 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       this.updateScheduled = true;
       requestAnimationFrame(() => requestAnimationFrame(() => {
                               this.updateScheduled = false;
-                              this.#update();
+                              this.#redrawCanvas();
                             }));
     }
   }
 
-  #update(): void {
+  #redrawCanvas(): void {
+    this.performUpdate();
     if (!this.layerTree?.root()) {
-      this.failBanner.show(this.contentElement);
+      this.#error = 'missing-root';
+      this.performUpdate();
       return;
     }
     const gl = this.initGLIfNecessary();
     if (!gl) {
-      this.failBanner.detach();
-      this.failBanner = this.webglDisabledBanner();
-      this.failBanner.show(this.contentElement);
+      this.#error = 'webgl-disabled';
+      this.performUpdate();
       return;
     }
-    this.failBanner.detach();
-    const viewportWidth = this.canvasElement.width;
-    const viewportHeight = this.canvasElement.height;
+    this.#error = undefined;
+    const viewportWidth = this.#canvasElement.width;
+    const viewportHeight = this.#canvasElement.height;
 
     this.calculateDepthsAndVisibility();
     this.calculateRects();
@@ -767,15 +847,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.drawViewportAndChrome();
   }
 
-  private webglDisabledBanner(): UI.EmptyWidget.EmptyWidget {
-    const emptyWidget = new UI.EmptyWidget.EmptyWidget(
-        i18nString(UIStrings.cantDisplayLayers), i18nString(UIStrings.webglSupportIsDisabledInYour));
-    emptyWidget.contentElement.appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.checkSForPossibleReasons,
-        {PH1: UI.XLink.XLink.create('about:gpu', undefined, undefined, undefined, 'about-gpu')}));
-    return emptyWidget;
-  }
-
   private selectionFromEventPoint(event: Event): Selection|null {
     const mouseEvent = event as MouseEvent;
     if (!this.layerTree) {
@@ -785,8 +856,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     let closestObject: Selection|null = null;
     const projectionMatrix =
         new WebKitCSSMatrix().scale(1, -1, -1).translate(-1, -1, 0).multiply(this.projectionMatrix);
-    const x0 = (mouseEvent.clientX - this.canvasElement.getBoundingClientRect().left) * window.devicePixelRatio;
-    const y0 = -(mouseEvent.clientY - this.canvasElement.getBoundingClientRect().top) * window.devicePixelRatio;
+    const x0 = (mouseEvent.clientX - this.#canvasElement.getBoundingClientRect().left) * window.devicePixelRatio;
+    const y0 = -(mouseEvent.clientY - this.#canvasElement.getBoundingClientRect().top) * window.devicePixelRatio;
 
     function checkIntersection(rect: Rectangle): void {
       if (!rect.relatedObject) {
@@ -808,22 +879,9 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       toolbar: UI.Toolbar.Toolbar): Common.Settings.Setting<boolean> {
     const setting = Common.Settings.Settings.instance().createSetting(name, value);
     setting.setTitle(caption);
-    setting.addChangeListener(this.update, this);
+    setting.addChangeListener(this.updateData, this);
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(setting));
     return setting;
-  }
-
-  private initToolbar(): void {
-    this.panelToolbar = this.transformController.toolbar();
-    this.contentElement.appendChild(this.panelToolbar);
-    this.showPaintsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.paints), 'frame-viewer-show-paints', false, this.panelToolbar);
-    this.showSlowScrollRectsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.slowScrollRects), 'frame-viewer-show-slow-scroll-rects', true, this.panelToolbar);
-    this.showPaintsSetting.addChangeListener(this.updatePaints, this);
-    Common.Settings.Settings.instance()
-        .moduleSetting('frame-viewer-hide-chrome-window')
-        .addChangeListener(this.update, this);
   }
 
   private onContextMenu(event: Event): void {
@@ -862,7 +920,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     const maxDistanceInPixels = 6;
     if (this.mouseDownX && Math.abs(mouseEvent.clientX - this.mouseDownX) < maxDistanceInPixels &&
         Math.abs(mouseEvent.clientY - (this.mouseDownY || 0)) < maxDistanceInPixels) {
-      this.canvasElement.focus();
+      this.#canvasElement.focus();
       this.layerViewHost.selectObject(this.selectionFromEventPoint(event));
     }
     delete this.mouseDownX;
@@ -884,7 +942,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     } else {
       this.textureManager.reset();
     }
-    this.update();
+    this.updateData();
   }
 
   private showPaints(): boolean {

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -66,6 +65,10 @@ describeWithMockConnection('TimelineUIUtils', function() {
   const SCRIPT_ID_STRING = String(SCRIPT_ID_NUMBER) as Protocol.Runtime.ScriptId;
 
   beforeEach(() => {
+    setMockConnectionResponseHandler(
+        'Debugger.enable', () => ({debuggerId: 'DEBUGGER_ID' as Protocol.Runtime.UniqueDebuggerId}));
+    setMockConnectionResponseHandler(
+        'Debugger.setInstrumentationBreakpoint', () => ({} as Protocol.Debugger.SetInstrumentationBreakpointResponse));
     target = createTarget();
 
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
@@ -77,6 +80,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       resourceMapping,
       targetManager,
       ignoreListManager,
+      workspace,
     });
   });
 
@@ -189,7 +193,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
         url: 'https://google.com/test.js',
         lineNumber: 0,
         columnNumber: 0,
-        isFreshRecording: true,
+        isFreshOrEnhanced: true,
         target,
         linkifier,
       });
@@ -236,6 +240,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
     it('maps to the authored name and script of a profile call', async function() {
       const {script} = await loadBasicSourceMapExample(target);
+
       // Ideally we would get a column number we can use from the source
       // map however the current status of the source map helpers makes
       // it difficult to do so.
@@ -270,7 +275,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
           parsedTrace, profileCall, new Components.Linkifier.Linkifier(), false, null);
       const stackTraceData = getStackTraceForDetailsElement(details);
       assert.exists(stackTraceData);
-      assert.isTrue(stackTraceData[0].startsWith('someFunction @'));
+      assert.strictEqual(stackTraceData[0], 'someFunction @ main.js:6:10');
     });
     it('maps to the authored name and script of a function call', async function() {
       const {script} = await loadBasicSourceMapExample(target);
@@ -422,7 +427,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
   }
 
   function getPieChartDataForDetailsElement(details: DocumentFragment) {
-    const pieChartComp = details.querySelector<HTMLDivElement>('devtools-perf-piechart');
+    const pieChartComp = details.querySelector('devtools-perf-piechart');
     if (!pieChartComp?.shadowRoot) {
       return [];
     }
@@ -598,6 +603,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const rowData = getRowDataForDetailsElement(details);
       assert.deepEqual(rowData, [
         {title: 'Duration', value: '0.22\xA0ms (self 0.20\xA0ms)'},
+        {title: 'eventKey', value: 'r-83'},
         {
           title: '',
           // Generic traces get their events rendered as JSON
@@ -615,7 +621,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       // though we return none, we need to mock these calls else the frontend
       // will not work.)
       const documentNode = {nodeId: 1 as Protocol.DOM.BackendNodeId};
-      setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+      setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode as unknown as Protocol.DOM.Node}));
       setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => {
         return {
           nodeIds: [],
@@ -652,7 +658,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
           // The "Recalculation forced" Stack trace
           title: undefined,
           value:
-              'testFuncs.changeAttributeAndDisplay @ chromedevtools.github.io/performance-stories/style-invalidations/app.js:47:40\n(anonymous) @ chromedevtools.github.io/performance-stories/style-invalidations/app.js:64:36',
+              'testFuncs.changeAttributeAndDisplay @ chromedevtools.githu…ations/app.js:47:40\n(anonymous) @ chromedevtools.githu…ations/app.js:64:36',
         },
         {
           title: 'Initiated by',
@@ -868,15 +874,6 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
 
     it('renders the details for a profile call properly', async function() {
-      Common.Linkifier.registerLinkifier({
-        contextTypes() {
-          return [Timeline.CLSLinkifier.CLSRect];
-        },
-        async loadLinkifier() {
-          return Timeline.CLSLinkifier.Linkifier.instance();
-        },
-      });
-
       const parsedTrace = await TraceLoader.traceEngine(this, 'simple-js-program.json.gz');
       const [process] = parsedTrace.data.Renderer.processes.values();
       const [thread] = process.threads.values();
@@ -898,15 +895,6 @@ describeWithMockConnection('TimelineUIUtils', function() {
       assert.strictEqual(stackTraceData[0], '(anonymous) @ www.google.com:21:17');
     });
     it('renders the stack trace of a ScheduleStyleRecalculation properly', async function() {
-      Common.Linkifier.registerLinkifier({
-        contextTypes() {
-          return [Timeline.CLSLinkifier.CLSRect];
-        },
-        async loadLinkifier() {
-          return Timeline.CLSLinkifier.Linkifier.instance();
-        },
-      });
-
       const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [process] = parsedTrace.data.Renderer.processes.values();
@@ -937,15 +925,6 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
 
     it('renders the stack trace of a RecalculateStyles properly', async function() {
-      Common.Linkifier.registerLinkifier({
-        contextTypes() {
-          return [Timeline.CLSLinkifier.CLSRect];
-        },
-        async loadLinkifier() {
-          return Timeline.CLSLinkifier.Linkifier.instance();
-        },
-      });
-
       const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [process] = parsedTrace.data.Renderer.processes.values();
@@ -969,14 +948,6 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const pid = 0;
       const traceId = 0;
       const tid = 0;
-      Common.Linkifier.registerLinkifier({
-        contextTypes() {
-          return [Timeline.CLSLinkifier.CLSRect];
-        },
-        async loadLinkifier() {
-          return Timeline.CLSLinkifier.Linkifier.instance();
-        },
-      });
 
       // Build the following hierarchy
       //       |-----------------v8.run--------------------|
@@ -1039,8 +1010,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
       assert.deepEqual(
           markerStackTraceData,
           [
-            `${function3.callFrame.functionName} @ `,
-            `${function1.callFrame.functionName} @ `,
+            `${function3.callFrame.functionName} @ (unknown)`,
+            `${function1.callFrame.functionName} @ (unknown)`,
           ],
       );
 
@@ -1067,8 +1038,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const trackEntryStackTraceData = getStackTraceForDetailsElement(trackEntryDetails);
       assert.exists(trackEntryStackTraceData);
       assert.deepEqual(trackEntryStackTraceData, [
-        `${function2.callFrame.functionName} @ `,
-        `${function1.callFrame.functionName} @ `,
+        `${function2.callFrame.functionName} @ (unknown)`,
+        `${function1.callFrame.functionName} @ (unknown)`,
       ]);
     });
     it('renders the stack trace of user timings properly', async function() {
@@ -1093,8 +1064,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
       assert.deepEqual(
           markerStackTraceData,
           [
-            `${function3.callFrame.functionName} @ `,
-            `${function1.callFrame.functionName} @ `,
+            `${function3.callFrame.functionName} @ (unknown)`,
+            `${function1.callFrame.functionName} @ (unknown)`,
           ],
       );
 
@@ -1108,8 +1079,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const trackEntryStackTraceData = getStackTraceForDetailsElement(trackEntryDetails);
       assert.exists(trackEntryStackTraceData);
       assert.deepEqual(trackEntryStackTraceData, [
-        `${function2.callFrame.functionName} @ `,
-        `${function1.callFrame.functionName} @ `,
+        `${function2.callFrame.functionName} @ (unknown)`,
+        `${function1.callFrame.functionName} @ (unknown)`,
       ]);
     });
     it('renders the warning for a trace event in its details', async function() {
@@ -1406,12 +1377,12 @@ describeWithMockConnection('TimelineUIUtils', function() {
       assert.deepEqual(
           testData,
           [
-            {description: '', stackFrames: ['\tbaz\t@\tunknown']},
-            {description: '\trequestIdleCallback\t\t', stackFrames: ['\tbar\t@\tunknown']},
-            {description: '\tsetTimeout\t\t', stackFrames: ['\tfoo\t@\tunknown']},
+            {description: '', stackFrames: ['\tbaz\t@\t(unknown)']},
+            {description: '\trequestIdleCallback\t\t', stackFrames: ['\tbar\t@\t(unknown)']},
+            {description: '\tsetTimeout\t\t', stackFrames: ['\tfoo\t@\t(unknown)']},
             {
               description: '\trequestAnimationFrame\t\t',
-              stackFrames: ['\tstartExample\t@\tunknown', '\t(anonymous)\t@\tunknown'],
+              stackFrames: ['\tstartExample\t@\t(unknown)', '\t(anonymous)\t@\t(unknown)'],
             },
           ],
       );
@@ -1549,153 +1520,6 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
   });
 
-  describe('statsForTimeRange', () => {
-    it('correctly aggregates up stats', async () => {
-      const mainThread = Trace.Types.Events.ThreadID(1);
-      const pid = Trace.Types.Events.ProcessID(100);
-      function microsec(x: number): Trace.Types.Timing.Micro {
-        return Trace.Types.Timing.Micro(x);
-      }
-
-      const events: Trace.Types.Events.Event[] = [
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'TracingStartedInBrowser',
-          ph: Trace.Types.Events.Phase.INSTANT,
-          pid,
-          tid: mainThread,
-          ts: microsec(100),
-          args: {
-            data: {
-              frames: [
-                {frame: 'frame1', url: 'frameurl', name: 'frame-name'},
-              ],
-            },
-          },
-        } as Trace.Types.Events.TracingStartedInBrowser,
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'SetLayerTreeId',
-          ph: Trace.Types.Events.Phase.INSTANT,
-          pid,
-          tid: mainThread,
-          ts: microsec(101),
-          args: {data: {frame: 'frame1', layerTreeId: 17}},
-        } as Trace.Types.Events.SetLayerTreeId,
-        {
-          cat: 'toplevel',
-          name: 'Program',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(100000),
-          dur: microsec(3000),
-          tid: mainThread,
-          pid,
-          args: {},
-        },
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'FunctionCall',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(100500),
-          dur: microsec(1500),
-          tid: mainThread,
-          pid,
-          args: {},
-        },
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'Layout',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(101000),
-          dur: microsec(1000),
-          tid: mainThread,
-          pid,
-          args: {
-            beginData: {
-              frame: 'FAKE_FRAME_ID',
-              dirtyObjects: 0,
-              partialLayout: false,
-              totalObjects: 1,
-            },
-            endData: {layoutRoots: []},
-          },
-        } as Trace.Types.Events.Layout,
-
-        {
-          cat: 'toplevel',
-          name: 'Program',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(104000),
-          dur: microsec(4000),
-          tid: mainThread,
-          pid,
-          args: {},
-        },
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'FunctionCall',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(104000),
-          dur: microsec(1000),
-          tid: mainThread,
-          pid,
-          args: {},
-        },
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'CommitLoad',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(105000),
-          dur: microsec(1000),
-          tid: mainThread,
-          pid,
-          args: {},
-        },
-        {
-          cat: 'disabled-by-default-devtools.timeline',
-          name: 'Layout',
-          ph: Trace.Types.Events.Phase.COMPLETE,
-          ts: microsec(107000),
-          dur: microsec(1000),
-          tid: mainThread,
-          pid,
-          args: {
-            beginData: {
-              frame: 'FAKE_FRAME_ID',
-              dirtyObjects: 0,
-              partialLayout: false,
-              totalObjects: 1,
-            },
-            endData: {layoutRoots: []},
-          },
-        } as Trace.Types.Events.Layout,
-      ];
-
-      const rangeStats101To103 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
-          events,
-          Trace.Types.Timing.Milli(101),
-          Trace.Types.Timing.Milli(103),
-      );
-      assert.deepEqual(rangeStats101To103, {
-        other: 1,
-        rendering: 1,
-        scripting: 0,
-        idle: 0,
-      });
-      const rangeStats104To109 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
-          events,
-          Trace.Types.Timing.Milli(104),
-          Trace.Types.Timing.Milli(109),
-      );
-      assert.deepEqual(rangeStats104To109, {
-        other: 2,
-        rendering: 1,
-        scripting: 1,
-        idle: 1,
-      });
-    });
-  });
-
   describe('isMarkerEvent', () => {
     it('is true for a timestamp event', async function() {
       const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-initial-url.json.gz');
@@ -1748,8 +1572,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
     it('is true for a LCP candiadate event', async function() {
       const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-initial-url.json.gz');
-      const markLCPCandidate =
-          parsedTrace.data.PageLoadMetrics.allMarkerEvents.find(Trace.Types.Events.isLargestContentfulPaintCandidate);
+      const markLCPCandidate = parsedTrace.data.PageLoadMetrics.allMarkerEvents.find(
+          Trace.Types.Events.isAnyLargestContentfulPaintCandidate);
       assert.isOk(markLCPCandidate);
       assert.isTrue(Timeline.TimelineUIUtils.isMarkerEvent(parsedTrace, markLCPCandidate));
     });
@@ -1818,13 +1642,13 @@ describeWithMockConnection('TimelineUIUtils', function() {
     it('builds the right link for an LCP Event', async function() {
       const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       const markLCPEvent = getEventOfType(
-          parsedTrace.data.PageLoadMetrics.allMarkerEvents, Trace.Types.Events.isLargestContentfulPaintCandidate);
+          parsedTrace.data.PageLoadMetrics.allMarkerEvents, Trace.Types.Events.isAnyLargestContentfulPaintCandidate);
       const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
           markLCPEvent,
       );
-      const url = html.querySelector('x-link')?.getAttribute('href');
+      const url = html.querySelector('devtools-link')?.getAttribute('href');
       assert.strictEqual(url, 'https://web.dev/lcp/');
-      assert.strictEqual(html.innerText, 'Learn more about largest contentful paint.');
+      assert.strictEqual(html.innerText, 'Learn more about Largest Contentful Paint.');
     });
 
     it('builds the right link for an FCP Event', async function() {
@@ -1834,9 +1658,9 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
           markFCPEvent,
       );
-      const url = html.querySelector('x-link')?.getAttribute('href');
+      const url = html.querySelector('devtools-link')?.getAttribute('href');
       assert.strictEqual(url, 'https://web.dev/first-contentful-paint/');
-      assert.strictEqual(html.innerText, 'Learn more about first contentful paint.');
+      assert.strictEqual(html.innerText, 'Learn more about First Contentful Paint.');
     });
 
     it('builds a generic event for other marker events', async function() {
@@ -1846,7 +1670,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
           markLoadEvent,
       );
-      const url = html.querySelector('x-link')?.getAttribute('href');
+      const url = html.querySelector('devtools-link')?.getAttribute('href');
       assert.strictEqual(url, 'https://web.dev/user-centric-performance-metrics/');
       assert.strictEqual(html.innerText, 'Learn more about page performance metrics.');
     });
@@ -1868,7 +1692,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       container.appendChild(fragment);
       assert.strictEqual(
           container.innerHTML,
-          'Check out: <button class="devtools-link text-button link-style" title="https://example.com" jslog="Link; context: url; track: click" role="link" tabindex="-1"></button>.');
+          'Check out: <button role="link" class=" devtools-link text-button link-style " title="https://example.com" jslog="Link; context: url; track: click" tabindex="-1"></button>.');
     });
 
     it('should handle URLs anywhere within the string', () => {
@@ -1879,9 +1703,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       container.appendChild(fragment);
       assert.strictEqual(
           container.innerHTML,
-          `<button class="devtools-link text-button link-style" title="http://example.com" jslog="Link; context: url; track: click" role="link" tabindex="-1"></button>
-at the beginning. <button class="devtools-link text-button link-style" title="http://example.com" jslog="Link; context: url; track: click" role="link" tabindex="-1"></button>
-in the middle or at the end: <button class="devtools-link text-button link-style" title="http://example.com" jslog="Link; context: url; track: click" role="link" tabindex="-1"></button>`
+          `<button role="link" class=" devtools-link text-button link-style " title="http://example.com" jslog="Link; context: url; track: click" tabindex="-1"></button> at the beginning. <button role="link" class=" devtools-link text-button link-style " title="http://example.com" jslog="Link; context: url; track: click" tabindex="-1"></button> in the middle or at the end: <button role="link" class=" devtools-link text-button link-style " title="http://example.com" jslog="Link; context: url; track: click" tabindex="-1"></button>`
               .replace(/\n/g, ' '));
     });
 
@@ -1892,7 +1714,7 @@ in the middle or at the end: <button class="devtools-link text-button link-style
       container.appendChild(fragment);
       assert.strictEqual(
           container.innerHTML,
-          'Node: <button class="devtools-link text-button link-style" jslog="Link; context: url; track: click" role="link" tabindex="-1">ext://node/123</button>   Root Cause: <button class="devtools-link text-button link-style" jslog="Link; context: url; track: click" role="link" tabindex="-1">ext://node/13566</button>');
+          'Node: <button role="link" class=" devtools-link text-button link-style " jslog="Link; context: url; track: click" tabindex="-1">ext://node/123</button>   Root Cause: <button role="link" class=" devtools-link text-button link-style " jslog="Link; context: url; track: click" tabindex="-1">ext://node/13566</button>');
     });
 
     it('does not linkify data URI or www. prefixed text handle a data URI', () => {

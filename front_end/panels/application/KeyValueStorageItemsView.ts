@@ -31,6 +31,7 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Geometry from '../../models/geometry/geometry.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import type {WidgetOptions} from '../../ui/legacy/Widget.js';
 import {Directives as LitDirectives, html, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
@@ -39,7 +40,7 @@ import {StorageItemsToolbar} from './StorageItemsToolbar.js';
 
 const {ARIAUtils} = UI;
 const {EmptyWidget} = UI.EmptyWidget;
-const {VBox, widgetConfig} = UI.Widget;
+const {VBox, widget} = UI.Widget;
 const {Size} = Geometry;
 const {repeat} = LitDirectives;
 
@@ -110,21 +111,21 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
 
   constructor(
       title: string, id: string, editable: boolean, view?: View,
-      metadataView?: ApplicationComponents.StorageMetadataView.StorageMetadataView) {
+      metadataView?: ApplicationComponents.StorageMetadataView.StorageMetadataView, opts?: WidgetOptions) {
     metadataView ??= new ApplicationComponents.StorageMetadataView.StorageMetadataView();
     if (!view) {
       view = (input: ViewInput, output: ViewOutput, target: HTMLElement) => {
         // clang-format off
         render(html `
             <devtools-widget
-              .widgetConfig=${widgetConfig(StorageItemsToolbar, {metadataView})}
+              ${widget(StorageItemsToolbar, {metadataView})}
               class=flex-none
               ${UI.Widget.widgetRef(StorageItemsToolbar, view => {output.toolbar = view;})}
             ></devtools-widget>
             <devtools-split-view sidebar-position="second" name="${id}-split-view-state">
                <devtools-widget
                   slot="main"
-                  .widgetConfig=${widgetConfig(VBox, {minimumSize: new Size(0, 50)})}>
+                  ${widget(VBox, {minimumSize: new Size(0, 50)})}>
                 <devtools-data-grid
                   .name=${`${id}-datagrid-with-preview`}
                   striped
@@ -159,7 +160,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
               </devtools-widget>
               <devtools-widget
                   slot="sidebar"
-                  .widgetConfig=${widgetConfig(VBox, {minimumSize: new Size(0, 50)})}
+                  ${widget(VBox, {minimumSize: new Size(0, 50)})}
                   jslog=${VisualLogging.pane('preview').track({resize: true})}>
                ${input.preview?.element}
               </devtools-widget>
@@ -168,7 +169,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
             target);
       };
     }
-    super();
+    super(opts);
     this.metadataView = metadataView;
     this.#editable = editable;
     this.#view = view;
@@ -182,6 +183,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refreshItems();
   }
 

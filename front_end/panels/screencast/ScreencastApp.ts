@@ -1,7 +1,7 @@
 // Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -46,6 +46,7 @@ export class ScreencastApp implements Common.App.App,
 
   presentUI(document: Document): void {
     this.rootView = new UI.RootView.RootView();
+    this.rootView.registerRequiredCSS(UI.inspectorCommonStyles);
 
     this.rootSplitWidget =
         new UI.SplitWidget.SplitWidget(false, true, 'inspector-view.screencast-split-view-state', 300, 300);

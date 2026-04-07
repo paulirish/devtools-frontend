@@ -56,17 +56,6 @@
     font-size: 13px;
   }
 
-  .timeline-details-range-summary {
-    padding: var(--sys-size-4) 0 0;
-    height: 100%;
-
-    & > devtools-performance-timeline-summary {
-      /* The category summary can't be more narrow than this, so we'll force a horizontal scrollbar
-        Also this style can't be applied on the element's :host without !important, thus its here. */
-      min-width: 192px;
-    }
-  }
-
   /* This is the coloured box that shows next to the event name */
   .timeline-details-chip-title > div {
     width: 14px;

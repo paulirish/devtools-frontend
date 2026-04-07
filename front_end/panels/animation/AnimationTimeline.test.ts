@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {
   createTarget,
   stubNoopSettings,
+  waitFor,
 } from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
-import * as Elements from '../elements/elements.js';
 
 import * as Animation from './animation.js';
 
@@ -88,13 +87,6 @@ class ManualPromise {
   }
 }
 
-const cancelAllPendingRaf = () => {
-  let rafId = window.requestAnimationFrame(() => {});
-  while (rafId--) {
-    window.cancelAnimationFrame(rafId);
-  }
-};
-
 const stubAnimationGroup = () => {
   sinon.stub(SDK.AnimationModel.AnimationGroup.prototype, 'scrollNode')
       .resolves(new SDK.AnimationModel.AnimationDOMNode(null as unknown as SDK.DOMModel.DOMNode));
@@ -121,15 +113,6 @@ const stubAnimationDOMNode = (): AnimationDOMNodeStubs => {
   };
 };
 
-const waitFor = async(selector: string, root?: Element|ShadowRoot): Promise<Element|null> => {
-  let element = null;
-  while (!element) {
-    element = root ? root.querySelector(selector) : document.querySelector(selector);
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  return element;
-};
-
 const waitForAll = async(selector: string, root?: Element|ShadowRoot): Promise<NodeListOf<Element>|null> => {
   let elements = root ? root.querySelectorAll(selector) : document.querySelectorAll(selector);
   let tryCount = 0;
@@ -146,15 +129,6 @@ describeWithMockConnection('AnimationTimeline', () => {
   let view: Animation.AnimationTimeline.AnimationTimeline;
 
   beforeEach(() => {
-    Common.Linkifier.registerLinkifier({
-      contextTypes() {
-        return [SDK.DOMModel.DOMNode];
-      },
-      async loadLinkifier() {
-        return Elements.DOMLinkifier.Linkifier.instance();
-      },
-    });
-
     stubNoopSettings();
     target = createTarget();
 
@@ -177,7 +151,6 @@ describeWithMockConnection('AnimationTimeline', () => {
   });
 
   afterEach(() => {
-    cancelAllPendingRaf();
     view.detach();
   });
 
@@ -587,7 +560,6 @@ describeWithMockConnection('AnimationTimeline', () => {
       const toolbarViewInput = await toolbarViewStub.nextInput;
 
       assert.isTrue(toolbarViewInput.playbackRateButtonsDisabled);
-      cancelAllPendingRaf();
     });
 
     it('should show current time text in pixels', async () => {

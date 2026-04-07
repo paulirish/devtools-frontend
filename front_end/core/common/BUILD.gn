@@ -24,13 +24,11 @@ devtools_module("common") {
     "Gzip.ts",
     "JavaScriptMetaData.ts",
     "Lazy.ts",
-    "Linkifier.ts",
     "MapWithDefault.ts",
     "Mutex.ts",
     "Object.ts",
     "ParsedURL.ts",
     "Progress.ts",
-    "QueryParamHandler.ts",
     "ResolverBase.ts",
     "ResourceType.ts",
     "ReturnToPanel.ts",
@@ -40,11 +38,12 @@ devtools_module("common") {
     "SettingRegistration.ts",
     "Settings.ts",
     "SimpleHistoryManager.ts",
+    "Srcset.ts",
     "StringOutputStream.ts",
     "TextDictionary.ts",
     "Throttler.ts",
     "Trie.ts",
-    "Worker.ts",
+    "VersionController.ts",
   ]
 
   deps = [
@@ -76,6 +75,18 @@ devtools_entrypoint("bundle") {
 ts_library("unittests") {
   testonly = true
 
+  sources = [ "Base64.browser.test.ts" ]
+
+  deps = [
+    ":bundle",
+    "../../testing",
+    "../i18n:bundle",
+  ]
+}
+
+devtools_foundation_module("foundation_unittests") {
+  testonly = true
+
   sources = [
     "Base64.test.ts",
     "CharacterIdMap.test.ts",
@@ -99,16 +110,17 @@ ts_library("unittests") {
     "SettingRegistration.test.ts",
     "Settings.test.ts",
     "SimpleHistoryManager.test.ts",
+    "Srcset.test.ts",
     "StringOutputStream.test.ts",
     "TextDictionary.test.ts",
     "Throttler.test.ts",
     "Trie.test.ts",
+    "VersionController.test.ts",
   ]
 
   deps = [
     ":bundle",
     "../../testing",
-    "../../ui/legacy/components/quick_open:bundle",
     "../i18n:bundle",
   ]
 }

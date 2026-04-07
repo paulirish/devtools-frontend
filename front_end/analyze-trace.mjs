@@ -55,11 +55,10 @@ if (import.meta.url.endsWith(process?.argv[1])) {
 async function cli() {
   const filename = process.argv.at(2);
   if (!filename)
-    throw new Error('Provide filename');
+    {throw new Error('Provide filename');}
   const TraceEngine = await analyzeTrace(filename);
   console.log(TraceEngine);
 }
-
 
 /**
  * @param {string} filename

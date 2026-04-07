@@ -1,8 +1,9 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view*/
+/* eslint-disable @devtools/no-lit-render-outside-of-view*/
 
+import '../../../../ui/kit/kit.js';
 import '../../../../ui/legacy/legacy.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -488,13 +489,6 @@ export class UserAgentClientHintsForm extends HTMLElement {
     this.dispatchEvent(new ClientHintsChangeEvent());
   };
 
-  #handleLinkPress = (event: KeyboardEvent): void => {
-    if (event.code === 'Space' || event.code === 'Enter') {
-      event.preventDefault();
-      (event.target as HTMLAnchorElement).click();
-    }
-  };
-
   #handleSubmit = (event: Event): void => {
     event.preventDefault();
     if (this.#showSubmitButton) {
@@ -662,9 +656,9 @@ export class UserAgentClientHintsForm extends HTMLElement {
         change: true,
       })}
           />
-          <devtools-icon name="bin" class="medium"
+          <devtools-icon name="bin"
             title=${i18nString(UIStrings.brandUserAgentDelete)}
-            class="delete-icon"
+            class="medium delete-icon"
             tabindex="0"
             role="button"
             @click=${handleDeleteClick}
@@ -757,9 +751,9 @@ export class UserAgentClientHintsForm extends HTMLElement {
         change: true,
       })}
           />
-          <devtools-icon name="bin" class="medium"
+          <devtools-icon name="bin" 
             title=${i18nString(UIStrings.brandFullVersionListDelete)}
-            class="delete-icon"
+            class="medium delete-icon"
             tabindex="0"
             role="button"
             @click=${handleDeleteClick}
@@ -868,18 +862,16 @@ export class UserAgentClientHintsForm extends HTMLElement {
             <devtools-icon name=triangle-down></devtools-icon>
             ${i18nString(UIStrings.title)}
           </div>
-          <devtools-icon class=info-icon name=info title=${i18nString(UIStrings.userAgentClientHintsInfo)}></devtools-icon>
-          <x-link
+          <devtools-icon tabindex=${this.#isFormDisabled ? '-1' : '0'} class=info-icon name=info aria-label=${i18nString(UIStrings.userAgentClientHintsInfo)} title=${i18nString(UIStrings.userAgentClientHintsInfo)}></devtools-icon>
+          <devtools-link
            tabindex=${this.#isFormDisabled ? '-1' : '0'}
            href="https://web.dev/user-agent-client-hints/"
-           target="_blank"
            class="link"
-           @keypress=${this.#handleLinkPress}
-           aria-label=${i18nString(UIStrings.userAgentClientHintsInfo)}
-           jslog=${VisualLogging.link('learn-more').track({click: true})}
+           aria-label=${i18nString(UIStrings.learnMore)}
+           jslogcontext="learn-more"
           >
             ${i18nString(UIStrings.learnMore)}
-          </x-link>
+          </devtools-link>
         </div>
         <form
           id="form-container"

@@ -1,11 +1,11 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
-import * as UI from '../../ui/legacy/legacy.js';
+import {Link} from '../../ui/kit/kit.js';
 
 import {AffectedResourcesView} from './AffectedResourcesView.js';
 
@@ -46,8 +46,8 @@ export class AffectedMetadataAllowedSitesView extends AffectedResourcesView {
         optOutTextElement.textContent = ' (opt-out: ' + issueData.details().optOutPercentage + '% - ';
         textContentElement.appendChild(optOutTextElement);
 
-        const linkElement = UI.XLink.XLink.create(
-            'https://developers.google.com/privacy-sandbox/blog/grace-period-opt-out', 'learn more');
+        const linkElement =
+            Link.create('https://developers.google.com/privacy-sandbox/blog/grace-period-opt-out', 'learn more');
         textContentElement.appendChild(linkElement);
 
         const endTextElement = document.createElement('span');

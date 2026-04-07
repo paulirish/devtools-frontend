@@ -29,6 +29,7 @@ npm-debug.log
 /scripts/ai_assistance/auto-run/data
 /scripts/ai_assistance/performance-trace-downloads
 /scripts/ai_assistance/auto-run/performance-trace-downloads
+/scripts/ai_assistance/eval-report*.html
 # This folder is populated from the GCP bucket and managed by gclient sync.
 /scripts/ai_assistance/suite/outputs
 
@@ -52,7 +53,18 @@ test/perf/.generated
 /.vscode/tasks.json
 /.vscode/launch.json
 
+/.gemini/settings.json
+
+# DevTools common script settings
+.env
+
 # Linters caches
 .eslintcache
 .stylelintcache
 **/tsconfig.tsbuildinfo
+
+# test runner copies dumps into the source tree.
+artifacts/*
+
+# cipd rollup binaries synced from third_party/
+node_modules/@rollup/rollup*/

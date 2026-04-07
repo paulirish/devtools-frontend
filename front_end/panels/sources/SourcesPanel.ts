@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -41,9 +41,11 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
-import * as Extensions from '../../models/extensions/extensions.js';
+import * as StackTrace from '../../models/stack_trace/stack_trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import * as PanelCommon from '../../panels/common/common.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
+import * as SettingsUI from '../../ui/legacy/components/settings_ui/settings_ui.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -215,7 +217,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
   private threadsSidebarPane: UI.View.View|null;
   private readonly watchSidebarPane: UI.View.View;
   private readonly callstackPane: CallStackSidebarPane;
-  private liveLocationPool: Bindings.LiveLocation.LiveLocationPool;
   private lastModificationTime: number;
   #paused?: boolean;
   private switchToPausedTargetTimeout?: number;
@@ -251,8 +252,12 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const initialDebugSidebarWidth = 225;
     this.splitWidget =
         new UI.SplitWidget.SplitWidget(true, true, 'sources-panel-split-view-state', initialDebugSidebarWidth);
-    this.splitWidget.enableShowModeSaving();
     this.splitWidget.show(this.element);
+    if (Root.Runtime.Runtime.isTraceApp()) {
+      this.splitWidget.hideSidebar();
+    } else {
+      this.splitWidget.enableShowModeSaving();
+    }
 
     // Create scripts navigator
     const initialNavigatorWidth = 225;
@@ -313,14 +318,13 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     void this.updateDebuggerButtonsAndStatus();
 
-    this.liveLocationPool = new Bindings.LiveLocation.LiveLocationPool();
-
     this.setTarget(UI.Context.Context.instance().flavor(SDK.Target.Target));
     Common.Settings.Settings.instance()
         .moduleSetting('breakpoints-active')
         .addChangeListener(this.breakpointsActiveStateChanged, this);
     UI.Context.Context.instance().addFlavorChangeListener(SDK.Target.Target, this.onCurrentTargetChanged, this);
-    UI.Context.Context.instance().addFlavorChangeListener(SDK.DebuggerModel.CallFrame, this.callFrameChanged, this);
+    UI.Context.Context.instance().addFlavorChangeListener(
+        StackTrace.StackTrace.DebuggableFrameFlavor, this.callFrameChanged, this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebuggerWasEnabled, this.debuggerWasEnabled, this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
@@ -333,8 +337,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.GlobalObjectCleared,
         event => this.debuggerResumed(event.data));
-    Extensions.ExtensionServer.ExtensionServer.instance().addEventListener(
-        Extensions.ExtensionServer.Events.SidebarPaneAdded, this.extensionSidebarPaneAdded, this);
+    PanelCommon.ExtensionServer.ExtensionServer.instance().addEventListener(
+        PanelCommon.ExtensionServer.Events.SidebarPaneAdded, this.extensionSidebarPaneAdded, this);
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
     this.lastModificationTime = -Infinity;
   }
@@ -363,10 +367,12 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
     if (!isInWrapper) {
       panel.#sourcesView.leftToolbar().appendToolbarItem(panel.toggleNavigatorSidebarButton);
-      if (panel.splitWidget.isVertical()) {
-        panel.#sourcesView.rightToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
-      } else {
-        panel.#sourcesView.bottomToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
+      if (!Root.Runtime.Runtime.isTraceApp()) {
+        if (panel.splitWidget.isVertical()) {
+          panel.#sourcesView.rightToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
+        } else {
+          panel.#sourcesView.bottomToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
+        }
       }
     }
   }
@@ -422,6 +428,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
       SourcesPanel.updateResizerAndSidebarButtons(this);
     }
     this.editorView.setMainWidget(this.#sourcesView);
+    this.callstackPane.requestUpdate();
   }
 
   override willHide(): void {
@@ -630,84 +637,59 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
   }
 
-  private addExperimentMenuItem(
-      menuSection: UI.ContextMenu.Section, experiment: string, menuItem: Common.UIString.LocalizedString): void {
-    /** menu handler **/
-    function toggleExperiment(): void {
-      const checked = Root.Runtime.experiments.isEnabled(experiment);
-      Root.Runtime.experiments.setEnabled(experiment, !checked);
-      Host.userMetrics.experimentChanged(experiment, checked);
-      // Need to signal to the NavigatorView that grouping has changed. Unfortunately,
-      // it can't listen to an experiment, and this class doesn't directly interact
-      // with it, so we will convince it a different grouping setting changed. When we switch
-      // from using an experiment to a setting, it will listen to that setting and we
-      // won't need to do this.
-      const groupByFolderSetting = Common.Settings.Settings.instance().moduleSetting('navigator-group-by-folder');
-      groupByFolderSetting.set(groupByFolderSetting.get());
-    }
-
-    menuSection.appendCheckboxItem(menuItem, toggleExperiment, {
-      checked: Root.Runtime.experiments.isEnabled(experiment),
-      experimental: true,
-      jslogContext: Platform.StringUtilities.toKebabCase(experiment),
-    });
+  private addSettingMenuItem(
+      contextMenu: UI.ContextMenu.Section, settingName: string, menuText: Common.UIString.LocalizedString): void {
+    const setting = Common.Settings.Settings.instance().moduleSetting(settingName);
+    contextMenu.appendCheckboxItem(
+        menuText, () => setting.set(!setting.get()), {checked: setting.get(), jslogContext: setting.name});
   }
 
   private populateNavigatorMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
-    const groupByFolderSetting = Common.Settings.Settings.instance().moduleSetting('navigator-group-by-folder');
     contextMenu.appendItemsAtLocation('navigatorMenu');
-    contextMenu.viewSection().appendCheckboxItem(
-        i18nString(UIStrings.groupByFolder), () => groupByFolderSetting.set(!groupByFolderSetting.get()),
-        {checked: groupByFolderSetting.get(), jslogContext: groupByFolderSetting.name});
-
-    this.addExperimentMenuItem(
-        contextMenu.viewSection(), Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING,
-        i18nString(UIStrings.groupByAuthored));
-    this.addExperimentMenuItem(
-        contextMenu.viewSection(), Root.Runtime.ExperimentName.JUST_MY_CODE, i18nString(UIStrings.hideIgnoreListed));
+    this.addSettingMenuItem(
+        contextMenu.viewSection(), 'navigator-group-by-folder', i18nString(UIStrings.groupByFolder));
+    this.addSettingMenuItem(
+        contextMenu.viewSection(), 'navigator-group-by-authored', i18nString(UIStrings.groupByAuthored));
+    this.addSettingMenuItem(
+        contextMenu.viewSection(), 'navigator-just-my-code', i18nString(UIStrings.hideIgnoreListed));
   }
 
   updateLastModificationTime(): void {
     this.lastModificationTime = window.performance.now();
   }
 
-  private async executionLineChanged(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> {
-    const uiLocation = await liveLocation.uiLocation();
-    if (liveLocation.isDisposed()) {
+  private async callFrameChanged(): Promise<void> {
+    const frameFlavor = UI.Context.Context.instance().flavor(StackTrace.StackTrace.DebuggableFrameFlavor);
+    if (!frameFlavor?.frame.uiSourceCode) {
       return;
     }
-    if (!uiLocation) {
-      return;
-    }
+
+    const uiLocation = new Workspace.UISourceCode.UILocation(
+        frameFlavor.frame.uiSourceCode, frameFlavor.frame.line, frameFlavor.frame.column);
     if (window.performance.now() - this.lastModificationTime < lastModificationTimeout) {
       return;
     }
     this.#sourcesView.showSourceLocation(uiLocation.uiSourceCode, uiLocation, undefined, true);
   }
 
-  private async callFrameChanged(): Promise<void> {
-    const callFrame = UI.Context.Context.instance().flavor(SDK.DebuggerModel.CallFrame);
-    if (!callFrame) {
-      return;
-    }
-    if (this.executionLineLocation) {
-      this.executionLineLocation.dispose();
-    }
-    this.executionLineLocation =
-        await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().createCallFrameLiveLocation(
-            callFrame.location(), this.executionLineChanged.bind(this), this.liveLocationPool);
-  }
-
   private async updateDebuggerButtonsAndStatus(): Promise<void> {
     const currentTarget = UI.Context.Context.instance().flavor(SDK.Target.Target);
     const currentDebuggerModel = currentTarget ? currentTarget.model(SDK.DebuggerModel.DebuggerModel) : null;
+
+    const paused = this.#paused;
+    const details = currentDebuggerModel ? currentDebuggerModel.debuggerPausedDetails() : null;
+    await this.debuggerPausedMessage.render(
+        details, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(),
+        Breakpoints.BreakpointManager.BreakpointManager.instance());
+    await this.debuggerPausedMessage.updateComplete;
+
     if (!currentDebuggerModel) {
       this.togglePauseAction.setEnabled(false);
       this.stepOverAction.setEnabled(false);
       this.stepIntoAction.setEnabled(false);
       this.stepOutAction.setEnabled(false);
       this.stepAction.setEnabled(false);
-    } else if (this.#paused) {
+    } else if (paused) {
       this.togglePauseAction.setToggled(true);
       this.togglePauseAction.setEnabled(true);
       this.stepOverAction.setEnabled(true);
@@ -722,11 +704,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
       this.stepOutAction.setEnabled(false);
       this.stepAction.setEnabled(false);
     }
-
-    const details = currentDebuggerModel ? currentDebuggerModel.debuggerPausedDetails() : null;
-    await this.debuggerPausedMessage.render(
-        details, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(),
-        Breakpoints.BreakpointManager.BreakpointManager.instance());
     if (details) {
       this.updateDebuggerButtonsAndStatusForTest();
     }
@@ -742,7 +719,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
     if (this.switchToPausedTargetTimeout) {
       clearTimeout(this.switchToPausedTargetTimeout);
     }
-    this.liveLocationPool.disposeAll();
   }
 
   private switchToPausedTarget(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
@@ -919,7 +895,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     const label = i18nString(UIStrings.pauseOnCaughtExceptions);
     const setting = Common.Settings.Settings.instance().moduleSetting('pause-on-caught-exception');
-    debugToolbarDrawer.appendChild(UI.SettingsUI.createSettingCheckbox(label, setting));
+    debugToolbarDrawer.appendChild(SettingsUI.SettingsUI.createSettingCheckbox(label, setting));
 
     return debugToolbarDrawer;
   }
@@ -956,7 +932,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const eventTarget = (event.target as Node);
     if (!uiSourceCode.project().isServiceProject() &&
         !eventTarget.isSelfOrDescendant(this.navigatorTabbedLocation.widget().element) &&
-        !(Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.JUST_MY_CODE) &&
+        !(Common.Settings.Settings.instance().moduleSetting('navigator-just-my-code').get() &&
           Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
               uiSourceCode))) {
       contextMenu.revealSection().appendItem(
@@ -970,11 +946,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
       const editorElement = this.element.querySelector('devtools-text-editor');
       if (!eventTarget.isSelfOrDescendant(editorElement) && uiSourceCode.contentType().isTextType()) {
         UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
-        if (Root.Runtime.hostConfig.devToolsAiSubmenuPrompts?.enabled) {
           const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
-          const submenu = contextMenu.footerSection().appendSubMenuItem(
-              action.title(), false, openAiAssistanceId,
-              Root.Runtime.hostConfig.devToolsAiAssistanceFileAgent?.featureName);
+          const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
           submenu.defaultSection().appendAction('drjones.sources-panel-context', i18nString(UIStrings.startAChat));
           appendSubmenuPromptAction(
               submenu, action, i18nString(UIStrings.assessPerformance), 'Is this script optimized for performance?',
@@ -985,13 +958,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
           appendSubmenuPromptAction(
               submenu, action, i18nString(UIStrings.explainInputHandling), 'Does the script handle user input safely',
               openAiAssistanceId + '.input');
-        } else if (Root.Runtime.hostConfig.devToolsAiDebugWithAi?.enabled) {
-          contextMenu.footerSection().appendAction(
-              openAiAssistanceId, undefined, false, undefined,
-              Root.Runtime.hostConfig.devToolsAiAssistanceFileAgent?.featureName);
-        } else {
-          contextMenu.footerSection().appendAction(openAiAssistanceId);
-        }
       }
     }
 
@@ -1217,6 +1183,10 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     SourcesPanel.updateResizerAndSidebarButtons(this);
 
+    if (Root.Runtime.Runtime.isTraceApp()) {
+      return;
+    }
+
     // Create vertical box with stack.
     const vbox = new UI.Widget.VBox();
     vbox.element.appendChild(this.debugToolbar);
@@ -1227,7 +1197,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
         this.revealDebuggerSidebar.bind(this), undefined, 'debug');
     this.sidebarPaneStack.widget().element.classList.add('y-overflow-only');
     this.sidebarPaneStack.widget().show(vbox.element);
-    this.sidebarPaneStack.widget().element.appendChild(this.debuggerPausedMessage.element());
+    this.debuggerPausedMessage.show(this.sidebarPaneStack.widget().element);
     this.sidebarPaneStack.appendApplicableItems('sources.sidebar-top');
 
     if (this.threadsSidebarPane) {
@@ -1274,7 +1244,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
 
     this.sidebarPaneStack.appendApplicableItems('sources.sidebar-bottom');
-    const extensionSidebarPanes = Extensions.ExtensionServer.ExtensionServer.instance().sidebarPanes();
+    const extensionSidebarPanes = PanelCommon.ExtensionServer.ExtensionServer.instance().sidebarPanes();
     for (let i = 0; i < extensionSidebarPanes.length; ++i) {
       this.addExtensionSidebarPane(extensionSidebarPanes[i]);
     }
@@ -1287,11 +1257,11 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   private extensionSidebarPaneAdded(
-      event: Common.EventTarget.EventTargetEvent<Extensions.ExtensionPanel.ExtensionSidebarPane>): void {
+      event: Common.EventTarget.EventTargetEvent<PanelCommon.ExtensionPanel.ExtensionSidebarPane>): void {
     this.addExtensionSidebarPane(event.data);
   }
 
-  private addExtensionSidebarPane(pane: Extensions.ExtensionPanel.ExtensionSidebarPane): void {
+  private addExtensionSidebarPane(pane: PanelCommon.ExtensionPanel.ExtensionSidebarPane): void {
     if (pane.panelName() === this.name) {
       (this.extensionSidebarPanesContainer as UI.View.ViewLocation).appendView(pane);
     }

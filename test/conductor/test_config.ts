@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as childProcess from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as childProcess from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
 import {asArray, commandLineArgs, DiffBehaviors} from './commandline.js';
-import {defaultChromePath, SOURCE_ROOT} from './paths.js';
+import {BUILD_ROOT, defaultChromePath, SOURCE_ROOT} from './paths.js';
 import {shardFilter} from './sharding.js';
 
 const argv = yargs(hideBin(process.argv)).parseSync()['_'] as string[];
@@ -19,11 +19,11 @@ const options = commandLineArgs(yargs(argv)).parseSync();
 
 export const enum ServerType {
   HOSTED_MODE = 'hosted-mode',
-  COMPONENT_DOCS = 'component-docs',
 }
 
 interface Config {
   tests: string[];
+  verbose: number;
   artifactsDir: string;
   chromeBinary: string;
   serverType: ServerType;
@@ -41,6 +41,7 @@ interface Config {
   shardCount: number;
   shardNumber: number;
   shardBias: number;
+  isAiAgent: boolean;
 }
 
 function sliceArrayFromElement(array: string[], element: string) {
@@ -95,21 +96,35 @@ function runProcess(exe: string, args: string[], options: childProcess.SpawnSync
 function configureChrome(executablePath: string) {
   if (os.type() === 'Windows_NT') {
     const result = runProcess(
-        'python3',
+        process.env.ComSpec ?? 'cmd.exe',
         [
+          '/c',
+          'python3',
           path.join(SOURCE_ROOT, 'scripts', 'deps', 'set_lpac_acls.py'),
           path.dirname(executablePath),
         ],
-        {encoding: 'utf-8', stdio: 'inherit', shell: true});
+        {
+          encoding: 'utf-8',
+          stdio: 'inherit',
+        });
     if (result.error || (result.status ?? 1) !== 0) {
       throw new Error('Setting permissions failed: ' + result.error?.message);
     }
   }
 }
 
+const getDefaultArtifactDir = () => {
+  const artifactsPath = path.join(BUILD_ROOT, 'artifacts');
+  if (!fs.existsSync(artifactsPath)) {
+    fs.mkdirSync(artifactsPath);
+  }
+  return artifactsPath;
+};
+
 export const TestConfig: Config = {
   tests: getTestsFromOptions(),
-  artifactsDir: options['artifacts-dir'] || SOURCE_ROOT,
+  verbose: Number(options['verbose'] ?? 0),
+  artifactsDir: options['artifacts-dir'] || getDefaultArtifactDir(),
   chromeBinary: options['chrome-binary'] ?? defaultChromePath(),
   serverType: ServerType.HOSTED_MODE,
   debug: options['debug'],
@@ -129,17 +144,22 @@ export const TestConfig: Config = {
   shardCount: options['shard-count'],
   shardNumber: options['shard-number'],
   shardBias: options['shard-bias'],
+  isAiAgent:
+      ['GEMINI_CLI', 'CLAUDECODE', 'CODEX_SANDBOX', 'CURSOR_AGENT', 'AI_AGENT'].some(agent => agent in process.env),
 };
 
-export function loadTests(testDirectory: string) {
-  const tests = fs.readFileSync(path.join(testDirectory, 'tests.txt'))
+export function loadTests(testDirectory: string, filename = 'tests.txt') {
+  const tests = fs.readFileSync(path.join(testDirectory, filename))
                     .toString()
                     .split('\n')
                     .map(t => t.trim())
                     .filter(t => t.length > 0)
                     .map(t => path.normalize(path.join(testDirectory, t)))
                     .filter(t => TestConfig.tests.some((spec: string) => t.startsWith(spec)))
-                    .filter(t => shardFilter(TestConfig, t));
+                    // To keep sharding deterministic, use the relative path from the test directory, NOT the
+                    // absolute file path on disk. Also replace backward slashes with forward slashes so sharding stays
+                    // the same across windows, linux and mac.
+                    .filter(t => shardFilter(TestConfig, path.relative(testDirectory, t).replaceAll('\\', '/')));
 
   if (TestConfig.shuffle) {
     for (let i = tests.length - 1; i > 0; i--) {

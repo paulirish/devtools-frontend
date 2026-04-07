@@ -13,7 +13,7 @@ import { disposeSymbol } from '../util/disposable.js';
 import { isErrorLike } from '../util/ErrorLike.js';
 import { CdpPreloadScript } from './CdpPreloadScript.js';
 import { isTargetClosedError } from './Connection.js';
-import { DeviceRequestPromptManager } from './DeviceRequestPrompt.js';
+import { CdpDeviceRequestPromptManager } from './DeviceRequestPrompt.js';
 import { ExecutionContext } from './ExecutionContext.js';
 import { CdpFrame } from './Frame.js';
 import { FrameManagerEvent } from './FrameManagerEvents.js';
@@ -264,12 +264,12 @@ export class FrameManager extends EventEmitter {
             frame.updateClient(target._session());
         }
         this.setupEventListeners(target._session());
-        void this.initialize(target._session(), frame);
+        void this.initialize(target._session(), frame).catch(debugError);
     }
     _deviceRequestPromptManager(client) {
         let manager = this.#deviceRequestPromptManagerMap.get(client);
         if (manager === undefined) {
-            manager = new DeviceRequestPromptManager(client, this.#timeoutSettings);
+            manager = new CdpDeviceRequestPromptManager(client, this.#timeoutSettings);
             this.#deviceRequestPromptManagerMap.set(client, manager);
         }
         return manager;

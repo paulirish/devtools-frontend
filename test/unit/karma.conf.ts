@@ -4,11 +4,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {Page, ScreenshotOptions, Target} from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
-import * as url from 'url';
 
 import {formatAsPatch, resultAssertionsDiff, ResultsDBReporter} from '../../test/conductor/karma-resultsdb-reporter.js';
 import {CHECKOUT_ROOT, GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
@@ -30,7 +29,7 @@ function* reporters() {
     yield 'resultsdb';
   } else {
     yield 'screenshots';
-    yield 'progress-diff';
+    yield TestConfig.verbose ? 'spec' : 'progress-diff';
   }
   if (TestConfig.coverage) {
     yield 'coverage';
@@ -50,6 +49,8 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
       executablePath: TestConfig.chromeBinary,
       defaultViewport: null,
       dumpio: true,
+      // We do not need to process network in unit tests.
+      networkEnabled: false,
       args,
       ignoreDefaultArgs: ['--hide-scrollbars'],
     });
@@ -131,6 +132,11 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
       '--disable-lcd-text',
       '--disable-device-discovery-notifications',
       '--window-size=1280,768',
+      '--enable-crash-reporter-for-testing',  // Works only on linux
+      `--crash-dumps-dir=${TestConfig.artifactsDir}`,
+      '--enable-logging',
+      '--v=1',
+      `--log-file=${path.join(TestConfig.artifactsDir, 'chrome-log.txt')}`,
       ...flagsDisabledWithDebugging,
       ...args.flags,
       url,
@@ -166,6 +172,13 @@ const ProgressWithDiffReporter = function(
       this.write(`\n${patch}\n\n`);
     }
   };
+
+  const baseSpecSuccess = this.specSuccess;
+  this.specSuccess = function(this: any, _browser: unknown, _result: unknown) {
+    if (!TestConfig.isAiAgent) {
+      baseSpecSuccess.apply(this, arguments);
+    }
+  };
 };
 ProgressWithDiffReporter.$inject =
     ['formatError', 'config.reportSlowerThan', 'config.colors', 'config.browserConsoleLogOptions'];
@@ -182,6 +195,9 @@ module.exports = function(config: any) {
   const options = {
     basePath: CHECKOUT_ROOT,
     autoWatchBatchDelay: 1000,
+
+    customContextFile: path.join(GEN_DIR, 'test/unit/context.html'),
+    customDebugFile: path.join(GEN_DIR, 'test/unit/debug.html'),
 
     files: [
       // Global hooks in test_setup must go first
@@ -293,12 +309,13 @@ function snapshotTesterFactory() {
     }
 
     if (req.url.startsWith('/snapshot')) {
-      const parsedUrl = url.parse(req.url, true);
-      if (typeof parsedUrl.query.snapshotPath !== 'string') {
+      const parsedUrl = new URL(req.url, 'http://localhost');
+      const snapshotPathParam = parsedUrl.searchParams.get('snapshotPath');
+      if (typeof snapshotPathParam !== 'string') {
         throw new Error('invalid snapshotPath');
       }
 
-      const snapshotPath = path.join(SOURCE_ROOT, parsedUrl.query.snapshotPath);
+      const snapshotPath = path.join(SOURCE_ROOT, snapshotPathParam);
       if (!fs.existsSync(snapshotPath)) {
         res.writeHead(404);
         res.end();
@@ -312,12 +329,13 @@ function snapshotTesterFactory() {
     }
 
     if (req.url.startsWith('/update-snapshot')) {
-      const parsedUrl = url.parse(req.url, true);
-      if (typeof parsedUrl.query.snapshotPath !== 'string') {
+      const parsedUrl = new URL(req.url, 'http://localhost');
+      const snapshotPathParam = parsedUrl.searchParams.get('snapshotPath');
+      if (typeof snapshotPathParam !== 'string') {
         throw new Error('invalid snapshotPath');
       }
 
-      const snapshotPath = path.join(SOURCE_ROOT, parsedUrl.query.snapshotPath);
+      const snapshotPath = path.join(SOURCE_ROOT, snapshotPathParam);
 
       let body = '';
       req.on('data', (chunk: any) => {

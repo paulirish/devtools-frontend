@@ -1,27 +1,28 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
-
-import './Checklist.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type {LCPDiscoveryInsightModel} from '../../../../models/trace/insights/LCPDiscovery.js';
 import * as Trace from '../../../../models/trace/trace.js';
+import * as uiI18n from '../../../../ui/i18n/i18n.js';
+import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
-import {imageRef} from './EventRef.js';
+import {Checklist} from './Checklist.js';
+import {imageRef} from './ImageRef.js';
+
+const {widget} = UI.Widget;
 
 const {UIStrings, i18nString, getImageData} = Trace.Insights.Models.LCPDiscovery;
 
 const {html} = Lit;
 
-// eslint-disable-next-line rulesdir/l10n-filename-matches
+// eslint-disable-next-line @devtools/l10n-filename-matches
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPDiscovery.ts', UIStrings);
 
 export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel> {
-  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-lcp-discovery`;
   override internalName = 'lcp-discovery';
 
   protected override hasAskAiSupport(): boolean {
@@ -60,10 +61,13 @@ export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel>
   }
 
   #renderDiscoveryDelay(delay: Trace.Types.Timing.Micro): HTMLElement {
+    // Trace.Types.Overlays.TimespanBreakdownEntryBreakdown needs an HTMLElement, which we have to localize here.
+    /* eslint-disable @devtools/no-imperative-dom-api */
     const timeWrapper = document.createElement('span');
     timeWrapper.classList.add('discovery-time-ms');
     timeWrapper.innerText = i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(delay);
-    return i18n.i18n.getFormatLocalizedString(str_, UIStrings.lcpLoadDelay, {PH1: timeWrapper});
+    return uiI18n.getFormatLocalizedString(str_, UIStrings.lcpLoadDelay, {PH1: timeWrapper});
+    /* eslint-enable @devtools/no-imperative-dom-api */
   }
 
   override renderContent(): Lit.LitTemplate {
@@ -87,17 +91,9 @@ export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel>
     // clang-format off
     return html`
       <div class="insight-section">
-        <devtools-performance-checklist class="insight-section" .checklist=${imageData.checklist}></devtools-performance-checklist>
+        ${widget(Checklist, {checklist: imageData.checklist})}
         <div class="insight-section">${imageRef(imageData.request)}${delayEl}</div>
       </div>`;
     // clang-format on
   }
 }
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-performance-lcp-discovery': LCPDiscovery;
-  }
-}
-
-customElements.define('devtools-performance-lcp-discovery', LCPDiscovery);

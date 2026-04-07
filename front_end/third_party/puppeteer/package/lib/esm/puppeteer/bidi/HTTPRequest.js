@@ -46,18 +46,20 @@ export class BidiHTTPRequest extends HTTPRequest {
             });
             void httpRequest.finalizeInterceptions();
         });
+        this.#request.once('response', data => {
+            // Create new response with the initial data. Note: the data can be updated later
+            // on, when the `success` event is received.
+            this.#response = BidiHTTPResponse.from(data, this, this.#frame.page().browser().cdpSupported);
+        });
         this.#request.once('success', data => {
+            // The `network.responseCompleted` event (mapped to `success` here)
+            // contains the most up-to-date and complete response data, including
+            // headers that might be missing from `network.responseStarted`
+            // (e.g., `Set-Cookie` for navigation requests in Chrome).
             this.#response = BidiHTTPResponse.from(data, this, this.#frame.page().browser().cdpSupported);
         });
         this.#request.on('authenticate', this.#handleAuthentication);
         this.#frame.page().trustedEmitter.emit("request" /* PageEvent.Request */, this);
-        if (this.#hasInternalHeaderOverwrite) {
-            this.interception.handlers.push(async () => {
-                await this.continue({
-                    headers: this.headers(),
-                }, 0);
-            });
-        }
     }
     canBeIntercepted() {
         return this.#request.isBlocked;
@@ -87,33 +89,19 @@ export class BidiHTTPRequest extends HTTPRequest {
         return this.#request.postData;
     }
     hasPostData() {
-        if (!this.#frame.page().browser().cdpSupported) {
-            throw new UnsupportedOperation();
-        }
         return this.#request.hasPostData;
     }
     async fetchPostData() {
-        throw new UnsupportedOperation();
-    }
-    get #hasInternalHeaderOverwrite() {
-        return Boolean(Object.keys(this.#extraHTTPHeaders).length ||
-            Object.keys(this.#userAgentHeaders).length);
-    }
-    get #extraHTTPHeaders() {
-        return this.#frame?.page()._extraHTTPHeaders ?? {};
-    }
-    get #userAgentHeaders() {
-        return this.#frame?.page()._userAgentHeaders ?? {};
+        return await this.#request.fetchPostData();
     }
     headers() {
+        // Callers should not be allowed to mutate internal structure.
         const headers = {};
         for (const header of this.#request.headers) {
             headers[header.name.toLowerCase()] = header.value.value;
         }
         return {
             ...headers,
-            ...this.#extraHTTPHeaders,
-            ...this.#userAgentHeaders,
         };
     }
     response() {
@@ -139,12 +127,6 @@ export class BidiHTTPRequest extends HTTPRequest {
     }
     frame() {
         return this.#frame;
-    }
-    async continue(overrides, priority) {
-        return await super.continue({
-            headers: this.#hasInternalHeaderOverwrite ? this.headers() : undefined,
-            ...overrides,
-        }, priority);
     }
     async _continue(overrides = {}) {
         const headers = getBidiHeaders(overrides.headers);

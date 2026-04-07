@@ -53,13 +53,23 @@ const actions = [
   {
     actionId: 'explain.console-message.hover',
     title: i18nLazyString(UIStrings.explainThisMessage),
+    configurableBindings: false,
     contextTypes(): [typeof Console.ConsoleViewMessage.ConsoleViewMessage] {
       return [Console.ConsoleViewMessage.ConsoleViewMessage];
     },
   },
   {
+    actionId: 'explain.console-message.teaser',
+    title: i18nLazyString(UIStrings.explainThisMessage),
+    configurableBindings: false,
+    contextTypes(): [] {
+      return [];
+    },
+  },
+  {
     actionId: 'explain.console-message.context.error',
     title: i18nLazyString(UIStrings.explainThisError),
+    configurableBindings: false,
     contextTypes(): [] {
       return [];
     },
@@ -67,6 +77,7 @@ const actions = [
   {
     actionId: 'explain.console-message.context.warning',
     title: i18nLazyString(UIStrings.explainThisWarning),
+    configurableBindings: false,
     contextTypes(): [] {
       return [];
     },
@@ -74,6 +85,7 @@ const actions = [
   {
     actionId: 'explain.console-message.context.other',
     title: i18nLazyString(UIStrings.explainThisMessage),
+    configurableBindings: false,
     contextTypes(): [] {
       return [];
     },

@@ -4,6 +4,11 @@
 
 import * as Host from '../../../core/host/host.js';
 import * as Root from '../../../core/root/root.js';
+import type * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
+import * as Greendev from '../../greendev/greendev.js';
+import type * as LHModel from '../../lighthouse/lighthouse.js';
+import type * as Trace from '../../trace/trace.js';
 import {debugLog, isStructuredLogEnabled} from '../debug.js';
 
 export const enum ResponseType {
@@ -17,6 +22,7 @@ export const enum ResponseType {
   ERROR = 'error',
   QUERYING = 'querying',
   USER_QUERY = 'user-query',
+  CONTEXT_CHANGE = 'context-change'
 }
 
 export const enum ErrorType {
@@ -24,6 +30,7 @@ export const enum ErrorType {
   ABORT = 'abort',
   MAX_STEPS = 'max-steps',
   BLOCK = 'block',
+  CROSS_ORIGIN = 'cross-origin'
 }
 
 export const enum MultimodalInputType {
@@ -44,6 +51,7 @@ export interface AnswerResponse {
   complete: boolean;
   rpcId?: Host.AidaClient.RpcGlobalId;
   suggestions?: [string, ...string[]];
+  widgets?: AiWidget[];
 }
 
 export interface SuggestionsResponse {
@@ -63,8 +71,8 @@ export interface ContextDetail {
 }
 export interface ContextResponse {
   type: ResponseType.CONTEXT;
-  title: string;
   details: [ContextDetail, ...ContextDetail[]];
+  widgets?: AiWidget[];
 }
 
 export interface TitleResponse {
@@ -81,9 +89,22 @@ export interface ThoughtResponse {
 
 export interface SideEffectResponse {
   type: ResponseType.SIDE_EFFECT;
+  description: string|null;
   code?: string;
   confirm: (confirm: boolean) => void;
 }
+export interface ContextChangeResponse {
+  type: ResponseType.CONTEXT_CHANGE;
+  /**
+   * Information to pass down what was selected
+   * Use to make the LLM understand the the user
+   * already selected something.
+   */
+  description: string;
+  context: ConversationContext<unknown>;
+  widgets?: AiWidget[];
+}
+
 interface SerializedSideEffectResponse extends Omit<SideEffectResponse, 'confirm'> {}
 
 export interface ActionResponse {
@@ -91,6 +112,7 @@ export interface ActionResponse {
   code?: string;
   output?: string;
   canceled: boolean;
+  widgets?: AiWidget[];
 }
 
 export interface QueryingResponse {
@@ -105,13 +127,13 @@ export interface UserQuery {
 }
 
 export type ResponseData = AnswerResponse|SuggestionsResponse|ErrorResponse|ActionResponse|SideEffectResponse|
-    ThoughtResponse|TitleResponse|QueryingResponse|ContextResponse|UserQuery;
+    ThoughtResponse|TitleResponse|QueryingResponse|ContextResponse|UserQuery|ContextChangeResponse;
 
 export type SerializedResponseData = AnswerResponse|SuggestionsResponse|ErrorResponse|ActionResponse|
     SerializedSideEffectResponse|ThoughtResponse|TitleResponse|QueryingResponse|ContextResponse|UserQuery;
 
 export type FunctionCallResponseData =
-    TitleResponse|ThoughtResponse|ActionResponse|SideEffectResponse|SuggestionsResponse;
+    TitleResponse|ThoughtResponse|ActionResponse|SideEffectResponse|SuggestionsResponse|ContextChangeResponse;
 
 export interface BuildRequestOptions {
   text: string;
@@ -125,7 +147,12 @@ export interface RequestOptions {
 export interface AgentOptions {
   aidaClient: Host.AidaClient.AidaClient;
   serverSideLoggingEnabled?: boolean;
+  sessionId?: string;
   confirmSideEffectForTest?: typeof Promise.withResolvers;
+  onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
+  history?: Host.AidaClient.Content[];
+  allowedOrigin?: () => string | undefined;
+  lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
 }
 
 export interface ParsedAnswer {
@@ -144,30 +171,6 @@ export interface ConversationSuggestion {
 
 /** At least one. */
 export type ConversationSuggestions = [ConversationSuggestion, ...ConversationSuggestion[]];
-
-export const enum ExternalRequestResponseType {
-  ANSWER = 'answer',
-  NOTIFICATION = 'notification',
-  ERROR = 'error',
-}
-
-export interface ExternalRequestAnswer {
-  type: ExternalRequestResponseType.ANSWER;
-  message: string;
-  devToolsLogs: object[];
-}
-
-export interface ExternalRequestNotification {
-  type: ExternalRequestResponseType.NOTIFICATION;
-  message: string;
-}
-
-export interface ExternalRequestError {
-  type: ExternalRequestResponseType.ERROR;
-  message: string;
-}
-
-export type ExternalRequestResponse = ExternalRequestAnswer|ExternalRequestNotification|ExternalRequestError;
 
 export abstract class ConversationContext<T> {
   abstract getOrigin(): string;
@@ -198,11 +201,109 @@ export abstract class ConversationContext<T> {
   }
 }
 
+export interface ComputedStyleAiWidget {
+  name: 'COMPUTED_STYLES';
+  data: {
+    computedStyles: Map<string, string>,
+    backendNodeId: Protocol.DOM.BackendNodeId,
+    matchedCascade: SDK.CSSMatchedStyles.CSSMatchedStyles,
+    // The subset of CSS properties that the AI looked up.
+    properties: string[],
+  };
+}
+export interface CoreVitalsAiWidget {
+  name: 'CORE_VITALS';
+  data: {
+    insightSetKey: string,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+  };
+}
+
+export interface StylePropertiesAiWidget {
+  name: 'STYLE_PROPERTIES';
+  data: {
+    backendNodeId: Protocol.DOM.BackendNodeId,
+    selector?: string,
+  };
+}
+
+export interface DomTreeAiWidget {
+  name: 'DOM_TREE';
+  data: {
+    root: SDK.DOMModel.DOMNodeSnapshot,
+    networkRequest?: {
+      url: string,
+      size: number,
+      resourceType: Protocol.Network.ResourceType,
+      mimeType: string,
+      imageUrl?: string,
+    },
+  };
+}
+
+export interface PerformanceTraceAiWidget {
+  name: 'PERFORMANCE_TRACE';
+  data: {
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+  };
+}
+
+export interface LcpBreakdownAiWidget {
+  name: 'LCP_BREAKDOWN';
+  data: {
+    lcpData: Trace.Insights.Models.LCPBreakdown.LCPBreakdownInsightModel,
+  };
+}
+
+export interface TimelineRangeSummaryAiWidget {
+  name: 'TIMELINE_RANGE_SUMMARY';
+  data: {
+    bounds: Trace.Types.Timing.TraceWindowMicro,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+    // We can use this component for other tracks summaries later, so
+    // we include the track in the data.
+    track: 'main',
+  };
+}
+
+export interface BottomUpTreeAiWidget {
+  name: 'BOTTOM_UP_TREE';
+  data: {
+    bounds: Trace.Types.Timing.TraceWindowMicro,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+  };
+}
+
+// This type will grow as we add more widgets.
+export type AiWidget = ComputedStyleAiWidget|CoreVitalsAiWidget|StylePropertiesAiWidget|DomTreeAiWidget|
+    PerformanceTraceAiWidget|LcpBreakdownAiWidget|TimelineRangeSummaryAiWidget|BottomUpTreeAiWidget;
+
 export type FunctionCallHandlerResult<Result> = {
-  result: Result,
-}|{
   requiresApproval: true,
-}|{error: string};
+  /**
+   * Provides extra description of what the required
+   * approval is requesting.
+   */
+  description: string|null,
+}|{
+  result: Result,
+  widgets?: AiWidget[],
+}|{
+  context: ConversationContext<unknown>,
+  description: string,
+  widgets?: AiWidget[],
+}|{
+  error: string,
+};
+
+export interface FunctionHandlerOptions {
+  /**
+   * Shows that the user approved
+   * the execution if it was required
+   */
+  approved?: boolean;
+  signal?: AbortSignal;
+}
 
 export interface FunctionDeclaration<Args extends Record<string, unknown>, ReturnType> {
   /**
@@ -228,14 +329,7 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
   /**
    * Function implementation that the LLM will try to execute,
    */
-  handler: (args: Args, options?: {
-    /**
-     * Shows that the user approved
-     * the execution if it was required
-     */
-    approved?: boolean,
-    signal?: AbortSignal,
-  }) => Promise<FunctionCallHandlerResult<ReturnType>>;
+  handler(args: Args, options?: FunctionHandlerOptions): Promise<FunctionCallHandlerResult<ReturnType>>;
 }
 
 interface AidaFetchResult {
@@ -267,7 +361,7 @@ export abstract class AiAgent<T> {
   abstract readonly userTier: string|undefined;
   abstract handleContextDetails(select: ConversationContext<T>|null): AsyncGenerator<ContextResponse, void, void>;
 
-  readonly #sessionId: string = crypto.randomUUID();
+  readonly #sessionId: string;
   readonly #aidaClient: Host.AidaClient.AidaClient;
   readonly #serverSideLoggingEnabled: boolean;
   readonly confirmSideEffect: typeof Promise.withResolvers;
@@ -282,27 +376,28 @@ export abstract class AiAgent<T> {
   }> = [];
 
   /**
-   * Might need to be part of history in case we allow chatting in
-   * historical conversations.
-   */
-  #origin?: string;
-
-  /**
    * `context` does not change during `AiAgent.run()`, ensuring that calls to JS
    * have the correct `context`. We don't want element selection by the user to
    * change the `context` during an `AiAgent.run()`.
    */
   protected context?: ConversationContext<T>;
 
-  #id: string = crypto.randomUUID();
-  #history: Host.AidaClient.Content[] = [];
+  #history: Host.AidaClient.Content[];
 
   #facts: Set<Host.AidaClient.RequestFact> = new Set<Host.AidaClient.RequestFact>();
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
     this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
+    // Disable logging for now.
+    // For context, see b/454563259#comment35.
+    // We should be able to remove this ~end of April.
+    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
+      this.#serverSideLoggingEnabled = false;
+    }
+    this.#sessionId = opts.sessionId ?? crypto.randomUUID();
     this.confirmSideEffect = opts.confirmSideEffectForTest ?? (() => Promise.withResolvers());
+    this.#history = opts.history ?? [];
   }
 
   async enhanceQuery(query: string, selected: ConversationContext<T>|null, multimodalInputType?: MultimodalInputType):
@@ -313,6 +408,10 @@ export abstract class AiAgent<T> {
 
   currentFacts(): ReadonlySet<Host.AidaClient.RequestFact> {
     return this.#facts;
+  }
+
+  get history(): Host.AidaClient.Content[] {
+    return [...this.#history];
   }
 
   /**
@@ -331,6 +430,10 @@ export abstract class AiAgent<T> {
 
   clearFacts(): void {
     this.#facts.clear();
+  }
+
+  popPendingMultimodalInput(): MultimodalInput|undefined {
+    return undefined;
   }
 
   preambleFeatures(): string[] {
@@ -390,12 +493,8 @@ export abstract class AiAgent<T> {
     return request;
   }
 
-  get id(): string {
-    return this.#id;
-  }
-
-  get origin(): string|undefined {
-    return this.#origin;
+  get sessionId(): string {
+    return this.#sessionId;
   }
 
   /**
@@ -460,6 +559,10 @@ export abstract class AiAgent<T> {
     return this.parseTextResponseForSuggestions(response.trim());
   }
 
+  protected async finalizeAnswer(answer: AnswerResponse): Promise<AnswerResponse> {
+    return answer;
+  }
+
   /**
    * Declare a function that the AI model can call.
    * @param name The name of the function
@@ -472,7 +575,9 @@ export abstract class AiAgent<T> {
    *    called with one object with `foo` and `bar` keys.
    */
   protected declareFunction<Args extends Record<string, unknown>, ReturnType = unknown>(
-      name: string, declaration: FunctionDeclaration<Args, ReturnType>): void {
+      name: string,
+      declaration: FunctionDeclaration<Args, ReturnType>,
+      ): void {
     if (this.#functionDeclarations.has(name)) {
       throw new Error(`Duplicate function declaration ${name}`);
     }
@@ -483,22 +588,22 @@ export abstract class AiAgent<T> {
     this.#functionDeclarations.clear();
   }
 
-  async *
-      run(initialQuery: string, options: {
-        selected: ConversationContext<T>|null,
-        signal?: AbortSignal,
-      },
-          multimodalInput?: MultimodalInput): AsyncGenerator<ResponseData, void, void> {
-    await options.selected?.refresh();
+  protected async preRun(): Promise<void> {
+  }
 
+  async *
+      run(
+          initialQuery: string,
+          options: {
+            selected: ConversationContext<T>|null,
+            signal?: AbortSignal,
+          },
+          multimodalInput?: MultimodalInput,
+          ): AsyncGenerator<ResponseData, void, void> {
+    await this.preRun();
+    await options.selected?.refresh();
     if (options.selected) {
-      // First context set on the agent determines its origin from now on.
-      if (this.#origin === undefined) {
-        this.#origin = options.selected.getOrigin();
-      }
-      if (options.selected.isOriginAllowed(this.#origin)) {
-        this.context = options.selected;
-      }
+      this.context = options.selected;
     }
 
     const enhancedQuery = await this.enhanceQuery(initialQuery, options.selected, multimodalInput?.type);
@@ -509,16 +614,13 @@ export abstract class AiAgent<T> {
     // Request is built here to capture history up to this point.
     let request = this.buildRequest(query, Host.AidaClient.Role.USER);
 
-    yield {
-      type: ResponseType.USER_QUERY,
-      query: initialQuery,
-      imageInput: multimodalInput?.input,
-      imageId: multimodalInput?.id,
-    };
-
     yield* this.handleContextDetails(options.selected);
 
-    for (let i = 0; i < MAX_STEPS; i++) {
+    const breakpointAgentEnabled = Greendev.Prototypes.instance().isEnabled('breakpointDebuggerAgent');
+    const isBreakpointDebuggerAgent = this.constructor.name === 'BreakpointDebuggerAgent';
+    const finalMaxSteps = (isBreakpointDebuggerAgent && breakpointAgentEnabled) ? 1000 : MAX_STEPS;
+
+    for (let i = 0; i < finalMaxSteps; i++) {
       yield {
         type: ResponseType.QUERYING,
       };
@@ -567,38 +669,65 @@ export abstract class AiAgent<T> {
         if (!('answer' in parsedResponse)) {
           throw new Error('Expected a completed response to have an answer');
         }
-        this.#history.push({
-          parts: [{
-            text: parsedResponse.answer,
-          }],
-          role: Host.AidaClient.Role.MODEL,
-        });
+        if (!functionCall) {
+          this.#history.push({
+            parts: [{
+              text: parsedResponse.answer,
+            }],
+            role: Host.AidaClient.Role.MODEL,
+          });
+        }
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceAnswerReceived);
-        yield {
+        yield await this.finalizeAnswer({
           type: ResponseType.ANSWER,
           text: parsedResponse.answer,
           suggestions: parsedResponse.suggestions,
           complete: true,
           rpcId,
-        };
-        break;
+        });
+        if (!functionCall) {
+          break;
+        }
       }
 
       if (functionCall) {
         try {
-          const result = yield* this.#callFunction(functionCall.name, functionCall.args, options);
+          const result = yield*
+              this.#callFunction(
+                  functionCall.name,
+                  functionCall.args,
+                  {
+                    ...options,
+                    explanation: textResponse,
+                  },
+              );
+
           if (options.signal?.aborted) {
             yield this.#createErrorResponse(ErrorType.ABORT);
             break;
           }
+
+          if ('context' in result) {
+            yield {
+              type: ResponseType.CONTEXT_CHANGE,
+              description: result.description,
+              context: result.context,
+              widgets: result.widgets,
+            };
+
+            return;
+          }
+
           query = {
             functionResponse: {
               name: functionCall.name,
-              response: result,
+              // Widgets are not sent back to the LLM
+              response: {...result, widgets: undefined},
             },
           };
           request = this.buildRequest(query, Host.AidaClient.Role.ROLE_UNSPECIFIED);
-        } catch {
+        } catch (err) {
+          debugLog('Error handling function call', err);
           yield this.#createErrorResponse(ErrorType.UNKNOWN);
           break;
         }
@@ -611,23 +740,36 @@ export abstract class AiAgent<T> {
     if (isStructuredLogEnabled()) {
       window.dispatchEvent(new CustomEvent('aiassistancedone'));
     }
+    return;
   }
 
-  async * #callFunction(name: string, args: Record<string, unknown>, options?: {
-    signal?: AbortSignal,
-    approved?: boolean,
-  }): AsyncGenerator<FunctionCallResponseData, {result: unknown}> {
+  async *
+      #callFunction(
+          name: string,
+          args: Record<string, unknown>,
+          options?: FunctionHandlerOptions&{explanation?: string},
+          ): AsyncGenerator<FunctionCallResponseData, {
+        result: unknown,
+        widgets?: AiWidget[],
+      }|{context: ConversationContext<unknown>, description: string, widgets?: AiWidget[]}> {
     const call = this.#functionDeclarations.get(name);
     if (!call) {
       throw new Error(`Function ${name} is not found.`);
     }
+    const parts: Host.AidaClient.Part[] = [];
+    if (options?.explanation) {
+      parts.push({
+        text: options.explanation,
+      });
+    }
+    parts.push({
+      functionCall: {
+        name,
+        args,
+      },
+    });
     this.#history.push({
-      parts: [{
-        functionCall: {
-          name,
-          args,
-        },
-      }],
+      parts,
       role: Host.AidaClient.Role.MODEL,
     });
 
@@ -650,7 +792,7 @@ export abstract class AiAgent<T> {
       }
     }
 
-    let result = await call.handler(args, options) as FunctionCallHandlerResult<unknown>;
+    let result = await call.handler(args, options);
 
     if ('requiresApproval' in result) {
       if (code) {
@@ -680,9 +822,8 @@ export abstract class AiAgent<T> {
 
       yield {
         type: ResponseType.SIDE_EFFECT,
-        confirm: (result: boolean) => {
-          sideEffectConfirmationPromiseWithResolvers.resolve(result);
-        },
+        confirm: sideEffectConfirmationPromiseWithResolvers.resolve,
+        description: result.description,
       };
 
       const approvedRun = await sideEffectConfirmationPromiseWithResolvers.promise;
@@ -700,7 +841,7 @@ export abstract class AiAgent<T> {
 
       result = await call.handler(args, {
         ...options,
-        approved: approvedRun,
+        approved: true,
       });
     }
 
@@ -709,6 +850,7 @@ export abstract class AiAgent<T> {
         type: ResponseType.ACTION,
         code,
         output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
+        widgets: result.widgets,
         canceled: false,
       };
     }
@@ -722,7 +864,11 @@ export abstract class AiAgent<T> {
       };
     }
 
-    return result as {result: unknown};
+    if ('context' in result) {
+      return result;
+    }
+
+    return result as {result: unknown, widgets?: AiWidget[]};
   }
 
   async *
@@ -738,6 +884,7 @@ export abstract class AiAgent<T> {
           rpcId,
           functionCall: aidaResponse.functionCalls[0],
           completed: true,
+          text: aidaResponse.explanation,
         };
         break;
       }

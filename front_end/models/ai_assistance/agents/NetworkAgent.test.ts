@@ -13,11 +13,7 @@ import * as RenderCoordinator from '../../../ui/components/render_coordinator/re
 import * as Logs from '../../logs/logs.js';
 import * as NetworkTimeCalculator from '../../network_time_calculator/network_time_calculator.js';
 import * as TextUtils from '../../text_utils/text_utils.js';
-import {
-  NetworkAgent,
-  RequestContext,
-  ResponseType,
-} from '../ai_assistance.js';
+import {AiAgent, NetworkAgent} from '../ai_assistance.js';
 
 const {urlString} = Platform.DevToolsPath;
 
@@ -38,7 +34,7 @@ describeWithMockConnection('NetworkAgent', () => {
   describe('buildRequest', () => {
     it('builds a request with a model id', async () => {
       mockHostConfig('test model');
-      const agent = new NetworkAgent({
+      const agent = new NetworkAgent.NetworkAgent({
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
@@ -49,7 +45,7 @@ describeWithMockConnection('NetworkAgent', () => {
 
     it('builds a request with a temperature', async () => {
       mockHostConfig('test model', 1);
-      const agent = new NetworkAgent({
+      const agent = new NetworkAgent.NetworkAgent({
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
@@ -133,7 +129,7 @@ describeWithMockConnection('NetworkAgent', () => {
     });
 
     it('generates an answer', async () => {
-      const agent = new NetworkAgent({
+      const agent = new NetworkAgent.NetworkAgent({
         aidaClient: mockAidaClient([[{
           explanation: 'This is the answer',
           metadata: {
@@ -142,18 +138,11 @@ describeWithMockConnection('NetworkAgent', () => {
         }]]),
       });
 
-      const responses =
-          await Array.fromAsync(agent.run('test', {selected: new RequestContext(selectedNetworkRequest, calculator)}));
+      const responses = await Array.fromAsync(
+          agent.run('test', {selected: new NetworkAgent.RequestContext(selectedNetworkRequest, calculator)}));
       assert.deepEqual(responses, [
         {
-          type: ResponseType.USER_QUERY,
-          query: 'test',
-          imageInput: undefined,
-          imageId: undefined,
-        },
-        {
-          type: ResponseType.CONTEXT,
-          title: 'Analyzing network data',
+          type: AiAgent.ResponseType.CONTEXT,
           details: [
             {
               title: 'Request',
@@ -161,9 +150,8 @@ describeWithMockConnection('NetworkAgent', () => {
             },
             {
               title: 'Response',
-              text:
-                  `Response Status: 200 \n\nResponse headers:\ncontent-type: bar2\nx-forwarded-for: bar3\n\nResponse body:\n${
-                      exampleResponse}`
+              text: `Response headers:\ncontent-type: bar2\nx-forwarded-for: bar3\n\nResponse body:\n${
+                  exampleResponse}\n\nResponse status: 200 \nNetwork request status: pending\n`
             },
             {
               title: 'Timing',
@@ -180,10 +168,10 @@ describeWithMockConnection('NetworkAgent', () => {
           ],
         },
         {
-          type: ResponseType.QUERYING,
+          type: AiAgent.ResponseType.QUERYING,
         },
         {
-          type: ResponseType.ANSWER,
+          type: AiAgent.ResponseType.ANSWER,
           text: 'This is the answer',
           complete: true,
           suggestions: undefined,
@@ -208,7 +196,9 @@ x-forwarded-for: bar3
 Response body:
 ${exampleResponse}
 
-Response status: 200 \n
+Response status: 200 
+Network request status: pending
+
 Request timing:
 Queued at (timestamp): 0 s
 Started at (timestamp): 501 s

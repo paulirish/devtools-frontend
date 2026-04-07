@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable @devtools/enforce-custom-element-definitions-location */
 
 import * as CodeHighlighter from '../../../ui/components/code_highlighter/code_highlighter.js';
 import codeHighlighterStyles from '../../../ui/components/code_highlighter/codeHighlighter.css.js';
@@ -216,21 +217,16 @@ class SuggestionBox extends LitElement {
       return;
     }
 
+    // clang-format off
     return html`<style>${contentEditableStyles}</style><ul class="suggestions">
-      ${this.#suggestions.map((suggestion, index) => {
-      return html`<li
-          class=${classMap({
-        selected: index === this.cursor,
-      })}
-          @mousedown=${this.#dispatchSuggestEvent.bind(this, suggestion)}
-          jslog=${VisualLogging.item('suggestion').track({
-        click: true,
-      })}
-        >
+      ${this.#suggestions.map((suggestion, index) => html`
+        <li class=${classMap({selected: index === this.cursor})}
+            @mousedown=${this.#dispatchSuggestEvent.bind(this, suggestion)}
+            jslog=${VisualLogging.item('suggestion').track({ click: true, resize: true })}>
           ${suggestion}
-        </li>`;
-    })}
+        </li>`)}
     </ul>`;
+    // clang-format on
   }
 }
 

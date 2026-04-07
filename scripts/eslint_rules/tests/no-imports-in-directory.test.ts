@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import path from 'path';
+import path from 'node:path';
 
 import rule from '../lib/no-imports-in-directory.ts';
 
 import {RuleTester} from './utils/RuleTester.ts';
 
 const NOT_SDK_PATH = path.join(
-    // @ts-expect-error
     import.meta.dirname,
     '..',
     '..',
@@ -21,7 +20,6 @@ const NOT_SDK_PATH = path.join(
 );
 
 const SDK_PATH = path.join(
-    // @ts-expect-error
     import.meta.dirname,
     '..',
     '..',

@@ -123,19 +123,10 @@ button.addEventListener('click', event => onClick(event));
 
 ### Resources
 
-#### For developers
-
-##### Implementation
-
   * [`devtools-button`](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/ui/components/buttons/Button.ts)
-
-#### For designers
-
-##### Figma
-
-  * [Buttons](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/CDT-design-kit?node-id=481-2167&m=dev)
+  * [Buttons Figma](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/CDT-design-kit?node-id=481-2167&m=dev)
   * [Icon
-    buttons](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/CDT-design-kit?node-id=571-616&m=dev)
+    buttons Figma](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/CDT-design-kit?node-id=571-616&m=dev)
 
 ## Combo Boxes and Single Select menus
 
@@ -290,14 +281,39 @@ Find an exhaustive collection of icons currently used in DevTools [here](https:/
 
 #### Developer guidelines
 
-For some frequently used icons e.g. cross-circle, warning-filled etc. colors are auto-set in the component. See full list [here](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/ui/components/icon_button/icon.css;l=47)
+For some frequently used icons, colors are auto-set in the component. The full list of icons with auto-set colors is:
+
+- `warning-filled`
+- `issue-exclamation-filled`
+- `cross-circle`
+- `cross-circle-filled`
+- `issue-cross-filled`
+- `small-status-dot`
+- `issue-text-filled`
+- `large-arrow-right-filled`
+- `code-circle`
+- `file-document`
+- `file-font`
+- `file-script`
+- `file-stylesheet`
+- `file-media`
+
+For the definitions, refer to the [icon.css file](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/ui/kit/icons/icon.css).
+
+The default icon size is at 20x20 pixels. There are predefined classes for other sizes, don't deviate from them:
+
+  * `.extra-small`: 12x12 pixels
+  * `.small`: 14x14 pixels
+  * `.medium`: 16x16 pixels
+  * `.large`: 18x18 pixels
+  * `.extra-large`: 20x20 pixels
 
 ##### Dos and Don'ts
 
 ###### Do
 
   * Set class and change color in .css files
-  * Set one of the predefined classes to change icon size e.g. extra-small for 12px
+  * Set one of the predefined classes to change icon size.
 
 ###### Don't
 
@@ -313,11 +329,12 @@ Usage with lit-html:
 html`<devtools-icon name=${'some-icon-name'}></devtools-icon>`;
 ```
 
-Usage with the imperative API:
+### Resources
 
-```ts
-const someIcon = IconButton.Icon.create('some-icon-name', 'some-class');
-```
+*   [`devtools-icon`](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/ui/kit/icons/Icon.ts)
+*   [Component Documentation Example](https://chromedevtools.github.io/devtools-frontend/#Icon)
+*   [Icon Figma](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/Chrome-DevTools-Design-Kit?node-id=4323-3772)
+*   [Greenlines](http://go/chrome-devtools:icons-greenlines)
 
 ## Context menus
 
@@ -568,3 +585,53 @@ UI.ContextMenu.registerItem({
 ```
 
 This will automatically add the "Open file" action to the context menu that appears when clicking the Elements panel's 3-dot button.
+
+
+## Cards
+
+![Card component](images/cards.png)
+
+### Usage
+
+#### Developer guidelines
+
+###### Basic card with heading
+
+Usage with lit-html:
+
+```ts
+html`<devtools-card heading="Simple card">
+  <div class="content">This is a simple card.</div>
+</devtools-card>`
+```
+
+###### Card without a heading
+
+Usage with lit-html:
+
+```ts
+html`<devtools-card>
+  <div class="content">This is a card without a heading.</div>
+</devtools-card>`
+```
+
+###### Card with rich heading
+
+Usage with lit-html:
+
+```ts
+html`<devtools-card heading="Card with rich heading">
+  <span slot="heading-prefix">Slotted heading prefix</span>
+  <span slot="heading-suffix">Slotted heading suffix</span>
+  <div class="content">This is a card with a rich heading.</div>
+</devtools-card>`
+```
+
+### Resources
+
+*   [`devtools-card`](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/ui/kit/cards/Card.ts)
+* [Component Documentation Example](https://chromedevtools.github.io/devtools-frontend/#Card)
+
+* [Cards Figma](https://www.figma.com/design/A5iQBBNAe5zPFpJvUzUgW8/Chrome-DevTools-Design-Kit?node-id=3456-939)
+
+* [Greenlines](http:/go/chrome-devtools:cards-greenlines)

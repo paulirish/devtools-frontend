@@ -1,7 +1,6 @@
 // Copyright 2018 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 import '../../ui/legacy/components/data_grid/data_grid.js';
@@ -23,7 +22,7 @@ import {Events as JSONEditorEvents, JSONEditor, type Parameter} from './JSONEdit
 import protocolMonitorStyles from './protocolMonitor.css.js';
 
 const {styleMap} = Directives;
-const {widgetConfig, widgetRef} = UI.Widget;
+const {widget, widgetRef} = UI.Widget;
 const UIStrings = {
   /**
    * @description Text for one or a group of functions
@@ -304,7 +303,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                       </tr>`)}
                   </table>
               </devtools-data-grid>
-              <devtools-widget .widgetConfig=${widgetConfig(InfoWidget, {
+              <devtools-widget ${widget(InfoWidget, {
                     request: input.selectedMessage?.params,
                     response: input.selectedMessage?.result || input.selectedMessage?.error,
                     type: !input.selectedMessage           ? undefined :
@@ -350,7 +349,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             </devtools-toolbar>
           </div>
           <devtools-widget slot="sidebar"
-              .widgetConfig=${widgetConfig(JSONEditor, { metadataByCommand, typesByName, enumsByName})}
+              ${widget(JSONEditor, { metadataByCommand, typesByName, enumsByName})}
               ${widgetRef(JSONEditor, e => {output.editorWidget = e;})}>
           </devtools-widget>
         </devtools-split-view>`,
@@ -359,7 +358,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
   // clang-format on
 };
 
-export class ProtocolMonitorImpl extends UI.Panel.Panel {
+export class ProtocolMonitorImpl extends UI.Panel.Panel implements SDK.TargetManager.Observer {
   private started: boolean;
   private startTime: number;
   private readonly messageForId = new Map<number, Message>();
@@ -374,6 +373,7 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
   #selectedMessage: Message|undefined;
   #filter = '';
   #editorWidget!: JSONEditor;
+  #targetsBySessionId = new Map<string, SDK.Target.Target>();
   constructor(view: View = DEFAULT_VIEW) {
     super('protocol-monitor', true);
     this.#view = view;
@@ -392,6 +392,15 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
         SDK.TargetManager.Events.AVAILABLE_TARGETS_CHANGED, () => {
           this.requestUpdate();
         });
+    SDK.TargetManager.TargetManager.instance().observeTargets(this);
+  }
+
+  targetAdded(target: SDK.Target.Target): void {
+    this.#targetsBySessionId.set(target.sessionId, target);
+  }
+
+  targetRemoved(target: SDK.Target.Target): void {
+    this.#targetsBySessionId.delete(target.sessionId);
   }
 
   #populateToolbarInput(): void {
@@ -530,6 +539,7 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
   }
 
   override wasShown(): void {
+    super.wasShown();
     if (this.started) {
       return;
     }
@@ -551,7 +561,7 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
     }
   }
 
-  private messageReceived(message: Message, target: ProtocolClient.InspectorBackend.TargetBase|null): void {
+  private messageReceived(message: Message): void {
     if ('id' in message && message.id) {
       const existingMessage = this.messageForId.get(message.id);
       if (!existingMessage) {
@@ -567,10 +577,11 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
       return;
     }
 
+    const target = message.sessionId !== undefined ? this.#targetsBySessionId.get(message.sessionId) : undefined;
     this.#messages.push({
       method: message.method,
       sessionId: message.sessionId,
-      target: (target ?? undefined) as SDK.Target.Target | undefined,
+      target,
       requestTime: Date.now() - this.startTime,
       result: message.params,
     });
@@ -579,14 +590,15 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
   }
 
   private messageSent(
-      message: {domain: string, method: string, params: Record<string, unknown>, id: number, sessionId?: string},
-      target: ProtocolClient.InspectorBackend.TargetBase|null): void {
+      message: {domain: string, method: string, params: Record<string, unknown>, id: number, sessionId?: string}):
+      void {
+    const target = message.sessionId !== undefined ? this.#targetsBySessionId.get(message.sessionId) : undefined;
     const messageRecord = {
       method: message.method,
       params: message.params,
       id: message.id,
       sessionId: message.sessionId,
-      target: (target ?? undefined) as SDK.Target.Target | undefined,
+      target,
       requestTime: Date.now() - this.startTime,
     };
     this.#messages.push(messageRecord);
@@ -652,46 +664,67 @@ export class CommandAutocompleteSuggestionProvider {
   }
 }
 
-export class InfoWidget extends UI.Widget.VBox {
-  private readonly tabbedPane: UI.TabbedPane.TabbedPane;
+interface InfoWidgetViewInput {
   request: Record<string, unknown>|undefined;
   response: Record<string, unknown>|undefined;
   type: 'sent'|'received'|undefined;
   selectedTab: 'request'|'response'|undefined;
-  constructor(element: HTMLElement) {
+}
+
+type InfoWidgetView = (input: InfoWidgetViewInput, output: undefined, target: HTMLElement) => void;
+
+const INFO_WIDGET_VIEW: InfoWidgetView = (input, _output, target) => {
+  // clang-format off
+  render(html`
+    <devtools-tabbed-pane>${input.type === undefined ? html`
+      <devtools-widget
+          id="request" title=${i18nString(UIStrings.request)}
+          ?selected=${input.selectedTab === 'request'} disabled
+          ${widget(UI.EmptyWidget.EmptyWidget, {
+              header: i18nString(UIStrings.noMessageSelected),
+              text: i18nString(UIStrings.selectAMessageToView)})}>
+      </devtools-widget>
+      <devtools-widget
+          id="response" title=${i18nString(UIStrings.response)}
+          ?selected=${input.selectedTab === 'response'}
+          ${widget(UI.EmptyWidget.EmptyWidget, {
+              header: i18nString(UIStrings.noMessageSelected),
+              text: i18nString(UIStrings.selectAMessageToView)})}>
+      </devtools-widget>`: html`
+      <devtools-widget
+          id="request" title=${i18nString(UIStrings.request)}
+          ?selected=${input.selectedTab === 'request'} ?disabled=${input.type !== 'sent'}
+          ${widget(SourceFrame.JSONView.SearchableJsonView, {jsonObject: input.request})}>
+      </devtools-widget>
+      <devtools-widget
+          id="response" title=${i18nString(UIStrings.response)}
+          ?selected=${input.selectedTab === 'response'}
+          ${widget(SourceFrame.JSONView.SearchableJsonView, {jsonObject: input.response})}>
+      </devtools-widget>`}
+    </devtools-tabbed-pane>`, target);
+  // clang-format on
+};
+
+export class InfoWidget extends UI.Widget.VBox {
+  #view: InfoWidgetView;
+  request: Record<string, unknown>|undefined;
+  response: Record<string, unknown>|undefined;
+  type: 'sent'|'received'|undefined;
+  constructor(element: HTMLElement, view = INFO_WIDGET_VIEW) {
     super(element);
-    this.tabbedPane = new UI.TabbedPane.TabbedPane();
-    this.tabbedPane.appendTab('request', i18nString(UIStrings.request), new UI.Widget.Widget());
-    this.tabbedPane.appendTab('response', i18nString(UIStrings.response), new UI.Widget.Widget());
-    this.tabbedPane.show(this.contentElement);
-    this.tabbedPane.selectTab('response');
-    this.request = {};
+    this.#view = view;
+    this.requestUpdate();
   }
 
   override performUpdate(): void {
-    if (!this.request && !this.response) {
-      this.tabbedPane.changeTabView(
-          'request',
-          new UI.EmptyWidget.EmptyWidget(
-              i18nString(UIStrings.noMessageSelected), i18nString(UIStrings.selectAMessageToView)));
-      this.tabbedPane.changeTabView(
-          'response',
-          new UI.EmptyWidget.EmptyWidget(
-              i18nString(UIStrings.noMessageSelected), i18nString(UIStrings.selectAMessageToView)));
-      return;
-    }
-
-    const requestEnabled = this.type && this.type === 'sent';
-    this.tabbedPane.setTabEnabled('request', Boolean(requestEnabled));
-    if (!requestEnabled) {
-      this.tabbedPane.selectTab('response');
-    }
-
-    this.tabbedPane.changeTabView('request', SourceFrame.JSONView.JSONView.createViewSync(this.request || null));
-    this.tabbedPane.changeTabView('response', SourceFrame.JSONView.JSONView.createViewSync(this.response || null));
-    if (this.selectedTab) {
-      this.tabbedPane.selectTab(this.selectedTab);
-    }
+    this.#view(
+        {
+          request: this.request,
+          response: this.response,
+          type: this.type,
+          selectedTab: this.type !== 'sent' ? 'response' : undefined,
+        },
+        undefined, this.contentElement);
   }
 }
 

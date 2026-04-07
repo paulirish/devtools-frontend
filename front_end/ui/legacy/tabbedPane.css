@@ -520,3 +520,10 @@
     --tabbed-pane-close-icon-color: HighlightText;
   }
 }
+
+.spark {
+  position: absolute;
+  top: 2px;
+
+  --icon-default: var(--sys-color-primary);
+}

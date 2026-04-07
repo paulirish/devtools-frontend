@@ -19,13 +19,12 @@ generate_css("css_files") {
   ]
 }
 
-devtools_module("components") {
+devtools_ui_module("components") {
   sources = [
     "DirectSocketConnectionView.ts",
     "EditableSpan.ts",
     "HeaderSectionRow.ts",
     "RequestHeaderSection.ts",
-    "RequestHeadersView.ts",
     "RequestTrustTokensView.ts",
     "ResponseHeaderSection.ts",
   ]
@@ -39,18 +38,22 @@ devtools_module("components") {
     "../../../core/sdk:bundle",
     "../../../generated:protocol",
     "../../../models/issues_manager:bundle",
+    "../../../models/persistence:bundle",
+    "../../../models/text_utils:bundle",
     "../../../models/workspace:bundle",
     "../../../panels/sources:bundle",
     "../../../panels/utils:bundle",
     "../../../third_party/chromium/client-variations:bundle",
     "../../../ui/components/buttons:bundle",
     "../../../ui/components/helpers:bundle",
-    "../../../ui/components/icon_button:bundle",
     "../../../ui/components/input:bundle",
     "../../../ui/components/legacy_wrapper:bundle",
+    "../../../ui/components/render_coordinator:bundle",
     "../../../ui/components/report_view:bundle",
+    "../../../ui/kit:bundle",
     "../../../ui/legacy:bundle",
     "../../../ui/lit:bundle",
+    "../../../ui/visual_logging:bundle",
     "../forward:bundle",
   ]
 }
@@ -66,18 +69,18 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../:*",
+    "../../application/*",
   ]
 
   visibility += devtools_panels_visibility
 }
 
-ts_library("unittests") {
+devtools_ui_module("unittests") {
   testonly = true
   sources = [
     "DirectSocketConnectionView.test.ts",
     "HeaderSectionRow.test.ts",
     "RequestHeaderSection.test.ts",
-    "RequestHeadersView.test.ts",
     "RequestTrustTokensView.test.ts",
     "ResponseHeaderSection.test.ts",
   ]

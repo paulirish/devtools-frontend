@@ -14,6 +14,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 
 import * as Insights from './insights/insights.js';
+import {nodeLink} from './insights/NodeLink.js';
 import layoutShiftDetailsStyles from './layoutShiftDetails.css.js';
 
 const {html, render} = Lit;
@@ -190,16 +191,23 @@ export const DEFAULT_VIEW: (input: ViewInput, output: object, target: HTMLElemen
       // clang-format on
     };
 
+function findInsightSet(insightSets: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|undefined):
+    Trace.Insights.Types.InsightSet|undefined {
+  return insightSets?.values().find(
+      insightSet =>
+          navigationId ? navigationId === insightSet.navigation?.args.data?.navigationId : !insightSet.navigation);
+}
+
 function renderLayoutShiftDetails(
-    layoutShift: Trace.Types.Events.SyntheticLayoutShift, traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
+    layoutShift: Trace.Types.Events.SyntheticLayoutShift, insightSets: Trace.Insights.Types.TraceInsightSets|null,
     parsedTrace: Trace.TraceModel.ParsedTrace, isFreshRecording: boolean,
     onEventClick: (e: Trace.Types.Events.Event) => void): Lit.LitTemplate {
-  if (!traceInsightsSets) {
+  if (!insightSets) {
     return Lit.nothing;
   }
-  const insightsId = layoutShift.args.data?.navigationId ?? Trace.Types.Events.NO_NAVIGATION;
-  const clsInsight = traceInsightsSets.get(insightsId)?.model.CLSCulprits;
-  if (!clsInsight || clsInsight instanceof Error) {
+
+  const clsInsight = findInsightSet(insightSets, layoutShift.args.data?.navigationId)?.model.CLSCulprits;
+  if (!clsInsight) {
     return Lit.nothing;
   }
 
@@ -242,15 +250,14 @@ function renderLayoutShiftDetails(
 }
 
 function renderLayoutShiftClusterDetails(
-    cluster: Trace.Types.Events.SyntheticLayoutShiftCluster,
-    traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null, parsedTrace: Trace.TraceModel.ParsedTrace,
-    onEventClick: (e: Trace.Types.Events.Event) => void): Lit.LitTemplate {
-  if (!traceInsightsSets) {
+    cluster: Trace.Types.Events.SyntheticLayoutShiftCluster, insightSets: Trace.Insights.Types.TraceInsightSets|null,
+    parsedTrace: Trace.TraceModel.ParsedTrace, onEventClick: (e: Trace.Types.Events.Event) => void): Lit.LitTemplate {
+  if (!insightSets) {
     return Lit.nothing;
   }
-  const insightsId = cluster.navigationId ?? Trace.Types.Events.NO_NAVIGATION;
-  const clsInsight = traceInsightsSets.get(insightsId)?.model.CLSCulprits;
-  if (!clsInsight || clsInsight instanceof Error) {
+
+  const clsInsight = findInsightSet(insightSets, cluster.navigationId)?.model.CLSCulprits;
+  if (!clsInsight) {
     return Lit.nothing;
   }
 
@@ -368,14 +375,11 @@ function renderShiftedElements(
     return html`
       ${elementsShifted?.map(el => {
         if (el.node_id !== undefined) {
-          return html`
-            <devtools-performance-node-link
-              .data=${{
-                backendNodeId: el.node_id,
-                frame: shift.args.frame,
-                fallbackHtmlSnippet: el.debug_name,
-              } as Insights.NodeLink.NodeLinkData}>
-            </devtools-performance-node-link>`;
+          return nodeLink({
+            backendNodeId: el.node_id,
+            frame: shift.args.frame,
+            fallbackHtmlSnippet: el.debug_name,
+          });
         }
           return Lit.nothing;
       })}`;
@@ -402,20 +406,17 @@ function renderAnimation(
 
 function renderUnsizedImage(
     frame: string, unsizedImage: Trace.Insights.Models.CLSCulprits.UnsizedImage): Lit.LitTemplate {
+  const nodeLinkEl = nodeLink({
+    backendNodeId: unsizedImage.backendNodeId,
+    frame,
+    fallbackUrl: unsizedImage.paintImageEvent.args.data.url as Platform.DevToolsPath.UrlString | undefined,
+  });
   // clang-format off
-    const el = html`
-      <devtools-performance-node-link
-        .data=${{
-          backendNodeId: unsizedImage.backendNodeId,
-          frame,
-          fallbackUrl: unsizedImage.paintImageEvent.args.data.url,
-        } as Insights.NodeLink.NodeLinkData}>
-      </devtools-performance-node-link>`;
-    return html`
-      <span class="culprit">
-        <span class="culprit-type">${i18nString(UIStrings.unsizedImage)}: </span>
-        <span class="culprit-value">${el}</span>
-      </span>`;
+  return html`
+    <span class="culprit">
+      <span class="culprit-type">${i18nString(UIStrings.unsizedImage)}: </span>
+      <span class="culprit-value">${nodeLinkEl}</span>
+    </span>`;
   // clang-format on
 }
 

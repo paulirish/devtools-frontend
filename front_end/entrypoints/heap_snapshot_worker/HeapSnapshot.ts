@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/prefer-private-class-members */
+/* eslint-disable @devtools/prefer-private-class-members */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as HeapSnapshotModel from '../../models/heap_snapshot_model/heap_snapshot_model.js';
+import * as HeapSnapshotModel from '../../models/heap_snapshot/heap_snapshot.js';
 
 import {AllocationProfile} from './AllocationProfile.js';
 import type {HeapSnapshotWorkerDispatcher} from './HeapSnapshotWorkerDispatcher.js';
@@ -875,7 +875,7 @@ export abstract class HeapSnapshot {
     interfaceDefinitions: string,
     aggregates: Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff>,
   };
-  #aggregates: Record<string, Record<string, AggregatedInfo>> = {};
+  #aggregates: Record<string, Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>> = {};
   #aggregatesSortedFlags: Record<string, boolean> = {};
   profile: Profile;
   nodeTypeOffset!: number;
@@ -1288,7 +1288,7 @@ export abstract class HeapSnapshot {
   }
 
   aggregatesWithFilter(nodeFilter: HeapSnapshotModel.HeapSnapshotModel.NodeFilter):
-      Record<string, HeapSnapshotModel.HeapSnapshotModel.Aggregate> {
+      Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo> {
     const filter = this.createFilter(nodeFilter);
     // @ts-expect-error key is added in createFilter
     const key = filter ? filter.key : 'allObjects';
@@ -1403,13 +1403,78 @@ export abstract class HeapSnapshot {
         }
         return getBit;
       }
+      case 'objectsRetainedByEventHandlers': {
+        // This filter is based on the assumption that event handler functions are contained
+        // (directly or indirectly) by V8EventListener nodes. In particular, the callback_object_
+        // field of V8EventListener points to either the function used as the event handler,
+        // or to a framework-specific wrapper object that in turn contains the actual handler.
+        //
+        // The filter works in two steps:
+        // 1. Identify all event handler functions and mark them in a bitmap.
+        // 2. Traverse the graph, avoiding paths that pass through any of the event handlers
+        const node = this.createNode(0);
+        const nodeFieldCount = this.nodeFieldCount;
+
+        // First, identify which nodes are event handlers
+        const eventHandlerBitmap = Platform.TypedArrayUtilities.createBitVector(this.nodeCount);
+
+        // Iterate all nodes looking for V8EventListener objects
+        for (let i = 0; i < this.nodeCount; ++i) {
+          node.nodeIndex = i * nodeFieldCount;
+
+          // Check if this node is a V8EventListener
+          if (node.rawName() === 'V8EventListener') {
+            // Get the callback_object_ (edge "1")
+            const callbackNode = this.getEdgeTarget(node, '1');
+            if (!callbackNode) {
+              continue;
+            }
+
+            const callbackOrdinal = callbackNode.nodeIndex / nodeFieldCount;
+
+            // Check if callback has a "code" edge (direct function handler)
+            if (this.getEdgeTarget(callbackNode, 'code')) {
+              eventHandlerBitmap.setBit(callbackOrdinal);
+              continue;
+            }
+
+            // Check if any child has a "code" edge (framework wrapper)
+            let foundChildWithCode = false;
+            for (let childEdgeIt = callbackNode.edges(); childEdgeIt.hasNext(); childEdgeIt.next()) {
+              const childNode = childEdgeIt.item().node();
+              if (this.getEdgeTarget(childNode, 'code')) {
+                eventHandlerBitmap.setBit(childNode.nodeIndex / nodeFieldCount);
+                foundChildWithCode = true;
+                break;
+              }
+            }
+
+            // Fallback to marking the callback node itself
+            if (!foundChildWithCode) {
+              eventHandlerBitmap.setBit(callbackOrdinal);
+            }
+          }
+        }
+
+        // Traverse the graph, avoiding paths that pass through event handlers
+        traverse((currentNode: HeapSnapshotNode, edge: HeapSnapshotEdge) => {
+          const targetNode = edge.node();
+          const targetOrdinal = targetNode.nodeIndex / nodeFieldCount;
+          // Return false (don't traverse) if the target node is an event handler
+          return !eventHandlerBitmap.getBit(targetOrdinal);
+        });
+
+        markUnreachableNodes();
+
+        return (node: HeapSnapshotNode) => !getBit(node);
+      }
     }
     throw new Error('Invalid filter name');
   }
 
   getAggregatesByClassKey(sortedIndexes: boolean, key?: string, filter?: ((arg0: HeapSnapshotNode) => boolean)):
-      Record<string, HeapSnapshotModel.HeapSnapshotModel.Aggregate> {
-    let aggregates: Record<string, HeapSnapshotModel.HeapSnapshotModel.Aggregate>;
+      Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo> {
+    let aggregates: Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
     if (key && this.#aggregates[key]) {
       aggregates = this.#aggregates[key];
     } else {
@@ -1439,7 +1504,7 @@ export abstract class HeapSnapshot {
       }
     }
 
-    return aggregates as Record<string, HeapSnapshotModel.HeapSnapshotModel.Aggregate>;
+    return aggregates;
   }
 
   allocationTracesTops(): HeapSnapshotModel.HeapSnapshotModel.SerializedAllocationNode[] {
@@ -1588,8 +1653,9 @@ export abstract class HeapSnapshot {
     }
   }
 
-  private buildAggregates(filter?: ((arg0: HeapSnapshotNode) => boolean)): Map<string|number, AggregatedInfo> {
-    const aggregates = new Map<string|number, AggregatedInfo>();
+  private buildAggregates(filter?: ((arg0: HeapSnapshotNode) => boolean)):
+      Map<string|number, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo> {
+    const aggregates = new Map<string|number, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>();
 
     const nodes = this.nodes;
     const nodesLength = nodes.length;
@@ -1638,7 +1704,8 @@ export abstract class HeapSnapshot {
   }
 
   private calculateClassesRetainedSize(
-      aggregates: Map<string|number, AggregatedInfo>, filter?: ((arg0: HeapSnapshotNode) => boolean)): void {
+      aggregates: Map<string|number, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>,
+      filter?: ((arg0: HeapSnapshotNode) => boolean)): void {
     const rootNodeIndex = this.rootNodeIndexInternal;
     const node = this.createNode(rootNodeIndex);
     const list = [rootNodeIndex];
@@ -1660,7 +1727,7 @@ export abstract class HeapSnapshot {
       const dominatedIndexTo = firstDominatedNodeIndex[nodeOrdinal + 1];
 
       if (!seen && (!filter || filter(node)) && node.selfSize()) {
-        (aggregates.get(classKey) as AggregatedInfo).maxRet += node.retainedSize();
+        (aggregates.get(classKey) as HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo).maxRet += node.retainedSize();
         if (dominatedIndexFrom !== dominatedIndexTo) {
           seenClassKeys.set(classKey, true);
           sizes.push(list.length);
@@ -1680,7 +1747,7 @@ export abstract class HeapSnapshot {
     }
   }
 
-  private sortAggregateIndexes(aggregates: Record<string, AggregatedInfo>): void {
+  private sortAggregateIndexes(aggregates: Record<string, HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>): void {
     const nodeA = this.createNode();
     const nodeB = this.createNode();
 
@@ -2395,6 +2462,22 @@ export abstract class HeapSnapshot {
   }
 
   /**
+   * Gets the target node of an edge with the specified name.
+   * @param node The source node to search from
+   * @param edgeName The name of the edge to find
+   * @returns The target node if found, null otherwise
+   */
+  private getEdgeTarget(node: HeapSnapshotNode, edgeName: string): HeapSnapshotNode|null {
+    for (let edgeIt = node.edges(); edgeIt.hasNext(); edgeIt.next()) {
+      const edge = edgeIt.item();
+      if (edge.name() === edgeName) {
+        return edge.node();
+      }
+    }
+    return null;
+  }
+
+  /**
    * The phase propagates whether a node is attached or detached through the
    * graph and adjusts the low-level representation of nodes.
    *
@@ -2592,7 +2675,7 @@ export abstract class HeapSnapshot {
     if (snapshotDiff) {
       return snapshotDiff;
     }
-    snapshotDiff = ({} as Record<string, HeapSnapshotModel.HeapSnapshotModel.Diff>);
+    snapshotDiff = {};
 
     const aggregates = this.getAggregatesByClassKey(true, 'allObjects');
     for (const classKey in baseSnapshotAggregates) {
@@ -2619,7 +2702,7 @@ export abstract class HeapSnapshot {
 
   private calculateDiffForClass(
       baseAggregate: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff,
-      aggregate?: HeapSnapshotModel.HeapSnapshotModel.Aggregate): HeapSnapshotModel.HeapSnapshotModel.Diff|null {
+      aggregate?: HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo): HeapSnapshotModel.HeapSnapshotModel.Diff|null {
     const baseIds = baseAggregate.ids;
     const baseIndexes = baseAggregate.indexes;
     const baseSelfSizes = baseAggregate.selfSizes;
@@ -3942,12 +4025,4 @@ export class JSHeapSnapshotRetainerEdge extends HeapSnapshotRetainerEdge {
   isWeak(): boolean {
     return this.edge().isWeak();
   }
-}
-export interface AggregatedInfo {
-  count: number;
-  distance: number;
-  self: number;
-  maxRet: number;
-  name: string;
-  idxs: number[];
 }

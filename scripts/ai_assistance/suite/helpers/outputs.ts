@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
-import type {Conversation, EvalFileOutput} from '../types';
+import type {Conversation, EvalFileOutput} from '../types.js';
 
 const BASE_DIR = path.join(path.dirname(import.meta.filename), '..', 'outputs', 'outputs');
 
@@ -59,6 +59,15 @@ export async function getOutputs(type: string, label: string): Promise<Output[]>
       contents: JSON.parse(fs.readFileSync(absoluteFilePath, 'utf8')) as EvalFileOutput,
     };
   });
+}
+
+export async function getGolden(type: string, label: string): Promise<Conversation|null> {
+  const goldenPath = path.join(BASE_DIR, type, 'golden', `${label}.json`);
+  if (!fs.existsSync(goldenPath)) {
+    return null;
+  }
+  const contents = JSON.parse(fs.readFileSync(goldenPath, 'utf8')) as EvalFileOutput;
+  return contents.conversations[0] || null;
 }
 
 /**

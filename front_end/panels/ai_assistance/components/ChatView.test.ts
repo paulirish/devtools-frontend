@@ -2,20 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
-import {initializePersistenceImplForTests, setupAutomaticFileSystem} from '../../../testing/AiAssistanceHelpers.js';
+import {
+  cleanup,
+  initializePersistenceImplForTests,
+  setupAutomaticFileSystem
+} from '../../../testing/AiAssistanceHelpers.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import * as AiAssistancePanel from '../ai_assistance.js';
 
 describeWithEnvironment('ChatView', () => {
+  beforeEach(() => {
+    initializePersistenceImplForTests();
+    setupAutomaticFileSystem();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   function getProp(options: Partial<AiAssistancePanel.Props>): AiAssistancePanel.Props {
     const noop = () => {};
-    const messages: AiAssistancePanel.ChatMessage[] = options.messages ?? [];
-    const selectedContext = sinon.createStubInstance(AiAssistanceModel.NodeContext);
-    selectedContext.getTitle.returns('');
+    const messages = options.messages ?? [];
+    const context = sinon.createStubInstance(AiAssistanceModel.StylingAgent.NodeContext);
+    context.getTitle.returns('');
     return {
       onTextSubmit: noop,
       onInspectElementClick: noop,
@@ -24,46 +36,56 @@ describeWithEnvironment('ChatView', () => {
       onContextClick: noop,
       onCopyResponseClick: noop,
       onNewConversation: noop,
-      onTextInputChange: noop,
-      changeManager: new AiAssistanceModel.ChangeManager(),
+      onExportConversation: noop,
+      generateConversationSummary: async () => '',
+      conversationMarkdown: 'placeholder conversation markdown',
+      onContextRemoved: noop,
+      onContextAdd: noop,
+      changeManager: new AiAssistanceModel.ChangeManager.ChangeManager(),
       inspectElementToggled: false,
-      state: AiAssistancePanel.State.CHAT_VIEW,
-      conversationType: AiAssistanceModel.ConversationType.STYLING,
-      aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
+      conversationType: AiAssistanceModel.AiHistoryStorage.ConversationType.STYLING,
       messages,
-      selectedContext,
+      context,
+      isContextSelected: true,
       isLoading: false,
       canShowFeedbackForm: false,
-      userInfo: {},
       blockedByCrossOrigin: false,
       isReadOnly: false,
       isTextInputDisabled: false,
       emptyStateSuggestions: [],
       inputPlaceholder: i18n.i18n.lockedString('input placeholder'),
       disclaimerText: i18n.i18n.lockedString('disclaimer text'),
-      isTextInputEmpty: true,
       markdownRenderer: new AiAssistancePanel.MarkdownRendererWithCodeBlock(),
+      walkthrough: {
+        onToggle: () => {},
+        onOpen: () => {},
+        isInlined: false,
+        isExpanded: false,
+        activeSidebarMessage: null,
+        inlineExpandedMessages: [],
+      },
       ...options,
     };
   }
 
   describe('SideEffects', () => {
     it('should show SideEffects when the step contains "sideEffect" object', async () => {
-      initializePersistenceImplForTests();
-      setupAutomaticFileSystem();
-
       const props = getProp({
         messages: [
           {
-            entity: AiAssistancePanel.ChatMessageEntity.MODEL,
-            steps: [
+            entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
+            parts: [
               {
-                isLoading: false,
-                title: 'Updating element styles',
-                thought: 'Updating element styles',
-                code: '$0.style.background = "blue";',
-                sideEffect: {
-                  onAnswer: () => {},
+                type: 'step',
+                step: {
+                  isLoading: false,
+                  title: 'Updating element styles',
+                  thought: 'Updating element styles',
+                  code: '$0.style.background = "blue";',
+                  requestApproval: {
+                    description: null,
+                    onAnswer: () => {},
+                  },
                 },
               },
             ],
@@ -75,30 +97,6 @@ describeWithEnvironment('ChatView', () => {
 
       const sideEffect = chat.shadowRoot!.querySelector('.side-effect-confirmation');
       assert.exists(sideEffect);
-    });
-
-    it('shows the disabled view when the state is CONSENT_VIEW', async () => {
-      const props = getProp({
-        state: AiAssistancePanel.State.CONSENT_VIEW,
-      });
-      const chat = new AiAssistancePanel.ChatView(props);
-      renderElementIntoDOM(chat);
-
-      const optIn = chat.shadowRoot?.querySelector('.disabled-view');
-      assert.strictEqual(
-          optIn?.textContent?.trim(), 'Turn on AI assistance in Settings to get help with understanding CSS styles');
-    });
-
-    it('shows the disabled view when the AIDA is not available', async () => {
-      const props = getProp({
-        state: AiAssistancePanel.State.CHAT_VIEW,
-        aidaAvailability: Host.AidaClient.AidaAccessPreconditions.NO_INTERNET,
-      });
-      const chat = new AiAssistancePanel.ChatView(props);
-      renderElementIntoDOM(chat);
-
-      const optIn = chat.shadowRoot?.querySelector('.disabled-view');
-      assert.strictEqual(optIn?.textContent?.trim(), 'Check your internet connection and try again');
     });
   });
 });

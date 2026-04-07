@@ -8,7 +8,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Elements from './elements.js';
+import * as Elements from './elements.js';
 
 const UIStrings = {
   /**
@@ -110,9 +110,13 @@ const UIStrings = {
   /**
    * @description Title of a setting under the Elements category. Whether to show/hide code comments in HTML.
    */
+  htmlComments: 'HTML comments',
+  /**
+   * @description Title of an option under the Elements category that can be invoked through the Command Menu
+   */
   showHtmlComments: 'Show `HTML` comments',
   /**
-   * @description Title of a setting under the Elements category. Whether to show/hide code comments in HTML.
+   * @description Title of an option under the Elements category that can be invoked through the Command Menu
    */
   hideHtmlComments: 'Hide `HTML` comments',
   /**
@@ -126,12 +130,12 @@ const UIStrings = {
    * the inspect tooltip (an information pane that hovers next to selected DOM elements) has extra
    * detail.
    */
-  showDetailedInspectTooltip: 'Show detailed inspect tooltip',
+  detailedInspectTooltip: 'Detailed inspect tooltip',
   /**
    * @description Title of a setting under the Elements category in Settings. Turns on a mode where
    * hovering over CSS properties in the Styles pane will display a popover with documentation.
    */
-  showCSSDocumentationTooltip: 'Show CSS documentation tooltip',
+  CSSDocumentationTooltip: 'CSS documentation tooltip',
   /**
    * @description A context menu item (command) in the Elements panel that copy the styles of
    * the HTML element.
@@ -146,7 +150,7 @@ const UIStrings = {
    * @description Title of a setting under the Elements category. Whether to show/hide hide
    * the shadow DOM nodes of HTML elements that are built into the browser (e.g. the <input> element).
    */
-  showUserAgentShadowDOM: 'Show user agent shadow `DOM`',
+  userAgentShadowDOM: 'User agent shadow `DOM`',
   /**
    * @description Command for showing the 'Computed' tool. Displays computed CSS styles in Elements sidebar.
    */
@@ -238,7 +242,7 @@ UI.ViewManager.registerViewExtension({
 });
 
 UI.ViewManager.registerViewExtension({
-  experiment: Root.Runtime.ExperimentName.CAPTURE_NODE_CREATION_STACKS,
+  experiment: Root.ExperimentNames.ExperimentName.CAPTURE_NODE_CREATION_STACKS,
   location: UI.ViewManager.ViewLocationValues.ELEMENTS_SIDEBAR,
   id: 'elements.dom-creation',
   commandPrompt: i18nLazyString(UIStrings.showStackTrace),
@@ -363,6 +367,7 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'elements.toggle-a11y-tree',
   category: UI.ActionRegistration.ActionCategory.ELEMENTS,
   title: i18nLazyString(UIStrings.toggleA11yTree),
+  toggleable: true,
   async loadActionDelegate() {
     const Elements = await loadElementsModule();
     return new Elements.ElementsPanel.ElementsActionDelegate();
@@ -454,6 +459,7 @@ UI.ActionRegistration.registerActionExtension({
       platform: UI.ActionRegistration.Platforms.MAC,
     },
   ],
+  configurableBindings: false,
 });
 
 UI.ActionRegistration.registerActionExtension({
@@ -488,7 +494,7 @@ Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.ELEMENTS,
   storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 1,
-  title: i18nLazyString(UIStrings.showUserAgentShadowDOM),
+  title: i18nLazyString(UIStrings.userAgentShadowDOM),
   settingName: 'show-ua-shadow-dom',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: false,
@@ -527,7 +533,7 @@ Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.ELEMENTS,
   storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 3,
-  title: i18nLazyString(UIStrings.showHtmlComments),
+  title: i18nLazyString(UIStrings.htmlComments),
   settingName: 'show-html-comments',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: true,
@@ -557,7 +563,7 @@ Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.ELEMENTS,
   storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 5,
-  title: i18nLazyString(UIStrings.showDetailedInspectTooltip),
+  title: i18nLazyString(UIStrings.detailedInspectTooltip),
   settingName: 'show-detailed-inspect-tooltip',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: true,
@@ -580,7 +586,7 @@ Common.Settings.registerSettingExtension({
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.ELEMENTS,
   storageType: Common.Settings.SettingStorageType.SYNCED,
-  title: i18nLazyString(UIStrings.showCSSDocumentationTooltip),
+  title: i18nLazyString(UIStrings.CSSDocumentationTooltip),
   settingName: 'show-css-property-documentation-on-hover',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: true,
@@ -613,9 +619,8 @@ UI.ViewManager.registerLocationResolver({
 Common.Revealer.registerRevealer({
   contextTypes() {
     return [
-      SDK.DOMModel.DOMNode,
-      SDK.DOMModel.DeferredDOMNode,
-      SDK.RemoteObject.RemoteObject,
+      SDK.DOMModel.DOMNode, SDK.DOMModel.DeferredDOMNode, SDK.RemoteObject.RemoteObject, SDK.DOMModel.AdoptedStyleSheet,
+      Elements.ElementsPanel.NodeComputedStyles
     ];
   },
   destination: Common.Revealer.RevealerDestination.ELEMENTS_PANEL,
@@ -687,18 +692,5 @@ UI.UIUtils.registerRenderer({
   async loadRenderer() {
     const Elements = await loadElementsModule();
     return Elements.ElementsTreeOutlineRenderer.Renderer.instance();
-  },
-});
-
-Common.Linkifier.registerLinkifier({
-  contextTypes() {
-    return [
-      SDK.DOMModel.DOMNode,
-      SDK.DOMModel.DeferredDOMNode,
-    ];
-  },
-  async loadLinkifier() {
-    const Elements = await loadElementsModule();
-    return Elements.DOMLinkifier.Linkifier.instance();
   },
 });

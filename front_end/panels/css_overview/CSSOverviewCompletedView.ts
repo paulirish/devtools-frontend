@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import '../../ui/legacy/components/data_grid/data_grid.js';
-import '../../ui/components/icon_button/icon_button.js';
+import '../../ui/kit/kit.js';
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -17,6 +17,7 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, type LitTemplate, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as PanelsCommon from '../common/common.js';
 
 import cssOverviewCompletedViewStyles from './cssOverviewCompletedView.css.js';
 import type {GlobalStyleStats} from './CSSOverviewModel.js';
@@ -24,7 +25,7 @@ import {CSSOverviewSidebarPanel} from './CSSOverviewSidebarPanel.js';
 import type {UnusedDeclaration} from './CSSOverviewUnusedDeclarations.js';
 
 const {styleMap, ref} = Directives;
-const {widgetConfig} = UI.Widget;
+const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
@@ -280,7 +281,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
   render(html`
       <style>${cssOverviewCompletedViewStyles}</style>
       <devtools-split-view direction="column" sidebar-position="first" sidebar-initial-size="200">
-        <devtools-widget slot="sidebar" .widgetConfig=${widgetConfig(CSSOverviewSidebarPanel, {
+        <devtools-widget slot="sidebar" ${widget(CSSOverviewSidebarPanel, {
           minimumSize: new Geometry.Size(100, 25),
           items: [
             {name: i18nString(UIStrings.overviewSummary), id: 'summary'},
@@ -324,7 +325,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               ${renderMediaQueries(input.mediaQueries)}
             </div>
           </div>
-          <devtools-widget slot="sidebar" .widgetConfig=${widgetConfig(e => {
+          <devtools-widget slot="sidebar" ${widget(e => {
               const tabbedPane = new UI.TabbedPane.TabbedPane(e);
               output.closeAllTabs = () => { tabbedPane.closeTabs(tabbedPane.tabIds()); };
               output.addTab = (id: string, tabTitle: string, view: UI.Widget.Widget, jslogContext: string) => {
@@ -482,7 +483,7 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
   const color = (minContrastIssue.textColor.asString(Common.Color.Format.HEXA));
   const backgroundColor = (minContrastIssue.backgroundColor.asString(Common.Color.Format.HEXA));
 
-  const showAPCA = Root.Runtime.experiments.isEnabled('apca');
+  const showAPCA = Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.APCA);
 
   const title = i18nString(UIStrings.textColorSOverSBackgroundResults, {
     PH1: color,
@@ -502,7 +503,7 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
     </button>
     <div class="block-title">
       ${showAPCA ? html`
-        <div class="contrast-warning hidden" $="apca">
+        <div class="contrast-warning hidden">
           <span class="threshold-label">${i18nString(UIStrings.apca)}</span>
           ${minContrastIssue.thresholdsViolated.apca ? createClearIcon() : createCheckIcon()}
         </div>` : html`
@@ -510,7 +511,7 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
           <span class="threshold-label">${i18nString(UIStrings.aa)}</span>
           ${minContrastIssue.thresholdsViolated.aa ? createClearIcon() : createCheckIcon()}
         </div>
-        <div class="contrast-warning hidden" $="aaa">
+        <div class="contrast-warning hidden">
           <span class="threshold-label">${i18nString(UIStrings.aaa)}</span>
           ${minContrastIssue.thresholdsViolated.aaa ? createClearIcon() : createCheckIcon()}
         </div>`}
@@ -880,7 +881,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
 interface ElementDetailsViewInput {
   items: Array<{
     data: PopulateNodesEventNodeTypes,
-    link?: HTMLElement,
+    link?: LitTemplate,
     showNode?: () => void,
   }>;
   visibility: Set<string>;
@@ -984,7 +985,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
       if ('nodeId' in item && visibility.has('node-id')) {
         const frontendNode = relatedNodesMap?.get(item.nodeId) ?? null;
         if (frontendNode) {
-          link = await Common.Linkifier.Linkifier.linkify(frontendNode) as HTMLElement;
+          link = PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(frontendNode);
           showNode = () => frontendNode.scrollIntoView();
         }
       }
@@ -995,18 +996,18 @@ export class ElementDetailsView extends UI.Widget.Widget {
           const lineNumber = styleSheetHeader.lineNumberInSource(ruleLocation.startLine);
           const columnNumber = styleSheetHeader.columnNumberInSource(ruleLocation.startLine, ruleLocation.startColumn);
           const matchingSelectorLocation = new SDK.CSSModel.CSSLocation(styleSheetHeader, lineNumber, columnNumber);
-          link = this.#linkifier.linkifyCSSLocation(matchingSelectorLocation) as HTMLElement;
+          link = html`${this.#linkifier.linkifyCSSLocation(matchingSelectorLocation)}`;
         }
       }
 
-      return {data: item, link, showNode};
+      return {data: item, link: link as LitTemplate | undefined, showNode};
     }));
 
     this.#view({items, visibility}, {}, this.element);
   }
 }
 
-function renderNode(data: PopulateNodesEventNodeTypes, link?: HTMLElement, showNode?: () => void): LitTemplate {
+function renderNode(data: PopulateNodesEventNodeTypes, link?: LitTemplate, showNode?: () => void): LitTemplate {
   if (!link) {
     return nothing;
   }
@@ -1026,7 +1027,7 @@ function renderDeclaration(data: PopulateNodesEventNodeTypes): TemplateResult {
   return html`<td>${data.declaration}</td>`;
 }
 
-function renderSourceURL(data: PopulateNodesEventNodeTypes, link?: HTMLElement): TemplateResult {
+function renderSourceURL(data: PopulateNodesEventNodeTypes, link?: LitTemplate): TemplateResult {
   if ('range' in data && data.range) {
     if (!link) {
       return html`<td>${i18nString(UIStrings.unableToLink)}</td>`;
@@ -1040,7 +1041,7 @@ function renderContrastRatio(data: PopulateNodesEventNodeTypes): TemplateResult 
   if (!('contrastRatio' in data)) {
     throw new Error('Contrast ratio entry is missing a contrast ratio.');
   }
-  const showAPCA = Root.Runtime.experiments.isEnabled('apca');
+  const showAPCA = Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.APCA);
   const contrastRatio = Platform.NumberUtilities.floor(data.contrastRatio, 2);
   const contrastRatioString = showAPCA ? contrastRatio + '%' : contrastRatio;
   const border = getBorderString(data.backgroundColor);
@@ -1073,5 +1074,5 @@ function createClearIcon(): TemplateResult {
 function createCheckIcon(): TemplateResult {
   return html`
     <devtools-icon name="checkmark" class="small"
-        style="color:var(--icon-checkmark-green);></devtools-icon>`;
+        style="color:var(--icon-checkmark-green);"></devtools-icon>`;
 }

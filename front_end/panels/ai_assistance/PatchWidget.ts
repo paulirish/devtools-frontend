@@ -1,11 +1,11 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../ui/legacy/legacy.js';
 import '../../ui/components/markdown_view/markdown_view.js';
 import '../../ui/components/spinners/spinners.js';
+import '../../ui/kit/kit.js';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -13,6 +13,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
+import * as GreenDev from '../../models/greendev/greendev.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
@@ -124,6 +125,7 @@ const UIStringsNotTranslate = {
 const lockedString = i18n.i18n.lockedString;
 
 const CODE_SNIPPET_WARNING_URL = 'https://support.google.com/legal/answer/13505487';
+const {widget} = UI.Widget;
 
 export enum PatchSuggestionState {
   /**
@@ -187,10 +189,240 @@ export interface ViewOutput {
 }
 
 type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+const DEFAULT_VIEW: View = (input, output, target) => {
+  if (!input.changeSummary && input.patchSuggestionState === PatchSuggestionState.INITIAL) {
+    return;
+  }
+
+  output.changeRef = output.changeRef ?? Directives.createRef<HTMLElement>();
+  output.summaryRef = output.summaryRef ?? Directives.createRef<HTMLElement>();
+
+  function renderSourcesLink(): LitTemplate {
+    if (!input.sources) {
+      return nothing;
+    }
+
+    return html`<devtools-link
+          class="link"
+          title="${UIStringsNotTranslate.viewUploadedFiles} ${UIStringsNotTranslate.opensInNewTab}"
+          href="data:text/plain;charset=utf-8,${encodeURIComponent(input.sources)}"
+          jslogcontext="files-used-in-patching">
+          ${UIStringsNotTranslate.viewUploadedFiles}
+        </devtools-link>`;
+  }
+
+  function renderHeader(): LitTemplate {
+    if (input.savedToDisk) {
+      return html`
+            <devtools-icon class="green-bright-icon summary-badge" name="check-circle"></devtools-icon>
+            <span class="header-text">
+              ${lockedString(UIStringsNotTranslate.savedToDisk)}
+            </span>
+          `;
+    }
+
+    if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
+      return html`
+            <devtools-icon class="on-tonal-icon summary-badge" name="difference"></devtools-icon>
+            <span class="header-text">
+              ${lockedString(`File changes in ${input.projectName}`)}
+            </span>
+            <devtools-icon
+              class="arrow"
+              name="chevron-down"
+            ></devtools-icon>
+          `;
+    }
+
+    return html`
+          <devtools-icon class="on-tonal-icon summary-badge" name="pen-spark"></devtools-icon>
+          <span class="header-text">
+            ${lockedString(UIStringsNotTranslate.unsavedChanges)}
+          </span>
+          <devtools-icon
+            class="arrow"
+            name="chevron-down"
+          ></devtools-icon>
+        `;
+  }
+
+  function renderContent(): LitTemplate {
+    if ((!input.changeSummary && input.patchSuggestionState === PatchSuggestionState.INITIAL) || input.savedToDisk) {
+      return nothing;
+    }
+
+    if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
+      return html`${widget(ChangesPanel.CombinedDiffView.CombinedDiffView, {
+        workspaceDiff: input.workspaceDiff,
+        // Ignore user creates inspector-stylesheets
+        ignoredUrls: ['inspector://']
+      })}`;
+    }
+
+    return html`<devtools-code-block
+          .code=${input.changeSummary ?? ''}
+          .codeLang=${'css'}
+          .displayNotice=${true}
+        ></devtools-code-block>
+        ${
+        input.patchSuggestionState === PatchSuggestionState.ERROR ?
+            html`<div class="error-container">
+              <devtools-icon name="cross-circle-filled"></devtools-icon>${
+                lockedString(UIStringsNotTranslate.genericErrorMessage)} ${renderSourcesLink()}
+            </div>` :
+            nothing}`;
+  }
+
+  function renderCopyPrompt(changedCode?: string): LitTemplate {
+    if (!GreenDev.Prototypes.instance().isEnabled('copyToGemini') || !changedCode) {
+      return nothing;
+    }
+
+    // clang-format off
+    return html`<devtools-widget class="copy-to-prompt"
+      ${widget(PanelCommon.CopyChangesToPrompt, {
+        workspaceDiff: input.workspaceDiff,
+        patchAgentCSSChange: changedCode,
+      })}></devtools-widget>`;
+    // clang-format on
+  }
+
+  function renderFooter(): LitTemplate {
+    if (input.savedToDisk) {
+      return nothing;
+    }
+
+    if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
+      return html`
+          <div class="footer">
+            <div class="left-side">
+              <devtools-link class="link disclaimer-link" href="https://support.google.com/legal/answer/13505487" jslogcontext="code-disclaimer">
+                ${lockedString(UIStringsNotTranslate.codeDisclaimer)}
+              </devtools-link>
+              ${renderSourcesLink()}
+            </div>
+            <div class="save-or-discard-buttons">
+              <devtools-button
+                @click=${input.onDiscard}
+                .jslogContext=${'patch-widget.discard'}
+                .variant=${Buttons.Button.Variant.OUTLINED}>
+                  ${lockedString(UIStringsNotTranslate.discard)}
+              </devtools-button>
+              <devtools-button
+                @click=${input.onSaveAll}
+                .jslogContext=${'patch-widget.save-all'}
+                .variant=${Buttons.Button.Variant.PRIMARY}>
+                  ${lockedString(UIStringsNotTranslate.saveAll)}
+              </devtools-button>
+            </div>
+          </div>
+          `;
+    }
+
+    const iconName = input.projectType === SelectedProjectType.AUTOMATIC_DISCONNECTED ? 'folder-off' :
+        input.projectType === SelectedProjectType.AUTOMATIC_CONNECTED                 ? 'folder-asterisk' :
+                                                                                        'folder';
+    return html`
+        <div class="footer">
+          ${
+        input.projectName ? html`
+            <div class="change-workspace" jslog=${VisualLogging.section('patch-widget.workspace')}>
+                <devtools-icon .name=${iconName}></devtools-icon>
+                <span class="folder-name" title=${input.projectPath}>${input.projectName}</span>
+              ${
+                                input.onChangeWorkspaceClick ? html`
+                <devtools-button
+                  @click=${input.onChangeWorkspaceClick}
+                  .jslogContext=${'change-workspace'}
+                  .variant=${Buttons.Button.Variant.TEXT}
+                  .title=${lockedString(UIStringsNotTranslate.changeRootFolder)}
+                  .disabled=${input.patchSuggestionState === PatchSuggestionState.LOADING}
+                  ${Directives.ref(output.changeRef)}
+                >${lockedString(UIStringsNotTranslate.change)}</devtools-button>
+              ` :
+                                                               nothing}
+            </div>
+          ` :
+                            nothing}
+          <div class="apply-to-workspace-container" aria-live="polite">
+            ${
+        input.patchSuggestionState === PatchSuggestionState.LOADING ?
+            html`
+              <div class="loading-text-container" jslog=${
+                VisualLogging.section('patch-widget.apply-to-workspace-loading')}>
+                <devtools-spinner></devtools-spinner>
+                <span>
+                  ${lockedString(UIStringsNotTranslate.applyingToWorkspace)}
+                </span>
+              </div>
+            ` :
+            html`
+               ${renderCopyPrompt(input.changeSummary)}
+                <devtools-button
+                @click=${input.onApplyToWorkspace}
+                .jslogContext=${'patch-widget.apply-to-workspace'}
+                .variant=${Buttons.Button.Variant.OUTLINED}>
+                ${lockedString(UIStringsNotTranslate.applyToWorkspace)}
+              </devtools-button>
+            `}
+            ${
+        input.patchSuggestionState === PatchSuggestionState.LOADING ? html`<devtools-button
+              @click=${input.onCancel}
+              .jslogContext=${'cancel'}
+              .variant=${Buttons.Button.Variant.OUTLINED}>
+              ${lockedString(UIStringsNotTranslate.cancel)}
+            </devtools-button>` :
+                                                                      nothing}
+            <devtools-button
+              aria-details="info-tooltip"
+              .jslogContext=${'patch-widget.info-tooltip-trigger'}
+              .iconName=${'info'}
+              .variant=${Buttons.Button.Variant.ICON}
+            ></devtools-button>
+            <devtools-tooltip
+                id="info-tooltip"
+                variant="rich"
+              >
+             <div class="info-tooltip-container">
+               ${input.applyToWorkspaceTooltipText}
+               <button
+                 class="link tooltip-link"
+                 role="link"
+                 jslog=${VisualLogging.link('open-ai-settings').track({
+      click: true,
+    })}
+                 @click=${input.onLearnMoreTooltipClick}
+               >${lockedString(UIStringsNotTranslate.learnMore)}</button>
+             </div>
+            </devtools-tooltip>
+          </div>
+        </div>`;
+  }
+
+  // Use a simple div for the "Saved to disk" state as it's not expandable,
+  // otherwise use the interactive <details> element.
+  const template = input.savedToDisk ? html`
+          <div class="change-summary saved-to-disk" role="status" aria-live="polite">
+            <div class="header-container">
+             ${renderHeader()}
+             </div>
+          </div>` :
+                                       html`
+          <details class="change-summary" jslog=${VisualLogging.section('patch-widget')}>
+            <summary class="header-container" ${Directives.ref(output.summaryRef)}>
+              ${renderHeader()}
+            </summary>
+            ${renderContent()}
+            ${renderFooter()}
+          </details>
+        `;
+
+  render(template, target);
+};
 
 export class PatchWidget extends UI.Widget.Widget {
   changeSummary = '';
-  changeManager: AiAssistanceModel.ChangeManager|undefined;
+  changeManager: AiAssistanceModel.ChangeManager.ChangeManager|undefined;
   // Whether the user completed first run experience dialog or not.
   #aiPatchingFreCompletedSetting =
       Common.Settings.Settings.instance().createSetting('ai-assistance-patching-fre-completed', false);
@@ -213,224 +445,15 @@ export class PatchWidget extends UI.Widget.Widget {
   // `rpcId` from the `applyPatch` request
   #rpcId: Host.AidaClient.RpcGlobalId|null = null;
 
-  constructor(element?: HTMLElement, view?: View, opts?: {
+  constructor(element?: HTMLElement, view = DEFAULT_VIEW, opts?: {
     aidaClient: Host.AidaClient.AidaClient,
   }) {
     super(element);
     this.#aidaClient = opts?.aidaClient ?? new Host.AidaClient.AidaClient();
     this.#noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
+    this.#view = view;
 
-    // clang-format off
-    this.#view = view ?? ((input, output, target) => {
-      if (!input.changeSummary && input.patchSuggestionState === PatchSuggestionState.INITIAL) {
-        return;
-      }
-
-      output.changeRef = output.changeRef ?? Directives.createRef<HTMLElement>();
-      output.summaryRef = output.summaryRef ?? Directives.createRef<HTMLElement>();
-
-      function renderSourcesLink(): LitTemplate {
-        if (!input.sources) {
-          return nothing;
-        }
-
-        return html`<x-link
-          class="link"
-          title="${UIStringsNotTranslate.viewUploadedFiles} ${UIStringsNotTranslate.opensInNewTab}"
-          href="data:text/plain;charset=utf-8,${encodeURIComponent(input.sources)}"
-          jslog=${VisualLogging.link('files-used-in-patching').track({click: true})}>
-          ${UIStringsNotTranslate.viewUploadedFiles}
-        </x-link>`;
-      }
-
-      function renderHeader(): LitTemplate {
-        if (input.savedToDisk) {
-          return html`
-            <devtools-icon class="green-bright-icon summary-badge" name="check-circle"></devtools-icon>
-            <span class="header-text">
-              ${lockedString(UIStringsNotTranslate.savedToDisk)}
-            </span>
-          `;
-        }
-
-        if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
-          return html`
-            <devtools-icon class="on-tonal-icon summary-badge" name="difference"></devtools-icon>
-            <span class="header-text">
-              ${lockedString(`File changes in ${input.projectName}`)}
-            </span>
-            <devtools-icon
-              class="arrow"
-              name="chevron-down"
-            ></devtools-icon>
-          `;
-        }
-
-        return html`
-          <devtools-icon class="on-tonal-icon summary-badge" name="pen-spark"></devtools-icon>
-          <span class="header-text">
-            ${lockedString(UIStringsNotTranslate.unsavedChanges)}
-          </span>
-          <devtools-icon
-            class="arrow"
-            name="chevron-down"
-          ></devtools-icon>
-        `;
-      }
-
-      function renderContent(): LitTemplate {
-        if ((!input.changeSummary && input.patchSuggestionState === PatchSuggestionState.INITIAL) || input.savedToDisk) {
-          return nothing;
-        }
-
-        if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
-          return html`<devtools-widget .widgetConfig=${UI.Widget.widgetConfig(ChangesPanel.CombinedDiffView.CombinedDiffView, {
-            workspaceDiff: input.workspaceDiff,
-            // Ignore user creates inspector-stylesheets
-            ignoredUrls: ['inspector://']
-          })}></devtools-widget>`;
-        }
-
-        return html`<devtools-code-block
-          .code=${input.changeSummary ?? ''}
-          .codeLang=${'css'}
-          .displayNotice=${true}
-        ></devtools-code-block>
-        ${input.patchSuggestionState === PatchSuggestionState.ERROR
-          ? html`<div class="error-container">
-              <devtools-icon name="cross-circle-filled"></devtools-icon>${
-              lockedString(UIStringsNotTranslate.genericErrorMessage)
-              } ${renderSourcesLink()}
-            </div>`
-          : nothing
-        }`;
-      }
-
-      function renderFooter(): LitTemplate {
-        if (input.savedToDisk) {
-          return nothing;
-        }
-
-        if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
-          return html`
-          <div class="footer">
-            <div class="left-side">
-              <x-link class="link disclaimer-link" href="https://support.google.com/legal/answer/13505487" jslog=${
-                VisualLogging.link('code-disclaimer').track({
-                  click: true,
-                })}>
-                ${lockedString(UIStringsNotTranslate.codeDisclaimer)}
-              </x-link>
-              ${renderSourcesLink()}
-            </div>
-            <div class="save-or-discard-buttons">
-              <devtools-button
-                @click=${input.onDiscard}
-                .jslogContext=${'patch-widget.discard'}
-                .variant=${Buttons.Button.Variant.OUTLINED}>
-                  ${lockedString(UIStringsNotTranslate.discard)}
-              </devtools-button>
-              <devtools-button
-                @click=${input.onSaveAll}
-                .jslogContext=${'patch-widget.save-all'}
-                .variant=${Buttons.Button.Variant.PRIMARY}>
-                  ${lockedString(UIStringsNotTranslate.saveAll)}
-              </devtools-button>
-            </div>
-          </div>
-          `;
-        }
-
-        const iconName = input.projectType === SelectedProjectType.AUTOMATIC_DISCONNECTED ? 'folder-off' : input.projectType === SelectedProjectType.AUTOMATIC_CONNECTED ? 'folder-asterisk' : 'folder';
-        return html`
-        <div class="footer">
-          ${input.projectName ? html`
-            <div class="change-workspace" jslog=${VisualLogging.section('patch-widget.workspace')}>
-                <devtools-icon .name=${iconName}></devtools-icon>
-                <span class="folder-name" title=${input.projectPath}>${input.projectName}</span>
-              ${input.onChangeWorkspaceClick ? html`
-                <devtools-button
-                  @click=${input.onChangeWorkspaceClick}
-                  .jslogContext=${'change-workspace'}
-                  .variant=${Buttons.Button.Variant.TEXT}
-                  .title=${lockedString(UIStringsNotTranslate.changeRootFolder)}
-                  .disabled=${input.patchSuggestionState === PatchSuggestionState.LOADING}
-                  ${Directives.ref(output.changeRef)}
-                >${lockedString(UIStringsNotTranslate.change)}</devtools-button>
-              ` : nothing}
-            </div>
-          ` : nothing}
-          <div class="apply-to-workspace-container" aria-live="polite">
-            ${input.patchSuggestionState === PatchSuggestionState.LOADING ? html`
-              <div class="loading-text-container" jslog=${VisualLogging.section('patch-widget.apply-to-workspace-loading')}>
-                <devtools-spinner></devtools-spinner>
-                <span>
-                  ${lockedString(UIStringsNotTranslate.applyingToWorkspace)}
-                </span>
-              </div>
-            ` : html`
-                <devtools-button
-                @click=${input.onApplyToWorkspace}
-                .jslogContext=${'patch-widget.apply-to-workspace'}
-                .variant=${Buttons.Button.Variant.OUTLINED}>
-                ${lockedString(UIStringsNotTranslate.applyToWorkspace)}
-              </devtools-button>
-            `}
-            ${input.patchSuggestionState === PatchSuggestionState.LOADING ? html`<devtools-button
-              @click=${input.onCancel}
-              .jslogContext=${'cancel'}
-              .variant=${Buttons.Button.Variant.OUTLINED}>
-              ${lockedString(UIStringsNotTranslate.cancel)}
-            </devtools-button>` : nothing}
-            <devtools-button
-              aria-details="info-tooltip"
-              .jslogContext=${'patch-widget.info-tooltip-trigger'}
-              .iconName=${'info'}
-              .variant=${Buttons.Button.Variant.ICON}
-            ></devtools-button>
-            <devtools-tooltip
-                id="info-tooltip"
-                variant=${'rich'}
-              >
-             <div class="info-tooltip-container">
-               ${input.applyToWorkspaceTooltipText}
-               <button
-                 class="link tooltip-link"
-                 role="link"
-                 jslog=${VisualLogging.link('open-ai-settings').track({
-                   click: true,
-                 })}
-                 @click=${input.onLearnMoreTooltipClick}
-               >${lockedString(UIStringsNotTranslate.learnMore)}</button>
-             </div>
-            </devtools-tooltip>
-          </div>
-        </div>`;
-      }
-
-      // Use a simple div for the "Saved to disk" state as it's not expandable,
-      // otherwise use the interactive <details> element.
-      const template = input.savedToDisk
-        ? html`
-          <div class="change-summary saved-to-disk" role="status" aria-live="polite">
-            <div class="header-container">
-             ${renderHeader()}
-             </div>
-          </div>`
-        : html`
-          <details class="change-summary" jslog=${VisualLogging.section('patch-widget')}>
-            <summary class="header-container" ${Directives.ref(output.summaryRef)}>
-              ${renderHeader()}
-            </summary>
-            ${renderContent()}
-            ${renderFooter()}
-          </details>
-        `;
-
-      render(template, target, {host: target});
-    });
-    // clang-format on
     this.requestUpdate();
   }
 
@@ -519,6 +542,7 @@ export class PatchWidget extends UI.Widget.Widget {
   }
 
   override willHide(): void {
+    super.willHide();
     this.#applyToDisconnectedAutomaticWorkspace = false;
     if (isAiAssistancePatchingEnabled()) {
       this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectAdded, this.#onProjectAdded, this);
@@ -532,8 +556,9 @@ export class PatchWidget extends UI.Widget.Widget {
       return true;
     }
 
+    const iconName = AiAssistanceModel.AiUtils.getIconName();
     const result = await PanelCommon.FreDialog.show({
-      header: {iconName: 'smart-assistant', text: lockedString(UIStringsNotTranslate.freDisclaimerHeader)},
+      header: {iconName, text: lockedString(UIStringsNotTranslate.freDisclaimerHeader)},
       reminderItems: [
         {
           iconName: 'psychiatry',
@@ -547,13 +572,11 @@ export class PatchWidget extends UI.Widget.Widget {
         {
           iconName: 'warning',
           // clang-format off
-          content: html`<x-link
+          content: html`<devtools-link
             href=${CODE_SNIPPET_WARNING_URL}
             class="link devtools-link"
-            jslog=${VisualLogging.link('code-snippets-explainer.patch-widget').track({
-              click: true
-            })}
-          >${lockedString(UIStringsNotTranslate.freDisclaimerTextUseWithCaution)}</x-link>`,
+            jslogcontext="code-snippets-explainer.patch-widget"
+          >${lockedString(UIStringsNotTranslate.freDisclaimerTextUseWithCaution)}</devtools-link>`,
           // clang-format on
         }
       ],
@@ -681,11 +704,11 @@ export class PatchWidget extends UI.Widget.Widget {
     // user already had other modified files, the widget will still transition to the
     // success state (displaying all current workspace modifications).
     const hasChanges = this.#modifiedFiles.length > 0;
-    if (response?.type === AiAssistanceModel.ResponseType.ANSWER && hasChanges) {
+    if (response?.type === AiAssistanceModel.AiAgent.ResponseType.ANSWER && hasChanges) {
       this.#patchSuggestionState = PatchSuggestionState.SUCCESS;
     } else if (
-        response?.type === AiAssistanceModel.ResponseType.ERROR &&
-        response.error === AiAssistanceModel.ErrorType.ABORT) {
+        response?.type === AiAssistanceModel.AiAgent.ResponseType.ERROR &&
+        response.error === AiAssistanceModel.AiAgent.ErrorType.ABORT) {
       // If this is an abort error, we're returning back to the initial state.
       this.#patchSuggestionState = PatchSuggestionState.INITIAL;
     } else {
@@ -748,14 +771,14 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
   }
 
   async #applyPatch(changeSummary: string): Promise<{
-    response: AiAssistanceModel.ResponseData | undefined,
+    response: AiAssistanceModel.AiAgent.ResponseData | undefined,
     processedFiles: string[],
   }> {
     if (!this.#project) {
       throw new Error('Project does not exist');
     }
     this.#applyPatchAbortController = new AbortController();
-    const agent = new AiAssistanceModel.PatchAgent({
+    const agent = new AiAssistanceModel.PatchAgent.PatchAgent({
       aidaClient: this.#aidaClient,
       serverSideLoggingEnabled: false,
       project: this.#project,
@@ -798,7 +821,7 @@ window.aiAssistanceTestPatchPrompt =
     throw new Error('project not found');
   }
   const aidaClient = new Host.AidaClient.AidaClient();
-  const agent = new AiAssistanceModel.PatchAgent({
+  const agent = new AiAssistanceModel.PatchAgent.PatchAgent({
     aidaClient,
     serverSideLoggingEnabled: false,
     project,
@@ -806,7 +829,7 @@ window.aiAssistanceTestPatchPrompt =
   try {
     const assertionFailures = [];
     const {processedFiles, responses} = await agent.applyChanges(changeSummary);
-    if (responses.at(-1)?.type === AiAssistanceModel.ResponseType.ERROR) {
+    if (responses.at(-1)?.type === AiAssistanceModel.AiAgent.ResponseType.ERROR) {
       return {
         error: 'failed to patch',
         debugInfo: {

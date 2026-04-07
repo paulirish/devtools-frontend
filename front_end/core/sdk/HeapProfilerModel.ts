@@ -13,18 +13,16 @@ import {SDKModel} from './SDKModel.js';
 import {Capability, type Target} from './Target.js';
 
 export class HeapProfilerModel extends SDKModel<EventTypes> {
-  #enabled: boolean;
+  #enabled = false;
   readonly #heapProfilerAgent: ProtocolProxyApi.HeapProfilerApi;
   readonly #runtimeModel: RuntimeModel;
-  #samplingProfilerDepth: number;
+  #samplingProfilerDepth = 0;
 
   constructor(target: Target) {
     super(target);
     target.registerHeapProfilerDispatcher(new HeapProfilerDispatcher(this));
-    this.#enabled = false;
     this.#heapProfilerAgent = target.heapProfilerAgent();
     this.#runtimeModel = (target.model(RuntimeModel) as RuntimeModel);
-    this.#samplingProfilerDepth = 0;
   }
 
   debuggerModel(): DebuggerModel {
@@ -106,7 +104,12 @@ export class HeapProfilerModel extends SDKModel<EventTypes> {
   }
 
   async takeHeapSnapshot(heapSnapshotOptions: Protocol.HeapProfiler.TakeHeapSnapshotRequest): Promise<void> {
-    await this.#heapProfilerAgent.invoke_takeHeapSnapshot(heapSnapshotOptions);
+    await this.target().targetManager().suspendAllTargets('heap-snapshot');
+    try {
+      await this.#heapProfilerAgent.invoke_takeHeapSnapshot(heapSnapshotOptions);
+    } finally {
+      await this.target().targetManager().resumeAllTargets();
+    }
   }
 
   async startTrackingHeapObjects(recordAllocationStacks: boolean): Promise<boolean> {

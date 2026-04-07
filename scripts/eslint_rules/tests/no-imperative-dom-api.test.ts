@@ -16,9 +16,51 @@ new RuleTester().run('no-imperative-dom-api', rule, {
           }
       }`,
     },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+        const el = document.createElement('div');
+        el.appendChild();
+      `,
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+        const el = document.createElement('div');
+        el.setAttribute();
+      `,
+    },
   ],
 
   invalid: [
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(document.createElement('br'));
+    this.contentElement.appendChild(document.createElement('hr'));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <br>
+      <hr>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
     {
       filename: 'front_end/ui/components/component/file.ts',
       code: `class SomeWidget extends UI.Widget.Widget {
@@ -508,7 +550,7 @@ export const DEFAULT_VIEW = (input, _output, target) => {
       <a href="https://www.google.com" data-some-key="some-value" role="some-role">some-text</a>
       <img src="https://www.google.com/some-image.png" alt="some-alt" draggable="true" height="100"
           hidden="hidden" href="https://www.google.com" id="some-id" name="some-name" rel="some-rel"
-          scope="some-scope"></img>
+          scope="some-scope">
       <input type="text" placeholder="some-placeholder" value="some-value"
           ?disabled=\${!this.enabled} checked>
     </div>\`,
@@ -729,9 +771,12 @@ class SomeWidget extends UI.Widget.Widget {
 class SomeWidget extends UI.Widget.Widget {
   constructor() {
     super();
-    const icon = new IconButton.Icon.Icon();
-    icon.data = {iconName: 'checkmark', color: 'var(--icon-checkmark-green)', width: '14px', height: '14px'};
+    const icon = createIcon('checkmark');
+    icon.data = {color: 'var(--icon-checkmark-green)', width: '14px', height: '14px'};
     this.contentElement.appendChild(icon);
+    const icon2 = new Icon();
+    icon2.name = 'cross-circle-filled';
+    this.contentElement.appendChild(icon2);
   }
 }`,
       output: `
@@ -741,6 +786,7 @@ export const DEFAULT_VIEW = (input, _output, target) => {
     <div>
       <devtools-icon name="checkmark"
           style="color:var(--icon-checkmark-green); width:14px; height:14px"></devtools-icon>
+      <devtools-icon name="cross-circle-filled"></devtools-icon>
     </div>\`,
     target, {host: input});
 };
@@ -790,6 +836,40 @@ export const DEFAULT_VIEW = (input, _output, target) => {
             \${bindToSetting(this.someSetting)}>\${i18nString(UIStrings.alternateToolbarTitle)}</devtools-checkbox>
         <devtools-checkbox \${bindToSetting(this.someOtherSetting)}>\${this.someOtherSetting.title()}</devtools-checkbox>
       </devtools-toolbar>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(UI.UIUtils.createIconLabel({
+        iconName: 'checkmark',
+        color: 'var(--icon-checkmark-green)',
+        width: '14px',
+        height: '14px',
+        title: 'some-title',
+    }));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-icon name="checkmark"
+          style="color:var(--icon-checkmark-green); width:14px; height:14px"></devtools-icon>
+      <span>some-title</span>
     </div>\`,
     target, {host: input});
 };
@@ -1155,72 +1235,7 @@ class SomeWidget extends UI.Widget.Widget {
 }`,
       errors: [{messageId: 'preferTemplateLiterals'}],
     },
-    {
-      filename: 'front_end/ui/components/component/file.ts',
-      code: `
-class SomeWidget extends UI.Widget.Widget {
-  constructor() {
-    super();
-    const contrastFragment = UI.Fragment.Fragment.build\`
-      <div class="contrast-container-in-grid" $="contrast-container-element">
-        <span class="contrast-preview">Aa</span>
-        <span>\${contrastRatioString}</span>
-      </div>\`;
-    this.contentElement.appendChild(contrastFragment.element());
-  }
-}`,
-      output: `
 
-export const DEFAULT_VIEW = (input, output, target) => {
-  render(html\`
-    <div>
-      <div class="contrast-container-in-grid" \${ref(e => { output.contrastContainerElement = e; })}>
-        <span class="contrast-preview">Aa</span>
-        <span>\${contrastRatioString}</span>
-      </div>
-    </div>\`,
-    target, {host: input});
-};
-
-class SomeWidget extends UI.Widget.Widget {
-  constructor() {
-    super();
-  }
-}`,
-      errors: [{messageId: 'preferTemplateLiterals'}],
-    },
-    {
-      filename: 'front_end/ui/components/component/file.ts',
-      code: `
-class SomeWidget extends UI.Widget.Widget {
-  constructor() {
-    super();
-    const contrastFragment = UI.Fragment.Fragment.build\`
-      <div class="contrast-container-in-grid" $="contrast-container-element">
-        <span class="contrast-preview">Aa</span>
-        <span>\${contrastRatioString}</span>
-      </div>\`;
-    const container = contrastFragment.$('contrast-container-element');
-    container.createChild('span', 'contrast-preview').textContent = 'Aa';
-  }
-}`,
-      output: `
-class SomeWidget extends UI.Widget.Widget {
-  constructor() {
-    super();
-    const contrastFragment = UI.Fragment.Fragment.build\`
-      <div class="contrast-container-in-grid" $="contrast-container-element">
-        <span class="contrast-preview">Aa</span>
-        <span>\${contrastRatioString}</span>
-      </div>\`;
-    const container = html\`
-    <template id="contrast-container-element">
-      <span class="contrast-preview">Aa</span>
-    </template>\`;
-  }
-}`,
-      errors: [{messageId: 'preferTemplateLiterals'}],
-    },
     {
       filename: 'front_end/ui/components/component/file.ts',
       code: `
@@ -1297,6 +1312,293 @@ class SomeWidget extends UI.Widget.Widget {
   constructor() {
     super();
   }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    toolbar.wrappable = true;
+    toolbar.appendSeparator();
+    const combo = new UI.Toolbar.ToolbarComboBox(this.onSelect.bind(this), 'aria-label', undefined, 'combo-box');
+    combo.createOption('Option 1', '1', 'option-1');
+    const option2 = document.createElement('option');
+    option2.value = '2';
+    option2.textContent = 'Option 2';
+    combo.addOption(option2);
+    toolbar.appendToolbarItem(combo);
+    toolbar.appendSpacer();
+    const button = new UI.Toolbar.ToolbarButton('Click me', 'largeicon-add');
+    button.setEnabled(false);
+    toolbar.appendToolbarItem(button);
+    const otherButton = new UI.Toolbar.ToolbarButton('Other button', 'largeicon-delete');
+    otherButton.setEnabled(this.isEnabled);
+    toolbar.appendToolbarItem(otherButton);
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator());
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(false));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(true));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-toolbar wrappable>
+        <div class="toolbar-divider"></div>
+        <select title="aria-label" aria-label="aria-label"
+            jslog=\${VisualLogging.dropDown('combo-box').track({change: true})}
+            @change=\${this.onSelect.bind(this)}>
+          <option value="1" jslog=\${VisualLogging.item('option-1').track({click: true})}>Option 1</option>
+          <option value="2">Option 2</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <devtools-button title="Click me" .variant=\${Buttons.Button.Variant.TOOLBAR}
+            .iconName=\${'largeicon-add'}></devtools-button>
+        <devtools-button title="Other button" ?disabled=\${this.isEnabled}
+            .variant=\${Buttons.Button.Variant.TOOLBAR} .iconName=\${'largeicon-delete'}></devtools-button>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-spacer"></div>
+      </devtools-toolbar>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.reportView = new UI.ReportView.ReportView();
+    this.reportView.show(this.contentElement);
+    this.section = this.reportView.appendSection('Some Section');
+    this.section.appendRow().appendChild(document.createTextNode('some message'));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-report>
+        <devtools-report-section-header>Some Section</devtools-report-section-header>
+        <devtools-report-section>
+          some message
+        </devtools-report-section>
+      </devtools-report>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.reportView = new UI.ReportView.ReportView('Some report');
+    this.reportView.show(this.contentElement);
+    const section1 = this.reportView.appendSection('Some Section', 'section-class', 'section-context');
+    section1.appendField('Field 1', 'Value 1');
+    section1.appendFlexedField('Field 2').appendChild(document.createTextNode('Value 2'));
+    section1.setTitle('New Section Title');
+    section1.appendRow().textContent = 'some content';
+
+    const section2 = this.reportView.appendSection('Another Section');
+    section2.appendSelectableRow().textContent = 'selectable content';
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-report .data=\${{title: 'Some report'}}>
+        <devtools-report-section-header class="section-class"
+            jslog=\${VisualLogging.section('section-context')}>New Section Title</devtools-report-section-header>
+        <devtools-report-key>Field 1</devtools-report-key>
+        <devtools-report-value>Value 1</devtools-report-value>
+        <devtools-report-key>Field 2</devtools-report-key>
+        <devtools-report-value class="report-field-value-is-flexed">
+          Value 2
+        </devtools-report-value>
+        <devtools-report-section>some content</devtools-report-section>
+        <devtools-report-divider></devtools-report-divider>
+        <devtools-report-section-header>Another Section</devtools-report-section-header>
+        <devtools-report-section class="report-row-selectable">selectable content</devtools-report-section>
+      </devtools-report>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(
+        Link.create('https://google.com', 'Google', 'some-class', 'some-context', 0));
+    this.contentElement.appendChild(
+        Link.create('https://chromium.org', 'Chromium', undefined, undefined, 1));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-link class="some-class" href="https://google.com" .jslogContext=\${'some-context'}>Google</devtools-link>
+      <devtools-link href="https://chromium.org" tabindex="1">Chromium</devtools-link>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(uiI18n.getFormatLocalizedString(locString, UIStrings.testString, {
+      PH1: document.createElement('div'),
+      PH2: 'some text',
+    }));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      \${i18nTemplate(locString, UIStrings.testString, {
+        PH1: html\`
+        <div></div>\`,
+        PH2: 'some text',
+      })}
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const colorSwatch = new InlineEditor.ColorSwatch.ColorSwatch();
+    colorSwatch.color = Common.Color.parse('red');
+    colorSwatch.readonly = true;
+    this.contentElement.appendChild(colorSwatch);
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-color-swatch .color=\${Common.Color.parse('red')} .readonly=\${true}></devtools-color-swatch>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+function createDiv() {
+  return document.createElement('div');
+}`,
+      output: `
+function createDiv() {
+  return html\`
+    <div></div>\`;
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+function createTextNode() {
+  return document.createTextNode('my-text');
+}`,
+      output: `
+function createTextNode() {
+  return html\`
+    my-text\`;
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+function createTextNodeWithVar(myVar) {
+  return document.createTextNode(myVar);
+}`,
+      output: `
+function createTextNodeWithVar(myVar) {
+  return html\`
+    \${myVar}\`;
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+function createDivWithVar(myVar) {
+  return document.createElement(myVar);
+}`,
+      output: `
+function createDivWithVar(myVar) {
+  return html\`
+    <\${myVar}></\${myVar}>\`;
 }`,
       errors: [{messageId: 'preferTemplateLiterals'}],
     },

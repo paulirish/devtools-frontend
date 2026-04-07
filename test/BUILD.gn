@@ -10,7 +10,6 @@ group("test") {
     ":run",
     ":unittests",
     "e2e",
-    "e2e_non_hosted",
     "perf",
     "shared",
   ]
@@ -21,6 +20,7 @@ group("unittests") {
     "../front_end:test_inputs",
     "../front_end:unittests",
     "../inspector_overlay:unittests",
+    "../mcp:foundation_unittests",
     "shared",
     "unit:karma",
   ]
@@ -37,4 +37,4 @@ checkout_root = rebase_path("//", target_gen_dir)
 build_root = rebase_path(root_build_dir, target_gen_dir)
 write_file(
     "$target_gen_dir/build.js",
-    "module.exports = {SOURCE_ROOT: '$source_root', CHECKOUT_ROOT: '$checkout_root', BUILD_ROOT: '$build_root', BUILD_WITH_CHROMIUM: $build_with_chromium};")
+    "export default {SOURCE_ROOT: '$source_root', CHECKOUT_ROOT: '$checkout_root', BUILD_ROOT: '$build_root', BUILD_WITH_CHROMIUM: $build_with_chromium};")

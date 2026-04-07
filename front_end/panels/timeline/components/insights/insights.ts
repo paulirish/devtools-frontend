@@ -4,6 +4,7 @@
 
 import * as BaseInsightComponent from './BaseInsightComponent.js';
 import * as Cache from './Cache.js';
+import * as CharacterSet from './CharacterSet.js';
 import * as Checklist from './Checklist.js';
 import * as CLSCulprits from './CLSCulprits.js';
 import * as DocumentLatency from './DocumentLatency.js';
@@ -32,6 +33,7 @@ import * as Viewport from './Viewport.js';
 export {
   BaseInsightComponent,
   Cache,
+  CharacterSet,
   Checklist,
   CLSCulprits,
   DocumentLatency,

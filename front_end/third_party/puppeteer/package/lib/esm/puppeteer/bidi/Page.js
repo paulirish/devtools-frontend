@@ -94,10 +94,10 @@ import { Page, } from '../api/Page.js';
 import { Coverage } from '../cdp/Coverage.js';
 import { EmulationManager } from '../cdp/EmulationManager.js';
 import { Tracing } from '../cdp/Tracing.js';
-import { UnsupportedOperation } from '../common/Errors.js';
+import { ProtocolError, UnsupportedOperation } from '../common/Errors.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { FileChooser } from '../common/FileChooser.js';
-import { evaluationString, isString, parsePDFOptions, timeout, } from '../common/util.js';
+import { evaluationString, parsePDFOptions, timeout } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { bubble } from '../util/decorators.js';
 import { Deferred } from '../util/Deferred.js';
@@ -172,74 +172,35 @@ let BidiPage = (() => {
         /**
          * @internal
          */
-        _userAgentHeaders = {};
-        #userAgentInterception;
-        #userAgentPreloadScript;
         async setUserAgent(userAgentOrOptions, userAgentMetadata) {
             let userAgent;
-            let metadata;
+            let clientHints;
             let platform;
             if (typeof userAgentOrOptions === 'string') {
                 userAgent = userAgentOrOptions;
-                metadata = userAgentMetadata;
+                clientHints = userAgentMetadata;
             }
             else {
-                userAgent =
-                    userAgentOrOptions.userAgent ??
-                        (await this.#browserContext.browser().userAgent());
-                metadata = userAgentOrOptions.userAgentMetadata;
-                platform = userAgentOrOptions.platform;
+                userAgent = userAgentOrOptions.userAgent ?? null;
+                clientHints = userAgentOrOptions.userAgentMetadata;
+                // Empty string platform should be interpreted as "no override".
+                platform =
+                    userAgentOrOptions.platform === ''
+                        ? undefined
+                        : userAgentOrOptions.platform;
             }
-            if (!this.#browserContext.browser().cdpSupported &&
-                (metadata || platform)) {
-                throw new UnsupportedOperation('Current Browser does not support `userAgentMetadata` or `platform`');
+            if (userAgent === '') {
+                // In WebDriver BiDi null is used to restore the original user agent.
+                userAgent = null;
             }
-            else if (this.#browserContext.browser().cdpSupported &&
-                (metadata || platform)) {
-                return await this._client().send('Network.setUserAgentOverride', {
-                    userAgent: userAgent,
-                    userAgentMetadata: metadata,
-                    platform: platform,
-                });
+            await this.#frame.browsingContext.setUserAgent(userAgent);
+            if (platform && platform !== '') {
+                // Work-around until https://github.com/w3c/webdriver-bidi/issues/1065 is resolved.
+                // Set platform via client hints override.
+                clientHints = clientHints ?? {};
+                clientHints.platform = platform;
             }
-            const enable = userAgent !== '';
-            userAgent = userAgent ?? (await this.#browserContext.browser().userAgent());
-            this._userAgentHeaders = enable
-                ? {
-                    'User-Agent': userAgent,
-                }
-                : {};
-            this.#userAgentInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#userAgentInterception, enable);
-            const overrideNavigatorProperties = (userAgent, platform) => {
-                Object.defineProperty(navigator, 'userAgent', {
-                    value: userAgent,
-                    configurable: true,
-                });
-                if (platform) {
-                    Object.defineProperty(navigator, 'platform', {
-                        value: platform,
-                        configurable: true,
-                    });
-                }
-            };
-            const frames = [this.#frame];
-            for (const frame of frames) {
-                frames.push(...frame.childFrames());
-            }
-            if (this.#userAgentPreloadScript) {
-                await this.removeScriptToEvaluateOnNewDocument(this.#userAgentPreloadScript);
-            }
-            const [evaluateToken] = await Promise.all([
-                enable
-                    ? this.evaluateOnNewDocument(overrideNavigatorProperties, userAgent, platform || undefined)
-                    : undefined,
-                // When we disable the UserAgent we want to
-                // evaluate the original value in all Browsing Contexts
-                ...frames.map(frame => {
-                    return frame.evaluate(overrideNavigatorProperties, userAgent, platform || undefined);
-                }),
-            ]);
-            this.#userAgentPreloadScript = evaluateToken?.identifier;
+            await this.#frame.browsingContext.setClientHintsOverride(clientHints ?? null);
         }
         async setBypassCSP(enabled) {
             // TODO: handle CDP-specific cases such as MPArch.
@@ -265,8 +226,20 @@ let BidiPage = (() => {
         mainFrame() {
             return this.#frame;
         }
+        async emulateFocusedPage(enabled) {
+            return await this.#cdpEmulationManager.emulateFocus(enabled);
+        }
         resize(_params) {
-            throw new Error('Method not implemented for WebDriver BiDi yet.');
+            throw new UnsupportedOperation();
+        }
+        async windowId() {
+            return this.#frame.browsingContext.windowId;
+        }
+        openDevTools() {
+            throw new UnsupportedOperation();
+        }
+        hasDevTools() {
+            throw new UnsupportedOperation();
         }
         async focusedFrame() {
             const env_1 = { stack: [], error: void 0, hasError: false };
@@ -332,7 +305,9 @@ let BidiPage = (() => {
         async reload(options = {}) {
             const [response] = await Promise.all([
                 this.#frame.waitForNavigation(options),
-                this.#frame.browsingContext.reload(),
+                this.#frame.browsingContext.reload({
+                    ignoreCache: options.ignoreCache ? true : undefined,
+                }),
             ]).catch(rewriteNavigationError(this.url(), options.timeout ?? this._timeoutSettings.navigationTimeout()));
             return response;
         }
@@ -392,22 +367,61 @@ let BidiPage = (() => {
             return await this.#cdpEmulationManager.emulateVisionDeficiency(type);
         }
         async setViewport(viewport) {
+            let needsReload = false;
             if (!this.browser().cdpSupported) {
-                await this.#frame.browsingContext.setViewport({
-                    viewport: viewport?.width && viewport?.height
+                const viewportSize = viewport?.width && viewport?.height
+                    ? {
+                        width: viewport.width,
+                        height: viewport.height,
+                    }
+                    : null;
+                const devicePixelRatio = viewport?.deviceScaleFactor
+                    ? viewport.deviceScaleFactor
+                    : null;
+                // If `viewport` is not set, remove screen orientation override.
+                const screenOrientation = viewport
+                    ? viewport.isLandscape
                         ? {
-                            width: viewport.width,
-                            height: viewport.height,
+                            natural: "landscape" /* Bidi.Emulation.ScreenOrientationNatural.Landscape */,
+                            type: 'landscape-primary',
                         }
-                        : null,
-                    devicePixelRatio: viewport?.deviceScaleFactor
-                        ? viewport.deviceScaleFactor
-                        : null,
-                });
-                this.#viewport = viewport;
-                return;
+                        : {
+                            natural: "portrait" /* Bidi.Emulation.ScreenOrientationNatural.Portrait */,
+                            type: 'portrait-primary',
+                        }
+                    : null;
+                const commands = [
+                    this.#frame.browsingContext.setViewport({
+                        viewport: viewportSize,
+                        devicePixelRatio,
+                    }),
+                    this.#frame.browsingContext.setScreenOrientationOverride(screenOrientation),
+                ];
+                if ((this.#viewport?.hasTouch ?? false) !== (viewport?.hasTouch ?? false)) {
+                    // The requested touch override state is different from the current one, meaning
+                    // the reload is needed.
+                    needsReload = true;
+                    // 1 touch point if touch is enabled, null otherwise.
+                    const maxTouchPoints = viewport?.hasTouch ? 1 : null;
+                    commands.push(this.#frame.browsingContext
+                        .setTouchOverride(maxTouchPoints)
+                        .catch(error => {
+                        if (error instanceof ProtocolError &&
+                            (error.message.includes('unknown command') ||
+                                error.message.includes('unsupported operation'))) {
+                            // Tolerate not implemented or not supported commands. At least until
+                            // the `emulation.setTouchOverride` is supported by all the supported
+                            // browsers.
+                            return;
+                        }
+                        throw error;
+                    }));
+                }
+                await Promise.all(commands);
             }
-            const needsReload = await this.#cdpEmulationManager.emulateViewport(viewport);
+            else {
+                needsReload = await this.#cdpEmulationManager.emulateViewport(viewport);
+            }
             this.#viewport = viewport;
             if (needsReload) {
                 await this.reload();
@@ -588,10 +602,7 @@ let BidiPage = (() => {
             return [...this.#workers];
         }
         get isNetworkInterceptionEnabled() {
-            return (Boolean(this.#requestInterception) ||
-                Boolean(this.#extraHeadersInterception) ||
-                Boolean(this.#authInterception) ||
-                Boolean(this.#userAgentInterception));
+            return (Boolean(this.#requestInterception) || Boolean(this.#authInterception));
         }
         #requestInterception;
         async setRequestInterception(enable) {
@@ -600,16 +611,8 @@ let BidiPage = (() => {
         /**
          * @internal
          */
-        _extraHTTPHeaders = {};
-        #extraHeadersInterception;
         async setExtraHTTPHeaders(headers) {
-            const extraHTTPHeaders = {};
-            for (const [key, value] of Object.entries(headers)) {
-                assert(isString(value), `Expected value of header "${key}" to be String, but "${typeof value}" is found.`);
-                extraHTTPHeaders[key.toLowerCase()] = value;
-            }
-            this._extraHTTPHeaders = extraHTTPHeaders;
-            this.#extraHeadersInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#extraHeadersInterception, Boolean(Object.keys(this._extraHTTPHeaders).length));
+            await this.#frame.browsingContext.setExtraHTTPHeaders(headers);
         }
         /**
          * @internal
@@ -640,7 +643,7 @@ let BidiPage = (() => {
         }
         async setOfflineMode(enabled) {
             if (!this.#browserContext.browser().cdpSupported) {
-                throw new UnsupportedOperation();
+                return await this.#frame.browsingContext.setOfflineMode(enabled);
             }
             if (!this.#emulatedNetworkConditions) {
                 this.#emulatedNetworkConditions = {
@@ -655,7 +658,14 @@ let BidiPage = (() => {
         }
         async emulateNetworkConditions(networkConditions) {
             if (!this.#browserContext.browser().cdpSupported) {
-                throw new UnsupportedOperation();
+                if (!networkConditions?.offline &&
+                    ((networkConditions?.upload ?? -1) >= 0 ||
+                        (networkConditions?.download ?? -1) >= 0 ||
+                        (networkConditions?.latency ?? 0) > 0)) {
+                    // WebDriver BiDi supports only offline mode.
+                    throw new UnsupportedOperation();
+                }
+                return await this.#frame.browsingContext.setOfflineMode(networkConditions?.offline ?? false);
             }
             if (!this.#emulatedNetworkConditions) {
                 this.#emulatedNetworkConditions = {
@@ -756,6 +766,9 @@ let BidiPage = (() => {
         metrics() {
             throw new UnsupportedOperation();
         }
+        async captureHeapSnapshot(_options) {
+            throw new UnsupportedOperation();
+        }
         async goBack(options = {}) {
             return await this.#go(-1, options);
         }
@@ -779,8 +792,11 @@ let BidiPage = (() => {
                 throw error;
             }
         }
-        waitForDevicePrompt() {
-            throw new UnsupportedOperation();
+        async waitForDevicePrompt(options = {}) {
+            return await this.mainFrame().waitForDevicePrompt(options);
+        }
+        get bluetooth() {
+            return this.mainFrame().browsingContext.bluetooth;
         }
     };
 })();
@@ -891,6 +907,10 @@ function cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, ...propertyN
             result[property] = bidiCookie[CDP_SPECIFIC_PREFIX + property];
         }
     }
+    // TODO: remove once deprecated sameParty attribute is dropped.
+    if (!result.sameParty) {
+        result.sameParty = false;
+    }
     return result;
 }
 /**
@@ -907,14 +927,28 @@ export function cdpSpecificCookiePropertiesFromPuppeteerToBidi(cookieParam, ...p
     return result;
 }
 function convertCookiesSameSiteBiDiToCdp(sameSite) {
-    return sameSite === 'strict' ? 'Strict' : sameSite === 'lax' ? 'Lax' : 'None';
+    switch (sameSite) {
+        case 'strict':
+            return 'Strict';
+        case 'lax':
+            return 'Lax';
+        case 'none':
+            return 'None';
+        default:
+            return 'Default';
+    }
 }
 export function convertCookiesSameSiteCdpToBiDi(sameSite) {
-    return sameSite === 'Strict'
-        ? "strict" /* Bidi.Network.SameSite.Strict */
-        : sameSite === 'Lax'
-            ? "lax" /* Bidi.Network.SameSite.Lax */
-            : "none" /* Bidi.Network.SameSite.None */;
+    switch (sameSite) {
+        case 'Strict':
+            return "strict" /* Bidi.Network.SameSite.Strict */;
+        case 'Lax':
+            return "lax" /* Bidi.Network.SameSite.Lax */;
+        case 'None':
+            return "none" /* Bidi.Network.SameSite.None */;
+        default:
+            return "default" /* Bidi.Network.SameSite.Default */;
+    }
 }
 export function convertCookiesExpiryCdpToBiDi(expiry) {
     return [undefined, -1].includes(expiry) ? undefined : expiry;

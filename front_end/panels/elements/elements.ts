@@ -4,13 +4,13 @@
 
 import './InspectElementModeController.js';
 import './ColorSwatchPopoverIcon.js';
-import './ComputedStyleModel.js';
-import './DOMLinkifier.js';
 import './DOMPath.js';
 import './ElementsSidebarPane.js';
 import './ElementsTreeElement.js';
+import './AdoptedStyleSheetTreeElement.js';
 import './TopLayerContainer.js';
 import './ElementsTreeOutline.js';
+import './ImagePreviewPopover.js';
 import './EventListenersWidget.js';
 import './MarkerDecorator.js';
 import './MetricsSidebarPane.js';
@@ -20,6 +20,7 @@ import './NodeStackTraceWidget.js';
 import './StylePropertiesSection.js';
 import './StylePropertyHighlighter.js';
 import './StylesSidebarPane.js';
+import './StylesAiCodeCompletionProvider.js';
 import './StylePropertyTreeElement.js';
 import './ComputedStyleWidget.js';
 import './CSSRuleValidator.js';
@@ -31,13 +32,12 @@ import './AccessibilityTreeView.js';
 
 import * as AccessibilityTreeUtils from './AccessibilityTreeUtils.js';
 import * as AccessibilityTreeView from './AccessibilityTreeView.js';
+import * as AdoptedStyleSheetTreeElement from './AdoptedStyleSheetTreeElement.js';
 import * as ClassesPaneWidget from './ClassesPaneWidget.js';
 import * as ColorSwatchPopoverIcon from './ColorSwatchPopoverIcon.js';
-import * as ComputedStyleModel from './ComputedStyleModel.js';
 import * as ComputedStyleWidget from './ComputedStyleWidget.js';
 import * as CSSRuleValidator from './CSSRuleValidator.js';
 import * as CSSValueTraceView from './CSSValueTraceView.js';
-import * as DOMLinkifier from './DOMLinkifier.js';
 import * as DOMPath from './DOMPath.js';
 import * as ElementsPanel from './ElementsPanel.js';
 import * as ElementsSidebarPane from './ElementsSidebarPane.js';
@@ -46,6 +46,7 @@ import * as ElementsTreeElement from './ElementsTreeElement.js';
 import * as ElementsTreeOutline from './ElementsTreeOutline.js';
 import * as ElementsTreeOutlineRenderer from './ElementsTreeOutlineRenderer.js';
 import * as EventListenersWidget from './EventListenersWidget.js';
+import * as ImagePreviewPopover from './ImagePreviewPopover.js';
 import * as InspectElementModeController from './InspectElementModeController.js';
 import * as LayersWidget from './LayersWidget.js';
 import * as LayoutPane from './LayoutPane.js';
@@ -55,11 +56,13 @@ import * as NodeStackTraceWidget from './NodeStackTraceWidget.js';
 import * as PlatformFontsWidget from './PlatformFontsWidget.js';
 import * as PropertiesWidget from './PropertiesWidget.js';
 import * as PropertyRenderer from './PropertyRenderer.js';
+import * as StandaloneStylesContainer from './StandaloneStylesContainer.js';
 import * as StyleEditorWidget from './StyleEditorWidget.js';
 import * as StylePropertiesSection from './StylePropertiesSection.js';
 import * as StylePropertyHighlighter from './StylePropertyHighlighter.js';
 import * as StylePropertyTreeElement from './StylePropertyTreeElement.js';
 import * as StylePropertyUtils from './StylePropertyUtils.js';
+import * as StylesAiCodeCompletionProvider from './StylesAiCodeCompletionProvider.js';
 import * as StylesSidebarPane from './StylesSidebarPane.js';
 import * as TopLayerContainer from './TopLayerContainer.js';
 import * as WebCustomData from './WebCustomData.js';
@@ -67,13 +70,12 @@ import * as WebCustomData from './WebCustomData.js';
 export {
   AccessibilityTreeUtils,
   AccessibilityTreeView,
+  AdoptedStyleSheetTreeElement,
   ClassesPaneWidget,
   ColorSwatchPopoverIcon,
-  ComputedStyleModel,
   ComputedStyleWidget,
   CSSRuleValidator,
   CSSValueTraceView,
-  DOMLinkifier,
   DOMPath,
   ElementsPanel,
   ElementsSidebarPane,
@@ -82,6 +84,7 @@ export {
   ElementsTreeOutline,
   ElementsTreeOutlineRenderer,
   EventListenersWidget,
+  ImagePreviewPopover,
   InspectElementModeController,
   LayersWidget,
   LayoutPane,
@@ -91,11 +94,13 @@ export {
   PlatformFontsWidget,
   PropertiesWidget,
   PropertyRenderer,
+  StandaloneStylesContainer,
   StyleEditorWidget,
   StylePropertiesSection,
   StylePropertyHighlighter,
   StylePropertyTreeElement,
   StylePropertyUtils,
+  StylesAiCodeCompletionProvider,
   StylesSidebarPane,
   TopLayerContainer,
   WebCustomData,

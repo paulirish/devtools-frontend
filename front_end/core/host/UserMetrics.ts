@@ -101,7 +101,7 @@ export class UserMetrics {
         EnumeratedHistogram.IssuesPanelOpenedFrom, issueOpener, IssueOpener.MAX_VALUE);
   }
 
-  issuesPanelIssueExpanded(issueExpandedCategory: string|undefined): void {
+  issuesPanelIssueExpanded(issueExpandedCategory?: string): void {
     if (issueExpandedCategory === undefined) {
       return;
     }
@@ -209,11 +209,6 @@ export class UserMetrics {
     });
   }
 
-  recordingAssertion(value: RecordingAssertion): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingAssertion, value, RecordingAssertion.MAX_VALUE);
-  }
-
   recordingToggled(value: RecordingToggled): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.RecordingToggled, value, RecordingToggled.MAX_VALUE);
@@ -224,34 +219,9 @@ export class UserMetrics {
         EnumeratedHistogram.RecordingReplayFinished, value, RecordingReplayFinished.MAX_VALUE);
   }
 
-  recordingReplaySpeed(value: RecordingReplaySpeed): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingReplaySpeed, value, RecordingReplaySpeed.MAX_VALUE);
-  }
-
   recordingReplayStarted(value: RecordingReplayStarted): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.RecordingReplayStarted, value, RecordingReplayStarted.MAX_VALUE);
-  }
-
-  recordingEdited(value: RecordingEdited): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingEdited, value, RecordingEdited.MAX_VALUE);
-  }
-
-  recordingExported(value: RecordingExported): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingExported, value, RecordingExported.MAX_VALUE);
-  }
-
-  recordingCodeToggled(value: RecordingCodeToggled): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingCodeToggled, value, RecordingCodeToggled.MAX_VALUE);
-  }
-
-  recordingCopiedToClipboard(value: RecordingCopiedToClipboard): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.RecordingCopiedToClipboard, value, RecordingCopiedToClipboard.MAX_VALUE);
   }
 
   lighthouseModeRun(type: LighthouseModeRun): void {
@@ -267,11 +237,6 @@ export class UserMetrics {
   swatchActivated(swatch: SwatchType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.SwatchActivated, swatch, SwatchType.MAX_VALUE);
-  }
-
-  animationPlaybackRateChanged(playbackRate: AnimationsPlaybackRate): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.AnimationPlaybackRateChanged, playbackRate, AnimationsPlaybackRate.MAX_VALUE);
   }
 
   workspacesPopulated(wallClockTimeInMilliseconds: number): void {
@@ -306,6 +271,61 @@ export class UserMetrics {
   performanceAIMainThreadActivityResponseSize(bytes: number): void {
     InspectorFrontendHostInstance.recordCountHistogram(
         'DevTools.PerformanceAI.MainThreadActivityResponseSize', bytes, 0, 100_000, 100);
+  }
+
+  builtInAiAvailability(availability: BuiltInAiAvailability): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.BuiltInAiAvailability, availability, BuiltInAiAvailability.MAX_VALUE);
+  }
+
+  consoleInsightTeaserGenerated(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.TeaserGenerationTime', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserGeneratedMedium(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogramMedium(
+        'DevTools.Insights.TeaserGenerationTimeMedium', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserFirstChunkGenerated(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.TeaserFirstChunkGenerationTime', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserFirstChunkGeneratedMedium(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogramMedium(
+        'DevTools.Insights.TeaserFirstChunkGenerationTimeMedium', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserChunkToEndMedium(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogramMedium(
+        'DevTools.Insights.TeaserChunkToEndMedium', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserAbortedAfterFirstCharacter(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.TeaserAfterFirstCharacterAbortionTime', timeInMilliseconds);
+  }
+
+  consoleInsightTeaserAbortedBeforeFirstCharacter(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.TeaserBeforeFirstCharacterAbortionTime', timeInMilliseconds);
+  }
+
+  consoleInsightLongTeaserGenerated(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.LongTeaserGenerationTime', timeInMilliseconds);
+  }
+
+  consoleInsightShortTeaserGenerated(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.Insights.ShortTeaserGenerationTime', timeInMilliseconds);
+  }
+
+  extensionEvalTarget(target: ExtensionEvalTarget): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ExtensionEvalTarget, target, ExtensionEvalTarget.MAX_VALUE);
   }
 }
 
@@ -506,15 +526,24 @@ export enum Action {
   AiAssistanceSideEffectConfirmed = 179,
   AiAssistanceSideEffectRejected = 180,
   AiAssistanceError = 181,
-  AiAssistanceOpenedFromPerformanceInsight = 182,
-  AiAssistanceOpenedFromPerformanceFullButton = 183,
   AiCodeCompletionResponseServedFromCache = 184,
   AiCodeCompletionRequestTriggered = 185,
   AiCodeCompletionSuggestionDisplayed = 186,
   AiCodeCompletionSuggestionAccepted = 187,
   AiCodeCompletionError = 188,
   AttributeLinkClicked = 189,
-  MAX_VALUE = 190,
+  InsightRequestedViaTeaser = 190,
+  InsightTeaserGenerationStarted = 191,
+  InsightTeaserGenerationCompleted = 192,
+  InsightTeaserGenerationAborted = 193,
+  InsightTeaserGenerationErrored = 194,
+  AiCodeGenerationSuggestionDisplayed = 195,
+  AiCodeGenerationSuggestionAccepted = 196,
+  InsightTeaserModelDownloadStarted = 197,
+  InsightTeaserModelDownloadCompleted = 198,
+  AiCodeGenerationError = 199,
+  AiCodeGenerationRequestTriggered = 200,
+  MAX_VALUE = 201,
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
@@ -786,27 +815,18 @@ export enum DevtoolsExperiments {
   'live-heap-profile' = 11,
   'protocol-monitor' = 13,
   'sampling-heap-profiler-timeline' = 17,
-  'show-option-tp-expose-internals-in-heap-snapshot' = 18,
   'timeline-invalidation-tracking' = 26,
-  'timeline-show-all-events' = 27,
-  'timeline-v8-runtime-call-stats' = 28,
   apca = 39,
   'font-editor' = 41,
-  'full-accessibility-tree' = 42,
-  'contrast-issues' = 44,
-  'experimental-cookie-features' = 45,
   'instrumentation-breakpoints' = 61,
-  'authored-deployed-grouping' = 63,
-  'just-my-code' = 65,
   'use-source-map-scopes' = 76,
-  'timeline-show-postmessage-events' = 86,
-  'timeline-enhanced-traces' = 90,
-  'timeline-compiled-sources' = 91,
   'timeline-debug-mode' = 93,
+  'durable-messages' = 110,
+  'jpeg-xl' = 111,
   /* eslint-enable @typescript-eslint/naming-convention */
 
   // Increment this when new experiments are added.
-  MAX_VALUE = 110,
+  MAX_VALUE = 112,
 }
 
 /** Update DevToolsIssuesPanelIssueExpanded from tools/metrics/histograms/enums.xml if new enum is added. **/
@@ -883,8 +903,8 @@ export enum IssueCreated {
   'CookieIssue::WarnSameSiteUnspecifiedCrossSiteContext::SetCookie' = 35,
   'SharedArrayBufferIssue::TransferIssue' = 36,
   'SharedArrayBufferIssue::CreationIssue' = 37,
-  LowTextContrastIssue = 41,
-  'CorsIssue::InsecurePrivateNetwork' = 42,
+
+  'CorsIssue::InsecureLocalNetwork' = 42,
   'CorsIssue::InvalidHeaders' = 44,
   'CorsIssue::WildcardOriginWithCredentials' = 45,
   'CorsIssue::PreflightResponseInvalid' = 46,
@@ -903,25 +923,20 @@ export enum IssueCreated {
   DeprecationIssue = 60,
   'ClientHintIssue::MetaTagAllowListInvalidOrigin' = 61,
   'ClientHintIssue::MetaTagModifiedHTML' = 62,
-  'CorsIssue::PreflightAllowPrivateNetworkError' = 63,
   'GenericIssue::CrossOriginPortalPostMessageError' = 64,
   'GenericIssue::FormLabelForNameError' = 65,
   'GenericIssue::FormDuplicateIdForInputError' = 66,
   'GenericIssue::FormInputWithNoLabelError' = 67,
   'GenericIssue::FormAutocompleteAttributeEmptyError' = 68,
   'GenericIssue::FormEmptyIdAndNameAttributesForInputError' = 69,
-  'GenericIssue::FormAriaLabelledByToNonExistingId' = 70,
+  'GenericIssue::FormAriaLabelledByToNonExistingIdError' = 70,
   'GenericIssue::FormInputAssignedAutocompleteValueToIdOrNameAttributeError' = 71,
-  'GenericIssue::FormLabelHasNeitherForNorNestedInput' = 72,
+  'GenericIssue::FormLabelHasNeitherForNorNestedInputError' = 72,
   'GenericIssue::FormLabelForMatchesNonExistingIdError' = 73,
   'GenericIssue::FormHasPasswordFieldWithoutUsernameFieldError' = 74,
   'GenericIssue::FormInputHasWrongButWellIntendedAutocompleteValueError' = 75,
   'StylesheetLoadingIssue::LateImportRule' = 76,
   'StylesheetLoadingIssue::RequestFailed' = 77,
-  'CorsIssue::PreflightMissingPrivateNetworkAccessId' = 78,
-  'CorsIssue::PreflightMissingPrivateNetworkAccessName' = 79,
-  'CorsIssue::PrivateNetworkAccessPermissionUnavailable' = 80,
-  'CorsIssue::PrivateNetworkAccessPermissionDenied' = 81,
   'CookieIssue::WarnThirdPartyPhaseout::ReadCookie' = 82,
   'CookieIssue::WarnThirdPartyPhaseout::SetCookie' = 83,
   'CookieIssue::ExcludeThirdPartyPhaseout::ReadCookie' = 84,
@@ -954,13 +969,14 @@ export enum IssueCreated {
   'CorsIssue::LocalNetworkAccessPermissionDenied' = 111,
   'SRIMessageSignatureIssue::ValidationFailedIntegrityMismatch' = 112,
   'ElementAccessibilityIssue::InteractiveContentSummaryDescendant' = 113,
+  'CorsIssue::InvalidLocalNetworkAccess' = 114,
   /* eslint-enable @typescript-eslint/naming-convention */
-  MAX_VALUE = 114,
+  MAX_VALUE = 115,
 }
 
 export const enum DeveloperResourceLoaded {
   LOAD_THROUGH_PAGE_VIA_TARGET = 0,
-  LOAD_THROUGH_PAGE_VIA_FRAME = 1,
+  /* LOAD_THROUGH_PAGE_VIA_FRAME = 1 was barely used */
   LOAD_THROUGH_PAGE_FAILURE = 2,
   LOAD_THROUGH_PAGE_FALLBACK = 3,
   FALLBACK_AFTER_FAILURE = 4,
@@ -1198,7 +1214,8 @@ export const enum SwatchType {
   LENGTH = 8,
   POSITION_TRY_LINK = 10,
   ATTR_LINK = 11,
-  MAX_VALUE = 12,
+  GRID_LANES = 12,
+  MAX_VALUE = 13,
 }
 
 export const enum BadgeType {
@@ -1230,4 +1247,25 @@ export const enum TimelineNavigationSetting {
   SWITCHED_TO_CLASSIC = 2,
   SWITCHED_TO_MODERN = 3,
   MAX_VALUE = 4,
+}
+
+export const enum BuiltInAiAvailability {
+  UNAVAILABLE_HAS_GPU = 0,
+  DOWNLOADABLE_HAS_GPU = 1,
+  DOWNLOADING_HAS_GPU = 2,
+  AVAILABLE_HAS_GPU = 3,
+  DISABLED_HAS_GPU = 4,
+  UNAVAILABLE_NO_GPU = 5,
+  DOWNLOADABLE_NO_GPU = 6,
+  DOWNLOADING_NO_GPU = 7,
+  AVAILABLE_NO_GPU = 8,
+  DISABLED_NO_GPU = 9,
+  MAX_VALUE = 10,
+}
+
+export const enum ExtensionEvalTarget {
+  WEB_PAGE = 0,
+  SAME_EXTENSION = 1,
+  OTHER_EXTENSION = 2,
+  MAX_VALUE = 3,
 }

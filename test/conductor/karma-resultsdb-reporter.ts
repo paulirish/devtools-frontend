@@ -4,11 +4,17 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+// TODO: Fix this as they are extraneous dependencies
+// The type that get resolve are wrong, so keep the required
+import chalkImport from 'chalk';
+// @ts-expect-error
+import * as diffImport from 'diff';
+
 import * as ResultsDb from './resultsdb.js';
 import {ScreenshotError} from './screenshot-error.js';
 
-const chalk = require('chalk');
-const diff = require('diff');
+const chalk: any = chalkImport;
+const diff: any = diffImport;
 
 type DiffCallback = (line: string) => string;
 function*
@@ -36,14 +42,25 @@ function*
 }
 
 export function resultAssertionsDiff({assertionErrors}: any) {
-  return assertionErrors && assertionErrors.length > 0 ?
-      diff.diffLines(`${assertionErrors[0].expected}`, `${assertionErrors[0].actual}`) :
-      [];
+  if (!assertionErrors || assertionErrors.length === 0) {
+    return [];
+  }
+  const expected = `${assertionErrors[0].expected}`;
+  const actual = `${assertionErrors[0].actual}`;
+
+  return diff.diffLines(
+      expected,
+      actual,
+  );
 }
 
 export function formatAsPatch(assertionDiff: any) {
   const consoleDiffLines = Array.from(formatDiff(
-      assertionDiff, same => ` ${same}`, actual => chalk.green(`+${actual}`), expected => chalk.red(`-${expected}`)));
+      assertionDiff,
+      same => ` ${same}`,
+      actual => chalk.green(`+${actual}`),
+      expected => chalk.red(`-${expected}`),
+      ));
   if (consoleDiffLines.length > 0) {
     return `${chalk.red('- expected')}\n${chalk.green('+ actual')}\n\n${consoleDiffLines.join('\n')}\n`;
   }
@@ -76,11 +93,10 @@ export const ResultsDBReporter = function(
 
     let summaryHtml = undefined;
     if (!expected || consoleLog.length > 0) {
-      const messages = [...consoleLog, ...log.map(formatError)];
+      const messages = consoleLog.concat(log.map(formatError));
       const assertionDiff = resultAssertionsDiff(result);
-
       // Prepare resultsdb summary
-      const summaryLines = messages.map(m => `<p><pre>${m}</pre></p>`);
+      let summaryLines = messages.map(m => `<p><pre>${m}</pre></p>`);
       const htmlDiffLines = Array.from(formatDiff(
           assertionDiff, same => `<pre style="margin: 0;"> ${same}</pre>`,
           actual => `<pre style="color: green;margin: 0;">+${actual}</pre>`,
@@ -93,12 +109,11 @@ export const ResultsDBReporter = function(
             '</p>',
             '<p>',
         );
-        summaryLines.push(...htmlDiffLines);
+        summaryLines = summaryLines.concat(htmlDiffLines);
         summaryLines.push('</p>');
       }
       summaryHtml = summaryLines.join('\n');
 
-      // Log to console
       const consoleHeader = `==== ${status}: ${testId}`;
       this.write(`${consoleHeader}\n${messages.join('\n\n')}\n`);
       const patch = formatAsPatch(assertionDiff);
@@ -134,7 +149,7 @@ export const ResultsDBReporter = function(
         }
       }
     }
-    ResultsDb.sendTestResult(testResult);
+    ResultsDb.sendTestResult(testResult, /* sendImmediately=*/ true);
   };
   this.specSuccess = specComplete;
   this.specSkipped = specComplete;

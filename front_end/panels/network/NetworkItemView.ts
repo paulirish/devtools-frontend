@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -10,8 +10,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
-import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
+import {Icon} from '../../ui/kit/kit.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -19,6 +18,8 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as NetworkComponents from './components/components.js';
 import {EventSourceMessagesView} from './EventSourceMessagesView.js';
 import {RequestCookiesView} from './RequestCookiesView.js';
+import {RequestDeviceBoundSessionsView} from './RequestDeviceBoundSessionsView.js';
+import {RequestHeadersView} from './RequestHeadersView.js';
 import {RequestInitiatorView} from './RequestInitiatorView.js';
 import {RequestPayloadView} from './RequestPayloadView.js';
 import {RequestPreviewView} from './RequestPreviewView.js';
@@ -113,6 +114,17 @@ const UIStrings = {
    */
   cookies: 'Cookies',
   /**
+   * @description Title of the Device Bound Sessions tab in the Network panel. A
+   * website may decide to create a session for a user, for example when the user
+   * logs in. They can use a protocol to make it a "device bound session". That
+   * means that when the session expires, it is only possible for it to be
+   * extended on the device it was created on. Thus the session is considered
+   * to be bound to that device. For more details on the protocol, see
+   * https://github.com/w3c/webappsec-dbsc/blob/main/README.md and
+   * https://w3c.github.io/webappsec-dbsc/.
+   */
+  deviceBoundSessions: 'Device bound sessions',
+  /**
    * @description Text in Network Item View of the Network panel
    */
   requestAndResponseCookies: 'Request and response cookies',
@@ -134,10 +146,11 @@ const requestToPreviewView = new WeakMap<SDK.NetworkRequest.NetworkRequest, Requ
 export class NetworkItemView extends UI.TabbedPane.TabbedPane {
   #request: SDK.NetworkRequest.NetworkRequest;
   readonly #resourceViewTabSetting: Common.Settings.Setting<NetworkForward.UIRequestLocation.UIRequestTabs>;
-  readonly #headersViewComponent: NetworkComponents.RequestHeadersView.RequestHeadersView|undefined;
+  readonly #headersViewComponent: RequestHeadersView|undefined;
   #payloadView: RequestPayloadView|null = null;
   readonly #responseView: RequestResponseView|undefined;
   #cookiesView: RequestCookiesView|null = null;
+  #deviceBoundSessionsView: RequestDeviceBoundSessionsView|null = null;
   #initialTab?: NetworkForward.UIRequestLocation.UIRequestTabs;
   readonly #firstTab: NetworkForward.UIRequestLocation.UIRequestTabs;
 
@@ -159,11 +172,11 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
           i18nString(UIStrings.headers));
     } else {
       this.#firstTab = NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT;
-      this.#headersViewComponent = new NetworkComponents.RequestHeadersView.RequestHeadersView(request);
+      this.#headersViewComponent = new RequestHeadersView();
+      this.#headersViewComponent.request = request;
       this.appendTab(
           NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT, i18nString(UIStrings.headers),
-          LegacyWrapper.LegacyWrapper.legacyWrapper(UI.Widget.VBox, this.#headersViewComponent),
-          i18nString(UIStrings.headers));
+          this.#headersViewComponent, i18nString(UIStrings.headers));
     }
 
     this.#resourceViewTabSetting =
@@ -208,7 +221,7 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
           i18nString(UIStrings.responsePreview));
       const signedExchangeInfo = request.signedExchangeInfo();
       if (signedExchangeInfo?.errors?.length) {
-        const icon = new IconButton.Icon.Icon();
+        const icon = new Icon();
         icon.name = 'cross-circle-filled';
         icon.classList.add('small');
         UI.Tooltip.Tooltip.install(icon, i18nString(UIStrings.signedexchangeError));
@@ -232,14 +245,14 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
 
     this.appendTab(
         NetworkForward.UIRequestLocation.UIRequestTabs.TIMING, i18nString(UIStrings.timing),
-        new RequestTimingView(request, calculator), i18nString(UIStrings.requestAndResponseTimeline));
+        RequestTimingView.create(request, calculator), i18nString(UIStrings.requestAndResponseTimeline));
 
     if (request.trustTokenParams()) {
+      const trustTokensView = new NetworkComponents.RequestTrustTokensView.RequestTrustTokensView();
+      trustTokensView.request = request;
       this.appendTab(
           NetworkForward.UIRequestLocation.UIRequestTabs.TRUST_TOKENS, i18nString(UIStrings.trustTokens),
-          LegacyWrapper.LegacyWrapper.legacyWrapper(
-              UI.Widget.VBox, new NetworkComponents.RequestTrustTokensView.RequestTrustTokensView(request)),
-          i18nString(UIStrings.trustTokenOperationDetails));
+          trustTokensView, i18nString(UIStrings.trustTokenOperationDetails));
     }
 
     this.#initialTab = initialTab || this.#resourceViewTabSetting.get();
@@ -251,10 +264,10 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
     super.wasShown();
     this.#request.addEventListener(SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.requestHeadersChanged, this);
     this.#request.addEventListener(
-        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.maybeAppendCookiesPanel, this);
+        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.maybeAppendCookieResponsePanels, this);
     this.#request.addEventListener(
         SDK.NetworkRequest.Events.TRUST_TOKEN_RESULT_ADDED, this.maybeShowErrorIconInTrustTokenTabHeader, this);
-    this.maybeAppendCookiesPanel();
+    this.maybeAppendCookieResponsePanels();
     this.maybeShowErrorIconInTrustTokenTabHeader();
 
     // Only select the initial tab the first time the view is shown after construction.
@@ -265,13 +278,15 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
       this.#selectTab(this.#initialTab);
       this.#initialTab = undefined;
     }
+
   }
 
   override willHide(): void {
+    super.willHide();
     this.#request.removeEventListener(
         SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.requestHeadersChanged, this);
     this.#request.removeEventListener(
-        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.maybeAppendCookiesPanel, this);
+        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.maybeAppendCookieResponsePanels, this);
     this.#request.removeEventListener(
         SDK.NetworkRequest.Events.TRUST_TOKEN_RESULT_ADDED, this.maybeShowErrorIconInTrustTokenTabHeader, this);
   }
@@ -279,6 +294,11 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
   private async requestHeadersChanged(): Promise<void> {
     this.maybeAppendCookiesPanel();
     void this.maybeAppendPayloadPanel();
+  }
+
+  private maybeAppendCookieResponsePanels(): void {
+    this.maybeAppendCookiesPanel();
+    this.maybeAppendDeviceBoundSessionsPanel();
   }
 
   private maybeAppendCookiesPanel(): void {
@@ -291,11 +311,22 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
           i18nString(UIStrings.requestAndResponseCookies));
     }
     if (this.#request.hasThirdPartyCookiePhaseoutIssue()) {
-      const icon = new IconButton.Icon.Icon();
+      const icon = new Icon();
       icon.name = 'warning-filled';
       icon.classList.add('small');
       icon.title = i18nString(UIStrings.thirdPartyPhaseout);
       this.setTrailingTabIcon(NetworkForward.UIRequestLocation.UIRequestTabs.COOKIES, icon);
+    }
+  }
+
+  private maybeAppendDeviceBoundSessionsPanel(): void {
+    const deviceBoundSessionsPresent = this.#request.getDeviceBoundSessionUsages().length > 0;
+    if (deviceBoundSessionsPresent && !this.#deviceBoundSessionsView) {
+      this.#deviceBoundSessionsView = new RequestDeviceBoundSessionsView(this.#request);
+      this.appendTab(
+          NetworkForward.UIRequestLocation.UIRequestTabs.DEVICE_BOUND_SESSIONS,
+          i18nString(UIStrings.deviceBoundSessions), this.#deviceBoundSessionsView,
+          i18nString(UIStrings.deviceBoundSessions));
     }
   }
 
@@ -304,7 +335,8 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
       return;
     }
     if (this.#request.queryParameters || await this.#request.requestFormData()) {
-      this.#payloadView = new RequestPayloadView(this.#request);
+      this.#payloadView = new RequestPayloadView();
+      this.#payloadView.request = this.#request;
       this.appendTab(
           NetworkForward.UIRequestLocation.UIRequestTabs.PAYLOAD, i18nString(UIStrings.payload), this.#payloadView,
           i18nString(UIStrings.payload), /* userGesture=*/ void 0,
@@ -316,7 +348,7 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
     const trustTokenResult = this.#request.trustTokenOperationDoneEvent();
     if (trustTokenResult &&
         !NetworkComponents.RequestTrustTokensView.statusConsideredSuccess(trustTokenResult.status)) {
-      const icon = new IconButton.Icon.Icon();
+      const icon = new Icon();
       icon.name = 'cross-circle-filled';
       icon.classList.add('small');
       this.setTabIcon(NetworkForward.UIRequestLocation.UIRequestTabs.TRUST_TOKENS, icon);
@@ -356,7 +388,7 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
     this.#headersViewComponent?.revealHeader(section, header);
   }
 
-  getHeadersViewComponent(): NetworkComponents.RequestHeadersView.RequestHeadersView|undefined {
+  getHeadersViewComponent(): RequestHeadersView|undefined {
     return this.#headersViewComponent;
   }
 }

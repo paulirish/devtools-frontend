@@ -2,7 +2,7 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -113,8 +113,6 @@ export abstract class ResourceChunkView<Chunk> extends UI.Widget.VBox {
     this.dataGrid = new DataGrid.SortableDataGrid.SortableDataGrid({
       displayName: dataGridDisplayName,
       columns,
-      deleteCallback: undefined,
-      refreshCallback: undefined,
     });
     this.dataGrid.setRowContextMenuCallback(onRowContextMenu.bind(this));
     this.dataGrid.setEnableAutoScrollToBottom(true);
@@ -201,7 +199,7 @@ export abstract class ResourceChunkView<Chunk> extends UI.Widget.VBox {
         weight: 5,
       },
       {id: 'time', title: i18nString(UIStrings.time), sortable: true, weight: 7},
-    ] as DataGrid.DataGrid.ColumnDescriptor[];
+    ];
   }
 
   chunkAdded(chunk: Chunk): void {

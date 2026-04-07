@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {strict as assert} from 'assert';
-import fs from 'fs';
+import {strict as assert} from 'node:assert';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import {analyzeTrace} from '../analyze-trace.mjs';
@@ -35,7 +35,7 @@ test('numeric values are set and look legit', t => {
   for (const datum of shouldBeNumbers) {
     assert.equal(typeof datum, 'number');
     if (typeof datum !== 'number')
-      throw new Error();
+      {throw new Error();}
     assert.equal(isNaN(datum), false);
     assert.equal(datum > 10, true);
   }
@@ -53,7 +53,7 @@ test('string values are set and look legit', t => {
   for (const datum of shouldBeStrings) {
     assert.equal(typeof datum, 'string');
     if (typeof datum !== 'string')
-      throw new Error();
+      {throw new Error();}
     assert.equal(datum.length > 10, true);
   }
 });
@@ -85,6 +85,7 @@ test('insights look ok', t => {
     'SlowCSSSelector',
     'ForcedReflow',
     'Cache',
+    'CharacterSet',
     'ModernHTTP',
     'LegacyJavaScript',
   ]);
@@ -96,8 +97,8 @@ test('insights look ok', t => {
     assert.ok(typeof insightItem === 'object', `insightName ${insightName} is not an object`);
   }
 
-  const entityNames = insightSet.model.ThirdParties.entitySummaries.map(s => s.entity.name);
-  const values = insightSet.model.ThirdParties.entitySummaries.values();
+  const entityNames = insightSet.model.ThirdParties?.entitySummaries.map(s => s.entity.name) ?? [];
+  const values = insightSet.model.ThirdParties?.entitySummaries.values() ?? [];
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], {transferSize: v.transferSize, mainThreadTime: v.mainThreadTime}]));
 
   const expected = {
@@ -124,14 +125,13 @@ test('bottom-up summary is good', t => {
       visibleEvents.concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
   const milliBounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.data.Meta.traceBounds);
 
-
   const mainThreadProbably =
       Trace.Handlers.Threads.threadsInTrace(parsedTrace.data)
           .filter(t => t.type === Trace.Handlers.Threads.ThreadType.MAIN_THREAD && t.processIsOnMainFrame)
           .sort((a, b) => b.entries.length - a.entries.length)
           .at(0);
   if (!mainThreadProbably)
-    assert.fail('No main thread found in trace');
+    {assert.fail('No main thread found in trace');}
 
   /** @param {Trace.Types.Events.Event} event  */
   const groupingFunction = event => event.name;
@@ -177,7 +177,6 @@ v8.produceModuleCache         	     0.005ms
 Decode Image                  	     0.043ms
 `.trim());
 });
-
 
 // TODO: needs more work...
 // test('inspector issues ok', t => {

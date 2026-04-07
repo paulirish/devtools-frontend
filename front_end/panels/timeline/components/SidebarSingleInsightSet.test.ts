@@ -5,30 +5,45 @@
 import * as Trace from '../../../models/trace/trace.js';
 import {getCleanTextContentFromElements, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {getInsightSetOrError} from '../../../testing/InsightHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
-import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import type * as UI from '../../../ui/legacy/legacy.js';
 
 import * as Components from './components.js';
 import type * as InsightComponents from './insights/insights.js';
 
 type BaseInsightComponent =
     InsightComponents.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>;
+type BaseInsightWidget = UI.Widget.WidgetElement<BaseInsightComponent>;
 
-function getUserVisibleInsights(component: Components.SidebarSingleInsightSet.SidebarSingleInsightSet): string[] {
-  assert.isOk(component.shadowRoot);
-  return [...component.shadowRoot.querySelectorAll<BaseInsightComponent>('[data-insight-name]')]
-      .flatMap(component => getCleanTextContentFromElements(component.shadowRoot!, '.insight-title'))
+function getInsightComponents(insightSetComponent: Components.SidebarSingleInsightSet.SidebarSingleInsightSet):
+    BaseInsightComponent[] {
+  assert.isOk(insightSetComponent.element.shadowRoot);
+  return [
+    ...insightSetComponent.element.shadowRoot.querySelectorAll<BaseInsightWidget>('.insight-component-widget')
+  ].map(widgetElement => {
+    const widget = widgetElement.getWidget();
+    assert.isOk(widget);
+    return widget;
+  });
+}
+
+function getInsightComponentsTitles(insightSetComponent: Components.SidebarSingleInsightSet.SidebarSingleInsightSet):
+    string[] {
+  return getInsightComponents(insightSetComponent)
+      .flatMap(widget => getCleanTextContentFromElements(widget.element.shadowRoot!, '.insight-title'))
       .filter(Boolean);
 }
 
-function getPassedInsights(component: Components.SidebarSingleInsightSet.SidebarSingleInsightSet): string[] {
-  assert.isOk(component.shadowRoot);
-  const passedInsightsSection = component.shadowRoot.querySelector<HTMLDetailsElement>('.passed-insights-section');
+function getPassedInsights(insightSetComponent: Components.SidebarSingleInsightSet.SidebarSingleInsightSet): string[] {
+  assert.isOk(insightSetComponent.element.shadowRoot);
+  const passedInsightsSection =
+      insightSetComponent.element.shadowRoot.querySelector<HTMLDetailsElement>('.passed-insights-section');
   assert.isOk(passedInsightsSection);
   passedInsightsSection.open = true;
-  return [
-    ...passedInsightsSection.querySelectorAll<BaseInsightComponent>('.passed-insights-section [data-insight-name]')
-  ].flatMap(component => getCleanTextContentFromElements(component.shadowRoot!, '.insight-title'));
+  return getInsightComponents(insightSetComponent)
+      .filter(widget => widget.element.closest('.passed-insights-section'))
+      .flatMap(widget => getCleanTextContentFromElements(widget.element.shadowRoot!, '.insight-title'));
 }
 
 describeWithEnvironment('SidebarSingleInsightSet', () => {
@@ -38,27 +53,26 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     assert.isOk(parsedTrace.insights);
     // only one navigation in this trace.
     assert.strictEqual(parsedTrace.insights.size, 1);
-    // This is the navigationID from this trace.
-    const navigationId = '8463DF94CD61B265B664E7F768183DE3';
-    assert.isTrue(parsedTrace.insights.has(navigationId));
+    const insightSet = getInsightSetOrError(parsedTrace.insights, '8463DF94CD61B265B664E7F768183DE3');
 
     const component = new Components.SidebarSingleInsightSet.SidebarSingleInsightSet();
     renderElementIntoDOM(component);
     component.data = {
-      insightSetKey: navigationId,
+      insightSetKey: insightSet.id,
       activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: null,
       parsedTrace,
     };
-    await RenderCoordinator.done();
+    await component.updateComplete;
 
-    const userVisibleTitles = getUserVisibleInsights(component);
+    const userVisibleTitles = getInsightComponentsTitles(component);
     assert.deepEqual(userVisibleTitles, [
       'LCP breakdown',
       'LCP request discovery',
-      'Render blocking requests',
+      'Render-blocking requests',
       'Document request latency',
       '3rd parties',
+      'Declare a character encoding',
     ]);
 
     const passedInsightTitles = getPassedInsights(component);
@@ -81,19 +95,20 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
 
   it('does not render experimental insights by default', async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'font-display.json.gz');
+    assert.isOk(parsedTrace.insights);
+
     const component = new Components.SidebarSingleInsightSet.SidebarSingleInsightSet();
     renderElementIntoDOM(component);
-    const firstNavigation = parsedTrace.data.Meta.mainFrameNavigations.at(0)?.args.data?.navigationId;
-    assert.isOk(firstNavigation);
+    const firstNavigation = parsedTrace.data.Meta.mainFrameNavigations.at(0);
+    const insightSet = getInsightSetOrError(parsedTrace.insights, firstNavigation);
     component.data = {
-      insightSetKey: firstNavigation,
+      insightSetKey: insightSet.id,
       activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: null,
       parsedTrace,
     };
-    await RenderCoordinator.done();
-    const userVisibleTitles = getUserVisibleInsights(component);
-    // Does not include "font display", which is experimental.
+    await component.updateComplete;
+    const userVisibleTitles = getInsightComponentsTitles(component);
     assert.deepEqual(userVisibleTitles, [
       'LCP breakdown',
       'Layout shift culprits',
@@ -102,14 +117,14 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Font display',
       '3rd parties',
       'Use efficient cache lifetimes',
+      'Declare a character encoding',
     ]);
 
     const passedInsightTitles = getPassedInsights(component);
-    // Does not include "font display", which is experimental.
     assert.deepEqual(passedInsightTitles, [
       'INP breakdown',
       'LCP request discovery',
-      'Render blocking requests',
+      'Render-blocking requests',
       'Document request latency',
       'Optimize viewport for mobile',
       'Optimize DOM size',
@@ -127,11 +142,9 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     assert.isOk(parsedTrace.insights);
     // only one navigation in this trace.
     assert.strictEqual(parsedTrace.insights.size, 1);
-    // This is the navigationID from this trace.
-    const navigationId = '8463DF94CD61B265B664E7F768183DE3';
-    assert.isTrue(parsedTrace.insights.has(navigationId));
+    const insightSet = getInsightSetOrError(parsedTrace.insights, '8463DF94CD61B265B664E7F768183DE3');
 
-    const model = parsedTrace.insights.get(navigationId)?.model.LCPBreakdown;
+    const model = insightSet.model.LCPBreakdown;
     if (!model) {
       throw new Error('missing LCPBreakdown model');
     }
@@ -139,20 +152,17 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     const component = new Components.SidebarSingleInsightSet.SidebarSingleInsightSet();
     renderElementIntoDOM(component);
     component.data = {
-      insightSetKey: navigationId,
+      insightSetKey: insightSet.id,
       activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: {
         model,
-        insightSetKey: navigationId,
+        insightSetKey: insightSet.id,
       },
       parsedTrace,
     };
-    await RenderCoordinator.done();
+    await component.updateComplete;
 
-    const expandedInsight =
-        [...component.shadowRoot!.querySelectorAll<BaseInsightComponent>('[data-insight-name]')].find(insight => {
-          return insight.selected;
-        });
+    const expandedInsight = getInsightComponents(component).find(insightComponent => insightComponent.selected);
     assert.isOk(expandedInsight);
     assert.strictEqual(expandedInsight.model?.title, 'LCP breakdown');
   });

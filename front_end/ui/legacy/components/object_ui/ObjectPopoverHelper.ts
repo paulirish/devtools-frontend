@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Geometry from '../../../../models/geometry/geometry.js';
+import {Link} from '../../../kit/kit.js';
+import {render} from '../../../lit/lit.js';
 import * as UI from '../../legacy.js';
 import * as Components from '../utils/utils.js';
 
@@ -65,7 +67,8 @@ export class ObjectPopoverHelper {
         const titleElement = popoverContentElement.createChild('div', 'object-popover-title');
         if (result.type === 'function') {
           titleElement.classList.add('source-code');
-          titleElement.appendChild(ObjectPropertiesSection.valueElementForFunctionDescription(result.description));
+          // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+          render(ObjectPropertiesSection.valueElementForFunctionDescription(result.description), titleElement);
         } else {
           titleElement.classList.add('monospace');
           titleElement.createChild('span').textContent = description;
@@ -107,8 +110,7 @@ export class ObjectPopoverHelper {
     descriptionDiv.dataset.stableNameForTest = 'object-popover-content';
     popover.registerRequiredCSS(objectPopoverStyles);
     descriptionDiv.textContent = description;
-    const learnMoreLink =
-        UI.XLink.XLink.create(link, i18nString(UIStrings.learnMore), undefined, undefined, 'learn-more');
+    const learnMoreLink = Link.create(link, i18nString(UIStrings.learnMore), undefined, 'learn-more');
     const footerDiv = document.createElement('div');
     footerDiv.classList.add('object-popover-footer');
     footerDiv.appendChild(learnMoreLink);

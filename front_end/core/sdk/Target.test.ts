@@ -5,20 +5,22 @@
 import {
   createTarget,
 } from '../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-} from '../../testing/MockConnection.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
 import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-describeWithMockConnection('Target', () => {
+describe('Target', () => {
   let browserTarget: SDK.Target.Target;
   let tabTarget: SDK.Target.Target;
   let mainFrameTargetUnderTab: SDK.Target.Target;
   let subframeTarget: SDK.Target.Target;
+
+  setupRuntimeHooks();
+  setupSettingsHooks();
 
   beforeEach(() => {
     browserTarget = createTarget({type: SDK.Target.Type.BROWSER});
@@ -38,7 +40,9 @@ describeWithMockConnection('Target', () => {
     assert.isFalse(subframeTarget.hasAllCapabilities(SDK.Target.Capability.DEVICE_EMULATION));
   });
 
-  it('should grant STORAGE capability to top-level workers', () => {
+  // Temporarily disabled until the root cause for the crashers in https://crbug.com/466134219 is
+  // found and resolved.
+  it.skip('[crbug.com/406991275] should grant STORAGE capability to top-level workers', () => {
     const serviceWorker = createTarget({type: SDK.Target.Type.ServiceWorker, parentTarget: browserTarget});
     const sharedWorker = createTarget({type: SDK.Target.Type.SHARED_WORKER, parentTarget: browserTarget});
     const dedicatedWorker = createTarget({type: SDK.Target.Type.Worker, parentTarget: browserTarget});

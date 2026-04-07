@@ -17,7 +17,6 @@ devtools_module("ai_code_completion") {
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/root:bundle",
-    "../../ui/components/text_editor:bundle",
   ]
 }
 
@@ -28,8 +27,10 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../panels/common/*",
     "../../panels/console/*",
     "../../panels/sources/*",
+    "../../ui/components/text_editor/*",
   ]
 
   visibility += devtools_models_visibility

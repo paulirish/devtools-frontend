@@ -91,10 +91,12 @@ A bunch of bundles with the exact same content: https://dupe-modules-lh-2.surge.
 
 Like above, but the source maps are inline data urls. https://dupe-modules-lh-inline-data.surge.sh/smaller.html
 
-### enhanced-traces.json.gz
+### enhanced-traces.json
 
 a) Contains traces with metadata needed to power a rehydrated session for enhanced tracing.
 b) (faked) script contents and source map urls, from the new "enhanced traces" feature. See http://crbug.com/337909145
+
+Not compressed because this is small and often modified.
 
 ### forced-layouts-and-no-gpu.json.gz
 
@@ -194,7 +196,7 @@ This is a trace that includes multiple navigations:
 
 ### multiple-navigations-render-blocking.json.gz
 
-Contains a navigation to a page with a render blocking request `script.js` followed by a page refresh.
+Contains a navigation to a page with a render-blocking request `script.js` followed by a page refresh.
 
 ### multiple-navigations-same-id.json.gz
 
@@ -263,11 +265,11 @@ Contains the following requests in the document body:
 
 ### render-blocking-in-iframe.json.gz
 
-Contains a navigation to a page with a render blocking request `style.css?main` and an iframe. The iframe also contains a render blocking request `style.css?iframe`.
+Contains a navigation to a page with a render-blocking request `style.css?main` and an iframe. The iframe also contains a render-blocking request `style.css?iframe`.
 
 ### render-blocking-requests.json.gz
 
-A page that has a few render blocking requests:
+A page that has a few render-blocking requests:
 
 - jQuery from a CDN
 - a stylesheet
@@ -359,3 +361,19 @@ A trace with lots of interactions generated from https://chromedevtools.github.i
 ### layout-shift-with-animation-culprit
 
 A trace that has a layout shift with a root cause that is a non-composited animation. Generated from https://github.com/ChromeDevTools/performance-stories/tree/main/layout-shift-animations.
+
+### cls-with-iframes
+
+A trace of https://astro-news-1026410574114.us-central1.run.app/ used to test CLS + iframes and what our AI output looks like.
+
+### render-blocking-preload
+
+A trace of https://andydavies.github.io/agent-tests/render-blocking/css-preload.html that highlighted a bug where we do not update render-blocking status based on PreloadRenderBlockingStatus events (crbug.com/457323832).
+
+### soft-navs
+
+A trace of https://developer.chrome.com/docs/web-platform/soft-navigations-experiment, navigating to many other pages on the same domain. All are soft navigations.
+
+### resource-initiators
+
+A trace created from https://github.com/ChromeDevTools/performance-stories/tree/main/resource-initiators which contains a bunch of different resources that get injected in different ways, so we can test our initiator logic.

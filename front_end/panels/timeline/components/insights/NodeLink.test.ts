@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../../../core/common/common.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 import {raf, renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
@@ -12,6 +11,8 @@ import {
   describeWithMockConnection,
   setMockConnectionResponseHandler
 } from '../../../../testing/MockConnection.js';
+import {html} from '../../../../ui/lit/lit.js';
+import * as PanelsCommon from '../../../common/common.js';
 
 import * as Insights from './insights.js';
 
@@ -25,10 +26,8 @@ describeWithMockConnection('NodeLink', () => {
   });
 
   it('renders a node link', async () => {
-    const linkifyStub = sinon.stub(Common.Linkifier.Linkifier, 'linkify').callsFake(() => {
-      const elem = document.createElement('div');
-      elem.classList.add('fake-linkify-node');
-      return Promise.resolve(elem);
+    const linkifyStub = sinon.stub(PanelsCommon.DOMLinkifier.Linkifier.instance(), 'linkify').callsFake(() => {
+      return html`<div class="fake-linkify-node"></div>`;
     });
 
     // Create a mock target, dom model, document and node.
@@ -40,7 +39,8 @@ describeWithMockConnection('NodeLink', () => {
     domNode.id = nodeId(2);
     // Set related CDP methods responses to return our mock document and node.
     setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => ({nodeIds: [domNode.id]}));
-    setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+    setMockConnectionResponseHandler(
+        'DOM.getDocument', () => ({root: documentNode} as Protocol.DOM.GetDocumentResponse));
 
     // Register the mock document and node in DOMModel, these use the mock responses set above.
     await domModel.requestDocument();
@@ -54,11 +54,10 @@ describeWithMockConnection('NodeLink', () => {
     renderElementIntoDOM(component);
     // await new Promise(r => setTimeout(r, 1000));
     await raf();
-    assert.isOk(component.shadowRoot);
 
     // Check that linkify was called with the right Node and we rendered the linkified node.
     sinon.assert.calledWith(linkifyStub, domNode);
-    assert.instanceOf(component.shadowRoot.querySelector('.fake-linkify-node'), Element);
+    assert.instanceOf(component.element.shadowRoot?.querySelector('.fake-linkify-node'), Element);
   });
 
   it('falls back to an HTML snippet if one is passed in', async () => {
@@ -71,7 +70,8 @@ describeWithMockConnection('NodeLink', () => {
     domNode.id = nodeId(2);
     // Return an empty array of NodeIds so that the frontend resolution fails.
     setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => ({nodeIds: []}));
-    setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+    setMockConnectionResponseHandler(
+        'DOM.getDocument', () => ({root: documentNode} as Protocol.DOM.GetDocumentResponse));
     await domModel.requestDocument();
     domModel.registerNode(domNode);
 
@@ -83,7 +83,7 @@ describeWithMockConnection('NodeLink', () => {
     };
     renderElementIntoDOM(component);
     await raf();
-    const fallback = component.shadowRoot?.querySelector('pre');
+    const fallback = component.element.shadowRoot?.querySelector('pre');
     assert.isOk(fallback);
     assert.strictEqual(fallback.innerText, '<p class=\"fallback\">fallback html</p>');
   });
@@ -98,7 +98,8 @@ describeWithMockConnection('NodeLink', () => {
     domNode.id = nodeId(2);
     // Return an empty array of NodeIds so that the frontend resolution fails.
     setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => ({nodeIds: []}));
-    setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+    setMockConnectionResponseHandler(
+        'DOM.getDocument', () => ({root: documentNode} as Protocol.DOM.GetDocumentResponse));
     await domModel.requestDocument();
     domModel.registerNode(domNode);
 
@@ -106,7 +107,7 @@ describeWithMockConnection('NodeLink', () => {
     component.data = {backendNodeId: nodeId(2), frame: domNode.frameId() as string, fallbackText: 'Fallback text'};
     renderElementIntoDOM(component);
     await raf();
-    const fallback = component.shadowRoot?.querySelector('span');
+    const fallback = component.element.shadowRoot?.querySelector('span');
     assert.isOk(fallback);
     assert.strictEqual(fallback.innerText, 'Fallback text');
   });

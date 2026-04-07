@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import path from 'path';
+import path from 'node:path';
 
 import rule from '../lib/l10n-filename-matches.ts';
 
@@ -11,7 +11,6 @@ import {RuleTester} from './utils/RuleTester.ts';
 const optionsFrontEndDir = [
   {
     rootFrontendDirectory: path.join(
-        // @ts-expect-error
         import.meta.dirname,
         '..',
         '..',
@@ -24,7 +23,6 @@ const optionsFrontEndDir = [
 const optionsComponentDir = [
   {
     rootFrontendDirectory: path.join(
-        // @ts-expect-error
         import.meta.dirname,
         '..',
         '..',

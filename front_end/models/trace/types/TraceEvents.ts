@@ -85,6 +85,9 @@ export interface Event {
   tdur?: Micro;
   dur?: Micro;
 }
+export function objectIsEvent(obj: object): obj is Event {
+  return 'cat' in obj && 'name' in obj && 'ts' in obj;
+}
 
 export interface Args {
   data?: ArgsData;
@@ -97,6 +100,8 @@ export interface ArgsData {
   sampleTraceId?: number;
   url?: string;
   navigationId?: string;
+  /** For soft navs. */
+  performanceTimelineNavigationId?: number;
   frame?: string;
 }
 
@@ -161,6 +166,7 @@ export interface Profile extends Sample {
   args: Args&{
     data: ArgsData & {
       startTime: Micro,
+      source?: ProfileSource,
     },
   };
 }
@@ -173,7 +179,9 @@ export interface ProfileChunk extends Sample {
     data?: ArgsData & {
       cpuProfile?: PartialProfile,
       timeDeltas?: Micro[],
-      lines?: Micro[],
+      lines?: number[],
+      source?: ProfileSource,
+      columns?: number[],
     },
   };
 }
@@ -190,6 +198,20 @@ export interface PartialProfile {
   trace_ids?: Record<string, number>;
   /* eslint-enable @typescript-eslint/naming-convention */
 }
+
+/**
+ * Source of profile data, used to select the most relevant profile when
+ * multiple profiles exist for the same thread.
+ *
+ * - 'Inspector': User-initiated via console.profile()/profileEnd().
+ * - 'Internal': Browser-initiated during performance traces.
+ * - 'SelfProfiling': Page-initiated via JS Self-Profiling API.
+ *
+ * Selection priority (see PROFILE_SOURCES_BY_PRIORITY in SamplesHandler.ts).
+ */
+export type ProfileSource = 'Inspector'|'SelfProfiling'|'Internal';
+
+export const VALID_PROFILE_SOURCES: readonly ProfileSource[] = ['Inspector', 'SelfProfiling', 'Internal'] as const;
 
 export interface PartialNode {
   callFrame: CallFrame;
@@ -656,7 +678,7 @@ export interface Mark extends Event {
 }
 
 export interface NavigationStart extends Mark {
-  name: 'navigationStart';
+  name: Name.NAVIGATION_START;
   args: Args&{
     frame: string,
     data?: ArgsData&{
@@ -682,6 +704,29 @@ export interface NavigationStart extends Mark {
   };
 }
 
+export interface SoftNavigationStart extends Event {
+  name: Name.SOFT_NAVIGATION_START;
+  ph: Phase.ASYNC_NESTABLE_INSTANT;
+  args: Args&{
+    frame: string,
+    context: {
+      softNavContextId: number,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      URL: string,
+      timeOrigin: number,
+      domModifications: number,
+      firstContentfulPaint: number,
+      paintedArea: number,
+      performanceTimelineNavigationId: number,
+      repaintedArea: number,
+    },
+  };
+}
+
+export function isSoftNavigationStart(event: Event): event is SoftNavigationStart {
+  return event.name === Name.SOFT_NAVIGATION_START;
+}
+
 export interface FirstContentfulPaint extends Mark {
   name: Name.MARK_FCP;
   args: Args&{
@@ -693,7 +738,7 @@ export interface FirstContentfulPaint extends Mark {
 }
 
 export interface FirstPaint extends Mark {
-  name: 'firstPaint';
+  name: Name.MARK_FIRST_PAINT;
   args: Args&{
     frame: string,
     data?: ArgsData&{
@@ -702,27 +747,21 @@ export interface FirstPaint extends Mark {
   };
 }
 
-export type PageLoadEvent = FirstContentfulPaint|MarkDOMContent|InteractiveTime|LargestContentfulPaintCandidate|
-    LayoutShift|FirstPaint|MarkLoad|NavigationStart;
+export type PageLoadEvent = FirstContentfulPaint|MarkDOMContent|InteractiveTime|AnyLargestContentfulPaintCandidate|
+    LayoutShift|FirstPaint|MarkLoad|NavigationStart|SoftNavigationStart;
 
 const markerTypeGuards = [
   isMarkDOMContent,
   isMarkLoad,
   isFirstPaint,
   isFirstContentfulPaint,
-  isLargestContentfulPaintCandidate,
+  isAnyLargestContentfulPaintCandidate,
   isNavigationStart,
+  isSoftNavigationStart,
 ];
 
-export const MarkerName =
-    ['MarkDOMContent', 'MarkLoad', 'firstPaint', 'firstContentfulPaint', 'largestContentfulPaint::Candidate'] as const;
-
-export interface MarkerEvent extends Event {
-  name: typeof MarkerName[number];
-}
-
 export function isMarkerEvent(event: Event): event is MarkerEvent {
-  if (event.ph === Phase.INSTANT || event.ph === Phase.MARK) {
+  if (event.ph === Phase.INSTANT || Phase.ASYNC_NESTABLE_INSTANT || event.ph === Phase.MARK) {
     return markerTypeGuards.some(fn => fn(event));
   }
   return false;
@@ -734,7 +773,7 @@ const pageLoadEventTypeGuards = [
 ];
 
 export function eventIsPageLoadEvent(event: Event): event is PageLoadEvent {
-  if (event.ph === Phase.INSTANT || event.ph === Phase.MARK) {
+  if (event.ph === Phase.INSTANT || Phase.ASYNC_NESTABLE_INSTANT || event.ph === Phase.MARK) {
     return pageLoadEventTypeGuards.some(fn => fn(event));
   }
   return false;
@@ -757,6 +796,28 @@ export interface LargestContentfulPaintCandidate extends Mark {
     },
   };
 }
+
+export interface LargestContentfulPaintCandidateForSoftNavigation extends Mark {
+  name: Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
+  args: Args&{
+    frame: string,
+    data?: ArgsData&{
+      candidateIndex: number,
+      isOutermostMainFrame: boolean,
+      isMainFrame: boolean,
+      nodeId: Protocol.DOM.BackendNodeId,
+      loadingAttr: string,
+      performanceTimelineNavigationId: number,
+      type?: string,
+      // Landed in Chrome M140: crrev.com/c/6702010
+      nodeName?: string,
+    },
+  };
+}
+
+export type AnyLargestContentfulPaintCandidate =
+    LargestContentfulPaintCandidate|LargestContentfulPaintCandidateForSoftNavigation;
+
 export interface LargestImagePaintCandidate extends Mark {
   name: 'LargestImagePaint::Candidate';
   args: Args&{
@@ -898,7 +959,7 @@ export interface CommitLoad extends Instant {
 }
 
 export interface MarkDOMContent extends Instant {
-  name: 'MarkDOMContent';
+  name: Name.MARK_DOM_CONTENT;
   args: Args&{
     data?: ArgsData & {
       frame: string,
@@ -910,7 +971,7 @@ export interface MarkDOMContent extends Instant {
 }
 
 export interface MarkLoad extends Instant {
-  name: 'MarkLoad';
+  name: Name.MARK_LOAD;
   args: Args&{
     data?: ArgsData & {
       frame: string,
@@ -937,7 +998,7 @@ export interface TraceImpactedNode {
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-type LayoutShiftData = ArgsData&{
+export type LayoutShiftData = ArgsData&{
   // These keys come from the trace data, so we have to use underscores.
   /* eslint-disable @typescript-eslint/naming-convention */
   cumulative_score: number,
@@ -1001,7 +1062,7 @@ export const NO_NAVIGATION = 'NO_NAVIGATION';
  * portion of the trace for which we don't have any navigation event for (as it happeneded prior
  * to the trace start).
  */
-export type NavigationId = string|typeof NO_NAVIGATION;
+export type NavigationId = string;
 
 /**
  * This is a synthetic Layout shift cluster. The rawSourceEvent is the worst layout shift event
@@ -1058,7 +1119,6 @@ export interface ResourceSendRequest extends Instant {
       resourceType?: Protocol.Network.ResourceType,
       /** Added Feb 2024. https://crrev.com/c/5297615 */
       fetchPriorityHint?: FetchPriorityHint,
-      // TODO(crbug.com/1457985): change requestMethod to enum when confirm in the backend code.
       requestMethod?: string,
       renderBlocking?: RenderBlocking,
       initiator?: Initiator,
@@ -1283,6 +1343,22 @@ export interface ParseMetaViewport extends Instant {
 }
 export function isParseMetaViewport(event: Event): event is ParseMetaViewport {
   return event.name === Name.PARSE_META_VIEWPORT;
+}
+
+export type MetaCharsetDisposition = 'found-in-first-1024-bytes'|'found-after-first-1024-bytes'|'not-found';
+
+export interface MetaCharsetCheck extends Instant {
+  name: Name.META_CHARSET_CHECK;
+  args: Args&{
+    data: {
+      frame: string,
+      disposition: MetaCharsetDisposition,
+    },
+  };
+}
+
+export function isMetaCharsetCheck(event: Event): event is MetaCharsetCheck {
+  return event.name === Name.META_CHARSET_CHECK;
 }
 
 export interface LinkPreconnect extends Instant {
@@ -1757,6 +1833,10 @@ export interface SyntheticJSSample extends Event {
   ph: Phase.INSTANT;
 }
 
+export function isJSSample(event: Event): event is SyntheticJSSample {
+  return event.name === Name.JS_SAMPLE;
+}
+
 export function isSyntheticInteraction(event: Event): event is SyntheticInteractionPair {
   return Boolean(
       'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
@@ -2187,11 +2267,14 @@ export function isLayoutInvalidationTracking(
 }
 
 export function isFirstContentfulPaint(event: Event): event is FirstContentfulPaint {
-  return event.name === 'firstContentfulPaint';
+  return event.name === Name.MARK_FCP;
 }
 
-export function isLargestContentfulPaintCandidate(event: Event): event is LargestContentfulPaintCandidate {
-  return event.name === Name.MARK_LCP_CANDIDATE;
+export function isAnyLargestContentfulPaintCandidate(event: Event): event is AnyLargestContentfulPaintCandidate {
+  return event.name === Name.MARK_LCP_CANDIDATE || event.name === Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
+}
+export function isSoftLargestContentfulPaintCandidate(event: Event): event is AnyLargestContentfulPaintCandidate {
+  return event.name === Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
 }
 export function isLargestImagePaintCandidate(event: Event): event is LargestImagePaintCandidate {
   return event.name === 'LargestImagePaint::Candidate';
@@ -2201,15 +2284,15 @@ export function isLargestTextPaintCandidate(event: Event): event is LargestTextP
 }
 
 export function isMarkLoad(event: Event): event is MarkLoad {
-  return event.name === 'MarkLoad';
+  return event.name === Name.MARK_LOAD;
 }
 
 export function isFirstPaint(event: Event): event is FirstPaint {
-  return event.name === 'firstPaint';
+  return event.name === Name.MARK_FIRST_PAINT;
 }
 
 export function isMarkDOMContent(event: Event): event is MarkDOMContent {
-  return event.name === 'MarkDOMContent';
+  return event.name === Name.MARK_DOM_CONTENT;
 }
 
 export function isInteractiveTime(event: Event): event is InteractiveTime {
@@ -2317,7 +2400,7 @@ export function isPrePaint(
 
 /** A VALID navigation start (as it has a populated documentLoaderURL) */
 export function isNavigationStart(event: Event): event is NavigationStart {
-  return event.name === 'navigationStart' && (event as NavigationStart).args?.data?.documentLoaderURL !== '';
+  return event.name === Name.NAVIGATION_START && (event as NavigationStart).args?.data?.documentLoaderURL !== '';
 }
 
 export interface DidCommitSameDocumentNavigation extends Complete {
@@ -2804,7 +2887,7 @@ export interface FunctionCall extends Complete {
   args: Args&{
     data?: Partial<CallFrame>& {
       frame?: string,
-      isolate?: number,
+      isolate?: string,
     },
   };
 }
@@ -3028,6 +3111,7 @@ export enum Name {
   SELECTOR_STATS = 'SelectorStats',
   BEGIN_COMMIT_COMPOSITOR_FRAME = 'BeginCommitCompositorFrame',
   PARSE_META_VIEWPORT = 'ParseMetaViewport',
+  META_CHARSET_CHECK = 'MetaCharsetCheck',
 
   /* Paint */
   SCROLL_LAYER = 'ScrollLayer',
@@ -3070,8 +3154,10 @@ export enum Name {
   MARK_FIRST_PAINT = 'firstPaint',
   MARK_FCP = 'firstContentfulPaint',
   MARK_LCP_CANDIDATE = 'largestContentfulPaint::Candidate',
+  MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION = 'largestContentfulPaint::CandidateForSoftNavigation',
   MARK_LCP_INVALIDATE = 'largestContentfulPaint::Invalidate',
   NAVIGATION_START = 'navigationStart',
+  SOFT_NAVIGATION_START = 'SoftNavigationStart',
   CONSOLE_TIME = 'ConsoleTime',
   USER_TIMING = 'UserTiming',
   INTERACTIVE_TIME = 'InteractiveTime',
@@ -3142,6 +3228,23 @@ export enum Name {
   USER_TIMING_MEASURE = 'UserTiming::Measure',
 
   LINK_PRECONNECT = 'LinkPreconnect',
+
+  PRELOAD_RENDER_BLOCKING_STATUS_CHANGE = 'PreloadRenderBlockingStatusChange',
+}
+
+export const MarkerName = [
+  Name.MARK_DOM_CONTENT,
+  Name.MARK_LOAD,
+  Name.MARK_FIRST_PAINT,
+  Name.MARK_FCP,
+  Name.MARK_LCP_CANDIDATE,
+  Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION,
+  Name.NAVIGATION_START,
+  Name.SOFT_NAVIGATION_START,
+] as const;
+
+export interface MarkerEvent extends Event {
+  name: typeof MarkerName[number];
 }
 
 /**
@@ -3274,4 +3377,21 @@ export interface RundownScriptStub extends Event {
 export function isAnyScriptSourceEvent(event: Event): event is RundownScriptSource|RundownScriptSourceLarge|
     RundownScriptStub {
   return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources';
+}
+
+export interface PreloadRenderBlockingStatusChangeEvent extends Instant {
+  name: Name.PRELOAD_RENDER_BLOCKING_STATUS_CHANGE;
+  cat: 'devtools.timeline';
+  args: Args&{
+    data: {
+      requestId: string,
+      url: string,
+      renderBlocking?: RenderBlocking,
+    },
+  };
+}
+
+export function isPreloadRenderBlockingStatusChangeEvent(event: Event):
+    event is PreloadRenderBlockingStatusChangeEvent {
+  return event.name === Name.PRELOAD_RENDER_BLOCKING_STATUS_CHANGE;
 }

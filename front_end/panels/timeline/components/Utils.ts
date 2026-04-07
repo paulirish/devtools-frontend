@@ -1,7 +1,7 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -227,7 +227,7 @@ export namespace NumberWithUnit {
       element.append(lastPart);
     }
 
-    return {text: element.textContent ?? '', element};
+    return {text: element.textContent, element};
   }
 
   export function formatMicroSecondsAsMillisFixed(time: Platform.Timing.MicroSeconds, fractionDigits = 0):
@@ -253,7 +253,7 @@ export namespace NumberWithUnit {
       element.append(lastPart);
     }
 
-    return {text: element.textContent ?? '', element};
+    return {text: element.textContent, element};
   }
 }
 
@@ -299,4 +299,29 @@ export function determineCompareRating(
   }
 
   return 'similar';
+}
+
+/**
+ * Returns true if LCP or INP are worse in the field than what was observed locally.
+ *
+ * CLS is ignored because the guidance of applying throttling or device emulation doesn't
+ * correlate as much with observing a more average user experience.
+ */
+export function isFieldWorseThanLocal(local: {lcp?: Trace.Types.Timing.Milli, inp?: Trace.Types.Timing.Milli}, field: {
+  lcp?: Trace.Types.Timing.Milli,
+  inp?: Trace.Types.Timing.Milli,
+}): boolean {
+  if (local.lcp !== undefined && field.lcp !== undefined) {
+    if (determineCompareRating('LCP', local.lcp, field.lcp) === 'better') {
+      return true;
+    }
+  }
+
+  if (local.inp !== undefined && field.inp !== undefined) {
+    if (determineCompareRating('LCP', local.inp, field.inp) === 'better') {
+      return true;
+    }
+  }
+
+  return false;
 }

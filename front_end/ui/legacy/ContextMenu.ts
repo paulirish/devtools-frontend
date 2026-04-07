@@ -122,8 +122,6 @@ export class Item {
           label: this.label,
           isExperimentalFeature: this.previewFeature,
           enabled: !this.disabled,
-          checked: undefined,
-          subItems: undefined,
           tooltip: this.#tooltip,
           jslogContext: this.jslogContext,
           featureName: this.featureName,
@@ -145,11 +143,6 @@ export class Item {
       case 'separator': {
         return {
           type: 'separator',
-          id: undefined,
-          label: undefined,
-          enabled: undefined,
-          checked: undefined,
-          subItems: undefined,
         };
       }
       case 'checkbox': {
@@ -160,7 +153,6 @@ export class Item {
           checked: Boolean(this.checked),
           isExperimentalFeature: this.previewFeature,
           enabled: !this.disabled,
-          subItems: undefined,
           tooltip: this.#tooltip,
           jslogContext: this.jslogContext,
         };
@@ -221,12 +213,12 @@ export class Section {
 
   /**
    * Appends a standard clickable item to this section.
-   * @param label The text to display for the item.
+   * @param labelOrItem The text to display for the item, or a premade Item. In the latter case, `option` is ignored.
    * @param handler The function to execute when the item is clicked.
    * @param options Optional settings for the item.
    * @returns The newly created `Item`.
    */
-  appendItem(label: string, handler: () => void, options?: {
+  appendItem(labelOrItem: string|Item, handler: () => void, options?: {
     accelerator?: Host.InspectorFrontendHostAPI.AcceleratorDescriptor,
     isPreviewFeature?: boolean,
     disabled?: boolean,
@@ -235,11 +227,16 @@ export class Section {
     jslogContext?: string,
     featureName?: string,
   }): Item {
-    const item = new Item(
-        this.contextMenu, 'item', label, options?.isPreviewFeature, options?.disabled, undefined, options?.accelerator,
-        options?.tooltip, options?.jslogContext, options?.featureName);
-    if (options?.additionalElement) {
-      item.customElement = options?.additionalElement;
+    let item;
+    if (labelOrItem instanceof Item) {
+      item = labelOrItem;
+    } else {
+      item = new Item(
+          this.contextMenu, 'item', labelOrItem, options?.isPreviewFeature, options?.disabled, undefined,
+          options?.accelerator, options?.tooltip, options?.jslogContext, options?.featureName);
+      if (options?.additionalElement) {
+        item.customElement = options?.additionalElement;
+      }
     }
     this.items.push(item);
     if (this.contextMenu) {
@@ -507,8 +504,6 @@ export class SubMenu extends Item {
       isExperimentalFeature: this.previewFeature,
       enabled: !this.disabled,
       subItems: [],
-      id: undefined,
-      checked: undefined,
       jslogContext: this.jslogContext,
       featureName: this.featureName,
     };
@@ -527,11 +522,6 @@ export class SubMenu extends Item {
         }
         result.subItems.push({
           type: 'separator',
-          id: undefined,
-          subItems: undefined,
-          checked: undefined,
-          enabled: undefined,
-          label: undefined,
         });
       }
     }
@@ -787,8 +777,17 @@ export class ContextMenu extends SubMenu {
 
     const menuObject = this.buildMenuDescriptors();
     const ownerDocument = (this.eventTarget as HTMLElement).ownerDocument;
-    if (this.useSoftMenu || ContextMenu.useSoftMenu ||
-        Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
+
+    let useSoftMenu = this.useSoftMenu || ContextMenu.useSoftMenu ||
+        Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode();
+
+    // Allow force opening a Native menu when DevTools is under test.
+    // This allows opening DevTools on DevTools
+    if (!this.useSoftMenu && ContextMenu.useSoftMenu && this.event.altKey) {
+      useSoftMenu = false;
+    }
+
+    if (useSoftMenu) {
       this.softMenu = new SoftContextMenu(
           (menuObject as SoftContextMenuDescriptor[]), this.itemSelected.bind(this), this.keepOpen, undefined,
           this.onSoftMenuClosed, this.loggableParent);
@@ -953,7 +952,7 @@ export class ContextMenu extends SubMenu {
   ];
 }
 
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 /**
  * @property jslogContext - Reflects the `"jslogContext"` attribute.
  * @property populateMenuCall - Callback function to populate the menu.
@@ -1107,7 +1106,7 @@ export class MenuButton extends HTMLElement {
   }
 }
 customElements.define('devtools-menu-button', MenuButton);
-/* eslint-enable rulesdir/no-lit-render-outside-of-view */
+/* eslint-enable @devtools/no-lit-render-outside-of-view */
 
 export interface Provider<T> {
   /**
@@ -1143,8 +1142,7 @@ export function registerProvider<T>(registration: ProviderRegistration<T>): void
 async function loadApplicableRegisteredProviders(target: unknown): Promise<Array<Provider<unknown>>> {
   const providers: Array<Provider<unknown>> = [];
   for (const providerRegistration of registeredProviders) {
-    if (!Root.Runtime.Runtime.isDescriptorEnabled(
-            {experiment: providerRegistration.experiment, condition: undefined})) {
+    if (!Root.Runtime.Runtime.isDescriptorEnabled({experiment: providerRegistration.experiment})) {
       continue;
     }
     if (providerRegistration.contextTypes) {
@@ -1216,7 +1214,7 @@ export interface ProviderRegistration<T> {
   /** A function that asynchronously loads the provider instance. */
   loadProvider: () => Promise<Provider<T>>;
   /** Optional. The experiment that enables this provider. */
-  experiment?: Root.Runtime.ExperimentName;
+  experiment?: Root.ExperimentNames.ExperimentName;
 }
 
 export interface ContextMenuItemRegistration {
@@ -1227,5 +1225,5 @@ export interface ContextMenuItemRegistration {
   /** Optional. A number used for sorting items within the same location. Lower numbers appear first. */
   order?: number;
   /** Optional. The experiment that enables this item. */
-  experiment?: Root.Runtime.ExperimentName;
+  experiment?: Root.ExperimentNames.ExperimentName;
 }

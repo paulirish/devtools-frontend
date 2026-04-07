@@ -10,6 +10,7 @@ import {CSSContainerQuery} from './CSSContainerQuery.js';
 import {CSSLayer} from './CSSLayer.js';
 import {CSSMedia} from './CSSMedia.js';
 import type {CSSModel, Edit} from './CSSModel.js';
+import {CSSNavigation} from './CSSNavigation.js';
 import {CSSScope} from './CSSScope.js';
 import {CSSStartingStyle} from './CSSStartingStyle.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
@@ -17,7 +18,7 @@ import type {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
 import {CSSSupports} from './CSSSupports.js';
 
 function styleSheetHeaderForRule(
-    cssModel: CSSModel, {styleSheetId}: {styleSheetId?: Protocol.CSS.StyleSheetId}): CSSStyleSheetHeader|null {
+    cssModel: CSSModel, {styleSheetId}: {styleSheetId?: Protocol.DOM.StyleSheetId}): CSSStyleSheetHeader|null {
   return styleSheetId && cssModel.styleSheetHeaderForId(styleSheetId) || null;
 }
 
@@ -26,15 +27,18 @@ export class CSSRule {
   readonly origin: Protocol.CSS.StyleSheetOrigin;
   readonly style: CSSStyleDeclaration;
   readonly header: CSSStyleSheetHeader|null;
+  readonly treeScope: Protocol.DOM.BackendNodeId|undefined;
 
   constructor(cssModel: CSSModel, payload: {
     style: Protocol.CSS.CSSStyle,
     origin: Protocol.CSS.StyleSheetOrigin,
     header: CSSStyleSheetHeader|null,
+    originTreeScopeNodeId?: Protocol.DOM.BackendNodeId,
   }) {
     this.header = payload.header;
     this.cssModelInternal = cssModel;
     this.origin = payload.origin;
+    this.treeScope = payload.originTreeScopeNodeId;
     this.style = new CSSStyleDeclaration(this.cssModelInternal, this, payload.style, Type.Regular);
   }
 
@@ -110,9 +114,15 @@ export class CSSStyleRule extends CSSRule {
   layers: CSSLayer[];
   ruleTypes: Protocol.CSS.CSSRuleType[];
   startingStyles: CSSStartingStyle[];
+  navigations: CSSNavigation[];
   wasUsed: boolean;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSRule, wasUsed?: boolean) {
-    super(cssModel, {origin: payload.origin, style: payload.style, header: styleSheetHeaderForRule(cssModel, payload)});
+    super(cssModel, {
+      origin: payload.origin,
+      style: payload.style,
+      header: styleSheetHeaderForRule(cssModel, payload),
+      originTreeScopeNodeId: payload.originTreeScopeNodeId
+    });
     this.reinitializeSelectors(payload.selectorList);
     this.nestingSelectors = payload.nestingSelectors;
     this.media = payload.media ? CSSMedia.parseMediaArrayPayload(cssModel, payload.media) : [];
@@ -124,25 +134,26 @@ export class CSSStyleRule extends CSSRule {
     this.layers = payload.layers ? CSSLayer.parseLayerPayload(cssModel, payload.layers) : [];
     this.startingStyles =
         payload.startingStyles ? CSSStartingStyle.parseStartingStylePayload(cssModel, payload.startingStyles) : [];
+    this.navigations = payload.navigations ? CSSNavigation.parseNavigationPayload(cssModel, payload.navigations) : [];
     this.ruleTypes = payload.ruleTypes || [];
     this.wasUsed = wasUsed || false;
   }
 
   static createDummyRule(cssModel: CSSModel, selectorText: string): CSSStyleRule {
-    const dummyPayload = {
+    const dummyPayload: Protocol.CSS.CSSRule = {
       selectorList: {
         text: '',
-        selectors: [{text: selectorText, value: undefined}],
+        selectors: [{text: selectorText}],
       },
       style: {
-        styleSheetId: '0' as Protocol.CSS.StyleSheetId,
+        styleSheetId: '0' as Protocol.DOM.StyleSheetId,
         range: new TextUtils.TextRange.TextRange(0, 0, 0, 0),
         shorthandEntries: [],
         cssProperties: [],
       },
       origin: Protocol.CSS.StyleSheetOrigin.Inspector,
     };
-    return new CSSStyleRule(cssModel, (dummyPayload as Protocol.CSS.CSSRule));
+    return new CSSStyleRule(cssModel, dummyPayload);
   }
 
   private reinitializeSelectors(selectorList: Protocol.CSS.SelectorList): void {
@@ -216,6 +227,7 @@ export class CSSStyleRule extends CSSRule {
     this.containerQueries.forEach(cq => cq.rebase(edit));
     this.scopes.forEach(scope => scope.rebase(edit));
     this.supports.forEach(supports => supports.rebase(edit));
+    this.navigations.forEach(navigation => navigation.rebase(edit));
 
     super.rebase(edit);
   }
@@ -224,7 +236,11 @@ export class CSSStyleRule extends CSSRule {
 export class CSSPropertyRule extends CSSRule {
   #name: CSSValue;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSPropertyRule) {
-    super(cssModel, {origin: payload.origin, style: payload.style, header: styleSheetHeaderForRule(cssModel, payload)});
+    super(cssModel, {
+      origin: payload.origin,
+      style: payload.style,
+      header: styleSheetHeaderForRule(cssModel, payload),
+    });
     this.#name = new CSSValue(payload.propertyName);
   }
 
@@ -255,15 +271,31 @@ export class CSSPropertyRule extends CSSRule {
   }
 }
 
-export class CSSFontPaletteValuesRule extends CSSRule {
-  readonly #paletteName: CSSValue;
-  constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSFontPaletteValuesRule) {
-    super(cssModel, {origin: payload.origin, style: payload.style, header: styleSheetHeaderForRule(cssModel, payload)});
-    this.#paletteName = new CSSValue(payload.fontPaletteName);
+export class CSSAtRule extends CSSRule {
+  readonly #name: CSSValue|null;
+  readonly #type: string;
+  readonly #subsection: string|null;
+  constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSAtRule) {
+    super(cssModel, {
+      origin: payload.origin,
+      style: payload.style,
+      header: styleSheetHeaderForRule(cssModel, payload),
+    });
+    this.#name = payload.name ? new CSSValue(payload.name) : null;
+    this.#type = payload.type;
+    this.#subsection = payload.subsection ?? null;
   }
 
-  name(): CSSValue {
-    return this.#paletteName;
+  name(): CSSValue|null {
+    return this.#name;
+  }
+
+  type(): string {
+    return this.#type;
+  }
+
+  subsection(): string|null {
+    return this.#subsection;
   }
 }
 
@@ -289,7 +321,11 @@ export class CSSKeyframeRule extends CSSRule {
   #keyText!: CSSValue;
   #parentRuleName: string;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSKeyframeRule, parentRuleName: string) {
-    super(cssModel, {origin: payload.origin, style: payload.style, header: styleSheetHeaderForRule(cssModel, payload)});
+    super(cssModel, {
+      origin: payload.origin,
+      style: payload.style,
+      header: styleSheetHeaderForRule(cssModel, payload),
+    });
     this.reinitializeKey(payload.keyText);
     this.#parentRuleName = parentRuleName;
   }
@@ -340,7 +376,11 @@ export class CSSPositionTryRule extends CSSRule {
   readonly #name: CSSValue;
   readonly #active: boolean;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSPositionTryRule) {
-    super(cssModel, {origin: payload.origin, style: payload.style, header: styleSheetHeaderForRule(cssModel, payload)});
+    super(cssModel, {
+      origin: payload.origin,
+      style: payload.style,
+      header: styleSheetHeaderForRule(cssModel, payload),
+    });
     this.#name = new CSSValue(payload.name);
     this.#active = payload.active;
   }
@@ -360,7 +400,7 @@ export interface CSSNestedStyleLeaf {
 
 export type CSSNestedStyleCondition = {
   children: CSSNestedStyle[],
-}&({media: CSSMedia}|{container: CSSContainerQuery}|{supports: CSSSupports});
+}&({media: CSSMedia}|{container: CSSContainerQuery}|{supports: CSSSupports}|{navigation: CSSNavigation});
 
 export type CSSNestedStyle = CSSNestedStyleLeaf|CSSNestedStyleCondition;
 
@@ -372,7 +412,7 @@ export class CSSFunctionRule extends CSSRule {
     super(cssModel, {
       origin: payload.origin,
       style: {cssProperties: [], shorthandEntries: []},
-      header: styleSheetHeaderForRule(cssModel, payload)
+      header: styleSheetHeaderForRule(cssModel, payload),
     });
     this.#name = new CSSValue(payload.name);
     this.#parameters = payload.parameters.map(({name}) => name);
@@ -427,7 +467,13 @@ export class CSSFunctionRule extends CSSRule {
           supports: new CSSSupports(this.cssModelInternal, node.condition.supports),
         };
       }
-      console.error('A function rule condition must have a media, container, or supports');
+      if (node.condition.navigation) {
+        return {
+          children,
+          navigation: new CSSNavigation(this.cssModelInternal, node.condition.navigation),
+        };
+      }
+      console.error('A function rule condition must have a media, container, supports, or navigation');
       return;
     }
     console.error('A function rule node must have a style or condition');

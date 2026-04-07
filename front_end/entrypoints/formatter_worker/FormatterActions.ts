@@ -48,12 +48,16 @@ export const enum ScopeKind {
   BLOCK = 1,
   FUNCTION = 2,
   GLOBAL = 3,
+  ARROW_FUNCTION = 4,
 }
 
 export interface ScopeTreeNode {
   variables: Array<{name: string, kind: DefinitionKind, offsets: number[]}>;
   start: number;
   end: number;
+  // If present, apply source map mappings to these locations to figure out the original function name.
+  nameMappingLocations?: number[];
+  name?: string;
   kind: ScopeKind;
   children: ScopeTreeNode[];
 }

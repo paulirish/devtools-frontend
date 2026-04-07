@@ -1,18 +1,17 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../../core/common/common.js';
 import type * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as TextUtils from '../../../models/text_utils/text_utils.js';
-import * as WindowBoundsService from '../../../services/window_bounds/window_bounds.js';
 import * as CM from '../../../third_party/codemirror.next/codemirror.next.js';
+import {Icon} from '../../kit/kit.js';
 import * as UI from '../../legacy/legacy.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as CodeHighlighter from '../code_highlighter/code_highlighter.js';
-import * as Icon from '../icon_button/icon_button.js';
 
 import {editorTheme} from './theme.js';
 
@@ -201,7 +200,7 @@ export const codeFolding = DynamicSetting.bool('text-editor-code-folding', [
   CM.foldGutter({
     markerDOM(open: boolean): HTMLElement {
       const iconName = open ? 'triangle-down' : 'triangle-right';
-      const icon = new Icon.Icon.Icon();
+      const icon = new Icon();
       icon.setAttribute('class', open ? 'cm-foldGutterElement' : 'cm-foldGutterElement cm-foldGutterElement-folded');
       icon.setAttribute('jslog', `${VisualLogging.expand().track({click: true})}`);
       icon.name = iconName;
@@ -343,8 +342,7 @@ let sideBarElement: HTMLElement|null = null;
 
 function getTooltipSpace(): DOMRect {
   if (!sideBarElement) {
-    sideBarElement =
-        WindowBoundsService.WindowBoundsService.WindowBoundsServiceImpl.instance().getDevToolsBoundingElement();
+    sideBarElement = UI.UIUtils.getDevToolsBoundingElement();
   }
   return sideBarElement.getBoundingClientRect();
 }
@@ -485,14 +483,20 @@ export function contentIncludingHint(view: CM.EditorView): string {
 
 export const setAiAutoCompleteSuggestion = CM.StateEffect.define<ActiveSuggestion|null>();
 
-interface ActiveSuggestion {
+export const enum AiSuggestionSource {
+  COMPLETION = 'completion',
+  GENERATION = 'generation',
+}
+
+export interface ActiveSuggestion {
   text: string;
   from: number;
-  sampleId: number;
+  sampleId?: number;
   rpcGlobalId?: Host.AidaClient.RpcGlobalId;
   startTime: number;
-  onImpression: (rpcGlobalId: Host.AidaClient.RpcGlobalId, sampleId: number, latency: number) => void;
-  clearCachedRequest: () => void;
+  onImpression: (rpcGlobalId: Host.AidaClient.RpcGlobalId, latency: number, sampleId?: number) => void;
+  clearCachedRequest?: () => void;
+  source: AiSuggestionSource;
 }
 
 export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggestion|null>({
@@ -503,7 +507,7 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
         if (effect.value) {
           return effect.value;
         }
-        value?.clearCachedRequest();
+        value?.clearCachedRequest?.();
         return null;
       }
     }
@@ -516,14 +520,14 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
     // between when the request was sent and the response was received.
     // We check if the position is still valid before trying to map it.
     if (value.from > tr.state.doc.length) {
-      value.clearCachedRequest();
+      value.clearCachedRequest?.();
       return null;
     }
 
     // If deletion occurs, set to null. Otherwise, the mapping might fail if
     // the position is inside the deleted range.
     if (tr.docChanged && tr.state.doc.length < tr.startState.doc.length) {
-      value.clearCachedRequest();
+      value.clearCachedRequest?.();
       return null;
     }
 
@@ -532,7 +536,7 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
 
     // If a change happened before the position from which suggestion was generated, set to null.
     if (tr.docChanged && head < from) {
-      value.clearCachedRequest();
+      value.clearCachedRequest?.();
       return null;
     }
 
@@ -573,7 +577,7 @@ export function acceptAiAutoCompleteSuggestion(view: CM.EditorView):
     userEvent: 'input.complete',
   });
 
-  suggestion.clearCachedRequest();
+  suggestion.clearCachedRequest?.();
   return {accepted: true, suggestion};
 }
 
@@ -679,7 +683,7 @@ export const aiAutoCompleteSuggestion: CM.Extension = [
           }
           const latency = performance.now() - activeSuggestion.startTime;
           // only register impression for the first time AI generated suggestion is shown to the user.
-          activeSuggestion.onImpression(activeSuggestion.rpcGlobalId, activeSuggestion.sampleId, latency);
+          activeSuggestion.onImpression(activeSuggestion.rpcGlobalId, latency, activeSuggestion.sampleId);
           this.#lastLoggedSuggestion = activeSuggestion;
         }
       },

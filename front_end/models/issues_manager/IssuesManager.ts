@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {AttributionReportingIssue} from './AttributionReportingIssue.js';
 import {BounceTrackingIssue} from './BounceTrackingIssue.js';
 import {ClientHintIssue} from './ClientHintIssue.js';
+import {ConnectionAllowlistIssue} from './ConnectionAllowlistIssue.js';
 import {ContentSecurityPolicyIssue} from './ContentSecurityPolicyIssue.js';
 import {CookieDeprecationMetadataIssue} from './CookieDeprecationMetadataIssue.js';
-import {CookieIssue, CookieIssueSubCategory} from './CookieIssue.js';
+import {CookieIssue} from './CookieIssue.js';
 import {CorsIssue} from './CorsIssue.js';
 import {CrossOriginEmbedderPolicyIssue, isCrossOriginEmbedderPolicyIssue} from './CrossOriginEmbedderPolicyIssue.js';
 import {DeprecationIssue} from './DeprecationIssue.js';
@@ -22,25 +22,25 @@ import {GenericIssue} from './GenericIssue.js';
 import {HeavyAdIssue} from './HeavyAdIssue.js';
 import type {Issue, IssueKind} from './Issue.js';
 import {Events} from './IssuesManagerEvents.js';
-import {LowTextContrastIssue} from './LowTextContrastIssue.js';
 import {MixedContentIssue} from './MixedContentIssue.js';
 import {PartitioningBlobURLIssue} from './PartitioningBlobURLIssue.js';
+import {PermissionElementIssue} from './PermissionElementIssue.js';
 import {PropertyRuleIssue} from './PropertyRuleIssue.js';
 import {QuirksModeIssue} from './QuirksModeIssue.js';
+import {SelectivePermissionsInterventionIssue} from './SelectivePermissionsInterventionIssue.js';
 import {SharedArrayBufferIssue} from './SharedArrayBufferIssue.js';
 import {SharedDictionaryIssue} from './SharedDictionaryIssue.js';
 import {SourceFrameIssuesManager} from './SourceFrameIssuesManager.js';
 import {SRIMessageSignatureIssue} from './SRIMessageSignatureIssue.js';
 import {StylesheetLoadingIssue} from './StylesheetLoadingIssue.js';
 import {UnencodedDigestIssue} from './UnencodedDigestIssue.js';
-import {UserReidentificationIssue} from './UserReidentificationIssue.js';
 
 export {Events} from './IssuesManagerEvents.js';
 
 let issuesManagerInstance: IssuesManager|null = null;
 
 function createIssuesForBlockedByResponseIssue(
-    issuesModel: SDK.IssuesModel.IssuesModel,
+    issuesModel: SDK.IssuesModel.IssuesModel|null,
     inspectorIssue: Protocol.Audits.InspectorIssue): CrossOriginEmbedderPolicyIssue[] {
   const blockedByResponseIssueDetails = inspectorIssue.details.blockedByResponseIssueDetails;
   if (!blockedByResponseIssueDetails) {
@@ -55,7 +55,7 @@ function createIssuesForBlockedByResponseIssue(
 
 const issueCodeHandlers = new Map<
     Protocol.Audits.InspectorIssueCode,
-    (model: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue) => Issue[]>([
+    (model: SDK.IssuesModel.IssuesModel|null, inspectorIssue: Protocol.Audits.InspectorIssue) => Issue[]>([
   [
     Protocol.Audits.InspectorIssueCode.CookieIssue,
     CookieIssue.fromInspectorIssue,
@@ -80,10 +80,6 @@ const issueCodeHandlers = new Map<
   [
     Protocol.Audits.InspectorIssueCode.SharedDictionaryIssue,
     SharedDictionaryIssue.fromInspectorIssue,
-  ],
-  [
-    Protocol.Audits.InspectorIssueCode.LowTextContrastIssue,
-    LowTextContrastIssue.fromInspectorIssue,
   ],
   [
     Protocol.Audits.InspectorIssueCode.CorsIssue,
@@ -146,8 +142,16 @@ const issueCodeHandlers = new Map<
     UnencodedDigestIssue.fromInspectorIssue,
   ],
   [
-    Protocol.Audits.InspectorIssueCode.UserReidentificationIssue,
-    UserReidentificationIssue.fromInspectorIssue,
+    Protocol.Audits.InspectorIssueCode.ConnectionAllowlistIssue,
+    ConnectionAllowlistIssue.fromInspectorIssue,
+  ],
+  [
+    Protocol.Audits.InspectorIssueCode.PermissionElementIssue,
+    PermissionElementIssue.fromInspectorIssue,
+  ],
+  [
+    Protocol.Audits.InspectorIssueCode.SelectivePermissionsInterventionIssue,
+    SelectivePermissionsInterventionIssue.fromInspectorIssue,
   ],
 ]);
 
@@ -156,7 +160,7 @@ const issueCodeHandlers = new Map<
  * Handlers are simple functions hard-coded into a map.
  */
 export function createIssuesFromProtocolIssue(
-    issuesModel: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue): Issue[] {
+    issuesModel: SDK.IssuesModel.IssuesModel|null, inspectorIssue: Protocol.Audits.InspectorIssue): Issue[] {
   const handler = issueCodeHandlers.get(inspectorIssue.code);
   if (handler) {
     return handler(issuesModel, inspectorIssue);
@@ -211,7 +215,6 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
   #thirdPartyCookiePhaseoutIssueCount = new Map<IssueKind, number>();
   #issuesById = new Map<string, Issue>();
   #issuesByOutermostTarget: WeakMap<SDK.Target.Target, Set<Issue>> = new Map();
-  #thirdPartyCookiePhaseoutIssueMessageSent = false;
 
   constructor(
       private readonly showThirdPartyIssuesSetting?: Common.Settings.Setting<boolean>,
@@ -314,7 +317,6 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
 
   #onIssueAddedEvent(event: Common.EventTarget.EventTargetEvent<SDK.IssuesModel.IssueAddedEvent>): void {
     const {issuesModel, inspectorIssue} = event.data;
-    const isPrivacyUiEnabled = Root.Runtime.hostConfig.devToolsPrivacyUI?.enabled;
 
     const issues = createIssuesFromProtocolIssue(issuesModel, inspectorIssue);
     for (const issue of issues) {
@@ -323,16 +325,7 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
       if (!message) {
         continue;
       }
-
-      // Only show one message for third-party cookie phaseout issues if the new privacy ui is enabled
-      const is3rdPartyCookiePhaseoutIssue =
-          CookieIssue.getSubCategory(issue.code()) === CookieIssueSubCategory.THIRD_PARTY_PHASEOUT_COOKIE;
-      if (!is3rdPartyCookiePhaseoutIssue || !isPrivacyUiEnabled || !this.#thirdPartyCookiePhaseoutIssueMessageSent) {
-        issuesModel.target().model(SDK.ConsoleModel.ConsoleModel)?.addMessage(message);
-      }
-      if (is3rdPartyCookiePhaseoutIssue && isPrivacyUiEnabled) {
-        this.#thirdPartyCookiePhaseoutIssueMessageSent = true;
-      }
+      issuesModel.target().model(SDK.ConsoleModel.ConsoleModel)?.addMessage(message);
     }
   }
 
@@ -453,7 +446,6 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     this.#issuesById.clear();
     this.#hiddenIssueCount.clear();
     this.#thirdPartyCookiePhaseoutIssueCount.clear();
-    this.#thirdPartyCookiePhaseoutIssueMessageSent = false;
     const values = this.hideIssueSetting?.get();
     for (const [key, issue] of this.#allIssues) {
       if (this.#issueFilter(issue)) {

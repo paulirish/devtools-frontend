@@ -50,9 +50,9 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsoleSidebar.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const {render, html, nothing, Directives} = Lit;
+const {render, html, nothing} = Lit;
 
-const enum GroupName {
+export const enum GroupName {
   CONSOLE_API = 'user message',
   ALL = 'message',
   ERROR = 'error',
@@ -78,18 +78,10 @@ interface ViewInput {
 
 export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
-  const nodeFilterMap = new WeakMap<Element, ConsoleFilter>();
-  const onSelectionChanged = (event: UI.TreeOutline.TreeViewElement.SelectEvent): void => {
-    const filter = nodeFilterMap.get(event.detail);
-    if (filter) {
-      input.onSelectionChanged(filter);
-    }
-  };
   render(
       html`<devtools-tree
         navigation-variant
         hide-overflow
-        @select=${onSelectionChanged}
         .template=${
           html`
           <ul role="tree">
@@ -98,21 +90,21 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                   group => html`
               <li
                 role="treeitem"
-                ${Directives.ref(element => element && nodeFilterMap.set(element, group.filter))}
+                @select=${() => input.onSelectionChanged(group.filter)}
                 ?selected=${group.filter === input.selectedFilter}>
                   <style>${consoleSidebarStyles}</style>
                   <devtools-icon name=${GROUP_ICONS[group.name].icon}></devtools-icon>
                   ${
-                      /* eslint-disable-next-line rulesdir/l10n-i18nString-call-only-with-uistrings */
+                      /* eslint-disable-next-line @devtools/l10n-i18nString-call-only-with-uistrings */
                       i18nString(GROUP_ICONS[group.name].label, {
 
                         n: group.messageCount
                       })}
                   ${group.messageCount === 0 ? nothing : html`
-                  <ul role="group" ?hidden=${group.filter !== input.selectedFilter}>
+                  <ul role="group">
                     ${group.urlGroups.values().map(urlGroup => html`
                       <li
-                        ${Directives.ref(element => element && nodeFilterMap.set(element, group.filter))}
+                        @select=${() => input.onSelectionChanged(urlGroup.filter)}
                         role="treeitem"
                         ?selected=${urlGroup.filter === input.selectedFilter}
                         title=${urlGroup.url ?? ''}>
@@ -126,7 +118,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
       target);
 };
 
-class ConsoleFilterGroup {
+export class ConsoleFilterGroup {
   readonly urlGroups = new Map<string|null, {filter: ConsoleFilter, url: string|null, count: number}>();
   messageCount = 0;
   readonly name: GroupName;

@@ -65,7 +65,7 @@ export function relativePathname(url: URL, base: URL): string {
   return result.join('/');
 }
 
-export function nonNull<T>(value: T|null|undefined): T {
+export function nonNull<T>(value?: T|null): T {
   assert.exists(value);
   return value;
 }

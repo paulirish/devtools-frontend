@@ -1,7 +1,7 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
@@ -54,6 +54,7 @@ export class FreDialog {
     if (ariaLabel) {
       dialog.setAriaLabel(ariaLabel);
     }
+    dialog.contentElement.tabIndex = -1;
     const result = Promise.withResolvers<boolean>();
     // clang-format off
     Lit.render(html`
@@ -131,6 +132,9 @@ export class FreDialog {
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     dialog.setDimmed(true);
     dialog.show();
+    // Explicitly calling focus as `dialog.show()` does not put the FRE
+    // dialog in focus.
+    dialog.contentElement.focus();
 
     return result.promise;
   }

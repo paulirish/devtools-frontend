@@ -5,6 +5,7 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Protocol from '../../../generated/protocol.js';
+import * as Extras from '../extras/extras.js';
 import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Lantern from '../lantern/lantern.js';
@@ -192,7 +193,7 @@ function isCritical(request: Types.Events.SyntheticNetworkRequest, context: Insi
     return false;
   }
 
-  // Iframes are considered High Priority but they are not render blocking
+  // Iframes are considered High Priority but they are not render-blocking
   const isIframe = request.args.data.resourceType === Protocol.Network.ResourceType.Document &&
       request.args.data.frame !== context.frameId;
 
@@ -548,8 +549,8 @@ function candidateRequestsByOrigin(
       return;
     }
 
-    // Filter out all resources that are loaded by the document. Connections are already early.
-    if (data.NetworkRequests.eventToInitiator.get(request) === mainResource) {
+    const initiator = Extras.Initiators.getNetworkInitiator(data, request);
+    if (initiator === mainResource) {
       return;
     }
 

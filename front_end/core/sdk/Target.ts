@@ -6,8 +6,9 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as ProtocolClient from '../protocol_client/protocol_client.js';
+import * as Root from '../root/root.js';
 
-import {SDKModel} from './SDKModel.js';
+import {SDKModel, type SDKModelConstructor} from './SDKModel.js';
 import type {TargetManager} from './TargetManager.js';
 
 export class Target extends ProtocolClient.InspectorBackend.TargetBase {
@@ -39,9 +40,8 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
   constructor(
       targetManager: TargetManager, id: Protocol.Target.TargetID|'main', name: string, type: Type,
       parentTarget: Target|null, sessionId: string, suspended: boolean,
-      connection: ProtocolClient.InspectorBackend.Connection|null, targetInfo?: Protocol.Target.TargetInfo) {
-    const needsNodeJSPatching = type === Type.NODE;
-    super(needsNodeJSPatching, parentTarget, sessionId, connection);
+      connection: ProtocolClient.CDPConnection.CDPConnection|null, targetInfo?: Protocol.Target.TargetInfo) {
+    super(parentTarget, sessionId, connection);
     this.#targetManager = targetManager;
     this.#name = name;
     this.#capabilitiesMask = 0;
@@ -50,7 +50,10 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         this.#capabilitiesMask = Capability.BROWSER | Capability.STORAGE | Capability.DOM | Capability.JS |
             Capability.LOG | Capability.NETWORK | Capability.TARGET | Capability.TRACING | Capability.EMULATION |
             Capability.INPUT | Capability.INSPECTOR | Capability.AUDITS | Capability.WEB_AUTHN | Capability.IO |
-            Capability.MEDIA | Capability.EVENT_BREAKPOINTS;
+            Capability.MEDIA | Capability.EVENT_BREAKPOINTS | Capability.DOM_STORAGE;
+        if (Root.Runtime.hostConfig.devToolsWebMCPSupport?.enabled) {
+          this.#capabilitiesMask |= Capability.WEB_MCP;
+        }
         if (parentTarget?.type() !== Type.FRAME) {
           // This matches backend exposing certain capabilities only for the main frame.
           this.#capabilitiesMask |=
@@ -67,7 +70,9 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         this.#capabilitiesMask = Capability.JS | Capability.LOG | Capability.NETWORK | Capability.TARGET |
             Capability.INSPECTOR | Capability.IO | Capability.EVENT_BREAKPOINTS;
         if (parentTarget?.type() !== Type.FRAME) {
-          this.#capabilitiesMask |= Capability.BROWSER | Capability.STORAGE;
+          // TODO(crbug.com/406991275): This should also grant the `STORAGE` capability, but first the
+          // crashers in https://crbug.com/466134219 have to be resolved.
+          this.#capabilitiesMask |= Capability.BROWSER;
         }
         break;
       case Type.SHARED_WORKER:
@@ -91,7 +96,8 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         this.#capabilitiesMask = Capability.JS | Capability.LOG | Capability.EVENT_BREAKPOINTS | Capability.NETWORK;
         break;
       case Type.NODE:
-        this.#capabilitiesMask = Capability.JS | Capability.NETWORK | Capability.TARGET | Capability.IO;
+        this.#capabilitiesMask =
+            Capability.JS | Capability.NETWORK | Capability.TARGET | Capability.IO | Capability.DOM_STORAGE;
         break;
       case Type.AUCTION_WORKLET:
         this.#capabilitiesMask = Capability.JS | Capability.EVENT_BREAKPOINTS;
@@ -112,20 +118,11 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
     this.#targetInfo = targetInfo;
   }
 
-  createModels(required: Set<new(arg1: Target) => SDKModel>): void {
+  /** Creates the models in the order in which they are provided */
+  createModels(models: SDKModelConstructor[]): void {
     this.#creatingModels = true;
-    const registeredModels = Array.from(SDKModel.registeredModels.entries());
-    // Create early models.
-    for (const [modelClass, info] of registeredModels) {
-      if (info.early) {
-        this.model(modelClass);
-      }
-    }
-    // Create autostart and required models.
-    for (const [modelClass, info] of registeredModels) {
-      if (info.autostart || required.has(modelClass)) {
-        this.model(modelClass);
-      }
+    for (const model of models) {
+      this.model(model);
     }
     this.#creatingModels = false;
   }
@@ -150,8 +147,7 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
     return this.#type;
   }
 
-  override markAsNodeJSForTest(): void {
-    super.markAsNodeJSForTest();
+  markAsNodeJSForTest(): void {
     this.#type = Type.NODE;
   }
 
@@ -327,5 +323,7 @@ export const enum Capability {
   IO = 1 << 17,
   MEDIA = 1 << 18,
   EVENT_BREAKPOINTS = 1 << 19,
+  DOM_STORAGE = 1 << 20,
+  WEB_MCP = 1 << 21,
   NONE = 0,
 }

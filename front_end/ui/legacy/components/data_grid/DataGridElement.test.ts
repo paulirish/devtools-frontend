@@ -76,7 +76,7 @@ describeWithEnvironment('DataGrid', () => {
 
   it('can initialize data from template', async () => {
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -125,7 +125,7 @@ describeWithEnvironment('DataGrid', () => {
 
   it('can filter data', async () => {
     await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -144,7 +144,7 @@ describeWithEnvironment('DataGrid', () => {
     // clang-format off
     const element = await renderDataGrid(html`
         <devtools-data-grid
-            striped name=${'Display Name'}
+            striped name="Display Name"
             .filters=${[{key: 'column-1', text: '3',  negative: false}]}>
           <table>
             <tr>
@@ -169,7 +169,7 @@ describeWithEnvironment('DataGrid', () => {
 
   it('can set selection from template', async () => {
     let element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -189,7 +189,7 @@ describeWithEnvironment('DataGrid', () => {
     assert.strictEqual(getAlertAnnouncement(element), 'Display Name Row  Column 1: Value 3, Column 2: Value 4');
 
     element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -212,7 +212,7 @@ describeWithEnvironment('DataGrid', () => {
   it('supports editable columns', async () => {
     const editCallback = sinon.stub();
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1" editable>Column 1</th>
@@ -236,11 +236,54 @@ describeWithEnvironment('DataGrid', () => {
     assert.strictEqual(editCallback.firstCall.args[0].detail.newText, 'New Value');
   });
 
+  it('supports pre-filling creation node', async () => {
+    const createCallback = sinon.stub();
+    const element = await renderDataGrid(html`
+        <devtools-data-grid striped name="Display Name"
+                            @create=${createCallback as () => void}>
+          <table>
+            <tr>
+              <th id="column-1" editable>Column 1</th>
+              <th id="column-2" editable>Column 2</th>
+            </tr>
+            <tr placeholder>
+              <td data-value="Prefill 1">Prefill 1</td>
+              <td data-value="Prefill 2">Prefill 2</td>
+            </tr>
+          </table>
+        </devtools-data-grid>`);
+
+    // Verify that the UI of the creation node contains the prefilled content
+    const placeholderRow = element.shadowRoot!.querySelector('tr.creation-node');
+    assert.instanceOf(placeholderRow, HTMLTableRowElement);
+    const cell1 = placeholderRow.querySelector('td:nth-child(1)');
+    const cell2 = placeholderRow.querySelector('td:nth-child(2)');
+    assert.strictEqual(cell1!.textContent, 'Prefill 1');
+    assert.strictEqual(cell2!.textContent, 'Prefill 2');
+
+    sendKeydown(element, 'ArrowDown');
+    sendKeydown(element, 'Enter');
+    assert.strictEqual(getFocusedElement().textContent, 'Prefill 1');
+
+    getFocusedElement().textContent = 'New Value 1';
+    sendKeydown(element, 'Tab');
+
+    sinon.assert.notCalled(createCallback);
+    assert.strictEqual(getFocusedElement().textContent, 'Prefill 2');
+
+    getFocusedElement().textContent = 'New Value 2';
+    sendKeydown(element, 'Tab');
+
+    sinon.assert.calledOnce(createCallback);
+    assert.deepEqual(
+        createCallback.firstCall.args[0].detail, {'column-1': 'New Value 1', 'column-2': 'New Value 2'});
+  });
+
   it('supports creation node', async () => {
     const createCallback = sinon.stub();
     const editCallback = sinon.stub();
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}
+        <devtools-data-grid striped name="Display Name"
                             @create=${createCallback as () => void}>
           <table>
             <tr>
@@ -272,7 +315,7 @@ describeWithEnvironment('DataGrid', () => {
 
   it('can display nested nodes', async () => {
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -318,7 +361,7 @@ describeWithEnvironment('DataGrid', () => {
   it('dispatches open event on expanding', async () => {
     const openCallback = sinon.stub();
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1">Column 1</th>
@@ -344,9 +387,43 @@ describeWithEnvironment('DataGrid', () => {
     sinon.assert.calledOnce(openCallback);
   });
 
+  it('dispatches expand/collapse events', async () => {
+    const expandCallback = sinon.stub();
+    const collapseCallback = sinon.stub();
+    const element = await renderDataGrid(html`
+        <devtools-data-grid striped name="Display Name">
+          <table>
+            <tr>
+              <th id="column-1">Column 1</th>
+            </tr>
+            <tr @expand=${expandCallback as () => void}
+                @collapse=${collapseCallback as () => void}>
+              <td>Parent Value 1</td>
+              <td>
+                <table>
+                  <tr>
+                    <td>Child Value 1</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </devtools-data-grid>`);
+
+    // Navigate to parent row.
+    sendKeydown(element, 'ArrowDown');
+    // Expand parent row.
+    sendKeydown(element, 'ArrowRight');
+    sinon.assert.calledOnce(expandCallback);
+
+    // Collapse parent row.
+    sendKeydown(element, 'ArrowLeft');
+    sinon.assert.calledOnce(collapseCallback);
+  });
+
   it('can set initial sort order from template', async () => {
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1" sort="descending">Column 1</th>
@@ -388,7 +465,7 @@ describeWithEnvironment('DataGrid', () => {
 
   it('resorts when a node is updated', async () => {
     const element = await renderDataGrid(html`
-        <devtools-data-grid striped name=${'Display Name'}>
+        <devtools-data-grid striped name="Display Name">
           <table>
             <tr>
               <th id="column-1" sortable sort="ascending">Column 1</th>

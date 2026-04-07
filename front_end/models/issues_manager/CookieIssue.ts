@@ -8,7 +8,6 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
 import {
@@ -26,10 +25,6 @@ const UIStrings = {
    * @description Label for the link for Schemeful Same-Site Issues
    */
   howSchemefulSamesiteWorks: 'How Schemeful Same-Site Works',
-  /**
-   * @description Label for a link for SameParty Issues. 'Attribute' refers to a cookie attribute.
-   */
-  firstPartySetsExplained: '`First-Party Sets` and the `SameParty` attribute',
   /**
    * @description Label for a link for cross-site redirect Issues.
    */
@@ -59,36 +54,20 @@ export const enum CookieStatus {
   ALLOWED_BY_HEURISTICS = 3,
 }
 
-export interface CookieReportInfo {
-  name: string;
-  domain: string;
-  type?: string;
-  platform?: string;
-  status: CookieStatus;
-  insight?: Protocol.Audits.CookieIssueInsight;
-}
-
-export class CookieIssue extends Issue {
-  #issueDetails: Protocol.Audits.CookieIssueDetails;
-
-  constructor(
-      code: string, issueDetails: Protocol.Audits.CookieIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel,
-      issueId: Protocol.Audits.IssueId|undefined) {
-    super(code, issuesModel, issueId);
-    this.#issueDetails = issueDetails;
-  }
-
+export class CookieIssue extends Issue<Protocol.Audits.CookieIssueDetails> {
   cookieId(): string {
-    if (this.#issueDetails.cookie) {
-      const {domain, path, name} = this.#issueDetails.cookie;
+    const details = this.details();
+    if (details.cookie) {
+      const {domain, path, name} = details.cookie;
       const cookieId = `${domain};${path};${name}`;
       return cookieId;
     }
-    return this.#issueDetails.rawCookieLine ?? 'no-cookie-info';
+    return this.details().rawCookieLine ?? 'no-cookie-info';
   }
 
   primaryKey(): string {
-    const requestId = this.#issueDetails.request ? this.#issueDetails.request.requestId : 'no-request';
+    const details = this.details();
+    const requestId = details.request ? details.request.requestId : 'no-request';
     return `${this.code()}-(${this.cookieId()})-(${requestId})`;
   }
 
@@ -96,7 +75,7 @@ export class CookieIssue extends Issue {
    * Returns an array of issues from a given CookieIssueDetails.
    */
   static createIssuesFromCookieIssueDetails(
-      cookieIssueDetails: Protocol.Audits.CookieIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel,
+      cookieIssueDetails: Protocol.Audits.CookieIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel|null,
       issueId: Protocol.Audits.IssueId|undefined): CookieIssue[] {
     const issues: CookieIssue[] = [];
 
@@ -210,22 +189,25 @@ export class CookieIssue extends Issue {
   }
 
   override cookies(): Iterable<Protocol.Audits.AffectedCookie> {
-    if (this.#issueDetails.cookie) {
-      return [this.#issueDetails.cookie];
+    const details = this.details();
+    if (details.cookie) {
+      return [details.cookie];
     }
     return [];
   }
 
   override rawCookieLines(): Iterable<string> {
-    if (this.#issueDetails.rawCookieLine) {
-      return [this.#issueDetails.rawCookieLine];
+    const details = this.details();
+    if (details.rawCookieLine) {
+      return [details.rawCookieLine];
     }
     return [];
   }
 
   override requests(): Iterable<Protocol.Audits.AffectedRequest> {
-    if (this.#issueDetails.request) {
-      return [this.#issueDetails.request];
+    const details = this.details();
+    if (details.request) {
+      return [details.request];
     }
     return [];
   }
@@ -244,31 +226,14 @@ export class CookieIssue extends Issue {
 
   override isCausedByThirdParty(): boolean {
     const outermostFrame = SDK.FrameManager.FrameManager.instance().getOutermostFrame();
-    return isCausedByThirdParty(outermostFrame, this.#issueDetails.cookieUrl, this.#issueDetails.siteForCookies);
+    return isCausedByThirdParty(outermostFrame, this.details().cookieUrl, this.details().siteForCookies);
   }
 
   getKind(): IssueKind {
-    if (this.#issueDetails.cookieExclusionReasons?.length > 0) {
+    if (this.details().cookieExclusionReasons?.length > 0) {
       return IssueKind.PAGE_ERROR;
     }
     return IssueKind.BREAKING_CHANGE;
-  }
-
-  makeCookieReportEntry(): CookieReportInfo|undefined {
-    const status = CookieIssue.getCookieStatus(this.#issueDetails);
-    if (this.#issueDetails.cookie && this.#issueDetails.cookieUrl && status !== undefined) {
-      const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(this.#issueDetails.cookieUrl);
-      return {
-        name: this.#issueDetails.cookie.name,
-        domain: this.#issueDetails.cookie.domain,
-        type: entity?.category,
-        platform: entity?.name,
-        status,
-        insight: this.#issueDetails.insight,
-      };
-    }
-
-    return;
   }
 
   static getCookieStatus(cookieIssueDetails: Protocol.Audits.CookieIssueDetails): CookieStatus|undefined {
@@ -294,8 +259,8 @@ export class CookieIssue extends Issue {
     return;
   }
 
-  static fromInspectorIssue(issuesModel: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue):
-      CookieIssue[] {
+  static fromInspectorIssue(
+      issuesModel: SDK.IssuesModel.IssuesModel|null, inspectorIssue: Protocol.Audits.InspectorIssue): CookieIssue[] {
     const cookieIssueDetails = inspectorIssue.details.cookieIssueDetails;
     if (!cookieIssueDetails) {
       console.warn('Cookie issue without details received.');
@@ -332,9 +297,8 @@ export class CookieIssue extends Issue {
       return new SDK.ConsoleModel.ConsoleMessage(
           issuesModel.target().model(SDK.RuntimeModel.RuntimeModel), Common.Console.FrontendMessageSource.ISSUE_PANEL,
           Protocol.Log.LogEntryLevel.Warning, UIStrings.consoleTpcdErrorMessage, {
-            url: this.#issueDetails.request?.url as Platform.DevToolsPath.UrlString | undefined,
-            affectedResources: {requestId: this.#issueDetails.request?.requestId, issueId: this.issueId},
-            isCookieReportIssue: true
+            url: this.details().request?.url as Platform.DevToolsPath.UrlString | undefined,
+            affectedResources: {requestId: this.details().request?.requestId, issueId: this.issueId},
           });
     }
     return;
@@ -523,22 +487,6 @@ function sameSiteExcludeContextDowngradeSet(isSecure: boolean): LazyMarkdownIssu
   };
 }
 
-const sameSiteInvalidSameParty: LazyMarkdownIssueDescription = {
-  file: 'SameSiteInvalidSameParty.md',
-  links: [{
-    link: 'https://developer.chrome.com/blog/first-party-sets-sameparty/',
-    linkTitle: i18nLazyString(UIStrings.firstPartySetsExplained),
-  }],
-};
-
-const samePartyCrossPartyContextSet: LazyMarkdownIssueDescription = {
-  file: 'SameSiteSamePartyCrossPartyContextSet.md',
-  links: [{
-    link: 'https://developer.chrome.com/blog/first-party-sets-sameparty/',
-    linkTitle: i18nLazyString(UIStrings.firstPartySetsExplained),
-  }],
-};
-
 const attributeValueExceedsMaxSize: LazyMarkdownIssueDescription = {
   file: 'CookieAttributeValueExceedsMaxSize.md',
   links: [],
@@ -611,8 +559,6 @@ const issueDescriptions = new Map<string, LazyMarkdownIssueDescription>([
   ['CookieIssue::ExcludeContextDowngrade::ReadCookie::Insecure', sameSiteExcludeContextDowngradeRead(false)],
   ['CookieIssue::ExcludeContextDowngrade::SetCookie::Secure', sameSiteExcludeContextDowngradeSet(true)],
   ['CookieIssue::ExcludeContextDowngrade::SetCookie::Insecure', sameSiteExcludeContextDowngradeSet(false)],
-  ['CookieIssue::ExcludeInvalidSameParty::SetCookie', sameSiteInvalidSameParty],
-  ['CookieIssue::ExcludeSamePartyCrossPartyContext::SetCookie', samePartyCrossPartyContextSet],
   ['CookieIssue::WarnAttributeValueExceedsMaxSize::ReadCookie', attributeValueExceedsMaxSize],
   ['CookieIssue::WarnAttributeValueExceedsMaxSize::SetCookie', attributeValueExceedsMaxSize],
   ['CookieIssue::WarnDomainNonASCII::ReadCookie', warnDomainNonAscii],

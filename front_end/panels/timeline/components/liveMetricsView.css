@@ -37,6 +37,10 @@
   flex-direction: column;
 }
 
+.live-metrics > * {
+  flex-shrink: 0;
+}
+
 .next-steps {
   flex: 0 0 336px;
   box-sizing: border-box;
@@ -300,7 +304,7 @@
   font-weight: var(--ref-typeface-weight-medium);
 }
 
-x-link {
+devtools-link {
   color: var(--sys-color-primary);
   text-decoration-line: underline;
 }

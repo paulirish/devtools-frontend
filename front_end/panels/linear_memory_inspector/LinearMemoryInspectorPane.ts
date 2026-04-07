@@ -1,11 +1,12 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import {Link} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
@@ -59,8 +60,8 @@ export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<E
 
     const description = placeholder.createChild('div', 'empty-state-description');
     description.createChild('span').textContent = i18nString(UIStrings.memoryInspectorExplanation);
-    const link = UI.XLink.XLink.create(
-        MEMORY_INSPECTOR_EXPLANATION_URL, i18nString(UIStrings.learnMore), undefined, undefined, 'learn-more');
+    const link =
+        Link.create(MEMORY_INSPECTOR_EXPLANATION_URL, i18nString(UIStrings.learnMore), undefined, 'learn-more');
     description.appendChild(link);
 
     return placeholder;
@@ -145,24 +146,16 @@ export class LinearMemoryInspectorView extends UI.Widget.VBox {
     this.firstTimeOpen = true;
 
     this.#inspector = new LinearMemoryInspectorComponents.LinearMemoryInspector.LinearMemoryInspector();
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent) =>
-            this.#memoryRequested(event));
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryInspector.AddressChangedEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryInspector.AddressChangedEvent) =>
-            this.updateAddress(event.data));
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryInspector.SettingsChangedEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryInspector.SettingsChangedEvent) => {
-          // Stop event from bubbling up, since no element further up needs the event.
-          event.stopPropagation();
-          this.saveSettings(event.data);
-        });
-    this.#inspector.contentElement.addEventListener(
-        LinearMemoryInspectorComponents.LinearMemoryHighlightChipList.DeleteMemoryHighlightEvent.eventName,
-        (event: LinearMemoryInspectorComponents.LinearMemoryHighlightChipList.DeleteMemoryHighlightEvent) => {
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.MEMORY_REQUEST, this.#memoryRequested, this);
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.ADDRESS_CHANGED,
+        event => this.updateAddress(event.data));
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.SETTINGS_CHANGED,
+        event => this.saveSettings(event.data));
+    this.#inspector.addEventListener(
+        LinearMemoryInspectorComponents.LinearMemoryInspector.Events.DELETE_MEMORY_HIGHLIGHT, event => {
           LinearMemoryInspectorController.instance().removeHighlight(this.#tabId, event.data);
           this.refreshData();
         });
@@ -191,6 +184,7 @@ export class LinearMemoryInspectorView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refreshData();
   }
 
@@ -214,7 +208,7 @@ export class LinearMemoryInspectorView extends UI.Widget.VBox {
         });
   }
 
-  #memoryRequested(event: LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent): void {
+  #memoryRequested(event: Common.EventTarget.EventTargetEvent<{start: number, end: number, address: number}>): void {
     const {start, end, address} = event.data;
     if (address < start || address >= end) {
       throw new Error('Requested address is out of bounds.');

@@ -103,6 +103,8 @@ let BidiBrowser = (() => {
                     // yet because WebDriver BiDi behavior is not specified. See
                     // https://github.com/w3c/webdriver-bidi/issues/321.
                     'goog:prerenderingDisabled': true,
+                    // TODO: remove after Puppeteer rolled Chrome to 142 after Oct 28, 2025.
+                    'goog:disableNetworkDurableMessages': true,
                 },
             });
             // Subscribe to all WebDriver BiDi events. Also subscribe to CDP events if CDP
@@ -116,22 +118,26 @@ let BidiBrowser = (() => {
                 }
                 return true;
             }));
-            try {
-                await session.send('network.addDataCollector', {
-                    dataTypes: ["response" /* Bidi.Network.DataType.Response */],
-                    // Buffer size of 20 MB is equivalent to the CDP:
-                    maxEncodedDataSize: 20 * 1000 * 1000, // 20 MB
-                });
-            }
-            catch (err) {
-                if (err instanceof Errors_js_1.ProtocolError) {
-                    // Ignore protocol errors, as the data collectors can be not implemented.
-                    (0, util_js_1.debugError)(err);
+            await Promise.all(["request" /* Bidi.Network.DataType.Request */, "response" /* Bidi.Network.DataType.Response */].map(
+            // Data collectors might be not implemented for specific data type, so create them
+            // separately and ignore protocol errors.
+            async (dataType) => {
+                try {
+                    await session.send('network.addDataCollector', {
+                        dataTypes: [dataType],
+                        // Buffer size of 20 MB is equivalent to the CDP:
+                        maxEncodedDataSize: 20_000_000,
+                    });
                 }
-                else {
-                    throw err;
+                catch (err) {
+                    if (err instanceof Errors_js_1.ProtocolError) {
+                        (0, util_js_1.debugError)(err);
+                    }
+                    else {
+                        throw err;
+                    }
                 }
-            }
+            }));
             const browser = new BidiBrowser(session.browser, opts);
             browser.#initialize();
             return browser;
@@ -245,14 +251,54 @@ let BidiBrowser = (() => {
         defaultBrowserContext() {
             return this.#browserContexts.get(this.#browserCore.defaultUserContext);
         }
-        newPage() {
-            return this.defaultBrowserContext().newPage();
+        newPage(options) {
+            return this.defaultBrowserContext().newPage(options);
         }
         installExtension(path) {
             return this.#browserCore.installExtension(path);
         }
         async uninstallExtension(id) {
             await this.#browserCore.uninstallExtension(id);
+        }
+        screens() {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        addScreen(_params) {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        removeScreen(_screenId) {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        async getWindowBounds(windowId) {
+            const clientWindowInfo = await this.#browserCore.getClientWindowInfo(windowId);
+            return {
+                left: clientWindowInfo.x,
+                top: clientWindowInfo.y,
+                width: clientWindowInfo.width,
+                height: clientWindowInfo.height,
+                windowState: clientWindowInfo.state,
+            };
+        }
+        async setWindowBounds(windowId, windowBounds) {
+            let params;
+            const windowState = windowBounds.windowState ?? 'normal';
+            if (windowState === 'normal') {
+                params = {
+                    clientWindow: windowId,
+                    state: 'normal',
+                    x: windowBounds.left,
+                    y: windowBounds.top,
+                    width: windowBounds.width,
+                    height: windowBounds.height,
+                };
+            }
+            else {
+                params = {
+                    clientWindow: windowId,
+                    state: windowState,
+                };
+            }
+            await this.#browserCore.setClientWindowState(params);
         }
         targets() {
             return [

@@ -1,7 +1,8 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 /*
  * Copyright (C) 2013 Google Inc. All rights reserved.
@@ -34,33 +35,38 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/kit/kit.js';
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as SourceMapsResolver from '../../models/trace_source_maps_resolver/trace_source_maps_resolver.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Tracing from '../../services/tracing/tracing.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
-// eslint-disable-next-line rulesdir/es-modules-import
+// eslint-disable-next-line @devtools/es-modules-import
 import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
+import * as uiI18n from '../../ui/i18n/i18n.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
-// eslint-disable-next-line rulesdir/es-modules-import
+// eslint-disable-next-line @devtools/es-modules-import
 import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import {html, render} from '../../ui/lit/lit.js';
+import * as PanelsCommon from '../common/common.js';
 
 import {getDurationString} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import * as Extensions from './extensions/extensions.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {targetForEvent} from './TargetForEvent.js';
-import * as ThirdPartyTreeView from './ThirdPartyTreeView.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {selectionFromEvent} from './TimelineSelection.js';
 import * as Utils from './utils/utils.js';
@@ -70,7 +76,7 @@ const UIStrings = {
    * @description Text that only contain a placeholder
    * @example {100ms (at 200ms)} PH1
    */
-  emptyPlaceholder: '{PH1}',  // eslint-disable-line rulesdir/l10n-no-locked-or-placeholder-only-phrase
+  emptyPlaceholder: '{PH1}',  // eslint-disable-line @devtools/l10n-no-locked-or-placeholder-only-phrase
   /**
    * @description Text for timestamps of items
    */
@@ -310,17 +316,9 @@ const UIStrings = {
    */
   idleCallbackRequested: 'Idle callback requested',
   /**
-   * @description Stack label in Timeline UIUtils of the Performance panel
-   */
-  recalculationForced: 'Recalculation forced',
-  /**
    * @description Call site stack label in Timeline UIUtils of the Performance panel
    */
   firstLayoutInvalidation: 'First layout invalidation',
-  /**
-   * @description Stack label in Timeline UIUtils of the Performance panel
-   */
-  layoutForced: 'Layout forced',
   /**
    * @description Label in front of CSS property (eg `opacity`) being animated or a CSS animation name (eg `layer-4-fade-in-out`)
    */
@@ -465,10 +463,6 @@ const UIStrings = {
    */
   priority: 'Priority',
   /**
-   * @description Label for third party table.
-   */
-  thirdPartyTable: '1st / 3rd party table',
-  /**
    * @description Label for the a source URL.
    */
   source: 'Source',
@@ -493,7 +487,7 @@ interface LinkifyLocationOptions {
   lineNumber: number;
   target: SDK.Target.Target|null;
   linkifier: LegacyComponents.Linkifier.Linkifier;
-  isFreshRecording?: boolean;
+  isFreshOrEnhanced?: boolean;
   columnNumber?: number;
   omitOrigin?: boolean;
 }
@@ -510,7 +504,7 @@ export class TimelineUIUtils {
   static getGetDebugModeEnabled(): boolean {
     if (TimelineUIUtils.debugModeEnabled === undefined) {
       TimelineUIUtils.debugModeEnabled =
-          Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE);
+          Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.TIMELINE_DEBUG_MODE);
     }
     return TimelineUIUtils.debugModeEnabled;
   }
@@ -656,7 +650,7 @@ export class TimelineUIUtils {
 
   static async buildDetailsNodeForTraceEvent(
       event: Trace.Types.Events.Event, target: SDK.Target.Target|null, linkifier: LegacyComponents.Linkifier.Linkifier,
-      isFreshRecording = false, parsedTrace: Trace.TraceModel.ParsedTrace): Promise<Node|null> {
+      isFreshOrEnhanced = false, parsedTrace: Trace.TraceModel.ParsedTrace): Promise<Node|null> {
     let details: HTMLElement|HTMLSpanElement|(Element | null)|Text|null = null;
     let detailsText;
     // TODO(40287735): update this code with type-safe data checks.
@@ -706,7 +700,7 @@ export class TimelineUIUtils {
           lineNumber: callFrame?.lineNumber || 0,
           columnNumber: callFrame?.columnNumber,
           target,
-          isFreshRecording,
+          isFreshOrEnhanced,
           linkifier,
           omitOrigin: true,
         });
@@ -725,29 +719,9 @@ export class TimelineUIUtils {
           lineNumber: 0,
           columnNumber: 0,
           target,
-          isFreshRecording,
+          isFreshOrEnhanced,
           linkifier,
         });
-        break;
-      }
-
-      case Trace.Types.Events.Name.COMPILE_SCRIPT:
-      case Trace.Types.Events.Name.CACHE_SCRIPT:
-      case Trace.Types.Events.Name.EVALUATE_SCRIPT: {
-        const url = unsafeEventData['url'];
-        if (url) {
-          const {lineNumber} = Trace.Helpers.Trace.getZeroIndexedLineAndColumnForEvent(event);
-          details = this.linkifyLocation({
-            scriptId: null,
-            url,
-            lineNumber: lineNumber || 0,
-            columnNumber: 0,
-            target,
-            isFreshRecording,
-            linkifier,
-            omitOrigin: true,
-          });
-        }
         break;
       }
 
@@ -761,7 +735,7 @@ export class TimelineUIUtils {
             lineNumber: 0,
             columnNumber: 0,
             target,
-            isFreshRecording,
+            isFreshOrEnhanced,
             linkifier,
             omitOrigin: true,
           });
@@ -779,7 +753,7 @@ export class TimelineUIUtils {
             Trace.Types.Events.isProfileCall(event)) {
           detailsText = null;
         } else {
-          details = this.linkifyTopCallFrame(event, target, linkifier, isFreshRecording) ?? null;
+          details = this.linkifyTopCallFrame(event, target, linkifier, isFreshOrEnhanced) ?? null;
         }
         break;
       }
@@ -792,7 +766,7 @@ export class TimelineUIUtils {
   }
 
   static linkifyLocation(linkifyOptions: LinkifyLocationOptions): Element|null {
-    const {scriptId, url, lineNumber, columnNumber, isFreshRecording, linkifier, target, omitOrigin} = linkifyOptions;
+    const {scriptId, url, lineNumber, columnNumber, isFreshOrEnhanced, linkifier, target, omitOrigin} = linkifyOptions;
     const options = {
       lineNumber,
       columnNumber,
@@ -802,7 +776,7 @@ export class TimelineUIUtils {
       tabStop: true,
       omitOrigin,
     };
-    if (isFreshRecording) {
+    if (isFreshOrEnhanced) {
       return linkifier.linkifyScriptLocation(
           target, scriptId, url as Platform.DevToolsPath.UrlString, lineNumber, options);
     }
@@ -811,7 +785,7 @@ export class TimelineUIUtils {
 
   static linkifyTopCallFrame(
       event: Trace.Types.Events.Event, target: SDK.Target.Target|null, linkifier: LegacyComponents.Linkifier.Linkifier,
-      isFreshRecording = false): Element|null {
+      isFreshOrEnhanced = false, maxLength?: number): Element|null {
     let frame = Trace.Helpers.Trace.getZeroIndexedStackTraceInEventPayload(event)?.[0];
     if (Trace.Types.Events.isProfileCall(event)) {
       frame = event.callFrame;
@@ -826,8 +800,9 @@ export class TimelineUIUtils {
       showColumnNumber: true,
       columnNumber: frame.columnNumber,
       lineNumber: frame.lineNumber,
+      maxLength,
     };
-    if (isFreshRecording) {
+    if (isFreshOrEnhanced) {
       return linkifier.maybeLinkifyConsoleCallFrame(target, frame, {showColumnNumber: true, inlineFrameIndex: 0});
     }
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
@@ -839,20 +814,28 @@ export class TimelineUIUtils {
     switch (event.name) {
       case Trace.Types.Events.Name.MARK_LCP_CANDIDATE:
         link = 'https://web.dev/lcp/';
-        name = 'largest contentful paint';
+        name = 'Largest Contentful Paint';
+        break;
+      case Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION:
+        link = 'https://developer.chrome.com/docs/web-platform/soft-navigations-experiment';
+        name = 'Soft Largest Contentful Paint';
+        break;
+      case Trace.Types.Events.Name.SOFT_NAVIGATION_START:
+        link = 'https://developer.chrome.com/docs/web-platform/soft-navigations-experiment';
+        name = 'Soft Navigations';
         break;
       case Trace.Types.Events.Name.MARK_FCP:
         link = 'https://web.dev/first-contentful-paint/';
-        name = 'first contentful paint';
+        name = 'First Contentful Paint';
         break;
       default:
         break;
     }
 
-    const html = UI.Fragment.html`<div>${
-        UI.XLink.XLink.create(
-            link, i18nString(UIStrings.learnMore), undefined, undefined, 'learn-more')} about ${name}.</div>`;
-    return html as HTMLElement;
+    const div = document.createElement('div');
+
+    render(html`<devtools-link href=${link}>${i18nString(UIStrings.learnMore)}</devtools-link> about ${name}.`, div);
+    return div;
   }
 
   static buildConsumeCacheDetails(
@@ -947,7 +930,6 @@ export class TimelineUIUtils {
         if (url) {
           previewElement = await LegacyComponents.ImagePreview.ImagePreview.build(url, false, {
             imageAltText: LegacyComponents.ImagePreview.ImagePreview.defaultAltTextForImageURL(url),
-            precomputedFeatures: undefined,
             align: LegacyComponents.ImagePreview.Align.START,
           });
         } else if (Trace.Types.Events.isPaint(event)) {
@@ -1018,6 +1000,22 @@ export class TimelineUIUtils {
       return contentHelper.fragment;
     }
 
+    if (Trace.Types.Events.isNavigationStart(event)) {
+      url = (event.args.data?.documentLoaderURL ?? event.args.data?.url) as Platform.DevToolsPath.UrlString;
+      if (url) {
+        contentHelper.appendElementRow(i18nString(UIStrings.url), LegacyComponents.Linkifier.Linkifier.linkifyURL(url));
+      }
+    }
+
+    if (Trace.Types.Events.isSoftNavigationStart(event)) {
+      url = event.args.context.URL as Platform.DevToolsPath.UrlString;
+      if (url) {
+        contentHelper.appendElementRow(i18nString(UIStrings.url), LegacyComponents.Linkifier.Linkifier.linkifyURL(url));
+      }
+      contentHelper.appendElementRow(
+          i18nString(UIStrings.details), TimelineUIUtils.buildDetailsNodeForMarkerEvents(event));
+    }
+
     if (Trace.Types.Events.isV8Compile(event)) {
       url = event.args.data?.url as Platform.DevToolsPath.UrlString;
       if (url) {
@@ -1078,8 +1076,8 @@ export class TimelineUIUtils {
       }
     }
 
-    const isFreshRecording =
-        Boolean(parsedTrace && Tracing.FreshRecording.Tracker.instance().recordingIsFresh(parsedTrace));
+    const isFreshOrEnhanced =
+        Boolean(parsedTrace && Tracing.FreshRecording.Tracker.instance().recordingIsFreshOrEnhanced(parsedTrace));
 
     switch (event.name) {
       case Trace.Types.Events.Name.GC:
@@ -1110,7 +1108,7 @@ export class TimelineUIUtils {
       }
       case Trace.Types.Events.Name.FUNCTION_CALL: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, targetForEvent(parsedTrace, event), linkifier, isFreshRecording, parsedTrace);
+            event, targetForEvent(parsedTrace, event), linkifier, isFreshOrEnhanced, parsedTrace);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.function), detailsNode);
           const originWithEntity = this.getOriginWithEntity(entityMapper, parsedTrace, event);
@@ -1445,6 +1443,7 @@ export class TimelineUIUtils {
         break;
       }
 
+      case Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION:
       // @ts-expect-error Fall-through intended.
       case Trace.Types.Events.Name.MARK_LCP_CANDIDATE: {
         contentHelper.appendTextRow(i18nString(UIStrings.type), String(unsafeEventData['type']));
@@ -1473,7 +1472,7 @@ export class TimelineUIUtils {
 
       case Trace.Types.Events.Name.EVENT_TIMING: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, targetForEvent(parsedTrace, event), linkifier, isFreshRecording, parsedTrace);
+            event, targetForEvent(parsedTrace, event), linkifier, isFreshOrEnhanced, parsedTrace);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
         }
@@ -1491,7 +1490,7 @@ export class TimelineUIUtils {
 
       default: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, targetForEvent(parsedTrace, event), linkifier, isFreshRecording, parsedTrace);
+            event, targetForEvent(parsedTrace, event), linkifier, isFreshOrEnhanced, parsedTrace);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
         }
@@ -1501,7 +1500,8 @@ export class TimelineUIUtils {
     const relatedNodes = relatedNodesMap?.values() || [];
     for (const relatedNode of relatedNodes) {
       if (relatedNode) {
-        const nodeSpan = await Common.Linkifier.Linkifier.linkify(relatedNode);
+        const nodeSpan = document.createElement('span');
+        render(PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(relatedNode), nodeSpan);
         contentHelper.appendElementRow(relatedNodeLabel || i18nString(UIStrings.relatedNode), nodeSpan);
       }
     }
@@ -1527,7 +1527,7 @@ export class TimelineUIUtils {
       await TimelineUIUtils.generateCauses(event, contentHelper, parsedTrace);
     }
 
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
+    if (Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.TIMELINE_DEBUG_MODE)) {
       TimelineUIUtils.renderEventJson(event, contentHelper);
     }
 
@@ -1542,126 +1542,10 @@ export class TimelineUIUtils {
     return contentHelper.fragment;
   }
 
-  static statsForTimeRange(
-      events: Trace.Types.Events.Event[], startTime: Trace.Types.Timing.Milli,
-      endTime: Trace.Types.Timing.Milli): TimeRangeCategoryStats {
-    if (!events.length) {
-      return {idle: endTime - startTime};
-    }
-
-    buildRangeStatsCacheIfNeeded(events);
-    const aggregatedStats = subtractStats(aggregatedStatsAtTime(endTime), aggregatedStatsAtTime(startTime));
-    const aggregatedTotal = Object.values(aggregatedStats).reduce((a, b) => a + b, 0);
-    aggregatedStats['idle'] = Math.max(0, endTime - startTime - aggregatedTotal);
-    return aggregatedStats;
-
-    function aggregatedStatsAtTime(time: number): TimeRangeCategoryStats {
-      const stats: TimeRangeCategoryStats = {};
-      // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-      const cache = events[categoryBreakdownCacheSymbol];
-      for (const category in cache) {
-        const categoryCache = cache[category];
-        const index =
-            Platform.ArrayUtilities.upperBound(categoryCache.time, time, Platform.ArrayUtilities.DEFAULT_COMPARATOR);
-        let value;
-        if (index === 0) {
-          value = 0;
-        } else if (index === categoryCache.time.length) {
-          value = categoryCache.value[categoryCache.value.length - 1];
-        } else {
-          const t0 = categoryCache.time[index - 1];
-          const t1 = categoryCache.time[index];
-          const v0 = categoryCache.value[index - 1];
-          const v1 = categoryCache.value[index];
-          value = v0 + (v1 - v0) * (time - t0) / (t1 - t0);
-        }
-        stats[category] = value;
-      }
-      return stats;
-    }
-
-    function subtractStats(a: TimeRangeCategoryStats, b: TimeRangeCategoryStats): TimeRangeCategoryStats {
-      const result = Object.assign({}, a);
-      for (const key in b) {
-        result[key] -= b[key];
-      }
-      return result;
-    }
-
-    function buildRangeStatsCacheIfNeeded(events: Trace.Types.Events.Event[]): void {
-      // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-      if (events[categoryBreakdownCacheSymbol]) {
-        return;
-      }
-
-      // aggregatedStats is a map by categories. For each category there's an array
-      // containing sorted time points which records accumulated value of the category.
-      const aggregatedStats: Record<string, {
-        time: number[],
-        value: number[],
-      }> = {};
-      const categoryStack: string[] = [];
-      let lastTime = 0;
-      Trace.Helpers.Trace.forEachEvent(events, {
-        onStartEvent,
-        onEndEvent,
-      });
-
-      function updateCategory(category: string, time: number): void {
-        let statsArrays: {
-          time: number[],
-          value: number[],
-        } = aggregatedStats[category];
-        if (!statsArrays) {
-          statsArrays = {time: [], value: []};
-          aggregatedStats[category] = statsArrays;
-        }
-        if (statsArrays.time.length && statsArrays.time[statsArrays.time.length - 1] === time || lastTime > time) {
-          return;
-        }
-        const lastValue = statsArrays.value.length > 0 ? statsArrays.value[statsArrays.value.length - 1] : 0;
-        statsArrays.value.push(lastValue + time - lastTime);
-        statsArrays.time.push(time);
-      }
-
-      function categoryChange(from: string|null, to: string|null, time: number): void {
-        if (from) {
-          updateCategory(from, time);
-        }
-        lastTime = time;
-        if (to) {
-          updateCategory(to, time);
-        }
-      }
-
-      function onStartEvent(e: Trace.Types.Events.Event): void {
-        const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(e);
-        const category = Trace.Styles.getEventStyle(e.name as Trace.Types.Events.Name)?.category.name ||
-            Trace.Styles.getCategoryStyles().other.name;
-        const parentCategory = categoryStack.length ? categoryStack[categoryStack.length - 1] : null;
-        if (category !== parentCategory) {
-          categoryChange(parentCategory || null, category, startTime);
-        }
-        categoryStack.push(category);
-      }
-
-      function onEndEvent(e: Trace.Types.Events.Event): void {
-        const {endTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(e);
-        const category = categoryStack.pop();
-        const parentCategory = categoryStack.length ? categoryStack[categoryStack.length - 1] : null;
-        if (category !== parentCategory) {
-          categoryChange(category || null, parentCategory || null, endTime || 0);
-        }
-      }
-
-      const obj = (events as Object);
-      // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-      obj[categoryBreakdownCacheSymbol] = aggregatedStats;
-    }
-  }
-
   private static renderEventJson(event: Trace.Types.Events.Event, contentHelper: TimelineDetailsContentHelper): void {
     contentHelper.addSection(i18nString(UIStrings.traceEvent));
+
+    contentHelper.appendElementRow('eventKey', new Trace.EventsSerializer.EventsSerializer().keyForEvent(event) ?? '?');
 
     const eventWithArgsFirst = {
       ...{args: event.args},
@@ -1709,25 +1593,14 @@ export class TimelineUIUtils {
     return {callFrames} as Protocol.Runtime.StackTrace;
   }
 
+  /** This renders a stack trace... and other cool stuff. */
   static async generateCauses(
       event: Trace.Types.Events.Event, contentHelper: TimelineDetailsContentHelper,
       parsedTrace: Trace.TraceModel.ParsedTrace): Promise<void> {
     const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);
     let initiatorStackLabel = i18nString(UIStrings.initiatorStackTrace);
-    let stackLabel = i18nString(UIStrings.functionStack);
-    const stackTraceForEvent = Trace.Extras.StackTraceForEvent.get(event, parsedTrace.data);
-    if (stackTraceForEvent?.callFrames.length || stackTraceForEvent?.description || stackTraceForEvent?.parent) {
-      contentHelper.addSection(i18nString(UIStrings.functionStack));
-      contentHelper.createChildStackTraceElement(stackTraceForEvent);
-      // TODO(andoli): also build stack trace component for other events
-      // that have a stack trace using the StackTraceForEvent helper.
-    } else {
-      const stackTrace = Trace.Helpers.Trace.getZeroIndexedStackTraceInEventPayload(event);
-      if (stackTrace?.length) {
-        contentHelper.addSection(stackLabel);
-        contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(stackTrace));
-      }
-    }
+    await contentHelper.appendFunctionStackTraceSection(event, parsedTrace);
+
     switch (event.name) {
       case Trace.Types.Events.Name.TIMER_FIRE:
         initiatorStackLabel = i18nString(UIStrings.timerInstalled);
@@ -1740,11 +1613,9 @@ export class TimelineUIUtils {
         break;
       case Trace.Types.Events.Name.RECALC_STYLE:
         initiatorStackLabel = i18nString(UIStrings.firstInvalidated);
-        stackLabel = i18nString(UIStrings.recalculationForced);
         break;
       case Trace.Types.Events.Name.LAYOUT:
         initiatorStackLabel = i18nString(UIStrings.firstLayoutInvalidation);
-        stackLabel = i18nString(UIStrings.layoutForced);
         break;
     }
 
@@ -1757,13 +1628,9 @@ export class TimelineUIUtils {
       // and the time since the initiator (Pending For).
       const stackTrace = Trace.Helpers.Trace.getZeroIndexedStackTraceInEventPayload(initiator);
       if (stackTrace) {
-        contentHelper.addSection(initiatorStackLabel);
-        contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(stackTrace.map(frame => {
-          return {
-            ...frame,
-            scriptId: String(frame.scriptId) as Protocol.Runtime.ScriptId,
-          };
-        })));
+        const traceElement =
+            await contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(stackTrace));
+        contentHelper.appendSectionWithBodyIfExists(initiatorStackLabel, {body: traceElement});
       }
 
       const link = this.createEntryLink(initiator);
@@ -1867,7 +1734,7 @@ export class TimelineUIUtils {
           null;
       if (node) {
         const nodeSpan = document.createElement('span');
-        void Common.Linkifier.Linkifier.linkify(node).then(link => nodeSpan.appendChild(link));
+        render(PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(node), nodeSpan);
         return nodeSpan;
       }
       if (invalidation.args.data.nodeName) {
@@ -1899,7 +1766,7 @@ export class TimelineUIUtils {
       const niceNodeLink = createLinkForInvalidationNode(invalidation);
 
       const text = scriptLink ?
-          i18n.i18n.getFormatLocalizedString(
+          uiI18n.getFormatLocalizedString(
               str_, UIStrings.invalidationWithCallFrame, {PH1: niceNodeLink, PH2: scriptLink}) as HTMLElement :
           niceNodeLink;
 
@@ -2121,58 +1988,6 @@ export class TimelineUIUtils {
 
     return element;
   }
-  // Generates a Summary component given a aggregated stats for categories.
-  static generateSummaryDetails(
-      aggregatedStats: Record<string, number>, rangeStart: number, rangeEnd: number,
-      selectedEvents: Trace.Types.Events.Event[],
-      thirdPartyTree: ThirdPartyTreeView.ThirdPartyTreeViewWidget): Element {
-    const element = document.createElement('div');
-    element.classList.add('timeline-details-range-summary', 'hbox');
-
-    // First, the category bar chart.
-    let total = 0;
-    let categories: TimelineComponents.TimelineSummary.CategoryData[] = [];
-    // Calculate total of all categories.
-    for (const categoryName in aggregatedStats) {
-      total += aggregatedStats[categoryName];
-    }
-
-    // Get stats values from categories.
-    for (const categoryName in Trace.Styles.getCategoryStyles()) {
-      const category = Trace.Styles.getCategoryStyles()[categoryName as keyof Trace.Styles.CategoryPalette];
-      if (category.name === Trace.Styles.EventCategory.IDLE) {
-        continue;
-      }
-      const value = aggregatedStats[category.name];
-      if (!value) {
-        continue;
-      }
-      const title = category.title;
-      const color = category.getCSSValue();
-      categories.push({value, color, title});
-    }
-
-    // Keeps the most useful categories on top.
-    categories = categories.sort((a, b) => b.value - a.value);
-    const start = Trace.Types.Timing.Milli(rangeStart);
-    const end = Trace.Types.Timing.Milli(rangeEnd);
-    const categorySummaryTable = new TimelineComponents.TimelineSummary.CategorySummary();
-    categorySummaryTable.data = {
-      rangeStart: start,
-      rangeEnd: end,
-      total,
-      categories,
-      selectedEvents,
-    };
-    element.append(categorySummaryTable);
-    // Add the 3p datagrid
-    const treeView = new ThirdPartyTreeView.ThirdPartyTreeElement();
-    treeView.treeView = thirdPartyTree;
-    UI.ARIAUtils.setLabel(treeView, i18nString(UIStrings.thirdPartyTable));
-    element.append(treeView);
-
-    return element;
-  }
 
   static generateDetailsContentForFrame(
       frame: Trace.Types.Events.LegacyTimelineFrame, filmStrip: Trace.Extras.FilmStrip.Data|null,
@@ -2207,7 +2022,7 @@ export class TimelineUIUtils {
       PH1: i18n.TimeUtilities.millisToString(durationMilli, true),
       PH2: i18n.TimeUtilities.millisToString(offsetMilli, true),
     });
-    return i18n.i18n.getFormatLocalizedString(str_, UIStrings.emptyPlaceholder, {PH1: durationText});
+    return uiI18n.getFormatLocalizedString(str_, UIStrings.emptyPlaceholder, {PH1: durationText});
   }
 
   static quadWidth(quad: number[]): number {
@@ -2266,6 +2081,10 @@ export class TimelineUIUtils {
         color = 'var(--color-text-primary)';
         tall = true;
         break;
+      case Trace.Types.Events.Name.SOFT_NAVIGATION_START:
+        color = 'var(--sys-color-blue)';
+        tall = true;
+        break;
       case Trace.Types.Events.Name.FRAME_STARTED_LOADING:
         color = 'green';
         tall = true;
@@ -2286,6 +2105,7 @@ export class TimelineUIUtils {
         color = 'var(--sys-color-green-bright)';
         tall = true;
         break;
+      case Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION:
       case Trace.Types.Events.Name.MARK_LCP_CANDIDATE:
         color = 'var(--sys-color-green)';
         tall = true;
@@ -2306,8 +2126,17 @@ export class TimelineUIUtils {
 
   static colorForId(id: string): string {
     if (!colorGenerator) {
-      colorGenerator =
-          new Common.Color.Generator({min: 30, max: 330, count: undefined}, {min: 50, max: 80, count: 3}, 85);
+      colorGenerator = new Common.Color.Generator(
+          {
+            min: 30,
+            max: 330,
+          },
+          {
+            min: 50,
+            max: 80,
+            count: 3,
+          },
+          85);
       colorGenerator.setColorForID('', '#f2ecdc');
     }
     return colorGenerator.colorForID(id);
@@ -2406,6 +2235,39 @@ export class TimelineDetailsContentHelper {
     this.fragment.appendChild(this.element);
   }
 
+  /**
+   * Creates a new section, but only if the provided `body` element is present,
+   * otherwise it does nothing.
+   */
+  appendSectionWithBodyIfExists(title: string, options: {
+    body: HTMLElement|null,
+    swatchColor?: string,
+    event?: Trace.Types.Events.Event,
+  }): void {
+    if (!options.body) {
+      return;
+    }
+    this.addSection(title, options.swatchColor, options.event);
+    this.tableElement.appendChild(options.body);
+  }
+
+  /**
+   * Generates a stack trace for the given event. If there is no stack data,
+   * nothing is appended; you can safely call this without fearing that it will
+   * create an empty section.
+   */
+  async appendFunctionStackTraceSection(
+      event: Trace.Types.Events.Event,
+      parsedTrace: Trace.TraceModel.ParsedTrace,
+      ): Promise<void> {
+    const stackTraceForEvent = Trace.Extras.StackTraceForEvent.get(event, parsedTrace.data);
+    if (!stackTraceForEvent) {
+      return;
+    }
+    const traceElement = await this.createChildStackTraceElement(stackTraceForEvent);
+    this.appendSectionWithBodyIfExists(i18nString(UIStrings.functionStack), {body: traceElement});
+  }
+
   linkifier(): LegacyComponents.Linkifier.Linkifier|null {
     return this.#linkifier;
   }
@@ -2473,28 +2335,36 @@ export class TimelineDetailsContentHelper {
     this.appendElementRow(title, locationContent);
   }
 
-  createChildStackTraceElement(stackTrace: Protocol.Runtime.StackTrace): void {
-    if (!this.#linkifier) {
-      return;
+  /**
+   * Creates a stack trace element for the given trace, but checks if it
+   * contains any entries, and discards it if it's empty.
+   */
+  async createChildStackTraceElement(runtimeStackTrace: Protocol.Runtime.StackTrace): Promise<HTMLElement|null> {
+    // Fallback to the main page/root target. Maybe the main page has a source map we need.
+    // Worst case the stack is identity mapped.
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const target = this.target ?? targetManager.primaryPageTarget() ?? targetManager.rootTarget();
+    if (!target) {
+      return null;
     }
-    const resolvedStackTrace: Protocol.Runtime.StackTrace = structuredClone(stackTrace);
-    let currentResolvedStackTrace: Protocol.Runtime.StackTrace|undefined = resolvedStackTrace;
-    while (currentResolvedStackTrace) {
-      currentResolvedStackTrace.callFrames = currentResolvedStackTrace.callFrames.map(
-          callFrame => ({
-            ...callFrame,
-            functionName: SourceMapsResolver.SourceMapsResolver.resolvedCodeLocationForCallFrame(callFrame)?.name ||
-                callFrame.functionName,
-          }));
-      currentResolvedStackTrace = currentResolvedStackTrace.parent;
+
+    const stackTrace =
+        await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().createStackTraceFromProtocolRuntime(
+            runtimeStackTrace, target);
+    const callFrameContents = new LegacyComponents.JSPresentationUtils.StackTracePreviewContent();
+    callFrameContents.options = {tabStops: true, showColumnNumber: true};
+    callFrameContents.stackTrace = stackTrace;
+
+    await callFrameContents.updateComplete;
+    if (!callFrameContents.hasContent()) {
+      return null;
     }
-    const stackTraceElement =
-        this.tableElement.createChild('div', 'timeline-details-view-row timeline-details-stack-values');
-    const callFrameContents = new LegacyComponents.JSPresentationUtils.StackTracePreviewContent(
-        undefined, this.target ?? undefined, this.#linkifier,
-        {stackTrace: resolvedStackTrace, tabStops: true, showColumnNumber: true});
+
+    const stackTraceElement = document.createElement('div');
+    stackTraceElement.classList.add('timeline-details-view-row', 'timeline-details-stack-values');
     callFrameContents.markAsRoot();
     callFrameContents.show(stackTraceElement);
+    return stackTraceElement;
   }
 }
 
@@ -2525,6 +2395,7 @@ export function timeStampForEventAdjustedForClosestNavigationIfPossible(
       event,
       parsedTrace.data.Meta.traceBounds,
       parsedTrace.data.Meta.navigationsByNavigationId,
+      parsedTrace.data.Meta.softNavigationsById,
       parsedTrace.data.Meta.navigationsByFrameId,
   );
   return Trace.Helpers.Timing.microToMilli(time);
@@ -2539,7 +2410,8 @@ export function timeStampForEventAdjustedForClosestNavigationIfPossible(
 export function isMarkerEvent(parsedTrace: Trace.TraceModel.ParsedTrace, event: Trace.Types.Events.Event): boolean {
   const {Name} = Trace.Types.Events;
 
-  if (event.name === Name.TIME_STAMP || event.name === Name.NAVIGATION_START) {
+  if (event.name === Name.TIME_STAMP || event.name === Name.NAVIGATION_START ||
+      event.name === Name.SOFT_NAVIGATION_START) {
     return true;
   }
 
@@ -2548,7 +2420,7 @@ export function isMarkerEvent(parsedTrace: Trace.TraceModel.ParsedTrace, event: 
   }
 
   if (Trace.Types.Events.isMarkDOMContent(event) || Trace.Types.Events.isMarkLoad(event) ||
-      Trace.Types.Events.isLargestContentfulPaintCandidate(event)) {
+      Trace.Types.Events.isAnyLargestContentfulPaintCandidate(event)) {
     // isOutermostMainFrame was added in 2022, so we fallback to isMainFrame
     // for older traces.
     if (!event.args.data) {

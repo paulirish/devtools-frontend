@@ -1,7 +1,7 @@
 // Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -98,13 +98,15 @@ export class InplaceFormatterEditorAction implements EditorAction {
     if (!uiSourceCode) {
       return false;
     }
-    if (uiSourceCode.project().canSetFileContent()) {
-      return true;
+    // Only show Format button for editable files
+    if (!Persistence.Persistence.PersistenceImpl.instance().hasEditableContent(uiSourceCode)) {
+      return false;
     }
-    if (Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode) !== null) {
-      return true;
-    }
-    return false;
+    // Only show Format button for JavaScript files. For other file types (JSON, CSS),
+    // the pretty-print toggle in the status bar should be used instead, which provides
+    // reversible formatting (fixes issue 378870233).
+    const mimeType = Common.ResourceType.ResourceType.simplifyContentType(uiSourceCode.mimeType());
+    return Common.ResourceType.ResourceType.isJavaScriptMimeType(mimeType);
   }
 
   private formatSourceInPlace(): void {

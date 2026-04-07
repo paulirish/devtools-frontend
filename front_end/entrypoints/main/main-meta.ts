@@ -6,6 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -134,11 +135,11 @@ const UIStrings = {
   /**
    * @description Title of a setting under the Appearance category in Settings
    */
-  enableCtrlShortcutToSwitchPanels: 'Enable Ctrl + 1-9 shortcut to switch panels',
+  enableCtrlShortcutToSwitchPanels: 'Use Ctrl + 1-9 to switch panels',
   /**
    * @description (Mac only) Title of a setting under the Appearance category in Settings
    */
-  enableShortcutToSwitchPanels: 'Enable ⌘ + 1-9 shortcut to switch panels',
+  enableShortcutToSwitchPanels: 'Use ⌘ + 1-9 to switch panels',
   /**
    * @description A drop-down menu option to dock to right
    */
@@ -866,7 +867,6 @@ UI.ContextMenu.registerProvider({
   async loadProvider() {
     return new Components.Linkifier.ContentProviderContextMenuProvider();
   },
-  experiment: undefined,
 });
 
 UI.ContextMenu.registerProvider({
@@ -876,9 +876,8 @@ UI.ContextMenu.registerProvider({
     ];
   },
   async loadProvider() {
-    return new UI.XLink.ContextMenuProvider();
+    return new UI.LinkContextMenuProvider.LinkContextMenuProvider();
   },
-  experiment: undefined,
 });
 
 UI.ContextMenu.registerProvider({
@@ -890,7 +889,6 @@ UI.ContextMenu.registerProvider({
   async loadProvider() {
     return new Components.Linkifier.LinkContextMenuProvider();
   },
-  experiment: undefined,
 });
 
 UI.Toolbar.registerToolbarItem({
@@ -909,13 +907,9 @@ UI.Toolbar.registerToolbarItem({
   condition(config) {
     const isFlagEnabled = config?.devToolsGlobalAiButton?.enabled;
 
-    const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
-    const isLocaleRestricted = !devtoolsLocale.locale.startsWith('en-');
-
     const isGeoRestricted = config?.aidaAvailability?.blockedByGeo === true;
     const isPolicyRestricted = config?.aidaAvailability?.blockedByEnterprisePolicy === true;
-    const isAgeRestricted = Boolean(config?.aidaAvailability?.blockedByAge);
-    return Boolean(isFlagEnabled && !isLocaleRestricted && !isGeoRestricted && !isPolicyRestricted && !isAgeRestricted);
+    return Boolean(isFlagEnabled && !isGeoRestricted && !isPolicyRestricted);
   },
   async loadItem() {
     const Main = await loadMainModule();
@@ -935,6 +929,7 @@ UI.Toolbar.registerToolbarItem({
 });
 
 UI.Toolbar.registerToolbarItem({
+  condition: () => !Root.Runtime.Runtime.isTraceApp(),
   async loadItem() {
     const Main = await loadMainModule();
     return Main.MainImpl.MainMenuItem.instance();

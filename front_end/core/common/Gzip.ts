@@ -5,7 +5,7 @@
 /**
  * Quickly determine if gzipped, by seeing if the first 3 bytes of the file header match the gzip signature
  */
-export function isGzip(ab: ArrayBuffer): boolean {
+export function isGzip(ab: ArrayBufferLike): boolean {
   const buf = new Uint8Array(ab);
   if (!buf || buf.length < 3) {
     return false;
@@ -15,7 +15,7 @@ export function isGzip(ab: ArrayBuffer): boolean {
 }
 
 /** Decode a gzipped _or_ plain text ArrayBuffer to a decoded string */
-export async function arrayBufferToString(ab: ArrayBuffer): Promise<string> {
+export async function arrayBufferToString(ab: ArrayBufferLike): Promise<string> {
   if (isGzip(ab)) {
     return await decompress(ab);
   }
@@ -37,10 +37,25 @@ export async function fileToString(file: File): Promise<string> {
  * Decompress a gzipped ArrayBuffer to a string.
  * Consider using `arrayBufferToString` instead, which can handle both gzipped and plain text buffers.
  */
-export async function decompress(gzippedBuffer: ArrayBuffer): Promise<string> {
+export async function decompress(gzippedBuffer: ArrayBufferLike, charset = 'utf-8'): Promise<string> {
   const buffer = await gzipCodec(gzippedBuffer, new DecompressionStream('gzip'));
-  const str = new TextDecoder('utf-8').decode(buffer);
+  const str = new TextDecoder(charset).decode(buffer);
   return str;
+}
+
+/**
+ * Decompress a deflate-encoded ArrayBuffer to a string.
+ * Tries 'deflate' (zlib wrapper) first, then falls back to 'deflate-raw'.
+ */
+export async function decompressDeflate(buffer: ArrayBufferLike, charset = 'utf-8'): Promise<string> {
+  let decompressedBuffer: ArrayBuffer;
+  try {
+    decompressedBuffer = await gzipCodec(buffer, new DecompressionStream('deflate'));
+  } catch {
+    // Try deflate-raw format if zlib-wrapped deflate fails.
+    decompressedBuffer = await gzipCodec(buffer, new DecompressionStream('deflate-raw'));
+  }
+  return new TextDecoder(charset).decode(decompressedBuffer);
 }
 export async function compress(str: string): Promise<ArrayBuffer> {
   const encoded = new TextEncoder().encode(str);
@@ -49,16 +64,18 @@ export async function compress(str: string): Promise<ArrayBuffer> {
 }
 
 /** Private coder/decoder **/
-function gzipCodec(buffer: Uint8Array<ArrayBufferLike>|ArrayBuffer, codecStream: CompressionStream|DecompressionStream):
-    Promise<ArrayBuffer> {
-  const {readable, writable} = new TransformStream();
+async function gzipCodec(
+    buffer: Uint8Array<ArrayBufferLike>|ArrayBufferLike,
+    codecStream: CompressionStream|DecompressionStream): Promise<ArrayBuffer> {
+  const readable = new ReadableStream({
+    start(controller) {
+      controller.enqueue(buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer);
+      controller.close();
+    }
+  });
   const codecReadable = readable.pipeThrough(codecStream);
-
-  const writer = writable.getWriter();
-  void writer.write(buffer);
-  void writer.close();
   // A response is a convenient way to get an ArrayBuffer from a ReadableStream.
-  return new Response(codecReadable).arrayBuffer();
+  return await new Response(codecReadable).arrayBuffer();
 }
 
 export function decompressStream(stream: ReadableStream): ReadableStream {
@@ -66,7 +83,22 @@ export function decompressStream(stream: ReadableStream): ReadableStream {
   const ds = new DecompressionStream('gzip');
   return stream.pipeThrough(ds);
 }
+
 export function compressStream(stream: ReadableStream): ReadableStream {
   const cs = new CompressionStream('gzip');
   return stream.pipeThrough(cs);
+}
+
+export function createMonitoredStream(stream: ReadableStream, onProgress: (bytesRead: number) => void): ReadableStream {
+  let bytesRead = 0;
+
+  const progressTransformer = new TransformStream({
+    transform(chunk, controller) {
+      bytesRead += chunk.byteLength;
+      onProgress(bytesRead);
+      controller.enqueue(chunk);
+    }
+  });
+
+  return stream.pipeThrough(progressTransformer);
 }

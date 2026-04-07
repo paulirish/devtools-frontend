@@ -4,19 +4,12 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as SDK from '../../core/sdk/sdk.js';
-import * as Workspace from '../../models/workspace/workspace.js';
-// TODO(crbug.com/442509324): remove UI dependency
-// eslint-disable-next-line rulesdir/no-imports-in-directory
-import * as UI from '../../ui/legacy/legacy.js';
-
-import type * as Persistence from './persistence.js';
 
 const UIStrings = {
   /**
    * @description Title of a setting under the Persistence category in Settings
    */
-  enableLocalOverrides: 'Enable Local Overrides',
+  localOverrides: 'Local overrides',
   /**
    * @description A tag of Enable Local Overrides setting that can be searched in the command menu
    */
@@ -39,29 +32,20 @@ const UIStrings = {
    */
   request: 'request',
   /**
-   * @description Title of a setting under the Persistence category that can be invoked through the Command Menu
+   * @description Title of an option under the Persistence category that can be invoked through the Command Menu
    */
   enableOverrideNetworkRequests: 'Enable override network requests',
   /**
-   * @description Title of a setting under the Persistence category that can be invoked through the Command Menu
+   * @description Title of an option under the Persistence category that can be invoked through the Command Menu
    */
   disableOverrideNetworkRequests: 'Disable override network requests',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('models/persistence/persistence-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
-let loadedPersistenceModule: (typeof Persistence|undefined);
-
-async function loadPersistenceModule(): Promise<typeof Persistence> {
-  if (!loadedPersistenceModule) {
-    loadedPersistenceModule = await import('./persistence.js');
-  }
-  return loadedPersistenceModule;
-}
-
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.PERSISTENCE,
-  title: i18nLazyString(UIStrings.enableLocalOverrides),
+  title: i18nLazyString(UIStrings.localOverrides),
   settingName: 'persistence-network-overrides-enabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: false,
@@ -82,19 +66,4 @@ Common.Settings.registerSettingExtension({
       title: i18nLazyString(UIStrings.disableOverrideNetworkRequests),
     },
   ],
-});
-
-UI.ContextMenu.registerProvider({
-  contextTypes() {
-    return [
-      Workspace.UISourceCode.UISourceCode,
-      SDK.Resource.Resource,
-      SDK.NetworkRequest.NetworkRequest,
-    ];
-  },
-  async loadProvider() {
-    const Persistence = await loadPersistenceModule();
-    return new Persistence.PersistenceActions.ContextMenuProvider();
-  },
-  experiment: undefined,
 });

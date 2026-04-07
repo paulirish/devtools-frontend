@@ -1,11 +1,12 @@
 // Copyright 2011 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
+import * as Highlighting from '../../../components/highlighting/highlighting.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 import * as ObjectUI from '../object_ui/object_ui.js';
@@ -134,6 +135,7 @@ export class JSONView extends UI.Widget.VBox implements UI.SearchableView.Search
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.initialize();
   }
 
@@ -145,10 +147,9 @@ export class JSONView extends UI.Widget.VBox implements UI.SearchableView.Search
 
     const obj = SDK.RemoteObject.RemoteObject.fromLocalObject(this.parsedJSON.data);
     const title = this.parsedJSON.prefix + obj.description + this.parsedJSON.suffix;
-    this.treeOutline =
-        new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection(obj, title, undefined, true /* showOverflow */);
+    this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection(
+        obj, title, undefined, true /* showOverflow */, false /* editable */);
     this.treeOutline.enableContextMenu();
-    this.treeOutline.setEditable(false);
     if (!this.startCollapsed) {
       this.treeOutline.expand();
     }
@@ -171,7 +172,7 @@ export class JSONView extends UI.Widget.VBox implements UI.SearchableView.Search
     const newFocusElement = this.currentSearchTreeElements[index];
     if (newFocusElement) {
       this.updateSearchIndex(index);
-      newFocusElement.setSearchRegex(this.searchRegex, UI.UIUtils.highlightedCurrentSearchResultClassName);
+      newFocusElement.setSearchRegex(this.searchRegex, Highlighting.highlightedCurrentSearchResultClassName);
       newFocusElement.reveal();
     } else {
       this.updateSearchIndex(0);
@@ -299,7 +300,7 @@ export class SearchableJsonView extends UI.SearchableView.SearchableView {
     jsonView.element.tabIndex = 0;
   }
 
-  set jsonObject(obj: Object) {
+  set jsonObject(obj: Object|null|undefined) {
     const jsonView = new JSONView(new ParsedJSON(obj, '', ''));
     this.#jsonView.detach();
     this.#jsonView = jsonView;

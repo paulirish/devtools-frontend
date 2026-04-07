@@ -6,6 +6,10 @@ import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
+import type {FinalizeOptions} from './types.js';
+
+let config: {showAllEvents: boolean};
+
 // We track the renderer processes we see in each frame on the way through the trace.
 let rendererProcessesByFrameId: FrameProcessData = new Map();
 
@@ -55,6 +59,7 @@ let traceBounds: Types.Timing.TraceWindowMicro = makeNewTraceBounds();
  */
 let navigationsByFrameId = new Map<string, Types.Events.NavigationStart[]>();
 let navigationsByNavigationId = new Map<string, Types.Events.NavigationStart>();
+let softNavigationsById = new Map<number, Types.Events.SoftNavigationStart>();
 let finalDisplayUrlByNavigationId = new Map<string, string>();
 let mainFrameNavigations: Types.Events.NavigationStart[] = [];
 
@@ -88,6 +93,7 @@ const CHROME_WEB_TRACE_EVENTS = new Set([
 export function reset(): void {
   navigationsByFrameId = new Map();
   navigationsByNavigationId = new Map();
+  softNavigationsById = new Map();
   finalDisplayUrlByNavigationId = new Map();
   processNames = new Map();
   mainFrameNavigations = [];
@@ -320,6 +326,10 @@ export function handleEvent(event: Types.Events.Event): void {
     return;
   }
 
+  if (Types.Events.isSoftNavigationStart(event)) {
+    softNavigationsById.set(event.args.context.performanceTimelineNavigationId, event);
+  }
+
   // Update `finalDisplayUrlByNavigationId` to reflect the latest redirect for each navigation.
   if (Types.Events.isResourceSendRequest(event)) {
     if (event.args.data.resourceType !== 'Document') {
@@ -349,7 +359,9 @@ export function handleEvent(event: Types.Events.Event): void {
   }
 }
 
-export async function finalize(): Promise<void> {
+export async function finalize(options?: FinalizeOptions): Promise<void> {
+  config = {showAllEvents: Boolean(options?.showAllEvents)};
+
   // We try to set the minimum time by finding the event with the smallest
   // timestamp. However, if we also got a timestamp from the
   // TracingStartedInBrowser event, we should always use that.
@@ -431,6 +443,7 @@ export async function finalize(): Promise<void> {
 }
 
 export interface MetaHandlerData {
+  config: {showAllEvents: boolean};
   traceIsGeneric: boolean;
   traceBounds: Types.Timing.TraceWindowMicro;
   browserProcessId: Types.Events.ProcessID;
@@ -438,7 +451,14 @@ export interface MetaHandlerData {
   browserThreadId: Types.Events.ThreadID;
   gpuProcessId: Types.Events.ProcessID;
   navigationsByFrameId: Map<string, Types.Events.NavigationStart[]>;
+  /**
+   * This does not include soft navigations.
+   *
+   * TODO(crbug.com/414468047): include soft navs here, so that
+   * PageLoadMetricsHandler and insights can use this map for all navigation types.
+   */
   navigationsByNavigationId: Map<string, Types.Events.NavigationStart>;
+  softNavigationsById: Map<number, Types.Events.SoftNavigationStart>;
   /**
    * The user-visible URL displayed to users in the address bar.
    * This captures:
@@ -494,6 +514,7 @@ export type FrameProcessData =
 
 export function data(): MetaHandlerData {
   return {
+    config,
     traceBounds,
     browserProcessId,
     browserThreadId,
@@ -506,6 +527,7 @@ export function data(): MetaHandlerData {
     mainFrameURL,
     navigationsByFrameId,
     navigationsByNavigationId,
+    softNavigationsById,
     finalDisplayUrlByNavigationId,
     threadsInProcess,
     rendererProcessesByFrame: rendererProcessesByFrameId,

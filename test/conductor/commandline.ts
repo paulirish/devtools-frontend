@@ -11,7 +11,7 @@ export enum DiffBehaviors {
   NO_UPDATE = 'no-update',
 }
 
-export function asArray(value: undefined|string|string[]) {
+export function asArray(value?: string|string[]) {
   if (!value) {
     return [];
   }
@@ -21,7 +21,7 @@ export function asArray(value: undefined|string|string[]) {
   return [value];
 }
 
-function validateDiffBehaviors(args: undefined|string|string[]) {
+function validateDiffBehaviors(args?: string|string[]) {
   const failed = [];
   for (const arg of asArray(args)) {
     if (Object.values(DiffBehaviors).includes(arg as DiffBehaviors)) {
@@ -52,7 +52,6 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
       })
       .option('headless', {
         type: 'boolean',
-        default: undefined,
         desc: 'Whether to run tests headless. If unspecified, the default depends on the `debug` option',
       })
       .option('coverage', {
@@ -73,6 +72,11 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
         coerce: validateDiffBehaviors,
         choices: Object.values(DiffBehaviors),
         desc: 'Define how to deal with diffs in snapshots/screenshots',
+      })
+      .option('verbose', {
+        alias: 'v',
+        type: 'count',
+        desc: 'Increases the log level',
       })
       .option('shuffle', {
         type: 'boolean',

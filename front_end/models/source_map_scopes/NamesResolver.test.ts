@@ -31,9 +31,10 @@ describeWithMockConnection('NameResolver', () => {
       resourceMapping,
       targetManager,
       ignoreListManager,
+      workspace,
     });
-    target = createTarget();
     backend = new MockProtocolBackend();
+    target = createTarget();
   });
 
   // Given a function scope <fn-start>,<fn-end> and a nested scope <start>,<end>,
@@ -110,17 +111,12 @@ describeWithMockConnection('NameResolver', () => {
       scopes: '          {B        BBBBB   B        B   B         B   }',
     },
     {
-      name: 'computes identifiers with nested scopes, var lifting',
-      source: 'function f(x) { let outer = x; { var b = x; return b } }',
-      scopes: '          {B        BBBBB   B        B   B         B   }',
-    },
-    {
       name: 'computes identifiers in catch clause',
       source: 'function f(x) { try { } catch (e) { let a = e + x; } }',
       scopes: '          {                   <B            B   F  > }',
     },
     {
-      name: 'computes identifiers in catch clause',
+      name: 'computes identifiers in catch clause with return',
       source: 'function f(x) { try { } catch (e) { let a = e; return a; } }',
       scopes: '          {                       <     B   F         B  > }',
     },
@@ -415,10 +411,7 @@ describeWithMockConnection('NameResolver', () => {
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       const script = debuggerModel?.scripts()[0];
       const scriptId = script?.scriptId;
-      if (scriptId === undefined) {
-        assert.fail('Script id not found');
-        return;
-      }
+      assert.exists(scriptId, 'Script id not found');
       const {lineNumber, columnNumber} = scopeLocation;
       await script?.requestContentData();
       const functionName = await SourceMapScopes.NamesResolver.resolveProfileFrameFunctionName(
@@ -429,7 +422,7 @@ describeWithMockConnection('NameResolver', () => {
 
   describe('Function name resolving from scopes', () => {
     it('resolves function scope name at scope start for a debugger frame', async () => {
-      Root.Runtime.experiments.enableForTest('use-source-map-scopes');
+      Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES);
 
       const sourceMapUrl = 'file:///tmp/example.js.min.map';
       const sourceMapContent = JSON.stringify({
@@ -462,7 +455,7 @@ describeWithMockConnection('NameResolver', () => {
 
       const functionName = await SourceMapScopes.NamesResolver.resolveDebuggerFrameFunctionName(callFrame);
       assert.strictEqual(functionName, 'main');
-      Root.Runtime.experiments.disableForTest('use-source-map-scopes');
+      Root.Runtime.experiments.disableForTest(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES);
     });
   });
 

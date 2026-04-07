@@ -4,7 +4,6 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -135,13 +134,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/ThreadAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-/**
- * This appender is only triggered when the Renderer handler is run. At
- * the moment this only happens in the basic component server example.
- * In the future, once this appender fully supports the behaviour of the
- * old engine's thread/sync tracks we can always run it by enabling the
- * Renderer and Samples handler by default.
- **/
 export class ThreadAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'Thread';
 
@@ -158,7 +150,7 @@ export class ThreadAppender implements TrackAppender {
   #headerAppended = false;
   readonly threadType: Trace.Handlers.Threads.ThreadType = Trace.Handlers.Threads.ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
-  #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
+  #showAllEventsEnabled = Common.Settings.Settings.instance().moduleSetting('timeline-show-all-events').get();
   #url = '';
   #headerNestingLevel: number|null = null;
   constructor(

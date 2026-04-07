@@ -29,11 +29,11 @@ const UIStrings = {
   /**
    * @description The UI destination when right clicking an item that can be revealed
    */
-  applicationPanel: 'Application panel',
+  requestConditionsDrawer: 'Request conditions drawer',
   /**
    * @description The UI destination when right clicking an item that can be revealed
    */
-  securityPanel: 'Security panel',
+  applicationPanel: 'Application panel',
   /**
    * @description The UI destination when right clicking an item that can be revealed
    */
@@ -181,10 +181,10 @@ export const RevealerDestination = {
   CHANGES_DRAWER: i18nLazyString(UIStrings.changesDrawer),
   ISSUES_VIEW: i18nLazyString(UIStrings.issuesView),
   NETWORK_PANEL: i18nLazyString(UIStrings.networkPanel),
+  REQUEST_CONDITIONS_DRAWER: i18nLazyString(UIStrings.requestConditionsDrawer),
   TIMELINE_PANEL: i18nLazyString(UIStrings.timelinePanel),
   APPLICATION_PANEL: i18nLazyString(UIStrings.applicationPanel),
   SOURCES_PANEL: i18nLazyString(UIStrings.sourcesPanel),
-  SECURITY_PANEL: i18nLazyString(UIStrings.securityPanel),
   MEMORY_INSPECTOR_PANEL: i18nLazyString(UIStrings.memoryInspectorPanel),
   ANIMATIONS_PANEL: i18nLazyString(UIStrings.animationsPanel),
 };

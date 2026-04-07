@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/kit/kit.js';
+
 import * as i18n from '../../core/i18n/i18n.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import {html, type TemplateResult} from '../../ui/lit/lit.js';
 
 import {SourcesView} from './SourcesView.js';
 import type {UISourceCodeFrame} from './UISourceCodeFrame.js';
@@ -57,10 +59,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
   #goToLineStrings: string[] = [];
 
-  constructor() {
-    super('source-line');
-  }
-
   override selectItem(_itemIndex: number|null, promptValue: string): void {
     const sourceFrame = this.currentSourceFrame();
     if (!sourceFrame) {
@@ -77,10 +75,14 @@ export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
     return this.#goToLineStrings.length;
   }
 
-  override renderItem(itemIndex: number, _query: string, titleElement: Element, _subtitleElement: Element): void {
-    const icon = IconButton.Icon.create('colon');
-    titleElement.parentElement?.parentElement?.insertBefore(icon, titleElement.parentElement);
-    UI.UIUtils.createTextChild(titleElement, this.#goToLineStrings[itemIndex]);
+  override renderItem(itemIndex: number, _query: string): TemplateResult {
+    // clang-format off
+    return html`
+      <devtools-icon name="colon"></devtools-icon>
+      <div>
+        <div>${this.#goToLineStrings[itemIndex]}</div>
+      </div>`;
+    // clang-format on
   }
 
   override rewriteQuery(_query: string): string {

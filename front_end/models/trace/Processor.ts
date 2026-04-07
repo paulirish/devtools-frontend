@@ -268,7 +268,8 @@ export class TraceProcessor extends EventTarget {
 
   #createLanternContext(
       data: Handlers.Types.HandlerData, traceEvents: readonly Types.Events.Event[], frameId: string,
-      navigationId: string, options: Types.Configuration.ParseOptions): Insights.Types.LanternContext|undefined {
+      navigation: Types.Events.NavigationStart,
+      options: Types.Configuration.ParseOptions): Insights.Types.LanternContext|undefined {
     // Check for required handlers.
     if (!data.NetworkRequests || !data.Workers || !data.PageLoadMetrics) {
       return;
@@ -278,7 +279,7 @@ export class TraceProcessor extends EventTarget {
     }
 
     const navStarts = data.Meta.navigationsByFrameId.get(frameId);
-    const navStartIndex = navStarts?.findIndex(n => n.args.data?.navigationId === navigationId);
+    const navStartIndex = navStarts?.findIndex(n => n === navigation);
     if (!navStarts || navStartIndex === undefined || navStartIndex === -1) {
       throw new Lantern.Core.LanternError('Could not find navigation start');
     }
@@ -295,7 +296,7 @@ export class TraceProcessor extends EventTarget {
 
     const requests = LanternComputationData.createNetworkRequests(trace, data, startTime, endTime);
     const graph = LanternComputationData.createGraph(requests, trace, data);
-    const processedNavigation = LanternComputationData.createProcessedNavigation(data, frameId, navigationId);
+    const processedNavigation = LanternComputationData.createProcessedNavigation(data, frameId, navigation);
 
     const networkAnalysis = Lantern.Core.NetworkAnalyzer.analyze(requests);
     if (!networkAnalysis) {
@@ -351,6 +352,7 @@ export class TraceProcessor extends EventTarget {
       SlowCSSSelector: null,
       ForcedReflow: null,
       Cache: null,
+      CharacterSet: null,
       ModernHTTP: null,
       LegacyJavaScript: null,
     };
@@ -376,10 +378,10 @@ export class TraceProcessor extends EventTarget {
     const observedClsScore = Insights.Common.evaluateCLSMetricScore(observedCls);
 
     const insightToSortingRank = new Map<string, number>();
-    for (const [name, model] of Object.entries(insightSet.model)) {
-      const lcp = model.metricSavings?.LCP ?? 0;
-      const inp = model.metricSavings?.INP ?? 0;
-      const cls = model.metricSavings?.CLS ?? 0;
+    for (const [name, insight] of Object.entries(insightSet.model)) {
+      const lcp = insight.metricSavings?.LCP ?? 0;
+      const inp = insight.metricSavings?.INP ?? 0;
+      const cls = insight.metricSavings?.CLS ?? 0;
 
       const lcpPostSavings =
           observedLcp !== undefined ? Math.max(0, observedLcp - lcp) as Types.Timing.Milli : undefined;
@@ -431,9 +433,13 @@ export class TraceProcessor extends EventTarget {
   #computeInsightSet(data: Handlers.Types.HandlerData, context: Insights.Types.InsightSetContext): void {
     const logger = context.options.logger;
 
+    if (!this.#insights) {
+      this.#insights = new Map();
+    }
+
     let id, urlString, navigation;
     if (context.navigation) {
-      id = context.navigationId;
+      id = `NAVIGATION_${this.#insights.size}`;
       urlString = data.Meta.finalDisplayUrlByNavigationId.get(context.navigationId) ?? data.Meta.mainFrameURL;
       navigation = context.navigation;
     } else {
@@ -441,28 +447,28 @@ export class TraceProcessor extends EventTarget {
       urlString = data.Meta.finalDisplayUrlByNavigationId.get('') ?? data.Meta.mainFrameURL;
     }
 
-    const insightSetModel = {} as Insights.Types.InsightSet['model'];
+    const insightSetModel = {} as Insights.Types.InsightModels;
+    const insightSetModelErrors: Insights.Types.InsightModelErrors = {};
 
     for (const [name, insight] of Object.entries(TraceProcessor.getInsightRunners())) {
-      let model: Insights.Types.InsightModel|Error;
       try {
         logger?.start(`insights:${name}`);
-        model = insight.generateInsight(data, context);
+        const model = insight.generateInsight(data, context);
         model.frameId = context.frameId;
         const navId = context.navigation?.args.data?.navigationId;
         if (navId) {
-          model.navigationId = navId;
+          model.navigation = context.navigation;
         }
         model.createOverlays = () => {
           // @ts-expect-error: model is a union of all possible insight model types.
           return insight.createOverlays(model);
         };
+        Object.assign(insightSetModel, {[name]: model});
       } catch (err) {
-        model = err;
+        Object.assign(insightSetModelErrors, {[name]: err});
       } finally {
         logger?.end(`insights:${name}`);
       }
-      Object.assign(insightSetModel, {[name]: model});
     }
 
     // We may choose to exclude the insightSet if it's trivial. Trivial means:
@@ -473,13 +479,11 @@ export class TraceProcessor extends EventTarget {
     // Generally, these cases are the short time ranges before a page reload starts.
     const isNavigation = id === Types.Events.NO_NAVIGATION;
     const trivialThreshold = Helpers.Timing.milliToMicro(Types.Timing.Milli(5000));
-    const everyInsightPasses = Object.values(insightSetModel)
-                                   .filter(model => !(model instanceof Error))
-                                   .every(model => model.state === 'pass');
+    const everyInsightPasses = Object.values(insightSetModel).every(model => model && model.state === 'pass');
 
-    const noLcp = !insightSetModel.LCPBreakdown.lcpEvent;
-    const noInp = !insightSetModel.INPBreakdown.longestInteractionEvent;
-    const noLayoutShifts = insightSetModel.CLSCulprits.shifts?.size === 0;
+    const noLcp = !insightSetModel.LCPBreakdown?.lcpEvent;
+    const noInp = !insightSetModel.INPBreakdown?.longestInteractionEvent;
+    const noLayoutShifts = insightSetModel.CLSCulprits?.shifts?.size === 0;
     const shouldExclude = isNavigation && context.bounds.range < trivialThreshold && everyInsightPasses && noLcp &&
         noInp && noLayoutShifts;
     if (shouldExclude) {
@@ -502,10 +506,8 @@ export class TraceProcessor extends EventTarget {
       frameId: context.frameId,
       bounds: context.bounds,
       model: insightSetModel,
+      modelErrors: insightSetModelErrors,
     };
-    if (!this.#insights) {
-      this.#insights = new Map();
-    }
     this.#insights.set(insightSet.id, insightSet);
     this.sortInsightSet(insightSet, context.options.metadata ?? null);
   }
@@ -571,7 +573,7 @@ export class TraceProcessor extends EventTarget {
     let lantern: Insights.Types.LanternContext|undefined;
     try {
       options.logger?.start('insights:createLanternContext');
-      lantern = this.#createLanternContext(data, traceEvents, frameId, navigationId, options);
+      lantern = this.#createLanternContext(data, traceEvents, frameId, navigation, options);
     } catch (e) {
       // Handle Lantern errors gracefully
       // Don't allow an error in constructing the Lantern graphs to break the rest of the trace processor.

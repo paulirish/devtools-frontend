@@ -19,7 +19,7 @@ const INITIAL_RESTORE_BREAKPOINT_COUNT = 100;
 
 export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDK.TargetManager.SDKModelObserver<SDK.DebuggerModel.DebuggerModel> {
-  readonly storage = new Storage();
+  readonly storage: Storage;
   readonly #workspace: Workspace.Workspace.WorkspaceImpl;
   readonly targetManager: SDK.TargetManager.TargetManager;
   readonly debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding;
@@ -38,11 +38,12 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   private constructor(
       targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl,
       debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding,
-      restoreInitialBreakpointCount?: number) {
+      settings: Common.Settings.Settings, restoreInitialBreakpointCount?: number) {
     super();
     this.#workspace = workspace;
     this.targetManager = targetManager;
     this.debuggerWorkspaceBinding = debuggerWorkspaceBinding;
+    this.storage = new Storage(settings);
 
     this.storage.mute();
     this.#setInitialBreakpoints(restoreInitialBreakpointCount ?? INITIAL_RESTORE_BREAKPOINT_COUNT);
@@ -73,25 +74,33 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
     targetManager: SDK.TargetManager.TargetManager|null,
     workspace: Workspace.Workspace.WorkspaceImpl|null,
     debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding|null,
+    settings: Common.Settings.Settings|null,
     restoreInitialBreakpointCount?: number,
-  } = {forceNew: null, targetManager: null, workspace: null, debuggerWorkspaceBinding: null}): BreakpointManager {
-    const {forceNew, targetManager, workspace, debuggerWorkspaceBinding, restoreInitialBreakpointCount} = opts;
+  } = {
+    forceNew: null,
+    targetManager: null,
+    workspace: null,
+    debuggerWorkspaceBinding: null,
+    settings: null,
+  }): BreakpointManager {
+    const {forceNew, targetManager, workspace, debuggerWorkspaceBinding, settings, restoreInitialBreakpointCount} =
+        opts;
     if (!breakpointManagerInstance || forceNew) {
-      if (!targetManager || !workspace || !debuggerWorkspaceBinding) {
+      if (!targetManager || !workspace || !debuggerWorkspaceBinding || !settings) {
         throw new Error(
-            `Unable to create settings: targetManager, workspace, and debuggerWorkspaceBinding must be provided: ${
+            `Unable to create settings: targetManager, workspace, debuggerWorkspaceBinding, and settings must be provided: ${
                 new Error().stack}`);
       }
 
-      breakpointManagerInstance =
-          new BreakpointManager(targetManager, workspace, debuggerWorkspaceBinding, restoreInitialBreakpointCount);
+      breakpointManagerInstance = new BreakpointManager(
+          targetManager, workspace, debuggerWorkspaceBinding, settings, restoreInitialBreakpointCount);
     }
 
     return breakpointManagerInstance;
   }
 
   modelAdded(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
+    if (Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
       debuggerModel.setSynchronizeBreakpointsCallback(this.restoreBreakpointsForScript.bind(this));
     }
   }
@@ -128,7 +137,7 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   // This method explicitly awaits the source map (if necessary) and the uiSourceCodes
   // required to set all breakpoints that are related to this script.
   async restoreBreakpointsForScript(script: SDK.Script.Script): Promise<void> {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
+    if (!Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
       return;
     }
     if (!script.sourceURL) {
@@ -986,8 +995,7 @@ export class ModelBreakpoint {
         const {lineNumber: uiLineNumber, columnNumber: uiColumnNumber} =
             BreakpointManager.uiLocationFromBreakpointLocation(uiSourceCode, lineNumber, columnNumber);
         const locations =
-            await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().uiLocationToRawLocations(
-                uiSourceCode, uiLineNumber, uiColumnNumber);
+            await this.#debuggerWorkspaceBinding.uiLocationToRawLocations(uiSourceCode, uiLineNumber, uiColumnNumber);
         debuggerLocations = locations.filter(location => location.debuggerModel === this.#debuggerModel);
         if (debuggerLocations.length) {
           break;
@@ -1006,7 +1014,7 @@ export class ModelBreakpoint {
           };
         }));
         newState = positions.slice(0);  // Create a copy
-      } else if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
+      } else if (!Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS)) {
         // Use this fallback if we do not have instrumentation breakpoints enabled yet. This currently makes
         // sure that v8 knows about the breakpoint and is able to restore it whenever the script is parsed.
         const lastResolvedState = this.#breakpoint.getLastResolvedState();
@@ -1248,8 +1256,8 @@ class Storage {
   readonly breakpoints: Map<string, BreakpointStorageState>;
   #muted: boolean;
 
-  constructor() {
-    this.setting = Common.Settings.Settings.instance().createLocalSetting('breakpoints', []);
+  constructor(settings: Common.Settings.Settings) {
+    this.setting = settings.createLocalSetting('breakpoints', []);
     this.breakpoints = new Map();
     this.#muted = false;
     for (const breakpoint of this.setting.get()) {

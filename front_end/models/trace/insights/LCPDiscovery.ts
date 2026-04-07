@@ -42,13 +42,17 @@ export const UIStrings = {
    */
   fetchPriorityShouldBeApplied: 'fetchpriority=high should be applied',
   /**
+   * @description Text to tell the user that a fetchpriority property value of "high" should be applied to the preload request that loads the LCP image.
+   */
+  fetchPriorityShouldBeAppliedToImagePreload: 'fetchpriority=high should be applied to the image preload request',
+  /**
    * @description Text to tell the user that the LCP request is discoverable in the initial document.
    */
   requestDiscoverable: 'Request is discoverable in initial document',
   /**
-   * @description Text to tell the user that the LCP request does not have the lazy load property applied.
+   * @description Text to tell the user that LCP resources should avoid using loading=lazy.
    */
-  lazyLoadNotApplied: 'lazy load not applied',
+  lazyLoadNotApplied: 'LCP resources should not use loading=lazy',
   /**
    * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
    */
@@ -66,7 +70,7 @@ export function isLCPDiscoveryInsight(model: InsightModel): model is LCPDiscover
   return model.insightKey === 'LCPDiscovery';
 }
 export type LCPDiscoveryInsightModel = InsightModel<typeof UIStrings, {
-  lcpEvent?: Types.Events.LargestContentfulPaintCandidate,
+  lcpEvent?: Types.Events.AnyLargestContentfulPaintCandidate,
   /** The network request for the LCP image, if there was one. */
   lcpRequest?: Types.Events.SyntheticNetworkRequest,
   earliestDiscoveryTimeTs?: Types.Timing.Micro,
@@ -108,13 +112,13 @@ export function generateInsight(
     throw new Error('no frame metrics');
   }
 
-  const navMetrics = frameMetrics.get(context.navigationId);
+  const navMetrics = frameMetrics.get(context.navigation);
   if (!navMetrics) {
     throw new Error('no navigation metrics');
   }
   const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
   const lcpEvent = metricScore?.event;
-  if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
+  if (!lcpEvent || !Types.Events.isAnyLargestContentfulPaintCandidate(lcpEvent)) {
     return finalize({warnings: [InsightWarning.NO_LCP]});
   }
 
@@ -129,18 +133,21 @@ export function generateInsight(
   }
 
   const initiatorUrl = lcpRequest.args.data.initiator?.url;
-  // TODO(b/372319476): Explore using trace event HTMLDocumentParser::FetchQueuedPreloads to determine if the request
-  // is discovered by the preload scanner.
   const initiatedByMainDoc =
       lcpRequest?.args.data.initiator?.type === 'parser' && docRequest.args.data.url === initiatorUrl;
   const imgPreloadedOrFoundInHTML = lcpRequest?.args.data.isLinkPreload || initiatedByMainDoc;
 
-  const imageLoadingAttr = lcpEvent.args.data?.loadingAttr;
   const imageFetchPriorityHint = lcpRequest?.args.data.fetchPriorityHint;
   // This is the earliest discovery time an LCP request could have - it's TTFB (as an absolute timestamp).
   const earliestDiscoveryTime = calculateDocFirstByteTs(docRequest);
 
   const priorityHintFound = imageFetchPriorityHint === 'high';
+  const missingPriorityHintLabel = lcpRequest.args.data.isLinkPreload ?
+      i18nString(UIStrings.fetchPriorityShouldBeAppliedToImagePreload) :
+      i18nString(UIStrings.fetchPriorityShouldBeApplied);
+  // A lazy-loaded LCP image can still be eagerly loaded when its request is
+  // initiated by a preload.
+  const lcpNotLazyLoaded = lcpEvent.args.data?.loadingAttr !== 'lazy' || lcpRequest.args.data.isLinkPreload;
 
   return finalize({
     lcpEvent,
@@ -148,12 +155,11 @@ export function generateInsight(
     earliestDiscoveryTimeTs: earliestDiscoveryTime ? Types.Timing.Micro(earliestDiscoveryTime) : undefined,
     checklist: {
       priorityHinted: {
-        label: priorityHintFound ? i18nString(UIStrings.fetchPriorityApplied) :
-                                   i18nString(UIStrings.fetchPriorityShouldBeApplied),
+        label: priorityHintFound ? i18nString(UIStrings.fetchPriorityApplied) : missingPriorityHintLabel,
         value: priorityHintFound
       },
       requestDiscoverable: {label: i18nString(UIStrings.requestDiscoverable), value: imgPreloadedOrFoundInHTML},
-      eagerlyLoaded: {label: i18nString(UIStrings.lazyLoadNotApplied), value: imageLoadingAttr !== 'lazy'},
+      eagerlyLoaded: {label: i18nString(UIStrings.lazyLoadNotApplied), value: lcpNotLazyLoaded},
     },
   });
 }

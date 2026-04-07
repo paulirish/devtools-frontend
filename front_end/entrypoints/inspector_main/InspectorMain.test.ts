@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -10,14 +9,13 @@ import type * as Protocol from '../../generated/protocol.js';
 import {
   createTarget,
   stubNoopSettings,
-  updateHostConfig,
 } from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {
   describeWithMockConnection,
   setMockConnectionResponseHandler,
 } from '../../testing/MockConnection.js';
-import * as UI from '../../ui/legacy/legacy.js';
+import type * as UI from '../../ui/legacy/legacy.js';
 
 import * as InspectorMain from './inspector_main.js';
 
@@ -37,152 +35,26 @@ describeWithMockConnection('InspectorMainImpl', () => {
   const DEBUGGER_ID = 'debuggerId' as Protocol.Runtime.UniqueDebuggerId;
 
   const runForTabTarget = async () => {
-    const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+    const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
     const runPromise = inspectorMain.run();
     const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
     SDK.TargetManager.TargetManager.instance().createTarget(
-        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, undefined);
+        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, 'session ID');
     await runPromise;
   };
 
   beforeEach(() => {
-    sinon.stub(ProtocolClient.InspectorBackend.Connection, 'setFactory');
-  });
-
-  describe('comparingBrowserSettingWithCookieControlSetting', () => {
-    // Before the tests, we need to add these settings to allow the InspectorMain.run to work
-    beforeEach(async () => {
-      Common.Settings.registerSettingExtension({
-        settingName: 'auto-attach-to-created-pages',
-        settingType: Common.Settings.SettingType.BOOLEAN,
-        defaultValue: false,
-      });
-      Common.Settings.registerSettingExtension({
-        settingName: 'network.ad-blocking-enabled',
-        settingType: Common.Settings.SettingType.BOOLEAN,
-        defaultValue: false,
-      });
-      Common.Settings.registerSettingExtension({
-        settingName: 'emulate-page-focus',
-        settingType: Common.Settings.SettingType.BOOLEAN,
-        defaultValue: false,
-      });
-
-      const storage = Common.Settings.Settings.instance().localStorage;
-      Common.Settings.Settings.instance(
-          {forceNew: true, syncedStorage: storage, globalStorage: storage, localStorage: storage});
-    });
-
-    function setBrowserConfig(
-        thirdPartyCookieRestrictionEnabled?: boolean, thirdPartyCookieMetadataEnabled?: boolean,
-        thirdPartyCookieHeuristicsEnabled?: boolean, managedBlockThirdPartyCookies?: boolean|string) {
-      updateHostConfig({
-        thirdPartyCookieControls: {
-          thirdPartyCookieRestrictionEnabled,
-          thirdPartyCookieHeuristicsEnabled,
-          thirdPartyCookieMetadataEnabled,
-          managedBlockThirdPartyCookies,
-        },
-        devToolsPrivacyUI: {enabled: true}
-      });
-    }
-
-    function setDevtoolsCookieControls(
-        cookieControlOverrideEnabled?: boolean, gracePeriodMitigationEnabled?: boolean,
-        heuristicMitigationEnabled?: boolean) {
-      Common.Settings.Settings.instance().createSetting(
-          'cookie-control-override-enabled', cookieControlOverrideEnabled);
-      Common.Settings.Settings.instance().createSetting(
-          'grace-period-mitigation-disabled', !gracePeriodMitigationEnabled);
-      Common.Settings.Settings.instance().createSetting('heuristic-mitigation-disabled', !heuristicMitigationEnabled);
-    }
-
-    it('does not show infobar when enterpirse is blocking third-party cookies', async () => {
-      const restrictThirdPartyCookies = true;
-      const gracePeriodEnabled = true;
-      const heuristicsEnabled = true;
-      const enterpriseBlocksThirdPartyCookies = true;
-      setBrowserConfig(
-          restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled, enterpriseBlocksThirdPartyCookies);
-      setDevtoolsCookieControls(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-
-      const reloadRequiredInfobarSpy =
-          sinon.spy(UI.InspectorView.InspectorView.instance(), 'displayDebuggedTabReloadRequiredWarning');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
-      await inspectorMain.run();
-
-      sinon.assert.notCalled(reloadRequiredInfobarSpy);
-    });
-
-    it('does not show infobar when control setting is undefined', async () => {
-      const restrictThirdPartyCookies = true;
-      const gracePeriodEnabled = true;
-      const heuristicsEnabled = true;
-      setBrowserConfig(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-
-      const reloadRequiredInfobarSpy =
-          sinon.spy(UI.InspectorView.InspectorView.instance(), 'displayDebuggedTabReloadRequiredWarning');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
-      await inspectorMain.run();
-
-      sinon.assert.notCalled(reloadRequiredInfobarSpy);
-    });
-
-    it('does not show infobar when control settings match browser settings', async () => {
-      const restrictThirdPartyCookies = true;
-      const gracePeriodEnabled = true;
-      const heuristicsEnabled = true;
-      setBrowserConfig(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-      setDevtoolsCookieControls(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-
-      const reloadRequiredInfobarSpy =
-          sinon.spy(UI.InspectorView.InspectorView.instance(), 'displayDebuggedTabReloadRequiredWarning');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
-      await inspectorMain.run();
-
-      sinon.assert.notCalled(reloadRequiredInfobarSpy);
-    });
-
-    it('shows infobar when cookie control override differs from browser setting', async () => {
-      const restrictThirdPartyCookies = true;
-      const gracePeriodEnabled = true;
-      const heuristicsEnabled = true;
-      setBrowserConfig(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-      setDevtoolsCookieControls(!restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-
-      const reloadRequiredInfobarSpy =
-          sinon.spy(UI.InspectorView.InspectorView.instance(), 'displayDebuggedTabReloadRequiredWarning');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
-      await inspectorMain.run();
-
-      sinon.assert.calledOnce(reloadRequiredInfobarSpy);
-    });
-
-    it('shows infobar when a mitigation override differs from browser setting', async () => {
-      const restrictThirdPartyCookies = true;
-      const gracePeriodEnabled = true;
-      const heuristicsEnabled = true;
-      setBrowserConfig(restrictThirdPartyCookies, gracePeriodEnabled, heuristicsEnabled);
-      setDevtoolsCookieControls(restrictThirdPartyCookies, !gracePeriodEnabled, heuristicsEnabled);
-
-      const reloadRequiredInfobarSpy =
-          sinon.spy(UI.InspectorView.InspectorView.instance(), 'displayDebuggedTabReloadRequiredWarning');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
-      await inspectorMain.run();
-
-      sinon.assert.calledOnce(reloadRequiredInfobarSpy);
-    });
+    sinon.stub(ProtocolClient.ConnectionTransport.ConnectionTransport, 'setFactory');
   });
 
   describe('withNoopSettings', () => {
     beforeEach(() => {
       stubNoopSettings();
-      updateHostConfig({devToolsPrivacyUI: {enabled: false}});
     });
 
     it('continues only after primary page target is available', async () => {
       Root.Runtime.Runtime.setQueryParamForTesting('targetType', 'tab');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       let finished = false;
       inspectorMain.run()
           .then(() => {
@@ -195,13 +67,13 @@ describeWithMockConnection('InspectorMainImpl', () => {
       assert.isFalse(finished);
       const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
       SDK.TargetManager.TargetManager.instance().createTarget(
-          'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, undefined);
+          'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, 'session ID');
       await new Promise(resolve => setTimeout(resolve, 0));
       assert.isTrue(finished);
     });
 
     it('sets main target type to Node if v8only query param present', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       Root.Runtime.Runtime.setQueryParamForTesting('v8only', 'true');
       assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
       await inspectorMain.run();
@@ -220,7 +92,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('sets main target type to Frame by default', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
       await inspectorMain.run();
 
@@ -228,7 +100,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('creates main target waiting for debugger if the main target is frame and panel is sources', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       Root.Runtime.Runtime.setQueryParamForTesting('panel', 'sources');
       assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
 
@@ -245,7 +117,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('wait for Debugger.enable before calling Debugger.pause', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       Root.Runtime.Runtime.setQueryParamForTesting('panel', 'sources');
       assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
 
@@ -253,9 +125,9 @@ describeWithMockConnection('InspectorMainImpl', () => {
       setMockConnectionResponseHandler('Debugger.pause', debuggerPause);
       const debuggerPauseCalled = expectCall(debuggerPause);
 
-      let debuggerEnable = (_: Protocol.Debugger.EnableResponse) => {};
+      let debuggerEnable = (_: Protocol.Debugger.EnableResponse): void => {};
       setMockConnectionResponseHandler(
-          'Debugger.enable', () => new Promise<Protocol.Debugger.EnableResponse>(resolve => {
+          'Debugger.enable', () => new Promise<Omit<Protocol.Debugger.EnableResponse, 'getError'>>(resolve => {
                                debuggerEnable = resolve;
                              }));
 
@@ -269,7 +141,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('frontend correctly registers if Debugger.enable fails', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
 
       setMockConnectionResponseHandler('Debugger.enable', () => ({getError: () => 'Debugger.enable failed'}));
@@ -283,7 +155,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
 
     it('calls Runtime.runIfWaitingForDebugger for Node target', async () => {
       Root.Runtime.Runtime.setQueryParamForTesting('v8only', 'true');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       const runIfWaitingForDebugger = sinon.spy();
       setMockConnectionResponseHandler('Runtime.runIfWaitingForDebugger', runIfWaitingForDebugger);
       await inspectorMain.run();
@@ -292,7 +164,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('calls Runtime.runIfWaitingForDebugger for frame target', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       const runIfWaitingForDebugger = sinon.spy();
       setMockConnectionResponseHandler('Runtime.runIfWaitingForDebugger', runIfWaitingForDebugger);
       await inspectorMain.run();
@@ -309,7 +181,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     });
 
     it('sets frame target to "main"', async () => {
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       const runIfWaitingForDebugger = sinon.spy();
       setMockConnectionResponseHandler('Runtime.runIfWaitingForDebugger', runIfWaitingForDebugger);
       await inspectorMain.run();
@@ -327,7 +199,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
 
     it('sets main frame target to "main"', async () => {
       Root.Runtime.Runtime.setQueryParamForTesting('targetType', 'tab');
-      const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+      const inspectorMain = new InspectorMain.InspectorMain.InspectorMainImpl();
       const runIfWaitingForDebugger = sinon.spy();
       setMockConnectionResponseHandler('Runtime.runIfWaitingForDebugger', runIfWaitingForDebugger);
       const runPromise = inspectorMain.run();

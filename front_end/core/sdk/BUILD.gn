@@ -20,6 +20,7 @@ devtools_module("sdk") {
     "CSSMedia.ts",
     "CSSMetadata.ts",
     "CSSModel.ts",
+    "CSSNavigation.ts",
     "CSSProperty.ts",
     "CSSPropertyParser.ts",
     "CSSPropertyParserMatchers.ts",
@@ -39,6 +40,7 @@ devtools_module("sdk") {
     "Cookie.ts",
     "CookieModel.ts",
     "CookieParser.ts",
+    "CrashReportContextModel.ts",
     "DOMDebuggerModel.ts",
     "DOMModel.ts",
     "DebuggerModel.ts",
@@ -130,7 +132,10 @@ devtools_entrypoint("meta") {
     "../../core/i18n:bundle",
   ]
 
-  visibility = [ "../../entrypoints/*" ]
+  visibility = [
+    "../../../mcp/*",
+    "../../entrypoints/*",
+  ]
 }
 
 ts_library("unittests") {
@@ -154,8 +159,8 @@ ts_library("unittests") {
     "Cookie.test.ts",
     "CookieModel.test.ts",
     "CookieParser.test.ts",
+    "CrashReportContextModel.test.ts",
     "DOMModel.test.ts",
-    "DebuggerModel.test.ts",
     "EmulationModel.test.ts",
     "EnhancedTracesParser.test.ts",
     "FrameManager.test.ts",
@@ -164,12 +169,10 @@ ts_library("unittests") {
     "OverlayColorGenerator.test.ts",
     "OverlayModel.test.ts",
     "OverlayPersistentHighlighter.test.ts",
-    "PageResourceLoader.test.ts",
     "PreloadingModel.test.ts",
     "RehydratingConnection.test.ts",
     "RemoteObject.test.ts",
     "ResourceTreeModel.test.ts",
-    "RuntimeModel.test.ts",
     "ScopeTreeCache.test.ts",
     "ScreenCaptureModel.test.ts",
     "Script.test.ts",
@@ -185,8 +188,6 @@ ts_library("unittests") {
     "SourceMapScopesInfo.test.ts",
     "StorageBucketsModel.test.ts",
     "StorageKeyManager.test.ts",
-    "Target.test.ts",
-    "TargetManager.test.ts",
     "TraceObject.test.ts",
   ]
 
@@ -202,6 +203,29 @@ ts_library("unittests") {
     "../../testing",
     "../common:bundle",
     "../protocol_client:bundle",
+    "../root:bundle",
+  ]
+}
+
+devtools_foundation_module("foundation_unittests") {
+  testonly = true
+
+  sources = [
+    "DebuggerModel.test.ts",
+    "PageResourceLoader.test.ts",
+    "RuntimeModel.test.ts",
+    "Target.test.ts",
+    "TargetManager.test.ts",
+  ]
+
+  deps = [
+    ":bundle",
+    "../../generated",
+    "../../models/bindings:bundle",
+    "../../models/workspace:bundle",
+    "../../testing",
+    "../host:bundle",
+    "../platform:bundle",
     "../root:bundle",
   ]
 }

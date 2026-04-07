@@ -4,7 +4,7 @@
 
 // Unsure why this lint is failing, given `lantern/metrics/SpeedIndex.test.ts` does the same
 // and is fine. Maybe `*.test.*` files are excluded from this rule?
-// eslint-disable-next-line rulesdir/es-modules-import
+// eslint-disable-next-line @devtools/es-modules-import
 import * as TraceLoader from '../../../../testing/TraceLoader.js';
 import * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
@@ -43,15 +43,15 @@ async function getComputationDataFromFixture(context: Mocha.Suite|Mocha.Context,
   }
 
   const frameId = data.Meta.mainFrameId;
-  const navigationId = data.Meta.mainFrameNavigations[0].args.data?.navigationId;
-  if (!navigationId) {
-    throw new Error('no navigation id found');
+  const navigation = data.Meta.mainFrameNavigations[0];
+  if (!navigation) {
+    throw new Error('no navigation found');
   }
 
   return {
     simulator: Lantern.Simulation.Simulator.createSimulator({...settings, networkAnalysis}),
     graph: Trace.LanternComputationData.createGraph(requests, trace, data, url),
-    processedNavigation: Trace.LanternComputationData.createProcessedNavigation(data, frameId, navigationId),
+    processedNavigation: Trace.LanternComputationData.createProcessedNavigation(data, frameId, navigation),
   };
 }
 

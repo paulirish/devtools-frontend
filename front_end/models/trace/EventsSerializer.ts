@@ -19,10 +19,20 @@ export class EventsSerializer {
       return `${Types.File.EventKeyType.LEGACY_TIMELINE_FRAME}-${event.index}`;
     }
 
+    if (Types.Events.isJSSample(event)) {
+      return null;
+    }
+
     const rawEvents = Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager().getRawTraceEvents();
+    const isSynthetic = Types.Events.isSyntheticBased(event);
+    const index = rawEvents.indexOf(isSynthetic ? event.rawSourceEvent : event);
+    if (index === -1) {
+      return null;
+    }
+
     const key: Types.File.SyntheticEventKey|Types.File.RawEventKey = Types.Events.isSyntheticBased(event) ?
-        `${Types.File.EventKeyType.SYNTHETIC_EVENT}-${rawEvents.indexOf(event.rawSourceEvent)}` :
-        `${Types.File.EventKeyType.RAW_EVENT}-${rawEvents.indexOf(event)}`;
+        `${Types.File.EventKeyType.SYNTHETIC_EVENT}-${index}` :
+        `${Types.File.EventKeyType.RAW_EVENT}-${index}`;
     if (key.length < 3) {
       return null;
     }

@@ -1,7 +1,7 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2011 Brian Grinstead All rights reserved.
@@ -39,8 +39,8 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
-import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as SrgbOverlay from '../../../components/srgb_overlay/srgb_overlay.js';
+import {createIcon, Icon} from '../../../kit/kit.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
@@ -563,7 +563,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
 
     function appendSwitcherIcon(parentElement: Element): void {
-      const switcherIcon = new IconButton.Icon.Icon();
+      const switcherIcon = new Icon();
       switcherIcon.name = 'fold-more';
       switcherIcon.classList.add('medium');
       parentElement.appendChild(switcherIcon);
@@ -876,8 +876,12 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private loadPalettes(): void {
     this.palettes.set(MaterialPalette.title, MaterialPalette);
-    const defaultCustomPalette:
-        Palette = {title: 'Custom', colors: [], colorNames: [], mutable: true, matchUserFormat: undefined};
+    const defaultCustomPalette: Palette = {
+      title: 'Custom',
+      colors: [],
+      colorNames: [],
+      mutable: true,
+    };
     this.customPaletteSetting =
         Common.Settings.Settings.instance().createSetting('custom-color-palette', defaultCustomPalette);
     const customPalette = this.customPaletteSetting.get();
@@ -1366,6 +1370,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.hueAlphaWidth = this.hueElement.offsetWidth;
     this.slideHelperWidth = this.hueSlider.offsetWidth / 2;
     this.dragWidth = this.colorElement.offsetWidth;
@@ -1388,6 +1393,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   override willHide(): void {
+    super.willHide();
     void this.toggleColorPicker(false);
     if (this.contrastDetails && this.contrastDetailsBackgroundColorPickerToggledBound) {
       this.contrastDetails.removeEventListener(
@@ -1536,7 +1542,6 @@ export class PaletteGenerator {
       colors: [...paletteColors.keys()].sort(hueComparator),
       colorNames: [],
       mutable: false,
-      matchUserFormat: undefined,
     });
   }
 
@@ -1648,7 +1653,7 @@ export class Swatch {
   private colorString!: string|null;
   private swatchInnerElement: HTMLElement;
   private swatchOverlayElement: HTMLElement;
-  private readonly swatchCopyIcon: IconButton.Icon.Icon;
+  private readonly swatchCopyIcon: Icon;
   constructor(parentElement: HTMLElement) {
     const swatchElement = parentElement.createChild('span', 'swatch');
     swatchElement.setAttribute('jslog', `${VisualLogging.action('copy-color').track({click: true})}`);
@@ -1660,7 +1665,7 @@ export class Swatch {
     self.onInvokeElement(this.swatchOverlayElement, this.onCopyText.bind(this));
     this.swatchOverlayElement.addEventListener('mouseout', this.onCopyIconMouseout.bind(this));
     this.swatchOverlayElement.addEventListener('blur', this.onCopyIconMouseout.bind(this));
-    this.swatchCopyIcon = IconButton.Icon.create('copy', 'copy-color-icon');
+    this.swatchCopyIcon = createIcon('copy', 'copy-color-icon');
     UI.Tooltip.Tooltip.install(this.swatchCopyIcon, i18nString(UIStrings.copyColorToClipboard));
     this.swatchOverlayElement.appendChild(this.swatchCopyIcon);
     UI.ARIAUtils.setLabel(this.swatchOverlayElement, this.swatchCopyIcon.title);

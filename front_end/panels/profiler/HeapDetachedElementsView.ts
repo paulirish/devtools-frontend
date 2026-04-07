@@ -1,7 +1,7 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -126,11 +126,6 @@ export class DetachedElementsProfileType extends
       return;
     }
 
-    const animationModel = target?.model(SDK.AnimationModel.AnimationModel);
-    if (animationModel) {
-      // TODO(b/406904348): Remove this once we correctly release animations on the backend.
-      await animationModel.releaseAllAnimations();
-    }
     const data = await domModel.getDetachedDOMNodes();
 
     const profile: DetachedElementsProfileHeader = new DetachedElementsProfileHeader(heapProfilerModel, this, data);
@@ -173,17 +168,18 @@ export class DetachedElementsProfileHeader extends WritableProfileHeader {
   readonly #heapProfilerModel: SDK.HeapProfilerModel.HeapProfilerModel|null;
   readonly detachedElements: Protocol.DOM.DetachedElementInfo[]|null;
   constructor(
-      heapProfilerModel: SDK.HeapProfilerModel.HeapProfilerModel|null, type: DetachedElementsProfileType,
-      detachedElements: Protocol.DOM.DetachedElementInfo[]|null, title?: string) {
+      heapProfilerModel: SDK.HeapProfilerModel.HeapProfilerModel|null,
+      type: DetachedElementsProfileType,
+      detachedElements: Protocol.DOM.DetachedElementInfo[]|null,
+      title?: string,
+  ) {
     super(
-        heapProfilerModel?.debuggerModel() ?? null, type,
-        title || i18nString(UIStrings.detachedElementProfile, {PH1: type.nextProfileUid()}));
+        heapProfilerModel?.debuggerModel() ?? null,
+        type,
+        title || i18nString(UIStrings.detachedElementProfile, {PH1: type.nextProfileUid()}),
+    );
     this.detachedElements = detachedElements;
     this.#heapProfilerModel = heapProfilerModel;
-  }
-
-  override createView(dataDisplayDelegate: DataDisplayDelegate): DetachedElementsProfileView {
-    return new DetachedElementsProfileView(dataDisplayDelegate, this);
   }
 
   heapProfilerModel(): SDK.HeapProfilerModel.HeapProfilerModel|null {

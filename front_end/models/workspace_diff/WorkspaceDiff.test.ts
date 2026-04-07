@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
@@ -24,12 +25,14 @@ describeWithEnvironment('UISourceCodeDiff', () => {
       resourceMapping:
           new Bindings.ResourceMapping.ResourceMapping(SDK.TargetManager.TargetManager.instance(), workspace),
       ignoreListManager,
+      workspace,
     });
     const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
       forceNew: true,
       targetManager: SDK.TargetManager.TargetManager.instance(),
       workspace,
       debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance(),
     });
     const persistence =
         Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});

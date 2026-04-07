@@ -22,7 +22,7 @@ export const removeElement = <T>(array: T[], element: T, firstOnly?: boolean): b
 
 type NumberComparator = (a: number, b: number) => number;
 
-function swap(array: number[], i1: number, i2: number): void {
+export function swap<T>(array: T[], i1: number, i2: number): void {
   const temp = array[i1];
   array[i1] = array[i2];
   array[i2] = temp;
@@ -268,4 +268,17 @@ export function nearestIndexFromEnd<T>(arr: readonly T[], predicate: (arrayItem:
 /** Type guard for ensuring that `arr` does not contain null or undefined **/
 export function arrayDoesNotContainNullOrUndefined<T>(arr: Array<T|null|undefined>): arr is T[] {
   return !arr.includes(null) && !arr.includes(undefined);
+}
+
+export function assertArrayIsSorted<T>(arr: readonly T[], compareFn?: (a: T, b: T) => number): void {
+  const comparator = compareFn || (DEFAULT_COMPARATOR as unknown as (a: T, b: T) => number);
+
+  for (let i = 0; i < arr.length - 1; i++) {
+    const current = arr[i];
+    const next = arr[i + 1];
+
+    if (comparator(current, next) > 0) {
+      throw new Error(`Array is not sorted at index ${i}: ${JSON.stringify(current)} > ${JSON.stringify(next)}`);
+    }
+  }
 }

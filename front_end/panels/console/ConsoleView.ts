@@ -1,7 +1,7 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -41,16 +41,20 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import type * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
+import * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
+import * as AiCodeGeneration from '../../models/ai_code_generation/ai_code_generation.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import * as Highlighting from '../../ui/components/highlighting/highlighting.js';
 import * as IssueCounter from '../../ui/components/issue_counter/issue_counter.js';
-// eslint-disable-next-line rulesdir/es-modules-import
+import type * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import {createIcon} from '../../ui/kit/kit.js';
+// eslint-disable-next-line @devtools/es-modules-import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import * as SettingsUI from '../../ui/legacy/components/settings_ui/settings_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -69,7 +73,6 @@ import {
   ConsoleTableMessageView,
   ConsoleViewMessage,
   getMessageForElement,
-  MaxLengthForLinks,
 } from './ConsoleViewMessage.js';
 import {ConsoleViewport, type ConsoleViewportElement, type ConsoleViewportProvider} from './ConsoleViewport.js';
 
@@ -104,11 +107,11 @@ const UIStrings = {
   /**
    * @description Title of a setting under the Console category that can be invoked through the Command Menu
    */
-  groupSimilarMessagesInConsole: 'Group similar messages in console',
+  groupSimilarMessagesInConsole: 'Group similar messages',
   /**
    * @description Title of a setting under the Console category that can be invoked through the Command Menu
    */
-  showCorsErrorsInConsole: 'Show `CORS` errors in console',
+  showCorsErrorsInConsole: 'CORS errors in console',
   /**
    * @description Tooltip for the the console sidebar toggle in the Console panel. Command to
    * open/show the sidebar.
@@ -138,7 +141,7 @@ const UIStrings = {
   /**
    * @description Text in Console View of the Console panel
    */
-  hideNetwork: 'Hide network',
+  networkMessages: 'Network messages',
   /**
    * @description Tooltip text that appears on the setting when hovering over it in Console View of the Console panel
    */
@@ -266,7 +269,7 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsoleView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-let consoleViewInstance: ConsoleView;
+let consoleViewInstance: ConsoleView|null;
 
 const MIN_HISTORY_LENGTH_FOR_DISABLING_SELF_XSS_WARNING = 5;
 const DISCLAIMER_TOOLTIP_ID = 'console-ai-code-completion-disclaimer-tooltip';
@@ -334,8 +337,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   private issueResolver = new IssuesManager.IssueResolver.IssueResolver();
   #isDetached = false;
   #onIssuesCountUpdateBound = this.#onIssuesCountUpdate.bind(this);
-  private aiCodeCompletionSetting =
-      Common.Settings.Settings.instance().createSetting('ai-code-completion-enabled', false);
+  aiCodeCompletionConfig?: TextEditor.AiCodeCompletionProvider.AiCodeCompletionConfig;
   private aiCodeCompletionSummaryToolbarContainer?: HTMLElement;
   private aiCodeCompletionSummaryToolbar?: AiCodeCompletionSummaryToolbar;
 
@@ -470,29 +472,30 @@ export class ConsoleView extends UI.Widget.VBox implements
     const preserveConsoleLogSetting = Common.Settings.Settings.instance().moduleSetting('preserve-console-log');
     const userActivationEvalSetting = Common.Settings.Settings.instance().moduleSetting('console-user-activation-eval');
     settingsPane.append(
-        UI.SettingsUI.createSettingCheckbox(
-            i18nString(UIStrings.hideNetwork), this.filter.hideNetworkMessagesSetting,
-            this.filter.hideNetworkMessagesSetting.title()),
-        UI.SettingsUI.createSettingCheckbox(i18nString(UIStrings.logXMLHttpRequests), monitoringXHREnabledSetting),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
+            i18nString(UIStrings.networkMessages), this.filter.networkMessagesSetting,
+            this.filter.networkMessagesSetting.title()),
+        SettingsUI.SettingsUI.createSettingCheckbox(
+            i18nString(UIStrings.logXMLHttpRequests), monitoringXHREnabledSetting),
+        SettingsUI.SettingsUI.createSettingCheckbox(
             i18nString(UIStrings.preserveLog), preserveConsoleLogSetting,
             i18nString(UIStrings.doNotClearLogOnPageReload)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             consoleEagerEvalSetting.title(), consoleEagerEvalSetting,
             i18nString(UIStrings.eagerlyEvaluateTextInThePrompt)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             i18nString(UIStrings.selectedContextOnly), this.filter.filterByExecutionContextSetting,
             i18nString(UIStrings.onlyShowMessagesFromTheCurrentContext)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             this.consoleHistoryAutocompleteSetting.title(), this.consoleHistoryAutocompleteSetting,
             i18nString(UIStrings.autocompleteFromHistory)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             this.groupSimilarSetting.title(), this.groupSimilarSetting,
             i18nString(UIStrings.groupSimilarMessagesInConsole)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             userActivationEvalSetting.title(), userActivationEvalSetting,
             i18nString(UIStrings.treatEvaluationAsUserActivation)),
-        UI.SettingsUI.createSettingCheckbox(
+        SettingsUI.SettingsUI.createSettingCheckbox(
             this.showCorsErrorsSetting.title(), this.showCorsErrorsSetting,
             i18nString(UIStrings.showCorsErrorsInConsole)),
     );
@@ -503,8 +506,9 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.showSettingsPaneSetting.addChangeListener(
         () => settingsPane.classList.toggle('hidden', !this.showSettingsPaneSetting.get()));
 
-    this.pinPane = new ConsolePinPane(liveExpressionButton, () => this.prompt.focus());
+    this.pinPane = new ConsolePinPane(() => this.prompt.focus());
     this.pinPane.element.classList.add('console-view-pinpane');
+    this.pinPane.element.classList.remove('flex-auto');
     this.pinPane.show(this.contentsElement);
 
     this.viewport = new ConsoleViewport(this);
@@ -545,28 +549,44 @@ export class ConsoleView extends UI.Widget.VBox implements
     // the linkifiers live location change event.
     const throttler = new Common.Throttler.Throttler(100);
     const refilterMessages = (): Promise<void> => throttler.schedule(async () => this.onFilterChanged());
-    this.linkifier = new Components.Linkifier.Linkifier(MaxLengthForLinks);
+    this.linkifier = new Components.Linkifier.Linkifier(UI.UIUtils.MaxLengthForDisplayedURLsInConsole);
     this.linkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, refilterMessages);
 
     this.consoleMessages = [];
     this.consoleGroupStarts = [];
 
-    this.prompt = new ConsolePrompt();
+    const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
+    this.aiCodeCompletionConfig =
+        AiCodeCompletion.AiCodeCompletion.AiCodeCompletion.isAiCodeCompletionEnabled(devtoolsLocale.locale) ? {
+          completionContext: {
+            getPrefix: this.getConsoleMessageHistory.bind(this),
+            additionalFiles: [{
+              path: 'devtools-console-context.js',
+              content: AiCodeCompletion.AiCodeCompletion.consoleAdditionalContextFileContent,
+              included_reason: Host.AidaClient.Reason.RELATED_FILE,
+            }],
+            stopSequences: ['\n\n'],
+          },
+          generationContext: {
+            additionalPreambleContext: AiCodeGeneration.AiCodeGeneration.additionalContextForConsole,
+          },
+          onFeatureEnabled: () => {
+            this.setupAiCodeCompletion();
+          },
+          onFeatureDisabled: () => {
+            this.cleanupAiCodeCompletion();
+          },
+          onSuggestionAccepted: this.#onAiCodeCompletionSuggestionAccepted.bind(this),
+          onRequestTriggered: this.#onAiCodeCompletionRequestTriggered.bind(this),
+          onResponseReceived: this.#onAiCodeCompletionResponseReceived.bind(this),
+          panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
+        } :
+                                                                                                              undefined;
+
+    this.prompt = new ConsolePrompt(this.aiCodeCompletionConfig);
     this.prompt.show(this.promptElement);
     this.prompt.element.addEventListener('keydown', this.promptKeyDown.bind(this), true);
     this.prompt.addEventListener(ConsolePromptEvents.TEXT_CHANGED, this.promptTextChanged, this);
-
-    if (this.isAiCodeCompletionEnabled()) {
-      this.aiCodeCompletionSetting.addChangeListener(this.onAiCodeCompletionSettingChanged.bind(this));
-      this.onAiCodeCompletionSettingChanged();
-      this.prompt.addEventListener(
-          ConsolePromptEvents.AI_CODE_COMPLETION_SUGGESTION_ACCEPTED, this.#onAiCodeCompletionSuggestionAccepted, this);
-      this.prompt.addEventListener(
-          ConsolePromptEvents.AI_CODE_COMPLETION_REQUEST_TRIGGERED, this.#onAiCodeCompletionRequestTriggered, this);
-      this.prompt.addEventListener(
-          ConsolePromptEvents.AI_CODE_COMPLETION_RESPONSE_RECEIVED, this.#onAiCodeCompletionResponseReceived, this);
-      this.element.addEventListener('keydown', this.keyDown.bind(this));
-    }
 
     this.messagesElement.addEventListener('keydown', this.messagesKeyDown.bind(this), false);
     this.prompt.element.addEventListener('focusin', () => {
@@ -617,6 +637,10 @@ export class ConsoleView extends UI.Widget.VBox implements
         IssuesManager.IssuesManager.Events.ISSUES_COUNT_UPDATED, this.#onIssuesCountUpdateBound);
   }
 
+  static clearConsoleViewInstanceForTest(): void {
+    consoleViewInstance = null;
+  }
+
   static instance(opts?: {forceNew: boolean, viewportThrottlerTimeout?: number}): ConsoleView {
     if (!consoleViewInstance || opts?.forceNew) {
       consoleViewInstance = new ConsoleView(opts?.viewportThrottlerTimeout ?? 50);
@@ -625,28 +649,26 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   createAiCodeCompletionSummaryToolbar(): void {
+    if (this.aiCodeCompletionSummaryToolbar) {
+      return;
+    }
     this.aiCodeCompletionSummaryToolbar = new AiCodeCompletionSummaryToolbar({
       citationsTooltipId: CITATIONS_TOOLTIP_ID,
       disclaimerTooltipId: DISCLAIMER_TOOLTIP_ID,
-      spinnerTooltipId: SPINNER_TOOLTIP_ID
+      spinnerTooltipId: SPINNER_TOOLTIP_ID,
+      panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
     });
-    this.aiCodeCompletionSummaryToolbarContainer = this.element.createChild('div');
+    this.aiCodeCompletionSummaryToolbarContainer =
+        this.element.createChild('div', 'ai-code-completion-summary-toolbar-container');
     this.aiCodeCompletionSummaryToolbar.show(this.aiCodeCompletionSummaryToolbarContainer, undefined, true);
   }
 
-  #onAiCodeCompletionSuggestionAccepted(
-      event: Common.EventTarget.EventTargetEvent<AiCodeCompletion.AiCodeCompletion.ResponseReceivedEvent>): void {
-    if (!this.aiCodeCompletionSummaryToolbar || !event.data.citations || event.data.citations.length === 0) {
+  #onAiCodeCompletionSuggestionAccepted(citations: Host.AidaClient.Citation[]): void {
+    if (!this.aiCodeCompletionSummaryToolbar || citations.length === 0) {
       return;
     }
-    const citations: string[] = [];
-    event.data.citations.forEach(citation => {
-      const uri = citation.uri;
-      if (uri) {
-        citations.push(uri);
-      }
-    });
-    this.aiCodeCompletionSummaryToolbar.updateCitations(citations);
+    const citationsUri = citations.map(citation => citation.uri).filter((uri): uri is string => Boolean(uri));
+    this.aiCodeCompletionSummaryToolbar.updateCitations(citationsUri);
   }
 
   #onAiCodeCompletionRequestTriggered(): void {
@@ -767,7 +789,24 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   override willHide(): void {
+    super.willHide();
     this.hidePromptSuggestBox();
+  }
+
+  dispose(): void {
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.ConsoleCleared, this.consoleCleared, this);
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, this.onConsoleMessageAdded, this);
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageUpdated, this.onConsoleMessageUpdated, this);
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.CommandEvaluated, this.commandEvaluated, this);
+    SDK.TargetManager.TargetManager.instance().unobserveModels(SDK.ConsoleModel.ConsoleModel, this);
+
+    const issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
+    issuesManager.removeEventListener(
+        IssuesManager.IssuesManager.Events.ISSUES_COUNT_UPDATED, this.#onIssuesCountUpdateBound);
   }
 
   override wasShown(): void {
@@ -1058,12 +1097,12 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
 
     const currentGroup = viewMessage.consoleGroup();
+    showGroup(currentGroup, this.visibleViewMessages);
 
     if (!currentGroup?.messagesHidden()) {
       const originatingMessage = viewMessage.consoleMessage().originatingMessage();
       const adjacent = Boolean(originatingMessage && lastMessage?.consoleMessage() === originatingMessage);
       viewMessage.setAdjacentUserCommandResult(adjacent);
-      showGroup(currentGroup, this.visibleViewMessages);
       this.visibleViewMessages.push(viewMessage);
       this.searchMessage(this.visibleViewMessages.length - 1);
     }
@@ -1084,7 +1123,9 @@ export class ConsoleView extends UI.Widget.VBox implements
       if (parentGroup) {
         showGroup(parentGroup, visibleViewMessages);
       }
-      visibleViewMessages.push(currentGroup);
+      if (!parentGroup?.messagesHidden()) {
+        visibleViewMessages.push(currentGroup);
+      }
     }
   }
 
@@ -1129,6 +1170,25 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
 
     this.pendingBatchResize = false;
+  }
+
+  getConsoleMessageHistory(): string {
+    const currentExecutionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
+    let consoleMessages = '';
+    if (currentExecutionContext) {
+      const consoleModel = currentExecutionContext.target().model(SDK.ConsoleModel.ConsoleModel);
+      if (consoleModel) {
+        let lastMessage = '';
+        for (const message of consoleModel.messages()) {
+          if (message.type !== SDK.ConsoleModel.FrontendMessageType.Command || message.messageText === lastMessage) {
+            continue;
+          }
+          lastMessage = message.messageText;
+          consoleMessages = consoleMessages + message.messageText + '\n\n';
+        }
+      }
+    }
+    return consoleMessages;
   }
 
   private consoleCleared(): void {
@@ -1320,7 +1380,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
     this.updateFilterStatus();
     this.#searchableView.updateSearchMatchesCount(this.regexMatchRanges.length);
-    this.jumpToMatch(this.currentMatchRangeIndex);  // Re-highlight current match.
+    this.highlightMatch(this.currentMatchRangeIndex, false);  // Re-highlight current match without scrolling.
     this.viewport.invalidate();
     this.messagesCountElement.setAttribute(
         'aria-label', i18nString(UIStrings.filteredMessagesInConsole, {PH1: this.visibleViewMessages.length}));
@@ -1452,19 +1512,6 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
   }
 
-  private async keyDown(event: Event): Promise<void> {
-    const keyboardEvent = (event as KeyboardEvent);
-    if (UI.KeyboardShortcut.KeyboardShortcut.eventHasCtrlEquivalentKey(keyboardEvent)) {
-      if (keyboardEvent.key === 'i') {
-        keyboardEvent.consume(true);
-        await this.prompt.onAiCodeCompletionTeaserActionKeyDown(event);
-      } else if (keyboardEvent.key === 'x') {
-        keyboardEvent.consume(true);
-        this.prompt.onAiCodeCompletionTeaserDismissKeyDown(event);
-      }
-    }
-  }
-
   private printResult(
       result: SDK.RemoteObject.RemoteObject|null, originatingConsoleMessage: SDK.ConsoleModel.ConsoleMessage,
       exceptionDetails?: Protocol.Runtime.ExceptionDetails): void {
@@ -1557,7 +1604,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
     this.#searchableView.updateSearchMatchesCount(this.regexMatchRanges.length);
     if (typeof this.searchShouldJumpBackwards !== 'undefined' && this.regexMatchRanges.length) {
-      this.jumpToMatch(this.searchShouldJumpBackwards ? -1 : 0);
+      this.highlightMatch(this.searchShouldJumpBackwards ? -1 : 0);
       delete this.searchShouldJumpBackwards;
     }
 
@@ -1582,11 +1629,11 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   jumpToNextSearchResult(): void {
-    this.jumpToMatch(this.currentMatchRangeIndex + 1);
+    this.highlightMatch(this.currentMatchRangeIndex + 1);
   }
 
   jumpToPreviousSearchResult(): void {
-    this.jumpToMatch(this.currentMatchRangeIndex - 1);
+    this.highlightMatch(this.currentMatchRangeIndex - 1);
   }
 
   supportsCaseSensitiveSearch(): boolean {
@@ -1601,7 +1648,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     return true;
   }
 
-  private jumpToMatch(index: number): void {
+  private highlightMatch(index: number, scrollIntoView = true): void {
     if (!this.regexMatchRanges.length) {
       return;
     }
@@ -1611,7 +1658,7 @@ export class ConsoleView extends UI.Widget.VBox implements
       matchRange = this.regexMatchRanges[this.currentMatchRangeIndex];
       const message = this.visibleViewMessages[matchRange.messageIndex];
       message.searchHighlightNode(matchRange.matchIndex)
-          .classList.remove(UI.UIUtils.highlightedCurrentSearchResultClassName);
+          .classList.remove(Highlighting.highlightedCurrentSearchResultClassName);
     }
 
     index = Platform.NumberUtilities.mod(index, this.regexMatchRanges.length);
@@ -1620,9 +1667,11 @@ export class ConsoleView extends UI.Widget.VBox implements
     matchRange = this.regexMatchRanges[index];
     const message = this.visibleViewMessages[matchRange.messageIndex];
     const highlightNode = message.searchHighlightNode(matchRange.matchIndex);
-    highlightNode.classList.add(UI.UIUtils.highlightedCurrentSearchResultClassName);
-    this.viewport.scrollItemIntoView(matchRange.messageIndex);
-    highlightNode.scrollIntoViewIfNeeded();
+    highlightNode.classList.add(Highlighting.highlightedCurrentSearchResultClassName);
+    if (scrollIntoView) {
+      this.viewport.scrollItemIntoView(matchRange.messageIndex);
+      highlightNode.scrollIntoViewIfNeeded();
+    }
   }
 
   private updateStickToBottomOnPointerDown(isRightClick?: boolean): void {
@@ -1687,18 +1736,14 @@ export class ConsoleView extends UI.Widget.VBox implements
     return distanceToPromptEditorBottom <= 2;
   }
 
-  private onAiCodeCompletionSettingChanged(): void {
-    if (this.aiCodeCompletionSetting.get() && this.isAiCodeCompletionEnabled()) {
-      this.createAiCodeCompletionSummaryToolbar();
-    } else if (this.aiCodeCompletionSummaryToolbarContainer) {
-      this.aiCodeCompletionSummaryToolbarContainer.remove();
-      this.aiCodeCompletionSummaryToolbarContainer = undefined;
-      this.aiCodeCompletionSummaryToolbar = undefined;
-    }
+  private setupAiCodeCompletion(): void {
+    this.createAiCodeCompletionSummaryToolbar();
   }
 
-  private isAiCodeCompletionEnabled(): boolean {
-    return Boolean(Root.Runtime.hostConfig.devToolsAiCodeCompletion?.enabled);
+  private cleanupAiCodeCompletion(): void {
+    this.aiCodeCompletionSummaryToolbarContainer?.remove();
+    this.aiCodeCompletionSummaryToolbarContainer = undefined;
+    this.aiCodeCompletionSummaryToolbar = undefined;
   }
 }
 
@@ -1710,7 +1755,7 @@ globalThis.Console.ConsoleView = ConsoleView;
 export class ConsoleViewFilter {
   private readonly filterChanged: () => void;
   messageLevelFiltersSetting: Common.Settings.Setting<LevelsMask>;
-  hideNetworkMessagesSetting: Common.Settings.Setting<boolean>;
+  networkMessagesSetting: Common.Settings.Setting<boolean>;
   filterByExecutionContextSetting: Common.Settings.Setting<boolean>;
   private readonly suggestionBuilder: UI.FilterSuggestionBuilder.FilterSuggestionBuilder;
   readonly textFilterUI: UI.Toolbar.ToolbarInput;
@@ -1725,12 +1770,12 @@ export class ConsoleViewFilter {
     this.filterChanged = filterChangedCallback;
 
     this.messageLevelFiltersSetting = ConsoleViewFilter.levelFilterSetting();
-    this.hideNetworkMessagesSetting = Common.Settings.Settings.instance().moduleSetting('hide-network-messages');
+    this.networkMessagesSetting = Common.Settings.Settings.instance().moduleSetting('network-messages');
     this.filterByExecutionContextSetting =
         Common.Settings.Settings.instance().moduleSetting('selected-context-filter-enabled');
 
     this.messageLevelFiltersSetting.addChangeListener(this.onFilterChanged.bind(this));
-    this.hideNetworkMessagesSetting.addChangeListener(this.onFilterChanged.bind(this));
+    this.networkMessagesSetting.addChangeListener(this.onFilterChanged.bind(this));
     this.filterByExecutionContextSetting.addChangeListener(this.onFilterChanged.bind(this));
     UI.Context.Context.instance().addFlavorChangeListener(
         SDK.RuntimeModel.ExecutionContext, this.onFilterChanged, this);
@@ -1760,7 +1805,7 @@ export class ConsoleViewFilter {
 
     this.levelMenuButton =
         new UI.Toolbar.ToolbarMenuButton(this.appendLevelMenuItems.bind(this), undefined, undefined, 'log-level');
-    const levelMenuButtonInfoIcon = IconButton.Icon.create('info', 'console-sidebar-levels-info');
+    const levelMenuButtonInfoIcon = createIcon('info', 'console-sidebar-levels-info');
     levelMenuButtonInfoIcon.title = i18nString(UIStrings.overriddenByFilterSidebar);
     this.levelMenuButtonInfo = new UI.Toolbar.ToolbarItem(levelMenuButtonInfoIcon);
     this.levelMenuButtonInfo.setVisible(false);
@@ -1815,7 +1860,7 @@ export class ConsoleViewFilter {
           break;
       }
     }
-    if (this.hideNetworkMessagesSetting.get()) {
+    if (!this.networkMessagesSetting.get()) {
       parsedFilters.push(
           {key: FilterType.Source, text: Protocol.Log.LogEntrySource.Network, negative: true, regex: undefined});
     }
@@ -1905,7 +1950,7 @@ export class ConsoleViewFilter {
   reset(): void {
     this.messageLevelFiltersSetting.set(ConsoleFilter.defaultLevelsFilterValue());
     this.filterByExecutionContextSetting.set(false);
-    this.hideNetworkMessagesSetting.set(false);
+    this.networkMessagesSetting.set(true);
     this.textFilterUI.setValue('');
     this.onFilterChanged();
   }

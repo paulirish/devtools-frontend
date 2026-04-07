@@ -207,8 +207,15 @@ describeWithEnvironment('TextEditor', () => {
 
       const text = 'hello';
       editor.dispatch({
-        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of(
-            {text, from: 0, sampleId: 1, startTime: 0, onImpression: () => {}, clearCachedRequest: () => {}}),
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({
+          text,
+          from: 0,
+          sampleId: 1,
+          startTime: 0,
+          onImpression: () => {},
+          clearCachedRequest: () => {},
+          source: TextEditor.Config.AiSuggestionSource.COMPLETION,
+        }),
       });
 
       const actualSuggestion = editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState);
@@ -222,8 +229,15 @@ describeWithEnvironment('TextEditor', () => {
       renderElementIntoDOM(editor);
 
       editor.dispatch({
-        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of(
-            {text: 'hello', from: 0, sampleId: 1, startTime: 0, onImpression: () => {}, clearCachedRequest: () => {}}),
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({
+          text: 'hello',
+          from: 0,
+          sampleId: 1,
+          startTime: 0,
+          onImpression: () => {},
+          clearCachedRequest: () => {},
+          source: TextEditor.Config.AiSuggestionSource.COMPLETION,
+        }),
       });
       assert.isOk(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
 
@@ -240,8 +254,15 @@ describeWithEnvironment('TextEditor', () => {
       renderElementIntoDOM(editor);
 
       editor.dispatch({
-        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of(
-            {text: 'hello', from: 0, sampleId: 1, startTime: 0, onImpression: () => {}, clearCachedRequest: () => {}}),
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({
+          text: 'hello',
+          from: 0,
+          sampleId: 1,
+          startTime: 0,
+          onImpression: () => {},
+          clearCachedRequest: () => {},
+          source: TextEditor.Config.AiSuggestionSource.COMPLETION,
+        }),
       });
       assert.isOk(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
 
@@ -255,8 +276,15 @@ describeWithEnvironment('TextEditor', () => {
       renderElementIntoDOM(editor);
       const text = 'hello';
       editor.dispatch({
-        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of(
-            {text, from: 0, sampleId: 1, startTime: 0, onImpression: () => {}, clearCachedRequest: () => {}}),
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({
+          text,
+          from: 0,
+          sampleId: 1,
+          startTime: 0,
+          onImpression: () => {},
+          clearCachedRequest: () => {},
+          source: TextEditor.Config.AiSuggestionSource.COMPLETION,
+        }),
       });
 
       const {accepted, suggestion} = TextEditor.Config.acceptAiAutoCompleteSuggestion(editor.editor);
@@ -304,6 +332,7 @@ describeWithMockConnection('TextEditor autocompletion', () => {
       resourceMapping,
       targetManager,
       ignoreListManager,
+      workspace,
     });
     const testScript = debuggerModel.parsedScriptSource(
         '1' as Protocol.Runtime.ScriptId, urlString`script://1`, 0, 0, 0, 0, executionContext.id, '', undefined, false,

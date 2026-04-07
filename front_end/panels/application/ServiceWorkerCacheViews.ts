@@ -1,7 +1,7 @@
 // Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -11,11 +11,9 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
-import * as NetworkComponents from '../network/components/components.js';
 import * as Network from '../network/network.js';
 
 import * as ApplicationComponents from './components/components.js';
@@ -135,7 +133,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
                            .model(SDK.StorageBucketsModel.StorageBucketsModel)
                            ?.getBucketByName(cache.storageBucket.storageKey, cache.storageBucket.name);
 
-    this.metadataView.setShowOnlyBucket(false);
+    this.metadataView.setShowOnlyBucket(true);
 
     if (bucketInfo) {
       this.metadataView.setStorageBucket(bucketInfo);
@@ -180,16 +178,18 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     this.dataGrid = this.createDataGrid();
     const dataGridWidget = this.dataGrid.asWidget();
     this.splitWidget.setSidebarWidget(dataGridWidget);
-    dataGridWidget.setMinimumSize(0, 250);
+    dataGridWidget.setMinimumSize(0, 100);
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.model.addEventListener(
         SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
     void this.updateData(true);
   }
 
   override willHide(): void {
+    super.willHide();
     this.model.removeEventListener(
         SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
   }
@@ -210,8 +210,8 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
   }
 
   private createDataGrid(): DataGrid.DataGrid.DataGridImpl<DataGridNode> {
-    const columns = ([
-      {id: 'number', title: '#', sortable: false, width: '3px'},
+    const columns: DataGrid.DataGrid.ColumnDescriptor[] = [
+      {id: 'number', title: '#' as Common.UIString.LocalizedString, sortable: false, width: '3px'},
       {id: 'name', title: i18nString(UIStrings.name), weight: 4, sortable: true},
       {
         id: 'response-type',
@@ -237,7 +237,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
         sortable: true,
       },
       {id: 'vary-header', title: i18n.i18n.lockedString('Vary Header'), weight: 1, sortable: true},
-    ] as DataGrid.DataGrid.ColumnDescriptor[]);
+    ];
     const dataGrid = new DataGrid.DataGrid.DataGridImpl({
       displayName: i18nString(UIStrings.serviceWorkerCache),
       columns,
@@ -408,7 +408,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     }
 
     // It is possible that table selection changes before the preview opens.
-    if (this.dataGrid?.selectedNode && request === this.dataGrid.selectedNode.data) {
+    if (request === this.dataGrid?.selectedNode?.data) {
       this.showPreview(preview);
     }
   }
@@ -540,10 +540,9 @@ export class RequestView extends UI.Widget.VBox {
     this.resourceViewTabSetting =
         Common.Settings.Settings.instance().createSetting('cache-storage-view-tab', 'preview');
 
-    this.tabbedPane.appendTab(
-        'headers', i18nString(UIStrings.headers),
-        LegacyWrapper.LegacyWrapper.legacyWrapper(
-            UI.Widget.VBox, new NetworkComponents.RequestHeadersView.RequestHeadersView(request)));
+    const requestHeadersView = new Network.RequestHeadersView.RequestHeadersView();
+    requestHeadersView.request = request;
+    this.tabbedPane.appendTab('headers', i18nString(UIStrings.headers), requestHeadersView);
     this.tabbedPane.appendTab(
         'preview', i18nString(UIStrings.preview), new Network.RequestPreviewView.RequestPreviewView(request));
     this.tabbedPane.show(this.element);

@@ -49,8 +49,7 @@ const DEFAULT_VIEW: View = (input: ViewInput, _output: ViewOutput, target: HTMLE
   // clang-format off
   render(html`
   <div class="header">
-    <devtools-adorner class="aggregated-issues-count"
-                      .data=${{name: 'countWrapper'}}>
+    <devtools-adorner class="aggregated-issues-count" .name=${'countWrapper'}>
       <span>${input.count}</span>
     </devtools-adorner>
     <div class="title">${i18nString(UIStrings.hiddenIssues)}</div>
@@ -67,7 +66,7 @@ export class HiddenIssuesRow extends UI.TreeOutline.TreeElement {
   #view: View;
 
   constructor(view: View = DEFAULT_VIEW) {
-    super(undefined, true);
+    super(undefined, true, 'hidden-issues');
     this.#view = view;
     this.toggleOnClick = true;
     this.listItemElement.classList.add('issue-category', 'hidden-issues');

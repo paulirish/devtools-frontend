@@ -1,7 +1,7 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Trace from '../../../models/trace/trace.js';
@@ -111,7 +111,7 @@ export class BreadcrumbsUI extends HTMLElement {
     // clang-format off
     return html`
           <div class="breadcrumb" @contextmenu=${(event: Event) => this.#onContextMenu(event, breadcrumb)} @click=${() => this.#activateBreadcrumb(breadcrumb)}
-          jslog=${VisualLogging.item('timeline.breadcrumb-select').track({click: true})}>
+          jslog=${VisualLogging.item('timeline.breadcrumb-select').track({click: true, resize: true})}>
            <span class="${(breadcrumb === this.#activeBreadcrumb) ? 'active-breadcrumb' : ''} range">
             ${(index === 0) ?
               `Full range (${i18n.TimeUtilities.preciseMillisToString(breadcrumbRange, 2)})` :

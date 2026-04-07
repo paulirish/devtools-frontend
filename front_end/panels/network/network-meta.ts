@@ -7,8 +7,8 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Extensions from '../../models/extensions/extensions.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import * as PanelCommon from '../../panels/common/common.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import * as NetworkForward from './forward/forward.js';
@@ -26,11 +26,11 @@ const UIStrings = {
   /**
    * @description Command for showing the 'Network request blocking' tool
    */
-  showNetworkRequestBlocking: 'Show Network request blocking',
+  showRequestConditions: 'Show Request conditions',
   /**
-   * @description Title of the 'Network request blocking' tool in the bottom drawer
+   * @description Title of the 'Request conditions' tool in the bottom drawer
    */
-  networkRequestBlocking: 'Network request blocking',
+  networkRequestConditions: 'Request conditions',
   /**
    * @description Command for showing the 'Network conditions' tool
    */
@@ -118,11 +118,11 @@ const UIStrings = {
   /**
    * @description Title of an action in the Network request blocking panel to add a new URL pattern to the blocklist.
    */
-  addNetworkRequestBlockingPattern: 'Add network request blocking pattern',
+  addNetworkRequestBlockingOrThrottlingPattern: 'Add network request blocking or throttling pattern',
   /**
    * @description Title of an action in the Network request blocking panel to clear all URL patterns.
    */
-  removeAllNetworkRequestBlockingPatterns: 'Remove all network request blocking patterns',
+  removeAllNetworkRequestBlockingOrThrottlingPatterns: 'Remove all network request blocking or throttling patterns',
   /**
    * @description Title of an action in the Network panel (and title of a setting in the Network category)
    *              that enables options in the UI to copy or export HAR (not translatable) with sensitive data.
@@ -142,6 +142,7 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/network-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let loadedNetworkModule: (typeof Network|undefined);
 
 const isNode = Root.Runtime.Runtime.isNode();
@@ -176,13 +177,13 @@ UI.ViewManager.registerViewExtension({
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.DRAWER_VIEW,
   id: 'network.blocked-urls',
-  commandPrompt: i18nLazyString(UIStrings.showNetworkRequestBlocking),
-  title: i18nLazyString(UIStrings.networkRequestBlocking),
+  commandPrompt: () => i18nString(UIStrings.showRequestConditions),
+  title: () => i18nString(UIStrings.networkRequestConditions),
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   order: 60,
   async loadView() {
     const Network = await loadNetworkModule();
-    return new Network.BlockedURLsPane.BlockedURLsPane();
+    return new Network.RequestConditionsDrawer.RequestConditionsDrawer();
   },
 });
 
@@ -329,28 +330,28 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'network.add-network-request-blocking-pattern',
   category: UI.ActionRegistration.ActionCategory.NETWORK,
-  title: i18nLazyString(UIStrings.addNetworkRequestBlockingPattern),
+  title: () => i18nString(UIStrings.addNetworkRequestBlockingOrThrottlingPattern),
   iconClass: UI.ActionRegistration.IconClass.PLUS,
   contextTypes() {
-    return maybeRetrieveContextTypes(Network => [Network.BlockedURLsPane.BlockedURLsPane]);
+    return maybeRetrieveContextTypes(Network => [Network.RequestConditionsDrawer.RequestConditionsDrawer]);
   },
   async loadActionDelegate() {
     const Network = await loadNetworkModule();
-    return new Network.BlockedURLsPane.ActionDelegate();
+    return new Network.RequestConditionsDrawer.ActionDelegate();
   },
 });
 
 UI.ActionRegistration.registerActionExtension({
   actionId: 'network.remove-all-network-request-blocking-patterns',
   category: UI.ActionRegistration.ActionCategory.NETWORK,
-  title: i18nLazyString(UIStrings.removeAllNetworkRequestBlockingPatterns),
+  title: () => i18nString(UIStrings.removeAllNetworkRequestBlockingOrThrottlingPatterns),
   iconClass: UI.ActionRegistration.IconClass.CLEAR,
   contextTypes() {
-    return maybeRetrieveContextTypes(Network => [Network.BlockedURLsPane.BlockedURLsPane]);
+    return maybeRetrieveContextTypes(Network => [Network.RequestConditionsDrawer.RequestConditionsDrawer]);
   },
   async loadActionDelegate() {
     const Network = await loadNetworkModule();
-    return new Network.BlockedURLsPane.ActionDelegate();
+    return new Network.RequestConditionsDrawer.ActionDelegate();
   },
 });
 
@@ -449,7 +450,6 @@ UI.ContextMenu.registerProvider({
     const Network = await loadNetworkModule();
     return Network.NetworkPanel.NetworkPanel.instance();
   },
-  experiment: undefined,
 });
 
 Common.Revealer.registerRevealer({
@@ -469,7 +469,6 @@ Common.Revealer.registerRevealer({
   contextTypes() {
     return [NetworkForward.UIRequestLocation.UIRequestLocation];
   },
-  destination: undefined,
   async loadRevealer() {
     const Network = await loadNetworkModule();
     return new Network.NetworkPanel.RequestLocationRevealer();
@@ -489,11 +488,22 @@ Common.Revealer.registerRevealer({
 
 Common.Revealer.registerRevealer({
   contextTypes() {
-    return [NetworkForward.UIFilter.UIRequestFilter, Extensions.ExtensionServer.RevealableNetworkRequestFilter];
+    return [NetworkForward.UIFilter.UIRequestFilter, PanelCommon.ExtensionServer.RevealableNetworkRequestFilter];
   },
   destination: Common.Revealer.RevealerDestination.NETWORK_PANEL,
   async loadRevealer() {
     const Network = await loadNetworkModule();
     return new Network.NetworkPanel.NetworkLogWithFilterRevealer();
+  },
+});
+
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return [SDK.NetworkManager.AppliedNetworkConditions];
+  },
+  destination: Common.Revealer.RevealerDestination.NETWORK_PANEL,
+  async loadRevealer() {
+    const Network = await loadNetworkModule();
+    return new Network.RequestConditionsDrawer.AppliedConditionsRevealer();
   },
 });

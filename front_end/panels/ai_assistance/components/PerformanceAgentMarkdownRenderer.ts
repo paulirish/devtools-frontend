@@ -8,11 +8,12 @@ import type * as Protocol from '../../../generated/protocol.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as Marked from '../../../third_party/marked/marked.js';
 import * as Lit from '../../../ui/lit/lit.js';
+import * as PanelsCommon from '../../common/common.js';
 
 import {MarkdownRendererWithCodeBlock} from './MarkdownRendererWithCodeBlock.js';
 
-const {html} = Lit;
-const {ref, createRef} = Lit.Directives;
+const {html} = Lit.StaticHtml;
+const {until} = Lit.Directives;
 
 export class PerformanceAgentMarkdownRenderer extends MarkdownRendererWithCodeBlock {
   constructor(
@@ -21,21 +22,13 @@ export class PerformanceAgentMarkdownRenderer extends MarkdownRendererWithCodeBl
     super();
   }
 
-  override templateForToken(token: Marked.Marked.MarkedToken): Lit.TemplateResult|null {
+  override templateForToken(token: Marked.Marked.MarkedToken): Lit.LitTemplate|null {
     if (token.type === 'link' && token.href.startsWith('#')) {
       if (token.href.startsWith('#node-')) {
         const nodeId = Number(token.href.replace('#node-', '')) as Protocol.DOM.BackendNodeId;
 
-        const templateRef = createRef();
-        void this.#linkifyNode(nodeId, token.text).then(node => {
-          if (!templateRef.value || !node) {
-            return;
-          }
-
-          templateRef.value.textContent = '';
-          templateRef.value.append(node);
-        });
-        return html`<span ${ref(templateRef)}>${token.text}</span>`;
+        return html`<span>${
+            until(this.#linkifyNode(nodeId, token.text).then(node => node || token.text), token.text)}</span>`;
       }
 
       const event = this.lookupEvent(token.href.slice(1) as Trace.Types.File.SerializableKey);
@@ -51,7 +44,7 @@ export class PerformanceAgentMarkdownRenderer extends MarkdownRendererWithCodeBl
         label += ` (${event.name})`;
       }
 
-      // eslint-disable-next-line rulesdir/no-a-tags-in-lit
+      // eslint-disable-next-line @devtools/no-a-tags-in-lit
       return html`<a href="#" draggable=false .title=${title} @click=${(e: Event) => {
         e.stopPropagation();
         void Common.Revealer.reveal(new SDK.TraceObject.RevealableEvent(event));
@@ -64,7 +57,7 @@ export class PerformanceAgentMarkdownRenderer extends MarkdownRendererWithCodeBl
   // Taken from front_end/panels/timeline/components/insights/NodeLink.ts
   // Would be nice to move the above component to somewhere that allows the AI
   // Assistance panel to also use it.
-  async #linkifyNode(backendNodeId: Protocol.DOM.BackendNodeId, label: string): Promise<Node|undefined> {
+  async #linkifyNode(backendNodeId: Protocol.DOM.BackendNodeId, label: string): Promise<Lit.LitTemplate|undefined> {
     if (backendNodeId === undefined) {
       return;
     }
@@ -84,7 +77,7 @@ export class PerformanceAgentMarkdownRenderer extends MarkdownRendererWithCodeBl
       return;
     }
 
-    const linkedNode = await Common.Linkifier.Linkifier.linkify(node, {textContent: label});
+    const linkedNode = PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(node, {textContent: label});
     return linkedNode;
   }
 }

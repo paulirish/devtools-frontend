@@ -42,7 +42,7 @@ var __setFunctionName = (this && this.__setFunctionName) || function (f, name, p
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
 import { Browser, } from '../api/Browser.js';
-import { ProtocolError } from '../common/Errors.js';
+import { ProtocolError, UnsupportedOperation } from '../common/Errors.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { debugError } from '../common/util.js';
 import { bubble } from '../util/decorators.js';
@@ -100,6 +100,8 @@ let BidiBrowser = (() => {
                     // yet because WebDriver BiDi behavior is not specified. See
                     // https://github.com/w3c/webdriver-bidi/issues/321.
                     'goog:prerenderingDisabled': true,
+                    // TODO: remove after Puppeteer rolled Chrome to 142 after Oct 28, 2025.
+                    'goog:disableNetworkDurableMessages': true,
                 },
             });
             // Subscribe to all WebDriver BiDi events. Also subscribe to CDP events if CDP
@@ -113,22 +115,26 @@ let BidiBrowser = (() => {
                 }
                 return true;
             }));
-            try {
-                await session.send('network.addDataCollector', {
-                    dataTypes: ["response" /* Bidi.Network.DataType.Response */],
-                    // Buffer size of 20 MB is equivalent to the CDP:
-                    maxEncodedDataSize: 20 * 1000 * 1000, // 20 MB
-                });
-            }
-            catch (err) {
-                if (err instanceof ProtocolError) {
-                    // Ignore protocol errors, as the data collectors can be not implemented.
-                    debugError(err);
+            await Promise.all(["request" /* Bidi.Network.DataType.Request */, "response" /* Bidi.Network.DataType.Response */].map(
+            // Data collectors might be not implemented for specific data type, so create them
+            // separately and ignore protocol errors.
+            async (dataType) => {
+                try {
+                    await session.send('network.addDataCollector', {
+                        dataTypes: [dataType],
+                        // Buffer size of 20 MB is equivalent to the CDP:
+                        maxEncodedDataSize: 20_000_000,
+                    });
                 }
-                else {
-                    throw err;
+                catch (err) {
+                    if (err instanceof ProtocolError) {
+                        debugError(err);
+                    }
+                    else {
+                        throw err;
+                    }
                 }
-            }
+            }));
             const browser = new BidiBrowser(session.browser, opts);
             browser.#initialize();
             return browser;
@@ -242,14 +248,54 @@ let BidiBrowser = (() => {
         defaultBrowserContext() {
             return this.#browserContexts.get(this.#browserCore.defaultUserContext);
         }
-        newPage() {
-            return this.defaultBrowserContext().newPage();
+        newPage(options) {
+            return this.defaultBrowserContext().newPage(options);
         }
         installExtension(path) {
             return this.#browserCore.installExtension(path);
         }
         async uninstallExtension(id) {
             await this.#browserCore.uninstallExtension(id);
+        }
+        screens() {
+            throw new UnsupportedOperation();
+        }
+        addScreen(_params) {
+            throw new UnsupportedOperation();
+        }
+        removeScreen(_screenId) {
+            throw new UnsupportedOperation();
+        }
+        async getWindowBounds(windowId) {
+            const clientWindowInfo = await this.#browserCore.getClientWindowInfo(windowId);
+            return {
+                left: clientWindowInfo.x,
+                top: clientWindowInfo.y,
+                width: clientWindowInfo.width,
+                height: clientWindowInfo.height,
+                windowState: clientWindowInfo.state,
+            };
+        }
+        async setWindowBounds(windowId, windowBounds) {
+            let params;
+            const windowState = windowBounds.windowState ?? 'normal';
+            if (windowState === 'normal') {
+                params = {
+                    clientWindow: windowId,
+                    state: 'normal',
+                    x: windowBounds.left,
+                    y: windowBounds.top,
+                    width: windowBounds.width,
+                    height: windowBounds.height,
+                };
+            }
+            else {
+                params = {
+                    clientWindow: windowId,
+                    state: windowState,
+                };
+            }
+            await this.#browserCore.setClientWindowState(params);
         }
         targets() {
             return [

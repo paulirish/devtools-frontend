@@ -4,9 +4,10 @@
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as AiAssistanceModel from '../ai_assistance/ai_assistance.js';
 
-describe('ChangeManager', () => {
+describeWithEnvironment('ChangeManager', () => {
   let styleSheetId = 0;
   const frameId = '1' as Protocol.Page.FrameId;
   const anotherFrameId = '2' as Protocol.Page.FrameId;
@@ -22,7 +23,7 @@ describe('ChangeManager', () => {
       createInspectorStylesheet: sinon.stub().callsFake(frameId => {
         styleSheetId++;
         return new SDK.CSSStyleSheetHeader.CSSStyleSheetHeader(cssModel, {
-          styleSheetId: String(styleSheetId) as Protocol.CSS.StyleSheetId,
+          styleSheetId: String(styleSheetId) as Protocol.DOM.StyleSheetId,
           frameId,
           sourceURL: '',
           origin: 'inspector' as Protocol.CSS.StyleSheetOrigin,
@@ -44,7 +45,7 @@ describe('ChangeManager', () => {
   }
 
   it('can register a change', async () => {
-    const changeManager = new AiAssistanceModel.ChangeManager();
+    const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
     const cssModel = createModel();
     await changeManager.addChange(cssModel, frameId, {
       groupId: agentId,
@@ -62,7 +63,7 @@ describe('ChangeManager', () => {
   });
 
   it('can merge multiple changes with same className', async () => {
-    const changeManager = new AiAssistanceModel.ChangeManager();
+    const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
     const cssModel = createModel();
     await changeManager.addChange(cssModel, frameId, {
       groupId: agentId,
@@ -91,7 +92,7 @@ describe('ChangeManager', () => {
   });
 
   it('can register multiple changes with the same selector', async () => {
-    const changeManager = new AiAssistanceModel.ChangeManager();
+    const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
     const cssModel = createModel();
     await changeManager.addChange(cssModel, frameId, {
       groupId: agentId,
@@ -119,7 +120,7 @@ describe('ChangeManager', () => {
   });
 
   it('creates a stylesheet per frame', async () => {
-    const changeManager = new AiAssistanceModel.ChangeManager();
+    const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
     const cssModel = createModel();
     await changeManager.addChange(cssModel, frameId, {
       groupId: agentId,
@@ -150,7 +151,7 @@ describe('ChangeManager', () => {
   });
 
   it('can clear changes', async () => {
-    const changeManager = new AiAssistanceModel.ChangeManager();
+    const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
     let cssModel = createModel();
     await changeManager.addChange(cssModel, frameId, {
       groupId: agentId,
@@ -184,13 +185,13 @@ describe('ChangeManager', () => {
 
   describe('format changes', () => {
     it('returns empty string when there are no changes from the given agent', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
 
       assert.strictEqual(changeManager.formatChangesForPatching(agentId), '');
     });
 
     it('returns formatted changes for an agent without `.ai-style-change` classes', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
 
       await changeManager.addChange(cssModel, frameId, {
@@ -207,7 +208,7 @@ describe('ChangeManager', () => {
     });
 
     it('formats source location', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
       await changeManager.addChange(cssModel, frameId, {
         groupId: agentId,
@@ -218,7 +219,7 @@ describe('ChangeManager', () => {
       });
 
       assert.strictEqual(
-          changeManager.formatChangesForPatching(agentId, /* includeSourceLocation=*/ true),
+          changeManager.formatChangesForPatching(agentId, /* includeMetadata=*/ true),
           `/* related resource: button.scss:1:1 */
 div {
   color: blue;
@@ -227,7 +228,7 @@ div {
     });
 
     it('formats a simpleSelector', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
       await changeManager.addChange(cssModel, frameId, {
         groupId: agentId,
@@ -238,17 +239,35 @@ div {
       });
 
       assert.strictEqual(
-          changeManager.formatChangesForPatching(agentId, /* includeSourceLocation=*/ true),
+          changeManager.formatChangesForPatching(agentId, /* includeMetadata=*/ true),
           `.bg-color-blue { /* the element was div#test */
   color: blue;
   background-color: green;
+}`);
+    });
+
+    it('omits source location and simple selector when includeMetadata is false', async () => {
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
+      const cssModel = createModel();
+
+      await changeManager.addChange(cssModel, frameId, {
+        groupId: agentId,
+        sourceLocation: 'button.scss:1:1',
+        selector: '.bg-color-blue',
+        simpleSelector: 'div#test',
+        className: 'ai-style-change-1',
+        styles: {color: 'blue'},
+      });
+
+      assert.strictEqual(changeManager.formatChangesForPatching(agentId, /* includeMetadata=*/ false), `.bg-color-blue {
+  color: blue;
 }`);
     });
   });
 
   describe('stashes', () => {
     it('can stash changes', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
       await changeManager.addChange(cssModel, frameId, {
         groupId: agentId,
@@ -272,7 +291,7 @@ div {
     });
 
     it('can restore changes', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
       await changeManager.addChange(cssModel, frameId, {
         groupId: agentId,
@@ -302,7 +321,7 @@ div {
     });
 
     it('can discard changes', async () => {
-      const changeManager = new AiAssistanceModel.ChangeManager();
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
       const cssModel = createModel();
       await changeManager.addChange(cssModel, frameId, {
         groupId: agentId,
@@ -325,6 +344,55 @@ div {
       );
       await changeManager.dropStashedChanges();
       sinon.assert.calledTwice(cssModel.setStyleSheetText);
+    });
+  });
+
+  describe('turn tracking', () => {
+    it('tracks changes by numeric turnId', async () => {
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
+      const cssModel = createModel();
+      const backendNodeId = 1 as Protocol.DOM.BackendNodeId;
+
+      await changeManager.addChange(cssModel, frameId, {
+        groupId: agentId,
+        turnId: 1,
+        selector: 'div',
+        className: 'ai-style-change-1',
+        styles: {color: 'blue'},
+        backendNodeId,
+      });
+
+      assert.deepEqual(changeManager.getChangedNodesForGroupId(agentId, 1), [backendNodeId]);
+      assert.deepEqual(changeManager.getChangedNodesForGroupId(agentId, 2), []);
+    });
+
+    it('updates turnId when an element is re-modified in a later turn', async () => {
+      const changeManager = new AiAssistanceModel.ChangeManager.ChangeManager();
+      const cssModel = createModel();
+      const backendNodeId = 1 as Protocol.DOM.BackendNodeId;
+
+      // Turn 1
+      await changeManager.addChange(cssModel, frameId, {
+        groupId: agentId,
+        turnId: 1,
+        selector: 'div',
+        className: 'ai-style-change-1',
+        styles: {color: 'blue'},
+        backendNodeId,
+      });
+
+      // Turn 2
+      await changeManager.addChange(cssModel, frameId, {
+        groupId: agentId,
+        turnId: 2,
+        selector: 'div',
+        className: 'ai-style-change-1',
+        styles: {color: 'red'},
+        backendNodeId,
+      });
+
+      assert.deepEqual(changeManager.getChangedNodesForGroupId(agentId, 2), [backendNodeId]);
+      assert.deepEqual(changeManager.getChangedNodesForGroupId(agentId, 1), []);
     });
   });
 });

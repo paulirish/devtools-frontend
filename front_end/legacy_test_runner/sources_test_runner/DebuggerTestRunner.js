@@ -89,7 +89,8 @@ export const runAsyncCallStacksTest = function(totalDebuggerStatements, maxAsync
   startDebuggerTest(step1);
 
   async function step1() {
-    await TestRunner.DebuggerAgent.setAsyncCallStackDepth(maxAsyncCallStackDepth || defaultMaxAsyncCallStackDepth);
+    await TestRunner.DebuggerAgent.invoke_setAsyncCallStackDepth(
+        {maxDepth: maxAsyncCallStackDepth || defaultMaxAsyncCallStackDepth});
     runTestFunctionAndWaitUntilPaused(didPause);
   }
 
@@ -401,7 +402,14 @@ export const showUISourceCode = function(uiSourceCode, callback) {
   if (sourceFrame.loaded) {
     callback(sourceFrame);
   } else {
-    TestRunner.addSniffer(sourceFrame, 'setContent', callback && callback.bind(null, sourceFrame));
+    const originalSetContent = sourceFrame.setContent;
+    sourceFrame.setContent = async (...args) => {
+      sourceFrame.setContent = originalSetContent;
+      await originalSetContent.apply(sourceFrame, args);
+      if (callback) {
+        callback(sourceFrame);
+      }
+    };
   }
 };
 

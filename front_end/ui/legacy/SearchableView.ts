@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2006, 2007, 2008 Apple Inc.  All rights reserved.
@@ -41,7 +41,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Buttons from '../components/buttons/buttons.js';
-import * as IconButton from '../components/icon_button/icon_button.js';
+import {createIcon} from '../kit/kit.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {InspectorView} from './InspectorView.js';
@@ -150,6 +150,7 @@ export class SearchableView extends VBox {
   private replaceToggleButton: ToolbarToggle;
   private searchInputElement: HTMLInputElement;
   private matchesElement: HTMLElement;
+  private matchesElementValue: HTMLElement;
   private searchNavigationPrevElement: ToolbarButton;
   private searchNavigationNextElement: ToolbarButton;
   private readonly replaceInputElement: HTMLInputElement;
@@ -189,7 +190,7 @@ export class SearchableView extends VBox {
     // Elements within `searchInputElements` are added according to their expected tab order.
     const searchInputElements = this.footerElement.createChild('div', 'search-inputs');
     const iconAndInput = searchInputElements.createChild('div', 'icon-and-input');
-    const searchIcon = IconButton.Icon.create('search');
+    const searchIcon = createIcon('search');
     iconAndInput.appendChild(searchIcon);
 
     this.searchInputElement = createHistoryInput('search', 'search-replace search');
@@ -314,6 +315,9 @@ export class SearchableView extends VBox {
     this.matchesElement.style.color = 'var(--sys-color-on-surface-subtle)';
     this.matchesElement.style.padding = '0 var(--sys-size-3)';
     this.matchesElement.classList.add('search-results-matches');
+    ARIAUtils.markAsPoliteLiveRegion(this.matchesElement, false);
+    this.matchesElementValue = this.matchesElement.createChild('span');
+    ARIAUtils.setHidden(this.matchesElementValue, true);
     toolbar.appendToolbarItem(matchesText);
 
     const cancelButtonElement = new Buttons.Button.Button();
@@ -455,7 +459,7 @@ export class SearchableView extends VBox {
   resetSearch(): void {
     this.clearSearch();
     this.updateReplaceVisibility();
-    this.matchesElement.textContent = '';
+    this.matchesElementValue.textContent = '';
   }
 
   refreshSearch(): void {
@@ -498,21 +502,25 @@ export class SearchableView extends VBox {
   private updateSearchNavigationButtonState(enabled: boolean): void {
     this.replaceButtonElement.disabled = !enabled;
     this.replaceAllButtonElement.disabled = !enabled;
-    this.searchNavigationPrevElement.setEnabled(enabled);
-    this.searchNavigationNextElement.setEnabled(enabled);
+    if (this.searchProvider.supportsMatchCounts?.() === true) {
+      this.searchNavigationPrevElement.setEnabled(enabled);
+      this.searchNavigationNextElement.setEnabled(enabled);
+    }
   }
 
   private updateSearchMatchesCountAndCurrentMatchIndex(matches: number, currentMatchIndex: number): void {
     if (!this.currentQuery) {
-      this.matchesElement.textContent = '';
+      this.matchesElementValue.textContent = '';
     } else if (matches === 0 || currentMatchIndex >= 0) {
-      this.matchesElement.textContent = i18nString(UIStrings.dOfD, {PH1: currentMatchIndex + 1, PH2: matches});
+      this.matchesElementValue.textContent = i18nString(UIStrings.dOfD, {PH1: currentMatchIndex + 1, PH2: matches});
       ARIAUtils.setLabel(
           this.matchesElement, i18nString(UIStrings.accessibledOfD, {PH1: currentMatchIndex + 1, PH2: matches}));
     } else if (matches === 1) {
-      this.matchesElement.textContent = i18nString(UIStrings.matchString);
+      this.matchesElementValue.textContent = i18nString(UIStrings.matchString);
+      ARIAUtils.setLabel(this.matchesElement, i18nString(UIStrings.matchString));
     } else {
-      this.matchesElement.textContent = i18nString(UIStrings.dMatches, {PH1: matches});
+      this.matchesElementValue.textContent = i18nString(UIStrings.dMatches, {PH1: matches});
+      ARIAUtils.setLabel(this.matchesElement, i18nString(UIStrings.dMatches, {PH1: matches}));
     }
     this.updateSearchNavigationButtonState(matches > 0);
   }
@@ -676,6 +684,7 @@ export class SearchableView extends VBox {
 const searchableViewsByElement = new WeakMap<Element, SearchableView>();
 
 export interface Searchable {
+  supportsMatchCounts?(): boolean;
   currentQuery?: string;
   currentSearchMatches?: number;
   onSearchCanceled(): void;

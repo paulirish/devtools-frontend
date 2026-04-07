@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -10,6 +11,7 @@ import * as Trace from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import {html, render} from '../../ui/lit/lit.js';
 
 import * as TimelineComponents from './components/components.js';
 import {initiatorsDataToDrawForNetwork} from './Initiators.js';
@@ -395,16 +397,20 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
 
   preparePopoverElement(index: number): Element|null {
     const event = this.#events[index];
+
     if (Trace.Types.Events.isSyntheticNetworkRequest(event)) {
       const element = document.createElement('div');
       const root = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: timelineFlamechartPopoverStyles});
-
-      const contents = root.createChild('div', 'timeline-flamechart-popover');
-      const infoElement = new TimelineComponents.NetworkRequestTooltip.NetworkRequestTooltip();
-      infoElement.data = {networkRequest: event, entityMapper: this.#entityMapper};
-      contents.appendChild(infoElement);
+      // clang-format off
+      render(html`
+        <div class="timeline-flamechart-popover">
+          ${TimelineComponents.NetworkRequestTooltip.NetworkRequestTooltip.createWidgetElement(
+                    event, this.#entityMapper || undefined)}
+        </div>`, root);
+      // clang-format on
       return element;
     }
+
     return null;
   }
 
@@ -422,28 +428,15 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
 
   /**
    * When users zoom in the flamechart, we only want to show them the network
-   * requests between startTime and endTime. This function will call the
-   * trackAppender to update the timeline data, and then force to create a new
-   * PerfUI.FlameChart.FlameChartTimelineData instance to force the flamechart
-   * to re-render.
+   * requests between startTime and endTime.
    */
   #updateTimelineData(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
     if (!this.#networkTrackAppender || !this.#timelineData) {
       return;
     }
+    // This also has the side-effect of updating this.#timelineData with new
+    // information.
     this.#maxLevel = this.#networkTrackAppender.relayoutEntriesWithinBounds(this.#events, startTime, endTime);
-
-    // TODO(crbug.com/1459225): Remove this recreating code.
-    // Force to create a new PerfUI.FlameChart.FlameChartTimelineData instance
-    // to force the flamechart to re-render. This also causes crbug.com/1459225.
-    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.create({
-      entryLevels: this.#timelineData?.entryLevels,
-      entryTotalTimes: this.#timelineData?.entryTotalTimes,
-      entryStartTimes: this.#timelineData?.entryStartTimes,
-      groups: this.#timelineData?.groups,
-      initiatorsData: this.#timelineData.initiatorsData,
-      entryDecorations: this.#timelineData.entryDecorations,
-    });
   }
 
   /**

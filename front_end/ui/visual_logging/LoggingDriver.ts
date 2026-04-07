@@ -76,7 +76,7 @@ export async function startLogging(options?: {
 export async function addDocument(document: Document): Promise<void> {
   documents.push(document);
   if (['interactive', 'complete'].includes(document.readyState)) {
-    await process();
+    await RenderCoordinator.read('processForLogging', process);
   }
   document.addEventListener('visibilitychange', scheduleProcessing);
   document.addEventListener('scroll', scheduleProcessing);
@@ -84,8 +84,8 @@ export async function addDocument(document: Document): Promise<void> {
 }
 
 export async function stopLogging(): Promise<void> {
-  await keyboardLogThrottler.schedule(async () => {}, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
   logging = false;
+  await keyboardLogThrottler.schedule(async () => {}, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
   unregisterAllLoggables();
   for (const document of documents) {
     document.removeEventListener('visibilitychange', scheduleProcessing);
@@ -139,7 +139,7 @@ const viewportRectFor = (element: Element): DOMRect => {
 };
 
 export async function process(): Promise<void> {
-  if (document.hidden) {
+  if (!logging || document.hidden) {
     return;
   }
   const startTime = performance.now();
@@ -266,6 +266,9 @@ export async function process(): Promise<void> {
     const root = nonDomRoots[i];
     for (const {loggable, config, parent, size} of getNonDomLoggables(root)) {
       const loggingState = getOrCreateLoggingState(loggable, config, parent);
+      if (loggingState.impressionLogged) {
+        continue;
+      }
       if (size) {
         loggingState.size = size;
       }
@@ -342,22 +345,26 @@ async function onResizeOrIntersection(entries: ResizeObserverEntry[]|Intersectio
     if (!loggingState?.size) {
       continue;
     }
+    const resizeToOrFromZero =
+        overlap.width * overlap.height * loggingState.size.width * loggingState.size.height === 0;
 
-    let hasPendingParent = false;
-    for (const pendingElement of pendingResize.keys()) {
+    let suppressedByParentResize = false;
+    for (const [pendingElement, overlap] of pendingResize.entries()) {
       if (pendingElement === element) {
         continue;
       }
       const pendingState = getLoggingState(pendingElement);
-      if (isAncestorOf(pendingState, loggingState)) {
-        hasPendingParent = true;
+      const pendingResizeToOrFromZero =
+          overlap.width * overlap.height * (pendingState?.size?.width || 0) * (pendingState?.size?.height || 0) === 0;
+      if (isAncestorOf(pendingState, loggingState) && resizeToOrFromZero && pendingResizeToOrFromZero) {
+        suppressedByParentResize = true;
         break;
       }
-      if (isAncestorOf(loggingState, pendingState)) {
+      if (isAncestorOf(loggingState, pendingState) && resizeToOrFromZero && pendingResizeToOrFromZero) {
         pendingResize.delete(pendingElement);
       }
     }
-    if (hasPendingParent) {
+    if (suppressedByParentResize) {
       continue;
     }
     pendingResize.set(element, overlap);

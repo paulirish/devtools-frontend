@@ -8,7 +8,7 @@
 import type {TSESTree} from '@typescript-eslint/utils';
 import type {RuleContext, RuleListener} from '@typescript-eslint/utils/ts-eslint';
 
-import type {DomFragment} from './dom-fragment';
+import type {DomFragment} from './dom-fragment.ts';
 
 type Node = TSESTree.Node;
 type CallExpression = TSESTree.CallExpression;
@@ -63,7 +63,10 @@ export function getEnclosingExpression(node: Node): Node|null {
   return null;
 }
 
-export function getEnclosingProperty(node: Node): Node|null {
+export function getEnclosingProperty(node: Node|undefined): Node|null {
+  if (!node) {
+    return null;
+  }
   if (isMemberExpression(
           node, n => n.type === 'ThisExpression', n => ['Identifier', 'PrivateIdentifier'].includes(n.type))) {
     return node;

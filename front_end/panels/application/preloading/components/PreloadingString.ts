@@ -4,7 +4,7 @@
 
 import type * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as Platform from '../../../../core/platform/platform.js';
+import * as Platform from '../../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
@@ -31,6 +31,11 @@ const UIStrings = {
    * @description  Description text for Prefetch status PrefetchFailedNon2XX.
    */
   PrefetchFailedNon2XX: 'The prefetch failed because of a non-2xx HTTP response status code.',
+  /**
+   * @description  Description text for Prefetch status PrefetchFailedNon2XX when the HTTP status code is known.
+   * @example {404} PH1
+   */
+  PrefetchFailedNon2XXWithStatusCode: 'The prefetch failed because of a non-2xx HTTP response status code ({PH1}).',
   /**
    * @description  Description text for Prefetch status PrefetchIneligibleRetryAfter.
    */
@@ -171,6 +176,12 @@ const UIStrings = {
    */
   prerenderFinalStatusNavigationBadHttpStatus:
       'The prerendering navigation failed because of a non-2xx HTTP response status code.',
+  /**
+   * @description Description text for PrerenderFinalStatus::kNavigationBadHttpStatus when the HTTP status code is known.
+   * @example {404} PH1
+   */
+  prerenderFinalStatusNavigationBadHttpStatusWithStatusCode:
+      'The prerendering navigation failed because of a non-2xx HTTP response status code ({PH1}).',
   /**
    *  Description text for PrerenderFinalStatus::kClientCertRequested.
    */
@@ -446,7 +457,8 @@ export const PrefetchReasonDescription: Record<string, {name: () => Platform.UIS
 };
 
 /** Decoding PrefetchFinalStatus prefetchAttempt to failure description. **/
-export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.PrefetchAttempt): string|null {
+export function prefetchFailureReason(
+    {prefetchStatus}: SDK.PreloadingModel.PrefetchAttempt, statusCode?: number): string|null {
   // If you face an error on rolling CDP changes, see
   // https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk
   switch (prefetchStatus) {
@@ -478,6 +490,9 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
     case Protocol.Preload.PrefetchStatus.PrefetchFailedNetError:
       return PrefetchReasonDescription['PrefetchFailedNetError'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchFailedNon2XX:
+      if (statusCode !== undefined) {
+        return i18nString(UIStrings.PrefetchFailedNon2XXWithStatusCode, {PH1: String(statusCode)});
+      }
       return PrefetchReasonDescription['PrefetchFailedNon2XX'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIneligibleRetryAfter:
       return PrefetchReasonDescription['PrefetchIneligibleRetryAfter'].name();
@@ -535,7 +550,9 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
 }
 
 /** Detailed failure reason for PrerenderFinalStatus. **/
-export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAttempt): string|null {
+export function prerenderFailureReason(
+    attempt: SDK.PreloadingModel.PrerenderAttempt|SDK.PreloadingModel.PrerenderUntilScriptAttempt,
+    statusCode?: number): string|null {
   // If you face an error on rolling CDP changes, see
   // https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk
   switch (attempt.prerenderStatus) {
@@ -571,7 +588,12 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       // TODO(https://crbug.com/1410709): Fill it.
       return i18n.i18n.lockedString('Internal error');
     case Protocol.Preload.PrerenderFinalStatus.NavigationBadHttpStatus:
+      if (statusCode !== undefined) {
+        return i18nString(
+            UIStrings.prerenderFinalStatusNavigationBadHttpStatusWithStatusCode, {PH1: String(statusCode)});
+      }
       return i18nString(UIStrings.prerenderFinalStatusNavigationBadHttpStatus);
+
     case Protocol.Preload.PrerenderFinalStatus.ClientCertRequested:
       return i18nString(UIStrings.prerenderFinalStatusClientCertRequested);
     case Protocol.Preload.PrerenderFinalStatus.NavigationRequestNetworkError:
@@ -730,14 +752,42 @@ export function ruleSetTagOrLocationShort(
 }
 
 export function capitalizedAction(action: Protocol.Preload.SpeculationAction): Common.UIString.LocalizedString {
-  // Use "prefetch"/"prerender" as is in SpeculationRules.
   switch (action) {
     case Protocol.Preload.SpeculationAction.Prefetch:
       return i18n.i18n.lockedString('Prefetch');
     case Protocol.Preload.SpeculationAction.Prerender:
       return i18n.i18n.lockedString('Prerender');
     case Protocol.Preload.SpeculationAction.PrerenderUntilScript:
-      return i18n.i18n.lockedString('PrerenderUntilScript');
+      return i18n.i18n.lockedString('Prerender until script');
+  }
+}
+
+export function sortOrder(attempt: SDK.PreloadingModel.PreloadingAttempt): number {
+  switch (attempt.status) {
+    case SDK.PreloadingModel.PreloadingStatus.NOT_SUPPORTED:
+      return 0;
+    case SDK.PreloadingModel.PreloadingStatus.PENDING:
+      return 1;
+    case SDK.PreloadingModel.PreloadingStatus.RUNNING:
+      return 2;
+    case SDK.PreloadingModel.PreloadingStatus.READY:
+      return 3;
+    case SDK.PreloadingModel.PreloadingStatus.SUCCESS:
+      return 4;
+    case SDK.PreloadingModel.PreloadingStatus.FAILURE: {
+      switch (attempt.action) {
+        case Protocol.Preload.SpeculationAction.Prefetch:
+          return 5;
+        case Protocol.Preload.SpeculationAction.Prerender:
+          return 6;
+        case Protocol.Preload.SpeculationAction.PrerenderUntilScript:
+          return 7;
+      }
+    }
+    case SDK.PreloadingModel.PreloadingStatus.NOT_TRIGGERED:
+      return 8;
+    default:
+      Platform.assertNever(attempt.status, 'Unknown Preloading attempt status');
   }
 }
 
@@ -766,7 +816,7 @@ export function status(status: SDK.PreloadingModel.PreloadingStatus): string {
   }
 }
 
-export function composedStatus(attempt: SDK.PreloadingModel.PreloadingAttempt): string {
+export function composedStatus(attempt: SDK.PreloadingModel.PreloadingAttempt, statusCode?: number): string {
   const short = status(attempt.status);
 
   if (attempt.status !== SDK.PreloadingModel.PreloadingStatus.FAILURE) {
@@ -775,11 +825,14 @@ export function composedStatus(attempt: SDK.PreloadingModel.PreloadingAttempt): 
 
   switch (attempt.action) {
     case Protocol.Preload.SpeculationAction.Prefetch: {
-      const detail = prefetchFailureReason(attempt) ?? i18n.i18n.lockedString('Internal error');
+      const detail = prefetchFailureReason(attempt, statusCode) ?? i18n.i18n.lockedString('Internal error');
       return short + ' - ' + detail;
     }
-    case Protocol.Preload.SpeculationAction.Prerender: {
-      const detail = prerenderFailureReason(attempt);
+    case Protocol.Preload.SpeculationAction.Prerender:
+    case Protocol.Preload.SpeculationAction.PrerenderUntilScript: {
+      const detail = prerenderFailureReason(
+          attempt as SDK.PreloadingModel.PrerenderAttempt | SDK.PreloadingModel.PrerenderUntilScriptAttempt,
+          statusCode);
       assertNotNullOrUndefined(detail);
       return short + ' - ' + detail;
     }

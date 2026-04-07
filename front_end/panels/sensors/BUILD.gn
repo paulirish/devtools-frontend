@@ -5,6 +5,7 @@
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/ninja/generate_css.gni")
+import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
 generate_css("css_files") {
@@ -14,7 +15,7 @@ generate_css("css_files") {
   ]
 }
 
-devtools_module("sensors") {
+devtools_ui_module("sensors") {
   sources = [
     "LocationsSettingsTab.ts",
     "SensorsView.ts",
@@ -28,8 +29,10 @@ devtools_module("sensors") {
     "../../models/geometry:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../ui/components/buttons:bundle",
-    "../../ui/components/cards:bundle",
+    "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
+    "../../ui/legacy/components/settings_ui:bundle",
+    "../../ui/visual_logging:bundle",
   ]
 }
 
@@ -60,7 +63,21 @@ devtools_entrypoint("meta") {
   ]
 
   visibility = [
+    ":*",
     "../../entrypoints/*",
+    "../../panels/greendev/*",
     "../../testing/*",
+  ]
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [ "SensorsView.test.ts" ]
+
+  deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../testing",
   ]
 }

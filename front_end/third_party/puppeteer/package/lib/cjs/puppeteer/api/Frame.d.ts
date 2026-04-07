@@ -8,11 +8,11 @@ import type { ClickOptions, ElementHandle } from '../api/ElementHandle.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { Page, QueryOptions, WaitForSelectorOptions, WaitTimeoutOptions } from '../api/Page.js';
 import type { Accessibility } from '../cdp/Accessibility.js';
-import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
 import type { PuppeteerLifeCycleEvent } from '../cdp/LifecycleWatcher.js';
 import { EventEmitter, type EventType } from '../common/EventEmitter.js';
 import type { Awaitable, EvaluateFunc, EvaluateFuncWith, HandleFor, NodeFor } from '../common/types.js';
 import type { CDPSession } from './CDPSession.js';
+import type { DeviceRequestPrompt } from './DeviceRequestPrompt.js';
 import type { KeyboardTypeOptions } from './Input.js';
 import { type Locator } from './locators/locators.js';
 import type { Realm } from './Realm.js';
@@ -572,7 +572,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * ```
      *
      * @param pageFunction - the function to evaluate in the frame context.
-     * @param options - options to configure the polling method and timeout.
+     * @param options - options to configure the polling method, timeout and signal.
      * @param args - arguments to pass to the `pageFunction`.
      * @returns the promise which resolve when the `pageFunction` returns a truthy value.
      */

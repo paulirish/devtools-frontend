@@ -32,6 +32,7 @@ export interface TraceEventsForNetworkRequest {
   resourceFinish?: Types.Events.ResourceFinish;
   receivedData?: Types.Events.ResourceReceivedData[];
   resourceMarkAsCached?: Types.Events.ResourceMarkAsCached;
+  preloadRenderBlockingStatusChange?: Types.Events.PreloadRenderBlockingStatusChangeEvent[];
 }
 
 export interface WebSocketTraceDataForFrame {
@@ -54,7 +55,13 @@ let linkPreconnectEvents: Types.Events.LinkPreconnect[] = [];
 interface NetworkRequestData {
   byId: Map<string, Types.Events.SyntheticNetworkRequest>;
   byTime: Types.Events.SyntheticNetworkRequest[];
-  eventToInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
+  requestIdsByURL: Map<string, string[]>;
+  /**
+   * IMPORTANT: you should prefer to use `Trace.Extras.Initiator` to find the initiator.
+   * This is because backend trace events have some bugs which means the initiators are not always accurate.
+   * See crrev.com/c/7032169 for context.
+   */
+  incompleteInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
   webSocket: WebSocketTraceData[];
   entityMappings: HandlerHelpers.EntityMappings;
   linkPreconnectEvents: Types.Events.LinkPreconnect[];
@@ -63,6 +70,11 @@ interface NetworkRequestData {
 let requestMap = new Map<string, TraceEventsForNetworkRequest>();
 let requestsById = new Map<string, Types.Events.SyntheticNetworkRequest>();
 let requestsByTime: Types.Events.SyntheticNetworkRequest[] = [];
+
+/**
+ * URL => RequestId[]. There can be multiple requests for a single URL.
+ */
+let requestIdsByURL = new Map<string, string[]>();
 
 let networkRequestEventByInitiatorUrl = new Map<string, Types.Events.SyntheticNetworkRequest[]>();
 let eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>();
@@ -119,6 +131,7 @@ export function reset(): void {
   networkRequestEventByInitiatorUrl = new Map();
   eventToInitiatorMap = new Map();
   webSocketData = new Map();
+  requestIdsByURL = new Map();
   entityMappings = {
     eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
     entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
@@ -162,6 +175,10 @@ export function handleEvent(event: Types.Events.Event): void {
   if (Types.Events.isResourceMarkAsCached(event)) {
     storeTraceEventWithRequestId(event.args.data.requestId, 'resourceMarkAsCached', event);
     return;
+  }
+
+  if (Types.Events.isPreloadRenderBlockingStatusChangeEvent(event)) {
+    storeTraceEventWithRequestId(event.args.data.requestId, 'preloadRenderBlockingStatusChange', [event]);
   }
 
   if (Types.Events.isWebSocketCreate(event) || Types.Events.isWebSocketInfo(event) ||
@@ -487,13 +504,24 @@ export async function finalize(): Promise<void> {
         Types.Timing.Micro(0);
 
     // Finally get some of the general data from the trace events.
-    const {frame, url, renderBlocking} = finalSendRequest.args.data;
+    const {frame, url, renderBlocking: sendRequestIsRenderBlocking} = finalSendRequest.args.data;
     const {encodedDataLength, decodedBodyLength} =
         request.resourceFinish ? request.resourceFinish.args.data : {encodedDataLength: 0, decodedBodyLength: 0};
     const parsedUrl = new URL(url);
     const isHttps = parsedUrl.protocol === 'https:';
     const requestingFrameUrl =
         Helpers.Trace.activeURLForFrameAtTime(frame, finalSendRequest.ts, rendererProcessesByFrame) || '';
+
+    // A resource that is preloaded (and not marked as render-blocking) can
+    // become render-blocked later via a PreloadRenderBlockingStatusChange. In
+    // this case, we take the render-blocking value of the last
+    // PreloadRenderBlockingStatusChange for this request.
+    const preloadRenderBlockingStatusChange =
+        request.preloadRenderBlockingStatusChange?.at(-1)?.args.data.renderBlocking;
+
+    // In the event the property isn't set, assume non-blocking.
+    const isRenderBlocking = preloadRenderBlockingStatusChange ?? sendRequestIsRenderBlocking ?? 'non_blocking';
+
     // Construct a synthetic trace event for this network request.
     const networkEvent =
         Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<Types.Events.SyntheticNetworkRequest>({
@@ -535,8 +563,7 @@ export async function finalize(): Promise<void> {
               initialPriority,
               protocol: request.receiveResponse?.args.data.protocol ?? 'unknown',
               redirects,
-              // In the event the property isn't set, assume non-blocking.
-              renderBlocking: renderBlocking ?? 'non_blocking',
+              renderBlocking: isRenderBlocking,
               requestId,
               requestingFrameUrl,
               requestMethod: finalSendRequest.args.data.requestMethod,
@@ -572,6 +599,10 @@ export async function finalize(): Promise<void> {
     requestsByTime.push(networkEvent);
     requestsById.set(networkEvent.args.data.requestId, networkEvent);
 
+    const requestsForUrl = requestIdsByURL.get(networkEvent.args.data.url) ?? [];
+    requestsForUrl.push(networkEvent.args.data.requestId);
+    requestIdsByURL.set(networkEvent.args.data.url, requestsForUrl);
+
     // Update entity relationships for network events
     HandlerHelpers.addNetworkRequestToEntityMapping(networkEvent, entityMappings, request);
 
@@ -602,7 +633,8 @@ export function data(): NetworkRequestData {
   return {
     byId: requestsById,
     byTime: requestsByTime,
-    eventToInitiator: eventToInitiatorMap,
+    requestIdsByURL,
+    incompleteInitiator: eventToInitiatorMap,
     webSocket: [...webSocketData.values()],
     entityMappings: {
       entityByEvent: entityMappings.entityByEvent,

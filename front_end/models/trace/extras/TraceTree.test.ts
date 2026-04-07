@@ -406,25 +406,30 @@ describeWithEnvironment('TraceTree', () => {
         throw new Error('Could not find a profile call');
       }
       const eventId = Trace.Extras.TraceTree.generateEventID(profileCallEntry);
-      assert.strictEqual(eventId, 'f:performConcurrentWorkOnRoot@7');
+      assert.strictEqual(eventId, 'f:performConcurrentWorkOnRoot@7:25701:38');
     });
 
-    it('generates the right ID for new engine native profile call events', async function() {
-      const {data} = await TraceLoader.traceEngine(this, 'invalid-animation-events.json.gz', {
-        ...Trace.Types.Configuration.defaults(),
-        includeRuntimeCallStats: true,
-      });
+    it('differentiates between anonymous functions based on their location', () => {
+      const event1 = makeProfileCall('(anonymous)', 0, 1000);
+      event1.callFrame.url = 'https://example.com/script.js';
+      event1.callFrame.scriptId = '1' as Protocol.Runtime.ScriptId;
+      event1.callFrame.lineNumber = 10;
+      event1.callFrame.columnNumber = 5;
 
-      const mainThread = getMainThread(data.Renderer);
-      const profileCallEntry = mainThread.entries.find(entry => {
-        return Trace.Types.Events.isProfileCall(entry) && entry.callFrame.url === 'native V8Runtime';
-      });
-      if (!profileCallEntry) {
-        throw new Error('Could not find a profile call');
-      }
-      const eventId = Trace.Extras.TraceTree.generateEventID(profileCallEntry);
-      assert.strictEqual(eventId, 'f:Compile@0');
+      const event2 = makeProfileCall('(anonymous)', 0, 1000);
+      event2.callFrame.url = 'https://example.com/script.js';
+      event2.callFrame.scriptId = '1' as Protocol.Runtime.ScriptId;
+      event2.callFrame.lineNumber = 15;
+      event2.callFrame.columnNumber = 10;
+
+      const eventId1 = Trace.Extras.TraceTree.generateEventID(event1);
+      const eventId2 = Trace.Extras.TraceTree.generateEventID(event2);
+
+      assert.strictEqual(eventId1, 'f:(anonymous)@1:10:5');
+      assert.strictEqual(eventId2, 'f:(anonymous)@1:15:10');
+      assert.notStrictEqual(eventId1, eventId2);
     });
+
     it('correctly groups events with eventGroupIdCallback when using forceGroupIdCallback', () => {
       // This builds the following tree:
       // |------------ROOT-----------|
@@ -473,6 +478,40 @@ describeWithEnvironment('TraceTree', () => {
 
       assert.strictEqual(second.id, 'thirdParty2');
       assert.lengthOf(second.events, 3);
+    });
+
+    it('correctly identifies which nodes have children in a nested structure', () => {
+      // This builds the following simple tree:
+      // |----Parent Task----|
+      //   |--Child Task--|
+
+      const parentEvent = makeCompleteEvent('Parent Task', 0, 100_000);
+      const childEvent = makeCompleteEvent('Child Task', 20_000, 50_000);
+
+      const events = [parentEvent, childEvent];
+      const root = new Trace.Extras.TraceTree.BottomUpRootNode(events, {
+        textFilter: new Trace.Extras.TraceFilter.InvisibleEventsFilter([]),
+        filters: [],
+        startTime: Trace.Types.Timing.Milli(0),
+        endTime: Trace.Types.Timing.Milli(200_000),
+      });
+
+      const rootChildren = root.children();
+
+      // One node for the parent, and one for the child.
+      assert.strictEqual(rootChildren.size, 2);
+
+      const parentNode = rootChildren.get('Parent Task') as Trace.Extras.TraceTree.BottomUpNode;
+      const childNode = rootChildren.get('Child Task') as Trace.Extras.TraceTree.BottomUpNode;
+
+      // Ensure we found the nodes before testing them.
+      assert.exists(parentNode, 'Parent node was not found');
+      assert.exists(childNode, 'Child node was not found');
+
+      // Since this is bottom-up, a node with callers should have children.
+      // A node with no callers (a top-level node) has no children.
+      assert.isFalse(parentNode.hasChildren(), 'Parent node (the root) should NOT have children in bottom-up');
+      assert.isTrue(childNode.hasChildren(), 'Child node (the nested event) SHOULD have children in bottom-up');
     });
   });
 

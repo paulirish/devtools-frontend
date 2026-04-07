@@ -1,8 +1,8 @@
 // Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-imperative-dom-api */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -377,10 +377,10 @@ export class HeadersViewComponent extends HTMLElement {
         ${i18nString(UIStrings.addOverrideRule)}
       </devtools-button>
       <div class="learn-more-row">
-        <x-link
+        <devtools-link
             href="https://goo.gle/devtools-override"
             class="link"
-            jslog=${VisualLogging.link('learn-more').track({click: true})}>${i18nString(UIStrings.learnMore)}</x-link>
+            jslogContext=${'learn-more'}>${i18nString(UIStrings.learnMore)}</devtools-link>
       </div>
     `, this.#shadow, {host: this});
     // clang-format on
@@ -404,7 +404,7 @@ export class HeadersViewComponent extends HTMLElement {
     // clang-format off
     return html`
       <div class="row" data-block-index=${blockIndex}
-           jslog=${VisualLogging.treeItem(pattern === '*' ? pattern : undefined)}>
+           jslog=${VisualLogging.treeItem(pattern === '*' ? pattern : undefined).track({resize: true})}>
         <div>${i18n.i18n.lockedString('Apply to')}</div>
         <div class="separator">:</div>
         ${this.#renderEditable(pattern, 'apply-to')}
@@ -427,7 +427,7 @@ export class HeadersViewComponent extends HTMLElement {
     // clang-format off
     return html`
       <div class="row padded" data-block-index=${blockIndex} data-header-index=${headerIndex}
-           jslog=${VisualLogging.treeItem(header.name).parent('headers-editor-row-parent')}>
+           jslog=${VisualLogging.treeItem(header.name).parent('headers-editor-row-parent').track({resize: true})}>
         ${this.#renderEditable(header.name, 'header-name red', true)}
         <div class="separator">:</div>
         ${this.#renderEditable(header.value, 'header-value')}

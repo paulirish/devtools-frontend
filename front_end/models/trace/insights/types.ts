@@ -96,7 +96,7 @@ export type InsightModel<UIStrings extends Record<string, string> = Record<strin
       /**
        * If this insight is attached to a navigation, this stores its ID.
        */
-      navigationId?: string,
+      navigation?: Types.Events.NavigationStart,
       /** This is lazily-generated because some insights may create many overlays. */
       createOverlays?: () => Types.Overlays.Overlay[],
     };
@@ -110,21 +110,31 @@ export type PartialInsightModel<T> =
  * navigation (or the end of the trace).
  */
 export interface InsightSet {
-  /** If for a navigation, this is the navigationId. Else it is Trace.Types.Events.NO_NAVIGATION. */
+  /** If for a navigation, this is of the form "NAVIGATION_(index)". Else it is Trace.Types.Events.NO_NAVIGATION. */
   id: Types.Events.NavigationId;
   /** The URL to show in the accordion list. */
   url: URL;
   frameId: string;
   bounds: Types.Timing.TraceWindowMicro;
+  /** Contains results for all non-errored insights. */
   model: InsightModels;
+  /** Contains errors for all insights that had an internal error. */
+  modelErrors: InsightModelErrors;
   navigation?: Types.Events.NavigationStart;
 }
 
 /**
- * Contains insights for a specific insight set.
+ * Contains insights for a specific insight set. If missing, it error'd.
  */
 export type InsightModels = {
-  [I in keyof InsightModelsType]: ReturnType<InsightModelsType[I]['generateInsight']>;
+  [I in keyof InsightModelsType]?: ReturnType<InsightModelsType[I]['generateInsight']>;
+};
+
+/**
+ * Contains an internal error for each insight in a specific insight set.
+ */
+export type InsightModelErrors = {
+  [I in keyof InsightModelsType]?: Error;
 };
 
 /**
@@ -154,4 +164,5 @@ export enum InsightKeys {
   VIEWPORT = 'Viewport',
   MODERN_HTTP = 'ModernHTTP',
   CACHE = 'Cache',
+  CHARACTER_SET = 'CharacterSet',
 }

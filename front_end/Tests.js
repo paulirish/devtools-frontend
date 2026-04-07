@@ -858,6 +858,7 @@
   // See crbug.com/747724
   TestSuite.prototype.testOfflineNetworkConditions = async function() {
     const test = this;
+    SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions.conditionsEnabled = true;
     SDK.NetworkManager.MultitargetNetworkManager.instance().setNetworkConditions(SDK.NetworkManager.OfflineConditions);
 
     function finishRequest(request) {
@@ -952,7 +953,12 @@
     }
 
     function gotPreferences(prefs) {
-      Main.Main.instanceForTest.createSettings(prefs);
+      Common.Settings.Settings.instance({
+        forceNew: true,
+        ...Main.Main.instanceForTest.createSettingsStorage(prefs),
+        settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
+        runSettingsMigration: false,
+      });
 
       const localSetting = Common.Settings.Settings.instance().createLocalSetting('local', undefined);
       test.assertEquals('object', typeof localSetting.get());
@@ -1080,20 +1086,36 @@
     this.takeControl({slownessFactor: 10});
   };
 
-  TestSuite.prototype.waitForTestResultsAsMessage = function() {
-    const onMessage = event => {
-      if (!event.data.testOutput) {
-        return;
-      }
-      top.removeEventListener('message', onMessage);
+  const earlyTestResults = [];
+  let testResultsWaiter = null;
+
+  top.addEventListener('message', event => {
+    if (event.data && event.data.testOutput) {
       const text = event.data.testOutput;
+      if (testResultsWaiter) {
+        testResultsWaiter(text);
+      } else {
+        earlyTestResults.push(text);
+      }
+    }
+  });
+
+  TestSuite.prototype.waitForTestResultsAsMessage = function() {
+    const handleMessage = text => {
+      testResultsWaiter = null;
       if (text === 'PASS') {
         this.releaseControl();
       } else {
         this.fail(text);
       }
     };
-    top.addEventListener('message', onMessage);
+
+    if (earlyTestResults.length) {
+      handleMessage(earlyTestResults.shift());
+      return;
+    }
+
+    testResultsWaiter = handleMessage;
     this.takeControl();
   };
 
@@ -1337,6 +1359,7 @@
   };
 
   TestSuite.prototype.testExtensionWebSocketOfflineNetworkConditions = async function(websocketPort) {
+    SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions.conditionsEnabled = true;
     SDK.NetworkManager.MultitargetNetworkManager.instance().setNetworkConditions(SDK.NetworkManager.OfflineConditions);
 
     // TODO(crbug.com/1263900): Currently we don't send loadingFailed for web sockets.

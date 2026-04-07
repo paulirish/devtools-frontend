@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as fs from 'fs';
-import * as http from 'http';
+import * as fs from 'node:fs';
+import * as http from 'node:http';
 
 import type {ArtifactGroup} from './screenshot-error.js';
 
@@ -38,7 +38,7 @@ export function sanitizedTestId(rawTestId: string): SanitizedTestId {
 }
 
 interface SinkData {
-  url: string|undefined;
+  url?: string;
   authToken?: string;
 }
 let resolvedSinkData: SinkData|undefined = undefined;
@@ -71,15 +71,41 @@ export function available(): boolean {
   return sinkData.url !== undefined;
 }
 
-/**
- * Call at the end of a test suite. Will send all `TestResult`s collected via
- * `recordTestResult` to the ResultSink endpoint (only if available).
- **/
-export function sendTestResult(results: TestResult): void {
+let pendingResults: TestResult[] = [];
+let timer: ReturnType<typeof setTimeout>|undefined;
+
+const seenTestIds = new Set<string>();
+
+function stringifyTestResults(results: TestResult[]): string {
+  const testResults = results.map(result => {
+    // SummaryHTML has a limit of 4096 bytes.
+    if (result.summaryHtml) {
+      const buf = Buffer.from(result.summaryHtml, 'utf8');
+      if (buf.length > 4096) {
+        // Note this may produce wrong last character
+        // but node outputs � in that case which is OK.
+        result.summaryHtml = buf.subarray(0, 4096).toString('utf8');
+      }
+    }
+
+    return result;
+  });
+
+  return JSON.stringify({testResults});
+}
+
+function takeAndSendResults() {
   const sinkData = getSinkData();
   if (sinkData.url === undefined) {
     return;
   }
+
+  if (pendingResults.length === 0) {
+    return;
+  }
+
+  const testResults = pendingResults;
+  pendingResults = [];
 
   const postOptions = {
     method: 'POST',
@@ -90,11 +116,40 @@ export function sendTestResult(results: TestResult): void {
     },
   };
 
+  for (const t of testResults) {
+    if (seenTestIds.has(t.testId)) {
+      console.warn('WARN: duplicate test id', t.testId);
+    }
+    seenTestIds.add(t.testId);
+  }
+
   // As per ResultSink documentation, this will always be a localhost connection
   // and can be treated as reliable as a local file write.
   const request = http.request(sinkData.url, postOptions);
-
-  const data = JSON.stringify({testResults: [results]});
-  request.write(data);
+  request.setTimeout(5000, function() {
+    request.destroy();
+    console.error('sending to rdb timed out');
+  });
+  request.write(stringifyTestResults(testResults));
   request.end();
+}
+
+/**
+ * Call at the end of a test suite. Will send all `TestResult`s collected via
+ * `recordTestResult` to the ResultSink endpoint (only if available).
+ **/
+export function sendTestResult(results: TestResult, sendImmediately = false): void {
+  const sinkData = getSinkData();
+  if (sinkData.url === undefined) {
+    return;
+  }
+  pendingResults.push(results);
+  if (sendImmediately) {
+    takeAndSendResults();
+    return;
+  }
+  if (timer) {
+    clearTimeout(timer);
+  }
+  timer = setTimeout(takeAndSendResults, 1000);
 }

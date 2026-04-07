@@ -4,12 +4,13 @@
 
 import '../../ui/components/spinners/spinners.js';
 import '../../ui/components/tooltips/tooltips.js';
+import '../../ui/kit/kit.js';
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, nothing, render} from '../../ui/lit/lit.js';
-import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AiCodeCompletionDisclaimer} from './AiCodeCompletionDisclaimer.js';
 import styles from './aiCodeCompletionSummaryToolbar.css.js';
@@ -26,12 +27,14 @@ const UIStringsNotTranslate = {
 } as const;
 
 const lockedString = i18n.i18n.lockedString;
+const {widget} = UI.Widget;
 
 export interface AiCodeCompletionSummaryToolbarProps {
   citationsTooltipId: string;
   disclaimerTooltipId?: string;
   spinnerTooltipId?: string;
   hasTopBorder?: boolean;
+  panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
 }
 
 export interface ViewInput {
@@ -42,6 +45,7 @@ export interface ViewInput {
   loading: boolean;
   hasTopBorder: boolean;
   aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
+  panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
 }
 
 export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
@@ -61,10 +65,11 @@ export const DEFAULT_SUMMARY_TOOLBAR_VIEW: View = (input, _output, target) => {
   // clang-format off
   const disclaimer = input.disclaimerTooltipId && input.spinnerTooltipId ?
     html`<devtools-widget
-            .widgetConfig=${UI.Widget.widgetConfig(AiCodeCompletionDisclaimer, {
+            ${widget(AiCodeCompletionDisclaimer, {
       disclaimerTooltipId: input.disclaimerTooltipId,
       spinnerTooltipId: input.spinnerTooltipId,
       loading: input.loading,
+      panel: input.panel,
     })} class="disclaimer-widget"></devtools-widget>` : nothing;
 
   const recitationNotice = input.citations && input.citations.size > 0 ?
@@ -79,15 +84,13 @@ export const DEFAULT_SUMMARY_TOOLBAR_VIEW: View = (input, _output, target) => {
                 </span>
                 <devtools-tooltip
                     id=${input.citationsTooltipId}
-                    variant=${'rich'}
-                    jslogContext=${'ai-code-completion-citations'}
+                    variant="rich"
+                    jslogContext="ai-code-completion-citations"
                 ><div class="citations-tooltip-container">
-                    ${Directives.repeat(input.citations, citation => html`<x-link
+                    ${Directives.repeat(input.citations, citation => html`<devtools-link
                         tabIndex="0"
                         href=${citation}
-                        jslog=${VisualLogging.link('ai-code-completion-citations.citation-link').track({
-      click: true
-    })}>${citation}</x-link>`)}</div></devtools-tooltip>
+                        jslogcontext="ai-code-completion-citations.citation-link">${citation}</devtools-link>`)}</div></devtools-tooltip>
             </div>` : nothing;
 
   render(
@@ -110,6 +113,7 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
   #citations = new Set<string>();
   #loading = false;
   #hasTopBorder = false;
+  #panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
 
   #aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
   #boundOnAidaAvailabilityChange: () => Promise<void>;
@@ -120,6 +124,7 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
     this.#spinnerTooltipId = props.spinnerTooltipId;
     this.#citationsTooltipId = props.citationsTooltipId;
     this.#hasTopBorder = props.hasTopBorder ?? false;
+    this.#panel = props.panel;
     this.#boundOnAidaAvailabilityChange = this.#onAidaAvailabilityChange.bind(this);
     this.#view = view ?? DEFAULT_SUMMARY_TOOLBAR_VIEW;
     this.requestUpdate();
@@ -158,6 +163,7 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
           loading: this.#loading,
           hasTopBorder: this.#hasTopBorder,
           aidaAvailability: this.#aidaAvailability,
+          panel: this.#panel,
         },
         undefined, this.contentElement);
   }

@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Root from '../../core/root/root.js';
+import * as SettingsUI from '../../ui/legacy/components/settings_ui/settings_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
@@ -65,13 +67,13 @@ const UIStrings = {
       'Highlights elements (teal) that can slow down scrolling, including touch & wheel event handlers and other main-thread scrolling situations.',
   /**
    * @description The name of a checkbox setting in the Rendering tool. This setting highlights the
-   * rendering frames for ads that are found on the page.
+   * rendering elements for ads that are found on the page.
    */
-  highlightAdFrames: 'Highlight ad frames',
+  highlightAds: 'Highlight ads',
   /**
-   * @description Explanation text for the 'Highlight ad frames' setting in the Rendering tool.
+   * @description Explanation text for the 'Highlight ads' setting in the Rendering tool.
    */
-  highlightsFramesRedDetectedToBe: 'Highlights frames (red) detected to be ads.',
+  highlightsElementsRedDetectedToBe: 'Highlights elements (red) detected to be ads.',
   /**
    * @description The name of a checkbox setting in the Rendering tool. This setting prevents the
    * webpage from loading 'local' fonts. Local fonts are fonts that are installed on the user's
@@ -144,10 +146,14 @@ const UIStrings = {
    */
   disableAvifImageFormat: 'Disable `AVIF` image format',
   /**
-   * @description Explanation text for both the 'Disable AVIF image format' and 'Disable WebP image
-   * format' settings in the Rendering tool.
+   * @description Explanation text for the image format disabling settings in the Rendering tool.
    */
   requiresAPageReloadToApplyAnd: 'Requires a page reload to apply and disables caching for image requests.',
+  /**
+   * @description The name of a checkbox setting in the Rendering tool. This setting disables the
+   * page from loading images with the JPEG XL format.
+   */
+  disableJpegXlImageFormat: 'Disable `JPEG XL` image format',
   /**
    * @description The name of a checkbox setting in the Rendering tool. This setting disables the
    * page from loading images with the WebP format.
@@ -183,7 +189,13 @@ const supportsPrefersContrast = (): boolean => {
   return window.matchMedia(query).matches;
 };
 
+const supportsJpegXl = (): boolean => {
+  return Boolean(Root.Runtime.hostConfig.devToolsJpegXlImageFormat?.enabled);
+};
+
 export class RenderingOptionsView extends UI.Widget.VBox {
+  #jpegXlCheckboxAdded = false;
+
   constructor() {
     super({useShadowDom: true});
     this.registerRequiredCSS(renderingOptionsStyles);
@@ -206,7 +218,7 @@ export class RenderingOptionsView extends UI.Widget.VBox {
         i18nString(UIStrings.scrollingPerformanceIssues), i18nString(UIStrings.highlightsElementsTealThatCan),
         Common.Settings.Settings.instance().moduleSetting('show-scroll-bottleneck-rects'));
     this.#appendCheckbox(
-        i18nString(UIStrings.highlightAdFrames), i18nString(UIStrings.highlightsFramesRedDetectedToBe),
+        i18nString(UIStrings.highlightAds), i18nString(UIStrings.highlightsElementsRedDetectedToBe),
         Common.Settings.Settings.instance().moduleSetting('show-ad-highlights'));
     this.#appendCheckbox(
         i18nString(UIStrings.disableLocalFonts), i18nString(UIStrings.disablesLocalSourcesInFontface),
@@ -265,28 +277,46 @@ export class RenderingOptionsView extends UI.Widget.VBox {
 
     this.contentElement.createChild('div').classList.add('panel-section-separator');
 
-    this.#appendCheckbox(
-        i18nString(UIStrings.disableAvifImageFormat), i18nString(UIStrings.requiresAPageReloadToApplyAnd),
-        Common.Settings.Settings.instance().moduleSetting('avif-format-disabled'));
+    const avifFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('avif-format-disabled');
+    const jpegXlFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('jpeg-xl-format-disabled');
+    const webpFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('webp-format-disabled');
 
     this.#appendCheckbox(
+        i18nString(UIStrings.disableAvifImageFormat), i18nString(UIStrings.requiresAPageReloadToApplyAnd),
+        avifFormatDisabledSetting);
+
+    const webpCheckbox = this.#appendCheckbox(
         i18nString(UIStrings.disableWebpImageFormat), i18nString(UIStrings.requiresAPageReloadToApplyAnd),
-        Common.Settings.Settings.instance().moduleSetting('webp-format-disabled'));
+        webpFormatDisabledSetting);
+
+    this.#appendJpegXlCheckboxWhenSupported(webpCheckbox, jpegXlFormatDisabledSetting);
 
     this.contentElement.createChild('div').classList.add('panel-section-separator');
   }
 
   #appendCheckbox(
       label: Common.UIString.LocalizedString, subtitle: Common.UIString.LocalizedString,
-      setting: Common.Settings.Setting<boolean>, metric?: UI.SettingsUI.UserMetricOptions): UI.UIUtils.CheckboxLabel {
+      setting: Common.Settings.Setting<boolean>, metric?: UI.UIUtils.UserMetricOptions): UI.UIUtils.CheckboxLabel {
     const checkbox = UI.UIUtils.CheckboxLabel.create(label, false, subtitle, setting.name);
-    UI.SettingsUI.bindCheckbox(checkbox, setting, metric);
+    UI.UIUtils.bindCheckbox(checkbox, setting, metric);
     this.contentElement.appendChild(checkbox);
     return checkbox;
   }
 
+  #appendJpegXlCheckboxWhenSupported(
+      webpCheckbox: UI.UIUtils.CheckboxLabel, jpegXlFormatDisabledSetting: Common.Settings.Setting<boolean>): void {
+    if (this.#jpegXlCheckboxAdded || !supportsJpegXl()) {
+      return;
+    }
+
+    this.#jpegXlCheckboxAdded = true;
+    webpCheckbox.before(this.#appendCheckbox(
+        i18nString(UIStrings.disableJpegXlImageFormat), i18nString(UIStrings.requiresAPageReloadToApplyAnd),
+        jpegXlFormatDisabledSetting));
+  }
+
   #appendSelect(label: string, setting: Common.Settings.Setting<unknown>): void {
-    const control = UI.SettingsUI.createControlForSetting(setting, label);
+    const control = SettingsUI.SettingsUI.createControlForSetting(setting, label);
     if (control) {
       this.contentElement.appendChild(control);
     }

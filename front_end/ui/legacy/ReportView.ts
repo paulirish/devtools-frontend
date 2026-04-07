@@ -1,7 +1,7 @@
 // Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import './Toolbar.js';
 
@@ -55,7 +55,7 @@ export class ReportView extends VBox {
   }
 
   setSubtitle(subtitle: string): void {
-    if (this.subtitleElement && this.subtitleElement.textContent === subtitle) {
+    if (this.subtitleElement?.textContent === subtitle) {
       return;
     }
     if (!this.subtitleElement) {
@@ -187,7 +187,7 @@ export class Section extends VBox {
     return row.lastElementChild as HTMLElement;
   }
 
-  appendFlexedField(title: string, textValue?: string): Element {
+  appendFlexedField(title: string, textValue?: string): HTMLElement {
     const field = this.appendField(title, textValue);
     field.classList.add('report-field-value-is-flexed');
     return field;
@@ -229,9 +229,5 @@ export class Section extends VBox {
   markFieldListAsGroup(): void {
     ARIAUtils.markAsGroup(this.fieldList);
     ARIAUtils.setLabel(this.fieldList, this.title());
-  }
-
-  setIconMasked(masked: boolean): void {
-    this.element.classList.toggle('show-mask', masked);
   }
 }

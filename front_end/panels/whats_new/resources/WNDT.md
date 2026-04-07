@@ -1,11 +1,11 @@
-### [Full stack trace AI agent in Performance panel](perf-ai-agent)
-The Performance panel now integrates a more capable AI agent that has full access to the stack trace.
+### [Start AI assistance chats without prior context](ai-assistance)
 
-### [AI code completion in Sources and Console](ai-code-completion)
-Code completion powered by AI is now available in the Sources panel and the Console.
+AI assistance chats can now be started from anywhere in DevTools and AI assistance will find required context based on the initial prompt.
 
-### [Google Developer Program support](gdp)
-The Google Developer Program, a ready-made subscription and community platform, is now in DevTools, offering a more personalized experience, a badge system, and easier discovery of new features.
+### [MCP server & CLI](mcp-server)
 
-### [One main 'Debug with AI' button](ai-main-button)
-The primary action bar at the top of DevTools now features the primary "Debug with AI" button which opens the 'AI assistance' panel in a right-hand side bar.
+Optionally expose DevTools and automation capabilities through CLI, enabling coding agents to batch tool calls and improve token efficiency.
+
+### [Code generation in the Console & Sources panels](code-generation)
+
+Generate entire code blocks directly in the Console and Sources panels by typing natural language comments.

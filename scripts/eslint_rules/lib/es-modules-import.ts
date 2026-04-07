@@ -8,7 +8,7 @@
  */
 
 import type {TSESLint, TSESTree} from '@typescript-eslint/utils';
-import path from 'path';
+import path from 'node:path';
 
 import {createRule} from './utils/ruleCreator.ts';
 import {isStarAsImportSpecifier} from './utils/treeHelpers.ts';
@@ -27,7 +27,6 @@ type MessageIds = 'doubleSlashInImportPath'|'missingExtension'|'invalidRelativeU
     'incorrectSameNamespaceTestImport';
 
 const FRONT_END_DIRECTORY = path.join(
-    // @ts-expect-error
     import.meta.dirname,
     '..',
     '..',
@@ -36,7 +35,6 @@ const FRONT_END_DIRECTORY = path.join(
 );
 const THIRD_PARTY_DIRECTORY = path.join(FRONT_END_DIRECTORY, 'third_party');
 const INSPECTOR_OVERLAY_DIRECTORY = path.join(
-    // @ts-expect-error
     import.meta.dirname,
     '..',
     '..',
@@ -338,6 +336,30 @@ export default createRule<[], MessageIds>({
           return;
         }
 
+        // We explicitly allow destructuring imports from 'lit/lit.js'.
+        if (importPath.endsWith(path.join('lit', 'lit.js'))) {
+          // If we try to import third_party report it as an error
+          // We should import from "../ui/lit/lit.js"
+          if (importPath.includes('third_party') && !filename.includes('ui/lit/')) {
+            context.report({
+              node,
+              messageId: 'crossNamespaceImportThirdParty',
+              data: {
+                importPathForErrorMessage,
+              },
+            });
+            return;
+          }
+          return;
+        }
+
+        const currentFileDirectory = path.dirname(filename);
+        const resolvedAbsoluteImportPath = path.resolve(currentFileDirectory, importPath);
+        // We explicitly allow destructuring imports from 'front_end/ui/kit/kit.js'.
+        if (resolvedAbsoluteImportPath.endsWith(path.join('front_end', 'ui', 'kit', 'kit.js'))) {
+          return;
+        }
+
         if (importPathForErrorMessage.endsWith('platform/platform.js') &&
             nodeSpecifiersSpecialImportsOnly(node.specifiers)) {
           /* We allow direct importing of the ls and assertNotNull utility as it's so frequently used. */
@@ -365,11 +387,6 @@ export default createRule<[], MessageIds>({
             if (importingFileName.endsWith('.test.ts') &&
                 importPath.includes([path.sep, 'testing', path.sep].join(''))) {
               /** Within test files we allow the direct import of test helpers.*/
-              return;
-            }
-
-            // We explicitly allow destructuring imports from 'lit/lit.js'.
-            if (importPath.endsWith(path.join('lit', 'lit.js'))) {
               return;
             }
 

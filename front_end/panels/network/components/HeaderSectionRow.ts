@@ -1,8 +1,9 @@
 // Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
+import '../../../ui/kit/kit.js';
 import '../../../ui/legacy/legacy.js';
 
 import * as Host from '../../../core/host/host.js';
@@ -231,6 +232,7 @@ export class HeaderSectionRow extends HTMLElement {
       ${showEditHeaderButton ? html`
         <devtools-button
           title=${i18nString(UIStrings.editHeader)}
+          .accessibleLabel=${i18nString(UIStrings.editHeader)}
           .size=${Buttons.Button.Size.SMALL}
           .iconName=${'edit'}
           .variant=${Buttons.Button.Variant.ICON}
@@ -338,11 +340,11 @@ export class HeaderSectionRow extends HTMLElement {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
       return html`
-        <x-link href=${blockedDetails.link.url} class="link">
+        <devtools-link href=${blockedDetails.link.url} class="link">
           <devtools-icon name="open-externally" class="inline-icon extra-large" style="color: var(--icon-link);">
           </devtools-icon
           >${i18nString(UIStrings.learnMore)}
-        </x-link>
+        </devtools-link>
       `;
       // clang-format on
     }

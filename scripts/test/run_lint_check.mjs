@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import { spawn } from 'child_process';
 import { ESLint } from 'eslint';
-import { readFileSync } from 'fs';
 import { sync } from 'globby';
-import { extname, join, resolve, relative } from 'path';
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { extname, join, resolve, relative } from 'node:path';
 import stylelint from 'stylelint';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -25,25 +25,32 @@ const flags = yargs(hideBin(process.argv))
     default: true,
     describe: 'Automatically fix, where possible, problems reported by rules.',
   })
+  .option('force-fix', {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Disables inline rule and allows auto fixers to run unconditionally.',
+  })
   .option('debug', {
     type: 'boolean',
     default: false,
     describe:
       'Disable cache validations during debugging, useful for custom rule creation/debugging.',
   })
+  .option('lint-only', {
+    type: 'boolean',
+    // LUCI_CONTEXT is an env that exists on the bots
+    // We want to disable caches and run more logging there.
+    default: false || Boolean(process.env['LUCI_CONTEXT']),
+    describe:
+      'Runs the linter against all files, ignores passed files, ignores caches, ignores --fix.',
+  })
   .usage('$0 [<files...>]', 'Run the linter on the provided files', yargs => {
     return yargs.positional('files', {
       describe: 'File(s), glob(s), or directories',
       type: 'string',
       array: true,
-      default: [
-        'front_end',
-        'inspector_overlay',
-        'scripts',
-        'test',
-        'extensions',
-        'extension-api',
-      ],
+      default: ['.'],
     });
   })
   .parseSync();
@@ -51,25 +58,47 @@ const flags = yargs(hideBin(process.argv))
 if (!flags.fix) {
   console.log('[lint]: fix is disabled; no errors will be autofixed.');
 }
+
+if (flags.forceFix && !flags.fix) {
+  throw new Error('`--force-fix` need `--fix` to work as intended');
+}
+
 if (flags.debug) {
   console.log('[lint]: Cache disabled, linting may take longer.');
 }
-const cacheLinters = !flags.debug;
+const linterFixer = flags.fix && !flags.lintOnly;
+const cacheLinters = !flags.debug || flags.lintOnly;
 
-function debugLogging(...args) {
+const LIT_ANALYZER_EXCLUDED_FOLDERS = [
+  'front_end/core',
+  'front_end/foundation',
+  'front_end/generated',
+  'front_end/legacy_test_runner',
+  'front_end/models',
+  'front_end/services',
+  'front_end/testing',
+  'front_end/third_party',
+];
+
+function debugLogging(messages, ...args) {
   if (!flags.debug) {
     return;
   }
 
-  console.log(...args);
+  messages.push(args.map(String).join(' '));
 }
 
 async function runESLint(scriptFiles) {
-  debugLogging('[lint]: Running EsLint...');
+  if (scriptFiles.length === 0) {
+    return { status: true, output: '' };
+  }
+  const messages = [];
+  debugLogging(messages, '[lint]: Running EsLint...');
   const cli = new ESLint({
     cwd: join(import.meta.dirname, '..', '..'),
-    fix: flags.fix,
+    fix: linterFixer,
     cache: cacheLinters,
+    allowInlineConfig: !flags.forceFix,
   });
 
   // We filter out certain files in the `eslint.config.mjs` `Ignore list` entry.
@@ -92,7 +121,7 @@ async function runESLint(scriptFiles) {
     // This can happen only if we pass things that will
     // be ignored by the above filter
     // https://github.com/eslint/eslint/pull/17644
-    return true;
+    return { status: true, output: messages.join('\n') };
   }
 
   const results = await cli.lintFiles(files);
@@ -101,35 +130,51 @@ async function runESLint(scriptFiles) {
     result => result.usedDeprecatedRules,
   );
   if (usedDeprecatedRules.length) {
-    console.log('Used deprecated rules:');
+    messages.push('Used deprecated rules:');
     for (const { ruleId, replacedBy } of usedDeprecatedRules) {
-      console.log(
-        ` Rule ${ruleId} can be replaced with ${
-          replacedBy.join(',') ?? 'none'
-        }`,
+      messages.push(
+        ` Rule ${ruleId} can be replaced with ${replacedBy.join(',') ?? 'none'}`,
       );
     }
   }
 
-  if (flags.fix) {
+  // Only do this for a single file as else its too noisy
+  // Also there is no file name we can print
+  if (files.length === 1) {
+    debugLogging(messages, '[lint]: EsLint suppressed the following errors:');
+    for (const result of results) {
+      debugLogging(messages, result.suppressedMessages);
+    }
+  }
+
+  if (linterFixer) {
     await ESLint.outputFixes(results);
   }
 
   const formatter = await cli.loadFormatter('stylish');
   const output = formatter.format(results);
   if (output) {
-    console.log(output);
+    messages.push(output);
   }
 
-  return !results.find(report => report.errorCount + report.warningCount > 0);
+  return {
+    status: !results.find(
+      report => report.errorCount + report.warningCount > 0,
+    ),
+    output: messages.join('\n'),
+  };
 }
 
 async function runStylelint(files) {
-  debugLogging('[lint]: Running StyleLint...');
+  if (files.length === 0) {
+    return { status: true, output: '' };
+  }
+  const messages = [];
+  debugLogging(messages, '[lint]: Running StyleLint...');
   const { report, errored } = await stylelint.lint({
     configFile: join(import.meta.dirname, '..', '..', '.stylelintrc.json'),
     ignorePath: join(import.meta.dirname, '..', '..', '.stylelintignore'),
-    fix: flags.fix,
+    fix: linterFixer,
     files,
     formatter: 'string',
     cache: cacheLinters,
@@ -137,10 +182,10 @@ async function runStylelint(files) {
   });
 
   if (report) {
-    console.log(report);
+    messages.push(report);
   }
 
-  return !errored;
+  return { status: !errored, output: messages.join('\n') };
 }
 
 /**
@@ -152,7 +197,11 @@ async function runStylelint(files) {
  * @param files the input files to analyze.
  */
 async function runLitAnalyzer(files) {
-  debugLogging('[lint]: Running LitAnalyzer...');
+  if (files.length === 0) {
+    return { status: true, output: '' };
+  }
+  const messages = [];
+  debugLogging(messages, '[lint]: Running LitAnalyzer...');
 
   const readLitAnalyzerConfigFromCompilerOptions = () => {
     const { compilerOptions } = JSON.parse(
@@ -170,7 +219,7 @@ async function runLitAnalyzer(files) {
     return tsLitPluginOptions;
   };
 
-  const {rules} = readLitAnalyzerConfigFromCompilerOptions();
+  const { rules } = readLitAnalyzerConfigFromCompilerOptions();
   const getLitAnalyzerResult = async subsetFiles => {
     const args = [
       litAnalyzerExecutablePath(),
@@ -239,14 +288,14 @@ async function runLitAnalyzer(files) {
     // Don't print if no problems are found
     // Mimics the other tools
     if (result.output && !result.output.includes('Found 0 problems')) {
-      console.log(result.output);
+      messages.push(result.output);
     }
     if (result.error) {
-      console.log(result.error);
+      messages.push(result.error);
     }
   }
 
-  return results.every(r => r.status);
+  return { status: results.every(r => r.status), output: messages.join('\n') };
 }
 
 const DEVTOOLS_ROOT_DIR = resolve(import.meta.dirname, '..', '..');
@@ -264,8 +313,12 @@ function shouldIgnoreFile(path) {
   return false;
 }
 
-async function runEslintRulesTypeCheck(_files) {
-  debugLogging('[lint]: Running EsLint custom rules typechecking...');
+async function runEslintRulesTypeCheck(files) {
+  if (files.length === 0) {
+    return { status: true, output: '' };
+  }
+  const messages = [];
+  debugLogging(messages, '[lint]: Running EsLint custom rules typechecking...');
   const tscPath = join(nodeModulesPath(), 'typescript', 'bin', 'tsc');
   const tsConfigEslintRules = join(
     devtoolsRootPath(),
@@ -311,16 +364,28 @@ async function runEslintRulesTypeCheck(_files) {
   const result = await runTypeCheck();
 
   if (result.output) {
-    console.log(result.output);
+    messages.push(result.output);
   }
   if (result.error) {
-    console.log(result.error);
+    messages.push(result.error);
   }
-  return result.status;
+  return { status: result.status, output: messages.join('\n') };
+}
+
+function getFilesToLint() {
+  if (flags.lintOnly) {
+    return ['.'];
+  }
+
+  if (Array.isArray(flags.files)) {
+    return flags.files;
+  }
+
+  return [flags.files];
 }
 
 async function run() {
-  const files = Array.isArray(flags.files) ? flags.files : [flags.files];
+  const files = getFilesToLint();
   const scripts = [];
   const styles = [];
   for (const path of sync(files, {
@@ -338,23 +403,44 @@ async function run() {
     }
   }
 
-  const frontEndFiles = scripts.filter(script => script.includes('front_end'));
+  const frontEndFiles = scripts.filter(script => {
+    // LitAnalyzer is filtered due to high memory usage and noise in
+    // specific large or legacy folders.
+    const isInExcludedFolder = LIT_ANALYZER_EXCLUDED_FOLDERS.some(folder =>
+      script.includes(folder),
+    );
+    return (
+      // Only include front_end files, as we use Lit
+      // only there
+      script.includes('front_end') &&
+      // Don't lint test files as we don't use Lit
+      !script.endsWith('.test.ts') &&
+      !isInExcludedFolder
+    );
+  });
   const esLintRules = scripts.filter(script =>
     script.includes('scripts/eslint_rules'),
   );
 
+  const results = await Promise.allSettled([
+    runESLint(scripts),
+    runLitAnalyzer(frontEndFiles),
+    runStylelint(styles),
+    runEslintRulesTypeCheck(esLintRules),
+  ]);
+
   let succeed = true;
-  if (scripts.length !== 0) {
-    succeed &&= await runESLint(scripts);
-  }
-  if (frontEndFiles.length !== 0) {
-    succeed &&= await runLitAnalyzer(frontEndFiles);
-  }
-  if (styles.length !== 0) {
-    succeed &&= await runStylelint(styles);
-  }
-  if (esLintRules.length !== 0) {
-    succeed &&= await runEslintRulesTypeCheck();
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error(result.reason);
+      succeed = false;
+      continue;
+    }
+    const { status, output } = result.value;
+    succeed &&= status;
+    if (output) {
+      console.log(output);
+    }
   }
 
   return succeed;

@@ -22,18 +22,12 @@ import {
 const GRAPH_SAVINGS_PRECISION = 50;
 
 export function getInsight<InsightName extends keyof InsightModels>(
-    insightName: InsightName, insightSet: InsightSet): InsightModels[InsightName]|null {
-  const insight = insightSet.model[insightName];
-  if (insight instanceof Error) {
-    return null;
-  }
-
-  // For some reason typescript won't narrow the type by removing Error, so do it manually.
-  return insight;
+    insightName: InsightName, insightSet: InsightSet): InsightModels[InsightName] {
+  return insightSet.model[insightName];
 }
 
 export function getLCP(insightSet: InsightSet):
-    {value: Types.Timing.Micro, event: Types.Events.LargestContentfulPaintCandidate}|null {
+    {value: Types.Timing.Micro, event: Types.Events.AnyLargestContentfulPaintCandidate}|null {
   const insight = getInsight(InsightKeys.LCP_BREAKDOWN, insightSet);
   if (!insight || !insight.lcpMs || !insight.lcpEvent) {
     return null;

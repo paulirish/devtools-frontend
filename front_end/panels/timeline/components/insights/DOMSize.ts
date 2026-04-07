@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../../../ui/components/icon_button/icon_button.js';
+import '../../../../ui/kit/kit.js';
 import './Table.js';
-import './NodeLink.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type {DOMSizeInsightModel} from '../../../../models/trace/insights/DOMSize.js';
 import * as Trace from '../../../../models/trace/trace.js';
+import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 import {eventRef} from './EventRef.js';
 import {md} from './Helpers.js';
-import type * as NodeLink from './NodeLink.js';
-import type {TableData, TableDataRow} from './Table.js';
+import {nodeLink} from './NodeLink.js';
+import {Table, type TableDataRow} from './Table.js';
 
 const {UIStrings, i18nString} = Trace.Insights.Models.DOMSize;
 
 const {html} = Lit;
+const {widget} = UI.Widget;
 
 export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
-  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-dom-size`;
   override internalName = 'dom-size';
 
   protected override hasAskAiSupport(): boolean {
@@ -30,37 +30,25 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
   }
 
   #renderNodeTable(domStatsData: Trace.Types.Events.DOMStats['args']['data']): Lit.LitTemplate {
-    const rows: TableData['rows'] = [];
+    const rows: TableDataRow[] = [];
 
     if (domStatsData.maxDepth) {
       const {nodeId, nodeName} = domStatsData.maxDepth;
-      // clang-format off
-      const template = html`
-        <devtools-performance-node-link
-          .data=${{
-            backendNodeId: nodeId,
-            frame: domStatsData.frame,
-            fallbackText: nodeName,
-          } as NodeLink.NodeLinkData}>
-        </devtools-performance-node-link>
-      `;
-      // clang-format on
+      const template = nodeLink({
+        backendNodeId: nodeId,
+        frame: domStatsData.frame,
+        fallbackText: nodeName,
+      });
       rows.push({values: [i18nString(UIStrings.maxDOMDepth), template]});
     }
 
     if (domStatsData.maxChildren) {
       const {nodeId, nodeName} = domStatsData.maxChildren;
-      // clang-format off
-      const template = html`
-        <devtools-performance-node-link
-          .data=${{
-            backendNodeId: nodeId,
-            frame: domStatsData.frame,
-            fallbackText: nodeName,
-          } as NodeLink.NodeLinkData}>
-        </devtools-performance-node-link>
-      `;
-      // clang-format on
+      const template = nodeLink({
+        backendNodeId: nodeId,
+        frame: domStatsData.frame,
+        fallbackText: nodeName,
+      });
       rows.push({values: [i18nString(UIStrings.maxChildren), template]});
     }
 
@@ -70,13 +58,12 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
 
     // clang-format off
     return html`<div class="insight-section">
-      <devtools-performance-table
-        .data=${{
+      ${widget(Table, {
+        data: {
           insight: this,
           headers: [i18nString(UIStrings.statistic), i18nString(UIStrings.element)],
           rows,
-        } as TableData}>
-      </devtools-performance-table>
+        }})}
     </div>`;
     // clang-format on
   }
@@ -100,13 +87,12 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
     // clang-format off
     return html`<div class="insight-section">
       <div class="insight-description">${md(i18nString(UIStrings.topUpdatesDescription))}</div>
-      <devtools-performance-table
-        .data=${{
+      ${widget(Table, {
+        data: {
           insight: this,
           headers: ['', i18nString(UIStrings.duration)],
           rows,
-        } as TableData}>
-      </devtools-performance-table>
+        }})}
     </div>`;
     // clang-format on
   }
@@ -123,8 +109,8 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
 
     // clang-format off
     return html`<div class="insight-section">
-      <devtools-performance-table
-        .data=${{
+      ${widget(Table, {
+        data: {
           insight: this,
           headers: [i18nString(UIStrings.statistic), i18nString(UIStrings.value)],
           rows: [
@@ -132,8 +118,8 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
             {values: [i18nString(UIStrings.maxDOMDepth), domStatsData.maxDepth?.depth ?? 0]},
             {values: [i18nString(UIStrings.maxChildren), domStatsData.maxChildren?.numChildren ?? 0]},
           ],
-        } as TableData}>
-      </devtools-performance-table>
+        },
+      })}>
     </div>
     ${this.#renderNodeTable(domStatsData)}
     ${this.#renderLargeUpdatesTable()}
@@ -141,11 +127,3 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
     // clang-format on
   }
 }
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-performance-dom-size': DOMSize;
-  }
-}
-
-customElements.define('devtools-performance-dom-size', DOMSize);

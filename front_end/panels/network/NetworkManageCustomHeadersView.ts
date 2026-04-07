@@ -1,7 +1,7 @@
 // Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -162,7 +162,9 @@ export class NetworkManageCustomHeadersView extends UI.Widget.VBox implements UI
       if (this.columnConfigs.has(headerId) && item.header !== headerId) {
         valid = false;
       }
-      return {valid, errorMessage: undefined};
+      return {
+        valid,
+      };
     }
   }
 }

@@ -1,4 +1,7 @@
-/*
+/* Copyright 2021 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ *
  * Copyright (C) 2006, 2007, 2008 Apple Inc.  All rights reserved.
  * Copyright (C) 2009 Anthony Ricaud <rik@webkit.org>
  *
@@ -90,17 +93,20 @@
 
 .console-prompt-editor-container {
   min-height: 21px;
+  padding-left: 2px;
+  padding-top: 1px;
 }
 
 .console-message,
 .console-user-command {
   clear: right;
   position: relative;
-  padding: 3px 22px 1px 0;
+  padding: 1px 22px 1px 0;
   margin-left: 24px;
-  min-height: 17px;  /* Sync with ConsoleViewMessage.js */
+  min-height: 18px;
   flex: auto;
   display: flex;
+  align-items: flex-end;
 }
 
 .console-message > * {
@@ -214,8 +220,8 @@
   --console-color-lightcyan: #5ff;
   --console-color-white: #fff;
 
-  &.console-selected {
-    background-color: var(--sys-color-tonal-container);
+  &:focus {
+    background-image: linear-gradient(to bottom, var(--sys-color-state-focus-highlight), var(--sys-color-state-focus-highlight));
   }
 }
 
@@ -329,7 +335,6 @@
   display: inline-block;
   overflow-wrap: break-word;
   max-width: 100%;
-  vertical-align: top;
   margin-top: -1.5px;
 }
 
@@ -430,11 +435,16 @@
     --display-ignored-formatted-stack-frame: var(--display-formatted-stack-frame-default);
   }
 
-  &:has(.formatted-stack-frame .ignore-list-link):has(.formatted-stack-frame .devtools-link:not(.ignore-list-link)) {
+  &:has(.formatted-stack-frame .ignore-list-link):has(.formatted-stack-frame .devtools-link:not(.ignore-list-link)),
+  &:has(.formatted-stack-frame .ignore-list-link):has(.stack-preview-container.has-non-ignored-links) {
     /* If there are ignored frames and unignored frames, then we want
     to enable the show more/less links. To do that we override some
     variables to always display the structured stack trace, but possibly
-    only the links at the bottom of it, as we share its show more/less links. */
+    only the links at the bottom of it, as we share its show more/less links.
+    We also check the structured stack trace (StackTracePreviewContent) for
+    non-ignored links, so that when all inline Error frames are ignored but
+    the console.error() call stack has non-ignored frames (e.g. in async
+    traces), the toggle is still shown. See crbug.com/379788109. */
     --override-display-stack-preview-toggle-link: table-row;
     --override-display-stack-preview-hidden-div: block;
 
@@ -481,11 +491,6 @@
   margin-left: 4px;
 }
 
-.cookie-report-anchor {
-  margin-top: -3px;
-  margin-bottom: -5px;
-}
-
 .console-message-nowrap-below,
 .console-message-nowrap-below div,
 .console-message-nowrap-below span {
@@ -522,7 +527,6 @@
 }
 
 .console-view-pinpane {
-  flex: none;
   max-height: 50%;
 }
 
@@ -534,7 +538,7 @@
   height: 0;
 }
 
-devtools-console-insight {
+.devtools-console-insight {
   margin: 9px 22px 11px 24px;
 }
 
@@ -627,6 +631,10 @@ devtools-console-insight {
       }
     }
   }
+}
+
+.ai-code-completion-summary-toolbar-container {
+  container-type: inline-size;
 }
 
 @media (forced-colors: active) {

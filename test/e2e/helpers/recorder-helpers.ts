@@ -3,25 +3,21 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type {Page} from 'puppeteer-core';
 
 import type {UserFlow} from '../../../front_end/panels/recorder/models/Schema.js';
 import type * as Recorder from '../../../front_end/panels/recorder/recorder.js';
 import {
-  platform,
   selectOption,
 } from '../../../test/shared/helper.js';
-import type {DevToolsPage} from '../../e2e_non_hosted/shared/frontend-helper.js';
-import type {InspectedPage} from '../../e2e_non_hosted/shared/target-helper.js';
+import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {InspectedPage} from '../shared/target-helper.js';
 
 import {openCommandMenu} from './quick_open-helpers.js';
 
 const RECORDER_CONTROLLER_TAG_NAME = 'devtools-recorder-controller' as const;
 const TEST_RECORDING_NAME = 'New Recording';
-const ControlOrMeta = platform === 'mac' ? 'Meta' : 'Control';
 
 export async function record(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-  await inspectedPage.bringToFront();
   await devToolsPage.bringToFront();
   await devToolsPage.page.waitForSelector('pierce/.settings');
   await inspectedPage.bringToFront();
@@ -85,10 +81,7 @@ export async function enableAndOpenRecorderPanel(
   await openRecorderPanel(devToolsPage);
 }
 
-async function createRecording(name: string, selectorAttribute?: string, devToolsPage?: DevToolsPage) {
-  if (!devToolsPage) {
-    throw new Error('DevToolsPage was not provided');
-  }
+async function createRecording(name: string, selectorAttribute: string|undefined, devToolsPage: DevToolsPage) {
   const newRecordingButton = await devToolsPage.waitForAria('Create recording');
   await newRecordingButton.click();
   const input = await devToolsPage.waitForAria('RECORDING NAME');
@@ -101,13 +94,11 @@ async function createRecording(name: string, selectorAttribute?: string, devTool
   }
 }
 
-export async function createAndStartRecording(name?: string, selectorAttribute?: string, devToolsPage?: DevToolsPage) {
-  if (!devToolsPage) {
-    throw new Error('DevToolsPage was not provided');
-  }
+export async function createAndStartRecording(
+    name: string|undefined, selectorAttribute: string|undefined, devToolsPage: DevToolsPage) {
   await createRecording(name ?? TEST_RECORDING_NAME, selectorAttribute, devToolsPage);
   const onRecordingStarted = onRecordingStateChanged(devToolsPage);
-  await devToolsPage.click('devtools-control-button');
+  await devToolsPage.click('.control-button');
   await devToolsPage.waitFor('.recording-view');
   await onRecordingStarted;
 }
@@ -115,7 +106,7 @@ export async function createAndStartRecording(name?: string, selectorAttribute?:
 export async function changeNetworkConditions(condition: string, devToolsPage: DevToolsPage) {
   await openCommandMenu(devToolsPage);
   await devToolsPage.typeText('Show Network');
-  await devToolsPage.page.keyboard.press('Enter');
+  await devToolsPage.pressKey('Enter');
   await devToolsPage.page.waitForSelector('pierce/select[aria-label="Throttling"]');
   await devToolsPage.page.select('pierce/select[aria-label="Throttling"]', condition);
 }
@@ -123,7 +114,7 @@ export async function changeNetworkConditions(condition: string, devToolsPage: D
 export async function openRecorderPanel(devToolsPage: DevToolsPage) {
   await openCommandMenu(devToolsPage);
   await devToolsPage.typeText('Show Recorder');
-  await devToolsPage.page.keyboard.press('Enter');
+  await devToolsPage.pressKey('Enter');
   await devToolsPage.waitFor(RECORDER_CONTROLLER_TAG_NAME);
 }
 
@@ -156,7 +147,7 @@ export async function startRecording(
 
 export async function stopRecording(devToolsPage: DevToolsPage): Promise<UserFlow> {
   await devToolsPage.bringToFront();
-  await raf(devToolsPage.page);
+  await devToolsPage.raf();
   const onRecordingStopped = onRecordingStateChanged(devToolsPage);
   await devToolsPage.click('aria/End recording');
   return await onRecordingStopped;
@@ -280,7 +271,7 @@ export async function setupRecorderWithScriptAndReplay(
     ): Promise<void> {
   await setupRecorderWithScript(script, path, devToolsPage, inspectedPage);
   const onceFinished = onReplayFinished(devToolsPage);
-  await clickSelectButtonItem('Normal (Default)', 'devtools-replay-section', devToolsPage);
+  await clickSelectButtonItem('Normal (Default)', '.select-button', devToolsPage);
   await onceFinished;
 }
 
@@ -292,7 +283,7 @@ export async function getCurrentRecording(
   const recording = (await controller?.evaluate(
       el => JSON.stringify(el.getUserFlow()),
       ));
-  return JSON.parse(recording);
+  return JSON.parse(recording ?? '');
 }
 
 export async function startOrStopRecordingShortcut(
@@ -300,13 +291,11 @@ export async function startOrStopRecordingShortcut(
     devToolsPage: DevToolsPage,
     inspectedPage: InspectedPage,
 ) {
-  const executeOn = execute === 'devToolsPage' ? devToolsPage.page : inspectedPage.page;
+  const executeOn = execute === 'devToolsPage' ? devToolsPage : inspectedPage;
   const onRecordingStarted = onRecordingStateChanged(devToolsPage);
   await executeOn.bringToFront();
-  await executeOn.keyboard.down(ControlOrMeta);
-  await executeOn.keyboard.down('e');
-  await executeOn.keyboard.up(ControlOrMeta);
-  await executeOn.keyboard.up('e');
+
+  await executeOn.pressKey('e', {control: true});
 
   await devToolsPage.waitFor('.recording-view');
   return await onRecordingStarted;
@@ -334,25 +323,13 @@ export async function replayShortcut(
     devToolsPage: DevToolsPage,
 ) {
   await devToolsPage.bringToFront();
-  await devToolsPage.page.keyboard.down(ControlOrMeta);
-  await devToolsPage.page.keyboard.down('Enter');
-  await devToolsPage.page.keyboard.up(ControlOrMeta);
-  await devToolsPage.page.keyboard.up('Enter');
+  await devToolsPage.pressKey('Enter', {control: true});
 }
 
 export async function toggleCodeView(
     devToolsPage: DevToolsPage,
 ) {
   await devToolsPage.bringToFront();
-  await devToolsPage.page.keyboard.down(ControlOrMeta);
-  await devToolsPage.page.keyboard.down('b');
-  await devToolsPage.page.keyboard.up(ControlOrMeta);
-  await devToolsPage.page.keyboard.up('b');
+  await devToolsPage.pressKey('b', {control: true});
   await devToolsPage.drainTaskQueue();
-}
-
-export async function raf(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    return new Promise(resolve => window.requestAnimationFrame(resolve));
-  });
 }

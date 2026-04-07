@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
@@ -523,7 +523,7 @@ async function getArgumentsForExpression(
   }
   const expression = doc.sliceString(callee.from, callee.to);
   const result = await evaluateExpression(context, expression, 'argumentsHint');
-  if (!result || result.type !== 'function') {
+  if (result?.type !== 'function') {
     return null;
   }
   const objGetter = async(): Promise<SDK.RemoteObject.RemoteObject|null> => {

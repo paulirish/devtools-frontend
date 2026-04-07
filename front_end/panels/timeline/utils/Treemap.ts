@@ -77,7 +77,6 @@ export function makeScriptNode(src: string, sourceRoot: string, sourcesData: Rec
     return {
       name,
       resourceBytes: 0,
-      encodedBytes: undefined,
     };
   }
 
@@ -132,7 +131,7 @@ export function makeScriptNode(src: string, sourceRoot: string, sourcesData: Rec
    * Collapse nodes that have only one child.
    */
   function collapseAll(node: TreemapNode): void {
-    while (node.children && node.children.length === 1) {
+    while (node.children?.length === 1) {
       const child = node.children[0];
       node.name += '/' + child.name;
       if (child.duplicatedNormalizedModuleName) {
@@ -215,7 +214,6 @@ export function createTreemapData(
       for (const [source, resourceBytes] of Object.entries(sizes.files)) {
         const sourceData: SourceData = {
           resourceBytes,
-          encodedBytes: undefined,
         };
 
         const key = Trace.Extras.ScriptDuplication.normalizeSource(source);
@@ -239,7 +237,6 @@ export function createTreemapData(
       node = {
         name,
         resourceBytes: script.content?.length ?? 0,
-        encodedBytes: undefined,
       };
     }
 
@@ -252,7 +249,6 @@ export function createTreemapData(
         htmlNode = {
           name,
           resourceBytes: 0,
-          encodedBytes: undefined,
           children: [],
         };
         htmlNodesByFrameId.set(script.frame, htmlNode);

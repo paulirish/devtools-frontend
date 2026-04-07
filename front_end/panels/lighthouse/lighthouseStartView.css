@@ -26,6 +26,12 @@
   margin-bottom: 16px;
 }
 
+.lighthouse-start-view .lighthouse-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: normal;
+}
+
 .lighthouse-logo {
   width: 75px;
   height: 75px;
@@ -44,6 +50,12 @@
 .lighthouse-form-section {
   padding: 8px;
   flex: 1 1;
+}
+
+.lighthouse-form-categories-fieldset {
+  border: none;
+  margin: 0;
+  padding: 8px;
 }
 
 .lighthouse-form-section-label {

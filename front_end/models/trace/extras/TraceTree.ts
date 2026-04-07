@@ -397,6 +397,7 @@ export class BottomUpRootNode extends Node {
     const root = this;
     const startTime = this.startTime;
     const endTime = this.endTime;
+    const idStack: string[] = [];
     const nodeById = new Map<string, Node>();
     const selfTimeStack: number[] = [endTime - startTime];
     const firstNodeStack: boolean[] = [];
@@ -460,6 +461,13 @@ export class BottomUpRootNode extends Node {
       if (forceGroupIdCallback && eventGroupIdCallback) {
         id = `${id}-${eventGroupIdCallback(e)}`;
       }
+
+      idStack.push(id);
+
+      // For an event 'X' that contains another event 'X' (resolving to the same node
+      // id), we need to measure `totalTime` from the start of the outermost 'X' to
+      // its corresponding end. This logic ensures we don't double-count the duration
+      // of the inner event.
       const noNodeOnStack = !totalTimeById.has(id);
       if (noNodeOnStack) {
         totalTimeById.set(id, duration);
@@ -468,10 +476,11 @@ export class BottomUpRootNode extends Node {
     }
 
     function onEndEvent(event: Types.Events.Event): void {
-      let id = generateEventID(event);
-      if (forceGroupIdCallback && eventGroupIdCallback) {
-        id = `${id}-${eventGroupIdCallback(event)}`;
+      const id = idStack.pop();
+      if (!id) {
+        return;
       }
+
       let node = nodeById.get(id);
       if (!node) {
         node = new BottomUpNode(root, id, event, false, root);
@@ -484,7 +493,10 @@ export class BottomUpRootNode extends Node {
         node.totalTime += totalTimeById.get(id) || 0;
         totalTimeById.delete(id);
       }
-      if (firstNodeStack.length) {
+
+      // An item on this stack means that this current node has a caller. Therefore,
+      // in a bottom-up view it has children.
+      if (idStack.length > 0) {
         node.setHasChildren(true);
       }
     }
@@ -675,7 +687,7 @@ export function generateEventID(event: Types.Events.Event): string {
         SamplesIntegrator.nativeGroup(event.callFrame.functionName) :
         event.callFrame.functionName;
     const location = event.callFrame.scriptId || event.callFrame.url || '';
-    return `f:${name}@${location}`;
+    return `f:${name}@${location}:${event.callFrame.lineNumber}:${event.callFrame.columnNumber}`;
   }
 
   if (Types.Events.isConsoleTimeStamp(event) && event.args.data) {

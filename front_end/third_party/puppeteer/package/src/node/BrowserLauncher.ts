@@ -30,6 +30,10 @@ import {TimeoutError} from '../common/Errors.js';
 import type {SupportedBrowser} from '../common/SupportedBrowser.js';
 import {debugError, DEFAULT_VIEWPORT} from '../common/util.js';
 import type {Viewport} from '../common/Viewport.js';
+import {
+  createIncrementalIdGenerator,
+  type GetIdFn,
+} from '../util/incremental-id-generator.js';
 
 import type {ChromeReleaseChannel, LaunchOptions} from './LaunchOptions.js';
 import {NodeWebSocketTransport as WebSocketTransport} from './NodeWebSocketTransport.js';
@@ -87,6 +91,8 @@ export abstract class BrowserLauncher {
       timeout = 30000,
       waitForInitialPage = true,
       protocolTimeout,
+      handleDevToolsAsPage,
+      idGenerator = createIncrementalIdGenerator(),
     } = options;
 
     let {protocol} = options;
@@ -139,6 +145,7 @@ export abstract class BrowserLauncher {
       env,
       pipe: usePipe,
       onExit: onProcessExit,
+      signal: options.signal,
     });
 
     let browser: Browser;
@@ -165,6 +172,7 @@ export abstract class BrowserLauncher {
             defaultViewport,
             acceptInsecureCerts,
             networkEnabled,
+            idGenerator,
           },
         );
       } else {
@@ -173,12 +181,14 @@ export abstract class BrowserLauncher {
             timeout,
             protocolTimeout,
             slowMo,
+            idGenerator,
           });
         } else {
           cdpConnection = await this.createCdpSocketConnection(browserProcess, {
             timeout,
             protocolTimeout,
             slowMo,
+            idGenerator,
           });
         }
 
@@ -206,20 +216,30 @@ export abstract class BrowserLauncher {
             undefined,
             undefined,
             networkEnabled,
+            handleDevToolsAsPage,
           );
         }
       }
     } catch (error) {
       void browserCloseCallback();
+      const logs = browserProcess.getRecentLogs().join('\n');
       if (
-        browserProcess.getRecentLogs().some(line => {
-          return line.includes(
-            'Failed to create a ProcessSingleton for your profile directory',
-          );
-        })
+        logs.includes(
+          'Failed to create a ProcessSingleton for your profile directory',
+        ) ||
+        // On Windows we will not get logs due to the singleton process
+        // handover. See
+        // https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/process_singleton_win.cc;l=46;drc=fc7952f0422b5073515a205a04ec9c3a1ae81658
+        (process.platform === 'win32' &&
+          existsSync(join(launchArgs.userDataDir, 'lockfile')))
       ) {
         throw new Error(
           `The browser is already running for ${launchArgs.userDataDir}. Use a different \`userDataDir\` or stop the running browser first.`,
+        );
+      }
+      if (logs.includes('Missing X server') && options.headless === false) {
+        throw new Error(
+          `Missing X server to start the headful browser. Either set headless to true or use xvfb-run to run your Puppeteer script.`,
         );
       }
       if (error instanceof BrowsersTimeoutError) {
@@ -331,6 +351,7 @@ export abstract class BrowserLauncher {
       timeout: number;
       protocolTimeout: number | undefined;
       slowMo: number;
+      idGenerator: GetIdFn;
     },
   ): Promise<Connection> {
     const browserWSEndpoint = await browserProcess.waitForLineOutput(
@@ -343,6 +364,8 @@ export abstract class BrowserLauncher {
       transport,
       opts.slowMo,
       opts.protocolTimeout,
+      /* rawErrors */ false,
+      opts.idGenerator,
     );
   }
 
@@ -355,6 +378,7 @@ export abstract class BrowserLauncher {
       timeout: number;
       protocolTimeout: number | undefined;
       slowMo: number;
+      idGenerator: GetIdFn;
     },
   ): Promise<Connection> {
     // stdio was assigned during start(), and the 'pipe' option there adds the
@@ -364,7 +388,14 @@ export abstract class BrowserLauncher {
       pipeWrite as NodeJS.WritableStream,
       pipeRead as NodeJS.ReadableStream,
     );
-    return new Connection('', transport, opts.slowMo, opts.protocolTimeout);
+    return new Connection(
+      '',
+      transport,
+      opts.slowMo,
+      opts.protocolTimeout,
+      /* rawErrors */ false,
+      opts.idGenerator,
+    );
   }
 
   /**
@@ -406,6 +437,7 @@ export abstract class BrowserLauncher {
       timeout: number;
       protocolTimeout: number | undefined;
       slowMo: number;
+      idGenerator: GetIdFn;
       defaultViewport: Viewport | null;
       acceptInsecureCerts?: boolean;
       networkEnabled?: boolean;
@@ -421,6 +453,7 @@ export abstract class BrowserLauncher {
     const bidiConnection = new BiDi.BidiConnection(
       browserWSEndpoint,
       transport,
+      opts.idGenerator,
       opts.slowMo,
       opts.protocolTimeout,
     );

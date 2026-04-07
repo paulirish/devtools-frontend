@@ -15,6 +15,7 @@ generate_css("css_files") {
     "callStackSidebarPane.css",
     "debuggerPausedMessage.css",
     "dialog.css",
+    "filteredUISourceCodeListProvider.css",
     "navigatorTree.css",
     "navigatorView.css",
     "scopeChainSidebarPane.css",
@@ -26,7 +27,7 @@ generate_css("css_files") {
   ]
 }
 
-devtools_module("sources") {
+devtools_ui_module("sources") {
   sources = [
     "AddSourceMapURLDialog.ts",
     "AiCodeCompletionPlugin.ts",
@@ -48,6 +49,7 @@ devtools_module("sources") {
     "NavigatorView.ts",
     "OpenFileQuickOpen.ts",
     "OutlineQuickOpen.ts",
+    "PersistenceActions.ts",
     "Plugin.ts",
     "ProfilePlugin.ts",
     "ResourceOriginPlugin.ts",
@@ -71,7 +73,11 @@ devtools_module("sources") {
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../entrypoints/formatter_worker:bundle",
+    "../../generated:protocol",
+    "../../models/ai_assistance:bundle",
     "../../models/ai_code_completion:bundle",
+    "../../models/badges:bundle",
     "../../models/bindings:bundle",
     "../../models/breakpoints:bundle",
     "../../models/extensions:bundle",
@@ -80,6 +86,7 @@ devtools_module("sources") {
     "../../models/issues_manager:bundle",
     "../../models/persistence:bundle",
     "../../models/source_map_scopes:bundle",
+    "../../models/stack_trace:bundle",
     "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../models/workspace_diff:bundle",
@@ -88,20 +95,30 @@ devtools_module("sources") {
     "../../panels/search:bundle",
     "../../panels/snippets:bundle",
     "../../panels/utils:bundle",
+    "../../third_party/codemirror.next:bundle",
     "../../third_party/diff:bundle",
     "../../ui/components/buttons:bundle",
-    "../../ui/components/icon_button:bundle",
+    "../../ui/components/highlighting:bundle",
+    "../../ui/components/input:bundle",
+    "../../ui/components/issue_counter:bundle",
+    "../../ui/components/render_coordinator:bundle",
     "../../ui/components/spinners:bundle",
     "../../ui/components/text_editor:bundle",
     "../../ui/components/tooltips:bundle",
+    "../../ui/i18n:bundle",
+    "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/color_picker:bundle",
     "../../ui/legacy/components/inline_editor:bundle",
     "../../ui/legacy/components/object_ui:bundle",
+    "../../ui/legacy/components/perf_ui:bundle",
     "../../ui/legacy/components/quick_open:bundle",
+    "../../ui/legacy/components/settings_ui:bundle",
     "../../ui/legacy/components/source_frame:bundle",
     "../../ui/legacy/components/utils:bundle",
+    "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
+    "../common:bundle",
     "../utils:bundle",
     "./components:bundle",
   ]
@@ -138,6 +155,7 @@ devtools_entrypoint("meta") {
     "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../models/breakpoints:bundle",
+    "../../models/stack_trace:bundle",
     "../../models/workspace:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/object_ui:bundle",
@@ -147,7 +165,7 @@ devtools_entrypoint("meta") {
   visibility = [ "../../entrypoints/*" ]
 }
 
-ts_library("unittests") {
+devtools_ui_module("unittests") {
   testonly = true
 
   sources = [
@@ -156,6 +174,7 @@ ts_library("unittests") {
     "BreakpointsView.test.ts",
     "BreakpointsViewUtils.test.ts",
     "CSSPlugin.test.ts",
+    "CallStackSidebarPane.test.ts",
     "CoveragePlugin.test.ts",
     "DebuggerPausedMessage.test.ts",
     "DebuggerPlugin.test.ts",
@@ -163,16 +182,20 @@ ts_library("unittests") {
     "FilteredUISourceCodeListProvider.test.ts",
     "NavigatorView.test.ts",
     "OutlineQuickOpen.test.ts",
+    "PersistenceAction.test.ts",
     "ResourceOriginPlugin.test.ts",
     "SourcesNavigator.test.ts",
     "SourcesPanel.test.ts",
     "SourcesView.test.ts",
     "TabbedEditorContainer.test.ts",
+    "ThreadsSidebarPane.test.ts",
     "UISourceCodeFrame.test.ts",
+    "WatchExpressionsSidebarPane.test.ts",
   ]
 
   deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../models/bindings:bundle",
@@ -180,6 +203,9 @@ ts_library("unittests") {
     "../../testing",
     "../../third_party/codemirror.next:bundle",
     "../../ui/components/text_editor:bundle",
+    "../../ui/legacy:bundle",
+    "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/source_frame:bundle",
+    "../../ui/legacy/components/utils:bundle",
   ]
 }

@@ -353,7 +353,8 @@ export function textContentWithLineBreaks(node) {
   let ignoreFirst = false;
   while (currentNode.traverseNextNode(node)) {
     currentNode = currentNode.traverseNextNode(node);
-    if (currentNode.nodeType === Node.TEXT_NODE && currentNode.parentNode?.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+    if (currentNode.nodeType === Node.TEXT_NODE && currentNode.parentNode?.nodeType !== Node.DOCUMENT_FRAGMENT_NODE &&
+        currentNode.parentNode?.nodeName !== 'STYLE') {
       buffer += currentNode.nodeValue;
     } else if (currentNode.nodeName === 'LI' || currentNode.nodeName === 'TR') {
       if (!ignoreFirst) {
@@ -691,7 +692,13 @@ export function startDumpingProtocolMessages() {
 export function addScriptForFrame(url, content, frame) {
   content += '\n//# sourceURL=' + url;
   const executionContext = TestRunner.runtimeModel.executionContexts().find(context => context.frameId === frame.id);
-  TestRunner.RuntimeAgent.evaluate(content, 'console', false, false, executionContext.id);
+  TestRunner.RuntimeAgent.invoke_evaluate({
+    expression: content,
+    objectGroup: 'console',
+    includeCommandLineAPI: false,
+    silent: false,
+    contextId: executionContext.id
+  });
 }
 
 export const formatters = {
@@ -1400,6 +1407,7 @@ export async function dumpInspectedPageElementText(querySelector) {
 export async function waitForPendingLiveLocationUpdates() {
   await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().pendingLiveLocationChangesPromise();
   await Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().pendingLiveLocationChangesPromise();
+  await UI.Widget.Widget.allUpdatesComplete;  // Let async Widgets finish rendering.
 }
 
 /** @type {!{logToStderr: function(), navigateSecondaryWindow: function(string), notifyDone: function()}|undefined} */

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../../generated/protocol.js';
@@ -18,6 +19,7 @@ import {
   dispatchEvent,
 } from '../../../../testing/MockConnection.js';
 import {MockProtocolBackend} from '../../../../testing/MockScopeChain.js';
+import {setMockResourceTree} from '../../../../testing/ResourceTreeHelpers.js';
 import * as UI from '../../legacy.js';
 
 import * as Components from './utils.js';
@@ -36,6 +38,7 @@ function foo(x) {
 
 describeWithMockConnection('Linkifier', () => {
   function setUpEnvironment() {
+    setMockResourceTree(false);
     const target = createTarget();
     const linkifier = new Components.Linkifier.Linkifier(100, false);
     linkifier.targetAdded(target);
@@ -49,9 +52,10 @@ describeWithMockConnection('Linkifier', () => {
       resourceMapping,
       targetManager,
       ignoreListManager,
+      workspace,
     });
     Breakpoints.BreakpointManager.BreakpointManager.instance(
-        {forceNew, targetManager, workspace, debuggerWorkspaceBinding});
+        {forceNew, targetManager, workspace, debuggerWorkspaceBinding, settings: Common.Settings.Settings.instance()});
     const backend = new MockProtocolBackend();
     return {target, linkifier, backend};
   }

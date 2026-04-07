@@ -105,7 +105,6 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    // TODO(crbug.com/445966299): Refactor to use `storageAgent().invoke_getStorageKey()` instead.
     const response = await this.storageAgent.invoke_getStorageKey({frameId});
     if (response.getError() === 'Frame tree node for given frame not found') {
       return null;
@@ -234,12 +233,15 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
   documentOpened(framePayload: Protocol.Page.Frame): void {
     this.frameNavigated(framePayload, undefined);
     const frame = this.framesInternal.get(framePayload.id);
-    if (frame && !frame.getResourcesMap().get(framePayload.url)) {
-      const frameResource = this.createResourceFromFramePayload(
-          framePayload, framePayload.url as Platform.DevToolsPath.UrlString, Common.ResourceType.resourceTypes.Document,
-          framePayload.mimeType, null, null);
-      frameResource.isGenerated = true;
-      frame.addResource(frameResource);
+    if (frame) {
+      this.dispatchEventToListeners(Events.DocumentOpened, frame);
+      if (!frame.getResourcesMap().get(framePayload.url)) {
+        const frameResource = this.createResourceFromFramePayload(
+            framePayload, framePayload.url as Platform.DevToolsPath.UrlString,
+            Common.ResourceType.resourceTypes.Document, framePayload.mimeType, null, null);
+        frameResource.isGenerated = true;
+        frame.addResource(frameResource);
+      }
     }
   }
 
@@ -583,6 +585,7 @@ export enum Events {
   FrameDetached = 'FrameDetached',
   FrameResized = 'FrameResized',
   FrameWillNavigate = 'FrameWillNavigate',
+  DocumentOpened = 'DocumentOpened',
   PrimaryPageChanged = 'PrimaryPageChanged',
   ResourceAdded = 'ResourceAdded',
   WillLoadCachedResources = 'WillLoadCachedResources',
@@ -605,6 +608,7 @@ export interface EventTypes {
   [Events.FrameDetached]: {frame: ResourceTreeFrame, isSwap: boolean};
   [Events.FrameResized]: void;
   [Events.FrameWillNavigate]: ResourceTreeFrame;
+  [Events.DocumentOpened]: ResourceTreeFrame;
   [Events.PrimaryPageChanged]: {frame: ResourceTreeFrame, type: PrimaryPageChangeType};
   [Events.ResourceAdded]: Resource;
   [Events.WillLoadCachedResources]: void;
@@ -642,13 +646,11 @@ export class ResourceTreeFrame {
   #childFrames = new Set<ResourceTreeFrame>();
   resourcesMap = new Map<Platform.DevToolsPath.UrlString, Resource>();
   backForwardCacheDetails: {
-    restoredFromCache: boolean|undefined,
     explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
-    explanationsTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined,
+    restoredFromCache?: boolean,
+    explanationsTree?: Protocol.Page.BackForwardCacheNotRestoredExplanationTree,
   } = {
-    restoredFromCache: undefined,
     explanations: [],
-    explanationsTree: undefined,
   };
 
   constructor(
@@ -721,9 +723,7 @@ export class ResourceTreeFrame {
     this.#crossOriginIsolatedContextType = framePayload.crossOriginIsolatedContextType;
     this.#gatedAPIFeatures = framePayload.gatedAPIFeatures;
     this.backForwardCacheDetails = {
-      restoredFromCache: undefined,
       explanations: [],
-      explanationsTree: undefined,
     };
 
     const mainResource = this.resourcesMap.get(this.#url);
@@ -754,7 +754,7 @@ export class ResourceTreeFrame {
     return this.#domainAndRegistry;
   }
 
-  async getAdScriptAncestry(frameId: Protocol.Page.FrameId): Promise<Protocol.Page.AdScriptAncestry|null> {
+  async getAdScriptAncestry(frameId: Protocol.Page.FrameId): Promise<Protocol.Network.AdAncestry|null> {
     const res = await this.#model.agent.invoke_getAdScriptAncestry({frameId});
     return res.adScriptAncestry || null;
   }
@@ -891,7 +891,7 @@ export class ResourceTreeFrame {
 
   addRequest(request: NetworkRequest): void {
     let resource = this.resourcesMap.get(request.url());
-    if (resource && resource.request === request) {
+    if (resource?.request === request) {
       // Already in the tree, we just got an extra update.
       return;
     }

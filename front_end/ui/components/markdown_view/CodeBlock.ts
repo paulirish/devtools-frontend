@@ -1,15 +1,15 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable @devtools/no-lit-render-outside-of-view, @devtools/enforce-custom-element-definitions-location */
 
-import '../../../ui/legacy/legacy.js'; // for x-link
+import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as CopyToClipboard from '../../../ui/components/copy_to_clipboard/copy_to_clipboard.js';
 import * as TextEditor from '../../../ui/components/text_editor/text_editor.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
@@ -34,6 +34,11 @@ const UIStrings = {
    * @description Disclaimer shown in the code blocks.
    */
   disclaimer: 'Use code snippets with caution',
+  /**
+   * @description The title of the button to show all lines of a code block.
+   * @example {5} PH1
+   */
+  showAllLines: 'Show all lines ({PH1} more)',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/components/markdown_view/CodeBlock.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -130,6 +135,7 @@ export class CodeBlock extends HTMLElement {
   #copied = false;
   #editorState?: CodeMirror.EditorState;
   #languageConf = new CodeMirror.Compartment();
+  #truncationConf = new CodeMirror.Compartment();
   /**
    * Whether to display a notice "​​Use code snippets with caution" in code
    * blocks.
@@ -138,6 +144,7 @@ export class CodeBlock extends HTMLElement {
   #header?: string;
   #showCopyButton = true;
   #citations: Citation[] = [];
+  #displayLimit = Number.MAX_VALUE;
 
   connectedCallback(): void {
     void this.#render();
@@ -152,6 +159,7 @@ export class CodeBlock extends HTMLElement {
         CodeMirror.EditorState.readOnly.of(true),
         CodeMirror.EditorView.lineWrapping,
         this.#languageConf.of(CodeMirror.javascript.javascript()),
+        this.#truncationConf.of([]),
       ],
     });
     void this.#render();
@@ -190,8 +198,17 @@ export class CodeBlock extends HTMLElement {
     this.#citations = citations;
   }
 
+  set displayLimit(value: number) {
+    this.#displayLimit = value;
+    void this.#render();
+  }
+
+  get displayLimit(): number {
+    return this.#displayLimit;
+  }
+
   #onCopy(): void {
-    CopyToClipboard.copyTextToClipboard(this.#code, i18nString(UIStrings.copied));
+    UI.UIUtils.copyTextToClipboard(this.#code, i18nString(UIStrings.copied));
     this.#copied = true;
     void this.#render();
     clearTimeout(this.#timer);
@@ -204,12 +221,9 @@ export class CodeBlock extends HTMLElement {
   #renderNotice(): Lit.TemplateResult {
     // clang-format off
     return html`<p class="notice">
-      <x-link class="link" href="https://support.google.com/legal/answer/13505487" jslog=${
-        VisualLogging.link('code-disclaimer').track({
-          click: true,
-        })}>
+      <devtools-link class="link" href="https://support.google.com/legal/answer/13505487" jslogcontext="code-disclaimer">
         ${i18nString(UIStrings.disclaimer)}
-      </x-link>
+      </devtools-link>
     </p>`;
     // clang-format on
   }
@@ -259,6 +273,9 @@ export class CodeBlock extends HTMLElement {
       throw new Error('Unexpected: trying to render the text editor without editorState');
     }
 
+    const linesCount = this.#editorState.doc.lines;
+    const isTruncated = linesCount > this.#displayLimit;
+
     // clang-format off
     Lit.render(
       html`<div class='codeblock' jslog=${VisualLogging.section('code')}>
@@ -274,6 +291,19 @@ export class CodeBlock extends HTMLElement {
         <div class="code">
           <devtools-text-editor .state=${this.#editorState}></devtools-text-editor>
         </div>
+        ${isTruncated ? html`
+          <div class="show-all-container">
+            <devtools-button
+              .variant=${Buttons.Button.Variant.OUTLINED}
+              .size=${Buttons.Button.Size.SMALL}
+              .jslogContext=${'show-all'}
+              .title=${i18nString(UIStrings.showAllLines, { PH1: linesCount - this.#displayLimit })}
+              @click=${() => {
+              this.displayLimit = Number.MAX_VALUE;
+            }}
+            >${i18nString(UIStrings.showAllLines, { PH1: linesCount - this.#displayLimit })}</devtools-button>
+          </div>
+        ` : Lit.nothing}
       </div>
       ${this.#displayNotice ? this.#renderNotice() : Lit.nothing}
     </div>`,
@@ -291,8 +321,21 @@ export class CodeBlock extends HTMLElement {
     }
 
     const language = await languageFromToken(this.#codeLang);
+    let truncationExtension: CodeMirror.Extension = [];
+    if (isTruncated) {
+      truncationExtension = CodeMirror.EditorView.decorations.of(CodeMirror.Decoration.set(
+          CodeMirror.Decoration.replace({}).range(
+              this.#editorState.doc.line(this.#displayLimit).to,
+              this.#editorState.doc.length,
+              ),
+          ));
+    }
+
     editor.dispatch({
-      effects: this.#languageConf.reconfigure(language),
+      effects: [
+        this.#languageConf.reconfigure(language),
+        this.#truncationConf.reconfigure(truncationExtension),
+      ],
     });
   }
 }

@@ -4,7 +4,9 @@
 
 import type * as Lit from '../../third_party/lit/lit.js';
 
+export type {DirectiveResult} from '../../third_party/lit/lib/directive.js';
 export {
+  AsyncDirective,
   Decorators,
   Directive,
   Directives,

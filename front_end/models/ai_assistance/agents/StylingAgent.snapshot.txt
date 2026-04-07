@@ -57,7 +57,7 @@ Content:
   "function_declarations": [
     {
       "name": "getStyles",
-      "description": "Get computed and source styles for one or multiple elements on the inspected page for multiple elements at once by uid.\n\n**CRITICAL** Use selectors to refer to elements in the text output. Do not use uids.\n**CRITICAL** Always provide the explanation argument to explain what and why you query.",
+      "description": "Get computed and source styles for one or multiple elements on the inspected page for multiple elements at once by uid.\n\n**CRITICAL** An element uid is a number, not a selector.\n**CRITICAL** Use selectors to refer to elements in the text output. Do not use uids.\n**CRITICAL** Always provide the explanation argument to explain what and why you query.\n**CRITICAL** You MUST provide a specific list of CSS property names. Do not use generic values like \"all\" or \"*\".",
       "parameters": {
         "type": 6,
         "description": "",
@@ -70,23 +70,28 @@ Content:
           },
           "elements": {
             "type": 5,
-            "description": "A list of element uids to get data for",
+            "description": "A list of element uids to get data for. These are numbers, not selectors.",
             "items": {
-              "type": 1,
+              "type": 3,
               "description": "An element uid."
             },
             "nullable": false
           },
           "styleProperties": {
             "type": 5,
-            "description": "One or more CSS style property names to fetch.",
+            "description": "One or more specific CSS style property names to fetch. Generic values like \"all\" or \"*\" are not supported.",
             "nullable": false,
             "items": {
               "type": 1,
               "description": "A CSS style property name to retrieve. For example, 'background-color'."
             }
           }
-        }
+        },
+        "required": [
+          "explanation",
+          "elements",
+          "styleProperties"
+        ]
       }
     },
     {
@@ -101,7 +106,7 @@ Content:
             "type": 1,
             "description": "JavaScript code snippet to run on the inspected page. Make sure the code is formatted for readability.\n\n# Instructions\n\n* To return data, define a top-level `data` variable and populate it with data you want to get. Only JSON-serializable objects can be assigned to `data`.\n* If you modify styles on an element, ALWAYS call the pre-defined global `async setElementStyles(el: Element, styles: object)` function. This function is an internal mechanism for you and should never be presented as a command/advice to the user.\n* **CRITICAL** Only get styles that might be relevant to the user request.\n* **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.\n* **CRITICAL** Consider that `data` variable from the previous function calls are not available in a new function call.\n\nFor example, the code to change element styles:\n\n```\nawait setElementStyles($0, {\n  color: 'blue',\n});\n```\n\nFor example, the code to get overlapping elements:\n\n```\nconst data = {\n  overlappingElements: Array.from(document.querySelectorAll('*'))\n    .filter(el => {\n      const rect = el.getBoundingClientRect();\n      const popupRect = $0.getBoundingClientRect();\n      return (\n        el !== $0 &&\n        rect.left < popupRect.right &&\n        rect.right > popupRect.left &&\n        rect.top < popupRect.bottom &&\n        rect.bottom > popupRect.top\n      );\n    })\n    .map(el => ({\n      tagName: el.tagName,\n      id: el.id,\n      className: el.className,\n      zIndex: window.getComputedStyle(el)['z-index']\n    }))\n};\n```\n"
           },
-          "thought": {
+          "explanation": {
             "type": 1,
             "description": "Explain why you want to run this code"
           },
@@ -109,7 +114,36 @@ Content:
             "type": 1,
             "description": "Provide a summary of what the code does. For example, \"Checking related element styles\"."
           }
-        }
+        },
+        "required": [
+          "code",
+          "explanation",
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "activateDeviceEmulation",
+      "description": "Sets emulation viewing mode for a specific device and optionally enables vision deficiency emulation.",
+      "parameters": {
+        "type": 6,
+        "description": "",
+        "nullable": false,
+        "properties": {
+          "deviceName": {
+            "type": 1,
+            "description": "The name of the device to emulate. Allowed values: Pixel 3 XL, Pixel 7, Samsung Galaxy S8+, Samsung Galaxy S20 Ultra, Surface Pro 7, Surface Duo, Galaxy Z Fold 5, Asus Zenbook Fold, Samsung Galaxy A51/71, Nest Hub Max, Nest Hub, iPhone 4, iPhone 5/SE, iPhone 6/7/8, iPhone SE, iPhone XR, iPhone 12 Pro, iPhone 14 Pro Max, iPad Mini, iPad Air, iPad Pro.",
+            "nullable": false
+          },
+          "visionDeficiency": {
+            "type": 1,
+            "description": "Optional vision deficiency to emulate. Allowed values: blurredVision, reducedContrast, achromatopsia, deuteranopia, protanopia, tritanopia.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "deviceName"
+        ]
       }
     }
   ],
@@ -119,7 +153,7 @@ Content:
   "metadata": {
     "disable_user_content_logging": false,
     "string_session_id": "sessionId",
-    "user_tier": 2,
+    "user_tier": 3,
     "client_version": "unit_test+function_calling"
   },
   "functionality_type": 5,
@@ -145,7 +179,7 @@ Content:
           "name": "executeJavaScript",
           "args": {
             "title": "title2",
-            "thought": "thought2",
+            "explanation": "thought2",
             "code": "action2"
           }
         }
@@ -181,12 +215,7 @@ Title: StylingAgent run generates an answer immediately
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -249,7 +278,7 @@ Content:
             "name": "executeJavaScript",
             "args": {
               "code": "const data = {\"test\": \"observation\"}",
-              "thought": "I am thinking.",
+              "explanation": "I am thinking.",
               "title": "thinking"
             }
           }
@@ -265,12 +294,7 @@ Title: StylingAgent run generates an rpcId for the answer
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -294,12 +318,7 @@ Title: StylingAgent run throws an error based on the attribution metadata includ
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -326,12 +345,7 @@ Title: StylingAgent run does not throw an error based on attribution metadata no
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -355,12 +369,7 @@ Title: StylingAgent run generates a response if nothing is returned
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -382,12 +391,7 @@ Title: StylingAgent run generates an action response if action and answer both p
 Content:
 [
   {
-    "type": "user-query",
-    "query": "test"
-  },
-  {
     "type": "context",
-    "title": "Analyzing the prompt",
     "details": [
       {
         "title": "Data used",
@@ -397,6 +401,11 @@ Content:
   },
   {
     "type": "querying"
+  },
+  {
+    "type": "answer",
+    "text": "this is my text before the actual answer",
+    "complete": true
   },
   {
     "type": "thought",
@@ -436,7 +445,7 @@ Content:
         "functionCall": {
           "name": "executeJavaScript",
           "args": {
-            "thought": "thought 1",
+            "explanation": "thought 1",
             "title": "test",
             "code": "console.log('test')"
           }
@@ -464,7 +473,7 @@ Content:
         "functionCall": {
           "name": "executeJavaScript",
           "args": {
-            "thought": "thought 2",
+            "explanation": "thought 2",
             "title": "test",
             "code": "console.log('test')"
           }
@@ -492,7 +501,7 @@ Content:
         "functionCall": {
           "name": "executeJavaScript",
           "args": {
-            "thought": "thought 3",
+            "explanation": "thought 3",
             "title": "test",
             "code": "console.log('test')"
           }

@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -35,7 +35,10 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Geometry from '../../models/geometry/geometry.js';
 import * as Lit from '../../ui/lit/lit.js';
 
-import {createShadowRootWithCoreStyles} from './UIUtils.js';
+import {appendStyle, deepActiveElement} from './DOMUtilities.js';
+import {cloneCustomElement, createShadowRootWithCoreStyles} from './UIUtils.js';
+
+const {html} = Lit;
 
 // Remember the original DOM mutation methods here, since we
 // will override them below to sanity check the Widget system.
@@ -50,8 +53,8 @@ function assert(condition: unknown, message: string): void {
   }
 }
 
-type WidgetConstructor<WidgetT extends Widget> = new (element: WidgetElement<WidgetT>) => WidgetT;
-type WidgetProducer<WidgetT extends Widget> = (element: WidgetElement<WidgetT>) => WidgetT;
+type WidgetConstructor<WidgetT extends Widget> = new (element: HTMLElement) => WidgetT;
+type WidgetProducer<WidgetT extends Widget> = (element: HTMLElement) => WidgetT;
 type WidgetFactory<WidgetT extends Widget> = WidgetConstructor<WidgetT>|WidgetProducer<WidgetT>;
 type InferWidgetTFromFactory<F> = F extends WidgetFactory<infer WidgetT>? WidgetT : never;
 
@@ -68,83 +71,205 @@ export function widgetConfig<F extends WidgetFactory<Widget>, ParamKeys extends 
   return new WidgetConfig(widgetClass, widgetParams);
 }
 
-export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
-  #widgetClass?: WidgetFactory<WidgetT>;
-  #widgetParams?: Partial<WidgetT>;
+let currentUpdateQueue: Map<Widget, PromiseWithResolvers<void>>|null = null;
+const currentlyProcessed = new Set<Widget>();
+let nextUpdateQueue = new Map<Widget, PromiseWithResolvers<void>>();
+let pendingAnimationFrame: number|null = null;
+let overallUpdatePromise: PromiseWithResolvers<void>|null = null;
 
-  createWidget(): WidgetT {
-    const widget = this.#instantiateWidget();
-    if (this.#widgetParams) {
-      Object.assign(widget, this.#widgetParams);
-    }
-    widget.requestUpdate();
-    return widget;
+function enqueueIntoNextUpdateQueue(widget: Widget): Promise<void> {
+  const scheduledUpdate = nextUpdateQueue.get(widget) ?? Promise.withResolvers<void>();
+  nextUpdateQueue.delete(widget);
+  nextUpdateQueue.set(widget, scheduledUpdate);
+  if (pendingAnimationFrame === null) {
+    pendingAnimationFrame = requestAnimationFrame(runNextUpdate);
   }
+  return scheduledUpdate.promise;
+}
 
-  #instantiateWidget(): WidgetT {
-    if (!this.#widgetClass) {
-      throw new Error('No widgetClass defined');
+function enqueueWidgetUpdate(widget: Widget): Promise<void> {
+  if (currentUpdateQueue) {
+    if (currentlyProcessed.has(widget)) {
+      return enqueueIntoNextUpdateQueue(widget);
     }
-
-    if (Widget.isPrototypeOf(this.#widgetClass)) {
-      const ctor = this.#widgetClass as WidgetConstructor<WidgetT>;
-      return new ctor(this);
-    }
-
-    const factory = this.#widgetClass as WidgetProducer<WidgetT>;
-    return factory(this);
+    const scheduledUpdate = currentUpdateQueue.get(widget) ?? Promise.withResolvers<void>();
+    currentUpdateQueue.delete(widget);
+    currentUpdateQueue.set(widget, scheduledUpdate);
+    return scheduledUpdate.promise;
   }
+  return enqueueIntoNextUpdateQueue(widget);
+}
 
-  set widgetConfig(config: WidgetConfig<WidgetT>) {
-    const widget = Widget.get(this);
-    if (widget) {
-      let needsUpdate = false;
-      for (const key in config.widgetParams) {
-        if (config.widgetParams.hasOwnProperty(key) && config.widgetParams[key] !== this.#widgetParams?.[key]) {
-          needsUpdate = true;
+function cancelUpdate(widget: Widget): void {
+  widget.cancelUpdateController();
+  if (currentUpdateQueue) {
+    const scheduledUpdate = currentUpdateQueue.get(widget);
+    if (scheduledUpdate) {
+      scheduledUpdate.resolve();
+      currentUpdateQueue.delete(widget);
+    }
+  }
+  const scheduledUpdate = nextUpdateQueue.get(widget);
+  if (scheduledUpdate) {
+    scheduledUpdate.resolve();
+    nextUpdateQueue.delete(widget);
+  }
+}
+
+function runNextUpdate(): void {
+  pendingAnimationFrame = null;
+  if (!currentUpdateQueue) {
+    currentUpdateQueue = nextUpdateQueue;
+    nextUpdateQueue = new Map();
+  }
+  for (const [widget, {resolve}] of currentUpdateQueue) {
+    currentlyProcessed.add(widget);
+    void (async () => {
+      try {
+        const controller = new AbortController();
+        widget.addUpdateController(controller);
+        await widget.performUpdate(controller.signal);
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          throw e;
         }
+      } finally {
+        resolve();
       }
-      if (needsUpdate) {
-        Object.assign(widget, config.widgetParams);
-        widget.requestUpdate();
+    })();
+  }
+  currentUpdateQueue.clear();
+  queueMicrotask(() => {
+    if (currentUpdateQueue && currentUpdateQueue.size > 0) {
+      runNextUpdate();
+    } else {
+      currentUpdateQueue = null;
+      currentlyProcessed.clear();
+      if (!pendingAnimationFrame && overallUpdatePromise) {
+        overallUpdatePromise.resolve();
+        overallUpdatePromise = null;
       }
     }
-    this.#widgetClass = config.widgetClass;
-    this.#widgetParams = config.widgetParams;
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const widgetConfigs = new WeakMap<HTMLElement, WidgetConfig<any>>();
+
+export function registerWidgetConfig<WidgetT extends Widget>(
+    element: HTMLElement, config: WidgetConfig<WidgetT>): void {
+  if (!widgetConfigs.has(element)) {
+    setUpLifecycleTracking(element);
   }
+  widgetConfigs.set(element, config);
+}
+
+function instantiateWidget<WidgetT extends Widget>(element: HTMLElement, widgetConfig: WidgetConfig<WidgetT>): WidgetT {
+  if (!widgetConfig.widgetClass) {
+    throw new Error('No widgetClass defined');
+  }
+
+  let newWidget: WidgetT;
+  if (Widget.isPrototypeOf(widgetConfig.widgetClass)) {
+    const ctor = widgetConfig.widgetClass as WidgetConstructor<WidgetT>;
+    newWidget = new ctor(element);
+  } else {
+    const factory = widgetConfig.widgetClass as WidgetProducer<WidgetT>;
+    newWidget = factory(element);
+  }
+
+  if (widgetConfig.widgetParams) {
+    Object.assign(newWidget, widgetConfig.widgetParams);
+  }
+  newWidget.requestUpdate();
+  return newWidget;
+}
+
+function setUpLifecycleTracking<WidgetT extends Widget>(element: HTMLElement): void {
+  let tracker: WidgetElement<WidgetT>;
+  if (element instanceof WidgetElement) {
+    tracker = element as WidgetElement<WidgetT>;
+  } else {
+    tracker = document.createElement('devtools-widget') as WidgetElement<WidgetT>;
+    tracker.style.display = 'none';
+    element.appendChild(tracker);
+  }
+
+  tracker.onDisconnect = () => {
+    const widget = Widget.get(element);
+    if (widget) {
+      widget.setHideOnDetach();
+      widget.detach();
+    }
+  };
+  tracker.onConnect = () => {
+    let widget = Widget.get(element) as WidgetT;
+    if (!widget) {
+      const config = widgetConfigs.get(element);
+      if (!config) {
+        throw new Error('No widgetConfig defined');
+      }
+      widget = instantiateWidget(element, config);
+    }
+    const parent = element.parentElementOrShadowHost() as HTMLElement | null;
+    if (!parent) {
+      widget.markAsRoot();
+    }
+    widget.show(parent as HTMLElement, undefined, /* suppressOrphanWidgetError= */ true);
+  };
+}
+
+export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
+  onDisconnect?: () => void;
+  onConnect?: () => void;
+  #disconnectTimeout?: ReturnType<typeof setTimeout>;
 
   getWidget(): WidgetT|undefined {
     return Widget.get(this) as WidgetT | undefined;
   }
 
   connectedCallback(): void {
-    const widget = Widget.getOrCreateWidget(this);
-    if (!widget.element.parentElement) {
-      widget.markAsRoot();
+    if (this.#disconnectTimeout) {
+      clearTimeout(this.#disconnectTimeout);
+      this.#disconnectTimeout = undefined;
     }
-    widget.show(this.parentElement as HTMLElement, undefined, /* suppressOrphanWidgetError= */ true);
+    if (this.onConnect) {
+      this.onConnect();
+      return;
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.onDisconnect) {
+      this.#disconnectTimeout = setTimeout(() => {
+        this.onDisconnect?.();
+      }, 0);
+      return;
+    }
   }
 
   override appendChild<T extends Node>(child: T): T {
-    if (child instanceof HTMLElement && child.tagName !== 'STYLE') {
-      Widget.getOrCreateWidget(child).show(this);
+    const widget = child instanceof HTMLElement ? Widget.get(child) : null;
+    if (widget) {
+      widget.show(this, undefined, /* suppressOrphanWidgetError= */ true);
       return child;
     }
     return super.appendChild(child);
   }
 
   override insertBefore<T extends Node>(child: T, referenceChild: Node): T {
-    if (child instanceof HTMLElement && child.tagName !== 'STYLE') {
-      Widget.getOrCreateWidget(child).show(this, referenceChild, true);
+    const widget = child instanceof HTMLElement ? Widget.get(child) : null;
+    if (widget) {
+      widget.show(this, referenceChild, /* suppressOrphanWidgetError= */ true);
       return child;
     }
     return super.insertBefore(child, referenceChild);
   }
 
   override removeChild<T extends Node>(child: T): T {
-    const childWidget = Widget.get(child as unknown as HTMLElement);
+    const childWidget = Widget.get(child);
     if (childWidget) {
-      childWidget.detach();
+      childWidget.detach(/* overrideHideOnDetach= */ true);
       return child;
     }
     return super.removeChild(child);
@@ -152,26 +277,93 @@ export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
 
   override removeChildren(): void {
     for (const child of this.children) {
-      const childWidget = Widget.get(child as unknown as HTMLElement);
+      const childWidget = Widget.get(child);
       if (childWidget) {
-        childWidget.detach();
+        childWidget.detach(/* overrideHideOnDetach= */ true);
       }
     }
     super.removeChildren();
   }
 
   override cloneNode(deep: boolean): Node {
-    const clone = super.cloneNode(deep) as WidgetElement<WidgetT>;
-    if (!this.#widgetClass) {
-      throw new Error('No widgetClass defined');
+    const clone = cloneCustomElement(this, deep) as WidgetElement<WidgetT>;
+    const config = widgetConfigs.get(this);
+    if (config) {
+      registerWidgetConfig(clone, config);
     }
-    clone.#widgetClass = this.#widgetClass;
-    clone.#widgetParams = this.#widgetParams;
     return clone;
+  }
+
+  override focus(): void {
+    const widget = Widget.get(this);
+    if (widget) {
+      widget.focus();
+    }
   }
 }
 
 customElements.define('devtools-widget', WidgetElement);
+
+export class WidgetDirective extends Lit.Directive.Directive {
+  #partType: Lit.Directive.PartType;
+
+  constructor(partInfo: Lit.Directive.PartInfo) {
+    super(partInfo);
+    this.#partType = partInfo.type;
+    if (this.#partType !== Lit.Directive.PartType.CHILD && this.#partType !== Lit.Directive.PartType.ELEMENT) {
+      throw new Error('Widget directive must be used as a child or element directive.');
+    }
+  }
+
+  override update(part: Lit.Directive.Part, [widgetClass, widgetParams]: Parameters<this['render']>): unknown {
+    if (this.#partType === Lit.Directive.PartType.ELEMENT) {
+      const element = (part as Lit.Directive.ElementPart).element as HTMLElement;
+
+      const config = widgetConfig(widgetClass, widgetParams);
+      const oldConfig = widgetConfigs.get(element);
+      const widget = Widget.get(element);
+      if (widget && config.widgetParams) {
+        let needsUpdate = false;
+        for (const key in config.widgetParams) {
+          if (Object.prototype.hasOwnProperty.call(config.widgetParams, key) &&
+              config.widgetParams[key] !== oldConfig?.widgetParams?.[key]) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (widget as any)[key] = config.widgetParams[key];
+            needsUpdate = true;
+          }
+        }
+        if (needsUpdate) {
+          widget.requestUpdate();
+        }
+      }
+      registerWidgetConfig(element, config);
+      return Lit.nothing;
+    }
+    return this.render(widgetClass, widgetParams);
+  }
+
+  render<F extends WidgetFactory<Widget>, ParamKeys extends keyof InferWidgetTFromFactory<F>>(
+      widgetClass: F,
+      widgetParams?: Pick<InferWidgetTFromFactory<F>, ParamKeys>&Partial<InferWidgetTFromFactory<F>>): unknown {
+    if (this.#partType === Lit.Directive.PartType.ELEMENT) {
+      return Lit.nothing;
+    }
+    // We use `repeat` to force Lit to recreate the `<devtools-widget>` DOM node when the `widgetClass` changes.
+    // If we didn't use `repeat` and used `html` directly, Lit would reuse the same `<devtools-widget>` instance
+    // even if `widgetClass` changed (for example, in a ternary operator `condition ? widget(A) : widget(B)`).
+    // This is because the template string is the same, so Lit reuses the DOM node and only updates `.widgetConfig`,
+    // which does not properly recreate the widget instance.
+    return Lit.Directives.repeat(
+        [widgetClass], () => widgetClass,
+        () => html`<devtools-widget ${widget<F, ParamKeys>(widgetClass, widgetParams)}></devtools-widget>`);
+  }
+}
+
+export const widget = Lit.Directive.directive(WidgetDirective) as
+    <F extends WidgetFactory<Widget>, ParamKeys extends keyof InferWidgetTFromFactory<F>>(
+                          widgetClass: F,
+                          widgetParams?: Pick<InferWidgetTFromFactory<F>, ParamKeys>&
+                          Partial<InferWidgetTFromFactory<F>>) => Lit.Directive.DirectiveResult<typeof WidgetDirective>;
 
 export function widgetRef<T extends Widget, Args extends unknown[]>(
     type: Platform.Constructor.Constructor<T, Args>, callback: (_: T) => void): ReturnType<typeof Lit.Directives.ref> {
@@ -183,7 +375,7 @@ export function widgetRef<T extends Widget, Args extends unknown[]>(
     if (!(widget instanceof type)) {
       throw new Error(`Expected an element with a widget of type ${type.name} but got ${e?.constructor?.name}`);
     }
-    callback(widget);
+    callback(widget as T);
   });
 }
 
@@ -210,8 +402,7 @@ function decrementWidgetCounter(parentElement: Element, childElement: Element): 
 // The resolved `updateComplete` promise, which is used as a marker for the
 // Widget's `#updateComplete` private property to indicate that there's no
 // pending update.
-const UPDATE_COMPLETE = Promise.resolve(true);
-const UPDATE_COMPLETE_RESOLVE = (_result: boolean): void => {};
+const UPDATE_COMPLETE = Promise.resolve();
 
 /**
  * Additional options passed to the `Widget` constructor to configure the
@@ -254,7 +445,6 @@ export interface WidgetOptions {
 export class Widget {
   readonly element: HTMLElement;
   contentElement: HTMLElement;
-  defaultFocusedChild: Widget|null = null;
   #shadowRoot: typeof Element.prototype.shadowRoot;
   #visible = false;
   #isRoot = false;
@@ -264,14 +454,12 @@ export class Widget {
   #notificationDepth = 0;
   #invalidationsSuspended = 0;
   #parentWidget: Widget|null = null;
-  #defaultFocusedElement?: Element|null;
   #cachedConstraints?: Geometry.Constraints;
   #constraints?: Geometry.Constraints;
   #invalidationsRequested?: boolean;
   #externallyManaged?: boolean;
   #updateComplete = UPDATE_COMPLETE;
-  #updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
-  #updateRequestID = 0;
+  #updateController?: AbortController;
 
   /**
    * Constructs a new `Widget` with the given `options`.
@@ -334,15 +522,26 @@ export class Widget {
     return widgetMap.get(node);
   }
 
+  static get allUpdatesComplete(): Promise<void> {
+    if (!pendingAnimationFrame && !currentUpdateQueue) {
+      return Promise.resolve();
+    }
+    if (!overallUpdatePromise) {
+      overallUpdatePromise = Promise.withResolvers<void>();
+    }
+    return overallUpdatePromise.promise;
+  }
+
   static getOrCreateWidget(element: HTMLElement): Widget {
     const widget = Widget.get(element);
     if (widget) {
       return widget;
     }
-    if (element instanceof WidgetElement) {
-      return element.createWidget();
+    let config = widgetConfigs.get(element as WidgetElement<Widget>);
+    if (!config) {
+      config = widgetConfig(element => new Widget(element));
     }
-    return new Widget(element);
+    return instantiateWidget(element as WidgetElement<Widget>, config);
   }
 
   markAsRoot(): void {
@@ -559,6 +758,10 @@ export class Widget {
         originalAppendChild.call(parentElement, this.element);
       }
     }
+    const focusedElementsCount = this.#parentWidget?.getDefaultFocusedElements?.()?.length ?? 0;
+    if (this.element.hasAttribute('autofocus') && focusedElementsCount > 1) {
+      this.element.removeAttribute('autofocus');
+    }
 
     if (!wasVisible && this.parentIsShowing()) {
       this.processWasShown();
@@ -610,14 +813,7 @@ export class Widget {
       return;
     }
 
-    // Cancel any pending update.
-    if (this.#updateRequestID !== 0) {
-      cancelAnimationFrame(this.#updateRequestID);
-      this.#updateCompleteResolve(true);
-      this.#updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
-      this.#updateComplete = UPDATE_COMPLETE;
-      this.#updateRequestID = 0;
-    }
+    cancelUpdate(this);
 
     // hideOnDetach means that we should never remove element from dom - content
     // has iframes and detaching it will hurt.
@@ -641,9 +837,6 @@ export class Widget {
       const childIndex = this.#parentWidget.#children.indexOf(this);
       assert(childIndex >= 0, 'Attempt to remove non-child widget');
       this.#parentWidget.#children.splice(childIndex, 1);
-      if (this.#parentWidget.defaultFocusedChild === this) {
-        this.#parentWidget.defaultFocusedChild = null;
-      }
       this.#parentWidget.childWasDetached(this);
       this.#parentWidget = null;
     } else {
@@ -700,7 +893,7 @@ export class Widget {
 
   registerRequiredCSS(...cssFiles: Array<string&{_tag: 'CSS-in-JS'}>): void {
     for (const cssFile of cssFiles) {
-      Platform.DOMUtilities.appendStyle(this.#shadowRoot ?? this.element, cssFile);
+      appendStyle(this.#shadowRoot ?? this.element, cssFile);
     }
   }
 
@@ -724,39 +917,94 @@ export class Widget {
   }
 
   setDefaultFocusedElement(element: Element|null): void {
-    this.#defaultFocusedElement = element;
+    const defaultFocusedElement = this.getDefaultFocusedElement();
+    if (defaultFocusedElement) {
+      defaultFocusedElement.removeAttribute('autofocus');
+    }
+    if (element) {
+      element.setAttribute('autofocus', '');
+    }
   }
 
   setDefaultFocusedChild(child: Widget): void {
     assert(child.#parentWidget === this, 'Attempt to set non-child widget as default focused.');
-    this.defaultFocusedChild = child;
+
+    const defaultFocusedElement = this.getDefaultFocusedElement();
+    if (defaultFocusedElement) {
+      defaultFocusedElement.removeAttribute('autofocus');
+    }
+    child.element.setAttribute('autofocus', '');
+  }
+
+  getDefaultFocusedElements(): HTMLElement[] {
+    const autofocusElements = [...this.contentElement.querySelectorAll<HTMLElement>('[autofocus]')];
+    if (this.contentElement !== this.element) {
+      if (this.contentElement.hasAttribute('autofocus')) {
+        autofocusElements.push(this.contentElement);
+      }
+      if (autofocusElements.length === 0) {
+        autofocusElements.push(...this.element.querySelectorAll<HTMLElement>('[autofocus]'));
+      }
+    }
+    return autofocusElements.filter(autofocusElement => {
+      let widgetElement: Element|null = autofocusElement;
+      while (widgetElement) {
+        const widget = Widget.get(widgetElement);
+        if (widget) {
+          if (widgetElement === autofocusElement && widget.#parentWidget === this && widget.#visible) {
+            return true;
+          }
+          return widget === this;
+        }
+        widgetElement = widgetElement.parentElementOrShadowHost();
+      }
+      return false;
+    });
+  }
+
+  getDefaultFocusedElement(): HTMLElement|null {
+    const elements = this.getDefaultFocusedElements();
+    if (elements.length > 1) {
+      console.error(
+          'Multiple autofocus elements found', this.constructor.name,
+          ...elements.map(e => Platform.StringUtilities.trimMiddle(e.outerHTML, 250)));
+    }
+    return elements[0] || null;
   }
 
   focus(): void {
     if (!this.isShowing()) {
       return;
     }
-
-    const element = (this.#defaultFocusedElement as HTMLElement | null);
-    if (element) {
-      if (!element.hasFocus()) {
-        element.focus();
+    const autofocusElement = this.getDefaultFocusedElement();
+    if (autofocusElement) {
+      const widget = Widget.get(autofocusElement);
+      if (widget && widget !== this) {
+        widget.focus();
+      } else if (autofocusElement === this.element && autofocusElement instanceof WidgetElement) {
+        // If the autofocus element is the widget itself, we need to call the native focus method
+        // to avoid infinite recursion if the element is a WidgetElement.
+        HTMLElement.prototype.focus.call(autofocusElement);
+      } else {
+        autofocusElement.focus();
       }
       return;
     }
 
-    if (this.defaultFocusedChild && this.defaultFocusedChild.#visible) {
-      this.defaultFocusedChild.focus();
-    } else {
-      for (const child of this.#children) {
-        if (child.#visible) {
-          child.focus();
-          return;
-        }
+    for (const child of this.#children) {
+      if (child.#visible) {
+        child.focus();
+        return;
       }
-      let child = this.contentElement.traverseNextNode(this.contentElement);
-      while (child) {
-        child = child.traverseNextNode(this.contentElement);
+    }
+
+    if (this.element === this.contentElement && this.element.hasAttribute('autofocus')) {
+      if (this.element instanceof WidgetElement) {
+        // If the autofocus element is the widget itself, we need to call the native focus method
+        // to avoid infinite recursion if the element is a WidgetElement.
+        HTMLElement.prototype.focus.call(this.element);
+      } else {
+        this.element.focus();
       }
     }
   }
@@ -852,22 +1100,18 @@ export class Widget {
    *          update logic will await the resolution of the returned promise
    *          before proceeding.
    */
-  performUpdate(): Promise<void>|void {
+  performUpdate(): Promise<void>|void;
+  performUpdate(signal: AbortSignal): Promise<void>|void;
+  performUpdate(_signal?: AbortSignal): Promise<void>|void {
   }
 
-  async #performUpdateCallback(): Promise<boolean> {
-    // Mark this update cycle as complete by assigning
-    // the marker sentinel.
-    this.#updateComplete = UPDATE_COMPLETE;
-    this.#updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
-    this.#updateRequestID = 0;
+  addUpdateController(controller: AbortController): void {
+    this.#updateController?.abort();
+    this.#updateController = controller;
+  }
 
-    // Run the actual update logic.
-    await this.performUpdate();
-
-    // Resolve the `updateComplete` with `true` if no
-    // new update was triggered during this cycle.
-    return this.#updateComplete === UPDATE_COMPLETE;
+  cancelUpdateController(): void {
+    this.#updateController?.abort();
   }
 
   /**
@@ -877,12 +1121,8 @@ export class Widget {
    * frame.
    */
   requestUpdate(): void {
-    if (this.#updateComplete === UPDATE_COMPLETE) {
-      this.#updateComplete = new Promise((resolve, reject) => {
-        this.#updateCompleteResolve = resolve;
-        this.#updateRequestID = requestAnimationFrame(() => this.#performUpdateCallback().then(resolve, reject));
-      });
-    }
+    this.#updateController?.abort();
+    this.#updateComplete = enqueueWidgetUpdate(this);
   }
 
   /**
@@ -906,11 +1146,9 @@ export class Widget {
    * assert.isTrue(widget.someDataLoaded);
    * ```
    *
-   * @returns a promise that resolves to a `boolean` when the widget has finished
-   *          updating, the value is `true` if there are no more pending updates,
-   *          and `false` if the update cycle triggered another update.
+   * @returns a promise that resolves when the widget has finished updating.
    */
-  get updateComplete(): Promise<boolean> {
+  get updateComplete(): Promise<void> {
     return this.#updateComplete;
   }
 }
@@ -1015,7 +1253,7 @@ export class WidgetFocusRestorer {
   private previous: HTMLElement|null;
   constructor(widget: Widget) {
     this.widget = widget;
-    this.previous = (Platform.DOMUtilities.deepActiveElement(widget.element.ownerDocument) as HTMLElement | null);
+    this.previous = (deepActiveElement(widget.element.ownerDocument) as HTMLElement | null);
     widget.focus();
   }
 

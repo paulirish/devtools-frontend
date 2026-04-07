@@ -1,7 +1,7 @@
 // Copyright 2011 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -53,6 +53,7 @@ export class RequestPreviewView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     void this.doShowPreview();
   }
 

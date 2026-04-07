@@ -9,7 +9,6 @@ import type { HTTPRequest } from '../api/HTTPRequest.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { Accessibility } from '../cdp/Accessibility.js';
 import type { Coverage } from '../cdp/Coverage.js';
-import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
 import type { NetworkConditions } from '../cdp/NetworkManager.js';
 import type { Tracing } from '../cdp/Tracing.js';
 import type { ConsoleMessage } from '../common/ConsoleMessage.js';
@@ -23,9 +22,11 @@ import type { Awaitable, AwaitablePredicate, EvaluateFunc, EvaluateFuncWith, Han
 import type { Viewport } from '../common/Viewport.js';
 import type { ScreenRecorder } from '../node/ScreenRecorder.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
-import type { Browser } from './Browser.js';
+import type { BluetoothEmulation } from './BluetoothEmulation.js';
+import type { Browser, WindowId } from './Browser.js';
 import type { BrowserContext } from './BrowserContext.js';
 import type { CDPSession } from './CDPSession.js';
+import type { DeviceRequestPrompt } from './DeviceRequestPrompt.js';
 import type { Dialog } from './Dialog.js';
 import type { BoundingBox, ClickOptions, ElementHandle } from './ElementHandle.js';
 import type { Frame, FrameAddScriptTagOptions, FrameAddStyleTagOptions, FrameWaitForFunctionOptions, GoToOptions, WaitForOptions } from './Frame.js';
@@ -215,7 +216,7 @@ export interface ScreenshotOptions {
      * relative to current working directory. If no path is provided, the image
      * won't be saved to the disk.
      */
-    path?: `${string}.${ImageFormat}`;
+    path?: string;
     /**
      * Specifies the region of the page/element to clip.
      */
@@ -413,7 +414,7 @@ export declare const enum PageEvent {
     Metrics = "metrics",
     /**
      * Emitted when an uncaught exception happens within the page. Contains an
-     * `Error`.
+     * `Error` or data of type unknown.
      */
     PageError = "pageerror",
     /**
@@ -510,7 +511,7 @@ export interface PageEvents extends Record<EventType, unknown> {
         title: string;
         metrics: Metrics;
     };
-    [PageEvent.PageError]: Error;
+    [PageEvent.PageError]: Error | unknown;
     [PageEvent.Popup]: Page | null;
     [PageEvent.Request]: HTTPRequest;
     [PageEvent.Response]: HTTPResponse;
@@ -530,6 +531,29 @@ export interface NewDocumentScriptEvaluation {
  * @internal
  */
 export declare function setDefaultScreenshotOptions(options: ScreenshotOptions): void;
+/**
+ * @public
+ */
+export interface ReloadOptions extends WaitForOptions {
+    /**
+     * If set to true, the browser caches are ignored for the page reload.
+     *
+     * @defaultValue true
+     * @public
+     */
+    ignoreCache?: boolean;
+}
+/**
+ * Options for {@link Page.captureHeapSnapshot}.
+ *
+ * @public
+ */
+export interface HeapSnapshotOptions {
+    /**
+     * The file path to save the heap snapshot to.
+     */
+    path: string;
+}
 /**
  * Page provides methods to interact with a single tab or
  * {@link https://developer.chrome.com/extensions/background_pages | extension background page}
@@ -587,6 +611,14 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @internal
      */
     _timeoutSettings: TimeoutSettings;
+    /**
+     * Internal API to get an implementation-specific identifier
+     * for the tab. In Chrome, it is a tab target id. If unknown,
+     * returns an empty string.
+     *
+     * @internal
+     */
+    _tabId: string;
     /**
      * @internal
      */
@@ -1381,6 +1413,10 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     abstract metrics(): Promise<Metrics>;
     /**
+     * Captures a snapshot of the JavaScript heap and writes it to a file.
+     */
+    abstract captureHeapSnapshot(options: HeapSnapshotOptions): Promise<void>;
+    /**
      * The page's URL.
      *
      * @remarks
@@ -1411,7 +1447,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * multiple redirects, the navigation will resolve with the response of the
      * last redirect.
      */
-    abstract reload(options?: WaitForOptions): Promise<HTTPResponse | null>;
+    abstract reload(options?: ReloadOptions): Promise<HTTPResponse | null>;
     /**
      * Waits for the page to navigate to a new URL or to reload. It is useful when
      * you run code that will indirectly cause the page to navigate.
@@ -1463,6 +1499,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * - `timeout`: Maximum wait time in milliseconds, defaults to `30` seconds, pass
      *   `0` to disable the timeout. The default value can be changed by using the
      *   {@link Page.setDefaultTimeout} method.
+     *
+     * - `signal`: A signal object that allows you to cancel a waitForRequest call.
      */
     waitForRequest(urlOrPredicate: string | AwaitablePredicate<HTTPRequest>, options?: WaitTimeoutOptions): Promise<HTTPRequest>;
     /**
@@ -1491,6 +1529,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * - `timeout`: Maximum wait time in milliseconds, defaults to `30` seconds,
      *   pass `0` to disable the timeout. The default value can be changed by using
      *   the {@link Page.setDefaultTimeout} method.
+     *
+     * - `signal`: A signal object that allows you to cancel a waitForResponse call.
      */
     waitForResponse(urlOrPredicate: string | AwaitablePredicate<HTTPResponse>, options?: WaitTimeoutOptions): Promise<HTTPResponse>;
     /**
@@ -1951,6 +1991,12 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     }): Promise<string>;
     screenshot(options?: Readonly<ScreenshotOptions>): Promise<Uint8Array>;
     /**
+     * Emulates focus state of the page.
+     *
+     * @param enabled - Whether to emulate focus.
+     */
+    abstract emulateFocusedPage(enabled: boolean): Promise<void>;
+    /**
      * @internal
      */
     abstract _screenshot(options: Readonly<ScreenshotOptions>): Promise<string>;
@@ -2259,6 +2305,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * - `timeout`: maximum time to wait for in milliseconds. Defaults to `30000`
      *   (30 seconds). Pass `0` to disable timeout. The default value can be changed
      *   by using the {@link Page.setDefaultTimeout} method.
+     *
+     * - `signal`: A signal object that allows you to cancel a waitForSelector call.
      */
     waitForSelector<Selector extends string>(selector: Selector, options?: WaitForSelectorOptions): Promise<ElementHandle<NodeFor<Selector>> | null>;
     /**
@@ -2344,20 +2392,41 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     abstract waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
     /**
-     * Resizes the browser window the page is in so that the content area
-     * (excluding browser UI) is according to the specified widht and height.
+     * Resizes the browser window of this page so that the content area (excluding
+     * browser UI) has the specified width and height.
      *
      * @experimental
-     * @internal
      */
     abstract resize(params: {
         contentWidth: number;
         contentHeight: number;
     }): Promise<void>;
+    /**
+     * Returns the page's window id.
+     *
+     * @experimental
+     */
+    abstract windowId(): Promise<WindowId>;
     /** @internal */
     [disposeSymbol](): void;
     /** @internal */
     [asyncDisposeSymbol](): Promise<void>;
+    /**
+     * Opens DevTools for the current Page and returns the DevTools Page. This
+     * method is only available in Chrome.
+     */
+    abstract openDevTools(): Promise<Page>;
+    /**
+     * Returns true if DevTools is attached to the current page.
+     * Use {@link Page.openDevTools} to get the DevTools page.
+     *
+     * @experimental
+     */
+    abstract hasDevTools(): Promise<boolean>;
+    /**
+     * {@inheritDoc BluetoothEmulation}
+     */
+    abstract get bluetooth(): BluetoothEmulation;
 }
 /**
  * @internal

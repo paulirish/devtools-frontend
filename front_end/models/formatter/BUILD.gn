@@ -7,7 +7,7 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("formatter") {
+devtools_foundation_module("formatter") {
   sources = [
     "FormatterWorkerPool.ts",
     "ScriptFormatter.ts",
@@ -15,6 +15,8 @@ devtools_module("formatter") {
 
   deps = [
     "../../core/common:bundle",
+    "../../core/platform:bundle",
+    "../../core/platform/api:bundle",
     "../../entrypoints/formatter_worker:formatter_actions",
     "../../models/text_utils:bundle",
   ]
@@ -30,11 +32,15 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../mcp/*",
     "../../core/sdk/*",
     "../../entrypoints/formatter_worker/*",
+    "../../models/bindings/*",
     "../../models/breakpoints/*",
     "../../models/source_map_scopes/*",
     "../../models/workspace_diff/*",
+    "../../panels/application/*",
+    "../../panels/console/*",
     "../../panels/coverage/*",
     "../../panels/sources/*",
     "../../panels/utils/*",
@@ -46,10 +52,13 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("unittests") {
   testonly = true
 
-  sources = [ "ScriptFormatter.test.ts" ]
+  sources = [
+    "FormatterWorkerPool.test.ts",
+    "ScriptFormatter.test.ts",
+  ]
 
   deps = [
     ":bundle",

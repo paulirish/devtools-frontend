@@ -40,6 +40,7 @@ devtools_module("bindings") {
     "../../models/stack_trace:impl",
     "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
+    "../formatter:bundle",
   ]
 }
 
@@ -50,14 +51,22 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../mcp/*",
+    "../../core/sdk:foundation_unittests",
+    "../../core/sdk:foundation_unittests_node_typecheck",
     "../../core/sdk:unittests",
+    "../../entrypoints/inspector_main",
     "../../entrypoints/main/*",
+    "../../foundation/*",
     "../../legacy_test_runner/*",
     "../../panels/application/*",
+    "../../panels/common/*",
     "../../panels/console/*",
     "../../panels/coverage/*",
     "../../panels/elements/*",
     "../../panels/emulation/*",
+    "../../panels/issues/*",
+    "../../panels/linear_memory_inspector/*",
     "../../panels/network/*",
     "../../panels/profiler/*",
     "../../panels/protocol_monitor/*",
@@ -68,6 +77,7 @@ devtools_entrypoint("bundle") {
     "../../testing/*",
     "../../ui/components/docs/performance_panel/*",
     "../../ui/components/linkifier/*",
+    "../../ui/components/text_editor/*",
     "../../ui/legacy/components/inline_editor/*",
     "../../ui/legacy/components/perf_ui/*",
     "../../ui/legacy/components/utils/*",
@@ -79,6 +89,7 @@ devtools_entrypoint("bundle") {
     "../persistence/*",
     "../source_map_scopes/*",
     "../trace_source_maps_resolver/*",
+    "../web_mcp/*",
     "../workspace/*",
   ]
 
@@ -105,7 +116,10 @@ ts_library("unittests") {
   deps = [
     ":bundle",
     "../../core/common:bundle",
+    "../../core/root:bundle",
+    "../../core/sdk:bundle",
     "../../testing",
+    "../../third_party/source-map-scopes-codec:bundle",
     "../persistence:bundle",
     "../stack_trace:impl",
     "../text_utils:bundle",

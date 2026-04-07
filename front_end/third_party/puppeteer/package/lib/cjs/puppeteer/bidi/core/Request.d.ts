@@ -17,6 +17,9 @@ export declare class Request extends EventEmitter<{
     authenticate: void;
     /** Emitted when the request succeeds. */
     success: Bidi.Network.ResponseData;
+    /** Analog of WebDriver BiDi event `network.responseStarted`. Emitted when a
+     * response is received. */
+    response: Bidi.Network.ResponseData;
     /** Emitted when the request fails. */
     error: string;
 }> {
@@ -41,6 +44,7 @@ export declare class Request extends EventEmitter<{
     continueRequest({ url, method, headers, cookies, body, }: Omit<Bidi.Network.ContinueRequestParameters, 'request'>): Promise<void>;
     failRequest(): Promise<void>;
     provideResponse({ statusCode, reasonPhrase, headers, body, }: Omit<Bidi.Network.ProvideResponseParameters, 'request'>): Promise<void>;
+    fetchPostData(): Promise<string | undefined>;
     getResponseContent(): Promise<Uint8Array>;
     continueWithAuth(parameters: Bidi.Network.ContinueWithAuthCredentials | Bidi.Network.ContinueWithAuthNoCredentials): Promise<void>;
     private dispose;

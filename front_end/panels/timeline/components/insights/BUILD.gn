@@ -16,11 +16,12 @@ generate_css("css_files") {
   ]
 }
 
-devtools_module("insights") {
+devtools_ui_module("insights") {
   sources = [
     "BaseInsightComponent.ts",
     "CLSCulprits.ts",
     "Cache.ts",
+    "CharacterSet.ts",
     "Checklist.ts",
     "DOMSize.ts",
     "DocumentLatency.ts",
@@ -31,6 +32,7 @@ devtools_module("insights") {
     "Helpers.ts",
     "INPBreakdown.ts",
     "ImageDelivery.ts",
+    "ImageRef.ts",
     "LCPBreakdown.ts",
     "LCPDiscovery.ts",
     "LegacyJavaScript.ts",
@@ -56,10 +58,11 @@ devtools_module("insights") {
     "../../../../third_party/marked:bundle",
     "../../../../ui/components/buttons:bundle",
     "../../../../ui/components/helpers:bundle",
-    "../../../../ui/components/icon_button:bundle",
     "../../../../ui/components/linkifier:bundle",
     "../../../../ui/components/markdown_view:bundle",
+    "../../../../ui/kit:bundle",
     "../../../../ui/lit:bundle",
+    "../../../common:bundle",
     "../../overlays:bundle",
     "../../utils:bundle",
   ]
@@ -76,10 +79,11 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "..:*",
+    "../../../ai_assistance/*",
   ]
 }
 
-ts_library("unittests") {
+devtools_ui_module("unittests") {
   testonly = true
 
   sources = [

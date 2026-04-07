@@ -1,7 +1,7 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -39,9 +39,9 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as Annotations from '../../models/annotations/annotations.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
@@ -128,14 +128,6 @@ const UIStrings = {
    * @description Tooltip for a filter in the Network panel
    */
   onlyShowThirdPartyRequests: 'Show only requests with origin different from page origin',
-  /**
-   * @description Label for a filter in the Network panel
-   */
-  ippRequests: 'IP Protected requests',
-  /**
-   * @description Tooltip for a filter in the Network panel
-   */
-  onlyShowIPProtectedRequests: 'Show only requests sent to IP Protection proxies. Has no effect in regular browsing.',
   /**
    * @description Text that appears when user drag and drop something (for example, a file) in Network Log View of the Network panel
    */
@@ -435,6 +427,27 @@ const UIStrings = {
   /**
    * @description A context menu item in the Network Log View of the Network panel
    */
+  throttleRequests: 'Throttle requests',
+  /**
+   * @description A context menu item in the Network Log View of the Network panel
+   */
+  throttleRequestUrl: 'Throttle request URL',
+  /**
+   * @description A context menu item in the Network Log View of the Network panel
+   * @example {example.com} PH1
+   */
+  unthrottleS: 'Stop throttling {PH1}',
+  /**
+   * @description A context menu item in the Network Log View of the Network panel
+   */
+  throttleRequestDomain: 'Throttle request domain',
+  /**
+   * @description A context menu item in the Network Log View of the Network panel
+   */
+  blockRequests: 'Block requests',
+  /**
+   * @description A context menu item in the Network Log View of the Network panel
+   */
   blockRequestUrl: 'Block request URL',
   /**
    * @description A context menu item in the Network Log View of the Network panel
@@ -509,7 +522,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly networkOnlyThirdPartySetting: Common.Settings.Setting<boolean>;
   private readonly networkResourceTypeFiltersSetting: Common.Settings.Setting<Record<string, boolean>>;
   private readonly networkShowOptionsToGenerateHarWithSensitiveData: Common.Settings.Setting<boolean>;
-  private readonly networkOnlyIPProtectedRequestsSetting: Common.Settings.Setting<boolean>;
   private readonly progressBarContainer: Element;
   private readonly networkLogLargeRowsSetting: Common.Settings.Setting<boolean>;
   private rowHeightInternal: number;
@@ -565,8 +577,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         Common.Settings.Settings.instance().createSetting('network-only-blocked-requests', false);
     this.networkOnlyThirdPartySetting =
         Common.Settings.Settings.instance().createSetting('network-only-third-party-setting', false);
-    this.networkOnlyIPProtectedRequestsSetting =
-        Common.Settings.Settings.instance().createSetting('network-only-ip-protected-requests', false);
     this.networkResourceTypeFiltersSetting =
         Common.Settings.Settings.instance().createSetting('network-resource-type-filters', {});
     this.networkShowOptionsToGenerateHarWithSensitiveData = Common.Settings.Settings.instance().createSetting(
@@ -972,6 +982,14 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     return this.summaryToolbarInternal;
   }
 
+  getDataGrid(): DataGrid.SortableDataGrid.SortableDataGrid<NetworkNode>|null {
+    if (Annotations.AnnotationRepository.annotationsEnabled()) {
+      return this.dataGrid;
+    }
+
+    return null;
+  }
+
   modelAdded(networkManager: SDK.NetworkManager.NetworkManager): void {
     // TODO(allada) Remove dependency on networkManager and instead use NetworkLog and PageLoad for needed data.
     const target = networkManager.target();
@@ -1073,7 +1091,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     const instruction =
         this.recording ? UIStrings.performARequestOrHitSToRecordThe : UIStrings.recordToDisplayNetworkActivity;
     const buttonText = this.recording ? i18nString(UIStrings.reloadPage) : i18nString(UIStrings.startRecording);
-    // eslint-disable-next-line rulesdir/l10n-i18nString-call-only-with-uistrings
+    // eslint-disable-next-line @devtools/l10n-i18nString-call-only-with-uistrings
     const description = i18nString(instruction, {
       PH1: buttonText,
       PH2: shortcutTitle,
@@ -1390,6 +1408,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   override willHide(): void {
+    super.willHide();
     this.columnsInternal.willHide();
   }
 
@@ -1431,17 +1450,14 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   private removeNodeAndMaybeAncestors(node: NetworkRequestNode): void {
-    let parent: NetworkNode|
-        (DataGrid.DataGrid.DataGridNode<DataGrid.ViewportDataGrid.ViewportDataGridNode<
-             DataGrid.SortableDataGrid.SortableDataGridNode<NetworkNode>>>|
-         null) = node.parent;
+    let parent = node.parent;
     if (!parent) {
       return;
     }
     parent.removeChild(node);
     while (parent && !parent.hasChildren() && parent.dataGrid && parent.dataGrid.rootNode() !== parent) {
       const grandparent = (parent.parent as NetworkNode);
-      grandparent.removeChild(parent);
+      grandparent.removeChild(parent as NetworkNode);
       parent = grandparent;
     }
   }
@@ -1581,7 +1597,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.networkOnlyBlockedRequestsSetting.set(false);
     this.networkOnlyThirdPartySetting.set(false);
     this.networkHideChromeExtensions.set(false);
-    this.networkOnlyIPProtectedRequestsSetting.set(false);
     this.resourceCategoryFilterUI.reset();
   }
 
@@ -1706,31 +1721,21 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         }
 
         UI.Context.Context.instance().setFlavor(SDK.NetworkRequest.NetworkRequest, request);
-        if (Root.Runtime.hostConfig.devToolsAiSubmenuPrompts?.enabled) {
-          const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
-          const submenu = contextMenu.footerSection().appendSubMenuItem(
-              action.title(), false, openAiAssistanceId,
-              Root.Runtime.hostConfig.devToolsAiAssistanceNetworkAgent?.featureName);
-          submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
-          appendSubmenuPromptAction(
-              submenu, action, i18nString(UIStrings.explainPurpose), 'What is the purpose of this request?',
-              openAiAssistanceId + '.purpose');
-          appendSubmenuPromptAction(
-              submenu, action, i18nString(UIStrings.explainSlowness), 'Why is this request taking so long?',
-              openAiAssistanceId + '.slowness');
-          appendSubmenuPromptAction(
-              submenu, action, i18nString(UIStrings.explainFailures), 'Why is the request failing?',
-              openAiAssistanceId + '.failures');
-          appendSubmenuPromptAction(
-              submenu, action, i18nString(UIStrings.assessSecurityHeaders), 'Are there any security headers present?',
-              openAiAssistanceId + '.security');
-        } else if (Root.Runtime.hostConfig.devToolsAiDebugWithAi?.enabled) {
-          contextMenu.footerSection().appendAction(
-              openAiAssistanceId, undefined, false, undefined,
-              Root.Runtime.hostConfig.devToolsAiAssistanceNetworkAgent?.featureName);
-        } else {
-          contextMenu.footerSection().appendAction(openAiAssistanceId);
-        }
+        const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
+        const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
+        submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
+        appendSubmenuPromptAction(
+            submenu, action, i18nString(UIStrings.explainPurpose), 'What is the purpose of this request?',
+            openAiAssistanceId + '.purpose');
+        appendSubmenuPromptAction(
+            submenu, action, i18nString(UIStrings.explainSlowness), 'Why is this request taking so long?',
+            openAiAssistanceId + '.slowness');
+        appendSubmenuPromptAction(
+            submenu, action, i18nString(UIStrings.explainFailures), 'Why is the request failing?',
+            openAiAssistanceId + '.failures');
+        appendSubmenuPromptAction(
+            submenu, action, i18nString(UIStrings.assessSecurityHeaders), 'Are there any security headers present?',
+            openAiAssistanceId + '.security');
       }
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyURL),
@@ -1847,43 +1852,84 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     if (request) {
       const maxBlockedURLLength = 20;
       const manager = SDK.NetworkManager.MultitargetNetworkManager.instance();
-      let patterns = manager.blockedPatterns();
 
-      function addBlockedURL(url: string): void {
-        patterns.push({enabled: true, url: url as Platform.DevToolsPath.UrlString});
-        manager.setBlockedPatterns(patterns);
-        manager.setBlockingEnabled(true);
+      function removeRequestCondition(pattern: SDK.NetworkManager.RequestURLPattern): void {
+        const entry = manager.requestConditions.findCondition(pattern.constructorString);
+        if (entry) {
+          manager.requestConditions.delete(entry);
+          void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
+        }
+      }
+
+      function addRequestCondition(
+          pattern: SDK.NetworkManager.RequestURLPattern,
+          conditions: SDK.NetworkManager.ThrottlingConditions,
+          ): void {
+        const entry = manager.requestConditions.findCondition(pattern.constructorString);
+        if (entry) {
+          entry.conditions = conditions;
+        } else {
+          manager.requestConditions.add(SDK.NetworkManager.RequestCondition.create(pattern, conditions));
+        }
+        manager.requestConditions.conditionsEnabled = true;
         void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
       }
 
-      function removeBlockedURL(url: string): void {
-        patterns = patterns.filter(pattern => pattern.url !== url);
-        manager.setBlockedPatterns(patterns);
-        void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
-      }
+      const blockingMenu =
+          contextMenu.debugSection().appendSubMenuItem(i18nString(UIStrings.blockRequests), /* disabled=*/ true);
+      const throttlingMenu =
+          contextMenu.debugSection().appendSubMenuItem(i18nString(UIStrings.throttleRequests), /* disabled=*/ true);
 
       const urlWithoutScheme = request.parsedURL.urlWithoutScheme();
-      if (urlWithoutScheme && !patterns.find(pattern => pattern.url === urlWithoutScheme)) {
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.blockRequestUrl), addBlockedURL.bind(null, urlWithoutScheme),
+      const urlPattern = urlWithoutScheme &&
+          SDK.NetworkManager.RequestURLPattern.create(
+              `*://${urlWithoutScheme}` as SDK.NetworkManager.URLPatternConstructorString);
+      if (urlPattern) {
+        throttlingMenu.setEnabled(true);
+        blockingMenu.setEnabled(true);
+        const existingConditions = manager.requestConditions.findCondition(urlPattern.constructorString);
+        const isBlocking = existingConditions?.conditions === SDK.NetworkManager.BlockingConditions;
+        const isThrottling = existingConditions &&
+            existingConditions.conditions !== SDK.NetworkManager.BlockingConditions &&
+            existingConditions.conditions !== SDK.NetworkManager.NoThrottlingConditions;
+        const croppedURL = Platform.StringUtilities.trimMiddle(urlPattern.constructorString, maxBlockedURLLength);
+        blockingMenu.debugSection().appendItem(
+            isBlocking ? i18nString(UIStrings.unblockS, {PH1: croppedURL}) : i18nString(UIStrings.blockRequestUrl),
+            () => isBlocking ? removeRequestCondition(urlPattern) :
+                               addRequestCondition(urlPattern, SDK.NetworkManager.BlockingConditions),
             {jslogContext: 'block-request-url'});
-      } else if (urlWithoutScheme) {
-        const croppedURL = Platform.StringUtilities.trimMiddle(urlWithoutScheme, maxBlockedURLLength);
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.unblockS, {PH1: croppedURL}), removeBlockedURL.bind(null, urlWithoutScheme),
-            {jslogContext: 'unblock'});
+        throttlingMenu.debugSection().appendItem(
+            isThrottling ? i18nString(UIStrings.unthrottleS, {PH1: croppedURL}) :
+                           i18nString(UIStrings.throttleRequestUrl),
+            () => isThrottling ? removeRequestCondition(urlPattern) :
+                                 addRequestCondition(urlPattern, SDK.NetworkManager.Slow3GConditions),
+            {jslogContext: 'throttle-request-url'});
       }
 
-      const domain = request.parsedURL.domain();
-      if (domain && !patterns.find(pattern => pattern.url === domain)) {
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.blockRequestDomain), addBlockedURL.bind(null, domain),
-            {jslogContext: 'block-request-domain'});
-      } else if (domain) {
-        const croppedDomain = Platform.StringUtilities.trimMiddle(domain, maxBlockedURLLength);
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.unblockS, {PH1: croppedDomain}), removeBlockedURL.bind(null, domain),
-            {jslogContext: 'unblock'});
+        const domain = request.parsedURL.domain();
+        const domainPattern = domain &&
+            SDK.NetworkManager.RequestURLPattern.create(
+                `*://${domain}` as SDK.NetworkManager.URLPatternConstructorString);
+        if (domainPattern) {
+          throttlingMenu.setEnabled(true);
+          blockingMenu.setEnabled(true);
+          const existingConditions = manager.requestConditions.findCondition(domainPattern.constructorString);
+          const isBlocking = existingConditions?.conditions === SDK.NetworkManager.BlockingConditions;
+          const isThrottling = existingConditions &&
+              existingConditions.conditions !== SDK.NetworkManager.BlockingConditions &&
+              existingConditions.conditions !== SDK.NetworkManager.NoThrottlingConditions;
+          const croppedURL = Platform.StringUtilities.trimMiddle(domainPattern.constructorString, maxBlockedURLLength);
+          blockingMenu.debugSection().appendItem(
+              isBlocking ? i18nString(UIStrings.unblockS, {PH1: croppedURL}) : i18nString(UIStrings.blockRequestDomain),
+              () => isBlocking ? removeRequestCondition(domainPattern) :
+                                 addRequestCondition(domainPattern, SDK.NetworkManager.BlockingConditions),
+              {jslogContext: 'block-request-domain'});
+          throttlingMenu.debugSection().appendItem(
+              isThrottling ? i18nString(UIStrings.unthrottleS, {PH1: croppedURL}) :
+                             i18nString(UIStrings.throttleRequestDomain),
+              () => isThrottling ? removeRequestCondition(domainPattern) :
+                                   addRequestCondition(domainPattern, SDK.NetworkManager.Slow3GConditions),
+              {jslogContext: 'throttle-request-domain'});
       }
 
       if (SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
@@ -2004,16 +2050,12 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     if (!this.resourceCategoryFilterUI.accept(categoryName)) {
       return false;
     }
-    const [hideDataURL, blockedCookies, blockedRequests, thirdParty, hideExtensionURL, ippRequests] = [
+    const [hideDataURL, blockedCookies, blockedRequests, thirdParty, hideExtensionURL] = [
       this.networkHideDataURLSetting.get(),
       this.networkShowBlockedCookiesOnlySetting.get(),
       this.networkOnlyBlockedRequestsSetting.get(),
       this.networkOnlyThirdPartySetting.get(),
       this.networkHideChromeExtensions.get(),
-      // TODO(crbug.com/425645896): Remove this guard once IP Protection is fully launched.
-      Root.Runtime.hostConfig.devToolsIpProtectionInDevTools?.enabled ?
-          this.networkOnlyIPProtectedRequestsSetting.get() :
-          false,
     ];
 
     if (hideDataURL && (request.parsedURL.isDataURL() || request.parsedURL.isBlobURL())) {
@@ -2030,12 +2072,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     }
     if (hideExtensionURL && request.scheme === 'chrome-extension') {
       return false;
-    }
-    // TODO(crbug.com/425645896): Remove this guard once IP Protection is fully launched.
-    if (Root.Runtime.hostConfig.devToolsIpProtectionInDevTools?.enabled) {
-      if (ippRequests && !request.isIpProtectionUsed()) {
-        return false;
-      }
     }
     for (let i = 0; i < this.filters.length; ++i) {
       if (!this.filters[i](request)) {
@@ -2402,7 +2438,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
               .replace(/"/g, '\\"')
               .replace(/[^a-zA-Z0-9\s_\-:=+~'\/.',?;()*`]/g, '^$&')
               .replace(/%(?=[a-zA-Z0-9_])/g, '%^')
-              .replace(/[^\S \r\n]/g, ' ')
+              .replace(/[^ -~\r\n]/g, ' ')
               .replace(/\r?\n|\r/g, '^\n\n') +
           encapsChars;
     }
@@ -2652,7 +2688,6 @@ export class MoreFiltersDropDownUI extends Common.ObjectWrapper.ObjectWrapper<UI
   private networkShowBlockedCookiesOnlySetting: Common.Settings.Setting<boolean>;
   private networkOnlyBlockedRequestsSetting: Common.Settings.Setting<boolean>;
   private networkOnlyThirdPartySetting: Common.Settings.Setting<boolean>;
-  private networkOnlyIPProtectedRequestsSetting: Common.Settings.Setting<boolean>;
   private activeFiltersCount: HTMLElement;
   private activeFiltersCountAdorner: Adorners.Adorner.Adorner;
 
@@ -2668,24 +2703,21 @@ export class MoreFiltersDropDownUI extends Common.ObjectWrapper.ObjectWrapper<UI
         Common.Settings.Settings.instance().createSetting('network-only-blocked-requests', false);
     this.networkOnlyThirdPartySetting =
         Common.Settings.Settings.instance().createSetting('network-only-third-party-setting', false);
-    this.networkOnlyIPProtectedRequestsSetting =
-        Common.Settings.Settings.instance().createSetting('network-only-ip-protected-requests', false);
 
     this.filterElement = document.createElement('div');
     this.filterElement.setAttribute('aria-label', 'Show only/hide requests dropdown');
     this.filterElement.setAttribute('jslog', `${VisualLogging.dropDown('more-filters').track({click: true})}`);
 
     this.activeFiltersCountAdorner = new Adorners.Adorner.Adorner();
+    this.activeFiltersCountAdorner.name = 'countWrapper';
     this.activeFiltersCount = document.createElement('span');
-    this.activeFiltersCountAdorner.data = {
-      name: 'countWrapper',
-      content: this.activeFiltersCount,
-    };
+    this.activeFiltersCountAdorner.append(this.activeFiltersCount);
     this.activeFiltersCountAdorner.classList.add('active-filters-count');
     this.updateActiveFiltersCount();
 
     this.dropDownButton = new UI.Toolbar.ToolbarMenuButton(
-        this.showMoreFiltersContextMenu.bind(this), /* isIconDropdown=*/ false, /* useSoftMenu=*/ true,
+        this.showMoreFiltersContextMenu.bind(this),
+        /* isIconDropdown=*/ false, /* useSoftMenu=*/ true,
         /* jslogContext=*/ undefined, /* iconName=*/ undefined,
         /* keepOpen=*/ true);
     this.dropDownButton.setTitle(i18nString(UIStrings.showOnlyHideRequests));
@@ -2706,10 +2738,6 @@ export class MoreFiltersDropDownUI extends Common.ObjectWrapper.ObjectWrapper<UI
     this.networkShowBlockedCookiesOnlySetting.addChangeListener(this.#onSettingChanged.bind(this));
     this.networkOnlyBlockedRequestsSetting.addChangeListener(this.#onSettingChanged.bind(this));
     this.networkOnlyThirdPartySetting.addChangeListener(this.#onSettingChanged.bind(this));
-    // TODO(crbug.com/425645896): Remove this guard once IP Protection is fully launched.
-    if (Root.Runtime.hostConfig.devToolsIpProtectionInDevTools?.enabled) {
-      this.networkOnlyIPProtectedRequestsSetting.addChangeListener(this.#onSettingChanged.bind(this));
-    }
 
     contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.hideDataUrls),
@@ -2741,17 +2769,6 @@ export class MoreFiltersDropDownUI extends Common.ObjectWrapper.ObjectWrapper<UI
           tooltip: i18nString(UIStrings.onlyShowBlockedRequests),
           jslogContext: 'only-blocked-requests',
         });
-    // Disable this filter if in regular browsing, as IP Protection is only available in incognito mode.
-    // TODO(crbug.com/425645896): Remove this guard once IP Protection is fully launched.
-    if (Root.Runtime.hostConfig.devToolsIpProtectionInDevTools?.enabled) {
-      contextMenu.defaultSection().appendCheckboxItem(
-          i18nString(UIStrings.ippRequests),
-          () => this.networkOnlyIPProtectedRequestsSetting.set(!this.networkOnlyIPProtectedRequestsSetting.get()), {
-            checked: this.networkOnlyIPProtectedRequestsSetting.get(),
-            tooltip: i18nString(UIStrings.onlyShowIPProtectedRequests),
-            jslogContext: 'only-ip-protected-requests',
-          });
-    }
     contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.thirdParty),
         () => this.networkOnlyThirdPartySetting.set(!this.networkOnlyThirdPartySetting.get()), {
@@ -2768,10 +2785,6 @@ export class MoreFiltersDropDownUI extends Common.ObjectWrapper.ObjectWrapper<UI
       ...this.networkShowBlockedCookiesOnlySetting.get() ? [i18nString(UIStrings.hasBlockedCookies)] : [],
       ...this.networkOnlyBlockedRequestsSetting.get() ? [i18nString(UIStrings.blockedRequests)] : [],
       ...this.networkOnlyThirdPartySetting.get() ? [i18nString(UIStrings.thirdParty)] : [],
-      ...Root.Runtime.hostConfig.devToolsIpProtectionInDevTools?.enabled &&
-              this.networkOnlyIPProtectedRequestsSetting.get() ?
-          [i18nString(UIStrings.ippRequests)] :
-          [],
     ];
     return filters;
   }

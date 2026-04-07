@@ -13,7 +13,6 @@ import {
   describeWithEnvironment,
   registerActions,
   registerNoopActions,
-  updateHostConfig
 } from '../../testing/EnvironmentHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -28,12 +27,14 @@ describeWithEnvironment('SourcesPanel', () => {
       resourceMapping:
           new Bindings.ResourceMapping.ResourceMapping(SDK.TargetManager.TargetManager.instance(), workspace),
       ignoreListManager: Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true}),
+      workspace,
     });
     const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
       forceNew: true,
       targetManager: SDK.TargetManager.TargetManager.instance(),
       workspace,
       debuggerWorkspaceBinding,
+      settings: Common.Settings.Settings.instance(),
     });
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     const networkPersistenceManager =
@@ -54,12 +55,6 @@ describeWithEnvironment('SourcesPanel', () => {
   }
 
   it('Shows Debug with Ai menu and submenu items', () => {
-    updateHostConfig({
-      devToolsAiSubmenuPrompts: {
-        enabled: true,
-      },
-    });
-
     registerNoopActions([
       'debugger.toggle-pause', 'debugger.step-over', 'debugger.step-into', 'debugger.step-out', 'debugger.step',
       'debugger.toggle-breakpoints-active'

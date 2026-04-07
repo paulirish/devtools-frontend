@@ -1,7 +1,7 @@
 // Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -86,18 +86,16 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
     }
     this.mainToolbar.appendToolbarItem(this.filterTextInput);
 
-    const columns = ([
+    const columns: DataGrid.DataGrid.ColumnDescriptor[] = [
       {id: 'id', title: i18nString(UIStrings.id), sortable: true, weight: 8},
       {id: 'type', title: i18nString(UIStrings.type), sortable: true, weight: 8},
       {id: 'data', title: i18nString(UIStrings.data), sortable: false, weight: 88},
       {id: 'time', title: i18nString(UIStrings.time), sortable: true, weight: 8},
-    ] as DataGrid.DataGrid.ColumnDescriptor[]);
+    ];
 
     this.dataGrid = new DataGrid.SortableDataGrid.SortableDataGrid({
       displayName: i18nString(UIStrings.eventSource),
       columns,
-      deleteCallback: undefined,
-      refreshCallback: undefined,
     });
     this.dataGrid.setStriped(true);
     this.dataGrid.setEnableAutoScrollToBottom(true);
@@ -117,6 +115,7 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
   }
 
   override willHide(): void {
+    super.willHide();
     this.request.removeEventListener(SDK.NetworkRequest.Events.EVENT_SOURCE_MESSAGE_ADDED, this.messageAdded, this);
   }
 
