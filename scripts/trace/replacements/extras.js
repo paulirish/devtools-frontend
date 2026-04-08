@@ -5,6 +5,7 @@
 // found in the LICENSE file.
 
 // Exclude the parts of extras.ts that have painful dependencies. Include these cuz they don't and are needed.
+export * as Initiators from './Initiators.js';
 export * as ScriptDuplication from './ScriptDuplication.js';
 export * as StackTraceForEvent from './StackTraceForEvent.js';
 export * as ThirdParties from './ThirdParties.js';
