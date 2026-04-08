@@ -13,19 +13,26 @@ export const IS_BROWSER =
     // @ts-ignore 'window' is not available when type-checking against node.js types.
     typeof window !== 'undefined' || (typeof self !== 'undefined' && typeof self.postMessage === 'function');
 
-export const HOST_RUNTIME = await (async(): Promise<Api.HostRuntime.HostRuntime> => {
-  // Check IS_BROWSER first: in some embedder environments, both IS_NODE
-  // and IS_BROWSER can be true because `process` is available in renderer
-  // contexts. The browser runtime is always correct when browser APIs
-  // (window/self) are available; the Node.js runtime should only be used in
-  // pure Node.js environments where those APIs don't exist.
-  if (IS_BROWSER) {
-    return (await import('./browser/browser.js')).HostRuntime.HOST_RUNTIME;
-  }
+// Not needed for Lighthouse. Also breaks bundling.
+// export const HOST_RUNTIME = await (async(): Promise<Api.HostRuntime.HostRuntime> => {
+//   // Check IS_BROWSER first: in some embedder environments, both IS_NODE
+//   // and IS_BROWSER can be true because `process` is available in renderer
+//   // contexts. The browser runtime is always correct when browser APIs
+//   // (window/self) are available; the Node.js runtime should only be used in
+//   // pure Node.js environments where those APIs don't exist.
+//   if (IS_BROWSER) {
+//     return (await import('./browser/browser.js')).HostRuntime.HOST_RUNTIME;
+//   }
 
-  if (IS_NODE) {
-    return (await import('./node/node.js')).HostRuntime.HOST_RUNTIME;
-  }
+//   if (IS_NODE) {
+//     return (await import('./node/node.js')).HostRuntime.HOST_RUNTIME;
+//   }
 
-  throw new Error('Unknown runtime!');
-})();
+//   throw new Error('Unknown runtime!');
+// })();
+
+export const HOST_RUNTIME = {
+  createWorker(_url: string) {
+    throw new Error('not supported');
+  }
+} as unknown as Api.HostRuntime.HostRuntime;
