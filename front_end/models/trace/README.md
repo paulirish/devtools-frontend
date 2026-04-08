@@ -39,10 +39,13 @@ scripts/trace/prep-trace-engine-package.sh
 # switch to standalone
 cd $HOME/code/trace_engine
 
-# bump and publish
-npm version v0.0.XXX   # Manually determine next version. `npm info @paulirish/trace_engine | grep latest` + 1
-npm publish --access public --dry-run
-npm publish --access public
+# bump
+npm version v0.0.XXX   # Manually determine next version. `npm info @paulirish/trace_engine --registry https://registry.npmjs.org | grep latest` + 1
+npm publish --access public --dry-run # everything look good?
+
+# do auth and publish
+npm whoami --registry https://registry.npmjs.org/ || npm login --registry https://registry.npmjs.org/
+npm publish --access public --registry https://registry.npmjs.org/
 ```
 
 ## High level architecture
