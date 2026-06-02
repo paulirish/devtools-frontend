@@ -31,13 +31,13 @@ action_foreach("generate_skills") {
                 root_build_dir),
   ]
 
-  if (!devtools_bundle) {
-    metadata = {
-      grd_files = []
-      foreach(src, sources) {
-        grd_files +=
-            [ "$target_gen_dir/" + get_path_info(src, "name") + ".skill.js" ]
-      }
-    }
-  }
+  # if (!devtools_bundle) {
+  #   metadata = {
+  #     grd_files = []
+  #     foreach(src, sources) {
+  #       grd_files +=
+  #           [ "$target_gen_dir/" + get_path_info(src, "name") + ".skill.js" ]
+  #     }
+  #   }
+  # }
 }
