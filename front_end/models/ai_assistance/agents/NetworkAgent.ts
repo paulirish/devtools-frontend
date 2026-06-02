@@ -110,12 +110,12 @@ export class RequestContext extends ConversationContext<SDK.NetworkRequest.Netwo
   }
 
   /**
-   * Note: this is not the literal origin of the network request. This origin
+   * Note: this is not the literal origin of the network request. This URL
    * is used to determine when we should force the user to start a new AI
    * conversation when the context changes. We allow a single AI conversation to
    * inspect all network requests that were made for that given target URL.
    */
-  override getOrigin(): string {
+  override getURL(): string {
     return this.#request.documentURL;
   }
 
@@ -161,6 +161,12 @@ export class NetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkRequest> {
     yield {
       type: ResponseType.CONTEXT,
       details: await createContextDetailsForNetworkAgent(selectedNetworkRequest),
+      widgets: [{
+        name: 'NETWORK_REQUEST_GENERAL_HEADERS',
+        data: {
+          request: selectedNetworkRequest.getItem(),
+        },
+      }],
     };
   }
 

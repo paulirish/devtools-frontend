@@ -3,13 +3,18 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../core/host/host.js';
+import type {UrlString} from '../../../core/platform/DevToolsPath.js';
 import * as Root from '../../../core/root/root.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import * as Greendev from '../../greendev/greendev.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
+import type * as TextUtils from '../../text_utils/text_utils.js';
 import type * as Trace from '../../trace/trace.js';
+import type * as Workspace from '../../workspace/workspace.js';
+import {areOriginsEquivalent, extractContextOrigin, isOpaqueOrigin} from '../AiOrigins.js';
 import {debugLog, isStructuredLogEnabled} from '../debug.js';
+
+const MAX_SUGGESTION_LENGTH = 200;
 
 export const enum ResponseType {
   CONTEXT = 'context',
@@ -144,6 +149,12 @@ export interface RequestOptions {
   modelId?: string;
 }
 
+export type AllowedOriginResult = {
+  origin: string|undefined,
+}|{
+  blocked: true,
+};
+
 export interface AgentOptions {
   aidaClient: Host.AidaClient.AidaClient;
   serverSideLoggingEnabled?: boolean;
@@ -151,7 +162,7 @@ export interface AgentOptions {
   confirmSideEffectForTest?: typeof Promise.withResolvers;
   onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
   history?: Host.AidaClient.Content[];
-  allowedOrigin?: () => string | undefined;
+  allowedOrigin?: () => AllowedOriginResult;
   lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
 }
 
@@ -173,19 +184,35 @@ export interface ConversationSuggestion {
 export type ConversationSuggestions = [ConversationSuggestion, ...ConversationSuggestion[]];
 
 export abstract class ConversationContext<T> {
-  abstract getOrigin(): string;
+  abstract getURL(): string;
   abstract getItem(): T;
   abstract getTitle(): string;
 
-  isOriginAllowed(agentOrigin: string|undefined): boolean {
-    if (!agentOrigin) {
-      return true;
+  getOrigin(): string {
+    return extractContextOrigin(this.getURL());
+  }
+
+  /**
+   * Returns true if this data context (e.g., a DOM node or Network Request) is
+   * allowed to be included in a conversation that is locked to the provided
+   * `establishedOrigin`.
+   *
+   * A conversation is "locked" to an origin once the first query is made.
+   * This method ensures that we don't mix data from different origins in the
+   * same conversation.
+   *
+   * @param establishedOrigin The origin that the current conversation is locked to.
+   * If undefined, the conversation has not yet been locked to an origin.
+   */
+  isOriginAllowed(establishedOrigin: string|undefined): boolean {
+    const origin = this.getOrigin();
+    // If no origin is established yet, this context will be the one to lock the conversation.
+    // Opaque origins are never allowed to be used as context.
+    if (!establishedOrigin) {
+      return !isOpaqueOrigin(origin);
     }
-    // Currently does not handle opaque origins because they
-    // are not available to DevTools, instead checks
-    // that serialization of the origin is the same
-    // https://html.spec.whatwg.org/#ascii-serialisation-of-an-origin.
-    return this.getOrigin() === agentOrigin;
+    // Only allow data that matches the origin the conversation is already locked to.
+    return areOriginsEquivalent(origin, establishedOrigin);
   }
 
   /**
@@ -236,7 +263,7 @@ export interface DomTreeAiWidget {
       size: number,
       resourceType: Protocol.Network.ResourceType,
       mimeType: string,
-      imageUrl?: string,
+      imageContent?: TextUtils.ContentData.ContentData,
     },
   };
 }
@@ -248,10 +275,11 @@ export interface PerformanceTraceAiWidget {
   };
 }
 
-export interface LcpBreakdownAiWidget {
-  name: 'LCP_BREAKDOWN';
+export interface PerfInsightAiWidget {
+  name: 'PERF_INSIGHT';
   data: {
-    lcpData: Trace.Insights.Models.LCPBreakdown.LCPBreakdownInsightModel,
+    insight: Trace.Insights.Types.InsightKeys,
+    insightData: Trace.Insights.Types.InsightModel,
   };
 }
 
@@ -274,9 +302,58 @@ export interface BottomUpTreeAiWidget {
   };
 }
 
-// This type will grow as we add more widgets.
-export type AiWidget = ComputedStyleAiWidget|CoreVitalsAiWidget|StylePropertiesAiWidget|DomTreeAiWidget|
-    PerformanceTraceAiWidget|LcpBreakdownAiWidget|TimelineRangeSummaryAiWidget|BottomUpTreeAiWidget;
+export interface SourceFileAiWidget {
+  name: 'SOURCE_FILE';
+  data: {
+    uiSourceCode: Workspace.UISourceCode.UISourceCode,
+  };
+}
+
+export interface SourceFilesListAiWidget {
+  name: 'SOURCE_FILES_LIST';
+  data: {
+    uiSourceCodes: Workspace.UISourceCode.UISourceCode[],
+  };
+}
+
+export interface LighthouseReportAiWidget {
+  name: 'LIGHTHOUSE_REPORT';
+  data: {
+    report: LHModel.ReporterTypes.ReportJSON,
+    snapshotReport?: boolean,
+  };
+}
+
+export interface TimelineEventSummaryAiWidget {
+  name: 'TIMELINE_EVENT_SUMMARY';
+  data: {
+    event: Trace.Types.Events.Event,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+  };
+}
+
+export interface NetworkRequestGeneralHeadersAiWidget {
+  name: 'NETWORK_REQUEST_GENERAL_HEADERS';
+  data: {
+    request: SDK.NetworkRequest.NetworkRequest,
+  };
+}
+
+// If the line and column are not provided, we assume the whole file was sent to the agent.s
+export interface SourceCodeAiWidget {
+  name: 'SOURCE_CODE';
+  data: {
+    url: UrlString,
+    code: string,
+    line?: number,
+    column?: number,
+  };
+}
+
+export type AiWidget =
+    ComputedStyleAiWidget|CoreVitalsAiWidget|StylePropertiesAiWidget|DomTreeAiWidget|PerformanceTraceAiWidget|
+    PerfInsightAiWidget|TimelineRangeSummaryAiWidget|BottomUpTreeAiWidget|SourceFileAiWidget|LighthouseReportAiWidget|
+    TimelineEventSummaryAiWidget|NetworkRequestGeneralHeadersAiWidget|SourceCodeAiWidget|SourceFilesListAiWidget;
 
 export type FunctionCallHandlerResult<Result> = {
   requiresApproval: true,
@@ -334,9 +411,16 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
 
 interface AidaFetchResult {
   text?: string;
-  functionCall?: Host.AidaClient.AidaFunctionCallResponse;
+  functionCall?: Host.AidaClient.AidaFunctionCall;
   completed: boolean;
   rpcId?: Host.AidaClient.RpcGlobalId;
+}
+
+class CrossOriginError extends Error {
+  constructor() {
+    super('Cross-origin navigation detected');
+    this.name = 'CrossOriginError';
+  }
 }
 
 /**
@@ -366,6 +450,7 @@ export abstract class AiAgent<T> {
   readonly #serverSideLoggingEnabled: boolean;
   readonly confirmSideEffect: typeof Promise.withResolvers;
   readonly #functionDeclarations = new Map<string, FunctionDeclaration<Record<string, unknown>, unknown>>();
+  readonly #allowedOrigin?: () => AllowedOriginResult;
 
   /**
    * Used in the debug mode and evals.
@@ -398,6 +483,7 @@ export abstract class AiAgent<T> {
     this.#sessionId = opts.sessionId ?? crypto.randomUUID();
     this.confirmSideEffect = opts.confirmSideEffectForTest ?? (() => Promise.withResolvers());
     this.#history = opts.history ?? [];
+    this.#allowedOrigin = opts.allowedOrigin;
   }
 
   async enhanceQuery(query: string, selected: ConversationContext<T>|null, multimodalInputType?: MultimodalInputType):
@@ -462,6 +548,8 @@ export abstract class AiAgent<T> {
     }
     const enableAidaFunctionCalling = declarations.length;
     const userTier = Host.AidaClient.convertToUserTierEnum(this.userTier);
+    const clientFeatureName = Host.AidaClient.getClientFeatureName(this.clientFeature);
+    debugLog(`Client ${clientFeatureName} running with userTier ${this.userTier}`);
     const preamble = userTier === Host.AidaClient.UserTier.TESTERS ? this.preamble : undefined;
     const facts = Array.from(this.#facts);
     const request: Host.AidaClient.DoConversationRequest = {
@@ -517,8 +605,7 @@ export abstract class AiAgent<T> {
       const trimmed = line.trim();
       if (trimmed.startsWith('SUGGESTIONS:')) {
         try {
-          // TODO: Do basic validation this is an array with strings
-          suggestions = JSON.parse(trimmed.substring('SUGGESTIONS:'.length).trim());
+          suggestions = sanitizeSuggestions(trimmed.substring('SUGGESTIONS:'.length).trim());
         } catch {
         }
       } else {
@@ -531,8 +618,7 @@ export abstract class AiAgent<T> {
     if (!suggestions && answerLines.at(-1)?.includes('SUGGESTIONS:')) {
       const [answer, suggestionsText] = answerLines[answerLines.length - 1].split('SUGGESTIONS:', 2);
       try {
-        // TODO: Do basic validation this is an array with strings
-        suggestions = JSON.parse(suggestionsText.trim().substring('SUGGESTIONS:'.length).trim());
+        suggestions = sanitizeSuggestions(suggestionsText.trim());
       } catch {
       }
       answerLines[answerLines.length - 1] = answer;
@@ -616,18 +702,14 @@ export abstract class AiAgent<T> {
 
     yield* this.handleContextDetails(options.selected);
 
-    const breakpointAgentEnabled = Greendev.Prototypes.instance().isEnabled('breakpointDebuggerAgent');
-    const isBreakpointDebuggerAgent = this.constructor.name === 'BreakpointDebuggerAgent';
-    const finalMaxSteps = (isBreakpointDebuggerAgent && breakpointAgentEnabled) ? 1000 : MAX_STEPS;
-
-    for (let i = 0; i < finalMaxSteps; i++) {
+    for (let i = 0; i < MAX_STEPS; i++) {
       yield {
         type: ResponseType.QUERYING,
       };
 
       let rpcId: Host.AidaClient.RpcGlobalId|undefined;
       let textResponse = '';
-      let functionCall: Host.AidaClient.AidaFunctionCallResponse|undefined = undefined;
+      let functionCall: Host.AidaClient.AidaFunctionCall|undefined = undefined;
       try {
         for await (const fetchResult of this.#aidaFetch(request, {signal: options.signal})) {
           rpcId = fetchResult.rpcId;
@@ -691,11 +773,19 @@ export abstract class AiAgent<T> {
       }
 
       if (functionCall) {
+        const allowedOriginResult = this.#allowedOrigin?.();
+        if (allowedOriginResult && 'blocked' in allowedOriginResult) {
+          // Abort immediately if the page navigated before we could lock the origin.
+          // This prevents the AI from accessing data from the new page.
+          yield this.#createErrorResponse(ErrorType.CROSS_ORIGIN);
+          break;
+        }
         try {
           const result = yield*
               this.#callFunction(
                   functionCall.name,
                   functionCall.args,
+                  functionCall.thoughtSignature,
                   {
                     ...options,
                     explanation: textResponse,
@@ -727,6 +817,10 @@ export abstract class AiAgent<T> {
           };
           request = this.buildRequest(query, Host.AidaClient.Role.ROLE_UNSPECIFIED);
         } catch (err) {
+          if (err instanceof CrossOriginError) {
+            yield this.#createErrorResponse(ErrorType.CROSS_ORIGIN);
+            break;
+          }
           debugLog('Error handling function call', err);
           yield this.#createErrorResponse(ErrorType.UNKNOWN);
           break;
@@ -747,6 +841,7 @@ export abstract class AiAgent<T> {
       #callFunction(
           name: string,
           args: Record<string, unknown>,
+          thoughtSignature?: string,
           options?: FunctionHandlerOptions&{explanation?: string},
           ): AsyncGenerator<FunctionCallResponseData, {
         result: unknown,
@@ -762,12 +857,14 @@ export abstract class AiAgent<T> {
         text: options.explanation,
       });
     }
-    parts.push({
-      functionCall: {
-        name,
-        args,
-      },
-    });
+    const functionCall: Host.AidaClient.AidaFunctionCall = {
+      name,
+      args,
+    };
+    if (thoughtSignature) {
+      functionCall.thoughtSignature = thoughtSignature;
+    }
+    parts.push({functionCall});
     this.#history.push({
       parts,
       role: Host.AidaClient.Role.MODEL,
@@ -792,7 +889,18 @@ export abstract class AiAgent<T> {
       }
     }
 
+    const isOriginBlocked = (): boolean => {
+      const allowedOriginResult = this.#allowedOrigin?.();
+      return Boolean(allowedOriginResult && 'blocked' in allowedOriginResult);
+    };
+
     let result = await call.handler(args, options);
+
+    // Check 1: After first handler execution.
+    // Navigation could have occurred during the async handler execution.
+    if (isOriginBlocked()) {
+      throw new CrossOriginError();
+    }
 
     if ('requiresApproval' in result) {
       if (code) {
@@ -839,10 +947,24 @@ export abstract class AiAgent<T> {
         };
       }
 
+      // Re-check allowed origin after the approval await to prevent a TOCTOU (Time-of-Check
+      // to Time-of-Use) race condition where the page might have navigated cross-origin
+      // while the user was confirming the action.
+      // Check 2: After waiting for user approval.
+      if (isOriginBlocked()) {
+        throw new CrossOriginError();
+      }
+
       result = await call.handler(args, {
         ...options,
         approved: true,
       });
+
+      // Check 3: After second handler execution (approved run).
+      // Navigation could have occurred during the async execution of the approved action.
+      if (isOriginBlocked()) {
+        throw new CrossOriginError();
+      }
     }
 
     if ('result' in result) {
@@ -927,4 +1049,27 @@ export abstract class AiAgent<T> {
       error,
     };
   }
+}
+
+function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefined {
+  const parsed = JSON.parse(suggestions);
+  if (!Array.isArray(parsed)) {
+    return undefined;
+  }
+  const sanitized: string[] = [];
+  for (const item of parsed) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    // Collapse multiple whitespace/newlines into a single space.
+    const noExtraWhitespace = item.replace(/\s+/g, ' ').trim();
+    if (noExtraWhitespace.length === 0) {
+      continue;
+    }
+    sanitized.push(noExtraWhitespace.substring(0, MAX_SUGGESTION_LENGTH));
+  }
+  if (sanitized.length === 0) {
+    return undefined;
+  }
+  return sanitized as [string, ...string[]];
 }

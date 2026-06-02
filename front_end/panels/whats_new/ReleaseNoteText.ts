@@ -40,22 +40,22 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 147,
-  header: 'What\'s new in DevTools 147',
+  version: 149,
+  header: 'What’s new in DevTools 149',
   markdownLinks: [
     {
+      key: 'devtools-for-agents',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#devtools-for-agents',
+    },
+    {
       key: 'ai-assistance',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#ai-assistance',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#ai-assistance',
     },
     {
-      key: 'mcp-server',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#mcp-server',
-    },
-    {
-      key: 'code-generation',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-147/#code-generation',
+      key: 'css-code-completion',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#css-code-completion',
     }
   ],
   videoLinks: [],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-147/',
+  link: 'https://developer.chrome.com/blog/new-in-devtools-149/',
 };

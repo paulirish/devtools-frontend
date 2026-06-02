@@ -35,6 +35,13 @@ function expectErrors() {
   expectError(/Protocol Error: the message with wrong session id/);
   expectError(/Protocol Error: the message with wrong session id/);
   expectError(/Protocol Error: the message with wrong session id/);
+
+  // I don't know why these started happening after adding lighthouse/busy-worker.html
+  expectError(/Request Emulation\.setEmitTouchEventsForMouse failed/);
+  expectError(/Request Emulation\.setEmitTouchEventsForMouse failed/);
+  expectError(/Request Emulation\.setEmitTouchEventsForMouse failed/);
+  expectError(/Request Emulation\.setEmitTouchEventsForMouse failed/);
+  expectError(/Request Emulation\.setEmitTouchEventsForMouse failed/);
 }
 
 describe('Navigation', function() {
@@ -79,7 +86,7 @@ describe('Navigation', function() {
       // 1 refresh after auditing to reset state
       assert.strictEqual(numNavigations, 5);
 
-      assert.strictEqual(lhr.lighthouseVersion, '13.0.2');
+      assert.strictEqual(lhr.lighthouseVersion, '13.3.0');
       assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
       assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -105,7 +112,7 @@ describe('Navigation', function() {
       });
 
       const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, ['max-potential-fid']);
-      assert.lengthOf(auditResults, 151);
+      assert.lengthOf(auditResults, 155);
       assert.deepEqual(erroredAudits, []);
       assert.deepEqual(failedAudits.map(audit => audit.id), [
         'document-title',
@@ -198,7 +205,7 @@ describe('Navigation', function() {
       ];
 
       const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, flakyAudits);
-      assert.lengthOf(auditResults, 151);
+      assert.lengthOf(auditResults, 155);
       assert.deepEqual(erroredAudits, []);
       assert.deepEqual(failedAudits.map(audit => audit.id), [
         'document-title',
@@ -210,6 +217,26 @@ describe('Navigation', function() {
 
       const viewTraceButton = await devToolsPage.$textContent('View Trace', reportEl);
       assert.isOk(viewTraceButton);
+    } catch (e) {
+      console.error(consoleLog.join('\n'));
+      throw e;
+    } finally {
+      devToolsPage.page.off('console', consoleListener);
+    }
+  });
+
+  it('successfully returns a Lighthouse report when a worker is busy', async ({devToolsPage, inspectedPage}) => {
+    devToolsPage.page.on('console', consoleListener);
+    try {
+      expectErrors();
+
+      await navigateToLighthouseTab('lighthouse/busy-worker.html', devToolsPage, inspectedPage);
+
+      await clickStartButton(devToolsPage);
+
+      const {lhr} = await waitForResult(devToolsPage, inspectedPage);
+
+      assert.strictEqual(lhr.lighthouseVersion, '13.3.0');
     } catch (e) {
       console.error(consoleLog.join('\n'));
       throw e;

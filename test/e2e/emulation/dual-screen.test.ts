@@ -5,11 +5,11 @@ import {assert} from 'chai';
 
 import {
   clickToggleButton,
-  getWidthOfDevice,
   selectDualScreen,
   selectNonDualScreenDevice,
   selectToggleButton,
   startEmulationWithDualScreenPage,
+  waitForWidthOfDevice,
 } from '../helpers/emulation-helpers.js';
 
 const DUO_VERTICAL_SPANNED_WIDTH = '1114';
@@ -21,12 +21,10 @@ describe('Dual screen mode', () => {
        await startEmulationWithDualScreenPage(devToolsPage, inspectedPage);
        await selectDualScreen(devToolsPage);
        await clickToggleButton(devToolsPage);
-       const widthDual = await getWidthOfDevice(devToolsPage);
-       assert.strictEqual(widthDual, DUO_VERTICAL_SPANNED_WIDTH);
+       await waitForWidthOfDevice(devToolsPage, DUO_VERTICAL_SPANNED_WIDTH);
 
        await clickToggleButton(devToolsPage);
-       const widthSingle = await getWidthOfDevice(devToolsPage);
-       assert.strictEqual(widthSingle, DUO_VERTICAL_WIDTH);
+       await waitForWidthOfDevice(devToolsPage, DUO_VERTICAL_WIDTH);
      });
 
   it('User may not click toggle dual screen button for a non-dual screen device',
@@ -35,7 +33,6 @@ describe('Dual screen mode', () => {
        await selectNonDualScreenDevice(devToolsPage);
        // toggle button should not be found
        const toggleButton = await selectToggleButton(devToolsPage);
-       const hidden = await toggleButton.evaluate(x => x.classList.contains('hidden'));
-       assert.isTrue(hidden);
+       assert.isNull(toggleButton);
      });
 });

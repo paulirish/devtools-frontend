@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
+
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
@@ -114,6 +116,36 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
       ['Status', 'Speculative load is running.'],
       ['Rule set', 'example.com/'],
     ]);
+  });
+
+  it('renders prerendering details with form submission', async () => {
+    const url = urlString`https://example.com/prerendered.html`;
+    const data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData = {
+      pipeline: SDK.PreloadingModel.PreloadPipeline.newFromAttemptsForTesting([
+        {
+          action: Protocol.Preload.SpeculationAction.Prerender,
+          key: {
+            loaderId: 'loaderId' as Protocol.Network.LoaderId,
+            action: Protocol.Preload.SpeculationAction.Prerender,
+            url,
+            formSubmission: true,
+          },
+          pipelineId: 'pipelineId:1' as Protocol.Preload.PreloadPipelineId,
+          status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
+          prerenderStatus: null,
+          disallowedMojoInterface: null,
+          mismatchedHeaders: null,
+          ruleSetIds: ['ruleSetId'] as Protocol.Preload.RuleSetId[],
+          nodeIds: [1] as Protocol.DOM.BackendNodeId[],
+        },
+      ]),
+      ruleSets: [],
+      pageURL: urlString`https://example.com/`,
+    };
+
+    const report = await renderPreloadingDetailsReportView(data);
+
+    assert.isTrue(report.shadowRoot?.textContent?.includes('Form submissionYes'));
   });
 
   it('renders prerendering details with target hint blank', async () => {

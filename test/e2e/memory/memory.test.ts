@@ -11,7 +11,6 @@ import {
 import {
   changeAllocationSampleViewViaDropdown,
   changeViewViaDropdown,
-  checkExposeInternals,
   checkRetainerChainSatisfies,
   clickOnContextMenuForRetainer,
   expandFocusedRow,
@@ -163,7 +162,7 @@ describe('The Memory Panel', function() {
     });
     await devToolsPage.page.keyboard.press('ArrowRight');
     const internalNodeSpan = await devToolsPage.waitFor(
-        '//span[text()="InternalNode"][ancestor-or-self::tr[preceding-sibling::*[1][//span[text()="Pending activities"]]]]',
+        '//span[contains(text(), "blink::HeapVectorBacking")][ancestor-or-self::tr[preceding-sibling::*[1][//span[text()="Pending activities"]]]]',
         undefined, undefined, 'xpath');
     const internalNodeRow = (await devToolsPage.$('ancestor-or-self::tr', internalNodeSpan, 'xpath'))!;
     await devToolsPage.waitForFunction(async () => {
@@ -216,7 +215,7 @@ describe('The Memory Panel', function() {
     await devToolsPage.waitForFunction(async () => {
       // Wait for all the rows of the data-grid to load.
       const retainerGridElements = await getDataGridRows('.retaining-paths-view table.data', devToolsPage);
-      return retainerGridElements.length === 12;
+      return retainerGridElements.length === 114;
     });
 
     const sharedInLeakingElementRow = await devToolsPage.waitForFunction(async () => {
@@ -300,6 +299,15 @@ describe('The Memory Panel', function() {
     await devToolsPage.waitFor('.source-code', el);
 
     await setSearchFilter('system / descriptorarray', devToolsPage);
+    // Explicitly wait for the search to complete and results to be updated
+    await devToolsPage.waitForFunction(async () => {
+      const selectedRow = await devToolsPage.$('.data-grid-data-grid-node.selected');
+      if (!selectedRow) {
+        return false;
+      }
+      const text = await selectedRow.evaluate(el => el.textContent);
+      return text?.includes('system / DescriptorArray');
+    });
     // Find the first one as these are system
     await findSearchResult('system / DescriptorArray', /1 of/, devToolsPage);
     await devToolsPage.hover('.selected.data-grid-data-grid-node span.object-value-null');
@@ -341,6 +349,24 @@ describe('The Memory Panel', function() {
     const dropdown = await devToolsPage.waitFor('select[aria-label="Perspective"]');
     await devToolsPage.waitForNoElementsWithTextContent('Allocation', dropdown);
   });
+
+  it('enables the sampling timeline checkbox only when allocation sampling is selected',
+     async ({devToolsPage, inspectedPage}) => {
+       await inspectedPage.goToResource('memory/allocations.html');
+       await navigateToMemoryTab(devToolsPage);
+
+       const input = await devToolsPage.waitFor('input[title="Sampling heap profiler timeline"]');
+       assert.isNotNull(input, 'Input not found');
+
+       let isDisabled = await input.evaluate(el => (el as HTMLInputElement).disabled);
+       assert.isTrue(isDisabled, 'Checkbox should be disabled by default');
+
+       const optionLabel = await devToolsPage.waitForElementWithTextContent('Allocation sampling');
+       await devToolsPage.clickElement(optionLabel);
+
+       isDisabled = await input.evaluate(el => (el as HTMLInputElement).disabled);
+       assert.isFalse(isDisabled, 'Checkbox should be enabled when allocation sampling is selected');
+     });
 
   it('shows object source links in snapshot', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.evaluate(`
@@ -436,31 +462,16 @@ describe('The Memory Panel', function() {
     }
   });
 
-  it('Includes backing store size in the shallow size of a JS Set', async ({devToolsPage, inspectedPage}) => {
-    await inspectedPage.goToResource('memory/set.html');
-    const sizes = await runJSSetTest(devToolsPage);
-
-    // The Set is reported as containing at least 100 pointers.
-    assert.isTrue(sizes.sizesForSet.shallowSize >= 400);
-    // The Set retains its backing storage.
-    assert.isTrue(
-        sizes.sizesForSet.retainedSize >= sizes.sizesForSet.shallowSize + sizes.sizesForBackingStorage.retainedSize);
-    // The backing storage is reported as zero size.
-    assert.strictEqual(sizes.sizesForBackingStorage.shallowSize, 0);
-    // The backing storage retains 100 strings, which occupy at least 16 bytes each.
-    assert.isTrue(sizes.sizesForBackingStorage.retainedSize >= 1600);
-  });
-
   it('Computes distances and sizes for WeakMap values correctly', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('memory/weakmap.html');
     await navigateToMemoryTab(devToolsPage);
     await takeHeapSnapshot(undefined, devToolsPage);
     await waitForNonEmptyHeapSnapshotData(devToolsPage);
     await setClassFilter('CustomClass', devToolsPage);
-    assert.strictEqual(6, await getDistanceFromCategoryRow('CustomClass1', devToolsPage));
-    assert.strictEqual(7, await getDistanceFromCategoryRow('CustomClass2', devToolsPage));
-    assert.strictEqual(3, await getDistanceFromCategoryRow('CustomClass3', devToolsPage));
-    assert.strictEqual(9, await getDistanceFromCategoryRow('CustomClass4', devToolsPage));
+    assert.strictEqual(8, await getDistanceFromCategoryRow('CustomClass1', devToolsPage));
+    assert.strictEqual(9, await getDistanceFromCategoryRow('CustomClass2', devToolsPage));
+    assert.strictEqual(5, await getDistanceFromCategoryRow('CustomClass3', devToolsPage));
+    assert.strictEqual(11, await getDistanceFromCategoryRow('CustomClass4', devToolsPage));
     assert.isTrue((await getSizesFromCategoryRow('CustomClass1Key', devToolsPage)).retainedSize >= 2 ** 15);
     assert.isTrue((await getSizesFromCategoryRow('CustomClass2Key', devToolsPage)).retainedSize >= 2 ** 15);
     assert.isTrue((await getSizesFromCategoryRow('CustomClass3Key', devToolsPage)).retainedSize < 2 ** 15);
@@ -621,7 +632,6 @@ describe('The Memory Panel', () => {
   it('Does not include backing store size in the shallow size of a JS Set', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('memory/set.html');
     await navigateToMemoryTab(devToolsPage);
-    await checkExposeInternals(devToolsPage);
     const sizes = await runJSSetTest(devToolsPage);
 
     // The Set object is small, regardless of the contained content.
@@ -637,4 +647,24 @@ describe('The Memory Panel', () => {
     // going from Chrome 142.0.7421.0 to 142.0.7427.0.
     assert.isTrue(sizes.sizesForBackingStorage.retainedSize >= sizes.sizesForBackingStorage.shallowSize);
   });
+
+  it('Does not crash when resolving heap snapshot object to a JS object on DOM wrapper boilerplate',
+     async ({devToolsPage, inspectedPage}) => {
+       await inspectedPage.goToResource('memory/default.html');
+       await navigateToMemoryTab(devToolsPage);
+       await inspectedPage.evaluate(`document.body.fieldOnDomWrapper = 2012;`);
+       await takeHeapSnapshot(undefined, devToolsPage);
+       await waitForNonEmptyHeapSnapshotData(devToolsPage);
+       await setClassFilter('HTMLBodyElement', devToolsPage);
+
+       const row = await getCategoryRow('HTMLBodyElement', undefined, devToolsPage);
+       assert.isOk(row, 'HTMLBodyElement row not found in UI');
+
+       const count = await getCountFromCategoryRow(row, devToolsPage);
+       assert.isAbove(count, 0, 'Should have found at least one HTMLBodyElement');
+
+       // Expand the row to make sure we can see instances without crashing
+       await focusTableRow(row, devToolsPage);
+       await expandFocusedRow(devToolsPage);
+     });
 });

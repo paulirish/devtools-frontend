@@ -99,12 +99,6 @@ function describeTitle(file: string, title: string) {
   return `${prefix}: ${title}`;
 }
 
-function iterationSuffix(iteration: number): string {
-  if (iteration === 0) {
-    return '';
-  }
-  return ` (#${iteration})`;
-}
 function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: string, mocha: Mocha) {
   function createTest(title: string, itBodyFn?: Mocha.AsyncFunc) {
     const test = new Mocha.Test(
@@ -132,8 +126,7 @@ function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: s
   // It is not possible with TestConfig.repetitions.
   const localIt = function(title: string, fn?: Mocha.AsyncFunc) {
     for (let i = 0; i < TestConfig.repetitions; i++) {
-      const iterationTitle = title + iterationSuffix(i);
-      createTest(iterationTitle, fn);
+      createTest(title, fn);
     }
   };
   localIt.skip = function(title: string, _fn: Mocha.AsyncFunc) {
@@ -142,8 +135,7 @@ function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: s
   };
   localIt.only = function(title: string, fn: Mocha.AsyncFunc) {
     for (let i = 0; i < TestConfig.repetitions; i++) {
-      const iterationTitle = title + iterationSuffix(i);
-      testImplementation.only(mocha, createTest(iterationTitle, fn));
+      testImplementation.only(mocha, createTest(title, fn));
     }
   };
   localIt.skipOnPlatforms = function(platforms: Platform[], title: string, fn: Mocha.AsyncFunc) {

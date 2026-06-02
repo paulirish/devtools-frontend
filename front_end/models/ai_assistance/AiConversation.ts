@@ -13,7 +13,9 @@ import type * as NetworkTimeCalculator from '../network_time_calculator/network_
 
 import {AccessibilityAgent, AccessibilityContext} from './agents/AccessibilityAgent.js';
 import {
+  type AgentOptions,
   type AiAgent,
+  type AllowedOriginResult,
   type ContextDetail,
   type ConversationContext,
   ErrorType,
@@ -22,18 +24,30 @@ import {
   ResponseType,
   type UserQuery
 } from './agents/AiAgent.js';
-import {BreakpointDebuggerAgent} from './agents/BreakpointDebuggerAgent.js';
 import {ContextSelectionAgent} from './agents/ContextSelectionAgent.js';
 import {FileAgent, FileContext} from './agents/FileAgent.js';
 import {NetworkAgent, RequestContext} from './agents/NetworkAgent.js';
 import {PerformanceAgent, PerformanceTraceContext} from './agents/PerformanceAgent.js';
+import {StorageAgent, StorageContext} from './agents/StorageAgent.js';
 import {NodeContext, StylingAgent} from './agents/StylingAgent.js';
+import {AiAgent2} from './AiAgent2.js';
 import {AiHistoryStorage, ConversationType, type SerializedConversation} from './AiHistoryStorage.js';
 import type {ChangeManager} from './ChangeManager.js';
 
 export const NOT_FOUND_IMAGE_DATA = '';
 export const CONTEXT_TITLE = 'Analyzing data';
 const MAX_TITLE_LENGTH = 80;
+/**
+ * List of page navigations that are allowed during an AI agent run.
+ * These are page navigations triggered by agents themselves:
+ * - `about://` : Navigated to before initiating a trace recording to ensure a clean state.
+ * - `chrome://terms`: Navigated to by Lighthouse during its Back-Forward Cache
+ *    audit.
+ */
+export const ALLOWED_PAGE_NAVIGATIONS: Platform.DevToolsPath.UrlString[] = [
+  Platform.DevToolsPath.urlString`about://`,
+  Platform.DevToolsPath.urlString`chrome://terms`,
+];
 
 export function generateContextDetailsMarkdown(details: ContextDetail[]): string {
   const detailsMarkdown: string[] = [];
@@ -87,6 +101,7 @@ export class AiConversation {
   #aidaClient: Host.AidaClient.AidaClient;
   #changeManager: ChangeManager|undefined;
   #origin?: string;
+  #navigationOccurredDuringRun = false;
 
   #contexts: Array<ConversationContext<unknown>> = [];
 
@@ -175,6 +190,8 @@ export class AiConversation {
         this.#updateAgent(ConversationType.PERFORMANCE);
       } else if (updateContext instanceof AccessibilityContext) {
         this.#updateAgent(ConversationType.ACCESSIBILITY);
+      } else if (updateContext instanceof StorageContext) {
+        this.#updateAgent(ConversationType.STORAGE);
       }
     }
   }
@@ -269,6 +286,7 @@ export class AiConversation {
     this.history.push(item);
     await AiHistoryStorage.instance().upsertHistoryEntry(this.serialize());
     if (item.type === ResponseType.USER_QUERY) {
+      void AiHistoryStorage.instance().addRecentPrompt(item.query);
       if (item.imageId && item.imageInput && 'inlineData' in item.imageInput) {
         const inlineData = item.imageInput.inlineData;
         await AiHistoryStorage.instance().upsertImage({
@@ -340,38 +358,27 @@ export class AiConversation {
       allowedOrigin: this.allowedOrigin,
       history,
     };
+
+    this.#agent = Root.Runtime.hostConfig.devToolsAiV2Architecture?.enabled ? new AiAgent2(options) :
+                                                                              this.#createV1Agent(type, options);
+  }
+
+  #createV1Agent(type: ConversationType, options: AgentOptions): AiAgent<unknown> {
     switch (type) {
-      case ConversationType.STYLING: {
-        this.#agent = new StylingAgent(options);
-        break;
-      }
-      case ConversationType.NETWORK: {
-        this.#agent = new NetworkAgent(options);
-        break;
-      }
-      case ConversationType.FILE: {
-        this.#agent = new FileAgent(options);
-        break;
-      }
-      case ConversationType.PERFORMANCE: {
-        this.#agent = new PerformanceAgent(options);
-        break;
-      }
-      case ConversationType.BREAKPOINT: {
-        const breakpointAgentEnabled = Greendev.Prototypes.instance().isEnabled('breakpointDebuggerAgent');
-        if (breakpointAgentEnabled) {
-          this.#agent = new BreakpointDebuggerAgent(options);
-        }
-        break;
-      }
-      case ConversationType.ACCESSIBILITY: {
-        this.#agent = new AccessibilityAgent(options);
-        break;
-      }
-      case ConversationType.NONE: {
-        this.#agent = new ContextSelectionAgent(options);
-        break;
-      }
+      case ConversationType.STYLING:
+        return new StylingAgent(options);
+      case ConversationType.NETWORK:
+        return new NetworkAgent(options);
+      case ConversationType.FILE:
+        return new FileAgent(options);
+      case ConversationType.PERFORMANCE:
+        return new PerformanceAgent(options);
+      case ConversationType.ACCESSIBILITY:
+        return new AccessibilityAgent(options);
+      case ConversationType.STORAGE:
+        return new StorageAgent(options);
+      case ConversationType.NONE:
+        return new ContextSelectionAgent(options);
       default:
         Platform.assertNever(type, 'Unknown conversation type');
     }
@@ -385,22 +392,34 @@ export class AiConversation {
             multimodalInput?: MultimodalInput,
           } = {},
           ): AsyncGenerator<ResponseData, void, void> {
-    if (this.isBlockedByOrigin) {
-      // This error should not be reached. If it happens, some
-      // invariants do not hold anymore.
-      throw new Error('cross-origin context data should not be included');
-    }
-
-    const userQuery: UserQuery = {
-      type: ResponseType.USER_QUERY,
-      query: initialQuery,
-      imageInput: options.multimodalInput?.input,
-      imageId: options.multimodalInput?.id,
+    this.#navigationOccurredDuringRun = false;
+    const originAtRunStart = getPrimaryPageOrigin();
+    const listener = (): void => {
+      // If an unexpected navigation to a different origin occurred
+      // during processing the user's request, we don't want to allow
+      // the agent to run any function calls and retrieve data from the new origin.
+      // Performance agent and accessibility agent navigate to 'about://' or 'chrome://terms'
+      const newOrigin = getPrimaryPageOrigin();
+      if (originAtRunStart !== newOrigin && newOrigin && !ALLOWED_PAGE_NAVIGATIONS.includes(newOrigin)) {
+        this.#navigationOccurredDuringRun = true;
+      }
     };
-    void this.addHistoryItem(userQuery);
-    yield userQuery;
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    targetManager.addModelListener(
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged, listener, this);
 
-    yield* this.#runAgent(initialQuery, options);
+    try {
+      if (this.isBlockedByOrigin) {
+        // This error should not be reached. If it happens, some
+        // invariants do not hold anymore.
+        throw new Error('cross-origin context data should not be included');
+      }
+
+      yield* this.#runAgent(initialQuery, options, {isInitialCall: true});
+    } finally {
+      targetManager.removeModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged, listener, this);
+    }
   }
 
   #getQueryAfterSelection(initialQuery: string, selection: string): string {
@@ -414,6 +433,7 @@ export class AiConversation {
             signal?: AbortSignal,
             multimodalInput?: MultimodalInput,
           } = {},
+          runOptions: {isInitialCall?: boolean} = {},
           ): AsyncGenerator<ResponseData, void, void> {
     this.#setOriginIfEmpty(this.selectedContext?.getOrigin());
     if (this.isBlockedByOrigin) {
@@ -422,6 +442,17 @@ export class AiConversation {
         error: ErrorType.CROSS_ORIGIN,
       };
       return;
+    }
+
+    if (runOptions.isInitialCall) {
+      const userQuery: UserQuery = {
+        type: ResponseType.USER_QUERY,
+        query: initialQuery,
+        imageInput: options.multimodalInput?.input,
+        imageId: options.multimodalInput?.id,
+      };
+      void this.addHistoryItem(userQuery);
+      yield userQuery;
     }
 
     function shouldAddToHistory(data: ResponseData): boolean {
@@ -457,7 +488,9 @@ export class AiConversation {
       // requery with the specialized agent.
       if (data.type === ResponseType.CONTEXT_CHANGE) {
         this.setContext(data.context);
-        yield* this.#runAgent(this.#getQueryAfterSelection(initialQuery, data.description), options);
+        yield*
+            this.#runAgent(
+                this.#getQueryAfterSelection(initialQuery, data.description), options, {isInitialCall: false});
         return;
       }
     }
@@ -480,15 +513,16 @@ export class AiConversation {
     return this.#type;
   }
 
-  allowedOrigin = (): string|undefined => {
-    if (this.#origin) {
-      return this.#origin;
+  allowedOrigin = (): AllowedOriginResult => {
+    if (this.#navigationOccurredDuringRun) {
+      return {blocked: true};
     }
-    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
-    const inspectedURL = target?.inspectedURL();
-    this.#origin = inspectedURL ? new Common.ParsedURL.ParsedURL(inspectedURL).securityOrigin() : undefined;
+    if (this.#origin) {
+      return {origin: this.#origin};
+    }
+    this.#origin = getPrimaryPageOrigin();
 
-    return this.#origin;
+    return {origin: this.#origin};
   };
 }
 
@@ -498,4 +532,10 @@ function isAiAssistanceServerSideLoggingEnabled(): boolean {
 
 function isAiAssistanceContextSelectionAgentEnabled(): boolean {
   return Boolean(Root.Runtime.hostConfig.devToolsAiAssistanceContextSelectionAgent?.enabled);
+}
+
+function getPrimaryPageOrigin(): Platform.DevToolsPath.UrlString|undefined {
+  const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+  const inspectedURL = target?.inspectedURL();
+  return inspectedURL ? new Common.ParsedURL.ParsedURL(inspectedURL).securityOrigin() : undefined;
 }

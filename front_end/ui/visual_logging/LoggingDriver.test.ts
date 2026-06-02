@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
@@ -1013,7 +1015,8 @@ describe('LoggingDriver', () => {
     assert.isTrue(recordResize.calledBefore(recordImpression));
   });
 
-  it('logs keydown, then resize, then impressions', async () => {
+  // Flaky test.
+  it.skip('[crbug.com/453711161] logs keydown, then resize, then impressions', async () => {
     await addLoggableElements();
     const element = document.getElementById('element')!;
     element.setAttribute('jslog', 'TreeItem; context:42; track: keydown: KeyA, resize');

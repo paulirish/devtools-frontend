@@ -323,6 +323,9 @@
   "core/sdk/NetworkManager.ts | noContentForRedirect": {
     "message": "このリクエストはリダイレクトされたため、コンテンツはありません"
   },
+  "core/sdk/NetworkManager.ts | noContentForSSE": {
+    "message": "サーバー送信イベント（SSE）のコンテンツは現在サポートされていません"
+  },
   "core/sdk/NetworkManager.ts | noContentForWebSocket": {
     "message": "WebSocket のコンテンツは現在サポートされていません"
   },
@@ -559,6 +562,9 @@
   },
   "core/sdk/sdk-meta.ts | achromatopsia": {
     "message": "色覚異常（色の識別不可）"
+  },
+  "core/sdk/sdk-meta.ts | apca": {
+    "message": "以前のコントラスト比と AA / AAA ガイドラインに代わる高度な知覚コントラスト アルゴリズム（APCA）"
   },
   "core/sdk/sdk-meta.ts | blurredVision": {
     "message": "かすみ目"
@@ -1061,9 +1067,6 @@
   "entrypoints/main/MainImpl.ts | dockToRight": {
     "message": "右に固定"
   },
-  "entrypoints/main/MainImpl.ts | externalRequestReceived": {
-    "message": "DevTools が外部リクエストを受信しました"
-  },
   "entrypoints/main/MainImpl.ts | focusDebuggee": {
     "message": "ページにフォーカス"
   },
@@ -1328,6 +1331,12 @@
   "generated/Deprecation.ts | DataUrlInSvgUse": {
     "message": "データのサポート: SVGUseElement の URL は非推奨となり、今後削除される予定です。"
   },
+  "generated/Deprecation.ts | DocumentCreateEventKeyboardEvents": {
+    "message": "document.createEvent('KeyboardEvents') は非推奨となり、今後削除されます。代わりに new KeyboardEvent() を使用してください。"
+  },
+  "generated/Deprecation.ts | DocumentCreateEventTransitionEvent": {
+    "message": "document.createEvent('TransitionEvent') は非推奨となり、今後削除されます。代わりに new TransitionEvent() を使用してください。"
+  },
   "generated/Deprecation.ts | ExampleBrowserProcessDeprecation": {
     "message": "これは、ブラウザ プロセスで報告された非推奨の機能に必要なコードを示す例です。"
   },
@@ -1438,6 +1447,9 @@
   },
   "generated/Deprecation.ts | PrefixedVideoSupportsFullscreen": {
     "message": "HTMLVideoElement.webkitSupportsFullscreen は非推奨になりました。代わりに Document.fullscreenEnabled を使用してください。"
+  },
+  "generated/Deprecation.ts | PreventSvgFilterPaint": {
+    "message": "SVG フィルタは、クロスオリジンの iframe、制限付き iframe（サンドボックス化されたものなど）、プラグインには適用できません。"
   },
   "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpFalse": {
     "message": "DtlsSrtpKeyAgreement の制約は削除されました。この制約に指定されている false 値は、削除された SDES key negotiation の方法を使用する試みとして解釈されます。この機能は削除されたため、DTLS key negotiation をサポートしているサービスで代用してください。"
@@ -2246,6 +2258,30 @@
   "models/trace/insights/Cache.ts | title": {
     "message": "効率的なキャッシュ保存期間を使用する"
   },
+  "models/trace/insights/CharacterSet.ts | description": {
+    "message": "文字エンコードの宣言が必要です。これには、HTML の最初の 1,024 バイトか Content-Type HTTP レスポンス ヘッダーの中で meta charset タグを使用します。[文字エンコードの宣言についての詳細](https://developer.chrome.com/docs/insights/charset/)"
+  },
+  "models/trace/insights/CharacterSet.ts | failedHttpHeader": {
+    "message": "文字セットが HTTP ヘッダーで宣言されていません"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetLate": {
+    "message": "文字セットがメタタグを使用して最初の 1,024 バイトの後に宣言されています"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetMissing": {
+    "message": "文字セットがメタタグを使用して宣言されていません"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetUnknown": {
+    "message": "トレースから meta charset の宣言を特定できませんでした"
+  },
+  "models/trace/insights/CharacterSet.ts | passingHttpHeader": {
+    "message": "文字セットが HTTP ヘッダーで宣言されています"
+  },
+  "models/trace/insights/CharacterSet.ts | passingMetaCharsetEarly": {
+    "message": "文字セットがメタタグを使用して最初の 1,024 バイトで宣言されています"
+  },
+  "models/trace/insights/CharacterSet.ts | title": {
+    "message": "文字エンコードの宣言"
+  },
   "models/trace/insights/DOMSize.ts | description": {
     "message": "DOM サイズが大きいと、スタイルの計算とレイアウトのリフローに時間がかかり、ページの応答性に影響する可能性があります。DOM サイズが大きいと、メモリ使用量も増加します。[過度な DOM サイズの回避方法の詳細](https://developer.chrome.com/docs/performance/insights/dom-size)"
   },
@@ -2453,8 +2489,11 @@
   "models/trace/insights/LCPDiscovery.ts | fetchPriorityShouldBeApplied": {
     "message": "「fetchpriority=high」を適用する必要があります"
   },
+  "models/trace/insights/LCPDiscovery.ts | fetchPriorityShouldBeAppliedToImagePreload": {
+    "message": "イメージのプリロード リクエストには「fetchpriority=high」を適用する必要があります"
+  },
   "models/trace/insights/LCPDiscovery.ts | lazyLoadNotApplied": {
-    "message": "遅延読み込みが適用されていません"
+    "message": "LCP リソースで loading=lazy を使用しないでください"
   },
   "models/trace/insights/LCPDiscovery.ts | lcpLoadDelay": {
     "message": "LCP のイメージは、最も早い開始点から {PH1} 後に読み込まれました。"
@@ -2657,24 +2696,6 @@
   "panels/accessibility/ARIAAttributesView.ts | noAriaAttributes": {
     "message": "ARIA 属性がありません"
   },
-  "panels/accessibility/AXBreadcrumbsPane.ts | accessibilityTree": {
-    "message": "ユーザー補助ツリー"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentDescription": {
-    "message": "アクセシビリティ ツリーは、DOM ツリーの右上に移動しました。"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentName": {
-    "message": "アクセシビリティ ツリーの全ページ表示を有効にする"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | ignored": {
-    "message": "除外"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | reloadRequired": {
-    "message": "変更を反映するには、再読み込みする必要があります"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | scrollIntoView": {
-    "message": "表示される位置までスクロール"
-  },
   "panels/accessibility/AccessibilityNodeView.ts | accessibilityNodeNotExposed": {
     "message": "非公開のユーザー補助ノード"
   },
@@ -2743,6 +2764,9 @@
   },
   "panels/accessibility/AccessibilityNodeView.ts | placeholderIsPlaceholderOnAncestor": {
     "message": "{PH1} は祖先の {PH2} です:  "
+  },
+  "panels/accessibility/AccessibilitySidebarView.ts | showAccessibilityTree": {
+    "message": "ユーザー補助ツリーを表示する"
   },
   "panels/accessibility/AccessibilityStrings.ts | aHumanreadableVersionOfTheValue": {
     "message": "人間が読める形式の、範囲ウィジェットの値（必要な場合）。"
@@ -3176,8 +3200,62 @@
   "panels/ai_assistance/components/DisabledWidget.ts | turnOnForStylesRequestsPerformanceAndFiles": {
     "message": "スタイル、ネットワーク リクエスト、パフォーマンス、ファイルについてサポートを利用するには、{PH1} をオンにしてください"
   },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | asMarkdown": {
+    "message": "マークダウンとして"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | asPrompt": {
+    "message": "プロンプトとして"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | copiedToClipboard": {
+    "message": "クリップボードにコピーしました"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | copyToClipboard": {
+    "message": "クリップボードにコピー"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | disclaimer": {
+    "message": "これは試験運用版の AI 機能であり、常に適切な結果が得られるとは限りません。このテキストを別のツールに貼り付ける前に、もう一度確認してください。"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | exportForAgents": {
+    "message": "コーディング エージェントにコピー"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | generatingSummary": {
+    "message": "要約を生成しています..."
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | saveAsMarkdown": {
+    "message": "名前を付けて保存..."
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | gotIt": {
+    "message": "OK"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | integrationPoint": {
+    "message": "AI アシスタンスがアプリケーション パネルと Lighthouse パネルに統合され、データソースからコンテキストを同時に取得するようになりました"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | manageSettings": {
+    "message": "設定で管理"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | privacyDisclaimer": {
+    "message": "チャット メッセージ、DevTools パネルと Web API を介してこのサイトからアクセスできるデータ、選択したアイテム（ネットワーク リクエスト、ファイル、パフォーマンス トレースなど）が Google に送信されます。データは、この機能を改善する目的で人間のレビュアーが確認する場合があります。これは試験運用版の AI 機能であり、常に適切な結果が得られるとは限りません。"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | privacyDisclaimerEnterpriseNoLogging": {
+    "message": "チャット メッセージ、DevTools パネルと Web API を介してこのサイトからアクセスできるデータ、選択したアイテム（ネットワーク リクエスト、ファイル、パフォーマンス トレースなど）が Google に送信されます。この機能によって送信または生成されたコンテンツは、Google AI モデルの改善には使用されません。これは試験運用版の AI 機能であり、常に適切な結果が得られるとは限りません。"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | title": {
+    "message": "AI アシスタンスがさらに便利に"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | widgetPoint": {
+    "message": "ウィジェットを使用して結果を確認したり、選択したデバッグケースのソースデータに移動したりできます"
+  },
   "panels/ai_assistance/components/WalkthroughView.ts | close": {
     "message": "閉じる"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | hideAgentWalkthrough": {
+    "message": "エージェントのチュートリアルを非表示"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | hideThinking": {
+    "message": "思考モードを非表示"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | inProgress": {
+    "message": "処理中"
   },
   "panels/ai_assistance/components/WalkthroughView.ts | showAgentWalkthrough": {
     "message": "エージェントのチュートリアルを表示"
@@ -3186,7 +3264,7 @@
     "message": "思考プロセスを表示"
   },
   "panels/ai_assistance/components/WalkthroughView.ts | title": {
-    "message": "調査手順"
+    "message": "エージェントのチュートリアル"
   },
   "panels/animation/AnimationTimeline.ts | animationDescription": {
     "message": "このページでは、アニメーションを検証して変更できます。"
@@ -3632,9 +3710,6 @@
   "panels/application/ApplicationPanelSidebar.ts | theContentOfThisDocumentHasBeen": {
     "message": "このドキュメントのコンテンツは、「document.write()」を介して動的に生成されています。"
   },
-  "panels/application/ApplicationPanelSidebar.ts | thirdPartyPhaseout": {
-    "message": "サードパーティ Cookie の段階的廃止により、{PH1} からの Cookie がブロックされた可能性があります。"
-  },
   "panels/application/ApplicationPanelSidebar.ts | versionS": {
     "message": "バージョン: {PH1}"
   },
@@ -3764,6 +3839,18 @@
   "panels/application/CookieItemsView.ts | showUrlDecoded": {
     "message": "デコードされた URL を表示する"
   },
+  "panels/application/CrashReportContextView.ts | filterByText": {
+    "message": "キーまたは値でフィルタ"
+  },
+  "panels/application/CrashReportContextView.ts | noContext": {
+    "message": "フレーム全体でコンテキスト エントリが検出されませんでした。"
+  },
+  "panels/application/CrashReportContextView.ts | refresh": {
+    "message": "更新"
+  },
+  "panels/application/CrashReportContextView.ts | unknownFrame": {
+    "message": "不明なフレーム"
+  },
   "panels/application/DOMStorageItemsView.ts | domStorageItemDeleted": {
     "message": "ストレージのアイテムが削除されました。"
   },
@@ -3772,6 +3859,9 @@
   },
   "panels/application/DOMStorageItemsView.ts | domStorageItemsCleared": {
     "message": "DOM ストレージのアイテムを消去しました"
+  },
+  "panels/application/DeviceBoundSessionsTreeElement.ts | clear": {
+    "message": "消去"
   },
   "panels/application/DeviceBoundSessionsTreeElement.ts | deviceBoundSessions": {
     "message": "デバイスにバインドされたセッション"
@@ -4538,6 +4628,9 @@
   "panels/application/PreloadingTreeElement.ts | speculativeLoads": {
     "message": "投機的読み込み"
   },
+  "panels/application/ReportingApiTreeElement.ts | crashReportContext": {
+    "message": "障害レポートのコンテキスト"
+  },
   "panels/application/ReportingApiTreeElement.ts | reportingApi": {
     "message": "Reporting API"
   },
@@ -4861,6 +4954,117 @@
   },
   "panels/application/TrustTokensTreeElement.ts | trustTokens": {
     "message": "プライベート ステート トークン"
+  },
+  "panels/application/WebMCPView.ts | cancelCall": {
+    "message": "キャンセル"
+  },
+  "panels/application/WebMCPView.ts | canceled": {
+    "message": "キャンセル済み"
+  },
+  "panels/application/WebMCPView.ts | canceledCount": {
+    "message": "キャンセル: {PH1} 件"
+  },
+  "panels/application/WebMCPView.ts | clearFilters": {
+    "message": "フィルタをクリア"
+  },
+  "panels/application/WebMCPView.ts | clearLog": {
+    "message": "ログを消去"
+  },
+  "panels/application/WebMCPView.ts | close": {
+    "message": "閉じる"
+  },
+  "panels/application/WebMCPView.ts | completed": {
+    "message": "完了"
+  },
+  "panels/application/WebMCPView.ts | copyDescription": {
+    "message": "説明をコピー"
+  },
+  "panels/application/WebMCPView.ts | copyName": {
+    "message": "名前をコピー"
+  },
+  "panels/application/WebMCPView.ts | declarative": {
+    "message": "宣言型"
+  },
+  "panels/application/WebMCPView.ts | editAndRun": {
+    "message": "編集して実行"
+  },
+  "panels/application/WebMCPView.ts | error": {
+    "message": "エラー"
+  },
+  "panels/application/WebMCPView.ts | failed": {
+    "message": "失敗: {PH1} 件"
+  },
+  "panels/application/WebMCPView.ts | filter": {
+    "message": "フィルタ"
+  },
+  "panels/application/WebMCPView.ts | frame": {
+    "message": "フレーム"
+  },
+  "panels/application/WebMCPView.ts | imperative": {
+    "message": "命令形"
+  },
+  "panels/application/WebMCPView.ts | inProgress": {
+    "message": "処理中"
+  },
+  "panels/application/WebMCPView.ts | inProgressCount": {
+    "message": "進行中: {PH1} 件"
+  },
+  "panels/application/WebMCPView.ts | input": {
+    "message": "入力"
+  },
+  "panels/application/WebMCPView.ts | name": {
+    "message": "名前"
+  },
+  "panels/application/WebMCPView.ts | noCallsPlaceholder": {
+    "message": "WebMCP エージェントとのやり取りを開始すると、ツールの呼び出しと実行がリアルタイムでここに表示されます。"
+  },
+  "panels/application/WebMCPView.ts | noCallsPlaceholderTitle": {
+    "message": "ツールのアクティビティ"
+  },
+  "panels/application/WebMCPView.ts | noToolsPlaceholder": {
+    "message": "このページに登録されている WebMCP ツールがここに表示されます。登録、検出されたツールはまだありません。"
+  },
+  "panels/application/WebMCPView.ts | noToolsPlaceholderTitle": {
+    "message": "使用可能な WebMCP ツール"
+  },
+  "panels/application/WebMCPView.ts | output": {
+    "message": "出力"
+  },
+  "panels/application/WebMCPView.ts | paste": {
+    "message": "貼り付け"
+  },
+  "panels/application/WebMCPView.ts | pending": {
+    "message": "処理中"
+  },
+  "panels/application/WebMCPView.ts | revealTool": {
+    "message": "ツールを表示"
+  },
+  "panels/application/WebMCPView.ts | runTool": {
+    "message": "ツールを実行"
+  },
+  "panels/application/WebMCPView.ts | status": {
+    "message": "ステータス"
+  },
+  "panels/application/WebMCPView.ts | statusTypes": {
+    "message": "ステータス タイプ"
+  },
+  "panels/application/WebMCPView.ts | toolDetails": {
+    "message": "詳細"
+  },
+  "panels/application/WebMCPView.ts | toolRegistry": {
+    "message": "使用可能なツール"
+  },
+  "panels/application/WebMCPView.ts | toolTypes": {
+    "message": "ツールの種類"
+  },
+  "panels/application/WebMCPView.ts | toolUnregisteredNotice": {
+    "message": "このツールは登録が解除されています"
+  },
+  "panels/application/WebMCPView.ts | totalCalls": {
+    "message": "合計呼び出し数: {PH1} 件"
+  },
+  "panels/application/WebMCPView.ts | viewInElementsPanel": {
+    "message": "[要素] パネルで表示"
   },
   "panels/application/application-meta.ts | application": {
     "message": "アプリケーション"
@@ -5345,6 +5549,18 @@
   "panels/application/components/BounceTrackingMitigationsView.ts | stateDeletedFor": {
     "message": "次のサイトの状態が削除されました。"
   },
+  "panels/application/components/CrashReportContextGrid.ts | copyKey": {
+    "message": "キーをコピー"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | copyValue": {
+    "message": "値をコピー"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | key": {
+    "message": "キー"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | value": {
+    "message": "値"
+  },
   "panels/application/components/EndpointsGrid.ts | endpointsDescription": {
     "message": "レポートを受信するエンドポイントの一覧が表示されます"
   },
@@ -5714,6 +5930,9 @@
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsFailureReason": {
     "message": "失敗の理由"
   },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsFormSubmission": {
+    "message": "フォームの送信"
+  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsRuleSet": {
     "message": "ルールセット"
   },
@@ -5723,11 +5942,17 @@
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsTargetHint": {
     "message": "ターゲットのヒント"
   },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | no": {
+    "message": "いいえ"
+  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | noElementSelected": {
     "message": "要素が選択されていません"
   },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | selectAnElementForMoreDetails": {
     "message": "要素を選択すると詳細が表示されます"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | yes": {
+    "message": "はい"
   },
   "panels/application/preloading/components/PreloadingDisabledInfobar.ts | descriptionDisabledByBatterySaver": {
     "message": "オペレーティング システムのバッテリー セーバー モードが原因で、投機的読み込みが無効になっています。"
@@ -5965,6 +6190,9 @@
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationBadHttpStatus": {
     "message": "2xx 以外の HTTP レスポンス ステータス コードが原因で事前レンダリング ナビゲーションに失敗しました。"
+  },
+  "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationBadHttpStatusWithStatusCode": {
+    "message": "2xx 以外の HTTP レスポンス ステータス コードが原因で事前レンダリング ナビゲーションに失敗しました（{PH1}）。"
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationRequestBlockedByCsp": {
     "message": "事前レンダリング ナビゲーションはコンテンツ セキュリティ ポリシーによってブロックされました。"
@@ -6467,9 +6695,6 @@
   "panels/common/BadgeNotification.ts | viewProfile": {
     "message": "プロフィールを表示"
   },
-  "panels/common/CopyChangesToPrompt.ts | responseCopiedToClipboard": {
-    "message": "回答をクリップボードにコピーしました"
-  },
   "panels/common/DOMLinkifier.ts | node": {
     "message": "<ノード>"
   },
@@ -6635,6 +6860,9 @@
   "panels/console/ConsoleView.ts | autocompleteFromHistory": {
     "message": "履歴から予測入力"
   },
+  "panels/console/ConsoleView.ts | collapseAll": {
+    "message": "すべて折りたたむ"
+  },
   "panels/console/ConsoleView.ts | consoleCleared": {
     "message": "コンソールが消去されました"
   },
@@ -6673,6 +6901,9 @@
   },
   "panels/console/ConsoleView.ts | errors": {
     "message": "エラー"
+  },
+  "panels/console/ConsoleView.ts | expandAll": {
+    "message": "すべて展開"
   },
   "panels/console/ConsoleView.ts | filteredMessagesInConsole": {
     "message": "コンソールのメッセージ数 {PH1} 件"
@@ -7529,12 +7760,6 @@
   "panels/elements/ElementsPanel.ts | styles": {
     "message": "スタイル"
   },
-  "panels/elements/ElementsPanel.ts | switchToAccessibilityTreeView": {
-    "message": "ユーザー補助ツリービューに切り替え"
-  },
-  "panels/elements/ElementsPanel.ts | switchToDomTreeView": {
-    "message": "DOM ツリービューに切り替え"
-  },
   "panels/elements/ElementsPanel.ts | theDeferredDomNodeCouldNotBe": {
     "message": "遅延 DOM ノードを有効なノードに解決できませんでした。"
   },
@@ -7591,6 +7816,9 @@
   },
   "panels/elements/ElementsTreeElement.ts | copyXpath": {
     "message": "XPath をコピー"
+  },
+  "panels/elements/ElementsTreeElement.ts | creatorAdScriptAncestry": {
+    "message": "クリエイター広告スクリプトの祖先"
   },
   "panels/elements/ElementsTreeElement.ts | cut": {
     "message": "切り取り"
@@ -7679,6 +7907,9 @@
   "panels/elements/ElementsTreeElement.ts | explainSubgrids": {
     "message": "サブグリッドを説明"
   },
+  "panels/elements/ElementsTreeElement.ts | filterListRule": {
+    "message": "フィルタリスト ルール"
+  },
   "panels/elements/ElementsTreeElement.ts | findGridDefinition": {
     "message": "グリッドの定義を検索"
   },
@@ -7694,6 +7925,9 @@
   "panels/elements/ElementsTreeElement.ts | hideElement": {
     "message": "要素を非表示"
   },
+  "panels/elements/ElementsTreeElement.ts | noProvenanceAvailable": {
+    "message": "来歴データがありません"
+  },
   "panels/elements/ElementsTreeElement.ts | openMediaPanel": {
     "message": "メディアパネルに移動"
   },
@@ -7706,8 +7940,11 @@
   "panels/elements/ElementsTreeElement.ts | reveal": {
     "message": "表示"
   },
+  "panels/elements/ElementsTreeElement.ts | rootScriptFilterListRule": {
+    "message": "ルート スクリプトのフィルタリスト ルール"
+  },
   "panels/elements/ElementsTreeElement.ts | scrollIntoView": {
-    "message": "表示される位置までスクロール"
+    "message": "スクロールして表示"
   },
   "panels/elements/ElementsTreeElement.ts | showCommandForTarget": {
     "message": "commandfor 属性に関連付けられている要素を表示します"
@@ -7730,8 +7967,8 @@
   "panels/elements/ElementsTreeElement.ts | styleScrollbars": {
     "message": "スクロールバーのスタイルを設定"
   },
-  "panels/elements/ElementsTreeElement.ts | thisFrameWasIdentifiedAsAnAd": {
-    "message": "このフレームは広告フレームと判断されました"
+  "panels/elements/ElementsTreeElement.ts | thisElementWasIdentifiedAsAnAd": {
+    "message": "この要素は広告として識別されました"
   },
   "panels/elements/ElementsTreeElement.ts | useSInTheConsoleToReferToThis": {
     "message": "この要素を参照するには、コンソールの {PH1} を使用してください。"
@@ -7747,6 +7984,9 @@
   },
   "panels/elements/ElementsTreeOutline.ts | pageDom": {
     "message": "ページ DOM"
+  },
+  "panels/elements/ElementsTreeOutline.ts | showAllLines": {
+    "message": "すべて表示（{PH1} 行）"
   },
   "panels/elements/ElementsTreeOutline.ts | showAllNodesDMore": {
     "message": "ノードをすべて表示（他 {PH1} 件）"
@@ -7865,6 +8105,9 @@
   "panels/elements/ShortcutTreeElement.ts | reveal": {
     "message": "表示"
   },
+  "panels/elements/StylePropertiesSection.ts | collapseExpandedRule": {
+    "message": "開いたルールを閉じる"
+  },
   "panels/elements/StylePropertiesSection.ts | constructedStylesheet": {
     "message": "作成されたスタイルシート"
   },
@@ -7879,6 +8122,9 @@
   },
   "panels/elements/StylePropertiesSection.ts | cssSelector": {
     "message": "CSS セレクタ"
+  },
+  "panels/elements/StylePropertiesSection.ts | expandCollapsedRule": {
+    "message": "閉じたルールを開く"
   },
   "panels/elements/StylePropertiesSection.ts | injectedStylesheet": {
     "message": "注入されたスタイルシート"
@@ -7973,6 +8219,9 @@
   "panels/elements/StylePropertyTreeElement.ts | viewComputedValue": {
     "message": "計算値を見る"
   },
+  "panels/elements/StylesSidebarPane.ts | aiSuggestionAccepted": {
+    "message": "{PH1} 提案が承認されました。"
+  },
   "panels/elements/StylesSidebarPane.ts | automaticDarkMode": {
     "message": "ダークモードを自動的に設定する"
   },
@@ -8007,7 +8256,7 @@
     "message": "{n,plural, =1{下記の # 件の表示セレクタ}other{下記の # 件の表示セレクタ}}"
   },
   "panels/elements/components/AccessibilityTreeNode.ts | ignored": {
-    "message": "除外"
+    "message": "除外されました"
   },
   "panels/elements/components/CSSHintDetailsView.ts | learnMore": {
     "message": "詳細"
@@ -8077,6 +8326,9 @@
   },
   "panels/elements/elements-meta.ts | copyStyles": {
     "message": "スタイルをコピー"
+  },
+  "panels/elements/elements-meta.ts | cssAnimationsOnlyWhenAnimationsTabOpen": {
+    "message": "[アニメーション] タブが開いている場合にのみアニメーション スタイルを表示する"
   },
   "panels/elements/elements-meta.ts | detailedInspectTooltip": {
     "message": "詳細な検証のツールチップ"
@@ -9238,6 +9490,12 @@
   },
   "panels/lighthouse/LighthouseStatusView.ts | ahSorryWeRanIntoAnError": {
     "message": "申し訳ありません。エラーが発生しました。"
+  },
+  "panels/lighthouse/LighthouseStatusView.ts | aiAuditingS": {
+    "message": "AI アシスタンスが {PH1} を監査しています"
+  },
+  "panels/lighthouse/LighthouseStatusView.ts | aiAuditingYourWebPage": {
+    "message": "AI アシスタンスがウェブページを監査しています"
   },
   "panels/lighthouse/LighthouseStatusView.ts | almostThereLighthouseIsNow": {
     "message": "もう少しで完了です。Lighthouse がレポートを生成しています。"
@@ -10526,6 +10784,9 @@
   "panels/network/NetworkLogViewColumns.ts | requestHeaders": {
     "message": "リクエスト ヘッダー"
   },
+  "panels/network/NetworkLogViewColumns.ts | requestNumber": {
+    "message": "リクエスト番号"
+  },
   "panels/network/NetworkLogViewColumns.ts | responseHeaders": {
     "message": "レスポンス ヘッダー"
   },
@@ -11540,6 +11801,9 @@
   "panels/profiler/HeapProfileView.ts | sBytes": {
     "message": "{PH1} バイト"
   },
+  "panels/profiler/HeapProfileView.ts | samplingHeapProfilerTimeline": {
+    "message": "サンプリング ヒープ プロファイラのタイムライン"
+  },
   "panels/profiler/HeapProfileView.ts | samplingProfiles": {
     "message": "サンプリング プロファイル"
   },
@@ -11714,9 +11978,6 @@
   "panels/profiler/HeapSnapshotGridNodes.ts | userObjectReachableFromWindow": {
     "message": "ウィンドウからユーザー オブジェクトにアクセス可能"
   },
-  "panels/profiler/HeapSnapshotProxy.ts | anErrorOccurredWhenACallToMethod": {
-    "message": "メソッド「{PH1}」の呼び出し中にエラーが発生しました"
-  },
   "panels/profiler/HeapSnapshotView.ts | AllocationTimelinesShowInstrumented": {
     "message": "メモリ割り当ての推移を記録し、割り当てが引き続き有効な間隔を選択してメモリリークを隔離します"
   },
@@ -11749,9 +12010,6 @@
   },
   "panels/profiler/HeapSnapshotView.ts | duplicatedStrings": {
     "message": "重複する文字列"
-  },
-  "panels/profiler/HeapSnapshotView.ts | exposeInternals": {
-    "message": "実装固有の詳細を含む内部データ"
   },
   "panels/profiler/HeapSnapshotView.ts | filter": {
     "message": "フィルタ"
@@ -11890,33 +12148,6 @@
   },
   "panels/profiler/IsolateSelector.ts | totalPageJsHeapSizeChangeTrend": {
     "message": "過去 {PH1} 分間の合計ページ JS ヒープサイズの変化傾向。"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | allocatedJsHeapSizeCurrentlyIn": {
-    "message": "割り当てられた JS ヒープサイズが現在使用されています"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | anonymousScriptS": {
-    "message": "（匿名スクリプト {PH1}）"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | heapProfile": {
-    "message": "ヒープ プロファイル"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | jsHeap": {
-    "message": "JS ヒープ"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | kb": {
-    "message": "KB"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | numberOfVmsSharingTheSameScript": {
-    "message": "同じスクリプト ソースを共有する VM の数"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | scriptUrl": {
-    "message": "スクリプト URL"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | urlOfTheScriptSource": {
-    "message": "スクリプト ソースの URL"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | vms": {
-    "message": "VM"
   },
   "panels/profiler/ModuleUIStrings.ts | buildingAllocationStatistics": {
     "message": "割り当て統計情報を作成しています…"
@@ -12095,9 +12326,6 @@
   "panels/profiler/profiler-meta.ts | deleteProfile": {
     "message": "プロフィールを削除"
   },
-  "panels/profiler/profiler-meta.ts | liveHeapProfile": {
-    "message": "ライブヒープ プロファイル"
-  },
   "panels/profiler/profiler-meta.ts | loadProfile": {
     "message": "プロファイルを読み込みます…"
   },
@@ -12107,23 +12335,11 @@
   "panels/profiler/profiler-meta.ts | saveProfile": {
     "message": "プロファイルを保存します…"
   },
-  "panels/profiler/profiler-meta.ts | showLiveHeapProfile": {
-    "message": "ライブヒープ プロファイルを表示"
-  },
   "panels/profiler/profiler-meta.ts | showMemory": {
     "message": "メモリを表示"
   },
-  "panels/profiler/profiler-meta.ts | startRecordingHeapAllocations": {
-    "message": "ヒープ割り当ての記録を開始"
-  },
-  "panels/profiler/profiler-meta.ts | startRecordingHeapAllocationsAndReload": {
-    "message": "ヒープ割り当ての記録を開始し、ページを再読み込み"
-  },
   "panels/profiler/profiler-meta.ts | startStopRecording": {
     "message": "記録を開始 / 停止"
-  },
-  "panels/profiler/profiler-meta.ts | stopRecordingHeapAllocations": {
-    "message": "ヒープ割り当ての記録を停止"
   },
   "panels/protocol_monitor/JSONEditor.ts | addCustomProperty": {
     "message": "カスタム プロパティを追加"
@@ -13280,6 +13496,21 @@
   "panels/settings/AISettingsTab.ts | aIAnnotationsFeatureDescription": {
     "message": "パフォーマンス トレースのアノテーションのタイトルを自動的に生成します"
   },
+  "panels/settings/AISettingsTab.ts | aiAssistanceDescriptionV2": {
+    "message": "検証ページでコンテキストアウェア ヘルプを利用する"
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceThingsToConsiderNoLoggingV2": {
+    "message": "説明を生成するため、チャット メッセージ、DevTools パネルと Web API を介してこのサイトからアクセスできるデータ、選択したアイテム（ネットワーク リクエスト、ファイル、パフォーマンス トレースなど）が Google に送信されます。この機能によって送信または生成されたコンテンツは、Google AI モデルの改善には使用されません。これは試験運用版の AI 機能であり、常に適切な結果が得られるとは限りません。"
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceThingsToConsiderV2": {
+    "message": "説明を生成するため、チャット メッセージ、DevTools パネルと Web API を介してこのサイトからアクセスできるデータ、選択したアイテム（ネットワーク リクエスト、ファイル、パフォーマンス トレースなど）が Google に送信されます。データは、この機能を改善する目的で人間のレビュアーが確認する場合があります。これは試験運用版の AI 機能であり、常に適切な結果が得られるとは限りません。"
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceWhenOnItem1V2": {
+    "message": "DevTools の AI アシスタンスを使用して、スタイル設定、ネットワーク、パフォーマンス、ソースコード、アクセシビリティ、ストレージの問題をデバッグします"
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceWhenOnItem2V2": {
+    "message": "エージェントの推論を順に確認し、関連するソースデータにすばやく移動できます"
+  },
   "panels/settings/AISettingsTab.ts | asYouTypeCodeSuggestions": {
     "message": "[コンソール] パネルまたは [ソース] パネルで入力すると、コードの候補が表示されます。Tab キーを押すと、候補を適用できます。"
   },
@@ -13660,6 +13891,9 @@
   },
   "panels/settings/emulation/DevicesSettingsTab.ts | userAgentString": {
     "message": "ユーザー エージェント文字列"
+  },
+  "panels/settings/emulation/DevicesSettingsTab.ts | userAgentStringCannotBeEmpty": {
+    "message": "ユーザー エージェント文字列を空白にすることはできません。"
   },
   "panels/settings/emulation/DevicesSettingsTab.ts | userAgentType": {
     "message": "ユーザー エージェント タイプ"
@@ -14356,12 +14590,6 @@
   },
   "panels/sources/PersistenceActions.ts | showOverrides": {
     "message": "すべてのオーバーライドを表示"
-  },
-  "panels/sources/ProfilePlugin.ts | kb": {
-    "message": "KB"
-  },
-  "panels/sources/ProfilePlugin.ts | mb": {
-    "message": "MB"
   },
   "panels/sources/ProfilePlugin.ts | ms": {
     "message": "ms"
@@ -15299,9 +15527,6 @@
   "panels/timeline/TimelinePanel.ts | exportingFailed": {
     "message": "トレースをエクスポートできませんでした"
   },
-  "panels/timeline/TimelinePanel.ts | externalRequestReceived": {
-    "message": "DevTools が外部リクエストを受信しました"
-  },
   "panels/timeline/TimelinePanel.ts | fixMe": {
     "message": "修正"
   },
@@ -15934,6 +16159,30 @@
   },
   "panels/timeline/components/CPUThrottlingSelector.ts | recommendedThrottlingReason": {
     "message": "実際のユーザー環境をシミュレートするには、設定を変更することをおすすめします"
+  },
+  "panels/timeline/components/CWVMetrics.ts | dismissTitle": {
+    "message": "閉じる"
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldMismatchNotice": {
+    "message": "ローカルとフィールドの指標が[一致しない](https://web.dev/articles/lab-and-field-data-differences)理由はさまざまです。[スロットリング設定とデバイス エミュレーション](https://developer.chrome.com/docs/devtools/device-mode)を調整して、平均的なユーザーの環境に近いトレースを分析してください。"
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldMismatchTitle": {
+    "message": "フィールドとローカルの指標が一致しません"
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldScoreLabel": {
+    "message": "フィールド（{PH1}）"
+  },
+  "panels/timeline/components/CWVMetrics.ts | metricScore": {
+    "message": "{PH1}: {PH2} {PH3} スコア"
+  },
+  "panels/timeline/components/CWVMetrics.ts | metricScoreUnavailable": {
+    "message": "{PH1}: 使用不可"
+  },
+  "panels/timeline/components/CWVMetrics.ts | originOption": {
+    "message": "オリジン"
+  },
+  "panels/timeline/components/CWVMetrics.ts | urlOption": {
+    "message": "URL"
   },
   "panels/timeline/components/DetailsView.ts | forcedReflow": {
     "message": "強制リフロー"
@@ -16718,6 +16967,9 @@
   "panels/timeline/timeline-meta.ts | stop": {
     "message": "停止"
   },
+  "panels/timeline/timeline-meta.ts | timelineShowAllEvents": {
+    "message": "すべてのイベントを表示"
+  },
   "panels/timeline/utils/IgnoreList.ts | skip3rdPartyScripts": {
     "message": "ソースマップで ignoreList とマーク"
   },
@@ -16859,6 +17111,12 @@
   "panels/webauthn/WebauthnPane.ts | signCount": {
     "message": "署名数"
   },
+  "panels/webauthn/WebauthnPane.ts | supportsHmacSecret": {
+    "message": "hmac-secret をサポートする"
+  },
+  "panels/webauthn/WebauthnPane.ts | supportsHmacSecretMc": {
+    "message": "hmac-secret-mc をサポートする"
+  },
   "panels/webauthn/WebauthnPane.ts | supportsLargeBlob": {
     "message": "大きな blob をサポートする"
   },
@@ -16955,10 +17213,10 @@
   "ui/components/issue_counter/IssueLinkIcon.ts | issueUnavailable": {
     "message": "現在、問題を表示できません"
   },
-  "ui/components/list/List.ts | edit": {
+  "ui/components/lists/List.ts | edit": {
     "message": "編集"
   },
-  "ui/components/list/List.ts | remove": {
+  "ui/components/lists/List.ts | remove": {
     "message": "削除"
   },
   "ui/components/markdown_view/CodeBlock.ts | code": {
@@ -16970,8 +17228,14 @@
   "ui/components/markdown_view/CodeBlock.ts | copy": {
     "message": "コードをコピー"
   },
+  "ui/components/markdown_view/CodeBlock.ts | copyCodeSnippet": {
+    "message": "{PH1} コード スニペットをコピー"
+  },
   "ui/components/markdown_view/CodeBlock.ts | disclaimer": {
     "message": "注意してコード スニペットをご使用ください"
+  },
+  "ui/components/markdown_view/CodeBlock.ts | showAllLines": {
+    "message": "すべての行を表示（他 {PH1} 行）"
   },
   "ui/components/panel_feedback/FeedbackButton.ts | feedback": {
     "message": "フィードバック"
@@ -17090,6 +17354,9 @@
   "ui/legacy/ActionRegistration.ts | sources": {
     "message": "ソース"
   },
+  "ui/legacy/Dialog.ts | close": {
+    "message": "閉じる"
+  },
   "ui/legacy/DockController.ts | close": {
     "message": "閉じる"
   },
@@ -17120,11 +17387,23 @@
   "ui/legacy/Infobar.ts | dontShowAgain": {
     "message": "次回から表示しない"
   },
+  "ui/legacy/InspectorDrawerView.ts | closeDrawer": {
+    "message": "ドロワーを閉じる"
+  },
+  "ui/legacy/InspectorDrawerView.ts | expandDrawer": {
+    "message": "ドロワーを展開する"
+  },
+  "ui/legacy/InspectorDrawerView.ts | minimizeDrawer": {
+    "message": "ドロワーを最小化"
+  },
+  "ui/legacy/InspectorDrawerView.ts | moreTools": {
+    "message": "その他のツール"
+  },
+  "ui/legacy/InspectorDrawerView.ts | toggleDrawerOrientation": {
+    "message": "ドロワーの向きを切り替える"
+  },
   "ui/legacy/InspectorView.ts | areYouSureYouWantToRestartChrome": {
     "message": "Chrome を再起動してもよろしいですか？"
-  },
-  "ui/legacy/InspectorView.ts | closeDrawer": {
-    "message": "ドロワーを閉じる"
   },
   "ui/legacy/InspectorView.ts | devToolsLanguageMissmatch": {
     "message": "{PH1} で DevTools をご利用いただけるようになりました"
@@ -17132,17 +17411,20 @@
   "ui/legacy/InspectorView.ts | drawer": {
     "message": "ツールドロワー"
   },
+  "ui/legacy/InspectorView.ts | drawerExpanded": {
+    "message": "ドロワーを展開しました"
+  },
   "ui/legacy/InspectorView.ts | drawerHidden": {
     "message": "ドロワーが非表示になっています"
+  },
+  "ui/legacy/InspectorView.ts | drawerMinimized": {
+    "message": "ドロワーを最小化しました"
   },
   "ui/legacy/InspectorView.ts | drawerShown": {
     "message": "ドロワーが表示されています"
   },
   "ui/legacy/InspectorView.ts | mainToolbar": {
     "message": "メインのツールバー"
-  },
-  "ui/legacy/InspectorView.ts | moreTools": {
-    "message": "その他のツール"
   },
   "ui/legacy/InspectorView.ts | moveToDrawer": {
     "message": "ドロワーに移動"
@@ -17173,9 +17455,6 @@
   },
   "ui/legacy/InspectorView.ts | setToSpecificLanguage": {
     "message": "DevTools を{PH1}に切り替える"
-  },
-  "ui/legacy/InspectorView.ts | toggleDrawerOrientation": {
-    "message": "ドロワーの向きを切り替える"
   },
   "ui/legacy/ListWidget.ts | addString": {
     "message": "追加"
@@ -17615,66 +17894,6 @@
   "ui/legacy/components/inline_editor/ColorSwatch.ts | shiftclickToChangeColorFormat": {
     "message": "Shift を押しながらクリックすると、カラー形式を変更できます"
   },
-  "ui/legacy/components/inline_editor/FontEditor.ts | PleaseEnterAValidValueForSText": {
-    "message": "* {PH1} テキスト入力について有効な値を入力してください"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | cssProperties": {
-    "message": "CSS プロパティ"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | deleteS": {
-    "message": "{PH1} を削除"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fallbackS": {
-    "message": "代替 {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontFamily": {
-    "message": "フォント ファミリー"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontSelectorDeletedAtIndexS": {
-    "message": "次のインデックスでフォント セレクタが削除されました: {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontSize": {
-    "message": "フォントサイズ"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontWeight": {
-    "message": "フォントの太さ"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | lineHeight": {
-    "message": "行の高さ"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sKeyValueSelector": {
-    "message": "{PH1} Key-Value セレクタ"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sSliderInput": {
-    "message": "{PH1} スライダー入力"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sTextInput": {
-    "message": "{PH1} テキスト入力"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sToggleInputType": {
-    "message": "{PH1} 入力タイプの切り替え"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sUnitInput": {
-    "message": "{PH1} ユニット入力"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | selectorInputMode": {
-    "message": "セレクタ入力モード"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sliderInputMode": {
-    "message": "スライダー入力モード"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | spacing": {
-    "message": "間隔"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | thereIsNoValueToDeleteAtIndexS": {
-    "message": "インデックス {PH1} で削除できる値がありません"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | thisPropertyIsSetToContainUnits": {
-    "message": "このプロパティはユニットを含むように設定されていますが、対応する unitsArray が定義されていません: {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | units": {
-    "message": "単位"
-  },
   "ui/legacy/components/object_ui/CustomPreviewComponent.ts | showAsJavascriptObject": {
     "message": "JavaScript オブジェクトとして表示"
   },
@@ -17792,6 +18011,9 @@
   "ui/legacy/components/perf_ui/FlameChart.ts | sSelected": {
     "message": "{PH1} を選択中"
   },
+  "ui/legacy/components/perf_ui/GCActionDelegate.ts | garbageCollectionCompleted": {
+    "message": "ガベージ コレクションが完了しました"
+  },
   "ui/legacy/components/perf_ui/NetworkPriorities.ts | high": {
     "message": "高"
   },
@@ -17828,17 +18050,8 @@
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | flamechartSelectedNavigation": {
     "message": "フレームチャートの操作:"
   },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | hideLiveMemoryAllocation": {
-    "message": "ライブメモリ割り当てアノテーションを非表示"
-  },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | liveMemoryAllocationAnnotations": {
-    "message": "ライブメモリ割り当てアノテーション"
-  },
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | modern": {
     "message": "新しいバージョン"
-  },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | showLiveMemoryAllocation": {
-    "message": "ライブメモリ割り当てアノテーションを表示"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | command": {
     "message": "コマンド"

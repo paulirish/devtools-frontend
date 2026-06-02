@@ -13,13 +13,18 @@ import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type {
-  AiWidget, BottomUpTreeAiWidget, ComputedStyleAiWidget, CoreVitalsAiWidget, DomTreeAiWidget, LcpBreakdownAiWidget,
-  PerformanceTraceAiWidget, StylePropertiesAiWidget,
+  AiWidget, BottomUpTreeAiWidget, ComputedStyleAiWidget, CoreVitalsAiWidget, DomTreeAiWidget, LighthouseReportAiWidget,
+  NetworkRequestGeneralHeadersAiWidget, PerfInsightAiWidget, PerformanceTraceAiWidget, SourceCodeAiWidget,
+  SourceFileAiWidget, SourceFilesListAiWidget, StylePropertiesAiWidget, TimelineEventSummaryAiWidget,
   TimelineRangeSummaryAiWidget} from '../../../models/ai_assistance/agents/AiAgent.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as ComputedStyle from '../../../models/computed_style/computed_style.js';
+import * as Formatter from '../../../models/formatter/formatter.js';
+import * as TextUtils from '../../../models/text_utils/text_utils.js';
 import * as Trace from '../../../models/trace/trace.js';
+import * as Workspace from '../../../models/workspace/workspace.js';
 import * as PanelsCommon from '../../../panels/common/common.js';
+import * as TraceBounds from '../../../services/trace_bounds/trace_bounds.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
@@ -30,20 +35,25 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Elements from '../../elements/elements.js';
+import * as Lighthouse from '../../lighthouse/lighthouse.js';
+import * as NetworkForward from '../../network/forward/forward.js';
+import * as Network from '../../network/network.js';
 import * as TimelineComponents from '../../timeline/components/components.js';
+import type {BaseInsightComponent} from '../../timeline/components/insights/BaseInsightComponent.js';
 import * as TimelineInsights from '../../timeline/components/insights/insights.js';
 import * as Timeline from '../../timeline/timeline.js';
 import * as TimelineUtils from '../../timeline/utils/utils.js';
 import {PanelUtils} from '../../utils/utils.js';
 
 import chatMessageStyles from './chatMessage.css.js';
+import {getButtonLabel} from './WalkthroughUtils.js';
 import {walkthroughCloseTitle, walkthroughTitle, WalkthroughView} from './WalkthroughView.js';
 
 const {html, Directives: {ref, ifDefined}} = Lit;
 const lockedString = i18n.i18n.lockedString;
 const {widget} = UI.Widget;
 
-const REPORT_URL = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;
+const REPORT_URL = 'https://crbug.com/508304827' as Platform.DevToolsPath.UrlString;
 const SCROLL_ROUNDING_OFFSET = 1;
 const MAX_NUM_LINES_IN_CODEBLOCK = 11;
 
@@ -157,9 +167,13 @@ const UIStringsNotTranslate = {
    */
   completed: 'Completed',
   /**
-   * @description Aria label for the cancel icon to be read by screen reader
+   * @description Aria label for the spinner to be read by screen reader when a step is in progress.
    */
-  canceled: 'Canceled',
+  inProgress: 'In progress',
+  /**
+   * @description Aria label for the aborted icon to be read by screen reader
+   */
+  aborted: 'Aborted',
   /**
    * @description Alt text for the image input (displayed in the chat messages) that has been sent to the model.
    */
@@ -181,13 +195,97 @@ const UIStringsNotTranslate = {
    */
   revealTrace: 'Reveal trace',
   /**
+   * @description Accessible label for the reveal button in the computed styles widget.
+   */
+  revealComputedStyles: 'Reveal computed styles',
+  /**
+   * @description Accessible label for the reveal button in the core web vitals widget.
+   */
+  revealCoreWebVitals: 'Reveal Core Web Vitals',
+  /**
+   * @description Accessible label for the reveal button in the style properties widget.
+   */
+  revealStyleProperties: 'Reveal style properties',
+  /**
+   * @description Accessible label for the reveal button in the LCP breakdown widget.
+   */
+  revealLcpBreakdown: 'Reveal LCP breakdown',
+  /**
+   * @description Accessible label for the reveal button in the LCP discovery widget.
+   */
+  revealLcpDiscovery: 'Reveal LCP discovery',
+  /**
+   * @description Accessible label for the reveal button in the layout shift culprits widget.
+   */
+  revealClsCulprits: 'Reveal layout shift culprits',
+  /**
+   * @description Accessible label for the reveal button in the render-blocking requests widget.
+   */
+  revealRenderBlockingBreakdown: 'Reveal render-blocking requests',
+  /**
+   * @description Accessible label for the reveal button in the LCP element widget.
+   */
+  revealLcpElement: 'Reveal LCP element',
+  /**
+   * @description Accessible label for the reveal button in the performance summary widget.
+   */
+  revealPerformanceSummary: 'Reveal performance summary',
+  /**
+   * @description Accessible label for the reveal button in the bottom up thread activity widget.
+   */
+  revealBottomUpTree: 'Reveal bottom-up thread activity',
+  /**
+   * @description Accessible label for the reveal button in the network dependency tree widget.
+   */
+  revealNetworkDependencyTree: 'Reveal network dependency tree',
+  /**
+   * @description Accessible label for the reveal button in the 3rd parties widget.
+   */
+  revealThirdParties: 'Reveal 3rd parties',
+  /**
    * @description Title for the core web vitals widget.
    */
   coreVitals: 'Core Web Vitals',
   /**
+   * @description Title for the Lighthouse report widget.
+   */
+  lighthouseReport: 'Lighthouse report',
+  /**
+   * @description Accessible label for the reveal button in the Lighthouse report widget.
+   */
+  revealLighthouse: 'Reveal Lighthouse report',
+  /**
+   * @description Title for the Timeline event summary widget.
+   */
+  timelineEventSummary: 'Event summary',
+  /**
+   * @description Accessible label for the reveal button in the Timeline event summary widget.
+   */
+  revealTimelineEventSummary: 'Reveal event',
+  /**
    * @description Title for the LCP breakdown widget.
    */
   lcpBreakdown: 'LCP breakdown',
+  /**
+   * @description Title for the LCP discovery widget.
+   */
+  lcpDiscovery: 'LCP discovery',
+  /**
+   * @description Title for the layout shift culprits widget.
+   */
+  clsCulprits: 'Layout shift culprits',
+  /**
+   * @description Title for the render-blocking requests widget.
+   */
+  renderBlockingBreakdown: 'Render-blocking requests',
+  /**
+   * @description Title for the network dependency tree widget.
+   */
+  networkDependencyTree: 'Network dependency tree',
+  /**
+   * @description Title for the 3rd parties widget.
+   */
+  thirdParties: '3rd parties',
   /**
    * @description Title for the LCP element widget.
    */
@@ -199,11 +297,127 @@ const UIStringsNotTranslate = {
   /**
    * @description The title of the button that allows exporting the conversation for agents.
    */
-  exportForAgents: 'Copy for your coding agent',
+  exportForAgents: 'Copy to coding agent',
   /**
    * @description Title for the bottom up thread activity widget.
    */
   bottomUpTree: 'Bottom-up thread activity',
+  /**
+   * @description Accessible label for the reveal button in the forced reflow widget.
+   */
+  revealForcedReflow: 'Reveal forced reflow',
+  /**
+   * @description Title for the forced reflow widget.
+   */
+  forcedReflow: 'Forced reflow',
+  /**
+   * @description Accessible label for the reveal button in the cache widget.
+   */
+  revealCache: 'Reveal efficient cache lifetimes',
+  /**
+   * @description Title for the cache widget.
+   */
+  cache: 'Efficient cache lifetimes',
+  /**
+   * @description Accessible label for the reveal button in the INP breakdown widget.
+   */
+  revealInpBreakdown: 'Reveal INP breakdown',
+  /**
+   * @description Title for the INP breakdown widget.
+   */
+  inpBreakdown: 'INP breakdown',
+  /**
+   * @description Accessible label for the reveal button in the document latency widget.
+   */
+  revealDocumentLatency: 'Reveal document latency',
+  /**
+   * @description Title for the document latency widget.
+   */
+  documentLatency: 'Document latency',
+  /**
+   * @description Accessible label for the reveal button in the DOM size widget.
+   */
+  revealDomSize: 'Reveal DOM size',
+  /**
+   * @description Title for the DOM size widget.
+   */
+  domSize: 'DOM size',
+  /**
+   * @description Accessible label for the reveal button in the duplicated JavaScript widget.
+   */
+  revealDuplicateJavaScript: 'Reveal duplicated JavaScript',
+  /**
+   * @description Title for the duplicated JavaScript widget.
+   */
+  duplicateJavaScript: 'Duplicated JavaScript',
+  /**
+   * @description Accessible label for the reveal button in the image delivery widget.
+   */
+  revealImageDelivery: 'Reveal image delivery',
+  /**
+   * @description Title for the image delivery widget.
+   */
+  imageDelivery: 'Image delivery',
+  /**
+   * @description Accessible label for the reveal button in the font display widget.
+   */
+  revealFontDisplay: 'Reveal font display',
+  /**
+   * @description Title for the font display widget.
+   */
+  fontDisplay: 'Font display',
+  /**
+   * @description Accessible label for the reveal button in the slow CSS selectors widget.
+   */
+  revealSlowCssSelector: 'Reveal slow CSS selectors',
+  /**
+   * @description Title for the slow CSS selectors widget.
+   */
+  slowCssSelector: 'Slow CSS selectors',
+  /**
+   * @description Accessible label for the reveal button in the legacy JavaScript widget.
+   */
+  revealLegacyJavaScript: 'Reveal legacy JavaScript',
+  /**
+   * @description Title for the legacy JavaScript widget.
+   */
+  legacyJavaScript: 'Legacy JavaScript',
+  /**
+   * @description Accessible label for the reveal button in the viewport optimization widget.
+   */
+  revealViewport: 'Reveal viewport optimization',
+  /**
+   * @description Title for the viewport optimization widget.
+   */
+  viewport: 'Viewport optimization',
+  /**
+   * @description Accessible label for the reveal button in the network request general headers widget.
+   */
+  revealNetworkRequest: 'Reveal network request',
+  /**
+   * @description Title for the network request general headers widget.
+   */
+  networkRequest: 'Network request',
+  /**
+   * @description Accessible label for the reveal button in the modern HTTP usage widget.
+   */
+  revealModernHttp: 'Reveal modern HTTP usage',
+  /**
+   * @description Title for the modern HTTP usage widget.
+   */
+  modernHttp: 'Modern HTTP usage',
+  /**
+   * @description Accessible label for the reveal button in the character set declaration widget.
+   */
+  revealCharacterSet: 'Reveal character set declaration',
+  /**
+   * @description Title for the character set declaration widget.
+   */
+  characterSet: 'Character set declaration',
+  /**
+   * @description Title for the source files list widget.
+   */
+  inspectedFileNames: 'Inspected file names',
 } as const;
 
 export interface Step {
@@ -239,6 +453,12 @@ export interface StepPart {
   step: Step;
 }
 
+/**
+ * Represents a part of the message that consists of one or more widgets.
+ * The agent can yield widgets directly as part of its response, separate
+ * from those returned by a specific tool call (which are encapsulated
+ * within a StepPart).
+ */
 export interface WidgetPart {
   type: 'widget';
   widgets: AiWidget[];
@@ -250,6 +470,7 @@ export interface UserChatMessage {
   entity: ChatMessageEntity.USER;
   text: string;
   imageInput?: Host.AidaClient.Part;
+  id: string;
 }
 
 export interface ModelChatMessage {
@@ -257,6 +478,7 @@ export interface ModelChatMessage {
   parts: ModelMessagePart[];
   error?: AiAssistanceModel.AiAgent.ErrorType;
   rpcId?: Host.AidaClient.RpcGlobalId;
+  id: string;
 }
 
 export type Message = UserChatMessage|ModelChatMessage;
@@ -305,6 +527,8 @@ export interface MessageInput {
   isReadOnly: boolean;
   isLastMessage: boolean;
   isFirstMessage: boolean;
+  prompt: string;
+  shouldShowCSSChangeSummary: boolean;
   canShowFeedbackForm: boolean;
   markdownRenderer: MarkdownLitRenderer;
   onSuggestionClick: (suggestion: string) => void;
@@ -406,7 +630,7 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
           },
         )}
         ${renderError(message)}
-        ${input.isLastMessage && hasAiV2 && !input.isLoading && input.changeSummary ? html`
+        ${input.shouldShowCSSChangeSummary && hasAiV2 && input.changeSummary ? html`
           <devtools-code-block
             .code=${input.changeSummary}
             .codeLang=${'css'}
@@ -417,6 +641,7 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
         ` : Lit.nothing}
         ${input.showActions ? renderActions(input, output) : Lit.nothing}
       </div>
+      ${hasAiV2 ? renderSideEffectStepsUI(input, steps) : Lit.nothing}
     </section>
   `, target);
   // clang-format on
@@ -462,7 +687,7 @@ function renderTitle(step: Step): Lit.LitTemplate {
       html`<span class="paused">${lockedString(UIStringsNotTranslate.paused)}: </span>` :
       Lit.nothing;
 
-  return html`<span class="title">${paused}${titleForStep(step)}</span>`;
+  return html`<h3 class="title" aria-label=${titleForStep(step)}>${paused}${titleForStep(step)}</h3>`;
 }
 
 function renderStepCode(step: Step): Lit.LitTemplate {
@@ -552,7 +777,7 @@ function renderWalkthroughSidebarButton(
   }
 
   const hasOneStepWithWidget = steps.some(step => step.widgets?.length);
-  const isExpanded = walkthrough.isExpanded && input.message === input.walkthrough.activeSidebarMessage;
+  const isExpanded = walkthrough.isExpanded && input.message.id === input.walkthrough.activeSidebarMessage?.id;
   const title = isExpanded ? walkthroughCloseTitle({hasWidgets: hasOneStepWithWidget}) : walkthroughTitle({
     isLoading: input.isLoading,
     hasWidgets: hasOneStepWithWidget,
@@ -570,6 +795,15 @@ function renderWalkthroughSidebarButton(
     // We only apply the widget styling when loading is complete
     'has-widgets': hasOneStepWithWidget && !input.isLoading,
   });
+
+  const accessibleLabel = getButtonLabel({
+    isExpanded,
+    isLoading: input.isLoading,
+    hasWidgets: hasOneStepWithWidget,
+    prompt: input.prompt,
+    stepTitle: titleForStep(lastStep),
+  });
+
   // clang-format off
   return html`
     <div class=${toggleContainerClasses}>
@@ -580,10 +814,11 @@ function renderWalkthroughSidebarButton(
         .variant=${variant}
         .size=${Buttons.Button.Size.SMALL}
         .title=${lastStep.isLoading ? titleForStep(lastStep) : title}
+        .accessibleLabel=${accessibleLabel}
         .jslogContext=${walkthrough.isExpanded ? 'ai-hide-walkthrough-sidebar' : 'ai-show-walkthrough-sidebar'}
         data-show-walkthrough
         @click=${() => {
-          if(walkthrough.activeSidebarMessage === input.message && walkthrough.isExpanded) {
+          if(walkthrough.activeSidebarMessage?.id === input.message.id && walkthrough.isExpanded) {
             walkthrough.onToggle(false, message as ModelChatMessage);
           } else {
             // Can't just toggle the visibility here; we need to ensure we
@@ -609,7 +844,6 @@ function renderWalkthroughUI(input: ChatMessageViewInput, steps: Step[]): Lit.Li
     // No steps = no walkthrough UI in the chat view.
     return Lit.nothing;
   }
-  const sideEffectSteps = steps.filter(s => s.requestApproval);
   // If the walkthrough is in the sidebar, we render a button into the
   // ChatView to open it.
   const openWalkThroughSidebarButton =
@@ -619,24 +853,8 @@ function renderWalkthroughUI(input: ChatMessageViewInput, steps: Step[]): Lit.Li
   // open and it is specifically targeting this message. This is necessary
   // because the walkthrough state is shared across all messages in the chat.
   const isExpanded = input.walkthrough.isInlined ?
-      input.walkthrough.inlineExpandedMessages.includes(input.message as ModelChatMessage) :
-      (input.walkthrough.isExpanded && input.walkthrough.activeSidebarMessage === input.message);
-
-  // When a side-effect step is present and needs user approval, it's
-  // shown in the main chat UI, regardless of if the walkthrough is
-  // open or closed.
-  // Once the user has approved/denied it, it goes back into the sidebar.
-  // clang-format off
-  const sideEffectStepsUI = sideEffectSteps.length > 0 ? sideEffectSteps.map(step => html`
-    <div class="side-effect-container">
-      ${renderStep({
-         step,
-         isLoading: input.isLoading,
-         markdownRenderer: input.markdownRenderer,
-         isLast: true
-      })}
-    </div> `) : Lit.nothing;
-  // clang-format on
+      input.walkthrough.inlineExpandedMessages.some(m => m.id === input.message.id) :
+      (input.walkthrough.isExpanded && input.walkthrough.activeSidebarMessage?.id === input.message.id);
 
   // clang-format off
   const walkthroughInline = input.walkthrough.isInlined ? html`
@@ -647,6 +865,7 @@ function renderWalkthroughUI(input: ChatMessageViewInput, steps: Step[]): Lit.Li
         markdownRenderer: input.markdownRenderer,
         isInlined: true,
         isExpanded,
+        prompt: input.prompt,
         onToggle: input.walkthrough.onToggle,
         onOpen: input.walkthrough.onOpen,
       })}
@@ -656,7 +875,26 @@ function renderWalkthroughUI(input: ChatMessageViewInput, steps: Step[]): Lit.Li
   return html`
     ${openWalkThroughSidebarButton}
     ${walkthroughInline}
-    ${sideEffectStepsUI}
+  `;
+  // clang-format on
+}
+
+function renderSideEffectStepsUI(input: ChatMessageViewInput, steps: Step[]): Lit.LitTemplate {
+  const sideEffectSteps = steps.filter(s => s.requestApproval);
+  if (sideEffectSteps.length === 0) {
+    return Lit.nothing;
+  }
+  // clang-format off
+  return html`
+    ${sideEffectSteps.map(step => html`
+      <div class="side-effect-container">
+        ${renderStep({
+           step,
+           isLoading: input.isLoading,
+           markdownRenderer: input.markdownRenderer,
+           isLast: true
+        })}
+      </div> `)}
   `;
   // clang-format on
 }
@@ -667,7 +905,7 @@ function renderStepBadge({step, isLoading, isLast}: {
   isLast: boolean,
 }): Lit.LitTemplate {
   if (isLoading && isLast && !step.requestApproval) {
-    return html`<devtools-spinner></devtools-spinner>`;
+    return html`<devtools-spinner aria-label=${lockedString(UIStringsNotTranslate.inProgress)}></devtools-spinner>`;
   }
 
   let iconName = 'checkmark';
@@ -675,10 +913,10 @@ function renderStepBadge({step, isLoading, isLast}: {
   let role: 'button'|undefined = 'button';
   if (isLast && step.requestApproval) {
     role = undefined;
-    ariaLabel = undefined;
+    ariaLabel = lockedString(UIStringsNotTranslate.paused);
     iconName = 'pause-circle';
   } else if (step.canceled) {
-    ariaLabel = lockedString(UIStringsNotTranslate.canceled);
+    ariaLabel = lockedString(UIStringsNotTranslate.aborted);
     iconName = 'cross';
   }
 
@@ -705,7 +943,7 @@ export function renderStep({step, isLoading, markdownRenderer, isLast}: {
   // clang-format off
   return html`
     <details class=${stepClasses}
-      jslog=${VisualLogging.section('step')}
+      jslog=${VisualLogging.expand('step').track({click: true})}
       .open=${Boolean(step.requestApproval)}>
       <summary>
         <div class="summary">
@@ -731,6 +969,8 @@ interface WidgetMakerResponse {
   customRevealTitle?: Platform.UIString.LocalizedString;
   // Can be null if the widget is only used to add the Reveal CTA.
   title: Lit.LitTemplate|Platform.UIString.LocalizedString|null;
+  jslogContext?: string;
+  accessibleRevealLabel: string;
 }
 
 const nodeCache = new Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode>();
@@ -786,6 +1026,7 @@ async function makeComputedStyleWidget(widgetData: ComputedStyleAiWidget): Promi
   return {
     renderedWidget,
     revealable: new Elements.ElementsPanel.NodeComputedStyles(domNodeForId),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealComputedStyles),
     // clang-format off
     title: html`
       <span class="computed-style-title-wrapper">
@@ -799,6 +1040,7 @@ async function makeComputedStyleWidget(widgetData: ComputedStyleAiWidget): Promi
         </span>
       </span>`,
     // clang-format on
+    jslogContext: 'computed-styles',
   };
 }
 
@@ -811,7 +1053,9 @@ async function makeCoreWebVitalsWidget(widgetData: CoreVitalsAiWidget): Promise<
   return {
     renderedWidget,
     revealable: new TimelineUtils.Helpers.RevealableCoreVitals(widgetData.data.insightSetKey),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealCoreWebVitals),
     title: lockedString(UIStringsNotTranslate.coreVitals),
+    jslogContext: 'core-web-vitals',
   };
 }
 
@@ -843,34 +1087,177 @@ async function makeStylePropertiesWidget(widgetData: StylePropertiesAiWidget): P
   return {
     renderedWidget,
     revealable: domNodeForId,
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealStyleProperties),
     title: html`<devtools-widget
       ${widget(PanelsCommon.DOMLinkifier.DOMNodeLink, {
       node: domNodeForId,
     })}
     ></devtools-widget>`,
+    jslogContext: 'standalone-styles',
   };
 }
 
-async function makeLcpBreakdownWidget(widgetData: LcpBreakdownAiWidget): Promise<WidgetMakerResponse|null> {
-  const insight = widgetData.data.lcpData;
-  if (!insight) {
-    return null;
-  }
+const INSIGHT_METADATA: Record<string, {
+  component: new () => BaseInsightComponent<Trace.Insights.Types.InsightModel>,
+  accessibleLabel: string,
+  title: string,
+  jslog: string,
+}> = {
+  [Trace.Insights.Types.InsightKeys.LCP_BREAKDOWN]: {
+    component: TimelineInsights.LCPBreakdown.LCPBreakdown,
+    accessibleLabel: UIStringsNotTranslate.revealLcpBreakdown,
+    title: UIStringsNotTranslate.lcpBreakdown,
+    jslog: 'lcp-breakdown-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.RENDER_BLOCKING]: {
+    component: TimelineInsights.RenderBlocking.RenderBlocking,
+    accessibleLabel: UIStringsNotTranslate.revealRenderBlockingBreakdown,
+    title: UIStringsNotTranslate.renderBlockingBreakdown,
+    jslog: 'render-blocking-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.LCP_DISCOVERY]: {
+    component: TimelineInsights.LCPDiscovery.LCPDiscovery,
+    accessibleLabel: UIStringsNotTranslate.revealLcpDiscovery,
+    title: UIStringsNotTranslate.lcpDiscovery,
+    jslog: 'lcp-discovery-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.CLS_CULPRITS]: {
+    component: TimelineInsights.CLSCulprits.CLSCulprits,
+    accessibleLabel: UIStringsNotTranslate.revealClsCulprits,
+    title: UIStringsNotTranslate.clsCulprits,
+    jslog: 'cls-culprits-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.NETWORK_DEPENDENCY_TREE]: {
+    component: TimelineInsights.NetworkDependencyTree.NetworkDependencyTree,
+    accessibleLabel: UIStringsNotTranslate.revealNetworkDependencyTree,
+    title: UIStringsNotTranslate.networkDependencyTree,
+    jslog: 'network-dependency-tree-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.THIRD_PARTIES]: {
+    component: TimelineInsights.ThirdParties.ThirdParties,
+    accessibleLabel: UIStringsNotTranslate.revealThirdParties,
+    title: UIStringsNotTranslate.thirdParties,
+    jslog: 'third-parties-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.FORCED_REFLOW]: {
+    component: TimelineInsights.ForcedReflow.ForcedReflow,
+    accessibleLabel: UIStringsNotTranslate.revealForcedReflow,
+    title: UIStringsNotTranslate.forcedReflow,
+    jslog: 'forced-reflow-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.CACHE]: {
+    component: TimelineInsights.Cache.Cache,
+    accessibleLabel: UIStringsNotTranslate.revealCache,
+    title: UIStringsNotTranslate.cache,
+    jslog: 'cache-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.INP_BREAKDOWN]: {
+    component: TimelineInsights.INPBreakdown.INPBreakdown,
+    accessibleLabel: UIStringsNotTranslate.revealInpBreakdown,
+    title: UIStringsNotTranslate.inpBreakdown,
+    jslog: 'inp-breakdown-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.DOCUMENT_LATENCY]: {
+    component: TimelineInsights.DocumentLatency.DocumentLatency,
+    accessibleLabel: UIStringsNotTranslate.revealDocumentLatency,
+    title: UIStringsNotTranslate.documentLatency,
+    jslog: 'document-latency-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.DOM_SIZE]: {
+    component: TimelineInsights.DOMSize.DOMSize,
+    accessibleLabel: UIStringsNotTranslate.revealDomSize,
+    title: UIStringsNotTranslate.domSize,
+    jslog: 'dom-size-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.DUPLICATE_JAVASCRIPT]: {
+    component: TimelineInsights.DuplicatedJavaScript.DuplicatedJavaScript,
+    accessibleLabel: UIStringsNotTranslate.revealDuplicateJavaScript,
+    title: UIStringsNotTranslate.duplicateJavaScript,
+    jslog: 'duplicate-javascript-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.IMAGE_DELIVERY]: {
+    component: TimelineInsights.ImageDelivery.ImageDelivery,
+    accessibleLabel: UIStringsNotTranslate.revealImageDelivery,
+    title: UIStringsNotTranslate.imageDelivery,
+    jslog: 'image-delivery-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.FONT_DISPLAY]: {
+    component: TimelineInsights.FontDisplay.FontDisplay,
+    accessibleLabel: UIStringsNotTranslate.revealFontDisplay,
+    title: UIStringsNotTranslate.fontDisplay,
+    jslog: 'font-display-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.SLOW_CSS_SELECTOR]: {
+    component: TimelineInsights.SlowCSSSelector.SlowCSSSelector,
+    accessibleLabel: UIStringsNotTranslate.revealSlowCssSelector,
+    title: UIStringsNotTranslate.slowCssSelector,
+    jslog: 'slow-css-selector-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.LEGACY_JAVASCRIPT]: {
+    component: TimelineInsights.LegacyJavaScript.LegacyJavaScript,
+    accessibleLabel: UIStringsNotTranslate.revealLegacyJavaScript,
+    title: UIStringsNotTranslate.legacyJavaScript,
+    jslog: 'legacy-javascript-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.VIEWPORT]: {
+    component: TimelineInsights.Viewport.Viewport,
+    accessibleLabel: UIStringsNotTranslate.revealViewport,
+    title: UIStringsNotTranslate.viewport,
+    jslog: 'viewport-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.MODERN_HTTP]: {
+    component: TimelineInsights.ModernHTTP.ModernHTTP,
+    accessibleLabel: UIStringsNotTranslate.revealModernHttp,
+    title: UIStringsNotTranslate.modernHttp,
+    jslog: 'modern-http-widget',
+  },
+  [Trace.Insights.Types.InsightKeys.CHARACTER_SET]: {
+    component: TimelineInsights.CharacterSet.CharacterSet,
+    accessibleLabel: UIStringsNotTranslate.revealCharacterSet,
+    title: UIStringsNotTranslate.characterSet,
+    jslog: 'character-set-widget',
+  },
+};
 
-  // clang-format off
+function renderInsightWidget<T extends Trace.Insights.Types.InsightModel>(
+    component: new () => BaseInsightComponent<T>, insight: T, jslog: string, accessibleLabel: string, title: string,
+    bounds?: Trace.Types.Timing.TraceWindowMicro): WidgetMakerResponse {
   const renderedWidget = html`<devtools-widget
-    class="lcp-breakdown-widget"
-    ${widget(TimelineInsights.LCPBreakdown.LCPBreakdown, {
-      model: insight,
-      minimal: true,
-    })}></devtools-widget>`;
-  // clang-format on
+    class=${jslog}
+    ${widget(component, {
+    model: insight,
+    minimal: true,
+    bounds: bounds ?? null,
+  })}></devtools-widget>`;
 
   return {
     renderedWidget,
     revealable: new TimelineUtils.Helpers.RevealableInsight(insight),
-    title: lockedString(UIStringsNotTranslate.lcpBreakdown),
+    accessibleRevealLabel: lockedString(accessibleLabel),
+    title: lockedString(title),
+    jslogContext: jslog,
   };
+}
+
+async function makePerfInsightWidget(widgetData: PerfInsightAiWidget): Promise<WidgetMakerResponse|null> {
+  const insightKey = widgetData.data.insight;
+  const insight = widgetData.data.insightData;
+
+  const meta = INSIGHT_METADATA[insightKey];
+  if (!meta) {
+    return null;
+  }
+
+  let bounds;
+  if (insightKey === Trace.Insights.Types.InsightKeys.CLS_CULPRITS) {
+    const traceBounds = TraceBounds.TraceBounds.BoundsManager.instance().state()?.micro.entireTraceBounds;
+    if (!traceBounds) {
+      return null;
+    }
+    bounds = traceBounds;
+  }
+
+  return renderInsightWidget(meta.component, insight, meta.jslog, meta.accessibleLabel, meta.title, bounds);
 }
 
 async function makeBottomUpTimelineTreeWidget(widgetData: BottomUpTreeAiWidget): Promise<WidgetMakerResponse|null> {
@@ -898,7 +1285,9 @@ async function makeBottomUpTimelineTreeWidget(widgetData: BottomUpTreeAiWidget):
   return {
     renderedWidget,
     revealable: new TimelineUtils.Helpers.RevealableBottomUpProfile(widgetData.data.bounds),
-    title: lockedString(UIStringsNotTranslate.bottomUpTree)
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealBottomUpTree),
+    title: lockedString(UIStringsNotTranslate.bottomUpTree),
+    jslogContext: 'bottom-up',
   };
 }
 
@@ -922,6 +1311,8 @@ function renderWidgetResponse(response: WidgetMakerResponse|null): Lit.LitTempla
   const revealButton = html`
     <devtools-button class="widget-reveal-button"
       .variant=${Buttons.Button.Variant.TEXT}
+      .accessibleLabel=${response.accessibleRevealLabel}
+      .jslogContext=${'reveal'}
       @click=${onReveal}
     >
       ${response.customRevealTitle ?? lockedString(UIStringsNotTranslate.reveal)}
@@ -931,10 +1322,10 @@ function renderWidgetResponse(response: WidgetMakerResponse|null): Lit.LitTempla
 
   // clang-format off
   return html`
-    <div class=${classes}>
+    <div class=${classes} jslog=${ifDefined(response.jslogContext ? VisualLogging.section(response.jslogContext) : undefined)}>
       ${response.title ? html`
         <div class="widget-header">
-          <div class="widget-name">${response.title}</div>
+          <h4 class="widget-name">${response.title}</h4>
           <div class="widget-reveal-container">
             ${revealButton}
           </div>
@@ -956,11 +1347,122 @@ function renderWidgetResponse(response: WidgetMakerResponse|null): Lit.LitTempla
 }
 
 async function makePerformanceTraceWidget(widgetData: PerformanceTraceAiWidget): Promise<WidgetMakerResponse|null> {
+  const customRevealTitle = lockedString(UIStringsNotTranslate.revealTrace);
   return {
     renderedWidget: null,
     title: null,
     revealable: new Timeline.TimelinePanel.ParsedTraceRevealable(widgetData.data.parsedTrace),
-    customRevealTitle: lockedString(UIStringsNotTranslate.revealTrace),
+    customRevealTitle,
+    accessibleRevealLabel: customRevealTitle,
+    jslogContext: 'performance-trace',
+  };
+}
+
+async function makeSourceFileWidget(widgetData: SourceFileAiWidget): Promise<WidgetMakerResponse|null> {
+  const file = widgetData.data.uiSourceCode;
+  const customRevealTitle = i18n.i18n.lockedString(`Show ${file.name()}`);
+  return {
+    renderedWidget: null,
+    title: null,
+    revealable: file,
+    customRevealTitle,
+    accessibleRevealLabel: customRevealTitle,
+    jslogContext: 'source-file-widget',
+  };
+}
+
+async function makeSourceCodeWidget(widgetData: SourceCodeAiWidget): Promise<WidgetMakerResponse|null> {
+  const url = widgetData.data.url;
+  const filename = url.split('/').pop() || url;
+  const line = widgetData.data.line;
+  const column = widgetData.data.column;
+
+  // If both line and column numbers are provided, we represent a specific function execution,
+  // so the widget title is formatted as 'filename:line:column' (matching the Sources Panel style).
+  // Otherwise, if line and column are not provided, we are viewing the entire file contents,
+  // so the header simply displays 'filename'.
+  const header = line !== undefined && column !== undefined ? `${filename}:${line}:${column}` : filename;
+
+  const uiSourceCode =
+      Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(url as Platform.DevToolsPath.UrlString);
+  const lastDotIndex = filename.lastIndexOf('.');
+  const fileExtension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1) : '';
+
+  let code = widgetData.data.code;
+  if (TextUtils.TextUtils.isMinified(code)) {
+    const canonicalMimeType = uiSourceCode?.contentType().canonicalMimeType() || 'text/javascript';
+    const formatted = await Formatter.ScriptFormatter.formatScriptContent(canonicalMimeType, code, '  ');
+    code = formatted.formattedContent;
+  }
+
+  const renderedWidget = html`
+    <devtools-code-block
+      class="source-code-widget"
+      .displayLimit=${20}
+      .code=${code}
+      .codeLang=${fileExtension}
+      .header=${' '}
+      .displayNotice=${false}
+    ></devtools-code-block>
+  `;
+
+  return {
+    renderedWidget,
+    title: lockedString(header),
+    revealable: uiSourceCode,
+    accessibleRevealLabel: i18n.i18n.lockedString(`Show ${filename} in Sources`),
+    jslogContext: 'source-code-widget',
+  };
+}
+
+function renderFileRevealButton(
+    file: Workspace.UISourceCode.UISourceCode,
+    collapsed: boolean,
+    ): Lit.TemplateResult {
+  const onReveal = (): void => {
+    void Common.Revealer.reveal(file);
+  };
+  const accessibleLabel = i18n.i18n.lockedString(`Show ${file.fullDisplayName()}`);
+  const className = `widget-reveal-button ${collapsed ? 'collapsed-file' : 'visible-file'}`;
+  return html`
+    <devtools-button class=${className}
+      .variant=${Buttons.Button.Variant.TEXT}
+      .accessibleLabel=${accessibleLabel}
+      .jslogContext=${'reveal'}
+      @click=${onReveal}>
+      ${file.fullDisplayName()}
+      <devtools-icon name='tab-move'></devtools-icon>
+    </devtools-button>
+  `;
+}
+
+async function makeSourceFilesListWidget(widgetData: SourceFilesListAiWidget): Promise<WidgetMakerResponse|null> {
+  const files = widgetData.data.uiSourceCodes;
+  if (files.length === 0) {
+    return null;
+  }
+
+  // If there are more than 10 files, only show the first 10, and hide the rest unless "Show all" is clicked.
+  // clang-format off
+  const renderedWidget = html`
+    <div class="source-files-widget">
+      ${files.slice(0, 10).map(file => renderFileRevealButton(file, /* collapsed */ false))}
+      ${files.length > 10 ? html`
+        <details class="source-files-details">
+          <summary class="show-more-summary">${i18n.i18n.lockedString(`Show all ${files.length} files`)}</summary>
+          ${files.slice(10).map(file => renderFileRevealButton(file, /* collapsed */ true))}
+        </details> ` : Lit.nothing}
+    </div>`;
+  // clang-format on
+
+  const title = lockedString(UIStringsNotTranslate.inspectedFileNames);
+
+  return {
+    renderedWidget,
+    title,
+    revealable: files[0],
+    accessibleRevealLabel: i18n.i18n.lockedString('Reveal first file in Sources panel'),
+    jslogContext: 'source-files-list-widget',
   };
 }
 
@@ -971,15 +1473,18 @@ function renderNetworkRequestPreview(networkRequest: NonNullable<DomTreeAiWidget
   const resourceType = Common.ResourceType.resourceTypes[networkRequest.resourceType];
   const {iconName, color} = PanelUtils.iconDataForResourceType(resourceType);
 
+  // This can be `null` if the image is too large to have a preview generated.
+  // And we can't fallback to the actual URL due to CSP restrictions.
+  const imageUrl = networkRequest.imageContent?.asImagePreviewUrl();
+
+  // clang-format off
   return html`
     <div class="network-request-preview">
       <div class="network-request-header">
         <div class="network-request-icon">
-          ${
-      resourceType.isImage() ? html`<img src=${networkRequest.imageUrl ?? networkRequest.url} alt=${filename} />` :
-                               html`<devtools-icon name=${iconName} style=${Lit.Directives.styleMap({
-                                 color: color ?? ''
-                               })}></devtools-icon>`}
+          ${resourceType.isImage() && imageUrl ? // only try to render the image if we have a preview URL, else fallback to a coloured square.
+            html`<img src=${imageUrl} alt=${filename} />` :
+            html`<devtools-icon name=${iconName} style=${Lit.Directives.styleMap({ color: color ?? '' })}></devtools-icon>`}
         </div>
         <div class="network-request-details">
           <div class="network-request-name" title=${networkRequest.url}>${filename}</div>
@@ -988,6 +1493,7 @@ function renderNetworkRequestPreview(networkRequest: NonNullable<DomTreeAiWidget
       </div>
     </div>
   `;
+  // clang-format on
 }
 
 async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMakerResponse|null> {
@@ -1019,7 +1525,9 @@ async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMak
   return {
     renderedWidget,
     revealable: new SDK.DOMModel.DeferredDOMNode(root.domModel().target(), root.backendNodeId()),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealLcpElement),
     title: lockedString(UIStringsNotTranslate.lcpElement),
+    jslogContext: 'dom-snapshot',
   };
 }
 
@@ -1038,8 +1546,94 @@ async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMak
  *
  * This allows for a flexible and extensible system where new widget types
  * can be added to the AI responses and rendered in DevTools by adding
- * corresponding \`make...Widget\` functions and handling them here.
+ * corresponding `make...Widget` functions and handling them here.
  */
+/**
+ * Generates a deterministic unique identifier for a given AiWidget based on
+ * its name and identifying data. This signature is used for widget deduplication.
+ */
+export function getWidgetSignature(widget: AiWidget): string {
+  switch (widget.name) {
+    case 'COMPUTED_STYLES':
+      return `${widget.name}:${widget.data.backendNodeId}`;
+    case 'CORE_VITALS':
+      return `${widget.name}:${widget.data.insightSetKey}`;
+    case 'STYLE_PROPERTIES':
+      return `${widget.name}:${widget.data.backendNodeId}:${widget.data.selector ?? ''}`;
+    case 'DOM_TREE':
+      return `${widget.name}:${widget.data.root.backendNodeId()}`;
+    case 'PERFORMANCE_TRACE':
+      return `${widget.name}`;
+    case 'PERF_INSIGHT':
+      return `${widget.name}:${widget.data.insight}:${widget.data.insightData.insightKey}:${
+          widget.data.insightData.navigation?.args?.data?.navigationId ?? 'no-nav-id'}`;
+    case 'TIMELINE_RANGE_SUMMARY':
+      return `${widget.name}:${widget.data.track}:${widget.data.bounds.min}-${widget.data.bounds.max}`;
+    case 'BOTTOM_UP_TREE':
+      return `${widget.name}:${widget.data.bounds.min}-${widget.data.bounds.max}`;
+    case 'SOURCE_FILE':
+      return `${widget.name}:${widget.data.uiSourceCode.url()}`;
+    case 'SOURCE_FILES_LIST':
+      return `${widget.name}:${widget.data.uiSourceCodes.map(f => f.url()).join(',')}`;
+    case 'LIGHTHOUSE_REPORT':
+      return `${widget.name}:${widget.data.report.fetchTime}`;
+    case 'TIMELINE_EVENT_SUMMARY':
+      return `${widget.name}:${widget.data.event.ts}:${widget.data.event.name}`;
+    case 'NETWORK_REQUEST_GENERAL_HEADERS':
+      return `${widget.name}:${widget.data.request.requestId()}`;
+    case 'SOURCE_CODE':
+      return `${widget.name}:${widget.data.url}:${widget.data.line ?? ''}:${widget.data.column ?? ''}`;
+    default:
+      Platform.assertNever(widget, 'Unknown AiWidget name');
+  }
+}
+
+/**
+ * Returns a new ModelChatMessage where widgets have been deduplicated
+ * across all parts and steps of the message. The first occurrence of each
+ * unique widget (determined by its signature) is preserved.
+ */
+export function getDeduplicatedWidgetsMessage(message: ModelChatMessage): ModelChatMessage {
+  const seenWidgets = new Set<string>();
+
+  const filterWidgets = (widgets: AiWidget[]): AiWidget[] => {
+    return widgets.filter(widget => {
+      const signature = getWidgetSignature(widget);
+      if (seenWidgets.has(signature)) {
+        return false;
+      }
+      seenWidgets.add(signature);
+      return true;
+    });
+  };
+
+  const deduplicatedParts = message.parts.map(part => {
+    if (part.type === 'widget') {
+      return {
+        ...part,
+        widgets: filterWidgets(part.widgets),
+      };
+    }
+
+    if (part.type === 'step' && part.step.widgets) {
+      return {
+        ...part,
+        step: {
+          ...part.step,
+          widgets: filterWidgets(part.step.widgets),
+        },
+      };
+    }
+
+    return part;
+  });
+
+  return {
+    ...message,
+    parts: deduplicatedParts,
+  };
+}
+
 async function renderWidgets(
     widgets: AiWidget[]|undefined, options: {wrapperClass?: string} = {}): Promise<Lit.LitTemplate> {
   if (!Root.Runtime.hostConfig.devToolsAiAssistanceV2?.enabled || !widgets || widgets.length === 0) {
@@ -1063,14 +1657,32 @@ async function renderWidgets(
       case 'PERFORMANCE_TRACE':
         response = await makePerformanceTraceWidget(widgetData);
         break;
-      case 'LCP_BREAKDOWN':
-        response = await makeLcpBreakdownWidget(widgetData);
+      case 'PERF_INSIGHT':
+        response = await makePerfInsightWidget(widgetData);
         break;
       case 'TIMELINE_RANGE_SUMMARY':
         response = await makeTimelineRangeSummaryWidget(widgetData);
         break;
       case 'BOTTOM_UP_TREE':
         response = await makeBottomUpTimelineTreeWidget(widgetData);
+        break;
+      case 'SOURCE_FILE':
+        response = await makeSourceFileWidget(widgetData);
+        break;
+      case 'SOURCE_FILES_LIST':
+        response = await makeSourceFilesListWidget(widgetData);
+        break;
+      case 'LIGHTHOUSE_REPORT':
+        response = await makeLighthouseReportWidget(widgetData);
+        break;
+      case 'TIMELINE_EVENT_SUMMARY':
+        response = await makeTimelineEventSummaryWidget(widgetData);
+        break;
+      case 'NETWORK_REQUEST_GENERAL_HEADERS':
+        response = await makeNetworkRequestGeneralHeadersWidget(widgetData);
+        break;
+      case 'SOURCE_CODE':
+        response = await makeSourceCodeWidget(widgetData);
         break;
       default:
         Platform.assertNever(widgetData, 'Unknown AiWidget name');
@@ -1239,6 +1851,7 @@ function renderActions(input: ChatMessageViewInput, output: ViewOutput): Lit.Lit
             .jslogContext=${'ai-export-for-agents'}
             .variant=${Buttons.Button.Variant.OUTLINED}
             .iconName=${'copy'}
+            aria-label=${lockedString(UIStringsNotTranslate.exportForAgents)}
             @click=${input.onExportClick}
           >${lockedString(UIStringsNotTranslate.exportForAgents)}</devtools-button>
           ${input.suggestions ? html`<div class="vertical-separator"></div>` : Lit.nothing}
@@ -1341,12 +1954,14 @@ function renderActions(input: ChatMessageViewInput, output: ViewOutput): Lit.Lit
 }
 
 export class ChatMessage extends UI.Widget.Widget {
-  message: Message = {entity: ChatMessageEntity.USER, text: ''};
+  message: Message = {entity: ChatMessageEntity.USER, text: '', id: ''};
   isLoading = false;
   isReadOnly = false;
+  prompt = '';
   canShowFeedbackForm = false;
   isLastMessage = false;
   isFirstMessage = false;
+  shouldShowCSSChangeSummary = false;
   markdownRenderer!: MarkdownLitRenderer;
   onSuggestionClick: (suggestion: string) => void = () => {};
   onFeedbackSubmit:
@@ -1388,15 +2003,19 @@ export class ChatMessage extends UI.Widget.Widget {
   }
 
   override performUpdate(): Promise<void>|void {
+    const message =
+        this.message.entity === ChatMessageEntity.MODEL ? getDeduplicatedWidgetsMessage(this.message) : this.message;
     this.#view(
         {
-          message: this.message,
+          message,
           isLoading: this.isLoading,
           isReadOnly: this.isReadOnly,
           canShowFeedbackForm: this.canShowFeedbackForm,
           markdownRenderer: this.markdownRenderer,
           isLastMessage: this.isLastMessage,
           isFirstMessage: this.isFirstMessage,
+          prompt: this.prompt,
+          shouldShowCSSChangeSummary: this.shouldShowCSSChangeSummary,
           onSuggestionClick: this.onSuggestionClick,
           onRatingClick: this.#handleRateClick.bind(this),
           onReportClick: () => UIHelpers.openInNewTab(REPORT_URL),
@@ -1532,21 +2151,38 @@ async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAi
     Promise<WidgetMakerResponse|null> {
   const {bounds, parsedTrace, track} = widgetData.data;
   let events: readonly Trace.Types.Events.Event[] = [];
+
+  // Note: right now "main" is the only track we support, but in the future we
+  // can imagine supporting more.
   if (track === 'main') {
-    const flameChartView = Timeline.TimelinePanel.TimelinePanel.instance().getFlameChart();
-    const mainDataProvider = flameChartView.getMainDataProvider();
-    const mainTrack =
-        mainDataProvider.timelineData().groups.find((group: {name: string}) => group.name.startsWith('Main \u2014 '));
-    if (mainTrack) {
-      events = mainDataProvider.groupTreeEvents(mainTrack) ?? [];
+    // To find the main thread, we first find the navigationId that is "active"
+    // for the given bounds. We do this because the "main" thread can change on
+    // navigations, so this is the most accurate way to find the main thread at
+    // the timespan we are interested in.
+    let navigationId: string|undefined;
+    for (const nav of parsedTrace.data.Meta.mainFrameNavigations) {
+      if (nav.ts <= bounds.min) {
+        navigationId = nav.args.data?.navigationId;
+      } else {
+        break;
+      }
+    }
+    const mainThread = AiAssistanceModel.AIQueries.AIQueries.findMainThread(navigationId, parsedTrace);
+    if (mainThread) {
+      events = mainThread.entries;
+      AiAssistanceModel.Debug.debugLog(
+          `TimelineRangeSummaryAiWidget found main thread. PID:`, mainThread.pid, 'TID:', mainThread.tid,
+          'Number of entries:', mainThread.entries.length);
     }
   }
-  const eventsArray = Array.from(events);
-  eventsArray.sort((a, b) => a.ts - b.ts);
+  if (!events) {
+    AiAssistanceModel.Debug.debugLog(`Warning: could not find events for TimelineRangeSummaryAiWidget`, widgetData);
+    return null;
+  }
 
   const thirdPartyTree = new Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget();
   const mapper = Trace.EntityMapper.EntityMapper.getOrCreate(parsedTrace);
-  thirdPartyTree.model = {selectedEvents: eventsArray, parsedTrace, entityMapper: mapper};
+  thirdPartyTree.model = {selectedEvents: events as Trace.Types.Events.Event[], parsedTrace, entityMapper: mapper};
   thirdPartyTree.activeSelection = Timeline.TimelineSelection.selectionFromRangeMicroSeconds(bounds.min, bounds.max);
   thirdPartyTree.refreshTree(true);
 
@@ -1557,11 +2193,13 @@ async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAi
         data: {
           parsedTrace,
           events,
+          isInAIWidget: true,
           startTime: Trace.Helpers.Timing.microToMilli(bounds.min),
           endTime: Trace.Helpers.Timing.microToMilli(bounds.max),
           thirdPartyTreeTemplate: html`${
             widget(Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget, {
               maxRows: 10,
+              isInAIWidget: true,
               model: {
                 selectedEvents: thirdPartyTree.selectedEvents ?? null,
                 parsedTrace,
@@ -1580,6 +2218,62 @@ async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAi
   return {
     renderedWidget: template,
     revealable: new TimelineUtils.Helpers.RevealableTimeRange(bounds),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealPerformanceSummary),
     title: lockedString(UIStringsNotTranslate.performanceSummary),
+    jslogContext: 'timeline-range-summary',
+  };
+}
+
+async function makeLighthouseReportWidget(widgetData: LighthouseReportAiWidget): Promise<WidgetMakerResponse|null> {
+  const reportEl =
+      Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(widgetData.data.report);
+  if (!reportEl) {
+    return null;
+  }
+
+  const snapshotReport = widgetData.data.snapshotReport;
+
+  return {
+    renderedWidget: html`<div class="lighthouse-report-widget">${reportEl}</div>`,
+    revealable: new Lighthouse.LighthousePanel.ActiveLighthouseReport(widgetData.data.report),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealLighthouse),
+    title: lockedString(UIStringsNotTranslate.lighthouseReport),
+    jslogContext: snapshotReport ? 'lighthouse-snapshot-report-widget' : 'lighthouse-report-widget',
+  };
+}
+
+async function makeTimelineEventSummaryWidget(widgetData: TimelineEventSummaryAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  const renderedWidget = html`<devtools-widget class="timeline-event-summary-widget" ${widget(() => {
+    return Timeline.TimelineDetailsView.TimelineDetailsPane.makeEventWidget(
+        widgetData.data.event,
+        widgetData.data.parsedTrace,
+    );
+  })}></devtools-widget>`;
+
+  return {
+    renderedWidget,
+    revealable: new SDK.TraceObject.RevealableEvent(widgetData.data.event),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealTimelineEventSummary),
+    title: lockedString(UIStringsNotTranslate.timelineEventSummary),
+    jslogContext: 'timeline-event-summary-widget',
+  };
+}
+
+async function makeNetworkRequestGeneralHeadersWidget(widgetData: NetworkRequestGeneralHeadersAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  const renderedWidget = html`<devtools-widget class="network-request-general-headers-widget" ${widget(() => {
+    return Network.RequestHeadersView.RequestHeadersView.createGeneralHeadersView(widgetData.data.request);
+  })}></devtools-widget>`;
+
+  return {
+    renderedWidget,
+    revealable: NetworkForward.UIRequestLocation.UIRequestLocation.tab(
+        widgetData.data.request,
+        NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT,
+        ),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealNetworkRequest),
+    title: lockedString(UIStringsNotTranslate.networkRequest),
+    jslogContext: 'network-request-general-headers-widget',
   };
 }

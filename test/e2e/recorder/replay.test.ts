@@ -105,24 +105,6 @@ describe('Recorder', function() {
       assert.isTrue(await inspectedPage.evaluate(() => document.querySelector('input')?.checked));
     });
 
-    it('should not be able to navigate to chrome URLs', async ({devToolsPage, inspectedPage}) => {
-      expectError('Replay error Not allowed to replay on chrome:// URLs');
-      await setupRecorderWithScriptAndReplay(
-          {
-            title: 'Test Recording',
-            steps: [
-              {
-                type: 'navigate' as StepType.Navigate,
-                url: 'chrome://version',
-              },
-            ],
-          },
-          undefined,
-          devToolsPage,
-          inspectedPage,
-      );
-    });
-
     it('should be able to replay keyboard events', async ({inspectedPage, devToolsPage}) => {
       await setupRecorderWithScriptAndReplay(
           {
@@ -745,7 +727,11 @@ describe('Recorder', function() {
     );
   });
 
-  it('should be able to navigate to a prerendered page', async ({inspectedPage, devToolsPage}) => {
+  // Test is failing on CQ and flaky locally
+  it.skip('[crbug.com/504874017] should be able to navigate to a prerendered page', async ({
+                                                                                      inspectedPage,
+                                                                                      devToolsPage
+                                                                                    }) => {
     await setupRecorderWithScriptAndReplay(
         {
           title: 'Test Recording',

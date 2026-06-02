@@ -6,6 +6,7 @@ import * as Mocha from 'mocha';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import * as DiffUtils from '../conductor/diff-utils.js';
 import * as ResultsDb from '../conductor/resultsdb.js';
 import {
   ScreenshotError,
@@ -20,14 +21,6 @@ const {
   EVENT_TEST_PENDING,
 } = Mocha.Runner.constants;
 
-function sanitize(message: string): string {
-  return message.replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll('\'', '&#39;');
-}
-
 function getErrorMessage(error: Error|unknown): string {
   if (error instanceof Error) {
     if (error.cause) {
@@ -36,11 +29,11 @@ function getErrorMessage(error: Error|unknown): string {
       // to read the `message` property.
       const cause = error.cause as {message?: string};
       const causeMessage = cause.message || '';
-      return sanitize(`${error.message}\n${causeMessage}`);
+      return `${error.message}\n${causeMessage}`;
     }
-    return sanitize(error.stack ?? error.message);
+    return error.stack ?? error.message;
   }
-  return sanitize(`${error}`);
+  return `${error}`;
 }
 
 interface TestRetry {
@@ -53,9 +46,6 @@ interface HookWithParent {
 }
 
 class ResultsDbReporter extends (TestConfig.isAiAgent ? Mocha.reporters.Base : Mocha.reporters.Spec) {
-  // The max length of the summary is 4000, but we need to leave some room for
-  // the rest of the HTML formatting (e.g. <pre> and </pre>).
-  static readonly SUMMARY_LENGTH_CUTOFF = 3985;
   private suitePrefix?: string;
   htmlResult: fs.WriteStream|undefined;
 
@@ -110,7 +100,10 @@ class ResultsDbReporter extends (TestConfig.isAiAgent ? Mocha.reporters.Base : M
         testResult.tags?.push({key: 'screenshot_path', value: error.screenshotPath});
       }
     } else {
-      testResult.summaryHtml = `<pre>${getErrorMessage(error).slice(0, ResultsDbReporter.SUMMARY_LENGTH_CUTOFF)}</pre>`;
+      const errorMessage = getErrorMessage(error);
+      const assertionDiff = DiffUtils.resultAssertionsDiff([error]);
+      const diffText = DiffUtils.formatDiffText(assertionDiff);
+      testResult.summaryHtml = DiffUtils.formatSummary(errorMessage, diffText);
     }
     if (this.htmlResult) {
       this.htmlResult.write(testResult.summaryHtml);

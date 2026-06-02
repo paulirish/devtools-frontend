@@ -9,7 +9,8 @@ import * as path from 'node:path';
 import type {Page, ScreenshotOptions, Target} from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
 
-import {formatAsPatch, resultAssertionsDiff, ResultsDBReporter} from '../../test/conductor/karma-resultsdb-reporter.js';
+import {resultAssertionsDiff} from '../../test/conductor/diff-utils.js';
+import {formatAsPatch, ResultsDBReporter} from '../../test/conductor/karma-resultsdb-reporter.js';
 import {CHECKOUT_ROOT, GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
 import * as ResultsDb from '../../test/conductor/resultsdb.js';
 import {loadTests, TestConfig} from '../../test/conductor/test_config.js';
@@ -17,7 +18,6 @@ import {ScreenshotError, ScreenshotErrorReporter} from '../conductor/screenshot-
 import {assertElementScreenshotUnchanged} from '../shared/screenshots.js';
 
 const COVERAGE_OUTPUT_DIRECTORY = 'karma-coverage';
-const REMOTE_DEBUGGING_PORT = 7722;
 
 const tests = [
   ...loadTests(path.join(GEN_DIR, 'front_end')),
@@ -27,6 +27,7 @@ const tests = [
 function* reporters() {
   if (ResultsDb.available()) {
     yield 'resultsdb';
+    yield 'spec';
   } else {
     yield 'screenshots';
     yield TestConfig.verbose ? 'spec' : 'progress-diff';
@@ -45,6 +46,7 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
   this._execCommand = async function(_cmd: string, args: string[]) {
     const url = args.pop()!;
     const browser = await puppeteer.launch({
+      pipe: true,
       headless: TestConfig.headless,
       executablePath: TestConfig.chromeBinary,
       defaultViewport: null,
@@ -122,9 +124,8 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
 
     return [
       '--remote-allow-origins=*',
-      `--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`,
       '--use-mock-keychain',
-      '--disable-features=DialMediaRouteProvider',
+      '--disable-features=DialMediaRouteProvider,WebUIReloadButton',
       '--password-store=basic',
       '--disable-extensions',
       '--disable-gpu',
@@ -164,8 +165,27 @@ const BaseProgressReporter =
 const ProgressWithDiffReporter = function(
     this: any, formatError: unknown, reportSlow: unknown, useColors: unknown, browserConsoleLogOptions: unknown) {
   BaseProgressReporter.call(this, formatError, reportSlow, useColors, browserConsoleLogOptions);
+
+  const seenTestIds = new Set<string>();
+  const duplicateTestIds: string[] = [];
+
+  const onSpecComplete = (result: any) => {
+    if (result.mocha?.hasExclusiveTests) {
+      this.hasExclusiveTests = true;
+    }
+    const testId = ResultsDb.sanitizedTestId([...result.suite, result.description].join('/'));
+    if (seenTestIds.has(testId)) {
+      duplicateTestIds.push(testId);
+    }
+    seenTestIds.add(testId);
+  };
+
   const baseSpecFailure = this.specFailure;
   this.specFailure = function(this: any, _browser: unknown, result: any) {
+    onSpecComplete(result);
+    if (result.mocha?.hasExclusiveTests) {
+      this.hasExclusiveTests = true;
+    }
     baseSpecFailure.apply(this, arguments);
     const patch = formatAsPatch(resultAssertionsDiff(result));
     if (patch) {
@@ -174,10 +194,43 @@ const ProgressWithDiffReporter = function(
   };
 
   const baseSpecSuccess = this.specSuccess;
-  this.specSuccess = function(this: any, _browser: unknown, _result: unknown) {
+  this.specSuccess = function(this: any, _browser: unknown, result: any) {
+    onSpecComplete(result);
+    if (result.mocha?.hasExclusiveTests) {
+      this.hasExclusiveTests = true;
+    }
     if (!TestConfig.isAiAgent) {
       baseSpecSuccess.apply(this, arguments);
     }
+  };
+
+  const baseSpecSkipped = this.specSkipped;
+  this.specSkipped = function(this: any, _browser: unknown, result: any) {
+    onSpecComplete(result);
+    if (result.mocha?.hasExclusiveTests) {
+      this.hasExclusiveTests = true;
+    }
+    if (baseSpecSkipped) {
+      baseSpecSkipped.apply(this, arguments);
+    }
+  };
+
+  const baseOnRunComplete = this.onRunComplete;
+  this.onRunComplete = function(this: any, browsers: any, _results: any) {
+    if (baseOnRunComplete) {
+      baseOnRunComplete.apply(this, arguments);
+    }
+
+    if (duplicateTestIds.length > 0) {
+      throw new Error(`duplicate test id(s): ${duplicateTestIds.join(', ')}`);
+    }
+
+    browsers.forEach((browser: any) => {
+      const {total, success, failed, skipped} = browser.lastResult;
+      if (total !== success + failed + skipped && !this.hasExclusiveTests) {
+        throw new Error(`Karma exited early: executed ${success + failed + skipped} out of ${total} tests`);
+      }
+    });
   };
 };
 ProgressWithDiffReporter.$inject =
@@ -201,6 +254,7 @@ module.exports = function(config: any) {
 
     files: [
       // Global hooks in test_setup must go first
+      {pattern: path.join(SOURCE_ROOT, 'node_modules/chai/**/*'), served: true, included: false},
       {pattern: path.join(GEN_DIR, 'front_end', 'testing', 'test_setup.js'), type: 'module'},
       ...tests.map(pattern => ({pattern, type: 'module'})),
       ...tests.map(pattern => ({pattern: `${pattern}.map`, served: true, included: false, watched: true})),
@@ -234,22 +288,21 @@ module.exports = function(config: any) {
       },
     },
 
-    frameworks: ['mocha', 'chai', 'sinon'],
+    frameworks: ['mocha', 'sinon'],
 
     client: {
       mocha: {
         ...TestConfig.mochaGrep,
         retries: TestConfig.retries,
         timeout: TestConfig.debug ? 0 : 5_000,
+        expose: ['hasExclusiveTests'],
       },
-      remoteDebuggingPort: REMOTE_DEBUGGING_PORT,
     },
 
     plugins: [
       {[`launcher:${CustomChrome.prototype.name}`]: ['type', CustomChrome]},
       require('karma-mocha'),
       require('karma-mocha-reporter'),
-      require('karma-chai'),
       require('karma-sinon'),
       require('karma-sourcemap-loader'),
       require('karma-spec-reporter'),
@@ -268,7 +321,6 @@ module.exports = function(config: any) {
     proxies: {
       '/Images': `/base/${targetDir}/front_end/Images`,
       '/locales': `/base/${targetDir}/front_end/core/i18n/locales`,
-      '/json': `http://localhost:${REMOTE_DEBUGGING_PORT}/json`,
       '/front_end': `/base/${targetDir}/front_end`,
     },
 

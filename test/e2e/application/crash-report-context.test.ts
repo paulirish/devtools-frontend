@@ -122,6 +122,10 @@ describe('The Crash Report Context Page', function() {
     });
     const refreshButton = await devToolsPage.waitFor(REFRESH_BUTTON_SELECTOR);
     await refreshButton.click();
+
+    // Wait for the deleted entry to be gone from the UI.
+    await devToolsPage.waitForNoElementsWithTextContent('apple');
+
     const innerText = await getInnerTextOfDataGridCells(dataGrid, 1, true, devToolsPage);
     assertRowDetails(innerText[0], 'banana', 'yellow');
   });

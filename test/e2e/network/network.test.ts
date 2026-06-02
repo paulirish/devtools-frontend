@@ -141,5 +141,41 @@ describe('The Network Tab', function() {
       await devToolsPage.waitFor('[aria-label=Response].tabbed-pane-header-tab[aria-selected=true]', networkView);
       await devToolsPage.waitFor('devtools-text-editor');
     });
+
+    it('does not persist response body if preserve log was disabled during request',
+       async ({devToolsPage, inspectedPage}) => {
+         await navigateToNetworkTabEmptyPage(devToolsPage, inspectedPage);
+         await setPersistLog(false, devToolsPage);
+
+         await navigateToNetworkTab('headers-and-payload.html', devToolsPage, inspectedPage);
+         await waitForSomeRequestsToAppear(3, devToolsPage);
+
+         // Enable preserve log after requests are made
+         await setPersistLog(true, devToolsPage);
+
+         // Navigate to a different origin's page
+         await inspectedPage.goToResourceWithCustomHost('devtools.test', 'host/page-with-oopif.html');
+
+         // Requests should still be there because preserve log was enabled before navigation
+         await waitForSomeRequestsToAppear(3, devToolsPage);
+
+         // Introspect a request from the first navigation
+         await selectRequestByName('headers-and-payload.html', {}, devToolsPage);
+         const networkView = await devToolsPage.waitFor('.network-item-view');
+         await devToolsPage.click('[aria-label=Response].tabbed-pane-header-tab', {
+           root: networkView,
+         });
+         await devToolsPage.waitFor('[aria-label=Response].tabbed-pane-header-tab[aria-selected=true]', networkView);
+
+         // Verify that the response body is NOT available.
+         // Wait for the expected fallback UI element that DevTools renders when a response body isn't available.
+         const emptyView = await devToolsPage.waitFor('.empty-state');
+         const emptyStateHeader = await emptyView.$('.empty-state-header');
+         const emptyStateText = await emptyStateHeader?.evaluate(el => el.textContent);
+         assert.strictEqual(emptyStateText, 'Failed to load response data');
+
+         const editors = await devToolsPage.$$('devtools-text-editor');
+         assert.isEmpty(editors, 'Editor should not have appeared because body should not be durable');
+       });
   });
 });

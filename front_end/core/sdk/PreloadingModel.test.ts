@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
+
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {
@@ -87,7 +89,7 @@ describeWithMockConnection('PreloadingModel', () => {
     ]);
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -193,7 +195,7 @@ describeWithMockConnection('PreloadingModel', () => {
     ]);
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -210,7 +212,7 @@ describeWithMockConnection('PreloadingModel', () => {
         },
       },
       {
-        id: `${loaderId}:Prerender:https://example.com/page.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/page.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -279,7 +281,7 @@ describeWithMockConnection('PreloadingModel', () => {
     ]);
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prerender:https://example.com/page.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/page.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -340,7 +342,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -475,7 +477,7 @@ describeWithMockConnection('PreloadingModel', () => {
     ]);
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -582,7 +584,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -599,7 +601,7 @@ describeWithMockConnection('PreloadingModel', () => {
         },
       },
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -619,7 +621,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts('ruleSetId:1' as Protocol.Preload.RuleSetId), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -639,7 +641,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts('ruleSetId:2' as Protocol.Preload.RuleSetId), [
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource12.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -656,7 +658,7 @@ describeWithMockConnection('PreloadingModel', () => {
         },
       },
       {
-        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/subresource2.js:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -718,7 +720,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -759,7 +761,7 @@ describeWithMockConnection('PreloadingModel', () => {
     // expect the duration is very short that these entries are shown.
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -777,7 +779,7 @@ describeWithMockConnection('PreloadingModel', () => {
         },
       },
       {
-        id: `${loaderId}:Prefetch:https://example.com/prerendered.html:undefined`,
+        id: `${loaderId}:Prefetch:https://example.com/prerendered.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prefetch,
           key: {
@@ -808,7 +810,7 @@ describeWithMockConnection('PreloadingModel', () => {
     // Converges to an entry.
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -852,7 +854,7 @@ describeWithMockConnection('PreloadingModel', () => {
     // The prerender is the representative of the pipeline even if it failed.
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined`,
+        id: `${loaderId}:Prerender:https://example.com/prerendered.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.Prerender,
           key: {
@@ -923,7 +925,7 @@ describeWithMockConnection('PreloadingModel', () => {
 
     assert.deepEqual(model.getRepresentativePreloadingAttempts(null), [
       {
-        id: `${loaderId}:PrerenderUntilScript:https://example.com/page.html:undefined`,
+        id: `${loaderId}:PrerenderUntilScript:https://example.com/page.html:undefined:undefined`,
         value: {
           action: Protocol.Preload.SpeculationAction.PrerenderUntilScript,
           key: {

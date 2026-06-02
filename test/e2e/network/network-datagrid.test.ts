@@ -253,11 +253,10 @@ describe('The Network Tab', function() {
     });
   });
 
-  // Flaky test on all platforms
-  it.skip('[crbug.com/463663626] shows preserved pending requests as unknown', async ({
-                                                                                 devToolsPage,
-                                                                                 inspectedPage,
-                                                                               }) => {
+  it('shows preserved pending requests as unknown', async ({
+                                                      devToolsPage,
+                                                      inspectedPage,
+                                                    }) => {
     await loadNetworkTab(devToolsPage, inspectedPage);
 
     await navigateToNetworkTab('send_beacon_on_unload.html', devToolsPage, inspectedPage);

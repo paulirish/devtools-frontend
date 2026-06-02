@@ -382,8 +382,3 @@ export async function setFilterDropdown(filter: string, devToolsPage: DevToolsPa
   const select = await devToolsPage.waitFor('devtools-toolbar select[aria-label="Filter"]');
   await select.select(filter);
 }
-
-export async function checkExposeInternals(devToolsPage: DevToolsPage) {
-  const element = await devToolsPage.waitForElementWithTextContent('Internals with implementation details');
-  await devToolsPage.clickElement(element);
-}

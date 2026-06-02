@@ -7,59 +7,20 @@
 // TODO: Fix this as they are extraneous dependencies
 // The type that get resolve are wrong, so keep the required
 import chalkImport from 'chalk';
-// @ts-expect-error
-import * as diffImport from 'diff';
 
+import {formatAsHtml, formatDiff, resultAssertionsDiff} from './diff-utils.js';
 import * as ResultsDb from './resultsdb.js';
 import {ScreenshotError} from './screenshot-error.js';
 
 const chalk: any = chalkImport;
-const diff: any = diffImport;
-
-type DiffCallback = (line: string) => string;
-function*
-    formatDiff(
-        diffBlocks: Array<{value: string, added: boolean, removed: boolean}>, onSame: DiffCallback,
-        onAdded: DiffCallback, onRemoved: DiffCallback) {
-  for (const block of diffBlocks) {
-    const lines = block.value.split('\n').filter(l => l.length > 0);
-    if (!block.added && !block.removed && lines.length > 3) {
-      yield onSame(lines[0]);
-      yield onSame('  ...');
-      yield onSame(lines[lines.length - 1]);
-    } else {
-      for (const line of lines) {
-        if (block.added) {
-          yield onAdded(line);
-        } else if (block.removed) {
-          yield onRemoved(line);
-        } else {
-          yield onSame(line);
-        }
-      }
-    }
-  }
-}
-
-export function resultAssertionsDiff({assertionErrors}: any) {
-  if (!assertionErrors || assertionErrors.length === 0) {
-    return [];
-  }
-  const expected = `${assertionErrors[0].expected}`;
-  const actual = `${assertionErrors[0].actual}`;
-
-  return diff.diffLines(
-      expected,
-      actual,
-  );
-}
 
 export function formatAsPatch(assertionDiff: any) {
+  // We keep the console patch formatting here as it uses chalk
   const consoleDiffLines = Array.from(formatDiff(
       assertionDiff,
-      same => ` ${same}`,
-      actual => chalk.green(`+${actual}`),
-      expected => chalk.red(`-${expected}`),
+      (same: string) => ` ${same}`,
+      (actual: string) => chalk.green(`+${actual}`),
+      (expected: string) => chalk.red(`-${expected}`),
       ));
   if (consoleDiffLines.length > 0) {
     return `${chalk.red('- expected')}\n${chalk.green('+ actual')}\n\n${consoleDiffLines.join('\n')}\n`;
@@ -79,6 +40,9 @@ export const ResultsDBReporter = function(
   };
 
   const specComplete = (_browser: any, result: any) => {
+    if (result.mocha?.hasExclusiveTests) {
+      this.hasExclusiveTests = true;
+    }
     const {suite, description, log, startTime, endTime, success, skipped} = result;
     const testId = ResultsDb.sanitizedTestId([...suite, description].join('/'));
     const expected = success || skipped;
@@ -96,21 +60,11 @@ export const ResultsDBReporter = function(
       const messages = consoleLog.concat(log.map(formatError));
       const assertionDiff = resultAssertionsDiff(result);
       // Prepare resultsdb summary
-      let summaryLines = messages.map(m => `<p><pre>${m}</pre></p>`);
-      const htmlDiffLines = Array.from(formatDiff(
-          assertionDiff, same => `<pre style="margin: 0;"> ${same}</pre>`,
-          actual => `<pre style="color: green;margin: 0;">+${actual}</pre>`,
-          expected => `<pre style="color: red;margin: 0;">-${expected}</pre>`));
-      if (htmlDiffLines.length > 0) {
-        summaryLines.push(
-            '<p>',
-            '<pre style="color: red;margin: 0;">- expected</pre>',
-            '<pre style="color: green;margin: 0;">+ actual</pre>',
-            '</p>',
-            '<p>',
-        );
-        summaryLines = summaryLines.concat(htmlDiffLines);
-        summaryLines.push('</p>');
+      const summaryLines = messages.map(m => `<p><pre>${m}</pre></p>`);
+
+      const htmlDiff = formatAsHtml(assertionDiff);
+      if (htmlDiff) {
+        summaryLines.push(htmlDiff);
       }
       summaryHtml = summaryLines.join('\n');
 
@@ -156,6 +110,13 @@ export const ResultsDBReporter = function(
   this.specFailure = specComplete;
 
   this.onRunComplete = (browsers: any, results: any) => {
+    browsers.forEach((browser: any) => {
+      const {total, success, failed, skipped} = browser.lastResult;
+      if (total !== success + failed + skipped && !this.hasExclusiveTests) {
+        throw new Error(`Karma exited early: executed ${success + failed + skipped} out of ${total} tests`);
+      }
+    });
+
     if (browsers.length >= 1 && !results.disconnected && !results.error) {
       if (!results.failed) {
         this.write('SUCCESS: %d passed (%d skipped)\n', results.success, results.skipped);

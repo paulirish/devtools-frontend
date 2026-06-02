@@ -167,10 +167,10 @@ describe('The Performance panel', function() {
 
   // This test started failing on Feb 11 2026 on mac after merging:
   // https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/7567531/1
-  it.skip('[crbug.com/484325128] CSS style invalidation results verification', async ({
-                                                                                 devToolsPage,
-                                                                                 inspectedPage,
-                                                                               }) => {
+  it.skipOnPlatforms(['mac'], '[crbug.com/484325128] CSS style invalidation results verification', async ({
+                                                                                                     devToolsPage,
+                                                                                                     inspectedPage,
+                                                                                                   }) => {
     await navigateToPerformanceTab(
         'selectorStats/css-style-invalidation',
         devToolsPage,

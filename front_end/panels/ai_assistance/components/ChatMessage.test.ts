@@ -2,16 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert, expect} from 'chai';
+
+import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type * as AIAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
+import * as TextUtils from '../../../models/text_utils/text_utils.js';
+import type * as Workspace from '../../../models/workspace/workspace.js';
 import {assertScreenshot, querySelectorErrorOnMissing, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {
   describeWithEnvironment,
   updateHostConfig,
   waitFor,
 } from '../../../testing/EnvironmentHelpers.js';
+import {makeFakeParsedTrace, microsecondsTraceWindow} from '../../../testing/TraceHelpers.js';
 import {createViewFunctionStub, type ViewFunctionStub} from '../../../testing/ViewFunctionHelpers.js';
 import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as AiAssistance from '../ai_assistance.js';
@@ -26,11 +32,14 @@ describeWithEnvironment('ChatMessage', () => {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
         parts: [],
         rpcId: 99,
+        id: '1',
       },
       isLoading: false,
       isReadOnly: false,
       isLastMessage: true,
       isFirstMessage: false,
+      prompt: 'test prompt',
+      shouldShowCSSChangeSummary: false,
       markdownRenderer: new AiAssistance.MarkdownRendererWithCodeBlock(),
       canShowFeedbackForm: true,
       onSuggestionClick: sinon.stub(),
@@ -70,11 +79,14 @@ describeWithEnvironment('ChatMessage', () => {
           isShowingFeedbackForm: false,
           isLastMessage: true,
           isFirstMessage: false,
+          prompt: 'test prompt',
+          shouldShowCSSChangeSummary: false,
           showActions: true,
           message: {
             entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
             parts: [],
             rpcId: 99,
+            id: '1',
           },
           isLoading: false,
           isReadOnly: false,
@@ -91,6 +103,282 @@ describeWithEnvironment('ChatMessage', () => {
         {}, target);
     return target;
   }
+
+  describe('Widget Deduplication', () => {
+    it('should generate the same signature for identical widgets', () => {
+      const widget1 = {
+        name: 'CORE_VITALS',
+        data: {
+          insightSetKey: 'insight1',
+          parsedTrace: makeFakeParsedTrace(),
+        },
+      } as AIAssistanceModel.AiAgent.AiWidget;
+      const widget2 = {
+        name: 'CORE_VITALS',
+        data: {
+          insightSetKey: 'insight1',
+          parsedTrace: makeFakeParsedTrace(),
+        },
+      } as AIAssistanceModel.AiAgent.AiWidget;
+      assert.strictEqual(
+          AiAssistance.ChatMessage.getWidgetSignature(widget1), AiAssistance.ChatMessage.getWidgetSignature(widget2));
+    });
+
+    it('should generate different signatures for different widgets', () => {
+      const widget1 = {
+        name: 'CORE_VITALS',
+        data: {
+          insightSetKey: 'insight1',
+          parsedTrace: makeFakeParsedTrace(),
+        },
+      } as AIAssistanceModel.AiAgent.AiWidget;
+      const widget2 = {
+        name: 'CORE_VITALS',
+        data: {
+          insightSetKey: 'insight2',
+          parsedTrace: makeFakeParsedTrace(),
+        },
+      } as AIAssistanceModel.AiAgent.AiWidget;
+      assert.notStrictEqual(
+          AiAssistance.ChatMessage.getWidgetSignature(widget1), AiAssistance.ChatMessage.getWidgetSignature(widget2));
+    });
+
+    it('should deduplicate identical widgets across the entire message', () => {
+      const widget = {
+        name: 'PERFORMANCE_TRACE',
+        data: {
+          parsedTrace: makeFakeParsedTrace(),
+        },
+      } as AIAssistanceModel.AiAgent.AiWidget;
+      const message = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [widget],
+          },
+          {
+            type: 'step',
+            step: {
+              isLoading: false,
+              widgets: [widget],
+            },
+          },
+        ],
+        id: '1',
+      } as AiAssistance.ChatMessage.ModelChatMessage;
+      const deduplicated = AiAssistance.ChatMessage.getDeduplicatedWidgetsMessage(message);
+      assert.lengthOf(deduplicated.parts, 2);
+      assert.strictEqual(deduplicated.parts[0].type, 'widget');
+      assert.lengthOf((deduplicated.parts[0] as AiAssistance.ChatMessage.WidgetPart).widgets, 1);
+      assert.strictEqual(deduplicated.parts[1].type, 'step');
+      assert.lengthOf((deduplicated.parts[1] as AiAssistance.ChatMessage.StepPart).step.widgets!, 0);
+    });
+
+    describe('getWidgetSignature', () => {
+      it('should correctly handle COMPUTED_STYLES widget', () => {
+        const widget = {
+          name: 'COMPUTED_STYLES',
+          data: {
+            backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+            computedStyles: new Map(),
+            matchedCascade: {} as unknown as AIAssistanceModel.AiAgent.ComputedStyleAiWidget['data']['matchedCascade'],
+            properties: [],
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'COMPUTED_STYLES:1');
+      });
+
+      it('should correctly handle CORE_VITALS widget', () => {
+        const widget = {
+          name: 'CORE_VITALS',
+          data: {
+            insightSetKey: 'insight1',
+            parsedTrace: makeFakeParsedTrace(),
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'CORE_VITALS:insight1');
+      });
+
+      it('should correctly handle STYLE_PROPERTIES widget', () => {
+        const widget = {
+          name: 'STYLE_PROPERTIES',
+          data: {
+            backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+            selector: '.test',
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'STYLE_PROPERTIES:1:.test');
+      });
+
+      it('should correctly handle DOM_TREE widget', () => {
+        const widget = {
+          name: 'DOM_TREE',
+          data: {
+            root: {
+              backendNodeId: () => 1 as Protocol.DOM.BackendNodeId,
+            } as unknown as AIAssistanceModel.AiAgent.DomTreeAiWidget['data']['root'],
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'DOM_TREE:1');
+      });
+
+      it('should correctly handle PERFORMANCE_TRACE widget', () => {
+        const widget = {
+          name: 'PERFORMANCE_TRACE',
+          data: {
+            parsedTrace: makeFakeParsedTrace(),
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERFORMANCE_TRACE');
+      });
+
+      it('should correctly handle PERF_INSIGHT widget', () => {
+        const widget = {
+          name: 'PERF_INSIGHT',
+          data: {
+            insight: 'LCPBreakdown',
+            insightData: {
+              insightKey: 'LCPBreakdown',
+              navigation: {
+                args: {
+                  data: {
+                    navigationId: 'nav1',
+                  },
+                },
+              },
+            } as unknown as AIAssistanceModel.AiAgent.PerfInsightAiWidget['data']['insightData'],
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERF_INSIGHT:LCPBreakdown:LCPBreakdown:nav1');
+      });
+
+      it('should correctly handle PERF_INSIGHT widget with render-blocking-request', () => {
+        const widget = {
+          name: 'PERF_INSIGHT',
+          data: {
+            insight: 'RenderBlocking',
+            insightData: {
+              insightKey: 'RenderBlocking',
+              navigation: {
+                args: {
+                  data: {
+                    navigationId: 'nav1',
+                  },
+                },
+              },
+            } as unknown as AIAssistanceModel.AiAgent.PerfInsightAiWidget['data']['insightData'],
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERF_INSIGHT:RenderBlocking:RenderBlocking:nav1');
+      });
+
+      it('should correctly handle TIMELINE_RANGE_SUMMARY widget', () => {
+        const widget = {
+          name: 'TIMELINE_RANGE_SUMMARY',
+          data: {
+            bounds: microsecondsTraceWindow(100, 200),
+            parsedTrace: makeFakeParsedTrace(),
+            track: 'main',
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'TIMELINE_RANGE_SUMMARY:main:100-200');
+      });
+
+      it('should correctly handle BOTTOM_UP_TREE widget', () => {
+        const widget = {
+          name: 'BOTTOM_UP_TREE',
+          data: {
+            bounds: microsecondsTraceWindow(100, 200),
+            parsedTrace: makeFakeParsedTrace(),
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'BOTTOM_UP_TREE:100-200');
+      });
+
+      it('should correctly handle LIGHTHOUSE_REPORT widget', () => {
+        const widget = {
+          name: 'LIGHTHOUSE_REPORT',
+          data: {
+            report: {
+              fetchTime: 123456,
+            },
+          },
+        } as unknown as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'LIGHTHOUSE_REPORT:123456');
+      });
+
+      it('should correctly handle TIMELINE_EVENT_SUMMARY widget', () => {
+        const widget = {
+          name: 'TIMELINE_EVENT_SUMMARY',
+          data: {
+            event: {
+              ts: 1000000,
+              name: 'MyTraceEvent',
+            },
+          },
+        } as unknown as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'TIMELINE_EVENT_SUMMARY:1000000:MyTraceEvent');
+      });
+
+      it('should correctly handle SOURCE_CODE widget without line/column', () => {
+        const widget = {
+          name: 'SOURCE_CODE',
+          data: {
+            url: 'https://example.com/script.js',
+            code: 'console.log("hello");',
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_CODE:https://example.com/script.js::');
+      });
+
+      it('should correctly handle SOURCE_CODE widget with line/column', () => {
+        const widget = {
+          name: 'SOURCE_CODE',
+          data: {
+            url: 'https://example.com/script.js',
+            line: 42,
+            column: 7,
+            code: 'const x = 1;',
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_CODE:https://example.com/script.js:42:7');
+      });
+
+      it('should correctly handle SOURCE_FILE widget', () => {
+        const widget = {
+          name: 'SOURCE_FILE',
+          data: {
+            uiSourceCode: {
+              url: () => 'https://example.com/script.js',
+            },
+          },
+        } as unknown as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_FILE:https://example.com/script.js');
+      });
+
+      it('should correctly handle SOURCE_FILES_LIST widget', () => {
+        const widget = {
+          name: 'SOURCE_FILES_LIST',
+          data: {
+            uiSourceCodes: [
+              {url: () => 'https://example.com/script1.js'},
+              {url: () => 'https://example.com/script2.js'},
+            ],
+          },
+        } as unknown as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'SOURCE_FILES_LIST:https://example.com/script1.js,https://example.com/script2.js');
+      });
+    });
+  });
 
   it('should show the feedback form when canShowFeedbackForm is true', async () => {
     const [view] = createComponent({
@@ -163,6 +451,7 @@ describeWithEnvironment('ChatMessage', () => {
       message: {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
         parts: [],
+        id: '1',
       },
     });
 
@@ -202,6 +491,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         ],
         rpcId: 99,
+        id: '1',
       },
       isLastMessage: false,
     });
@@ -222,6 +512,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         ],
         rpcId: 99,
+        id: '1',
       },
       isLastMessage: true,
     });
@@ -246,6 +537,7 @@ describeWithEnvironment('ChatMessage', () => {
         },
       }],
       rpcId: 99,
+      id: '1',
     };
 
     it('renders "Show thinking" button when there are steps and not inline', () => {
@@ -304,6 +596,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
 
       const target = renderView({
@@ -331,6 +624,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
       const target = renderView({
         isLoading: true,
@@ -342,6 +636,88 @@ describeWithEnvironment('ChatMessage', () => {
       });
       const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
       assert.strictEqual(button.innerText, 'Investigating XYZ');
+    });
+
+    it('accessible label shows the step title when loading', async () => {
+      const loadingMessage: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [{
+          type: 'step',
+          step: {
+            isLoading: true,
+            title: 'Investigating XYZ',
+            code: 'console.log("test")',
+          },
+        }],
+        rpcId: 99,
+        id: '1',
+      };
+      const target = renderView({
+        isLoading: true,
+        message: loadingMessage,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: false,
+        }
+      });
+      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Loading: Investigating XYZ');
+    });
+
+    it('accessible label defaults to visible text when generic', async () => {
+      const target = renderView({
+        isLoading: false,
+        message: stepMessage,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: false,
+        }
+      });
+      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Show thinking for prompt test prompt');
+    });
+
+    it('accessible label defaults to visible text when expanded and not loading', async () => {
+      const target = renderView({
+        isLoading: false,
+        message: stepMessage,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: false,
+          isExpanded: true,
+          activeSidebarMessage: stepMessage,
+        }
+      });
+      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Hide thinking for prompt test prompt');
+    });
+
+    it('accessible label appends "Loading: " when expanded and loading', async () => {
+      const loadingMessage: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [{
+          type: 'step',
+          step: {
+            isLoading: true,
+            title: 'Investigating XYZ',
+            code: 'console.log("test")',
+          },
+        }],
+        rpcId: 99,
+        id: '1',
+      };
+      const target = renderView({
+        isLoading: true,
+        message: loadingMessage,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: false,
+          isExpanded: true,
+          activeSidebarMessage: loadingMessage,
+        }
+      });
+      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Loading: Hide thinking');
     });
 
     it('does not render "Show thinking" button when inline', () => {
@@ -367,6 +743,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
       const target = renderView({
         isLoading: false,
@@ -394,6 +771,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
       const target = renderView({
         isLoading: false,
@@ -451,6 +829,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
 
       // Test closed state
@@ -497,6 +876,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
 
       // Test closed state
@@ -525,6 +905,56 @@ describeWithEnvironment('ChatMessage', () => {
       assert.include(targetOpen.querySelector('.side-effect-container')?.textContent, sideEffectDescription);
     });
 
+    it('renders side effect confirmation below the text output', () => {
+      const sideEffectDescription = 'Proceed with cation!';
+      const textOutput = 'Here is some text output before the action.';
+
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'answer',
+            text: textOutput,
+          },
+          {
+            type: 'step',
+            step: {
+              isLoading: false,
+              title: 'Side Effect Step',
+              code: 'doSomethingDangerous()',
+              requestApproval: {
+                description: sideEffectDescription,
+                onAnswer: () => {},
+              },
+            },
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const target = renderView({
+        message,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: true,
+          isExpanded: false,
+        }
+      });
+
+      const answerBody = target.querySelector('.answer-body-wrapper');
+      const sideEffect = target.querySelector('.side-effect-container');
+
+      assert.isNotNull(answerBody);
+      assert.isNotNull(sideEffect);
+
+      // Verify that sideEffect appears after answerBody in the DOM
+      const position = answerBody.compareDocumentPosition(sideEffect);
+      assert.isTrue(
+          Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING),
+          'Side effect confirmation should render after the text output');
+    });
+
     it('does not force walkthrough expansion when there are side-effect steps', () => {
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
@@ -541,6 +971,7 @@ describeWithEnvironment('ChatMessage', () => {
           },
         }],
         rpcId: 99,
+        id: '1',
       };
 
       const target = renderView({
@@ -578,42 +1009,64 @@ describeWithEnvironment('ChatMessage', () => {
           }],
         }],
         rpcId: 99,
+        id: '1',
       };
 
-      // We need to mock the widget maker to return a name
-      const targetElement = document.createElement('div');
-      AiAssistance.ChatMessage.DEFAULT_VIEW(
-          {
-            onRatingClick: () => {},
-            onReportClick: () => {},
-            onCopyResponseClick: () => {},
-            scrollSuggestionsScrollContainer: () => {},
-            onSuggestionsScrollOrResize: () => {},
-            onSuggestionClick: () => {},
-            onSubmit: () => {},
-            onClose: () => {},
-            onInputChange: () => {},
-            onFeedbackSubmit: () => {},
-            showRateButtons: false,
-            isSubmitButtonDisabled: false,
-            isShowingFeedbackForm: false,
-            isLastMessage: true,
-            isFirstMessage: false,
-            showActions: true,
-            message: messageWithNamedWidget,
-            isLoading: false,
-            isReadOnly: false,
-            canShowFeedbackForm: false,
-            markdownRenderer: new AiAssistance.MarkdownRendererWithCodeBlock(),
-            currentRating: undefined,
-            walkthrough: {...DEFAULT_WALKTHROUGH},
-          },
-          {}, targetElement);
+      const targetElement = renderView({
+        message: messageWithNamedWidget,
+      });
 
       // We need to wait for the async renderWidgets
       const widgetHeader = await waitFor('.widget-header', targetElement);
       assert.isNotNull(widgetHeader);
       assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'LCP element');
+      const revealButton = widgetHeader.querySelector('.widget-reveal-button');
+      assert.isNotNull(revealButton);
+      assert.strictEqual(revealButton.getAttribute('accessibleLabel'), 'Reveal LCP element');
+    });
+
+    it('renders network request image using imageContent.asImagePreviewUrl()', async () => {
+      const root = sinon.createStubInstance(SDK.DOMModel.DOMNodeSnapshot);
+      const domModel = sinon.createStubInstance(SDK.DOMModel.DOMModel);
+      const target = sinon.createStubInstance(SDK.Target.Target);
+      root.domModel.returns(domModel);
+      domModel.target.returns(target);
+      root.backendNodeId.returns(1 as Protocol.DOM.BackendNodeId);
+
+      const mockContentData = sinon.createStubInstance(TextUtils.ContentData.ContentData);
+      mockContentData.asImagePreviewUrl.returns('blob:http://localhost/123');
+
+      const messageWithWidget: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [{
+          type: 'widget',
+          widgets: [{
+            name: 'DOM_TREE',
+            data: {
+              root,
+              networkRequest: {
+                url: 'https://example.com/image.png',
+                size: 100,
+                resourceType: 'Image' as Protocol.Network.ResourceType,
+                mimeType: 'image/png',
+                imageContent: mockContentData,
+              },
+            },
+          }],
+        }],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({
+        message: messageWithWidget,
+      });
+
+      await waitFor('img', targetElement);
+      const img = targetElement.querySelector('img');
+      assert.exists(img);
+      assert.strictEqual(img?.src, 'blob:http://localhost/123');
+      sinon.assert.calledOnce(mockContentData.asImagePreviewUrl);
     });
 
     it('renders the "Export for agents" button after action buttons and before suggestions when onExportClick is provided, it is the last message, and V2 is enabled',
@@ -635,13 +1088,15 @@ describeWithEnvironment('ChatMessage', () => {
                },
              ],
              rpcId: 99,
+             id: '1',
            },
          });
 
          const row = querySelectorErrorOnMissing(target, '.ai-assistance-feedback-row');
          const exportButton = querySelectorErrorOnMissing(row, '.export-for-agents-button');
 
-         assert.strictEqual(exportButton.textContent?.trim(), 'Copy for your coding agent');
+         assert.strictEqual(exportButton.textContent?.trim(), 'Copy to coding agent');
+         assert.strictEqual(exportButton.getAttribute('aria-label'), 'Copy to coding agent');
          exportButton.click();
          sinon.assert.calledOnce(onExportClick);
        });
@@ -665,23 +1120,22 @@ describeWithEnvironment('ChatMessage', () => {
       updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
     });
 
-    it('should render devtools-code-block when hasAiV2 is true and changeSummary is present', async () => {
-      const target = renderView({
-        isLastMessage: true,
-        isLoading: false,
-        changeSummary: 'test summary',
-      });
+    it('should render devtools-code-block when hasAiV2 is true, changeSummary is present and shouldShowCSSChangeSummary is true',
+       async () => {
+         const target = renderView({
+           shouldShowCSSChangeSummary: true,
+           changeSummary: 'test summary',
+         });
 
-      const codeBlock = target.querySelector('devtools-code-block');
-      assert.instanceOf(codeBlock, MarkdownView.CodeBlock.CodeBlock);
-      assert.strictEqual(codeBlock.code, 'test summary');
-      assert.strictEqual(codeBlock.displayLimit, 11);
-    });
+         const codeBlock = target.querySelector('devtools-code-block');
+         assert.instanceOf(codeBlock, MarkdownView.CodeBlock.CodeBlock);
+         assert.strictEqual(codeBlock.code, 'test summary');
+         assert.strictEqual(codeBlock.displayLimit, 11);
+       });
 
     it('should NOT render devtools-code-block when changeSummary is missing', async () => {
       const target = renderView({
-        isLastMessage: true,
-        isLoading: false,
+        shouldShowCSSChangeSummary: true,
         changeSummary: undefined,
       });
 
@@ -689,10 +1143,9 @@ describeWithEnvironment('ChatMessage', () => {
       assert.isNull(codeBlock);
     });
 
-    it('should NOT render devtools-code-block when it is not the last message', async () => {
+    it('should NOT render devtools-code-block when shouldShowCSSChangeSummary is false', async () => {
       const target = renderView({
-        isLastMessage: false,
-        isLoading: false,
+        shouldShowCSSChangeSummary: false,
         changeSummary: 'test summary',
       });
 
@@ -703,8 +1156,7 @@ describeWithEnvironment('ChatMessage', () => {
     it('should NOT render devtools-code-block when hasAiV2 is false', async () => {
       updateHostConfig({devToolsAiAssistanceV2: {enabled: false}});
       const target = renderView({
-        isLastMessage: true,
-        isLoading: false,
+        shouldShowCSSChangeSummary: true,
         changeSummary: 'test summary',
       });
 
@@ -734,11 +1186,14 @@ describeWithEnvironment('ChatMessage', () => {
             isShowingFeedbackForm: true,
             isLastMessage: true,
             isFirstMessage: false,
+            prompt: 'test prompt',
+            shouldShowCSSChangeSummary: false,
             showActions: true,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
               parts: [],
               rpcId: 99,
+              id: '1',
             },
             isLoading: false,
             isReadOnly: false,
@@ -749,60 +1204,6 @@ describeWithEnvironment('ChatMessage', () => {
           },
           {}, target);
       await assertScreenshot('ai_assistance/user_action_row_minimal.png');
-    });
-
-    it('renders a complete model message', async () => {
-      const target = document.createElement('div');
-      renderElementIntoDOM(target);
-      AiAssistance.ChatMessage.DEFAULT_VIEW(
-          {
-            onRatingClick: () => {},
-            onReportClick: () => {},
-            onCopyResponseClick: () => {},
-            scrollSuggestionsScrollContainer: () => {},
-            onSuggestionsScrollOrResize: () => {},
-            onSuggestionClick: () => {},
-            onSubmit: () => {},
-            onClose: () => {},
-            onInputChange: () => {},
-            onFeedbackSubmit: () => {},
-            showRateButtons: true,
-            isSubmitButtonDisabled: false,
-            isShowingFeedbackForm: true,
-            isLastMessage: true,
-            isFirstMessage: false,
-            showActions: true,
-            message: {
-              entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-              rpcId: 99,
-              parts: [
-                {
-                  type: 'step',
-                  step: {
-                    isLoading: false,
-                    title: 'Analyzing the page',
-                    thought: 'I am checking the page content to find the issue.',
-                    code: 'document.body.innerHTML',
-                    output: '<body>...</body>',
-                  }
-                },
-                {
-                  type: 'answer',
-                  text: 'The page seems to have some content.',
-                  suggestions: ['Fix the issue', 'Explain more'],
-                }
-              ],
-            },
-            isLoading: false,
-            isReadOnly: false,
-            canShowFeedbackForm: true,
-            markdownRenderer: new AiAssistance.MarkdownRendererWithCodeBlock(),
-            currentRating: undefined,
-            suggestions: ['Fix the issue', 'Explain more'],
-            walkthrough: {...DEFAULT_WALKTHROUGH},
-          },
-          {}, target);
-      await assertScreenshot('ai_assistance/user_action_row_complete.png');
     });
 
     it('renders a complete user message', async () => {
@@ -825,10 +1226,13 @@ describeWithEnvironment('ChatMessage', () => {
             isShowingFeedbackForm: false,
             isLastMessage: true,
             isFirstMessage: false,
+            prompt: 'test prompt',
+            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.USER,
               text: 'Can you help me fix specific CSS rules?',
+              id: '1',
             },
             isLoading: false,
             isReadOnly: false,
@@ -860,10 +1264,13 @@ describeWithEnvironment('ChatMessage', () => {
             isShowingFeedbackForm: false,
             isLastMessage: false,
             isFirstMessage: true,
+            prompt: 'test prompt',
+            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.USER,
               text: 'First user message',
+              id: '1',
             },
             isLoading: false,
             isReadOnly: false,
@@ -894,10 +1301,13 @@ describeWithEnvironment('ChatMessage', () => {
             isShowingFeedbackForm: false,
             isLastMessage: false,
             isFirstMessage: true,
+            prompt: 'test prompt',
+            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
               parts: [],
+              id: '1',
             },
             isLoading: false,
             isReadOnly: false,
@@ -910,5 +1320,104 @@ describeWithEnvironment('ChatMessage', () => {
       const modelMessage = querySelectorErrorOnMissing(modelTarget, '.chat-message');
       assert.isTrue(modelMessage.classList.contains('is-first-message'));
     });
+
+    it('renders SOURCE_FILES_LIST widget with correct dynamic title', async () => {
+      updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
+      function createMockFile(name: string) {
+        return {
+          name: () => name,
+          fullDisplayName: () => `example.com/path/to/${name}`,
+          url: () => `https://example.com/path/to/${name}`,
+        } as unknown as Workspace.UISourceCode.UISourceCode;
+      }
+
+      const uiSourceCodes = [createMockFile('file1.js'), createMockFile('file2.js')];
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [{
+          type: 'widget',
+          widgets: [{
+            name: 'SOURCE_FILES_LIST',
+            data: {
+              uiSourceCodes,
+            },
+          }],
+        }],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const widgetHeader = await waitFor('.widget-header', targetElement);
+      assert.isNotNull(widgetHeader);
+      assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'Inspected file names');
+
+      // Inspected list items (all 2 files should be visible)
+      const listItems = targetElement.querySelectorAll('.source-files-widget .visible-file');
+      assert.lengthOf(listItems, 2);
+
+      const fileNames = Array.from(listItems).map(item => item.textContent?.trim());
+      assert.deepEqual(fileNames, ['example.com/path/to/file1.js', 'example.com/path/to/file2.js']);
+
+      // No details element since there are <= 10 files. We show collapse files list only if there are over 10 of them
+      assert.isNull(targetElement.querySelector('.source-files-details'));
+    });
+
+    it('renders SOURCE_FILES_LIST widget with more than 10 files, limiting to 10 and using details element for the rest',
+       async () => {
+         updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
+         function createMockFile(name: string) {
+           return {
+             name: () => name,
+             fullDisplayName: () => `example.com/path/to/${name}`,
+             url: () => `https://example.com/path/to/${name}`,
+           } as unknown as Workspace.UISourceCode.UISourceCode;
+         }
+
+         const uiSourceCodes = Array.from({length: 12}, (_, i) => createMockFile(`file${i + 1}.js`));
+         const message: AiAssistance.ChatMessage.ModelChatMessage = {
+           entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+           parts: [{
+             type: 'widget',
+             widgets: [{
+               name: 'SOURCE_FILES_LIST',
+               data: {
+                 uiSourceCodes,
+               },
+             }],
+           }],
+           rpcId: 99,
+           id: '1',
+         };
+
+         const targetElement = renderView({message});
+         const widgetHeader = await waitFor('.widget-header', targetElement) as HTMLElement;
+         assert.isNotNull(widgetHeader);
+         assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'Inspected file names');
+
+         // Header reveal button click should reveal the first file
+         const revealStub = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').resolves();
+         const revealBtn =
+             querySelectorErrorOnMissing(widgetHeader, 'devtools-button.widget-reveal-button') as HTMLElement;
+         revealBtn.click();
+         sinon.assert.calledWith(revealStub, uiSourceCodes[0]);
+         revealStub.restore();
+
+         // Outer list should contain 10 items directly, and 2 items nested inside details
+         const details = targetElement.querySelector('.source-files-details');
+         assert.isNotNull(details);
+
+         // Assert expand button has count within text
+         const summaryText = details?.querySelector('.show-more-summary')?.textContent?.trim();
+         assert.strictEqual(summaryText, 'Show all 12 files');
+
+         // Verify that there are exactly 10 visible files (with the class "visible-file").
+         const outerListItems = targetElement.querySelectorAll('.source-files-widget .visible-file');
+         assert.lengthOf(outerListItems, 10);
+
+         // Verify that the remaining 2 files are nested inside details and have the "collapsed-file" class.
+         const innerListItems = details?.querySelectorAll('.collapsed-file');
+         assert.lengthOf(innerListItems ?? [], 2);
+       });
   });
 });

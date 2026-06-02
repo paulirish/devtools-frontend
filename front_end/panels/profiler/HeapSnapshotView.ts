@@ -183,12 +183,6 @@ const UIStrings = {
    */
   heapSnapshotProfilesShowMemory: 'See the memory distribution of JavaScript objects and related DOM nodes',
   /**
-   * @description Label for a checkbox in the heap snapshot view of the profiler tool. The "heap snapshot" contains the
-   * current state of JavaScript memory. With this checkbox enabled, the snapshot also includes internal data that is
-   * specific to Chrome (hence implementation-specific).
-   */
-  exposeInternals: 'Internals with implementation details',
-  /**
    * @description Progress update that the profiler is capturing a snapshot of the heap
    */
   snapshotting: 'Snapshotting…',
@@ -1282,7 +1276,6 @@ export class StatisticsPerspective extends Perspective {
 export class HeapSnapshotProfileType extends
     Common.ObjectWrapper.eventMixin<HeapSnapshotProfileTypeEventTypes, typeof ProfileType>(ProfileType)
         implements SDK.TargetManager.SDKModelObserver<SDK.HeapProfilerModel.HeapProfilerModel> {
-  readonly exposeInternals: Common.Settings.Setting<boolean>;
   customContentInternal: UI.UIUtils.CheckboxLabel|null;
   constructor(id?: string, title?: string) {
     super(id || HeapSnapshotProfileType.TypeId, title || i18nString(UIStrings.heapSnapshot));
@@ -1295,7 +1288,6 @@ export class HeapSnapshotProfileType extends
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.HeapProfilerModel.HeapProfilerModel, SDK.HeapProfilerModel.Events.REPORT_HEAP_SNAPSHOT_PROGRESS,
         this.reportHeapSnapshotProgress, this);
-    this.exposeInternals = Common.Settings.Settings.instance().createSetting('expose-internals', false);
     this.customContentInternal = null;
   }
 
@@ -1336,19 +1328,6 @@ export class HeapSnapshotProfileType extends
     return i18nString(UIStrings.heapSnapshotProfilesShowMemory);
   }
 
-  override customContent(): Element|null {
-    const exposeInternalsInHeapSnapshotCheckbox =
-        SettingsUI.SettingsUI.createSettingCheckbox(i18nString(UIStrings.exposeInternals), this.exposeInternals);
-    this.customContentInternal = exposeInternalsInHeapSnapshotCheckbox;
-    return exposeInternalsInHeapSnapshotCheckbox;
-  }
-
-  override setCustomContentEnabled(enable: boolean): void {
-    if (this.customContentInternal) {
-      this.customContentInternal.disabled = !enable;
-    }
-  }
-
   override createProfileLoadedFromFile(title: string): ProfileHeader {
     return new HeapProfileHeader(null, this, title);
   }
@@ -1370,7 +1349,7 @@ export class HeapSnapshotProfileType extends
     await heapProfilerModel.takeHeapSnapshot({
       reportProgress: true,
       captureNumericValue: true,
-      exposeInternals: this.exposeInternals.get(),
+      exposeInternals: true,
     });
     profile = this.profileBeingRecorded() as HeapProfileHeader;
     if (!profile) {

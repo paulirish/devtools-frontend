@@ -323,6 +323,9 @@
   "core/sdk/NetworkManager.ts | noContentForRedirect": {
     "message": "لا يتوفّر أي محتوى لأنّ هذا الطلب تمت إعادة توجيهه."
   },
+  "core/sdk/NetworkManager.ts | noContentForSSE": {
+    "message": "محتوى أحداث Server-Sent Events (SSE) غير متاح حاليًا"
+  },
   "core/sdk/NetworkManager.ts | noContentForWebSocket": {
     "message": "محتوى WebSockets غير متاح حاليًا."
   },
@@ -559,6 +562,9 @@
   },
   "core/sdk/sdk-meta.ts | achromatopsia": {
     "message": "عمى الألوان (بدون ألوان)"
+  },
+  "core/sdk/sdk-meta.ts | apca": {
+    "message": "تحلّ \"خوارزمية التباين الإدراكي المتقدّمة\" (APCA) محلّ الإرشادات السابقة بشأن نسبة التباين ومعايير AA/AAA"
   },
   "core/sdk/sdk-meta.ts | blurredVision": {
     "message": "رؤية غير واضحة"
@@ -1061,9 +1067,6 @@
   "entrypoints/main/MainImpl.ts | dockToRight": {
     "message": "إرساء إلى يسار علامة تبويب المتصفِّح"
   },
-  "entrypoints/main/MainImpl.ts | externalRequestReceived": {
-    "message": "تم إرسال طلب خارجي إلى \"DevTools\""
-  },
   "entrypoints/main/MainImpl.ts | focusDebuggee": {
     "message": "صفحة التركيز"
   },
@@ -1328,6 +1331,12 @@
   "generated/Deprecation.ts | DataUrlInSvgUse": {
     "message": "تم بشكل نهائي إيقاف استخدام عناوين URL التي تبدأ بمخطّط \"data:‎\" في واجهة SVGUseElement، وستتم إزالة هذه الميزة في المستقبل."
   },
+  "generated/Deprecation.ts | DocumentCreateEventKeyboardEvents": {
+    "message": "تم إيقاف واجهة document.createEvent('KeyboardEvents') نهائيًا وستتم إزالتها. يمكن استخدام new KeyboardEvent() كبديل."
+  },
+  "generated/Deprecation.ts | DocumentCreateEventTransitionEvent": {
+    "message": "تم إيقاف واجهة document.createEvent('TransitionEvent') نهائيًا وستتم إزالتها. يمكن استخدام new TransitionEvent() كبديل."
+  },
   "generated/Deprecation.ts | ExampleBrowserProcessDeprecation": {
     "message": "هذا مثال على عرض الرمز البرمجي المطلوب لعملية متصفّح تم الإبلاغ عن إيقافها نهائيًا."
   },
@@ -1438,6 +1447,9 @@
   },
   "generated/Deprecation.ts | PrefixedVideoSupportsFullscreen": {
     "message": "تم إيقاف واجهة برمجة التطبيقات HTMLVideoElement.webkitSupportsFullscreen نهائيًا. يُرجى استخدام واجهة برمجة التطبيقات Document.fullscreenEnabled بدلاً من ذلك."
+  },
+  "generated/Deprecation.ts | PreventSvgFilterPaint": {
+    "message": "لا يمكن تطبيق فلاتر الرسومات الموجّهة التي يمكن تغيير حجمها (SVG) على إطارات iframe المتعددة المصادر أو المحظورة (مثلاً في وضع الحماية) أو المكوّنات الإضافية."
   },
   "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpFalse": {
     "message": "تمت إزالة القيد DtlsSrtpKeyAgreement. لقد حدَّدت القيمة false لهذا القيد، وهو أمر يتم تفسيره كمحاولة لاستخدام الميزة SDES key negotiation التي تمت إزالتها. لقد تمت إزالة هذه الميزة. وبدلاً منها، يمكنك استخدام إحدى الخدمات التي تتوفّر فيها الميزة DTLS key negotiation."
@@ -2246,6 +2258,30 @@
   "models/trace/insights/Cache.ts | title": {
     "message": "استخدام فترات التخزين المؤقت الفعّالة"
   },
+  "models/trace/insights/CharacterSet.ts | description": {
+    "message": "يجب تحديد ترميز الأحرف. ويمكن إجراء ذلك باستخدام علامة meta charset في أول 1,024 بايت من ملف HTML أو في عنوان استجابة HTTP لنوع المحتوى. [مزيد من المعلومات حول تحديد ترميز الأحرف](https://developer.chrome.com/docs/insights/charset/)"
+  },
+  "models/trace/insights/CharacterSet.ts | failedHttpHeader": {
+    "message": "لم يتم تحديد ترميز الأحرف في عنوان HTTP"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetLate": {
+    "message": "يتم تعريف ترميز الأحرف باستخدام علامة وصفية بعد أول 1,024 بايت"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetMissing": {
+    "message": "لم يتم تحديد ترميز الأحرف باستخدام علامة وصفية"
+  },
+  "models/trace/insights/CharacterSet.ts | failedMetaCharsetUnknown": {
+    "message": "تعذَّر تحديد ترميز الأحرف meta charset من بيانات التتبُّع"
+  },
+  "models/trace/insights/CharacterSet.ts | passingHttpHeader": {
+    "message": "يتم تحديد ترميز الأحرف في عنوان HTTP"
+  },
+  "models/trace/insights/CharacterSet.ts | passingMetaCharsetEarly": {
+    "message": "يتم تحديد ترميز الأحرف باستخدام علامة وصفية في أول 1,024 بايت"
+  },
+  "models/trace/insights/CharacterSet.ts | title": {
+    "message": "تحديد ترميز الأحرف"
+  },
   "models/trace/insights/DOMSize.ts | description": {
     "message": "إنّ الحجم الكبير لنموذج العناصر في المستند (DOM) يمكن أن يؤدي إلى زيادة مدة عمليات احتساب الأنماط وإعادة تدفق التنسيقات، ما يؤثر في سرعة استجابة الصفحة. وسيزيد هذا الحجم الكبير أيضًا من استخدام الذاكرة. [التعرّف على كيفية تجنُّب زيادة حجم DOM](https://developer.chrome.com/docs/performance/insights/dom-size)"
   },
@@ -2453,8 +2489,11 @@
   "models/trace/insights/LCPDiscovery.ts | fetchPriorityShouldBeApplied": {
     "message": "يجب تطبيق القيمة fetchpriority=high"
   },
+  "models/trace/insights/LCPDiscovery.ts | fetchPriorityShouldBeAppliedToImagePreload": {
+    "message": "يجب تطبيق القيمة fetchpriority=high على طلب التحميل المسبق للصورة"
+  },
   "models/trace/insights/LCPDiscovery.ts | lazyLoadNotApplied": {
-    "message": "لم يتم تطبيق طريقة \"التحميل الكسول\""
+    "message": "يجب عدم استخدام السمة loading=lazy في موارد LCP"
   },
   "models/trace/insights/LCPDiscovery.ts | lcpLoadDelay": {
     "message": "تم تحميل الصورة الخاصة بمقياس \"سرعة عرض أكبر محتوى مرئي\" (LCP) بعد {PH1} من نقطة البداية الأقدم."
@@ -2657,24 +2696,6 @@
   "panels/accessibility/ARIAAttributesView.ts | noAriaAttributes": {
     "message": "ما مِن سمات ARIA"
   },
-  "panels/accessibility/AXBreadcrumbsPane.ts | accessibilityTree": {
-    "message": "شجرة تسهيل الاستخدام"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentDescription": {
-    "message": "تم نقل شجرة تسهيل الاستخدام إلى أعلى يسار شجرة نموذج العناصر في المستند."
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentName": {
-    "message": "تفعيل ميزة العرض الكامل لشجرة تسهيل الاستخدام"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | ignored": {
-    "message": "عنصر تم تجاهله"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | reloadRequired": {
-    "message": "يجب إعادة التحميل لتطبيق التعديل"
-  },
-  "panels/accessibility/AXBreadcrumbsPane.ts | scrollIntoView": {
-    "message": "التمرير للوصول إلى طريقة العرض"
-  },
   "panels/accessibility/AccessibilityNodeView.ts | accessibilityNodeNotExposed": {
     "message": "عقدة إمكانية الوصول غير ظاهرة"
   },
@@ -2743,6 +2764,9 @@
   },
   "panels/accessibility/AccessibilityNodeView.ts | placeholderIsPlaceholderOnAncestor": {
     "message": "{PH1} هو {PH2} على كيان أصل: "
+  },
+  "panels/accessibility/AccessibilitySidebarView.ts | showAccessibilityTree": {
+    "message": "عرض شجرة تسهيل الاستخدام"
   },
   "panels/accessibility/AccessibilityStrings.ts | aHumanreadableVersionOfTheValue": {
     "message": "نسخة يمكن للمستخدمين قراءتها من قيمة تطبيق النطاق المصغَّر (عند الحاجة)"
@@ -3176,8 +3200,62 @@
   "panels/ai_assistance/components/DisabledWidget.ts | turnOnForStylesRequestsPerformanceAndFiles": {
     "message": "فعِّل \"{PH1}\" للحصول على مساعدة بشأن الأنماط وطلبات الشبكة والأداء والملفات"
   },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | asMarkdown": {
+    "message": "بتنسيق Markdown"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | asPrompt": {
+    "message": "بتنسيق طلب"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | copiedToClipboard": {
+    "message": "تم النسخ إلى الحافظة"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | copyToClipboard": {
+    "message": "نسخ إلى الحافظة"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | disclaimer": {
+    "message": "هذه ميزة تجريبية تستخدم الذكاء الاصطناعي وقد توفِّر نتائج غير دقيقة في بعض الأحيان. يُرجى التحقّق من هذا النص قبل لصقه في أداة أخرى."
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | exportForAgents": {
+    "message": "النسخ إلى وكيل الترميز"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | generatingSummary": {
+    "message": "جارٍ إنشاء ملخّص…"
+  },
+  "panels/ai_assistance/components/ExportForAgentsDialog.ts | saveAsMarkdown": {
+    "message": "حفظ بتنسيق…"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | gotIt": {
+    "message": "حسنًا"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | integrationPoint": {
+    "message": "يتوفر \"الدعم الذكي\" الآن في لوحتَي \"التطبيق\" وLighthouse، كما يستخلص السياق من عدة مصادر بيانات في آنٍ واحد"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | manageSettings": {
+    "message": "إدارة الخيارات في الإعدادات"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | privacyDisclaimer": {
+    "message": "تُرسَل إلى Google رسائل محادثاتك والبيانات المتاح الوصول إليها لهذا الموقع الإلكتروني من خلال لوحات \"أدوات مطوّري البرامج\" وواجهات برمجة تطبيقات الويب، والبيانات التي يتم اختيارها من قِبلك، مثل طلبات الشبكة والملفات وبيانات تتبُّع الأداء، وقد يطّلع عليها فريق من المراجعين لتحسين هذه الميزة. هذه ميزة تجريبية تستخدم الذكاء الاصطناعي وقد توفِّر نتائج غير دقيقة في بعض الأحيان."
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | privacyDisclaimerEnterpriseNoLogging": {
+    "message": "تُرسَل إلى Google رسائل محادثاتك والبيانات المتاح الوصول إليها لهذا الموقع الإلكتروني من خلال لوحات \"أدوات مطوّري البرامج\" وواجهات برمجة تطبيقات الويب، والبيانات التي يتم اختيارها من قِبلك، مثل طلبات الشبكة والملفات وبيانات تتبُّع الأداء. ولن يتم استخدام المحتوى المُرسَل إلى هذه الميزة، أو المُنشأ من خلالها، في تحسين نماذج الذكاء الاصطناعي من Google. هذه ميزة تجريبية تستخدم الذكاء الاصطناعي وقد توفِّر نتائج غير دقيقة في بعض الأحيان."
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | title": {
+    "message": "الدعم الذكي أصبح أكثر ذكاءً"
+  },
+  "panels/ai_assistance/components/OptInChangeDialog.ts | widgetPoint": {
+    "message": "يمكنك استخدام الأدوات المصغّرة للتحقّق من النتائج أو الانتقال إلى بيانات المصدر في حالات معيّنة لتصحيح الأخطاء"
+  },
   "panels/ai_assistance/components/WalkthroughView.ts | close": {
     "message": "إغلاق"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | hideAgentWalkthrough": {
+    "message": "إخفاء خطوات الوكيل التفصيلية"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | hideThinking": {
+    "message": "إخفاء خطوات التفكير"
+  },
+  "panels/ai_assistance/components/WalkthroughView.ts | inProgress": {
+    "message": "قيد المعالجة"
   },
   "panels/ai_assistance/components/WalkthroughView.ts | showAgentWalkthrough": {
     "message": "عرض جولة تفصيلية للوكيل"
@@ -3186,7 +3264,7 @@
     "message": "عرض طريقة التفكير"
   },
   "panels/ai_assistance/components/WalkthroughView.ts | title": {
-    "message": "خطوات التحقيق"
+    "message": "خطوات الوكيل التفصيلية"
   },
   "panels/animation/AnimationTimeline.ts | animationDescription": {
     "message": "يمكنك في هذه الصفحة فحص الصور المتحركة وتعديلها."
@@ -3632,9 +3710,6 @@
   "panels/application/ApplicationPanelSidebar.ts | theContentOfThisDocumentHasBeen": {
     "message": "تم إنشاء محتوى هذا المستند ديناميكيًا من خلال \"document.write()‎\"."
   },
-  "panels/application/ApplicationPanelSidebar.ts | thirdPartyPhaseout": {
-    "message": "ربما تمّ حظر ملفّات تعريف الارتباط الواردة من {PH1} بسبب الإيقاف التدريجي لملفّات تعريف الارتباط التابعة لجهات خارجية."
-  },
   "panels/application/ApplicationPanelSidebar.ts | versionS": {
     "message": "الإصدار: {PH1}"
   },
@@ -3764,6 +3839,18 @@
   "panels/application/CookieItemsView.ts | showUrlDecoded": {
     "message": "عرض عنوان URL المفكوك ترميزه"
   },
+  "panels/application/CrashReportContextView.ts | filterByText": {
+    "message": "الفلترة حسب المفتاح أو القيمة"
+  },
+  "panels/application/CrashReportContextView.ts | noContext": {
+    "message": "لم يتم رصد أي إدخالات سياق في جميع الإطارات."
+  },
+  "panels/application/CrashReportContextView.ts | refresh": {
+    "message": "إعادة تحميل"
+  },
+  "panels/application/CrashReportContextView.ts | unknownFrame": {
+    "message": "إطار غير معروف"
+  },
   "panels/application/DOMStorageItemsView.ts | domStorageItemDeleted": {
     "message": "تم حذف عنصر التخزين."
   },
@@ -3772,6 +3859,9 @@
   },
   "panels/application/DOMStorageItemsView.ts | domStorageItemsCleared": {
     "message": "تم محو عناصر التخزين في DOM."
+  },
+  "panels/application/DeviceBoundSessionsTreeElement.ts | clear": {
+    "message": "محو"
   },
   "panels/application/DeviceBoundSessionsTreeElement.ts | deviceBoundSessions": {
     "message": "الجلسات المقيّدة بالجهاز"
@@ -4538,6 +4628,9 @@
   "panels/application/PreloadingTreeElement.ts | speculativeLoads": {
     "message": "عمليات التحميل المبني على توقُّع"
   },
+  "panels/application/ReportingApiTreeElement.ts | crashReportContext": {
+    "message": "سياق تقرير الأعطال"
+  },
   "panels/application/ReportingApiTreeElement.ts | reportingApi": {
     "message": "واجهة برمجة التطبيقات لإعداد التقارير"
   },
@@ -4861,6 +4954,117 @@
   },
   "panels/application/TrustTokensTreeElement.ts | trustTokens": {
     "message": "الرموز المميّزة للحالة الخاصة"
+  },
+  "panels/application/WebMCPView.ts | cancelCall": {
+    "message": "إلغاء"
+  },
+  "panels/application/WebMCPView.ts | canceled": {
+    "message": "تم الإلغاء"
+  },
+  "panels/application/WebMCPView.ts | canceledCount": {
+    "message": "عدد الطلبات التي تم إلغاؤها: {PH1}"
+  },
+  "panels/application/WebMCPView.ts | clearFilters": {
+    "message": "محو الفلاتر"
+  },
+  "panels/application/WebMCPView.ts | clearLog": {
+    "message": "محو السجلّ"
+  },
+  "panels/application/WebMCPView.ts | close": {
+    "message": "إغلاق"
+  },
+  "panels/application/WebMCPView.ts | completed": {
+    "message": "مكتمل"
+  },
+  "panels/application/WebMCPView.ts | copyDescription": {
+    "message": "نسخ الوصف"
+  },
+  "panels/application/WebMCPView.ts | copyName": {
+    "message": "نسخ الاسم"
+  },
+  "panels/application/WebMCPView.ts | declarative": {
+    "message": "تعمل لتحقيق نتيجة"
+  },
+  "panels/application/WebMCPView.ts | editAndRun": {
+    "message": "التعديل والتشغيل"
+  },
+  "panels/application/WebMCPView.ts | error": {
+    "message": "خطأ"
+  },
+  "panels/application/WebMCPView.ts | failed": {
+    "message": "عدد الطلبات التي تعذَّر تنفيذها: {PH1}"
+  },
+  "panels/application/WebMCPView.ts | filter": {
+    "message": "فلتر"
+  },
+  "panels/application/WebMCPView.ts | frame": {
+    "message": "الإطار"
+  },
+  "panels/application/WebMCPView.ts | imperative": {
+    "message": "تعمل بالأوامر"
+  },
+  "panels/application/WebMCPView.ts | inProgress": {
+    "message": "قيد التقدّم"
+  },
+  "panels/application/WebMCPView.ts | inProgressCount": {
+    "message": "عدد الطلبات قيد التقدّم: {PH1}"
+  },
+  "panels/application/WebMCPView.ts | input": {
+    "message": "إدخال"
+  },
+  "panels/application/WebMCPView.ts | name": {
+    "message": "الاسم"
+  },
+  "panels/application/WebMCPView.ts | noCallsPlaceholder": {
+    "message": "يمكنك بدء التفاعل مع وكيل WebMCP للاطّلاع على استدعاء الأدوات وعمليات التنفيذ مباشرة هنا."
+  },
+  "panels/application/WebMCPView.ts | noCallsPlaceholderTitle": {
+    "message": "نشاط الأداة"
+  },
+  "panels/application/WebMCPView.ts | noToolsPlaceholder": {
+    "message": "ستظهر هنا أدوات WebMCP المسجَّلة لهذه الصفحة. وللعلم، لم يتم تسجيل أي أدوات أو رصدها بعد."
+  },
+  "panels/application/WebMCPView.ts | noToolsPlaceholderTitle": {
+    "message": "أدوات WebMCP المتاحة"
+  },
+  "panels/application/WebMCPView.ts | output": {
+    "message": "الناتج"
+  },
+  "panels/application/WebMCPView.ts | paste": {
+    "message": "لصق"
+  },
+  "panels/application/WebMCPView.ts | pending": {
+    "message": "قيد التقدّم"
+  },
+  "panels/application/WebMCPView.ts | revealTool": {
+    "message": "إظهار الأداة"
+  },
+  "panels/application/WebMCPView.ts | runTool": {
+    "message": "تشغيل الأداة"
+  },
+  "panels/application/WebMCPView.ts | status": {
+    "message": "الحالة"
+  },
+  "panels/application/WebMCPView.ts | statusTypes": {
+    "message": "أنواع الحالات"
+  },
+  "panels/application/WebMCPView.ts | toolDetails": {
+    "message": "التفاصيل"
+  },
+  "panels/application/WebMCPView.ts | toolRegistry": {
+    "message": "الأدوات المتاحة"
+  },
+  "panels/application/WebMCPView.ts | toolTypes": {
+    "message": "أنواع الأدوات"
+  },
+  "panels/application/WebMCPView.ts | toolUnregisteredNotice": {
+    "message": "تم إلغاء تسجيل هذه الأداة"
+  },
+  "panels/application/WebMCPView.ts | totalCalls": {
+    "message": "إجمالي عدد الطلبات: {PH1}"
+  },
+  "panels/application/WebMCPView.ts | viewInElementsPanel": {
+    "message": "العرض في لوحة \"العناصر\""
   },
   "panels/application/application-meta.ts | application": {
     "message": "التطبيق"
@@ -5345,6 +5549,18 @@
   "panels/application/components/BounceTrackingMitigationsView.ts | stateDeletedFor": {
     "message": "تم حذف الحالة الخاصة بالمواقع الإلكترونية التالية:"
   },
+  "panels/application/components/CrashReportContextGrid.ts | copyKey": {
+    "message": "نسخ المفتاح"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | copyValue": {
+    "message": "نسخ القيمة"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | key": {
+    "message": "المفتاح"
+  },
+  "panels/application/components/CrashReportContextGrid.ts | value": {
+    "message": "القيمة"
+  },
   "panels/application/components/EndpointsGrid.ts | endpointsDescription": {
     "message": "ستظهر هنا قائمة بنقاط النهاية التي تتلقّى التقارير"
   },
@@ -5714,6 +5930,9 @@
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsFailureReason": {
     "message": "سبب التعذُّر"
   },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsFormSubmission": {
+    "message": "إرسال نموذج"
+  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsRuleSet": {
     "message": "مجموعة القواعد"
   },
@@ -5723,11 +5942,17 @@
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsTargetHint": {
     "message": "تلميح الهدف"
   },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | no": {
+    "message": "لا"
+  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | noElementSelected": {
     "message": "لم يتم اختيار أي عنصر"
   },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | selectAnElementForMoreDetails": {
     "message": "يُرجى اختيار عنصر لمعرفة مزيد من التفاصيل"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | yes": {
+    "message": "نعم"
   },
   "panels/application/preloading/components/PreloadingDisabledInfobar.ts | descriptionDisabledByBatterySaver": {
     "message": "تم إيقاف التحميل المبني على توقُّع بسبب تفعيل وضع \"توفير شحن البطارية\" في نظام التشغيل."
@@ -5965,6 +6190,9 @@
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationBadHttpStatus": {
     "message": "تعذَّر الانتقال إلى العرض المُسبَق بسبب توفُّر رمز حالة ليس من فئة 2xx لاستجابة HTTP."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationBadHttpStatusWithStatusCode": {
+    "message": "تعذَّر الانتقال إلى العرض المُسبَق بسبب تلقّي رمز حالة لاستجابة HTTP لا ينتمي إلى فئة 2xx ({PH1})."
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusNavigationRequestBlockedByCsp": {
     "message": "حظرت \"سياسة أمان المحتوى\" عملية الانتقال إلى العرض المُسبَق."
@@ -6467,9 +6695,6 @@
   "panels/common/BadgeNotification.ts | viewProfile": {
     "message": "عرض الملف الشخصي"
   },
-  "panels/common/CopyChangesToPrompt.ts | responseCopiedToClipboard": {
-    "message": "تم نسخ الردّ إلى الحافظة"
-  },
   "panels/common/DOMLinkifier.ts | node": {
     "message": "<عقدة>"
   },
@@ -6606,7 +6831,7 @@
     "message": "طلب وحدة التحكم"
   },
   "panels/console/ConsolePrompt.ts | selfXssWarning": {
-    "message": "تحذير: لا تلصق في \"وحدة التحكّم في أدوات مطوّري البرامج\" رمزًا برمجيًا لا تفهمه أو لم تراجعه بنفسك. فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكّم في جهاز الكمبيوتر لديك. يُرجى كتابة \"{PH1}\" أدناه والضغط على Enter للسماح باللصق."
+    "message": "تحذير: يجب ألا يُلصَق في \"وحدة التحكّم في أدوات مطوّري البرامج\" رمز برمجي غير مفهوم لك أو لم تتم مراجعته من قِبلك. فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكم في جهاز الكمبيوتر الخاص بك. يُرجى كتابة \"{PH1}\" أدناه والضغط على مفتاح Enter للسماح باللصق."
   },
   "panels/console/ConsoleSidebar.ts | dErrors": {
     "message": "{n,plural, =0{ما مِن أخطاء}=1{خطأ واحد}two{عدد الأخطاء: #}few{عدد الأخطاء: #}many{عدد الأخطاء: #}other{عدد الأخطاء: #}}"
@@ -6634,6 +6859,9 @@
   },
   "panels/console/ConsoleView.ts | autocompleteFromHistory": {
     "message": "الإكمال التلقائي من السجلّ"
+  },
+  "panels/console/ConsoleView.ts | collapseAll": {
+    "message": "تصغير الكل"
   },
   "panels/console/ConsoleView.ts | consoleCleared": {
     "message": "تم محو وحدة التحكم."
@@ -6673,6 +6901,9 @@
   },
   "panels/console/ConsoleView.ts | errors": {
     "message": "الأخطاء"
+  },
+  "panels/console/ConsoleView.ts | expandAll": {
+    "message": "توسيع الكل"
   },
   "panels/console/ConsoleView.ts | filteredMessagesInConsole": {
     "message": "{PH1} رسالة في وحدة التحكُّم"
@@ -7529,12 +7760,6 @@
   "panels/elements/ElementsPanel.ts | styles": {
     "message": "الأنماط"
   },
-  "panels/elements/ElementsPanel.ts | switchToAccessibilityTreeView": {
-    "message": "التبديل إلى العرض التدرّجي لتسهيل الاستخدام"
-  },
-  "panels/elements/ElementsPanel.ts | switchToDomTreeView": {
-    "message": "التبديل إلى طريقة عرض شجرة نموذج العناصر في المستند"
-  },
   "panels/elements/ElementsPanel.ts | theDeferredDomNodeCouldNotBe": {
     "message": "تعذَّرت مطابقة عقدة إطار DOM المؤجَّلة مع عقدة صالحة."
   },
@@ -7591,6 +7816,9 @@
   },
   "panels/elements/ElementsTreeElement.ts | copyXpath": {
     "message": "نسخ XPath"
+  },
+  "panels/elements/ElementsTreeElement.ts | creatorAdScriptAncestry": {
+    "message": "أصل النص البرمجي لإنشاء الإعلان"
   },
   "panels/elements/ElementsTreeElement.ts | cut": {
     "message": "قص"
@@ -7679,6 +7907,9 @@
   "panels/elements/ElementsTreeElement.ts | explainSubgrids": {
     "message": "شرح الشبكات الفرعية"
   },
+  "panels/elements/ElementsTreeElement.ts | filterListRule": {
+    "message": "قاعدة قائمة الفلاتر"
+  },
   "panels/elements/ElementsTreeElement.ts | findGridDefinition": {
     "message": "العثور على تعريف الشبكة"
   },
@@ -7694,6 +7925,9 @@
   "panels/elements/ElementsTreeElement.ts | hideElement": {
     "message": "إخفاء العنصر"
   },
+  "panels/elements/ElementsTreeElement.ts | noProvenanceAvailable": {
+    "message": "لا تتوفّر بيانات عن المصدر"
+  },
   "panels/elements/ElementsTreeElement.ts | openMediaPanel": {
     "message": "الانتقال السريع إلى لوحة الوسائط"
   },
@@ -7705,6 +7939,9 @@
   },
   "panels/elements/ElementsTreeElement.ts | reveal": {
     "message": "عرض"
+  },
+  "panels/elements/ElementsTreeElement.ts | rootScriptFilterListRule": {
+    "message": "قاعدة قائمة الفلترة للنص البرمجي الأصلي"
   },
   "panels/elements/ElementsTreeElement.ts | scrollIntoView": {
     "message": "التمرير للوصول إلى طريقة العرض"
@@ -7730,8 +7967,8 @@
   "panels/elements/ElementsTreeElement.ts | styleScrollbars": {
     "message": "تنسيق أشرطة التمرير"
   },
-  "panels/elements/ElementsTreeElement.ts | thisFrameWasIdentifiedAsAnAd": {
-    "message": "هذا الإطار تم تحديده بوصفه إطار إعلان"
+  "panels/elements/ElementsTreeElement.ts | thisElementWasIdentifiedAsAnAd": {
+    "message": "تم تصنيف هذا العنصر على أنّه إعلان"
   },
   "panels/elements/ElementsTreeElement.ts | useSInTheConsoleToReferToThis": {
     "message": "استخدام {PH1} في وحدة التحكّم للإشارة إلى هذا العنصر"
@@ -7747,6 +7984,9 @@
   },
   "panels/elements/ElementsTreeOutline.ts | pageDom": {
     "message": "شجرة DOM للصفحة"
+  },
+  "panels/elements/ElementsTreeOutline.ts | showAllLines": {
+    "message": "عرض الكل ({PH1} سطر)"
   },
   "panels/elements/ElementsTreeOutline.ts | showAllNodesDMore": {
     "message": "عرض كل العُقد ({PH1} أخرى)"
@@ -7865,6 +8105,9 @@
   "panels/elements/ShortcutTreeElement.ts | reveal": {
     "message": "عرض"
   },
+  "panels/elements/StylePropertiesSection.ts | collapseExpandedRule": {
+    "message": "تصغير القاعدة الموسّعة"
+  },
   "panels/elements/StylePropertiesSection.ts | constructedStylesheet": {
     "message": "أوراق الأنماط التي تم إنشاؤها"
   },
@@ -7879,6 +8122,9 @@
   },
   "panels/elements/StylePropertiesSection.ts | cssSelector": {
     "message": "أداة اختيار CSS"
+  },
+  "panels/elements/StylePropertiesSection.ts | expandCollapsedRule": {
+    "message": "توسيع القاعدة المصغّرة"
   },
   "panels/elements/StylePropertiesSection.ts | injectedStylesheet": {
     "message": "ورقة الأنماط التي تم إدخالها"
@@ -7972,6 +8218,9 @@
   },
   "panels/elements/StylePropertyTreeElement.ts | viewComputedValue": {
     "message": "عرض القيمة المحتسَبة"
+  },
+  "panels/elements/StylesSidebarPane.ts | aiSuggestionAccepted": {
+    "message": "{PH1} تمّ قبول الاقتراح."
   },
   "panels/elements/StylesSidebarPane.ts | automaticDarkMode": {
     "message": "الوضع الداكن التلقائي"
@@ -8077,6 +8326,9 @@
   },
   "panels/elements/elements-meta.ts | copyStyles": {
     "message": "نسْخ الأنماط"
+  },
+  "panels/elements/elements-meta.ts | cssAnimationsOnlyWhenAnimationsTabOpen": {
+    "message": "عرض أنماط الصور المتحركة فقط عند فتح علامة التبويب \"الصور المتحركة\""
   },
   "panels/elements/elements-meta.ts | detailedInspectTooltip": {
     "message": "تلميح الفحص المفصّل"
@@ -9238,6 +9490,12 @@
   },
   "panels/lighthouse/LighthouseStatusView.ts | ahSorryWeRanIntoAnError": {
     "message": "عذرًا، حدث خطأ."
+  },
+  "panels/lighthouse/LighthouseStatusView.ts | aiAuditingS": {
+    "message": "جارٍ تدقيق {PH1} باستخدام الدعم الذكي"
+  },
+  "panels/lighthouse/LighthouseStatusView.ts | aiAuditingYourWebPage": {
+    "message": "يفحص الدعم الذكي صفحة الويب حاليًا"
   },
   "panels/lighthouse/LighthouseStatusView.ts | almostThereLighthouseIsNow": {
     "message": "لقد أوشكت على الانتهاء. يعمل Lighthouse على إنشاء التقرير الآن."
@@ -10526,6 +10784,9 @@
   "panels/network/NetworkLogViewColumns.ts | requestHeaders": {
     "message": "عناوين الطلبات"
   },
+  "panels/network/NetworkLogViewColumns.ts | requestNumber": {
+    "message": "الطلب #"
+  },
   "panels/network/NetworkLogViewColumns.ts | responseHeaders": {
     "message": "عناوين الاستجابة"
   },
@@ -11540,6 +11801,9 @@
   "panels/profiler/HeapProfileView.ts | sBytes": {
     "message": "{PH1} بايت"
   },
+  "panels/profiler/HeapProfileView.ts | samplingHeapProfilerTimeline": {
+    "message": "المخطط الزمني لمسجّل عيّنات من اللقطات لعناصر متعدّدة"
+  },
   "panels/profiler/HeapProfileView.ts | samplingProfiles": {
     "message": "لقطات لعناصر متعدّدة من عينات عشوائية"
   },
@@ -11714,9 +11978,6 @@
   "panels/profiler/HeapSnapshotGridNodes.ts | userObjectReachableFromWindow": {
     "message": "يمكن الوصول لكائن المستخدم من النافذة."
   },
-  "panels/profiler/HeapSnapshotProxy.ts | anErrorOccurredWhenACallToMethod": {
-    "message": "حدث خطأ أثناء طلب استدعاء الإجراء \"{PH1}\"."
-  },
   "panels/profiler/HeapSnapshotView.ts | AllocationTimelinesShowInstrumented": {
     "message": "تعمل هذه الأداة على تسجيل عمليات تخصيص الذاكرة على مدار الوقت واستبعاد حالات تسرُّب الذاكرة من خلال اختيار فواصل زمنية تحتوي على عمليات تخصيص ما زالت نشطة"
   },
@@ -11749,9 +12010,6 @@
   },
   "panels/profiler/HeapSnapshotView.ts | duplicatedStrings": {
     "message": "سلاسل مكرّرة"
-  },
-  "panels/profiler/HeapSnapshotView.ts | exposeInternals": {
-    "message": "البيانات الداخلية مع تفاصيل التنفيذ"
   },
   "panels/profiler/HeapSnapshotView.ts | filter": {
     "message": "فلتر"
@@ -11890,33 +12148,6 @@
   },
   "panels/profiler/IsolateSelector.ts | totalPageJsHeapSizeChangeTrend": {
     "message": "مؤشر تغيّر إجمالي حجم عناصر JS المتعددة خلال آخر {PH1} دقيقة"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | allocatedJsHeapSizeCurrentlyIn": {
-    "message": "حجم عناصر JavaScript المتعدّدة المخصّصة والمستخدمة حاليًا"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | anonymousScriptS": {
-    "message": "(نص برمجي مجهول الهوية {PH1})"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | heapProfile": {
-    "message": "تسجيل لقطات لعناصر متعددة"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | jsHeap": {
-    "message": "عناصر JavaScript المتعدّدة"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | kb": {
-    "message": "كيلوبايت"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | numberOfVmsSharingTheSameScript": {
-    "message": "عدد الأجهزة الافتراضية (VM) التي تشارك مصدر النص البرمجي ذاته"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | scriptUrl": {
-    "message": "عنوان URL للنص البرمجي"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | urlOfTheScriptSource": {
-    "message": "عنوان URL لمصدر النص البرمجي"
-  },
-  "panels/profiler/LiveHeapProfileView.ts | vms": {
-    "message": "الأجهزة الافتراضية (VM)"
   },
   "panels/profiler/ModuleUIStrings.ts | buildingAllocationStatistics": {
     "message": "جارٍ إنشاء إحصاءات التخصيص…"
@@ -12095,9 +12326,6 @@
   "panels/profiler/profiler-meta.ts | deleteProfile": {
     "message": "حذف اللقطات"
   },
-  "panels/profiler/profiler-meta.ts | liveHeapProfile": {
-    "message": "أداة \"الملف التعريفي لعناصر متعددة في الوقت الفعلي\""
-  },
   "panels/profiler/profiler-meta.ts | loadProfile": {
     "message": "تحميل الملف التعريفي…"
   },
@@ -12107,23 +12335,11 @@
   "panels/profiler/profiler-meta.ts | saveProfile": {
     "message": "حفظ الملف التعريفي…"
   },
-  "panels/profiler/profiler-meta.ts | showLiveHeapProfile": {
-    "message": "عرض أداة Live Heap Profile"
-  },
   "panels/profiler/profiler-meta.ts | showMemory": {
     "message": "عرض الذاكرة"
   },
-  "panels/profiler/profiler-meta.ts | startRecordingHeapAllocations": {
-    "message": "بدء تسجيل عمليات التخصيص لعناصر متعددة"
-  },
-  "panels/profiler/profiler-meta.ts | startRecordingHeapAllocationsAndReload": {
-    "message": "بدء تسجيل لقطات للأجزاء المخصّصة في الذاكرة لعناصر متعددة وإعادة تحميل الصفحة"
-  },
   "panels/profiler/profiler-meta.ts | startStopRecording": {
     "message": "بدء/إيقاف التسجيل"
-  },
-  "panels/profiler/profiler-meta.ts | stopRecordingHeapAllocations": {
-    "message": "إيقاف تسجيل تخصيصات لقطات لعناصر متعدّدة"
   },
   "panels/protocol_monitor/JSONEditor.ts | addCustomProperty": {
     "message": "إضافة خاصية مخصصة"
@@ -12237,7 +12453,7 @@
     "message": "حذف التسجيل"
   },
   "panels/recorder/RecorderController.ts | doNotImport": {
-    "message": "يُرجى عدم استيراد التسجيلات غير المفهومة أو التي راجعتها بنفسك في \"أدوات مطوّري البرامج\". فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكّم في جهاز الكمبيوتر. يُرجى كتابة \"{PH1}\" أدناه للسماح باستيراد البيانات."
+    "message": "يُرجى عدم استيراد التسجيلات غير المفهومة لك أو التي لم تتم مراجعتها من قِبلك في \"أدوات مطوّري البرامج\". فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكم في جهاز الكمبيوتر الخاص بك. يُرجى كتابة \"{PH1}\" أدناه للسماح باستيراد البيانات."
   },
   "panels/recorder/RecorderController.ts | doYouTrustThisCode": {
     "message": "هل هذا التسجيل موثوق؟"
@@ -12297,7 +12513,7 @@
     "message": "تبديل طريقة عرض الرمز"
   },
   "panels/recorder/RecorderController.ts | typeAllowImporting": {
-    "message": "كتابة \"{PH1}\""
+    "message": "يُرجى كتابة \"{PH1}\""
   },
   "panels/recorder/components/CreateRecordingView.ts | cancelRecording": {
     "message": "إلغاء التسجيل"
@@ -13280,6 +13496,21 @@
   "panels/settings/AISettingsTab.ts | aIAnnotationsFeatureDescription": {
     "message": "إنشاء عناوين تلقائيًا لتعليقات تتبُّع الأداء التوضيحية"
   },
+  "panels/settings/AISettingsTab.ts | aiAssistanceDescriptionV2": {
+    "message": "مساعدة بانتظارك مناسبة للسياق على الصفحة التي يتم فحصها"
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceThingsToConsiderNoLoggingV2": {
+    "message": "لتقديم التفسيرات، تُرسَل إلى Google رسائل محادثاتك والبيانات المتاح الوصول إليها لهذا الموقع الإلكتروني من خلال لوحات \"أدوات مطوّري البرامج\" وواجهات برمجة تطبيقات الويب، والبيانات التي يتم اختيارها من قِبلك، مثل طلبات الشبكة والملفات وبيانات تتبُّع الأداء. ولن يتم استخدام المحتوى المُرسَل من خلالك، والمحتوى الذي تنشئه هذه الميزة، في تحسين نماذج ذكاء Google الاصطناعي. هذه ميزة تجريبية تستخدم الذكاء الاصطناعي وقد توفِّر نتائج غير دقيقة في بعض الأحيان."
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceThingsToConsiderV2": {
+    "message": "لتقديم التفسيرات، تُرسَل إلى Google رسائل محادثاتك، والبيانات المتاح الوصول إليها لهذا الموقع الإلكتروني من خلال لوحات \"أدوات مطوّري البرامج\" وواجهات برمجة تطبيقات الويب، والبيانات التي يتم اختيارها من قِبلك، مثل طلبات الشبكة والملفات وبيانات تتبُّع الأداء، وقد يطّلع عليها فريق من المراجعين لتحسين هذه الميزة. هذه ميزة تجريبية تستخدم الذكاء الاصطناعي وقد توفِّر نتائج غير دقيقة في بعض الأحيان."
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceWhenOnItem1V2": {
+    "message": "يمكنك تصحيح الأخطاء في الأنماط والشبكة والأداء والرمز المصدر وإمكانية الوصول والتخزين باستخدام الدعم الذكي في \"أدوات مطوّري البرامج\""
+  },
+  "panels/settings/AISettingsTab.ts | aiAssistanceWhenOnItem2V2": {
+    "message": "يمكنك تتبُّع كل خطوة من خطوات الاستدلال التي يجريها الوكيل والانتقال بسرعة إلى بيانات المصدر ذات الصلة"
+  },
   "panels/settings/AISettingsTab.ts | asYouTypeCodeSuggestions": {
     "message": "أثناء الكتابة في لوحة \"وحدة التحكّم\" أو لوحة \"المصادر\"، ستظهر لك اقتراحات للرموز البرمجية. يمكنك الضغط على مفتاح Tab لقبول أحد الاقتراحات."
   },
@@ -13660,6 +13891,9 @@
   },
   "panels/settings/emulation/DevicesSettingsTab.ts | userAgentString": {
     "message": "سلسلة وكيل المستخدم"
+  },
+  "panels/settings/emulation/DevicesSettingsTab.ts | userAgentStringCannotBeEmpty": {
+    "message": "لا يمكن ترك حقل سلسلة وكيل المستخدم فارغًا."
   },
   "panels/settings/emulation/DevicesSettingsTab.ts | userAgentType": {
     "message": "نوع وكيل المستخدم"
@@ -14356,12 +14590,6 @@
   },
   "panels/sources/PersistenceActions.ts | showOverrides": {
     "message": "عرض كل الملفات التي تم تجاهلها"
-  },
-  "panels/sources/ProfilePlugin.ts | kb": {
-    "message": "كيلوبايت"
-  },
-  "panels/sources/ProfilePlugin.ts | mb": {
-    "message": "ميغابايت"
   },
   "panels/sources/ProfilePlugin.ts | ms": {
     "message": "ملي ثانية"
@@ -15299,9 +15527,6 @@
   "panels/timeline/TimelinePanel.ts | exportingFailed": {
     "message": "تعذَّر تصدير بيانات التتبّع"
   },
-  "panels/timeline/TimelinePanel.ts | externalRequestReceived": {
-    "message": "تم إرسال طلب خارجي إلى \"DevTools\""
-  },
   "panels/timeline/TimelinePanel.ts | fixMe": {
     "message": "حلّ المشكلة"
   },
@@ -15934,6 +16159,30 @@
   },
   "panels/timeline/components/CPUThrottlingSelector.ts | recommendedThrottlingReason": {
     "message": "يُرجى تغيير الإعدادات لمحاكاة بيئات المستخدِمين الحقيقيين"
+  },
+  "panels/timeline/components/CWVMetrics.ts | dismissTitle": {
+    "message": "إغلاق"
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldMismatchNotice": {
+    "message": "هناك العديد من الأسباب التي قد تؤدي إلى [عدم تطابق](https://web.dev/articles/lab-and-field-data-differences) المقاييس على نظامك المحلي مع مقاييس تجارب المستخدمِين الحقيقين. يُرجى ضبط [إعدادات التقييد ومحاكاة الأجهزة](https://developer.chrome.com/docs/devtools/device-mode) لتحليل عمليات تتبُّع أقرب إلى بيئة المستخدم العادي."
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldMismatchTitle": {
+    "message": "عدم تطابق المقاييس على نظامك المحلي مع مقاييس تجارب المستخدمِين الحقيقيين"
+  },
+  "panels/timeline/components/CWVMetrics.ts | fieldScoreLabel": {
+    "message": "مقاييس تجارب المستخدمِين الحقيقيين ({PH1})"
+  },
+  "panels/timeline/components/CWVMetrics.ts | metricScore": {
+    "message": "‫{PH1}: {PH2}، النتيجة {PH3}"
+  },
+  "panels/timeline/components/CWVMetrics.ts | metricScoreUnavailable": {
+    "message": "بيانات {PH1}: غير متوفِّرة"
+  },
+  "panels/timeline/components/CWVMetrics.ts | originOption": {
+    "message": "المصدر"
+  },
+  "panels/timeline/components/CWVMetrics.ts | urlOption": {
+    "message": "عنوان URL"
   },
   "panels/timeline/components/DetailsView.ts | forcedReflow": {
     "message": "إعادة التدفق الإلزامية"
@@ -16718,6 +16967,9 @@
   "panels/timeline/timeline-meta.ts | stop": {
     "message": "إيقاف"
   },
+  "panels/timeline/timeline-meta.ts | timelineShowAllEvents": {
+    "message": "عرض جميع الأحداث"
+  },
   "panels/timeline/utils/IgnoreList.ts | skip3rdPartyScripts": {
     "message": "تم وضع علامة على النص البرمجي باستخدام قائمة التجاهل (ignoreList) في خريطة المصدر"
   },
@@ -16859,6 +17111,12 @@
   "panels/webauthn/WebauthnPane.ts | signCount": {
     "message": "عدد التوقيعات"
   },
+  "panels/webauthn/WebauthnPane.ts | supportsHmacSecret": {
+    "message": "يتوافق مع hmac-secret"
+  },
+  "panels/webauthn/WebauthnPane.ts | supportsHmacSecretMc": {
+    "message": "يتوافق مع hmac-secret-mc"
+  },
   "panels/webauthn/WebauthnPane.ts | supportsLargeBlob": {
     "message": "إتاحة تخزين الكائنات الثنائية الكبيرة (blob)"
   },
@@ -16955,10 +17213,10 @@
   "ui/components/issue_counter/IssueLinkIcon.ts | issueUnavailable": {
     "message": "المشكلة غير متاحة في الوقت الحالي"
   },
-  "ui/components/list/List.ts | edit": {
+  "ui/components/lists/List.ts | edit": {
     "message": "تعديل"
   },
-  "ui/components/list/List.ts | remove": {
+  "ui/components/lists/List.ts | remove": {
     "message": "إزالة"
   },
   "ui/components/markdown_view/CodeBlock.ts | code": {
@@ -16970,8 +17228,14 @@
   "ui/components/markdown_view/CodeBlock.ts | copy": {
     "message": "نسخ الرمز"
   },
+  "ui/components/markdown_view/CodeBlock.ts | copyCodeSnippet": {
+    "message": "نسخ مقتطف الرمز \"{PH1}\""
+  },
   "ui/components/markdown_view/CodeBlock.ts | disclaimer": {
     "message": "يجب استخدام مقتطفات الرموز بحذر"
+  },
+  "ui/components/markdown_view/CodeBlock.ts | showAllLines": {
+    "message": "عرض كل الأسطر ({PH1} سطر آخر)"
   },
   "ui/components/panel_feedback/FeedbackButton.ts | feedback": {
     "message": "الملاحظات"
@@ -17090,6 +17354,9 @@
   "ui/legacy/ActionRegistration.ts | sources": {
     "message": "المصادر"
   },
+  "ui/legacy/Dialog.ts | close": {
+    "message": "إغلاق"
+  },
   "ui/legacy/DockController.ts | close": {
     "message": "إغلاق"
   },
@@ -17120,11 +17387,23 @@
   "ui/legacy/Infobar.ts | dontShowAgain": {
     "message": "عدم الإظهار مرة أخرى"
   },
+  "ui/legacy/InspectorDrawerView.ts | closeDrawer": {
+    "message": "إغلاق الدرج"
+  },
+  "ui/legacy/InspectorDrawerView.ts | expandDrawer": {
+    "message": "توسيع الدرج"
+  },
+  "ui/legacy/InspectorDrawerView.ts | minimizeDrawer": {
+    "message": "تصغير الدرج"
+  },
+  "ui/legacy/InspectorDrawerView.ts | moreTools": {
+    "message": "مزيد من الأدوات"
+  },
+  "ui/legacy/InspectorDrawerView.ts | toggleDrawerOrientation": {
+    "message": "تبديل اتجاه الدرج"
+  },
   "ui/legacy/InspectorView.ts | areYouSureYouWantToRestartChrome": {
     "message": "هل المطلوب فعلاً إعادة تشغيل Chrome؟"
-  },
-  "ui/legacy/InspectorView.ts | closeDrawer": {
-    "message": "إغلاق الدرج"
   },
   "ui/legacy/InspectorView.ts | devToolsLanguageMissmatch": {
     "message": "\"أدوات مطوري البرامج\" متاحة الآن باللغة {PH1}"
@@ -17132,17 +17411,20 @@
   "ui/legacy/InspectorView.ts | drawer": {
     "message": "درج الأداة"
   },
+  "ui/legacy/InspectorView.ts | drawerExpanded": {
+    "message": "تم توسيع الدرج"
+  },
   "ui/legacy/InspectorView.ts | drawerHidden": {
     "message": "الدُرج المخفي"
+  },
+  "ui/legacy/InspectorView.ts | drawerMinimized": {
+    "message": "تم تصغير الدرج"
   },
   "ui/legacy/InspectorView.ts | drawerShown": {
     "message": "الدُرج المعروض"
   },
   "ui/legacy/InspectorView.ts | mainToolbar": {
     "message": "شريط الأدوات الرئيسي"
-  },
-  "ui/legacy/InspectorView.ts | moreTools": {
-    "message": "مزيد من الأدوات"
   },
   "ui/legacy/InspectorView.ts | moveToDrawer": {
     "message": "الانتقال إلى الدرج"
@@ -17173,9 +17455,6 @@
   },
   "ui/legacy/InspectorView.ts | setToSpecificLanguage": {
     "message": "تغيير لغة أدوات مطوري البرامج إلى {PH1}"
-  },
-  "ui/legacy/InspectorView.ts | toggleDrawerOrientation": {
-    "message": "تبديل اتجاه الدرج"
   },
   "ui/legacy/ListWidget.ts | addString": {
     "message": "إضافة"
@@ -17615,66 +17894,6 @@
   "ui/legacy/components/inline_editor/ColorSwatch.ts | shiftclickToChangeColorFormat": {
     "message": "اضغط على Shift مع النقر لتغيير تنسيق اللون"
   },
-  "ui/legacy/components/inline_editor/FontEditor.ts | PleaseEnterAValidValueForSText": {
-    "message": "يُرجى إدخال قيمة صالحة لإدخال {PH1} النصي."
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | cssProperties": {
-    "message": "الخصائص المصمّمة بلغة \"صفحات الأنماط المتتالية\" (CSS)"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | deleteS": {
-    "message": "حذف {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fallbackS": {
-    "message": "أدوات الاختيار الاحتياطية {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontFamily": {
-    "message": "مجموعة الخطوط"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontSelectorDeletedAtIndexS": {
-    "message": "تم حذف \"أداة اختيار الخط\" في الفهرس: {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontSize": {
-    "message": "حجم الخط"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | fontWeight": {
-    "message": "مدى غمق الخط"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | lineHeight": {
-    "message": "ارتفاع السطر"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sKeyValueSelector": {
-    "message": "أداة اختيار قيمة المفتاح {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sSliderInput": {
-    "message": "إدخال شريط تمرير {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sTextInput": {
-    "message": "إدخال {PH1} النصي"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sToggleInputType": {
-    "message": "{PH1} تبديل نوع الإدخال"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sUnitInput": {
-    "message": "إدخال وحدة {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | selectorInputMode": {
-    "message": "وضع الإدخال لأداة الاختيار"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | sliderInputMode": {
-    "message": "وضع الإدخال باستخدام شريط تمرير"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | spacing": {
-    "message": "تباعد"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | thereIsNoValueToDeleteAtIndexS": {
-    "message": "ما مِن قيمة لحذفها في الفهرس: {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | thisPropertyIsSetToContainUnits": {
-    "message": "تم ضبط هذه الخاصية لتتضمَّن وحدات، ولكنها لا تتضمّن unitsArray محدَّدًا ومطابقًا لها: {PH1}"
-  },
-  "ui/legacy/components/inline_editor/FontEditor.ts | units": {
-    "message": "الوحدات"
-  },
   "ui/legacy/components/object_ui/CustomPreviewComponent.ts | showAsJavascriptObject": {
     "message": "عرض ككائن JavaScript"
   },
@@ -17792,6 +18011,9 @@
   "ui/legacy/components/perf_ui/FlameChart.ts | sSelected": {
     "message": "تمّ اختيار {PH1}."
   },
+  "ui/legacy/components/perf_ui/GCActionDelegate.ts | garbageCollectionCompleted": {
+    "message": "اكتملت عملية جمع البيانات غير الضرورية"
+  },
   "ui/legacy/components/perf_ui/NetworkPriorities.ts | high": {
     "message": "أولوية عالية"
   },
@@ -17828,17 +18050,8 @@
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | flamechartSelectedNavigation": {
     "message": "التنقّل في الرسم البياني المفصّل لأداء الرموز:"
   },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | hideLiveMemoryAllocation": {
-    "message": "إخفاء التعليقات التوضيحية المباشرة المتعلقة بتخصيص الذاكرة"
-  },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | liveMemoryAllocationAnnotations": {
-    "message": "التعليقات التوضيحية المباشرة لتخصيص الذاكرة"
-  },
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | modern": {
     "message": "حديث"
-  },
-  "ui/legacy/components/perf_ui/perf_ui-meta.ts | showLiveMemoryAllocation": {
-    "message": "عرض تعليقات توضيحية مباشرة لتخصيص الذاكرة"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | command": {
     "message": "أمر"
@@ -17952,7 +18165,7 @@
     "message": "النصوص المُختارة في {PH1}"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | doNotPaste": {
-    "message": "لا تلصق رمزًا برمجيًا لا تفهمه أو لم تراجعه بنفسك خلال وحدة التحكّم في أدوات مطوّري البرامج فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكم في جهاز الكمبيوتر. يُرجى كتابة \"{PH1}\" أدناه للسماح باللصق."
+    "message": "يُرجى عدم لصق أي رمز برمجي غير مفهوم لك أو لم تتم مراجعته من قِبلك في \"أدوات مطوّري البرامج\". فقد يسمح هذا للمهاجمين بسرقة هويتك أو التحكم في جهاز الكمبيوتر الخاص بك. يُرجى كتابة \"{PH1}\" أدناه للسماح باللصق."
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | doYouTrustThisCode": {
     "message": "هل تثق بهذا الرمز؟"
@@ -17970,7 +18183,7 @@
     "message": "المصدر"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | typeAllowPasting": {
-    "message": "كتابة \"{PH1}\""
+    "message": "يُرجى كتابة \"{PH1}\""
   },
   "ui/legacy/components/source_frame/XMLView.ts | find": {
     "message": "بحث"

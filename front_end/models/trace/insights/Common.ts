@@ -26,6 +26,10 @@ export function getInsight<InsightName extends keyof InsightModels>(
   return insightSet.model[insightName];
 }
 
+export function isInsightKey(key: string): key is InsightKeys {
+  return Object.values(InsightKeys).includes(key as InsightKeys);
+}
+
 export function getLCP(insightSet: InsightSet):
     {value: Types.Timing.Micro, event: Types.Events.AnyLargestContentfulPaintCandidate}|null {
   const insight = getInsight(InsightKeys.LCP_BREAKDOWN, insightSet);
@@ -411,6 +415,15 @@ export function calculateDocFirstByteTs(docRequest: Types.Events.SyntheticNetwor
   if (docRequest.args.data.protocol === 'file') {
     // file: requests do not have timings
     return docRequest.ts;
+  }
+
+  // @ts-expect-error
+  const isLightrider = globalThis.isLightrider;
+  if (isLightrider) {
+    const lrServerResponseTime = docRequest.args.data.lrServerResponseTime;
+    if (lrServerResponseTime !== undefined) {
+      return Types.Timing.Micro(docRequest.ts + Helpers.Timing.milliToMicro(lrServerResponseTime));
+    }
   }
 
   const timing = docRequest.args.data.timing;

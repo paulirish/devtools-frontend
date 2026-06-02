@@ -47,14 +47,7 @@ const UIStringsNotTranslate = {
 
 const lockedString = i18n.i18n.lockedString;
 
-function getPreamble(): string {
-  /**
-   * WARNING: preamble defined in code is only used when userTier is
-   * TESTERS. Otherwise, a server-side preamble is used (see
-   * chrome_preambles.gcl). Sync local changes with the server-side.
-   */
-  /* clang-format off */
-  let preamble = `You are the most advanced CSS/DOM/HTML debugging assistant integrated into Chrome DevTools.
+const preamble = `You are the most advanced CSS/DOM/HTML debugging assistant integrated into Chrome DevTools.
 You always suggest considering the best web development practices and the newest platform features such as view transitions.
 The user selected a DOM element in the browser's DevTools and sends a query about the page or the selected DOM element.
 First, examine the provided context, then use the functions to gather additional context and resolve the user request.
@@ -92,9 +85,7 @@ If the user asks a question that requires an investigation of a problem, use thi
       - [Suggestion 1]
       - [Suggestion 2]`;
 
-  const greenDevEmulationEnabled = Greendev.Prototypes.instance().isEnabled('emulationCapabilities');
-  if (greenDevEmulationEnabled) {
-    preamble += `
+const emulationInstructions = `
 # Emulation and Screenshots
 
 * If asked to verify whether the page is visually broken or if there are display problems with specific devices, use the \`activateDeviceEmulation\` tool. This tool will activate emulation for a specified device and capture a screenshot.
@@ -127,10 +118,6 @@ When referring to an element for which you know the nodeId, annotate your output
 - Always prefix the nodeId with the 'node-' prefix when using the markdown syntax.
 - This link will reveal the element in the Elements panel
 - Never mention node or nodeId when referring to the element, and especially not in the link text.`;
-}
-
-  return preamble;
-}
 
 /* clang-format on */
 
@@ -173,13 +160,13 @@ export class NodeContext extends ConversationContext<SDK.DOMModel.DOMNode> {
     this.#node = node;
   }
 
-  getOrigin(): string {
+  override getURL(): string {
     const ownerDocument = this.#node.ownerDocument;
     if (!ownerDocument) {
       // The node is detached from a document.
       return 'detached';
     }
-    return new URL(ownerDocument.documentURL).origin;
+    return ownerDocument.documentURL;
   }
 
   getItem(): SDK.DOMModel.DOMNode {
@@ -242,7 +229,7 @@ export class NodeContext extends ConversationContext<SDK.DOMModel.DOMNode> {
  * instance for a new conversation.
  */
 export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
-  preamble = getPreamble();
+  readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_STYLING_AGENT;
   get userTier(): string|undefined {
     const greenDevEmulationEnabled = Greendev.Prototypes.instance().isEnabled('emulationCapabilities');
@@ -278,6 +265,7 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   #createExtensionScope: CreateExtensionScopeFunction;
   #greenDevEmulationScreenshot: string|null = null;
   #greenDevEmulationAxTree: string|null = null;
+  #hasAddedEmulationInstructions = false;
   #currentTurnId = 0;
 
   constructor(opts: ExecuteJsAgentOptions) {
@@ -530,6 +518,10 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
       const resolved = await node.resolvePromise();
       if (!resolved) {
         return {error: 'Error: Could not find the element with uid=' + uid};
+      }
+      const newContext = new NodeContext(resolved);
+      if (this.context?.getOrigin() !== newContext.getOrigin()) {
+        return {error: 'Error: Node does not belong to the current origin.'};
       }
       const styles = await resolved.domModel().cssModel().getComputedStyle(resolved.id);
       if (!styles) {
@@ -819,6 +811,11 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
     if (this.#greenDevEmulationAxTree) {
       multimodalInputEnhancementQuery += '\n# Accessibility Tree\n\n' + this.#greenDevEmulationAxTree;
       this.#greenDevEmulationAxTree = null;
+    }
+
+    if (Greendev.Prototypes.instance().isEnabled('emulationCapabilities') && !this.#hasAddedEmulationInstructions) {
+      multimodalInputEnhancementQuery = emulationInstructions + '\n' + multimodalInputEnhancementQuery;
+      this.#hasAddedEmulationInstructions = true;
     }
 
     const elementEnchancementQuery = selectedElement ?

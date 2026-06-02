@@ -1,11 +1,14 @@
-### [Start AI assistance chats without prior context](ai-assistance)
+### [DevTools for agents](devtools-for-agents)
 
-AI assistance chats can now be started from anywhere in DevTools and AI assistance will find required context based on the initial prompt.
+DevTools for agents is now stable at version 1.0, bringing support for third-party developer tools
+provided by the inspected page, WebMCP debugging, and an improved CLI experience.
 
-### [MCP server & CLI](mcp-server)
+### [AI assistance](ai-assistance)
 
-Optionally expose DevTools and automation capabilities through CLI, enabling coding agents to batch tool calls and improve token efficiency.
+The AI assistance panel now integrates with Lighthouse data and offers interactive, widget-based agent walkthroughs.
+Supported by an upgrade to Gemini 3 and other optimizations, responses are now more concise and actionable.
 
-### [Code generation in the Console & Sources panels](code-generation)
+### [CSS code completion](css-code-completion)
 
-Generate entire code blocks directly in the Console and Sources panels by typing natural language comments.
+The Styles tab in the Elements panel now features enhanced, Gemini-powered code completion.
+Experience smarter, real-time CSS suggestions that adapt dynamically as you type.
