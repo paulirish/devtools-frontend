@@ -13,8 +13,7 @@
   "author": "",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "third-party-web": "latest",
-    "legacy-javascript": "latest"
+    "third-party-web": "latest"
   },
   "devDependencies": {
     "typescript": "5.6.2",

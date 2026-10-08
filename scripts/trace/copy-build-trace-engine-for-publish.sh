@@ -13,10 +13,10 @@ echo -e "\nCopying to $standalone … \n"
 mkdir -p "$standalone"
 
 # don't keep around old stuff
-command rm -rf "$standalone/models" "$standalone/core" "$standalone/generated"
+command rm -rf "$standalone/models" "$standalone/core" "$standalone/generated" "$standalone/third_party" "$standalone/dist"
 
 # copy files over
-cp -rp "$trace_engine_dist/" "$standalone/"
+cp -rp "$trace_engine_dist"/. "$standalone/"
 cp -rp "$dtfe/front_end/models/trace/README.md" "$standalone"
 cp -rp "$dtfe/front_end/models/trace/package-template.json" "$standalone/package.json"
 cp -rp "$dtfe/front_end/models/trace/tsconfig-template.json" "$standalone/tsconfig.json"
