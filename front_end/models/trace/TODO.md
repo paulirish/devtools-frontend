@@ -32,18 +32,18 @@
 ## 3. Action Plan to Simplify `@paulirish/trace_engine`
 
 ### A. Eliminate `front_end/` Source Diffs on `trace-engine-lib` (0 Merge Conflicts on Rolls)
-- [ ] **`Common.ParsedURL` (~540 lines of branch diff)**:
+- [x] **`Common.ParsedURL` (~540 lines of branch diff)**:
   - `trace-engine-lib` previously patched `NetworkDependencyTree.ts` (with a 518-line copy-paste of `ParsedURL`), `ScriptsHandler.ts`, and `Trace.ts` because `core/common` used to be stubbed as `export {};`.
   - Since `core/common/ParsedURL.js` is now a clean foundation module (only depending on `core/platform`), copy `core/common/ParsedURL.{js,d.ts}` in `scripts/trace/prep-trace-engine-package.sh`, export `ParsedURL` from `$dist/core/common/common.{js,d.ts}`, and revert `NetworkDependencyTree.ts`, `ScriptsHandler.ts`, and `Trace.ts` to match `origin/main`.
-- [ ] **`HostRuntime.ts` Top-Level `await`**:
+- [x] **`HostRuntime.ts` Top-Level `await`**:
   - Revert `front_end/core/platform/HostRuntime.ts` to match `origin/main`, and write the synchronous `HOST_RUNTIME` stub to `$dist/core/platform/HostRuntime.js` in `scripts/trace/prep-trace-engine-package.sh`.
 - [ ] **`export const enum` -> `export enum` (Upstream to `devtools-frontend` `main`)**:
   - Land a CL on `devtools-frontend` `main` changing `export const enum` to `export enum` in `front_end/models/trace/` (`LayoutShiftsHandler.ts`, `PageLoadMetricsHandler.ts`, `Threads.ts`, `SamplesIntegrator.ts`, `CLSCulprits.ts`, `File.ts`, `TraceEvents.ts`), and keeping `MarkerEventName` / `MarkerName` / `MarkerEvent` below `enum Name` in `TraceEvents.ts`.
 - [ ] **`ImageDelivery.ts` Return Types (Upstream to `devtools-frontend` `main`)**:
   - Land a CL on `devtools-frontend` `main` changing the return types of `getOptimizationMessage` and `getOptimizationMessageWithBytes` in `front_end/models/trace/insights/ImageDelivery.ts` from `string` to `Platform.UIString.LocalizedString`.
 
-### B. Replace `.js` `i18n` Regex Rewriting in `prep-trace-engine-package.sh`
-- [ ] Replace the Python string-replacement pass for `i18n` in `scripts/trace/prep-trace-engine-package.sh` with a clean `$dist/core/i18n/i18n.js` shim module that implements `i18n.registerUIStrings`, `i18n.getLocalizedString`, `i18n.getLazilyComputedLocalizedString`, `i18n.lockedLazyString`, `ByteUtilities.bytesToString`, and `TimeUtilities.millisToString`.
+### B. Replace `.js` and `.d.ts` Regex Rewriting in `prep-trace-engine-package.sh`
+- [x] Replace the Python string-replacement passes for `i18n`, `Common`, `SDK`, and `CrUXManager` in `scripts/trace/prep-trace-engine-package.sh` with clean module shims in `scripts/trace/replacements/` (`i18n.{js,d.ts}`, `common.{js,d.ts}`, `UIString.d.ts`, `sdk.d.ts`, `crux-manager.d.ts`).
 
 ### C. Upstream `scripts/trace/prep-trace-engine-package.sh` to `devtools-frontend` `main`
 - [ ] Once `trace-engine-lib` has zero `front_end/` source modifications relative to `origin/main`, upstream the packaging script and templates to `devtools-frontend` `main` so `@paulirish/trace_engine` can be built and published directly from `main` without maintaining a separate branch.

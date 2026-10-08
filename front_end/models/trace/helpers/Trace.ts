@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type * as CPUProfile from '../../cpu_profile/cpu_profile.js';
@@ -71,7 +72,7 @@ export function stackTraceInEvent(event: Types.Events.Event): Types.Events.CallF
 }
 
 export function extractOriginFromTrace(firstNavigationURL: string): string|null {
-  const url = URL.parse(firstNavigationURL);
+  const url = Common.ParsedURL.ParsedURL.fromString(firstNavigationURL);
   if (url) {
     // We do this to save some space in the toolbar - seeing the `www` is less
     // useful than seeing `foo.com` if it's truncated at narrow widths
