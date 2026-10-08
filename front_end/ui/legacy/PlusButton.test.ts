@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {setupUserMetricHooks} from '../../testing/UserMetricsHelpers.js';
+import * as Lit from '../lit/lit.js';
 
 import * as UI from './legacy.js';
 
@@ -60,7 +63,7 @@ function makeView(spec: ViewSpec): UI.View.View {
     isPreviewFeature: () => spec.preview ?? false,
     isTransient: () => spec.transient ?? false,
     iconName: () => undefined,
-    toolbarItems: () => Promise.resolve([]),
+    toolbarItems: () => Promise.resolve(Lit.nothing),
     // No test calls widget(); avoid constructing a real Widget per view.
     widget: sinon.stub<[], Promise<UI.Widget.Widget>>(),
     disposeView: () => {},
@@ -100,6 +103,7 @@ function makeContext(overrides: Partial<UI.PlusButton.PlusButtonMenuContext>&{ta
 }
 
 describeWithEnvironment('PlusButton', () => {
+  setupUserMetricHooks();
   describe('populatePlusButtonMenu', () => {
     it('lists addable views (not currently shown as tabs) sorted alphabetically', () => {
       const tabbedPane = makeStubTabbedPane({visible: ['shown']});
@@ -211,6 +215,59 @@ describeWithEnvironment('PlusButton', () => {
 
       assert.deepEqual(itemLabels(defaultSectionItems(menu)), ['Memory']);
       assert.deepEqual(itemLabels(footerSectionItems(menu)), ['Drawer Other']);
+    });
+
+    it('deduplicates other-location entries against currently-visible tabs by title', () => {
+      // Regression test: a visible (non-overflowed) tab in the local
+      // location ("Console") and a closeable view in the other main
+      // location sharing the title must not produce a duplicate entry —
+      // otherwise clicking the menu item moves the other-location view
+      // in and the user ends up with two same-titled tabs.
+      const tabbedPane = makeStubTabbedPane({visible: ['console']});
+      const localViews: UI.View.View[] = [
+        makeView({id: 'console', title: 'Console'}),
+      ];
+      const otherLocationViews: UI.View.View[] = [
+        makeView({id: 'drawer-console', title: 'Console', closeable: true}),
+        makeView({id: 'drawer-only', title: 'Drawer Only', closeable: true}),
+      ];
+      const menu = makeContextMenu();
+
+      UI.PlusButton.populatePlusButtonMenu(menu, makeContext({
+                                             tabbedPane,
+                                             location: 'panel',
+                                             views: () => localViews,
+                                             manager: {viewsForLocation: () => otherLocationViews, moveView: () => {}},
+                                           }));
+
+      // No overflow → everything lives in the default section.
+      assert.deepEqual(itemLabels(defaultSectionItems(menu)), ['Drawer Only']);
+    });
+
+    it('deduplicates other-location entries when both surfaces have the same-titled tab visible', () => {
+      // Regression test: when the local location has a visible "Console"
+      // tab AND the other-location view set also contains a visible
+      // closeable "Console" view (mirror of the case above), the menu
+      // must still only offer the unique other-location entry. This
+      // guards against the symmetric variant of the dedup bug.
+      const tabbedPane = makeStubTabbedPane({visible: ['drawer-console']});
+      const localViews: UI.View.View[] = [
+        makeView({id: 'drawer-console', title: 'Console'}),
+      ];
+      const otherLocationViews: UI.View.View[] = [
+        makeView({id: 'console', title: 'Console', closeable: true}),
+        makeView({id: 'sources', title: 'Sources', closeable: true}),
+      ];
+      const menu = makeContextMenu();
+
+      UI.PlusButton.populatePlusButtonMenu(menu, makeContext({
+                                             tabbedPane,
+                                             location: 'drawer-view',
+                                             views: () => localViews,
+                                             manager: {viewsForLocation: () => otherLocationViews, moveView: () => {}},
+                                           }));
+
+      assert.deepEqual(itemLabels(defaultSectionItems(menu)), ['Sources']);
     });
 
     it('skips transient views in the local view set', () => {
@@ -422,7 +479,7 @@ describeWithEnvironment('PlusButton', () => {
       assert.strictEqual(button.parentElement, tabbedPane.element);
     });
 
-    it('falls back to the default tooltip when no title is provided', () => {
+    it('falls back to the default label when no title is provided', () => {
       const tabbedPane = new UI.TabbedPane.TabbedPane();
       tabbedPane.markAsRoot();
       renderElementIntoDOM(tabbedPane);
@@ -439,7 +496,7 @@ describeWithEnvironment('PlusButton', () => {
 
       // Tests run only against the en-US locale, so the literal English
       // string is the source of truth here.
-      assert.strictEqual(button.title, 'More tools');
+      assert.strictEqual(button.accessibleLabel, 'More tools');
     });
 
     it('attaches itself synchronously inside installPlusButton (no microtask deferral)', () => {

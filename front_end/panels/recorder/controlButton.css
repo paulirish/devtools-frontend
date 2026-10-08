@@ -1,0 +1,88 @@
+/*
+ * Copyright 2023 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-size: inherit;
+}
+
+.control {
+  background: none;
+  border: none;
+  border-radius: var(--sys-shape-corner-small);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.control:focus-visible {
+  outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+  outline-offset: var(--sys-size-2);
+}
+
+.control[disabled] {
+  filter: grayscale(100%);
+  cursor: auto;
+}
+
+.icon {
+  display: flex;
+  width: var(--sys-size-14);
+  height: var(--sys-size-14);
+  border-radius: var(--sys-shape-corner-full);
+  background: var(--sys-color-error-bright);
+  margin-bottom: var(--sys-size-5);
+  position: relative;
+  transition: background 200ms;
+  place-content: center center;
+  align-items: center;
+}
+
+.icon::before {
+  --override-white: #fff;
+
+  box-sizing: border-box;
+  content: "";
+  display: block;
+  width: var(--sys-size-7);
+  height: var(--sys-size-7);
+  border: var(--sys-size-1) solid var(--override-white);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--override-white);
+}
+
+.icon.square::before {
+  border-radius: 0;
+}
+
+.icon.circle::before {
+  border-radius: var(--sys-shape-corner-full);
+}
+
+.icon:hover {
+  background: color-mix(in srgb, var(--sys-color-error-bright), var(--sys-color-state-hover-on-prominent) 10%);
+}
+
+.icon:active {
+  background: color-mix(in srgb, var(--sys-color-error-bright), var(--sys-color-state-ripple-neutral-on-prominent) 16%);
+}
+
+.control[disabled] .icon:hover {
+  background: var(--sys-color-error);
+}
+
+.label {
+  font-size: var(--sys-typescale-body4-size);
+  line-height: var(--sys-typescale-body4-line-height);
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: var(--sys-color-on-surface);
+}

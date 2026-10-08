@@ -6,6 +6,7 @@
 import type { Protocol } from 'devtools-protocol';
 import { type CDPSession } from '../api/CDPSession.js';
 import type { GeolocationOptions, MediaFeature } from '../api/Page.js';
+import { type Logger } from '../common/Debug.js';
 import type { Viewport } from '../common/Viewport.js';
 /**
  * @internal
@@ -31,7 +32,7 @@ export declare class EmulatedState<T extends {
  */
 export declare class EmulationManager implements ClientProvider {
     #private;
-    constructor(client: CDPSession);
+    constructor(client: CDPSession, logger: Logger);
     updateClient(client: CDPSession): void;
     registerState(state: EmulatedState<any>): void;
     clients(): CDPSession[];
@@ -43,6 +44,7 @@ export declare class EmulationManager implements ClientProvider {
         isScreenUnlocked: boolean;
     }): Promise<void>;
     emulateTimezone(timezoneId?: string): Promise<void>;
+    emulateLocale(locale?: string): Promise<void>;
     emulateVisionDeficiency(type?: Protocol.Emulation.SetEmulatedVisionDeficiencyRequest['type']): Promise<void>;
     emulateCPUThrottling(factor: number | null): Promise<void>;
     emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;

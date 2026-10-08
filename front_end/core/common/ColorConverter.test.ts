@@ -97,7 +97,9 @@ describe('ColorConverter', () => {
       [
         [0.07718833433230218, 0.15437666866460437, 0.025729444777434055],
         [0.5197518277948419, -0.14030232755310995, 0.10767589774360209],
-      ],  // green
+      ],                                                    // green
+      [[0.0, 0.0, 1.0], [0.152597, -1.415088, -0.448819]],  // out of gamut cyan
+      [[0.9, 0.1, -0.3], [0.580633, 0.45305, 0.800411]],    // out of gamut orange
     ];
 
     for (const [input, expected] of colorCases) {
@@ -273,6 +275,19 @@ describe('ColorConverter', () => {
       assertAlmostEqual(Common.ColorConverter.ColorConverter.displayP3ToXyzd50(input[0], input[1], input[2]), expected);
     }
   });
+
+  it('DisplayP3LinearToXyzd50', () => {
+    const colorCases = [
+      [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],                                               // black
+      [[1.0, 1.0, 1.0], [0.9642956660812443, 1.0000000361162846, 0.8251045485672053]],  // white
+    ];
+
+    for (const [input, expected] of colorCases) {
+      assertAlmostEqual(Common.ColorConverter.ColorConverter.displayP3LinearToXyzd50(input[0], input[1], input[2]),
+                        expected);
+    }
+  });
+
   it('XYZD50ToDisplayP3', () => {
     const colorCases = [
       [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],  // black
@@ -300,6 +315,18 @@ describe('ColorConverter', () => {
 
     for (const [input, expected] of colorCases) {
       assertAlmostEqual(Common.ColorConverter.ColorConverter.xyzd50ToDisplayP3(input[0], input[1], input[2]), expected);
+    }
+  });
+
+  it('XYZD50ToDisplayP3Linear', () => {
+    const colorCases = [
+      [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],                                               // black
+      [[0.9642956660812443, 1.0000000361162846, 0.8251045485672053], [1.0, 1.0, 1.0]],  // white
+    ];
+
+    for (const [input, expected] of colorCases) {
+      assertAlmostEqual(Common.ColorConverter.ColorConverter.xyzd50ToDisplayP3Linear(input[0], input[1], input[2]),
+                        expected);
     }
   });
   it('ProPhotoToXyzd50', () => {

@@ -33,12 +33,19 @@ _EXCLUDED_PATHS = [
     r'^front_end[\\/]core[\\/]platform[\\/]UIString\.ts$',  # Apple copyright
     r'^front_end[\\/]core[\\/]sdk[\\/]Resource\.ts$',  # Apple copyright
     r'^front_end[\\/]core[\\/]sdk[\\/]Script\.ts$',  # Apple copyright
+    # Apple copyright
+    r'^front_end[\\/]panels[\\/]application[\\/]resourcesPanel\.css$',
+    r'^front_end[\\/]panels[\\/]profiler[\\/]profilesPanel\.css$',
+    r'^front_end[\\/]panels[\\/]sources[\\/]navigatorTree\.css$',
+    r'^front_end[\\/]panels[\\/]sources[\\/]sourcesPanel\.css$',
+    r'^front_end[\\/]panels[\\/]network[\\/]networkPanel\.css$',
+    r'^front_end[\\/]panels[\\/]profiler[\\/]heapProfiler\.css$',
+    r'^front_end[\\/]panels[\\/]timeline[\\/]timelinePanel\.css$',
     r'^front_end[\\/]third_party[\\/].*',  # 3rd party code
     # Apple copyright
     r'^front_end[\\/]ui[\\/]legacy[\\/]components[\\/]data_grid[\\/]DataGrid\.ts$',
     r'^front_end[\\/]ui[\\/]legacy[\\/]tabbedPane\.css$',  # Apple copyright
     r'^node_modules[\\/].*',  # 3rd party code
-    r'^scripts[\\/]build[\\/]build_inspector_overlay\.py$',  # Lines too long
     r'^scripts[\\/]build[\\/]code_generator_frontend\.py$',
     r'^scripts[\\/]deps[\\/]manage_node_deps\.py$',  # Lines too long
     # Auto-generated files
@@ -109,7 +116,6 @@ def _CheckWithNodeScript(input_api,
                          output_api,
                          script_path,
                          script_arguments=None,
-                         allow_typescript=False,
                          message=None):
     original_sys_path = sys.path
     try:
@@ -207,9 +213,46 @@ def CheckESBuildVersion(input_api, output_api):
                                 message='ESBuild version')
 
 
+def CheckBuildGN(input_api, output_api):
+    devtools_root = input_api.PresubmitLocalPath()
+    devtools_front_end = input_api.os_path.join(devtools_root, 'front_end')
+    verifier_dir = input_api.os_path.join(devtools_root, 'scripts',
+                                          'gn_deps_verifier')
+    script_path = input_api.os_path.join(verifier_dir, 'cli.ts')
+
+    verifier_files = _GetAffectedFiles(input_api, [verifier_dir], ['D'], [])
+    affected_front_end_files = _GetAffectedFiles(
+        input_api, [devtools_front_end], ['D'],
+        ['.ts', '.js', '.css', 'BUILD.gn'])
+
+    excluded_front_end_dirs = [
+        input_api.os_path.join(devtools_front_end, 'third_party'),
+        input_api.os_path.join(devtools_front_end, 'legacy_test_runner'),
+    ]
+    affected_front_end_files = [
+        f for f in affected_front_end_files
+        if not any(excluded_dir in f
+                   for excluded_dir in excluded_front_end_dirs)
+    ]
+
+    if len(verifier_files) == 0 and len(affected_front_end_files) == 0:
+        return []
+
+    if len(verifier_files) > 0 or len(affected_front_end_files) > 50:
+        script_arguments = ['--dry-run', '--all']
+    else:
+        script_arguments = ['--dry-run'] + affected_front_end_files
+
+    return _CheckWithNodeScript(input_api,
+                                output_api,
+                                script_path,
+                                script_arguments=script_arguments,
+                                message='BUILD.gn dependency check')
+
+
 def CheckDevToolsLint(input_api, output_api):
     lint_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
-                                       'scripts', 'test', 'run_lint_check.mjs')
+                                       'scripts', 'lint', 'run_lint_check.mjs')
 
     lint_related_paths = [
         input_api.os_path.join(input_api.PresubmitLocalPath(),
@@ -222,7 +265,7 @@ def CheckDevToolsLint(input_api, output_api):
         input_api.os_path.join(input_api.PresubmitLocalPath(), 'front_end',
                                'tsconfig.json'),
         input_api.os_path.join(input_api.PresubmitLocalPath(), 'scripts',
-                               'test', 'run_lint_check.mjs'),
+                               'lint'),
         input_api.os_path.join(input_api.PresubmitLocalPath(), 'node_modules'),
     ]
 
@@ -248,7 +291,6 @@ def CheckDevToolsLint(input_api, output_api):
                              output_api,
                              lint_path,
                              script_arguments=files_to_lint,
-                             allow_typescript=True,
                              message="Lint"))
 
     results.extend(_CheckFormat(input_api, output_api))
@@ -362,10 +404,24 @@ def CheckObsoleteScreenshotGoldens(input_api, output_api):
                                 message='Obsolete screenshot images')
 
 
+def CheckTestExpectations(input_api, output_api):
+    script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
+                                         'scripts', 'test',
+                                         'check_test_expectations.js')
+    expectations_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
+                                               'test', 'TestExpectations')
+    return _CheckWithNodeScript(
+        input_api,
+        output_api,
+        script_path,
+        script_arguments=['--expectations-file', expectations_path],
+        message='Test expectations')
+
+
 _UPDATE_NODE_DEPENDENCIES_FOOTER = 'Update-Node-Dependencies'
 
 def CheckNodeModules(input_api, output_api):
-    files = ['.clang-format', 'OWNERS', 'README.chromium']
+    files = ['.clang-format', 'OWNERS', 'README.md']
     results = []
     for file in files:
         file_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
@@ -452,7 +508,7 @@ def CheckKnownContextValues(input_api, output_api):
     """
     # This regexp matches the one we use in `StringUtilities.isExtendedKebabCase()`.
     kebab_case_re = re.compile(
-        r"^([a-z0-9]+(?:-[a-z0-9]+)*\.)*[a-z0-9]+(?:-[a-z0-9]+)*$")
+        r"^-?([a-z0-9]+(?:-[a-z0-9]+)*\.)*[a-z0-9]+(?:-[a-z0-9]+)*$")
     local_path = input_api.os_path.join('front_end', 'ui', 'visual_logging',
                                         'KnownContextValues.ts')
     invalid_contexts = []

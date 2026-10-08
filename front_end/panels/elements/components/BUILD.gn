@@ -40,8 +40,7 @@ devtools_ui_module("components") {
     "QueryContainer.ts",
     "StylePropertyEditor.ts",
   ]
-
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/i18n:bundle",
     "../../../core/platform:bundle",
@@ -52,22 +51,21 @@ devtools_ui_module("components") {
     "../../../ui/components/input:bundle",
     "../../../ui/components/node_text:bundle",
     "../../../ui/components/render_coordinator:bundle",
+    "../../../ui/components/tooltips:bundle",
     "../../../ui/kit:bundle",
     "../../../ui/legacy:bundle",
+    "../../../ui/legacy/components/inline_editor:bundle",
     "../../../ui/lit:bundle",
+    "../../../ui/settings:bundle",
     "../../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "components.ts"
 
-  deps = [
-    ":components",
-    ":css_files",
-    "../:css_files",
-    "../../../ui/legacy:css_files",
-  ]
+  ts_deps = [ ":components" ]
 
   visibility = [
     ":*",
@@ -97,13 +95,13 @@ devtools_ui_module("unittests") {
     "QueryContainer.test.ts",
     "StylePropertyEditor.test.ts",
   ]
-
-  deps = [
+  ts_deps = [
     ":bundle",
     "..:bundle",
     "../../../core/sdk:bundle",
     "../../../generated",
     "../../../testing",
     "../../../ui/components/render_coordinator:bundle",
+    "../../../ui/legacy/components/inline_editor:bundle",
   ]
 }

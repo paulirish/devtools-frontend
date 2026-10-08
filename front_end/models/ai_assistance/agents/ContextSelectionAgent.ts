@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
@@ -12,10 +11,17 @@ import * as Logs from '../../logs/logs.js';
 import * as NetworkTimeCalculator from '../../network_time_calculator/network_time_calculator.js';
 import type * as Trace from '../../trace/trace.js';
 import * as Workspace from '../../workspace/workspace.js';
-import {isOpaqueOrigin} from '../AiOrigins.js';
+import {DOMNodeContext} from '../contexts/DOMNodeContext.js';
+import {FileContext} from '../contexts/FileContext.js';
+import {LighthouseContext} from '../contexts/LighthouseContext.js';
+import {PerformanceTraceContext} from '../contexts/PerformanceTraceContext.js';
+import {RequestContext} from '../contexts/RequestContext.js';
+import {StorageContext} from '../contexts/StorageContext.js';
+import {formatBytesToKb, seconds} from '../data_formatters/UnitFormatters.js';
 import {debugLog} from '../debug.js';
+import {StorageItem} from '../StorageItem.js';
+import {isOriginAllowedByLock} from '../tools/Tool.js';
 
-import {AccessibilityContext} from './AccessibilityAgent.js';
 import {
   type AgentOptions,
   AiAgent,
@@ -23,10 +29,8 @@ import {
   type ContextResponse,
   type RequestOptions,
 } from './AiAgent.js';
-import {FileContext} from './FileAgent.js';
-import {RequestContext} from './NetworkAgent.js';
-import {PerformanceTraceContext} from './PerformanceAgent.js';
-import {NodeContext} from './StylingAgent.js';
+
+type NetworkRequest = SDK.NetworkRequest.NetworkRequest;
 
 const lockedString = i18n.i18n.lockedString;
 /**
@@ -35,19 +39,26 @@ const lockedString = i18n.i18n.lockedString;
  * chrome_preambles.gcl). Sync local changes with the server-side.
  */
 const preamble = `
-You are a Web Development Assistant integrated into Chrome DevTools. Your tone is educational, supportive, and technically precise.
-You aim to help developers of all levels, prioritizing teaching web concepts as the primary entry point for any solution.
+You are an advanced Web Development Assistant and AI routing agent integrated into Chrome DevTools. Your tone is educational, supportive, and technically precise. You aim to help developers of all levels, prioritizing teaching web concepts as the primary entry point for any solution.
+
+Your role is to understand the user's query, identify the appropriate specialized agent to handle it, and select the relevant context from the page to assist that agent.
+
+# Workflow
+1.  **Analyze**: Understand the user's intent and what they are trying to achieve.
+2.  **Classify**: Determine which specialized agent is best suited for the task (e.g., StylingAgent for CSS/styling issues, NetworkAgent for network requests, FileAgent for source files, PerformanceAgent for performance details, AccessibilityAgent for accessibility reports, or StorageAgent for analyzing and explaining storage but not editing).
+3.  **Gather Context**: Identify what information the specialized agent will need. Proactively use your tools to find and select this context (e.g., finding the relevant DOM node, network request, file, performance trace, or storage). Always try to select a single specific context before answering the question.
+4.  **Delegate**: Once context is selected, hand over to the specialized agent. If you are unable to delegate or gather more information, provide a comprehensive guide on how to fix the issue using Chrome DevTools, explaining how and why, or suggest any panel/flow that may help.
 
 # Considerations
-* Determine what is the domain of the question - styling, network, sources, performance or other part of DevTools.
+* Determine what is the domain of the question - styling, network, sources, performance, storage, or other part of DevTools.
 * For questions about performance (e.g., general performance issues, page speed, performance metrics like LCP, INP, CLS), use performanceRecordAndReload to record a performance trace.
-* Proactively try to gather additional data. If a select specific data can be selected, select one.
-* Always try select single specific context before answering the question.
+* Proactively try to gather additional data. If a specific piece of data can be selected, select it.
+* Always try to select a single specific context before answering the question.
 * Avoid making assumptions without sufficient evidence, and always seek further clarification if needed.
 * When presenting solutions, clearly distinguish between the primary cause and contributing factors.
 * Please answer only if you are sure about the answer. Otherwise, explain why you're not able to answer.
 * If you are unable to gather more information provide a comprehensive guide to how to fix the issue using Chrome DevTools and explain how and why.
-* You can suggest any panel or flow in Chrome DevTools that may help the user out
+* You can suggest any panel or flow in Chrome DevTools that may help the user out.
 
 # Formatting Guidelines
 * Use Markdown for all code snippets.
@@ -55,7 +66,7 @@ You aim to help developers of all levels, prioritizing teaching web concepts as 
 * **CRITICAL**: Use the precision of Strunk & White, the brevity of Hemingway, and the simple clarity of Vonnegut. Don't add repeated information, and keep the whole answer short.
 
 * **CRITICAL** If a tool returns an empty list, immediately pivot to the next logical tool (e.g., from sources to network).
-* **CRITICAL** Always exhaust all possible way to find and select context from different domains.
+* **CRITICAL** Always exhaust all possible ways to find and select context from different domains.
 * **CRITICAL** NEVER write full Python programs - you should only write individual statements that invoke a single function from the provided library.
 * **CRITICAL** NEVER output text before a function call. Always do a function call first.
 * **CRITICAL** You are a debugging assistant in DevTools. NEVER provide answers to questions of unrelated topics such as legal advice, financial advice, personal opinions, medical advice, religion, race, politics, sexuality, gender, or any other non web-development topics. Answer "Sorry, I can't answer that. I'm best at questions about debugging web pages." to such questions.
@@ -63,13 +74,21 @@ You aim to help developers of all levels, prioritizing teaching web concepts as 
 * The only available types are \`#req\` for network request and \`#file\` for source files. Only use ID inside the link, never ask about user selecting by ID.
 `;
 
+export interface ContextSelectionAgentOptions extends AgentOptions {
+  performanceRecordAndReload?: () => Promise<Trace.TraceModel.ParsedTrace>;
+  onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
+  networkTimeCalculator?: NetworkTimeCalculator.NetworkTransferTimeCalculator;
+  networkLog?: Logs.NetworkLog.NetworkLog;
+  workspace?: Workspace.Workspace.WorkspaceImpl;
+}
+
 /**
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
 export class ContextSelectionAgent extends AiAgent<never> {
-  readonly preamble = preamble;
-  readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_CONTEXT_SELECTION_AGENT;
+  readonly preamble: string = preamble;
+  readonly clientFeature: Host.AidaClient.ClientFeature = Host.AidaClient.ClientFeature.CHROME_CONTEXT_SELECTION_AGENT;
   get userTier(): string|undefined {
     // TODO: Make this depend on variable.
     return Root.Runtime.hostConfig.devToolsFreestyler?.userTier;
@@ -90,13 +109,15 @@ export class ContextSelectionAgent extends AiAgent<never> {
   readonly #lighthouseRecording?:
       (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
   #allowedOrigin: () => AllowedOriginResult;
+  readonly #networkLog: Logs.NetworkLog.NetworkLog;
+  readonly #workspace: Workspace.Workspace.WorkspaceImpl;
 
-  constructor(opts: AgentOptions&{
-    performanceRecordAndReload?: () => Promise<Trace.TraceModel.ParsedTrace>,
-    onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>,
-    networkTimeCalculator?: NetworkTimeCalculator.NetworkTransferTimeCalculator,
-  }) {
+  constructor(opts: ContextSelectionAgentOptions) {
     super(opts);
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    this.#networkLog = opts.networkLog ?? Logs.NetworkLog.NetworkLog.instance();
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    this.#workspace = opts.workspace ?? Workspace.Workspace.WorkspaceImpl.instance();
     this.#performanceRecordAndReload = opts.performanceRecordAndReload;
     this.#lighthouseRecording = opts.lighthouseRecording;
     this.#onInspectElement = opts.onInspectElement;
@@ -127,15 +148,15 @@ export class ContextSelectionAgent extends AiAgent<never> {
           };
         }
         const origin = allowedOriginResult.origin;
-        if (origin && isOpaqueOrigin(origin)) {
+        if (!origin || origin.isOpaque()) {
           return {
             error: 'No requests recorded by DevTools',
           };
         }
 
         let hasCrossOriginRequest = false;
-        for (const request of Logs.NetworkLog.NetworkLog.instance().requests()) {
-          const documentOrigin = Common.ParsedURL.ParsedURL.extractOrigin(request.documentURL);
+        const requestsToShow: NetworkRequest[] = [];
+        for (const request of this.#networkLog.requests()) {
           /**
            * NOTE: this origin check does not ensure that all the requests are
            * from the same origin as the target page. Instead, it ensures that
@@ -144,7 +165,7 @@ export class ContextSelectionAgent extends AiAgent<never> {
            * during the loading of the target page, and do not leak URLs from
            * other pages.
            */
-          if (origin && documentOrigin !== origin) {
+          if (!isOriginAllowedByLock({status: 'ESTABLISHED_ORIGIN', origin}, request.initiatorSecurityOrigin())) {
             hasCrossOriginRequest = true;
             continue;
           }
@@ -153,21 +174,28 @@ export class ContextSelectionAgent extends AiAgent<never> {
             id: request.requestId(),
             url: request.url(),
             statusCode: request.statusCode,
-            duration: i18n.TimeUtilities.secondsToString(request.duration),
-            transferSize: i18n.ByteUtilities.formatBytesToKb(request.transferSize),
+            duration: seconds(request.duration),
+            transferSize: formatBytesToKb(request.transferSize),
           });
+          requestsToShow.push(request);
         }
 
         if (requests.length === 0) {
           return {
             error: hasCrossOriginRequest ?
-                `No requests showing with origin ${origin}. Tell the user to start a new chat` :
+                `No requests showing with origin ${origin.siteId()}. Tell the user to start a new chat` :
                 'No requests recorded by DevTools',
           };
         }
 
         return {
           result: requests,
+          widgets: [{
+            name: 'NETWORK_REQUESTS_LIST',
+            data: {
+              requests: requestsToShow,
+            },
+          }],
         };
       },
     });
@@ -202,18 +230,17 @@ export class ContextSelectionAgent extends AiAgent<never> {
           };
         }
         const origin = allowedOriginResult.origin;
-        if (origin && isOpaqueOrigin(origin)) {
+        if (!origin || origin.isOpaque()) {
           return {
             error: 'No request found',
           };
         }
-        const request = Logs.NetworkLog.NetworkLog.instance().requests().find(req => {
+        const request = this.#networkLog.requests().find(req => {
           if (req.requestId() !== id) {
             return false;
           }
 
-          const documentOrigin = Common.ParsedURL.ParsedURL.extractOrigin(req.documentURL);
-          return !origin || documentOrigin === origin;
+          return isOriginAllowedByLock({status: 'ESTABLISHED_ORIGIN', origin}, req.initiatorSecurityOrigin());
         });
 
         if (request) {
@@ -259,14 +286,16 @@ export class ContextSelectionAgent extends AiAgent<never> {
           };
         }
         const origin = allowedOriginResult.origin;
+        if (!origin || origin.isOpaque()) {
+          return {
+            result: [],
+          };
+        }
 
         const files: Array<{file: string, id: number | undefined}> = [];
         const uiSourceCodes: Workspace.UISourceCode.UISourceCode[] = [];
-        for (const file of ContextSelectionAgent.getUISourceCodes()) {
-          const fileUrl = file.url();
-          const fileOrigin = Common.ParsedURL.ParsedURL.extractOrigin(fileUrl);
-
-          if (origin && fileOrigin !== origin) {
+        for (const file of ContextSelectionAgent.getUISourceCodes(this.#workspace)) {
+          if (!isOriginAllowedByLock({status: 'ESTABLISHED_ORIGIN', origin}, file.securityOrigin())) {
             continue;
           }
 
@@ -319,15 +348,7 @@ export class ContextSelectionAgent extends AiAgent<never> {
           };
         }
         const origin = allowedOriginResult.origin;
-
-        const file = ContextSelectionAgent.getUISourceCodes().find(file => {
-          if (ContextSelectionAgent.uiSourceCodeId.get(file) !== params.id) {
-            return false;
-          }
-          const fileUrl = file.url();
-          const fileOrigin = Common.ParsedURL.ParsedURL.extractOrigin(fileUrl);
-          return !origin || fileOrigin === origin;
-        });
+        const file = ContextSelectionAgent.getSourceById(params.id, origin, this.#workspace);
 
         if (!file) {
           return {
@@ -375,9 +396,9 @@ export class ContextSelectionAgent extends AiAgent<never> {
         return {
           context: PerformanceTraceContext.fromParsedTrace(result),
           description: 'User recorded a performance trace',
-          widgets: [{name: 'PERFORMANCE_TRACE', data: {parsedTrace: result}}]
+          widgets: [{name: 'PERFORMANCE_TRACE', data: {parsedTrace: result}}],
         };
-      }
+      },
     });
 
     type LHSupportedRunMode = Extract<LHModel.RunTypes.RunMode, 'navigation'|'snapshot'>;
@@ -399,7 +420,7 @@ export class ContextSelectionAgent extends AiAgent<never> {
             description:
                 'The mode to run Lighthouse in. Your ONLY options are "navigation" or "snapshot". You should determine this based on the user\'s question. If the user is asking specifically about accessibility, you can run in "snapshot" mode which avoids reloading the page. If the user asks for a full Lighthouse report, you should run in "navigation" mode which is the default. These are the only options you can pass.',
             nullable: false,
-          }
+          },
         },
       },
       displayInfoFromArgs: args => {
@@ -423,11 +444,11 @@ export class ContextSelectionAgent extends AiAgent<never> {
         }
 
         return {
-          context: new AccessibilityContext(result),
+          context: new LighthouseContext(result),
           description: 'User has selected a Lighthouse report',
           widgets: [{name: 'LIGHTHOUSE_REPORT', data: {report: result}}],
         };
-      }
+      },
     });
 
     this.declareFunction<Record<string, never>>('inspectDom', {
@@ -462,7 +483,7 @@ export class ContextSelectionAgent extends AiAgent<never> {
         const node = await this.#onInspectElement();
         if (node) {
           return {
-            context: new NodeContext(node),
+            context: new DOMNodeContext(node),
             description: 'User selected an element',
           };
         }
@@ -471,6 +492,45 @@ export class ContextSelectionAgent extends AiAgent<never> {
         };
       },
     });
+
+    if (Root.Runtime.hostConfig.devToolsAiAssistanceStorageAgent?.enabled) {
+      this.declareFunction<Record<string, never>>('analyzeStorage', {
+        description:
+            'Selects the page storage. Use this when asked about browser storage (localStorage, sessionStorage, cookies) and issues related to these.',
+        parameters: {
+          type: Host.AidaClient.ParametersTypes.OBJECT,
+          description: '',
+          nullable: true,
+          required: [],
+          properties: {},
+        },
+        displayInfoFromArgs: () => {
+          return {
+            title: lockedString('Prepare storage analysis'),
+            action: 'analyzeStorage()',
+          };
+        },
+        handler: async () => {
+          const allowedOriginResult = this.#allowedOrigin();
+          if ('blocked' in allowedOriginResult) {
+            return {
+              error: 'Cross-origin access blocked due to navigation. Please start a new chat.',
+            };
+          }
+          const origin = allowedOriginResult.origin;
+          if (!origin || origin.isOpaque()) {
+            return {
+              error: 'Unable to find page storage.',
+            };
+          }
+
+          return {
+            context: new StorageContext(new StorageItem(origin.siteId(), origin.siteId())),
+            description: 'User selected page storage',
+          };
+        },
+      });
+    }
   }
 
   async * handleContextDetails(): AsyncGenerator<ContextResponse, void, void> {
@@ -481,7 +541,8 @@ export class ContextSelectionAgent extends AiAgent<never> {
   }
 
   static lastSourceId = 0;
-  static uiSourceCodeId = new WeakMap<Workspace.UISourceCode.UISourceCode, number>();
+  static uiSourceCodeId: WeakMap<Workspace.UISourceCode.UISourceCode, number> =
+      new WeakMap<Workspace.UISourceCode.UISourceCode, number>();
   /**
    * This is a heuristic algorithm that gets all the source files coming from the
    * network and assigns unique ids to be linked from the LLM Markdown response.
@@ -496,8 +557,9 @@ export class ContextSelectionAgent extends AiAgent<never> {
    * coming from SourceMaps (usually only one) as that has simple code and
    * usually is what the user authored.
    */
-  static getUISourceCodes(): Workspace.UISourceCode.UISourceCode[] {
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+  // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+  static getUISourceCodes(workspace: Workspace.Workspace.WorkspaceImpl = Workspace.Workspace.WorkspaceImpl.instance()):
+      Workspace.UISourceCode.UISourceCode[] {
     const projects =
         workspace.projects().filter(project => project.type() === Workspace.Workspace.projectTypes.Network);
     const uiSourceCodes = new Map<string, Workspace.UISourceCode.UISourceCode>();
@@ -519,5 +581,29 @@ export class ContextSelectionAgent extends AiAgent<never> {
     }
 
     return [...uiSourceCodes.values()];
+  }
+
+  /**
+   * Resolves a workspace source file by its ID, ensuring that the file's security
+   * origin is authorized by the conversation's established origin lock.
+   *
+   * Fails closed by returning `undefined` if the established origin is missing or opaque,
+   * if the file ID is invalid, or if the file origin does not match the lock.
+   */
+  static getSourceById(
+      id: number,
+      establishedOrigin?: SDK.SecurityOrigin.SecurityOrigin,
+      // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+      workspace: Workspace.Workspace.WorkspaceImpl = Workspace.Workspace.WorkspaceImpl.instance(),
+      ): Workspace.UISourceCode.UISourceCode|undefined {
+    if (!establishedOrigin || !Number.isInteger(id) || id <= 0) {
+      return undefined;
+    }
+    return ContextSelectionAgent.getUISourceCodes(workspace).find(file => {
+      if (ContextSelectionAgent.uiSourceCodeId.get(file) !== id) {
+        return false;
+      }
+      return isOriginAllowedByLock({status: 'ESTABLISHED_ORIGIN', origin: establishedOrigin}, file.securityOrigin());
+    });
   }
 }

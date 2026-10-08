@@ -4,7 +4,6 @@
 /* eslint-disable @devtools/enforce-custom-element-definitions-location */
 
 import * as CodeHighlighter from '../../../ui/components/code_highlighter/code_highlighter.js';
-import codeHighlighterStyles from '../../../ui/components/code_highlighter/codeHighlighter.css.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -23,8 +22,7 @@ function assert<T>(
   }
 }
 
-const {html, Decorators, Directives, LitElement} = Lit;
-const {customElement, property, state} = Decorators;
+const {html, Directives} = Lit;
 const {classMap} = Directives;
 
 declare global {
@@ -42,7 +40,6 @@ const jsonPropertyOptions = {
   attribute: false,
 };
 
-@customElement('devtools-editable-content')
 class EditableContent extends HTMLElement {
   static get observedAttributes(): string[] {
     return ['disabled', 'placeholder'];
@@ -128,7 +125,7 @@ class SuggestionInitEvent extends Event {
   }
 }
 
-type SuggestionFilter = (option: string, query: string) => boolean;
+export type SuggestionFilter = (option: string, query: string) => boolean;
 
 const defaultSuggestionFilter = (option: string, query: string): boolean =>
     option.toLowerCase().startsWith(query.toLowerCase());
@@ -137,13 +134,21 @@ const defaultSuggestionFilter = (option: string, query: string): boolean =>
  * @fires SuggestionInitEvent#suggestioninit
  * @fires SuggestEvent#suggest
  */
-@customElement('devtools-suggestion-box')
-class SuggestionBox extends LitElement {
-  @property(jsonPropertyOptions) declare options: readonly string[];
-  @property() declare expression: string;
-  @property() declare suggestionFilter?: SuggestionFilter;
+class SuggestionBox extends Lit.LitElement {
+  static override properties: typeof Lit.LitElement.properties = {
+    options: jsonPropertyOptions,
+    expression: {type: String},
+    suggestionFilter: {attribute: false},
+    hideExactMatch: {type: Boolean},
+    cursor: {state: true},
+  };
 
-  @state() private declare cursor: number;
+  declare options: readonly string[];
+  declare expression: string;
+  declare suggestionFilter?: SuggestionFilter;
+  declare hideExactMatch: boolean;
+
+  private declare cursor: number;
 
   #suggestions: string[] = [];
 
@@ -152,14 +157,21 @@ class SuggestionBox extends LitElement {
 
     this.options = [];
     this.expression = '';
+    this.hideExactMatch = false;
 
     this.cursor = 0;
+  }
+
+  #hasVisibleSuggestions(): boolean {
+    return this.#suggestions.length > 0 &&
+        !(this.hideExactMatch && this.#suggestions.length === 1 &&
+          this.#suggestions[0].toLowerCase() === this.expression.toLowerCase());
   }
 
   #handleKeyDownEvent = (event: Event): void => {
     assert(event instanceof KeyboardEvent, 'Bound to the wrong event.');
 
-    if (this.#suggestions.length > 0) {
+    if (this.#hasVisibleSuggestions()) {
       switch (event.key) {
         case 'ArrowDown':
           event.stopPropagation();
@@ -176,7 +188,7 @@ class SuggestionBox extends LitElement {
 
     switch (event.key) {
       case 'Enter':
-        if (this.#suggestions[this.cursor]) {
+        if (this.#hasVisibleSuggestions() && this.#suggestions[this.cursor]) {
           this.#dispatchSuggestEvent(this.#suggestions[this.cursor]);
         }
         event.preventDefault();
@@ -213,7 +225,7 @@ class SuggestionBox extends LitElement {
   }
 
   protected override render(): Lit.TemplateResult|undefined {
-    if (this.#suggestions.length === 0) {
+    if (!this.#hasVisibleSuggestions()) {
       return;
     }
 
@@ -230,30 +242,44 @@ class SuggestionBox extends LitElement {
   }
 }
 
-@customElement('devtools-suggestion-input')
-export class SuggestionInput extends LitElement {
-  static override shadowRootOptions = {
-    ...LitElement.shadowRootOptions,
+export class SuggestionInput extends Lit.LitElement {
+  static override shadowRootOptions: ShadowRootInit = {
+    ...Lit.LitElement.shadowRootOptions,
     delegatesFocus: true,
-  } as const;
+  };
+
+  static override properties: typeof Lit.LitElement.properties = {
+    options: jsonPropertyOptions,
+    autocomplete: {type: Boolean},
+    suggestionFilter: {attribute: false},
+    hideExactMatch: {type: Boolean},
+    expression: {state: true},
+    placeholder: {type: String},
+    value: {type: String},
+    disabled: {type: Boolean},
+    strikethrough: {type: Boolean},
+    mimeType: {type: String},
+    jslogContext: {type: String},
+  };
 
   /**
    * State passed to devtools-suggestion-box.
    */
-  @property(jsonPropertyOptions) declare options: readonly string[];
-  @property({type: Boolean}) declare autocomplete?: boolean;
-  @property() declare suggestionFilter?: SuggestionFilter;
-  @state() declare expression: string;
+  declare options: readonly string[];
+  declare autocomplete?: boolean;
+  declare suggestionFilter?: SuggestionFilter;
+  declare hideExactMatch: boolean;
+  declare expression: string;
 
   /**
    * State passed to devtools-editable-content.
    */
-  @property() declare placeholder: string;
-  @property() declare value: string;
-  @property({type: Boolean}) declare disabled: boolean;
-  @property({type: Boolean}) declare strikethrough: boolean;
-  @property() declare mimeType: string;
-  @property() declare jslogContext?: string;
+  declare placeholder: string;
+  declare value: string;
+  declare disabled: boolean;
+  declare strikethrough: boolean;
+  declare mimeType: string;
+  declare jslogContext?: string;
 
   constructor() {
     super();
@@ -267,6 +293,7 @@ export class SuggestionInput extends LitElement {
     this.strikethrough = true;
     this.mimeType = '';
     this.autocomplete = true;
+    this.hideExactMatch = false;
     this.addEventListener('blur', this.#handleBlurEvent);
     let jslog = VisualLogging.value().track({keydown: 'ArrowUp|ArrowDown|Enter', change: true, click: true});
     if (this.jslogContext) {
@@ -338,7 +365,7 @@ export class SuggestionInput extends LitElement {
   protected override render(): Lit.TemplateResult {
     // clang-format off
     return html`<style>${contentEditableStyles}</style>
-      <style>${codeHighlighterStyles}</style>
+      <style>${CodeHighlighter.codeHighlighterStyles}</style>
       <devtools-editable-content
         ?disabled=${this.disabled}
         class=${classMap({
@@ -360,8 +387,13 @@ export class SuggestionInput extends LitElement {
         @suggest=${this.#handleSuggestEvent}
         .options=${this.options}
         .suggestionFilter=${this.suggestionFilter}
+        .hideExactMatch=${this.hideExactMatch}
         .expression=${this.autocomplete ? this.expression : ''}
       ></devtools-suggestion-box>`;
     // clang-format on
   }
 }
+
+customElements.define('devtools-editable-content', EditableContent);
+customElements.define('devtools-suggestion-box', SuggestionBox);
+customElements.define('devtools-suggestion-input', SuggestionInput);

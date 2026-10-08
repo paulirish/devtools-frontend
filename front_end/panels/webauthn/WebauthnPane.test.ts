@@ -3,19 +3,17 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {expectCalled} from '../../testing/ExpectStubCall.js';
-import {
-  describeWithMockConnection,
-} from '../../testing/MockConnection.js';
 
 import type * as WebauthnModule from './webauthn.js';
 
-describeWithMockConnection('WebAuthn pane', () => {
+describeWithEnvironment('WebAuthn pane', () => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   let Webauthn: typeof WebauthnModule;
 
@@ -359,10 +357,11 @@ describeWithMockConnection('WebAuthn pane', () => {
   it('shows the placeholder', () => {
     const panel = new Webauthn.WebauthnPane.WebauthnPaneImpl();
     renderElementIntoDOM(panel);
-    assert.exists(panel.contentElement.querySelector('.empty-state'));
-    assert.deepEqual(panel.contentElement.querySelector('.empty-state-header')?.textContent, 'No authenticator set up');
-    assert.deepEqual(
-        panel.contentElement.querySelector('.empty-state-description > span')?.textContent,
-        'Use WebAuthn for phishing-resistant authentication.');
+    const emptyWidget = panel.contentElement.querySelector('devtools-widget')!;
+    assert.exists(emptyWidget.shadowRoot?.querySelector('.empty-state'));
+    assert.deepEqual(emptyWidget.shadowRoot?.querySelector('.empty-state-header')?.textContent,
+                     'No authenticator set up');
+    assert.deepEqual(emptyWidget.shadowRoot!.querySelector('.empty-state-description > span')?.textContent,
+                     'Use WebAuthn for phishing-resistant authentication');
   });
 });

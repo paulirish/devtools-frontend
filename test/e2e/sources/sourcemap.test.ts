@@ -3,19 +3,20 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import type * as puppeteer from 'puppeteer-core';
 
 import {
   CONSOLE_TAB_SELECTOR,
   focusConsolePrompt,
   getCurrentConsoleMessages,
-  Level
+  Level,
 } from '../helpers/console-helpers.js';
 import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
 import {
   clickNthChildOfSelectedElementNode,
   focusElementsTree,
   waitForCSSPropertyValue,
-  waitForElementsStyleSection
+  waitForElementsStyleSection,
 } from '../helpers/elements-helpers.js';
 import {setIgnoreListPattern} from '../helpers/settings-helpers.js';
 import {
@@ -37,9 +38,9 @@ import {
   STEP_INTO_BUTTON,
   STEP_OUT_BUTTON,
   STEP_OVER_BUTTON,
-  waitForStackTopMatch
+  waitForStackTopMatch,
 } from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 async function waitForTextContent(selector: string, devToolsPage: DevToolsPage) {
   const element = await devToolsPage.waitFor(selector);
@@ -50,13 +51,13 @@ const DEVTOOLS_LINK = 'devtools-toolbar .devtools-link';
 const INFOBAR_TEXT = '.infobar-info-text';
 
 describe('The Sources Tab', function() {
-  setup({enabledDevToolsExperiments: ['instrumentation-breakpoints']});
+  setup({enabledFeatures: ['DevToolsInstrumentationBreakpoints']});
   it('reliably hits breakpoints on worker with source map', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile(
-        'sourcemap-stepping-source.js', 'sourcemap-breakpoint.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-stepping-source.js',
+                                      'sourcemap-breakpoint.html');
 
     // Add a breakpoint at first line of function multiline
-    await addBreakpointForLine(4, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 4);
 
     // Navigate to a different site to refresh devtools and remove back-end state
     await inspectedPage.goTo('about:blank');
@@ -79,25 +80,25 @@ describe('The Sources Tab', function() {
 describe('The Sources Tab', function() {
   setup({});
   it('steps over a source line mapping to a range with several statements', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile(
-        'sourcemap-stepping-source.js', 'sourcemap-stepping.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-stepping-source.js',
+                                      'sourcemap-stepping.html');
     // DevTools is contracting long filenames with ellipses.
     // Let us match the location with regexp to match even contracted locations.
     const breakLocationRegExp = /.*source\.js:12$/;
     const stepLocationRegExp = /.*source\.js:13$/;
 
     // Run to breakpoint
-    await addBreakpointForLine(12, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 12);
 
     const scriptEvaluation = inspectedPage.evaluate('singleline();');
 
-    const scriptLocation = await waitForStackTopMatch(breakLocationRegExp, devToolsPage);
+    const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationRegExp);
     assert.match(scriptLocation, breakLocationRegExp);
 
     // Step over the mapped line
     await devToolsPage.click(STEP_OVER_BUTTON);
 
-    const stepLocation = await waitForStackTopMatch(stepLocationRegExp, devToolsPage);
+    const stepLocation = await waitForStackTopMatch(devToolsPage, stepLocationRegExp);
     assert.match(stepLocation, stepLocationRegExp);
 
     // Resume
@@ -107,8 +108,8 @@ describe('The Sources Tab', function() {
 
   it('steps over a source line with mappings to several adjacent target lines',
      async ({devToolsPage, inspectedPage}) => {
-       await openSourceCodeEditorForFile(
-           'sourcemap-stepping-source.js', 'sourcemap-stepping.html', devToolsPage, inspectedPage);
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-stepping-source.js',
+                                         'sourcemap-stepping.html');
 
        // DevTools is contracting long filenames with ellipses.
        // Let us match the location with regexp to match even contracted locations.
@@ -116,17 +117,17 @@ describe('The Sources Tab', function() {
        const stepLocationRegExp = /.*source\.js:5$/;
 
        // Run to breakpoint
-       await addBreakpointForLine(4, devToolsPage);
+       await addBreakpointForLine(devToolsPage, 4);
 
        const scriptEvaluation = inspectedPage.evaluate('multiline();');
 
-       const scriptLocation = await waitForStackTopMatch(breakLocationRegExp, devToolsPage);
+       const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationRegExp);
        assert.match(scriptLocation, breakLocationRegExp);
 
        // Step over the mapped line
        await devToolsPage.click(STEP_OVER_BUTTON);
 
-       const stepLocation = await waitForStackTopMatch(stepLocationRegExp, devToolsPage);
+       const stepLocation = await waitForStackTopMatch(devToolsPage, stepLocationRegExp);
        assert.match(stepLocation, stepLocationRegExp);
 
        // Resume
@@ -135,8 +136,8 @@ describe('The Sources Tab', function() {
      });
 
   it('steps out from a function, with source maps available (crbug/1283188)', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile(
-        'sourcemap-stepping-source.js', 'sourcemap-stepping.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-stepping-source.js',
+                                      'sourcemap-stepping.html');
 
     // DevTools is contracting long filenames with ellipses.
     // Let us match the location with regexp to match even contracted locations.
@@ -144,17 +145,17 @@ describe('The Sources Tab', function() {
     const stepLocationRegExp = /sourcemap-stepping.html:6$/;
 
     // Run to breakpoint
-    await addBreakpointForLine(4, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 4);
 
     const scriptEvaluation = inspectedPage.evaluate('outer();');
 
-    const scriptLocation = await waitForStackTopMatch(breakLocationRegExp, devToolsPage);
+    const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationRegExp);
     assert.match(scriptLocation, breakLocationRegExp);
 
     // Step out from breakpoint
     await devToolsPage.click(STEP_OUT_BUTTON);
 
-    const stepLocation = await waitForStackTopMatch(stepLocationRegExp, devToolsPage);
+    const stepLocation = await waitForStackTopMatch(devToolsPage, stepLocationRegExp);
     assert.match(stepLocation, stepLocationRegExp);
 
     // Resume
@@ -163,8 +164,8 @@ describe('The Sources Tab', function() {
   });
 
   it('stepping works at the end of a sourcemapped script (crbug/1305956)', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile(
-        'sourcemap-stepping-at-end.js', 'sourcemap-stepping-at-end.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-stepping-at-end.js',
+                                      'sourcemap-stepping-at-end.html');
 
     // DevTools is contracting long filenames with ellipses.
     // Let us match the location with regexp to match even contracted locations.
@@ -175,13 +176,13 @@ describe('The Sources Tab', function() {
       // Run to debugger statement
       const scriptEvaluation = inspectedPage.evaluate('outer();');
 
-      const scriptLocation = await waitForStackTopMatch(breakLocationRegExp, devToolsPage);
+      const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationRegExp);
       assert.match(scriptLocation, breakLocationRegExp);
 
       // Step ${description} from debugger statement
       await devToolsPage.click(button);
 
-      const stepLocation = await waitForStackTopMatch(stepLocationRegExp, devToolsPage);
+      const stepLocation = await waitForStackTopMatch(devToolsPage, stepLocationRegExp);
       assert.match(stepLocation, stepLocationRegExp);
 
       // Resume
@@ -195,19 +196,19 @@ describe('The Sources Tab', function() {
       // @ts-expect-error different context
       DevToolsAPI.setUseSoftMenu(true);
     });
-    await openSourceCodeEditorForFile('sourcemap-minified.js', 'sourcemap-minified.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-minified.js', 'sourcemap-minified.html');
 
     const breakLocationRegExp = /sourcemap-minified\.js:1$/;
 
     // Run to debugger statement
     const scriptEvaluation = inspectedPage.evaluate('sayHello(" world");');
 
-    const scriptLocation = await waitForStackTopMatch(breakLocationRegExp, devToolsPage);
+    const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationRegExp);
     assert.match(scriptLocation, breakLocationRegExp);
 
     // Check local variable is eventually un-minified
     const unminifiedVariable = 'element: div';
-    await openSoftContextMenuAndClickOnItem('.cm-executionLine', 'Add source map…', devToolsPage);
+    await openSoftContextMenuAndClickOnItem(devToolsPage, '.cm-executionLine', 'Add source map…');
 
     // Enter the source map URL into the appropriate input box.
     await devToolsPage.click('.add-source-map');
@@ -215,7 +216,7 @@ describe('The Sources Tab', function() {
     await devToolsPage.pressKey('Enter');
 
     const scopeValues = await devToolsPage.waitForFunction(async () => {
-      const values = await getValuesForScope('Local', 0, 0, devToolsPage);
+      const values = await getValuesForScope(devToolsPage, 'Local', 0, 0);
       return (values?.includes(unminifiedVariable)) ? values : undefined;
     });
     assert.include(scopeValues, unminifiedVariable);
@@ -229,7 +230,7 @@ describe('The Sources Tab', function() {
     // Wait for the console to be usable again.
     await devToolsPage.waitForFunction(
         () => devToolsPage.evaluate(() => document.querySelectorAll('.console-user-command-result').length === 1));
-    const messages = await getCurrentConsoleMessages(false, Level.All, undefined, devToolsPage);
+    const messages = await getCurrentConsoleMessages(devToolsPage, false, Level.All, undefined);
 
     assert.deepEqual(messages, ['\'Hello world!\'']);
 
@@ -242,8 +243,8 @@ describe('The Sources Tab', function() {
 
   it('shows unminified identifiers in scopes with minified names clash and nested scopes',
      async ({devToolsPage, inspectedPage}) => {
-       await openSourceCodeEditorForFile(
-           'sourcemap-scopes-minified.js', 'sourcemap-scopes-minified.html', devToolsPage, inspectedPage);
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-scopes-minified.js',
+                                         'sourcemap-scopes-minified.html');
 
        const breakLocationOuterRegExp = /sourcemap-scopes-minified\.js:2$/;
        const breakLocationInnerRegExp = /sourcemap-scopes-minified\.js:5$/;
@@ -252,17 +253,17 @@ describe('The Sources Tab', function() {
        const innerUnminifiedVariable = 'loop_var: 0';
 
        // Run to outer scope breakpoint
-       await addBreakpointForLine(2, devToolsPage);
+       await addBreakpointForLine(devToolsPage, 2);
 
        const scriptEvaluation = inspectedPage.evaluate('foo(10);');
 
-       const scriptLocation = await waitForStackTopMatch(breakLocationOuterRegExp, devToolsPage);
+       const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationOuterRegExp);
        assert.match(scriptLocation, breakLocationOuterRegExp);
 
        // Check local scope variable is eventually un-minified
        {
          const scopeValues = await devToolsPage.waitForFunction(async () => {
-           const values = await getValuesForScope('Local', 0, 0, devToolsPage);
+           const values = await getValuesForScope(devToolsPage, 'Local', 0, 0);
            return (values?.includes(outerUnminifiedVariable)) ? values : undefined;
          });
          assert.include(scopeValues, outerUnminifiedVariable);
@@ -270,47 +271,46 @@ describe('The Sources Tab', function() {
 
        // Resume from outer breakpoint
        {
-         await addBreakpointForLine(5, devToolsPage);
+         await addBreakpointForLine(devToolsPage, 5);
          await devToolsPage.click(RESUME_BUTTON);
-         const scriptLocation = await waitForStackTopMatch(breakLocationInnerRegExp, devToolsPage);
+         const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationInnerRegExp);
          assert.match(scriptLocation, breakLocationInnerRegExp);
        }
 
        // Check local and block scope variables are eventually un-minified
        const blockScopeValues = await devToolsPage.waitForFunction(async () => {
-         const values = await getValuesForScope('Block', 0, 0, devToolsPage);
+         const values = await getValuesForScope(devToolsPage, 'Block', 0, 0);
          return (values?.includes(innerUnminifiedVariable)) ? values : undefined;
        });
        assert.include(blockScopeValues, innerUnminifiedVariable);
 
        const scopeValues = await devToolsPage.waitForFunction(async () => {
-         const values = await getValuesForScope('Local', 0, 0, devToolsPage);
+         const values = await getValuesForScope(devToolsPage, 'Local', 0, 0);
          return (values?.includes(outerUnminifiedVariable)) ? values : undefined;
        });
        assert.include(scopeValues, outerUnminifiedVariable);
 
        // Resume from inner breakpoint
-       await removeBreakpointForLine(2, devToolsPage);
-       await removeBreakpointForLine(5, devToolsPage);
+       await removeBreakpointForLine(devToolsPage, 2);
+       await removeBreakpointForLine(devToolsPage, 5);
        await devToolsPage.click(RESUME_BUTTON);
        await scriptEvaluation;
      });
 
   it('shows unminified function name in stack trace', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile(
-        'sourcemap-minified-function-name-compiled.js', 'sourcemap-minified-function-name.html', devToolsPage,
-        inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-minified-function-name-compiled.js',
+                                      'sourcemap-minified-function-name.html');
 
     const breakLocationOuterRegExp = /sourcemap-.*-compiled\.js:1$/;
 
     // Run to breakpoint
     const scriptEvaluation = inspectedPage.evaluate('o(1, 2)');
 
-    const scriptLocation = await waitForStackTopMatch(breakLocationOuterRegExp, devToolsPage);
+    const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationOuterRegExp);
     assert.match(scriptLocation, breakLocationOuterRegExp);
 
     // Add source map
-    await openSoftContextMenuAndClickOnItem('.cm-line', 'Add source map…', devToolsPage);
+    await openSoftContextMenuAndClickOnItem(devToolsPage, '.cm-line', 'Add source map…');
 
     // Enter the source map URL into the appropriate input box.
     await devToolsPage.click('.add-source-map');
@@ -330,14 +330,14 @@ describe('The Sources Tab', function() {
   });
 
   it('automatically ignore-lists third party code from source maps', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile('webpack-main.js', 'webpack-index.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'webpack-main.js', 'webpack-index.html');
 
     const breakLocationOuterRegExp = /index\.js:12$/;
 
     // Run to breakpoint
     const scriptEvaluation = inspectedPage.evaluate('window.foo()');
 
-    const scriptLocation = await waitForStackTopMatch(breakLocationOuterRegExp, devToolsPage);
+    const scriptLocation = await waitForStackTopMatch(devToolsPage, breakLocationOuterRegExp);
     assert.match(scriptLocation, breakLocationOuterRegExp);
     assert.deepEqual(await getCallFrameNames(devToolsPage), ['baz', 'bar', 'foo', '(anonymous)']);
 
@@ -358,13 +358,13 @@ describe('The Sources Tab', function() {
 
   it('updates decorators for removed breakpoints in case of code-splitting (crbug.com/1251675)',
      async ({devToolsPage, inspectedPage}) => {
-       await openSourceCodeEditorForFile(
-           'sourcemap-disjoint.js', 'sourcemap-disjoint.html', devToolsPage, inspectedPage);
-       assert.deepEqual(await getBreakpointDecorators(false, 0, devToolsPage), []);
-       await addBreakpointForLine(2, devToolsPage);
-       assert.deepEqual(await getBreakpointDecorators(false, 1, devToolsPage), [2]);
-       await removeBreakpointForLine(2, devToolsPage);
-       assert.deepEqual(await getBreakpointDecorators(false, 0, devToolsPage), []);
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-disjoint.js',
+                                         'sourcemap-disjoint.html');
+       assert.deepEqual(await getBreakpointDecorators(devToolsPage, false, 0), []);
+       await addBreakpointForLine(devToolsPage, 2);
+       assert.deepEqual(await getBreakpointDecorators(devToolsPage, false, 1), [2]);
+       await removeBreakpointForLine(devToolsPage, 2);
+       assert.deepEqual(await getBreakpointDecorators(devToolsPage, false, 0), []);
      });
 
   it('links to the correct origins for source-mapped resources', async ({devToolsPage, inspectedPage}) => {
@@ -373,21 +373,21 @@ describe('The Sources Tab', function() {
 
     // Check origin of source-mapped JavaScript
     {
-      await openFileInEditor('sourcemap-origin.js', devToolsPage);
+      await openFileInEditor(devToolsPage, 'sourcemap-origin.js');
       const linkText = await waitForTextContent(DEVTOOLS_LINK, devToolsPage);
       assert.strictEqual(linkText, 'sourcemap-origin.min.js');
     }
 
     // Check origin of source-mapped SASS
     {
-      await openFileInEditor('sourcemap-origin.scss', devToolsPage);
+      await openFileInEditor(devToolsPage, 'sourcemap-origin.scss');
       const linkText = await waitForTextContent(DEVTOOLS_LINK, devToolsPage);
       assert.strictEqual(linkText, 'sourcemap-origin.css');
     }
 
     // Check origin of source-mapped JavaScript with URL clash
     {
-      await openFileInEditor('sourcemap-origin.clash.js', devToolsPage);
+      await openFileInEditor(devToolsPage, 'sourcemap-origin.clash.js');
       const linkText = await waitForTextContent(DEVTOOLS_LINK, devToolsPage);
       assert.strictEqual(linkText, 'sourcemap-origin.clash.js');
     }
@@ -398,16 +398,16 @@ describe('The Sources Tab', function() {
     await openSourcesPanel(devToolsPage);
 
     // Get infobar text
-    await openFileInEditor('sourcemap-origin.min.js', devToolsPage);
+    await openFileInEditor(devToolsPage, 'sourcemap-origin.min.js');
     const infobarText = await waitForTextContent(INFOBAR_TEXT, devToolsPage);
     assert.strictEqual(infobarText, 'Source map loaded');
   });
 
   it('shows Source map loaded infobar after attaching', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile('sourcemap-minified.js', 'sourcemap-minified.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-minified.js', 'sourcemap-minified.html');
 
     // Attach source map
-    await openSoftContextMenuAndClickOnItem('.cm-line', 'Add source map…', devToolsPage);
+    await openSoftContextMenuAndClickOnItem(devToolsPage, '.cm-line', 'Add source map…');
 
     // Enter the source map URL into the appropriate input box.
     await devToolsPage.click('.add-source-map');
@@ -420,23 +420,23 @@ describe('The Sources Tab', function() {
   });
 
   it('shows Source map skipped infobar', async ({devToolsPage, inspectedPage}) => {
-    await setIgnoreListPattern('.min.js', devToolsPage);
-    await openSourceCodeEditorForFile('sourcemap-origin.min.js', 'sourcemap-origin.html', devToolsPage, inspectedPage);
+    await setIgnoreListPattern(devToolsPage, '.min.js');
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-origin.min.js', 'sourcemap-origin.html');
 
     // Get infobar texts
-    await openFileInEditor('sourcemap-origin.min.js', devToolsPage);
+    await openFileInEditor(devToolsPage, 'sourcemap-origin.min.js');
     await devToolsPage.waitFor('.infobar-warning');
     await devToolsPage.waitFor('.infobar-info');
     const infobarTexts = await devToolsPage.getVisibleTextContents(INFOBAR_TEXT);
-    assert.deepEqual(
-        infobarTexts, ['This script is on the debugger\'s ignore list', 'Source map skipped for this file']);
+    assert.deepEqual(infobarTexts,
+                     ['This script is on the debugger’s ignore list', 'Source map skipped for this file']);
   });
 
   it('shows Source map error infobar after failing to attach', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile('sourcemap-minified.js', 'sourcemap-minified.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-minified.js', 'sourcemap-minified.html');
 
     // Attach source map
-    await openSoftContextMenuAndClickOnItem('.cm-line', 'Add source map…', devToolsPage);
+    await openSoftContextMenuAndClickOnItem(devToolsPage, '.cm-line', 'Add source map…');
 
     // Enter the source map URL into the appropriate input box.
     await devToolsPage.click('.add-source-map');
@@ -450,13 +450,13 @@ describe('The Sources Tab', function() {
 
   describe('can deal with code-splitting', () => {
     it('sets multiple breakpoints in case of code-splitting', async ({devToolsPage, inspectedPage}) => {
-      await openSourceCodeEditorForFile(
-          'sourcemap-codesplit.ts', 'sourcemap-codesplit.html', devToolsPage, inspectedPage);
-      await addBreakpointForLine(3, devToolsPage);
+      await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-codesplit.ts',
+                                        'sourcemap-codesplit.html');
+      await addBreakpointForLine(devToolsPage, 3);
 
       for (let i = 0; i < 2; ++i) {
         const scriptLocation =
-            await retrieveTopCallFrameScriptLocation(`functions[${i}]();`, inspectedPage, devToolsPage);
+            await retrieveTopCallFrameScriptLocation(devToolsPage, inspectedPage, `functions[${i}]();`);
         assert.deepEqual(scriptLocation, 'sourcemap-codesplit.ts:3');
       }
     });
@@ -464,27 +464,16 @@ describe('The Sources Tab', function() {
     it('restores breakpoints correctly in case of code-splitting (crbug.com/1412033)',
        async ({devToolsPage, inspectedPage}) => {
          // Load the initial setup with only one script pointing to `codesplitting-bar.ts`...
-         await openSourceCodeEditorForFile('codesplitting-bar.ts', 'codesplitting.html', devToolsPage, inspectedPage);
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'codesplitting-bar.ts', 'codesplitting.html');
 
          // ...and set a breakpoint inside `bar()`.
-         await addBreakpointForLine(2, devToolsPage);
+         await addBreakpointForLine(devToolsPage, 2);
 
          // Now load the second script pointing to `codesplitting-bar.ts`...
          await inspectedPage.evaluate('addSecond();');
 
-         // ...wait for the new origin to be listed...
-         const linkTexts = await devToolsPage.waitForFunction(async () => {
-           const links = await devToolsPage.page.$$(DEVTOOLS_LINK);
-           const linkTexts = await Promise.all(links.map(node => node.evaluate(({textContent}) => textContent)));
-           if (linkTexts.length === 1 && linkTexts[0] === 'codesplitting-first.js') {
-             return undefined;
-           }
-           return linkTexts;
-         });
-         assert.sameMembers(linkTexts, ['codesplitting-first.js', 'codesplitting-second.js']);
-
          // ...and eventually wait for the breakpoint to be restored in line 2.
-         await devToolsPage.waitForFunction(async () => await isBreakpointSet(2, devToolsPage));
+         await devToolsPage.waitForFunction(async () => await isBreakpointSet(devToolsPage, 2));
 
          // Eventually we should stop on the breakpoint in the `codesplitting-second.js`.
          await devToolsPage.waitForFunction(() => {
@@ -499,9 +488,9 @@ describe('The Sources Tab', function() {
     it('hits breakpoints reliably after reload in case of code-splitting (crbug.com/1490369)',
        async ({devToolsPage, inspectedPage}) => {
          // Set the breakpoint inside `shared()` in `shared.js`.
-         await openSourceCodeEditorForFile('shared.js', 'codesplitting-race.html', devToolsPage, inspectedPage);
-         await addBreakpointForLine(2, devToolsPage);
-         await devToolsPage.waitForFunction(async () => await isBreakpointSet(2, devToolsPage));
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'shared.js', 'codesplitting-race.html');
+         await addBreakpointForLine(devToolsPage, 2);
+         await devToolsPage.waitForFunction(async () => await isBreakpointSet(devToolsPage, 2));
 
          // Reload the page.
          const reloadPromise = inspectedPage.reload();
@@ -523,7 +512,7 @@ describe('The Sources Tab', function() {
     it('correctly handles URL clashes between compiled and source-mapped scripts',
        async ({devToolsPage, inspectedPage}) => {
          // Load the "initial bundle"...
-         await openSourceCodeEditorForFile('index.js', 'sourcemap-hmr.html', devToolsPage, inspectedPage);
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'index.js', 'sourcemap-hmr.html');
 
          // ...and check that index.js content is as expected.
          // In particular, this asserts that the front-end does not get creative in
@@ -566,8 +555,8 @@ describe('The Sources Tab', function() {
 
     it('correctly maintains breakpoints from initial bundle to replacement', async ({devToolsPage, inspectedPage}) => {
       // Load the "initial bundle" and set a breakpoint on the second line.
-      await openSourceCodeEditorForFile('index.js', 'sourcemap-hmr.html', devToolsPage, inspectedPage);
-      await addBreakpointForLine(2, devToolsPage);
+      await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'index.js', 'sourcemap-hmr.html');
+      await addBreakpointForLine(devToolsPage, 2);
 
       // Simulate the hot module replacement for index.js
       await inspectedPage.evaluate('update();');
@@ -579,13 +568,13 @@ describe('The Sources Tab', function() {
       });
 
       // Wait for the breakpoint to appear on line 2 of the updated index.js.
-      await devToolsPage.waitForFunction(async () => await isBreakpointSet(2, devToolsPage));
+      await devToolsPage.waitForFunction(async () => await isBreakpointSet(devToolsPage, 2));
     });
 
     it('correctly maintains breakpoints from replacement to initial bundle (across reloads)',
        async ({devToolsPage, inspectedPage}) => {
          // Load the "initial bundle".
-         await openSourceCodeEditorForFile('index.js', 'sourcemap-hmr.html', devToolsPage, inspectedPage);
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'index.js', 'sourcemap-hmr.html');
 
          // Simulate the hot module replacement for index.js
          await inspectedPage.evaluate('update();');
@@ -597,20 +586,30 @@ describe('The Sources Tab', function() {
          });
 
          // Set a breakpoint on the second line.
-         await addBreakpointForLine(2, devToolsPage);
+         await addBreakpointForLine(devToolsPage, 2);
 
          // Reload the page and re-open (the initial) index.js.
-         await reloadPageAndWaitForSourceFile('index.js', devToolsPage, inspectedPage);
+         await reloadPageAndWaitForSourceFile(devToolsPage, inspectedPage, 'index.js');
 
          // Check that the breakpoint still exists on line 2.
-         assert.isTrue(await isBreakpointSet(2, devToolsPage));
+         assert.isTrue(await isBreakpointSet(devToolsPage, 2));
        });
   });
 
   it('can attach sourcemaps to CSS files from a context menu', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile('sourcemap-css.css', 'sourcemap-css-noinline.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'sourcemap-css.css', 'sourcemap-css-noinline.html');
 
-    await devToolsPage.click('aria/Code editor', {clickOptions: {button: 'right'}});
+    const bodyLine = await devToolsPage.waitForFunction(async () => {
+      const lines = await devToolsPage.$$('.cm-line');
+      for (const line of lines) {
+        const text = await line.evaluate(node => node.textContent);
+        if (text?.includes('body ')) {
+          return line;
+        }
+      }
+      return undefined;
+    });
+    await (bodyLine as puppeteer.ElementHandle).click({button: 'right'});
     await devToolsPage.click('aria/Add source map…');
     await devToolsPage.waitFor('.add-source-map');
     await devToolsPage.typeText('sourcemap-css-absolute.map');
@@ -621,9 +620,9 @@ describe('The Sources Tab', function() {
 });
 
 describe('The Elements Tab', () => {
-  async function clickStyleValueWithModifiers(
-      selector: string, name: string, value: string, location: string, devToolsPage: DevToolsPage) {
-    const element = await waitForCSSPropertyValue(selector, name, value, location, devToolsPage);
+  async function clickStyleValueWithModifiers(selector: string, name: string, value: string, location: string,
+                                              devToolsPage: DevToolsPage) {
+    const element = await waitForCSSPropertyValue(devToolsPage, selector, name, value, location);
     // Click with offset to skip swatches.
 
     await devToolsPage.clickElement(
@@ -639,43 +638,44 @@ describe('The Elements Tab', () => {
      async ({devToolsPage, inspectedPage}) => {
        await inspectedPage.goToResource('sources/sourcemap-css-inline-relative.html');
        // Prepare elements tab
-       await waitForElementsStyleSection('<body', devToolsPage);
+       await waitForElementsStyleSection(devToolsPage, '<body');
        await focusElementsTree(devToolsPage);
-       await clickNthChildOfSelectedElementNode(1, devToolsPage);
+       await clickNthChildOfSelectedElementNode(devToolsPage, 1);
        await clickStyleValueWithModifiers('body .text', 'color', 'green', 'app.scss:6', devToolsPage);
-       await devToolsPage.waitForElementWithTextContent('Line 12, Column 9');
+
+       await devToolsPage.waitForElementWithTextContent('Line 12, column 9');
      });
 
   it('links to the right SASS source for inline CSS with absolute sourcemap (crbug.com/787792)',
      async ({devToolsPage, inspectedPage}) => {
        await inspectedPage.goToResource('sources/sourcemap-css-dynamic-link.html');
        // Prepare elements tab
-       await waitForElementsStyleSection('<body', devToolsPage);
+       await waitForElementsStyleSection(devToolsPage, '<body');
        await focusElementsTree(devToolsPage);
-       await clickNthChildOfSelectedElementNode(1, devToolsPage);
+       await clickNthChildOfSelectedElementNode(devToolsPage, 1);
        await clickStyleValueWithModifiers('body .text', 'color', 'green', 'app.scss:6', devToolsPage);
-       await devToolsPage.waitForElementWithTextContent('Line 12, Column 9');
+       await devToolsPage.waitForElementWithTextContent('Line 12, column 9');
      });
 
   it('links to the right SASS source for dynamically added CSS style tags (crbug.com/787792)',
      async ({devToolsPage, inspectedPage}) => {
        await inspectedPage.goToResource('sources/sourcemap-css-dynamic.html');
        // Prepare elements tab
-       await waitForElementsStyleSection('<body', devToolsPage);
+       await waitForElementsStyleSection(devToolsPage, '<body');
        await focusElementsTree(devToolsPage);
-       await clickNthChildOfSelectedElementNode(1, devToolsPage);
+       await clickNthChildOfSelectedElementNode(devToolsPage, 1);
        await clickStyleValueWithModifiers('body .text', 'color', 'green', 'app.scss:6', devToolsPage);
-       await devToolsPage.waitForElementWithTextContent('Line 12, Column 9');
+       await devToolsPage.waitForElementWithTextContent('Line 12, column 9');
      });
 
   it('links to the right SASS source for dynamically added CSS link tags (crbug.com/787792)',
      async ({devToolsPage, inspectedPage}) => {
        await inspectedPage.goToResource('sources/sourcemap-css-dynamic-link.html');
        // Prepare elements tab
-       await waitForElementsStyleSection('<body', devToolsPage);
+       await waitForElementsStyleSection(devToolsPage, '<body');
        await focusElementsTree(devToolsPage);
-       await clickNthChildOfSelectedElementNode(1, devToolsPage);
+       await clickNthChildOfSelectedElementNode(devToolsPage, 1);
        await clickStyleValueWithModifiers('body .text', 'color', 'green', 'app.scss:6', devToolsPage);
-       await devToolsPage.waitForElementWithTextContent('Line 12, Column 9');
+       await devToolsPage.waitForElementWithTextContent('Line 12, column 9');
      });
 });

@@ -12,32 +12,36 @@ import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import {html, render} from '../../../ui/lit/lit.js';
+import * as SettingsUI from '../../../ui/settings/settings.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as Components from './components/components.js';
-import type {SectionPosition} from './components/TimespanBreakdownOverlay.js';
 
 const UIStrings = {
   /**
-   * @description Text for showing that a metric was observed in the local environment.
+   * @description Tooltip text indicating that a metric was observed in the local environment in the Performance panel.
    * @example {LCP} PH1
    */
   fieldMetricMarkerLocal: '{PH1} - Local',
 
   /**
-   * @description Text for showing that a metric was observed in the field, from real use data (CrUX). Also denotes if from URL or Origin dataset.
+   * @description Tooltip text indicating that a metric was observed in the field (from Chrome UX Report data) for a specific page scope in the Performance panel.
    * @example {LCP} PH1
    * @example {URL} PH2
    */
   fieldMetricMarkerField: '{PH1} - Field ({PH2})',
   /**
-   * @description Label for an option that selects the page's specific URL as opposed to it's entire origin/domain.
+   * @description Text for the page scope option that selects the specific URL instead of its entire origin in the Performance panel.
    */
   urlOption: 'URL',
   /**
-   * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
+   * @description Text for the page scope option that selects the entire origin instead of its specific URL in the Performance panel.
    */
   originOption: 'Origin',
+  /**
+   * @description Accessible label for the comment pin overlay button on a flame chart entry.
+   */
+  commentPin: 'Comment',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/OverlaysImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -117,6 +121,10 @@ export function entriesForOverlay(overlay: Trace.Types.Overlays.Overlay): readon
     }
     case 'BOTTOM_INFO_BAR':
       break;
+    case 'COMMENT_PIN': {
+      entries.push(overlay.entry);
+      break;
+    }
     default:
       Platform.assertNever(overlay, `Unknown overlay type ${JSON.stringify(overlay)}`);
   }
@@ -273,6 +281,16 @@ export class EventReferenceClick extends Event {
 }
 
 /**
+ * Dispatched when a comment pin overlay on a flame chart entry is clicked.
+ */
+export class CommentPinClick extends Event {
+  static readonly eventName = 'commentpinclick';
+  constructor(public overlay: Trace.Types.Overlays.CommentPin) {
+    super(CommentPinClick.eventName, {composed: true, bubbles: true});
+  }
+}
+
+/**
  * This class manages all the overlays that get drawn onto the performance
  * timeline. Overlays are DOM and are drawn above the network and main flame
  * chart.
@@ -354,7 +372,8 @@ export class Overlays extends EventTarget {
     this.#charts = init.charts;
     this.#queries = init.entryQueries;
     this.#entriesLinkInProgress = null;
-    this.#annotationsHiddenSetting = Common.Settings.Settings.instance().moduleSetting('annotations-hidden');
+    this.#annotationsHiddenSetting =
+        Common.Settings.Settings.instance().resolve(SettingsUI.TimelineSettings.annotationsHiddenSettingDescriptor);
     this.#annotationsHiddenSetting.addChangeListener(this.update.bind(this));
 
     // HTMLElements of both Flamecharts. They are used to get the mouse position over the Flamecharts.
@@ -573,7 +592,7 @@ export class Overlays extends EventTarget {
 
   /**
    * Update the dimensions of a chart.
-   * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
+   * IMPORTANT: this does not trigger a re-draw. You must call the update() method manually.
    */
   updateChartDimensions(chart: EntryChartLocation, dimensions: FlameChartDimensions): void {
     this.#dimensions.charts[chart] = dimensions;
@@ -581,7 +600,7 @@ export class Overlays extends EventTarget {
 
   /**
    * Update the visible window of the UI.
-   * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
+   * IMPORTANT: this does not trigger a re-draw. You must call the update() method manually.
    */
   updateVisibleWindow(visibleWindow: Trace.Types.Timing.TraceWindowMicro): void {
     this.#dimensions.trace.visibleWindow = visibleWindow;
@@ -820,6 +839,15 @@ export class Overlays extends EventTarget {
         break;
       }
 
+      case 'COMMENT_PIN': {
+        const isVisible = this.entryIsVisibleOnChart(overlay.entry);
+        this.#setOverlayElementVisibility(element, isVisible);
+        if (isVisible) {
+          this.#positionEntryBorderOutlineType(overlay.entry, element);
+        }
+        break;
+      }
+
       default: {
         Platform.TypeScriptUtilities.assertNever(overlay, `Unknown overlay: ${JSON.stringify(overlay)}`);
       }
@@ -874,6 +902,9 @@ export class Overlays extends EventTarget {
     // (it has height as now it's visible on the screen)
     // We do this by removing the default banner height (to reset our
     // calculation back to "0") and adding the actual height.
+    if (!(overlay.infobar.element instanceof HTMLElement)) {
+      return;
+    }
     const actualBannerHeight = overlay.infobar.element.clientHeight;
     const adjustedVisiblePixels = visiblePixelsOfBanner - defaultBannerHeight + actualBannerHeight;
     // Use Math.min here to ensure the infobar never grows beyond the size it
@@ -914,6 +945,10 @@ export class Overlays extends EventTarget {
       return;
     }
 
+    const isPositionedByEvent =
+        overlay.entry && (overlay.renderLocation === 'BELOW_EVENT' || overlay.renderLocation === 'ABOVE_EVENT');
+    element.classList.toggle('positioned-by-event', Boolean(isPositionedByEvent));
+
     const component = element.querySelector('.devtools-timespan-breakdown-overlay');
 
     if (!component) {
@@ -935,7 +970,7 @@ export class Overlays extends EventTarget {
     widget.left = leftEdgePixel;
     widget.width = rangeWidth;
 
-    const widths: SectionPosition[] = [];
+    const widths: Components.TimespanBreakdownOverlay.SectionPosition[] = [];
     for (const section of overlay.sections) {
       const leftPixel = this.#xPixelForMicroSeconds('main', section.bounds.min);
       const rightPixel = this.#xPixelForMicroSeconds('main', section.bounds.max);
@@ -981,6 +1016,7 @@ export class Overlays extends EventTarget {
 
         const top = bottom - height;
         widget.top = top;
+        widget.maxHeight = height;
       }
     }
   }
@@ -1543,24 +1579,29 @@ export class Overlays extends EventTarget {
         return overlayElement;
       }
       case 'TIME_RANGE': {
-        const component = new Components.TimeRangeOverlay.TimeRangeOverlay(overlay.label);
-        component.duration = overlay.showDuration ? overlay.bounds.range : null;
-        component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
-        component.addEventListener(Components.TimeRangeOverlay.TimeRangeLabelChangeEvent.eventName, event => {
-          const newLabel = (event as Components.TimeRangeOverlay.TimeRangeLabelChangeEvent).newLabel;
-          overlay.label = newLabel;
-          this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Update'));
-        });
-        component.addEventListener(Components.TimeRangeOverlay.TimeRangeRemoveEvent.eventName, () => {
-          this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
-        });
-        component.addEventListener('mouseover', () => {
+        // clang-format off
+        render(html`${widget(Components.TimeRangeOverlay.TimeRangeOverlay, {
+          label: overlay.label,
+          duration: overlay.showDuration ? overlay.bounds.range : null,
+          canvasRect: this.#charts.mainChart.canvasBoundingClientRect(),
+          onLabelChange: (newLabel: string) => {
+            overlay.label = newLabel;
+            this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Update'));
+          },
+          onRemove: () => {
+            this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
+          },
+        })}`, overlayElement);
+        // clang-format on
+        // Use enter and leave rather than over and out: the label's elements
+        // are in the light DOM, so over and out would also fire as the pointer
+        // moves between them.
+        overlayElement.addEventListener('mouseenter', () => {
           this.dispatchEvent(new TimeRangeMouseOverEvent(overlay));
         });
-        component.addEventListener('mouseout', () => {
+        overlayElement.addEventListener('mouseleave', () => {
           this.dispatchEvent(new TimeRangeMouseOutEvent());
         });
-        overlayElement.appendChild(component);
         return overlayElement;
       }
       case 'TIMESPAN_BREAKDOWN': {
@@ -1579,6 +1620,30 @@ export class Overlays extends EventTarget {
         const markersComponent = this.#createTimingsMarkerElement(overlay);
         overlayElement.appendChild(markersComponent);
         overlayElement.style.setProperty('--marker-color', color);
+        return overlayElement;
+      }
+      case 'COMMENT_PIN': {
+        const pin = document.createElement('div');
+        pin.classList.add('comment-pin');
+        pin.setAttribute('role', 'button');
+        pin.setAttribute('tabindex', '0');
+        UI.ARIAUtils.setLabel(pin, i18nString(UIStrings.commentPin));
+        const cursor = document.createElement('div');
+        cursor.classList.add('comment-cursor');
+        pin.appendChild(cursor);
+
+        const handleActivation = (event: Event): void => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.dispatchEvent(new CommentPinClick(overlay));
+        };
+        pin.addEventListener('click', handleActivation);
+        pin.addEventListener('keydown', (event: KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            handleActivation(event);
+          }
+        });
+        overlayElement.appendChild(pin);
         return overlayElement;
       }
       default: {
@@ -1627,6 +1692,8 @@ export class Overlays extends EventTarget {
       markers: HTMLElement, marker: HTMLElement): void {
     if (Trace.Types.Events.isSoftNavigationStart(event)) {
       name = 'Soft Nav';
+    } else if (Trace.Types.Events.isSoftFirstContentfulPaint(event)) {
+      name = 'Soft FCP';
     } else if (Trace.Types.Events.isSoftLargestContentfulPaintCandidate(event)) {
       name = 'Soft LCP';
     }
@@ -1677,7 +1744,7 @@ export class Overlays extends EventTarget {
       case 'ENTRY_SELECTED':
         break;
       case 'TIME_RANGE': {
-        const component = element.querySelector('devtools-time-range-overlay');
+        const component = this.#timeRangeOverlayWidget(element);
         if (component) {
           component.duration = overlay.showDuration ? overlay.bounds.range : null;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
@@ -1714,6 +1781,9 @@ export class Overlays extends EventTarget {
       case 'TIMINGS_MARKER':
         break;
       case 'BOTTOM_INFO_BAR': {
+        if (!(overlay.infobar.element instanceof HTMLElement)) {
+          return;
+        }
         if (element.contains(overlay.infobar.element)) {
           return;
         }
@@ -1723,13 +1793,26 @@ export class Overlays extends EventTarget {
         // before appending the infobar, just in case.
         element.innerHTML = '';
         element.appendChild(overlay.infobar.element);
+        break;
       }
-
-      break;
+      case 'COMMENT_PIN':
+        break;
       default:
         Platform.TypeScriptUtilities.assertNever(overlay, `Unexpected overlay ${overlay}`);
     }
   }
+
+  /**
+   * Returns the `TimeRangeOverlay` widget rendered into a `TIME_RANGE`
+   * overlay's element, or `null` if it has not been created yet. The widget is
+   * created when the element is first connected to the DOM.
+   */
+  #timeRangeOverlayWidget(element: HTMLElement): Components.TimeRangeOverlay.TimeRangeOverlay|null {
+    const widgetElement = element.querySelector('devtools-widget');
+    const widget = widgetElement ? UI.Widget.Widget.get(widgetElement) : undefined;
+    return widget instanceof Components.TimeRangeOverlay.TimeRangeOverlay ? widget : null;
+  }
+
   /**
    * Some overlays have custom logic within them to manage visibility of
    * labels/etc that can be impacted if the positioning or size of the overlay
@@ -1741,8 +1824,7 @@ export class Overlays extends EventTarget {
       case 'ENTRY_SELECTED':
         break;
       case 'TIME_RANGE': {
-        const component = element.querySelector('devtools-time-range-overlay');
-        component?.updateLabelPositioning();
+        this.#timeRangeOverlayWidget(element)?.updateLabelPositioning();
         break;
       }
       case 'ENTRY_LABEL':
@@ -1769,6 +1851,8 @@ export class Overlays extends EventTarget {
       case 'TIMINGS_MARKER':
         break;
       case 'BOTTOM_INFO_BAR':
+        break;
+      case 'COMMENT_PIN':
         break;
       default:
         Platform.TypeScriptUtilities.assertNever(overlay, `Unexpected overlay ${overlay}`);
@@ -2101,6 +2185,9 @@ export function jsLogContext(overlay: Trace.Types.Overlays.Overlay): string|null
     }
     case 'BOTTOM_INFO_BAR':
       return 'timeline.overlays.info-bar';
+    case 'COMMENT_PIN': {
+      return 'timeline.overlays.comment-pin';
+    }
     default:
       Platform.assertNever(overlay, 'Unknown overlay type');
   }

@@ -10,16 +10,15 @@ import("../../visibility.gni")
 
 generate_css("css_files") {
   sources = [
+    "adScriptsTable.css",
+    "adsView.css",
     "backForwardCacheView.css",
     "bounceTrackingMitigationsView.css",
     "endpointsGrid.css",
-    "interestGroupAccessGrid.css",
     "permissionsPolicySection.css",
     "protocolHandlersView.css",
     "reportsGrid.css",
     "serviceWorkerRouterView.css",
-    "sharedStorageAccessGrid.css",
-    "sharedStorageMetadataView.css",
     "storageMetadataView.css",
     "trustTokensView.css",
   ]
@@ -27,39 +26,36 @@ generate_css("css_files") {
 
 devtools_ui_module("components") {
   sources = [
+    "AdsView.ts",
     "BackForwardCacheStrings.ts",
     "BackForwardCacheView.ts",
     "BounceTrackingMitigationsView.ts",
     "CrashReportContextGrid.ts",
     "EndpointsGrid.ts",
-    "InterestGroupAccessGrid.ts",
     "PermissionsPolicySection.ts",
     "ProtocolHandlersView.ts",
     "ReportsGrid.ts",
     "ServiceWorkerRouterView.ts",
-    "SharedStorageAccessGrid.ts",
-    "SharedStorageMetadataView.ts",
     "StorageMetadataView.ts",
     "TrustTokensView.ts",
   ]
-
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/i18n:bundle",
     "../../../core/platform:bundle",
     "../../../core/root:bundle",
     "../../../core/sdk:bundle",
+    "../../../core/text_utils:bundle",
     "../../../generated",
-    "../../../models/text_utils:bundle",
     "../../../panels/network/forward:bundle",
-    "../../../third_party/csp_evaluator:bundle",
     "../../../ui/components/buttons:bundle",
     "../../../ui/components/expandable_list:bundle",
     "../../../ui/components/input:bundle",
     "../../../ui/components/legacy_wrapper:bundle",
     "../../../ui/components/render_coordinator:bundle",
     "../../../ui/components/report_view:bundle",
+    "../../../ui/components/tooltips:bundle",
     "../../../ui/i18n:bundle",
     "../../../ui/kit:bundle",
     "../../../ui/legacy:bundle",
@@ -68,15 +64,13 @@ devtools_ui_module("components") {
     "../../../ui/lit:bundle",
     "../../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "components.ts"
 
-  deps = [
-    ":components",
-    ":css_files",
-  ]
+  ts_deps = [ ":components" ]
 
   visibility = [
     ":*",
@@ -91,25 +85,23 @@ devtools_ui_module("unittests") {
   testonly = true
 
   sources = [
+    "AdsView.test.ts",
     "BackForwardCacheView.test.ts",
     "BounceTrackingMitigationsView.test.ts",
     "CrashReportContextGrid.test.ts",
     "EndpointsGrid.test.ts",
-    "InterestGroupAccessGrid.test.ts",
     "ProtocolHandlersView.test.ts",
     "ReportsGrid.test.ts",
     "ServiceWorkerRouterView.test.ts",
-    "SharedStorageAccessGrid.test.ts",
-    "SharedStorageMetadataView.test.ts",
     "StorageMetadataView.test.ts",
     "TrustTokensView.test.ts",
   ]
-
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/platform:bundle",
+    "../../../core/root:bundle",
     "../../../core/sdk:bundle",
     "../../../generated",
     "../../../testing",
@@ -117,5 +109,6 @@ devtools_ui_module("unittests") {
     "../../../ui/components/report_view:bundle",
     "../../../ui/kit:bundle",
     "../../../ui/legacy:bundle",
+    "../../../ui/legacy/components/utils:bundle",
   ]
 }

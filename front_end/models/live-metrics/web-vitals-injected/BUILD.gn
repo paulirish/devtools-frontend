@@ -2,18 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("../../../../scripts/build/ninja/bundle.gni")
 import("../../../../scripts/build/ninja/devtools_module.gni")
-import("../../../../scripts/build/ninja/node.gni")
+import("../../../../scripts/build/typescript/typescript.gni")
 
 web_vitals_injected_sources = [
   "OnEachLayoutShift.ts",
   "web-vitals-injected.ts",
 ]
 
-devtools_module("web-vitals-injected") {
+devtools_base_module("web-vitals-injected") {
   sources = web_vitals_injected_sources
 
-  deps = [
+  ts_deps = [
     "../../../third_party/web-vitals:bundle",
     "../../trace:bundle",
     "./spec:bundle",
@@ -21,44 +22,38 @@ devtools_module("web-vitals-injected") {
 
   visibility = [
     ":*",
-    "../:live-metrics",
+    "../:*",
   ]
 }
 
-node_action("bundled_library") {
-  script = "node_modules/rollup/dist/bin/rollup"
+bundle("bundled_library") {
+  entrypoint = "web-vitals-injected.ts"
+  output_file_location = "$target_gen_dir/web-vitals-injected.generated.js"
+  bundle_all = true
+  format = "iife"
+  sourcemap = false
 
-  _bundled_entrypoint = target_gen_dir + "/web-vitals-injected.js"
-  _output_file_location = target_gen_dir + "/web-vitals-injected.generated.js"
-
+  # Injected bundles inline all dependencies into a standalone IIFE (bundle_all
+  # = true). Because devtools_entrypoint does not expose implementation sources
+  # across module boundaries, explicitly list the imported entrypoint TS files
+  # and pre-built JS sources so they are staged for esbuild during strict remote
+  # execution.
   inputs = [
-             _bundled_entrypoint,
-             "rollup.config.mjs",
-           ] + web_vitals_injected_sources
-
-  deps = [ ":web-vitals-injected" ]
-
-  args = [
-    "--config",
-    rebase_path("rollup.config.mjs", root_build_dir),
-    "--input",
-    rebase_path(_bundled_entrypoint, root_build_dir),
-    "--file",
-    rebase_path(_output_file_location, root_build_dir),
+    "spec/spec.ts",
+    "../../../third_party/web-vitals/web-vitals.ts",
+  ]
+  deps = [
+    ":web-vitals-injected_sources",
+    "../../../third_party/web-vitals:web-vitals_sources",
   ]
 
-  if (is_debug) {
-    args += [ "--environment=DEBUG_INJECTED" ]
-  }
-
-  outputs = [ _output_file_location ]
-  data = outputs
+  data = [ output_file_location ]
   metadata = {
-    grd_files = [ _output_file_location ]
+    grd_files = [ output_file_location ]
   }
 
   visibility = [
     ":*",
-    "../:live-metrics",
+    "../:*",
   ]
 }

@@ -101,9 +101,12 @@ export class BidiHTTPResponse extends HTTPResponse {
       // TODO: How to handle Binary Headers
       // https://w3c.github.io/webdriver-bidi/#type-network-Header
       if (header.value.type === 'string') {
-        headers[header.name.toLowerCase()] = normalizeHeaderValue(
-          header.value.value,
-        );
+        const headerName = header.name.toLowerCase();
+        const value =
+          headerName in headers
+            ? `${headers[headerName]}\n${header.value.value}`
+            : header.value.value;
+        headers[headerName] = normalizeHeaderValue(headerName, value);
       }
     }
     return headers;

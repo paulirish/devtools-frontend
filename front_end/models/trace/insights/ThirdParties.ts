@@ -6,7 +6,7 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
 import * as Extras from '../extras/extras.js';
 import * as Handlers from '../handlers/handlers.js';
-import type * as Types from '../types/types.js';
+import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
@@ -17,28 +17,36 @@ import {
 } from './types.js';
 
 export const UIStrings = {
-  /** Title of an insight that provides details about the code on a web page that the user doesn't control (referred to as "third-party code"). */
+  /**
+   * @description Title of an insight that provides details about the code on a web page that the user doesn't control (referred to as "third-party code").
+   */
   title: '3rd parties',
   /**
    * @description Description of a DevTools insight that identifies the code on the page that the user doesn't control.
    * This is displayed after a user expands the section to see more. No character length limits.
    */
-  description: '3rd party code can significantly impact load performance. ' +
-      '[Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page\'s content.',
-  /** Label for a table column that displays the name of a third-party provider. */
+  description:
+      `3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page’s content.`,
+  /**
+   * @description Label for a table column that displays the name of a third-party provider.
+   */
   columnThirdParty: '3rd party',
-  /** Label for a column in a data table; entries will be the download size of a web resource in kilobytes. */
+  /**
+   * @description Label for a column in a data table; entries will be the download size of a web resource in kilobytes.
+   */
   columnTransferSize: 'Transfer size',
-  /** Label for a table column that displays how much time each row spent running on the main thread, entries will be the number of milliseconds spent. */
+  /**
+   * @description Label for a table column that displays how much time each row spent running on the main thread, entries will be the number of milliseconds spent.
+   */
   columnMainThreadTime: 'Main thread time',
   /**
-   * @description Text block indicating that no third party content was detected on the page
+   * @description Text block indicating that no third party content was detected on the page.
    */
   noThirdParties: 'No third parties found',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/ThirdParties.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type ThirdPartiesInsightModel = InsightModel<typeof UIStrings, {
   /** The entity for this navigation's URL. Any other entity is from a third party. */
@@ -82,7 +90,10 @@ export function generateInsight(
     data: Handlers.Types.HandlerData, context: InsightSetContext): ThirdPartiesInsightModel {
   const entitySummaries = Extras.ThirdParties.summarizeByThirdParty(data as Handlers.Types.HandlerData, context.bounds);
 
-  const firstPartyUrl = context.navigation?.args.data?.documentLoaderURL ?? data.Meta.mainFrameURL;
+  let firstPartyUrl = data.Meta.mainFrameURL;
+  if (context.navigation && !Types.Events.isSoftNavigationStart(context.navigation)) {
+    firstPartyUrl = context.navigation.args.data?.documentLoaderURL ?? firstPartyUrl;
+  }
   const firstPartyEntity = ThirdPartyWeb.ThirdPartyWeb.getEntity(firstPartyUrl) ||
       Handlers.Helpers.makeUpEntity(data.Renderer.entityMappings.createdEntityCache, firstPartyUrl);
 

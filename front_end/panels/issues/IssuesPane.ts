@@ -21,99 +21,89 @@ import {IssueView} from './IssueView.js';
 
 const UIStrings = {
   /**
-   * @description Category title for a group of cross origin embedder policy (COEP) issues
+   * @description Category title in the Issues panel for a group of Cross-Origin Embedder Policy (COEP) issues.
    */
-  crossOriginEmbedderPolicy: 'Cross Origin Embedder Policy',
+  crossOriginEmbedderPolicy: 'Cross-Origin Embedder Policy',
   /**
-   * @description Category title for a group of mixed content issues
+   * @description Category title in the Issues panel for a group of mixed content issues.
    */
-  mixedContent: 'Mixed Content',
+  mixedContent: 'Mixed content',
   /**
-   * @description Category title for a group of SameSite cookie issues
+   * @description Category title in the Issues panel for a group of SameSite cookie issues.
    */
-  samesiteCookie: 'SameSite Cookie',
+  samesiteCookie: 'SameSite cookie',
   /**
-   * @description Category title for a group of heavy ads issues
+   * @description Category title in the Issues panel for a group of heavy ads issues.
    */
-  heavyAds: 'Heavy Ads',
+  heavyAds: 'Heavy ads',
   /**
-   * @description Category title for a group of content security policy (CSP) issues
+   * @description Category title in the Issues panel for a group of Content Security Policy (CSP) issues.
    */
   contentSecurityPolicy: 'Content Security Policy',
   /**
-   * @description Text for other types of items
+   * @description Category title in the Issues panel for other types of issues.
    */
   other: 'Other',
   /**
-   * @description Category title for the different 'low text contrast' issues. Low text contrast refers
-   *              to the difference between the color of a text and the background color where that text
-   *              appears.
+   * @description Category title in the Issues panel for a group of low text contrast issues.
    */
-  lowTextContrast: 'Low Text Contrast',
+  lowTextContrast: 'Low text contrast',
   /**
-   * @description Category title for the different 'Cross-Origin Resource Sharing' (CORS) issues. CORS
-   *              refers to one origin (e.g 'a.com') loading resources from another origin (e.g. 'b.com').
+   * @description Category title in the Issues panel for a group of Cross-Origin Resource Sharing (CORS) issues.
    */
-  cors: 'Cross Origin Resource Sharing',
+  cors: 'Cross-Origin Resource Sharing',
   /**
-   * @description Title for a checkbox which toggles grouping by category in the issues tab
+   * @description Tooltip in the Issues panel for the checkbox to group issues by category.
    */
   groupDisplayedIssuesUnder: 'Group displayed issues under associated categories',
   /**
-   * @description Label for a checkbox which toggles grouping by category in the issues tab
+   * @description Label in the Issues panel for the checkbox to group issues by category.
    */
   groupByCategory: 'Group by category',
   /**
-   * @description Title for a checkbox which toggles grouping by kind in the issues tab
+   * @description Tooltip in the Issues panel for the checkbox to group issues by kind.
    */
-  groupDisplayedIssuesUnderKind: 'Group displayed issues as Page errors, Breaking changes and Improvements',
+  groupDisplayedIssuesUnderKind: 'Group displayed issues as page errors, breaking changes, and improvements',
   /**
-   * @description Label for a checkbox which toggles grouping by kind in the issues tab
+   * @description Label in the Issues panel for the checkbox to group issues by kind.
    */
   groupByKind: 'Group by kind',
   /**
-   * @description Title for a checkbox. Whether the issues tab should include third-party issues or not.
+   * @description Tooltip in the Issues panel for the checkbox to include cookie issues caused by third-party sites.
    */
-  includeCookieIssuesCausedBy: 'Include cookie Issues caused by third-party sites',
+  includeCookieIssuesCausedBy: 'Include cookie issues caused by third-party sites',
   /**
-   * @description Label for a checkbox. Whether the issues tab should include third-party issues or not.
+   * @description Label in the Issues panel for the checkbox to include cookie issues caused by third-party sites.
    */
   includeThirdpartyCookieIssues: 'Include third-party cookie issues',
   /**
-   * @description Label on the issues tab
+   * @description Message in the Issues panel displayed when only third-party cookie issues are detected.
    */
   onlyThirdpartyCookieIssues: 'Only third-party cookie issues detected',
   /**
-   * @description Label in the issues panel
+   * @description Message in the Issues panel displayed when no issues are detected.
    */
   noIssues: 'No issues detected',
   /**
-   * @description Text that explains the issues panel that is shown if no issues are shown.
+   * @description Explanation text in the Issues panel shown when no issues are detected.
    */
-  issuesPanelDescription: 'On this page you can find warnings from the browser.',
+  issuesPanelDescription: 'On this page you can find warnings from the browser',
   /**
-   * @description Category title for the different 'Attribution Reporting API' issues. The
-   * Attribution Reporting API is a newly proposed web API (see https://github.com/WICG/conversion-measurement-api).
+   * @description Category title in the Issues panel for a group of quirks mode issues.
    */
-  attributionReporting: 'Attribution Reporting `API`',
+  quirksMode: 'Quirks mode',
   /**
-   * @description Category title for the different 'Quirks Mode' issues. Quirks Mode refers
-   *              to the legacy browser modes that displays web content according to outdated
-   *              browser behaviors.
-   */
-  quirksMode: 'Quirks Mode',
-  /**
-   * @description Category title for the different 'Generic' issues.
+   * @description Category title in the Issues panel for a group of generic issues.
    */
   generic: 'Generic',
   /**
-   * @description Category title for a group of permission element issues
+   * @description Category title in the Issues panel for a group of permission element issues.
    */
-  permissionElement: 'PEPC Element',
+  permissionElement: 'Permission element',
   /**
-   * @description Category title for the different 'Selective Permissions Intervention' issues.
+   * @description Category title in the Issues panel for a group of selective permissions intervention issues.
    */
-  selectivePermissionsIntervention: 'Selective Permissions Intervention',
+  selectivePermissionsIntervention: 'Selective permissions intervention',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/issues/IssuesPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -149,8 +139,6 @@ class IssueCategoryView extends UI.TreeOutline.TreeElement {
         return i18nString(UIStrings.lowTextContrast);
       case IssuesManager.Issue.IssueCategory.CORS:
         return i18nString(UIStrings.cors);
-      case IssuesManager.Issue.IssueCategory.ATTRIBUTION_REPORTING:
-        return i18nString(UIStrings.attributionReporting);
       case IssuesManager.Issue.IssueCategory.QUIRKS_MODE:
         return i18nString(UIStrings.quirksMode);
       case IssuesManager.Issue.IssueCategory.GENERIC:
@@ -195,7 +183,7 @@ export class IssuesPane extends UI.Widget.VBox {
   #noIssuesMessageDiv: UI.EmptyWidget.EmptyWidget;
   #issuesManager: IssuesManager.IssuesManager.IssuesManager;
   #aggregator: IssuesManager.IssueAggregator.IssueAggregator;
-  #issueViewUpdatePromise: Promise<void> = Promise.resolve();
+  #dirtyIssues = new Set<IssuesManager.IssueAggregator.AggregatedIssue>();
 
   constructor() {
     super({
@@ -229,14 +217,16 @@ export class IssuesPane extends UI.Widget.VBox {
 
     this.#issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
     this.#aggregator = new IssuesManager.IssueAggregator.IssueAggregator(this.#issuesManager);
-    this.#aggregator.addEventListener(
-        IssuesManager.IssueAggregator.Events.AGGREGATED_ISSUE_UPDATED, this.#issueUpdated, this);
+    this.#aggregator.addEventListener(IssuesManager.IssueAggregator.Events.AGGREGATED_ISSUE_UPDATED, event => {
+      this.#dirtyIssues.add(event.data);
+      this.requestUpdate();
+    });
     this.#aggregator.addEventListener(
         IssuesManager.IssueAggregator.Events.FULL_UPDATE_REQUIRED, this.#onFullUpdate, this);
     this.#hiddenIssuesRow.hidden = this.#issuesManager.numberOfHiddenIssues() === 0;
     this.#onFullUpdate();
-    this.#issuesManager.addEventListener(
-        IssuesManager.IssuesManager.Events.ISSUES_COUNT_UPDATED, this.#updateCounts, this);
+    this.#issuesManager.addEventListener(IssuesManager.IssuesManager.Events.ISSUES_COUNT_UPDATED, this.requestUpdate,
+                                         this);
   }
 
   override elementsToRestoreScrollPositionsFor(): Element[] {
@@ -271,7 +261,7 @@ export class IssuesPane extends UI.Widget.VBox {
     });
     groupByKindSettingCheckbox.setVisible(true);
 
-    const thirdPartySetting = IssuesManager.Issue.getShowThirdPartyIssuesSetting();
+    const thirdPartySetting = IssuesManager.Issue.getShowThirdPartyIssuesSetting(Common.Settings.Settings.instance());
     this.#showThirdPartyCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
         thirdPartySetting, i18nString(UIStrings.includeCookieIssuesCausedBy),
         i18nString(UIStrings.includeThirdpartyCookieIssues));
@@ -281,7 +271,9 @@ export class IssuesPane extends UI.Widget.VBox {
     const issueCounter = new IssueCounter.IssueCounter.IssueCounter();
     issueCounter.data = {
       clickHandler: () => {
-        this.focus();
+        const summary = IssueCounter.IssueCounter.getIssueCountsEnumeration(
+            IssuesManager.IssuesManager.IssuesManager.instance(), false);
+        UI.ARIAUtils.LiveAnnouncer.alert(summary);
       },
       tooltipCallback: () => {
         const issueEnumeration = IssueCounter.IssueCounter.getIssueCountsEnumeration(
@@ -299,15 +291,15 @@ export class IssuesPane extends UI.Widget.VBox {
     return {toolbarContainer};
   }
 
-  #issueUpdated(event: Common.EventTarget.EventTargetEvent<IssuesManager.IssueAggregator.AggregatedIssue>): void {
-    this.#scheduleIssueViewUpdate(event.data);
+  override async performUpdate(): Promise<void> {
+    // Snapshot and clear so new arrivals during `await` schedule a fresh update
+    const issuesToUpdate = [...this.#dirtyIssues];
+    this.#dirtyIssues.clear();
+    await Promise.allSettled(issuesToUpdate.map(issue => this.#updateIssueView(issue)));
+    this.#updateCounts();
   }
 
-  #scheduleIssueViewUpdate(issue: IssuesManager.IssueAggregator.AggregatedIssue): void {
-    this.#issueViewUpdatePromise = this.#issueViewUpdatePromise.then(() => this.#updateIssueView(issue));
-  }
-
-  /** Don't call directly. Use `scheduleIssueViewUpdate` instead. */
+  /** Don't call directly. Use `requestUpdate` instead. */
   async #updateIssueView(issue: IssuesManager.IssueAggregator.AggregatedIssue): Promise<void> {
     let issueView = this.#issueViews.get(issue.aggregationKey());
     if (!issueView) {
@@ -316,12 +308,22 @@ export class IssuesPane extends UI.Widget.VBox {
         console.warn('Could not find description for issue code:', issue.code());
         return;
       }
-      const markdownDescription =
-          await IssuesManager.MarkdownIssueDescription.createIssueDescriptionFromMarkdown(description);
-      issueView = new IssueView(issue, markdownDescription);
-      this.#issueViews.set(issue.aggregationKey(), issueView);
-      const parent = this.#getIssueViewParent(issue);
-      this.appendIssueViewToParent(issueView, parent);
+      try {
+        const markdownDescription =
+            await IssuesManager.MarkdownIssueDescription.createIssueDescriptionFromMarkdown(description);
+        issueView = new IssueView(issue, markdownDescription);
+        const parent = this.#getIssueViewParent(issue);
+        // `appendIssueViewToParent` attaches `issueView` to the tree and synchronously invokes
+        // `IssueView.onattach()`, which renders `MarkdownView` tokens and can throw if an unsupported
+        // token or missing link key is encountered. Since `TreeElement.insertChild()` attaches the
+        // child before calling `onattach()`, we must detach `issueView` if `onattach()` fails.
+        this.appendIssueViewToParent(issueView, parent);
+        this.#issueViews.set(issue.aggregationKey(), issueView);
+      } catch (err) {
+        console.error(err);
+        issueView?.parent?.removeChild(issueView);
+        return;
+      }
     } else {
       issueView.setIssue(issue);
       const newParent = this.#getIssueViewParent(issue);
@@ -332,7 +334,6 @@ export class IssuesPane extends UI.Widget.VBox {
       }
     }
     issueView.update();
-    this.#updateCounts();
   }
 
   appendIssueViewToParent(issueView: IssueView, parent: UI.TreeOutline.TreeOutline|UI.TreeOutline.TreeElement): void {
@@ -425,15 +426,16 @@ export class IssuesPane extends UI.Widget.VBox {
   }
 
   #fullUpdate(force: boolean): void {
+    this.#dirtyIssues.clear();
     this.#clearViews(this.#categoryViews, force ? undefined : this.#aggregator.aggregatedIssueCategories());
     this.#clearViews(this.#kindViews, force ? undefined : this.#aggregator.aggregatedIssueKinds());
     this.#clearViews(this.#issueViews, force ? undefined : this.#aggregator.aggregatedIssueCodes());
     if (this.#aggregator) {
       for (const issue of this.#aggregator.aggregatedIssues()) {
-        this.#scheduleIssueViewUpdate(issue);
+        this.#dirtyIssues.add(issue);
       }
     }
-    this.#updateCounts();
+    this.requestUpdate();
   }
 
   #updateIssueKindViewsCount(): void {
@@ -475,7 +477,7 @@ export class IssuesPane extends UI.Widget.VBox {
   }
 
   async reveal(issue: IssuesManager.Issue.Issue): Promise<void> {
-    await this.#issueViewUpdatePromise;
+    await this.updateComplete;
     const key = this.#aggregator.keyForIssue(issue);
     const issueView = this.#issueViews.get(key);
     if (issueView) {

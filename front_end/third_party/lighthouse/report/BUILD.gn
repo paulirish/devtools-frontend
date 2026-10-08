@@ -10,7 +10,6 @@ devtools_pre_built("bundle") {
   sources_are_release = false
 
   sources = [
-    "bundle-tsconfig.json",
     "bundle.d.ts",
     "bundle.js",
   ]
@@ -19,7 +18,7 @@ devtools_pre_built("bundle") {
 devtools_entrypoint("report") {
   entrypoint = "report.ts"
 
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
   visibility = [
     "../*",
     "../../../panels/lighthouse/*",

@@ -11,7 +11,7 @@ import("../visibility.gni")
 devtools_module("wasmparser_worker") {
   sources = [ "WasmParserWorker.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../third_party/wasmparser:bundle",
   ]
@@ -20,7 +20,7 @@ devtools_module("wasmparser_worker") {
 devtools_entrypoint("bundle") {
   entrypoint = "wasmparser_worker.ts"
 
-  deps = [ ":wasmparser_worker" ]
+  ts_deps = [ ":wasmparser_worker" ]
 
   visibility = [ ":*" ]
 
@@ -32,7 +32,7 @@ devtools_entrypoint("worker_entrypoint") {
 
   forward_variables_from(devtools_worker_config, "*")
 
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 
   visibility = [ "../../../front_end" ]
 
@@ -44,7 +44,7 @@ ts_library("unittests") {
 
   sources = [ "wasmparser_worker.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../testing",
   ]

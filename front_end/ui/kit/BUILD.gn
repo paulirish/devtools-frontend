@@ -23,7 +23,11 @@ devtools_ui_module("kit") {
   ]
 
   deps = [
+    ":css_files",
     "../../Images:optimize_images",
+  ]
+
+  ts_deps = [
     "../../core/platform:bundle",
     "../helpers:bundle",
     "../lit:bundle",
@@ -34,10 +38,7 @@ devtools_ui_module("kit") {
 devtools_entrypoint("bundle") {
   entrypoint = "kit.ts"
 
-  deps = [
-    ":css_files",
-    ":kit",
-  ]
+  ts_deps = [ ":kit" ]
 
   visibility = [
     ":*",
@@ -57,8 +58,10 @@ devtools_ui_module("unittests") {
     "link/Link.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/host:bundle",
+    "../../core/platform:bundle",
     "../../testing",
   ]
 }
@@ -69,7 +72,7 @@ component_doc("docs") {
     "icons/Icon.docs.ts",
     "link/Link.docs.ts",
   ]
-  deps = [
+  ts_deps = [
     ":bundle",
     "../lit:bundle",
   ]

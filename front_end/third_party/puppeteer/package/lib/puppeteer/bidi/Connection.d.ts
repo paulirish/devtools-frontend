@@ -3,8 +3,9 @@
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import type * as ChromiumBidi from 'chromium-bidi/lib/protocol/protocol.js';
+import type { Protocol as ChromiumBidi } from 'chromium-bidi';
 import type { ConnectionTransport } from '../common/ConnectionTransport.js';
+import { type Logger } from '../common/Debug.js';
 import type { EventsWithWildcard } from '../common/EventEmitter.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import type { GetIdFn } from '../util/incremental-id-generator.js';
@@ -32,7 +33,7 @@ export interface Commands extends BidiCommands {
  */
 export declare class BidiConnection extends EventEmitter<BidiEvents> implements Connection {
     #private;
-    constructor(url: string, transport: ConnectionTransport, idGenerator: GetIdFn, delay?: number, timeout?: number);
+    constructor(url: string, transport: ConnectionTransport, idGenerator: GetIdFn, delay: number | undefined, timeout: number | undefined, logger: Logger);
     get closed(): boolean;
     get url(): string;
     pipeTo<Events extends BidiEvents>(emitter: EventEmitter<Events>): void;

@@ -12,12 +12,12 @@ group("conductor") {
 }
 
 ts_e2e_library("implementation") {
-  deps = [
+  testonly = false
+  ts_deps = [
     "../../conductor:implementation",
     "../shared",
   ]
   sources = [
-    "mocha-interface-helpers.ts",
     "mocha-interface.ts",
     "mocha_hooks.ts",
     "state-provider.ts",

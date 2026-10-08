@@ -9,9 +9,9 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as Geometry from '../../models/geometry/geometry.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, type LitTemplate, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
@@ -28,99 +28,99 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description Label for the summary in the CSS overview report
+   * @description Label for the summary in the CSS overview report.
    */
   overviewSummary: 'Overview summary',
   /**
-   * @description Title of colors subsection in the CSS overview panel
+   * @description Title of colors subsection in the CSS overview panel.
    */
   colors: 'Colors',
   /**
-   * @description Title of font info subsection in the CSS overview panel
+   * @description Title of font info subsection in the CSS overview panel.
    */
   fontInfo: 'Font info',
   /**
-   * @description Label to denote unused declarations in the target page
+   * @description Label to denote unused declarations in the target page.
    */
   unusedDeclarations: 'Unused declarations',
   /**
-   * @description Label for the number of media queries in the CSS overview report
+   * @description Label for the number of media queries in the CSS overview report.
    */
   mediaQueries: 'Media queries',
   /**
-   * @description Title of the Elements Panel
+   * @description Title of the Elements panel.
    */
   elements: 'Elements',
   /**
-   * @description Label for the number of External stylesheets in the CSS overview report
+   * @description Label for the number of external stylesheets in the CSS overview report.
    */
   externalStylesheets: 'External stylesheets',
   /**
-   * @description Label for the number of inline style elements in the CSS overview report
+   * @description Label for the number of inline style elements in the CSS overview report.
    */
   inlineStyleElements: 'Inline style elements',
   /**
-   * @description Label for the number of style rules in CSS overview report
+   * @description Label for the number of style rules in CSS overview report.
    */
   styleRules: 'Style rules',
   /**
-   * @description Label for the number of type selectors in the CSS overview report
+   * @description Label for the number of type selectors in the CSS overview report.
    */
   typeSelectors: 'Type selectors',
   /**
-   * @description Label for the number of ID selectors in the CSS overview report
+   * @description Label for the number of ID selectors in the CSS overview report.
    */
   idSelectors: 'ID selectors',
   /**
-   * @description Label for the number of class selectors in the CSS overview report
+   * @description Label for the number of class selectors in the CSS overview report.
    */
   classSelectors: 'Class selectors',
   /**
-   * @description Label for the number of universal selectors in the CSS overview report
+   * @description Label for the number of universal selectors in the CSS overview report.
    */
   universalSelectors: 'Universal selectors',
   /**
-   * @description Label for the number of Attribute selectors in the CSS overview report
+   * @description Label for the number of attribute selectors in the CSS overview report.
    */
   attributeSelectors: 'Attribute selectors',
   /**
-   * @description Label for the number of non-simple selectors in the CSS overview report
+   * @description Label for the number of non-simple selectors in the CSS overview report.
    */
   nonsimpleSelectors: 'Non-simple selectors',
   /**
-   * @description Label for unique background colors in the CSS overview panel
+   * @description Label for unique background colors in the CSS overview panel.
    * @example {32} PH1
    */
   backgroundColorsS: 'Background colors: {PH1}',
   /**
-   * @description Label for unique text colors in the CSS overview panel
+   * @description Label for unique text colors in the CSS overview panel.
    * @example {32} PH1
    */
   textColorsS: 'Text colors: {PH1}',
   /**
-   * @description Label for unique fill colors in the CSS overview panel
+   * @description Label for unique fill colors in the CSS overview panel.
    * @example {32} PH1
    */
   fillColorsS: 'Fill colors: {PH1}',
   /**
-   * @description Label for unique border colors in the CSS overview panel
+   * @description Label for unique border colors in the CSS overview panel.
    * @example {32} PH1
    */
   borderColorsS: 'Border colors: {PH1}',
   /**
-   * @description Label to indicate that there are no fonts in use
+   * @description Label to indicate that no fonts are in use.
    */
-  thereAreNoFonts: 'There are no fonts.',
+  thereAreNoFonts: 'No fonts',
   /**
-   * @description Message to show when no unused declarations in the target page
+   * @description Message to show when no unused declarations are in the target page.
    */
-  thereAreNoUnusedDeclarations: 'There are no unused declarations.',
+  thereAreNoUnusedDeclarations: 'No unused declarations',
   /**
-   * @description Message to show when no media queries are found in the target page
+   * @description Message to show when no media queries are found in the target page.
    */
-  thereAreNoMediaQueries: 'There are no media queries.',
+  thereAreNoMediaQueries: 'No media queries',
   /**
-   * @description Title of the Drawer for contrast issues in the CSS overview panel
+   * @description Title of the drawer for contrast issues in the CSS overview panel.
    */
   contrastIssues: 'Contrast issues',
   /**
@@ -128,43 +128,43 @@ const UIStrings = {
    */
   nOccurrences: '{n, plural, =1 {# occurrence} other {# occurrences}}',
   /**
-   * @description Section header for contrast issues in the CSS overview panel
+   * @description Section header for contrast issues in the CSS overview panel.
    * @example {1} PH1
    */
   contrastIssuesS: 'Contrast issues: {PH1}',
   /**
-   * @description Title of the button for a contrast issue in the CSS overview panel
+   * @description Title of the button for a contrast issue in the CSS overview panel.
    * @example {#333333} PH1
    * @example {#333333} PH2
    * @example {2} PH3
    */
   textColorSOverSBackgroundResults: 'Text color {PH1} over {PH2} background results in low contrast for {PH3} elements',
   /**
-   * @description Label aa text content in Contrast Details of the Color Picker
+   * @description Label aa text content in contrast details of the color picker.
    */
   aa: 'AA',
   /**
-   * @description Label aaa text content in Contrast Details of the Color Picker
+   * @description Label aaa text content in contrast details of the color picker.
    */
   aaa: 'AAA',
   /**
-   * @description Label for the APCA contrast in Color Picker
+   * @description Label for the APCA contrast in color picker.
    */
   apca: 'APCA',
   /**
-   * @description Label for the column in the element list in the CSS overview report
+   * @description Label for the column in the element list in the CSS overview report.
    */
   element: 'Element',
   /**
-   * @description Column header title denoting which declaration is unused
+   * @description Column header title denoting which declaration is unused.
    */
   declaration: 'Declaration',
   /**
-   * @description Text for the source of something
+   * @description Text for the source of something.
    */
   source: 'Source',
   /**
-   * @description Text of a DOM element in Contrast Details of the Color Picker
+   * @description Text of a DOM element in contrast details of the color picker.
    */
   contrastRatio: 'Contrast ratio',
   /**
@@ -172,7 +172,7 @@ const UIStrings = {
    */
   cssOverviewElements: 'CSS overview elements',
   /**
-   * @description Title of the button to show the element in the CSS overview panel
+   * @description Title of the button to show the element in the CSS overview panel.
    */
   showElement: 'Show element',
   /**
@@ -219,7 +219,7 @@ export interface OverviewData {
 }
 
 export type FontInfo = Map<string, Map<string, Map<string, number[]>>>;
-interface FontMetric {
+export interface FontMetric {
   label: string;
   values: Array<{title: string, nodes: number[]}>;
 }
@@ -236,7 +236,7 @@ function getBorderString(color: Common.Color.Color): string {
   return `1px solid hsl(${h}deg ${s}% ${l}%)`;
 }
 
-interface ViewInput {
+export interface ViewInput {
   elementCount: number;
   backgroundColors: string[];
   textColors: string[];
@@ -253,7 +253,7 @@ interface ViewInput {
   onReset: () => void;
 }
 
-interface ViewOutput {
+export interface ViewOutput {
   revealSection: Map<string, (setFocus: boolean) => void>;
   closeAllTabs: () => void;
   addTab: (id: string, tabTitle: string, view: UI.Widget.Widget, jslogContext: string) => void;
@@ -261,7 +261,7 @@ interface ViewOutput {
 
 const formatter = new Intl.NumberFormat('en-US');
 
-type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, output, target) => {
   function revealSection(section: Element|undefined, setFocus: boolean): void {
@@ -287,7 +287,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             {name: i18nString(UIStrings.colors), id: 'colors'},
             {name: i18nString(UIStrings.fontInfo), id: 'font-info'},
             {name: i18nString(UIStrings.unusedDeclarations), id: 'unused-declarations'},
-            {name: i18nString(UIStrings.mediaQueries), id: 'media-queries'}
+            {name: i18nString(UIStrings.mediaQueries), id: 'media-queries'},
           ],
           selectedId: input.selectedSection,
           onItemSelected: input.onSectionSelected,
@@ -299,26 +299,31 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             <!-- Dupe the styles into the main container because of the shadow root will prevent outer styles. -->
             <style>${cssOverviewCompletedViewStyles}</style>
             <div class="results-section horizontally-padded summary"
+                  jslog=${VisualLogging.section('summary')}
                   ${ref(e => { output.revealSection.set('summary', revealSection.bind(null, e));})}>
               <h1>${i18nString(UIStrings.overviewSummary)}</h1>
               ${renderSummary(input.elementCount, input.globalStyleStats, input.mediaQueries)}
             </div>
             <div class="results-section horizontally-padded colors"
+                jslog=${VisualLogging.section('colors')}
                 ${ref(e => { output.revealSection.set('colors', revealSection.bind(null, e));})}>
                 <h1>${i18nString(UIStrings.colors)}</h1>
                 ${renderColors(input.backgroundColors, input.textColors, input.textColorContrastIssues, input.fillColors, input.borderColors)}
               </div>
               <div class="results-section font-info"
+                    jslog=${VisualLogging.section('font-info')}
                     ${ref(e => { output.revealSection.set('font-info', revealSection.bind(null, e));})}>
                 <h1>${i18nString(UIStrings.fontInfo)}</h1>
                 ${renderFontInfo(input.fontInfo)}
               </div>
               <div class="results-section unused-declarations"
+                    jslog=${VisualLogging.section('unused-declarations')}
                     ${ref(e => { output.revealSection.set('unused-declarations', revealSection.bind(null, e));})}>
                 <h1>${i18nString(UIStrings.unusedDeclarations)}</h1>
                 ${renderUnusedDeclarations(input.unusedDeclarations)}
               </div>
               <div class="results-section media-queries"
+                    jslog=${VisualLogging.section('media-queries')}
                     ${ref(e => { output.revealSection.set('media-queries', revealSection.bind(null, e));})}>
               <h1>${i18nString(UIStrings.mediaQueries)}</h1>
               ${renderMediaQueries(input.mediaQueries)}
@@ -355,7 +360,7 @@ function renderSummary(
     elementCount: number, globalStyleStats: GlobalStyleStats,
     mediaQueries: Array<{title: string, nodes: Protocol.CSS.CSSMedia[]}>): TemplateResult {
   const renderSummaryItem = (label: string, value: number): TemplateResult => html`
-    <li>
+    <li jslog=${VisualLogging.item('summary-item')}>
       <div class="label">${label}</div>
       <div class="value">${formatter.format(value)}</div>
     </li>`;
@@ -423,14 +428,13 @@ function renderFontMetrics(font: string, fontMetricInfo: FontMetric[]): Template
       ${fontMetricInfo.map(({label, values}) => html`
         <div>
           <h3>${label}</h3>
-          ${renderGroup(values, 'font-info', `${font}/${label}`)}
+          ${renderGroup(values, 'font-info', `${font}/${label}`, label)}
         </div>`)}
     </div>`;
 }
 
-function renderGroup(
-    values: Array<{title: string, nodes: Array<number|UnusedDeclaration|Protocol.CSS.CSSMedia>}>, type: string,
-    path = ''): TemplateResult {
+function renderGroup(values: Array<{title: string, nodes: Array<number|UnusedDeclaration|Protocol.CSS.CSSMedia>}>,
+                     type: string, path = '', groupLabel = ''): TemplateResult {
   const total = values.reduce((prev, curr) => prev + curr.nodes.length, 0);
 
   // clang-format off
@@ -440,11 +444,11 @@ function renderGroup(
           const width = 100 * nodes.length / total;
           const itemLabel = i18nString(UIStrings.nOccurrences, {n: nodes.length});
 
-          return html`<li>
+          return html`<li jslog=${VisualLogging.item('css-overview.group-item')}>
             <div class="title">${title}</div>
             <button data-type=${type} data-path=${path} data-label=${title}
             jslog=${VisualLogging.action().track({click: true}).context(`css-overview.${type}`)}
-            aria-label=${`${title}: ${itemLabel}`}>
+            aria-label=${`${groupLabel ? `${groupLabel}, ` : ''}${title}: ${itemLabel}`}>
               <div class="details">${itemLabel}</div>
               <div class="bar-container">
                 <div class="bar" style=${styleMap({width})}></div>
@@ -482,7 +486,7 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
   const color = (minContrastIssue.textColor.asString(Common.Color.Format.HEXA));
   const backgroundColor = (minContrastIssue.backgroundColor.asString(Common.Color.Format.HEXA));
 
-  const showAPCA = Common.Settings.Settings.instance().moduleSetting('apca').get();
+  const showAPCA = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.apcaSettingDescriptor).get();
 
   const title = i18nString(UIStrings.textColorSOverSBackgroundResults, {
     PH1: color,
@@ -492,7 +496,7 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
   const border = getBorderString(minContrastIssue.backgroundColor.asLegacyColor());
 
   // clang-format off
-  return html`<li>
+  return html`<li jslog=${VisualLogging.item('contrast-issue')}>
     <button
       title=${title} aria-label=${title}
       data-type="contrast" data-key=${key} data-section="contrast" class="block"
@@ -525,7 +529,7 @@ function renderColor(section: string, color: string): LitTemplate {
     return nothing;
   }
   // clang-format off
-  return html`<li>
+  return html`<li jslog=${VisualLogging.item('color-item')}>
     <button title=${color} data-type="color" data-color=${color}
       data-section=${section} class="block"
       style=${styleMap({backgroundColor: color, border: getBorderString(borderColor)})}
@@ -536,7 +540,7 @@ function renderColor(section: string, color: string): LitTemplate {
   // clang-format on
 }
 
-type PopulateNodesEvent = {
+export type PopulateNodesEvent = {
   type: 'contrast',
   key: string,
   section: string|undefined,
@@ -575,10 +579,10 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
   #viewOutput: ViewOutput = {
     revealSection: new Map(),
     closeAllTabs: () => {},
-    addTab: (_id, _tabTitle, _view, _jslogContext) => {}
+    addTab: (_id, _tabTitle, _view, _jslogContext) => {},
   };
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
     this.registerRequiredCSS(cssOverviewCompletedViewStyles);
@@ -852,7 +856,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
         font,
         fontMetrics: fontMetricInfo.map(([label, values]) => {
           return {label, values: this.#sortGroupBySize(values)};
-        })
+        }),
       };
     });
   }
@@ -874,10 +878,10 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
     this.requestUpdate();
   }
 
-  static readonly pushedNodes = new Set<Protocol.DOM.BackendNodeId>();
+  static readonly pushedNodes: Set<Protocol.DOM.BackendNodeId> = new Set<Protocol.DOM.BackendNodeId>();
 }
 
-interface ElementDetailsViewInput {
+export interface ElementDetailsViewInput {
   items: Array<{
     data: PopulateNodesEventNodeTypes,
     link?: LitTemplate,
@@ -885,7 +889,7 @@ interface ElementDetailsViewInput {
   }>;
   visibility: Set<string>;
 }
-type ElementDetailsViewFunction = (input: ElementDetailsViewInput, output: object, target: HTMLElement) => void;
+export type ElementDetailsViewFunction = (input: ElementDetailsViewInput, output: object, target: HTMLElement) => void;
 
 export const ELEMENT_DETAILS_DEFAULT_VIEW: ElementDetailsViewFunction = (input, _output, target) => {
   const {items, visibility} = input;
@@ -1040,7 +1044,7 @@ function renderContrastRatio(data: PopulateNodesEventNodeTypes): TemplateResult 
   if (!('contrastRatio' in data)) {
     throw new Error('Contrast ratio entry is missing a contrast ratio.');
   }
-  const showAPCA = Common.Settings.Settings.instance().moduleSetting('apca').get();
+  const showAPCA = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.apcaSettingDescriptor).get();
   const contrastRatio = Platform.NumberUtilities.floor(data.contrastRatio, 2);
   const contrastRatioString = showAPCA ? contrastRatio + '%' : contrastRatio;
   const border = getBorderString(data.backgroundColor);

@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-
-import * as Root from '../root/root.js';
+import sinon from 'sinon';
 
 import * as Common from './common.js';
 
@@ -27,6 +26,7 @@ describe('VersionController', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       runSettingsMigration: false,
+      console: new Common.Console.Console(),
     });
   });
 
@@ -360,6 +360,7 @@ describe('updateVersionFrom37To38', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       runSettingsMigration: false,
+      console: new Common.Console.Console(),
     });
   });
 
@@ -428,6 +429,7 @@ describe('updateVersionFrom38To39', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       runSettingsMigration: false,
+      console: new Common.Console.Console(),
     });
     setting = settings.createSetting('preferred-network-condition', {title: 'Offline', i18nTitleKey: 'Offline'});
   });
@@ -496,6 +498,7 @@ describe('updateVersionFrom38To39', () => {
         localStorage,
         settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
         runSettingsMigration: false,
+        console: new Common.Console.Console(),
       });
       customNetworkCondSetting = settings.moduleSetting('custom-network-conditions');
       preferredNetworkCondSetting = settings.createSetting('preferred-network-condition', {i18nTitleKey: 'Offline'});
@@ -519,7 +522,7 @@ describe('updateVersionFrom38To39', () => {
         },
         {
           key: 'USER_CUSTOM_SETTING_2',
-        }
+        },
       ]);
     });
 
@@ -632,6 +635,7 @@ describe('updateVersionFrom40To41', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       runSettingsMigration: false,
+      console: new Common.Console.Console(),
     });
     hideNetworkMessagesSetting =
         settings.createSetting('hide-network-messages', false, Common.Settings.SettingStorageType.SYNCED);
@@ -694,6 +698,7 @@ describe('updateVersionFrom41To42', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       runSettingsMigration: false,
+      console: new Common.Console.Console(),
     });
     recordingsSetting = settings.createSetting('recorder-recordings-ng', []);
   });
@@ -706,7 +711,7 @@ describe('updateVersionFrom41To42', () => {
 
   it('trims title', () => {
     recordingsSetting.set([
-      {storageName: '1', flow: {title: 'a'.repeat(350), steps: []}}
+      {storageName: '1', flow: {title: 'a'.repeat(350), steps: []}},
     ]);  // User had "Hide chrome frame" changed from default value to ON
     const versionController = new Common.VersionController.VersionController(settings);
     versionController.updateVersionFrom41To42();
@@ -716,7 +721,7 @@ describe('updateVersionFrom41To42', () => {
 
   it('trims steps', async () => {
     recordingsSetting.set([
-      {storageName: '1', flow: {title: 'a', steps: Array(5000).fill({})}}
+      {storageName: '1', flow: {title: 'a', steps: Array(5000).fill({})}},
     ]);  // User had "Hide chrome frame" changed from default value to ON
     const versionController = new Common.VersionController.VersionController(settings);
     versionController.updateVersionFrom41To42();
@@ -724,114 +729,6 @@ describe('updateVersionFrom41To42', () => {
     assert.isTrue(first.flow.steps.length <= 4096);
   });
 });
-
-function describeExperimentMigration(
-    versionFrom: number,
-    versionTo: number,
-    settingName: string,
-    experimentName: Root.ExperimentNames.ExperimentName,
-    ): void {
-  const updateMethodName =
-      `updateVersionFrom${versionFrom}To${versionTo}` as keyof Common.VersionController.VersionController;
-
-  describe(updateMethodName, () => {
-    let settings: Common.Settings.Settings;
-    let syncedStorage: Common.Settings.SettingsStorage;
-    let globalStorage: Common.Settings.SettingsStorage;
-    let localStorage: Common.Settings.SettingsStorage;
-
-    beforeEach((): void => {
-      const mockStore = new Common.Settings.InMemoryStorage();
-      syncedStorage = new Common.Settings.SettingsStorage({}, mockStore);
-      globalStorage = new Common.Settings.SettingsStorage({}, mockStore);
-      localStorage = new Common.Settings.SettingsStorage({}, mockStore);
-
-      Common.Settings.registerSettingExtension({
-        settingName,
-        settingType: Common.Settings.SettingType.BOOLEAN,
-        defaultValue: false,
-        storageType: Common.Settings.SettingStorageType.SYNCED,
-      });
-
-      settings = new Common.Settings.Settings({
-        syncedStorage,
-        globalStorage,
-        localStorage,
-        settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
-        runSettingsMigration: false,
-      });
-    });
-
-    afterEach((): void => {
-      Common.Settings.resetSettings();
-    });
-
-    it(`does nothing if ${experimentName} experiment is not enabled`, (): void => {
-      const versionController = new Common.VersionController.VersionController(settings);
-      const setting = settings.moduleSetting(settingName);
-      setting.set(false);
-
-      (versionController[updateMethodName] as () => void)();
-
-      assert.isFalse(setting.get());
-    });
-
-    it(`sets ${settingName} setting to true if experiment is enabled`, (): void => {
-      const versionController = new Common.VersionController.VersionController(settings);
-      const setting = settings.moduleSetting(settingName);
-
-      const getValueFromStorageStub = sinon.stub(Root.Runtime.experiments, 'getValueFromStorage');
-      getValueFromStorageStub.withArgs(experimentName).returns(true);
-
-      (versionController[updateMethodName] as () => void)();
-
-      assert.isTrue(setting.get());
-      getValueFromStorageStub.restore();
-    });
-
-    it(`does not overwrite ${settingName} setting if already present in syncedStorage`, (): void => {
-      const versionController = new Common.VersionController.VersionController(settings);
-      const setting = settings.moduleSetting(settingName);
-      setting.set(true);
-
-      const getValueFromStorageStub = sinon.stub(Root.Runtime.experiments, 'getValueFromStorage');
-      getValueFromStorageStub.withArgs(experimentName).returns(true);
-
-      const moduleSettingSpy = sinon.spy(settings, 'moduleSetting');
-
-      (versionController[updateMethodName] as () => void)();
-
-      sinon.assert.notCalled(moduleSettingSpy);
-      assert.isTrue(setting.get());
-
-      getValueFromStorageStub.restore();
-      moduleSettingSpy.restore();
-    });
-
-    it('does not crash if setting is not registered', (): void => {
-      const versionController = new Common.VersionController.VersionController(settings);
-
-      const getValueFromStorageStub = sinon.stub(Root.Runtime.experiments, 'getValueFromStorage');
-      getValueFromStorageStub.withArgs(experimentName).returns(true);
-
-      const moduleSettingStub = sinon.stub(settings, 'moduleSetting');
-      moduleSettingStub.withArgs(settingName).throws();
-
-      (versionController[updateMethodName] as () => void)();
-
-      moduleSettingStub.restore();
-      getValueFromStorageStub.restore();
-    });
-  });
-}
-
-describeExperimentMigration(
-    42, 43, 'timeline-show-all-events', 'timeline-show-all-events' as Root.ExperimentNames.ExperimentName);
-describeExperimentMigration(43, 44, 'apca', 'apca' as Root.ExperimentNames.ExperimentName);
-describeExperimentMigration(
-    44, 45, 'timeline-debug-mode', 'timeline-debug-mode' as Root.ExperimentNames.ExperimentName);
-describeExperimentMigration(
-    45, 46, 'timeline-invalidation-tracking', 'timeline-invalidation-tracking' as Root.ExperimentNames.ExperimentName);
 
 describe('access logging', () => {
   let settings: Common.Settings.Settings;
@@ -849,6 +746,7 @@ describe('access logging', () => {
       localStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
       logSettingAccess,
+      console: new Common.Console.Console(),
     });
   });
 

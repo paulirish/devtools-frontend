@@ -17,9 +17,7 @@ import {ViewLocationValues} from './ViewRegistration.js';
 
 const UIStrings = {
   /**
-   * @description Default tooltip / accessible name of the "plus" button shown
-   * after the visible tabs in a tab strip. Clicking it opens a menu listing
-   * tools that are not currently shown as a visible tab.
+   * @description Default tooltip and accessible name for the plus button shown in a tab strip.
    */
   moreTools: 'More tools',
 } as const;
@@ -108,8 +106,13 @@ export class PlusButtonPresenter {
     for (const view of views()) {
       // Skip views that already have a tab. Hidden tabs are already listed
       // in the overflow section above, and visible tabs are accessible
-      // directly in the tab strip.
+      // directly in the tab strip. Track their id and title so the
+      // cross-location loop below cannot offer a same-titled duplicate
+      // (e.g. drawer "Console" while the panel "Console" is already
+      // visible — they have different view ids).
       if (tabbedPane.hasTab(view.viewId())) {
+        seenIds.add(view.viewId());
+        seenTitles.add(view.title());
         continue;
       }
       // Transient views are not user-addable.
@@ -230,19 +233,18 @@ interface PlusButtonViewInput {
  */
 export const PLUS_BUTTON_VIEW =
     (input: PlusButtonViewInput, output: {button?: MenuButton}, target: HTMLElement): void => {
-      render(
-          html`
+      render(html`
         <devtools-menu-button
             ${Directives.ref(el => {
-            output.button = el as MenuButton | undefined;
-          })}
+               output.button = el as MenuButton | undefined;
+             })}
             slot="trailing-button"
             .iconName=${'plus'}
-            .title=${input.title}
+            .accessibleLabel=${input.title}
             .jslogContext=${input.jslogContext}
             .populateMenuCall=${input.populateMenuCall}>
         </devtools-menu-button>`,
-          target);
+             target);
     };
 
 /**

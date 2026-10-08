@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import * as Logs from '../../../../models/logs/logs.js';
 import {
+  assertScreenshot,
   getCleanTextContentFromElements,
-  getElementWithinComponent,
   renderElementIntoDOM,
 } from '../../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
-import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
-import * as ReportView from '../../../../ui/components/report_view/report_view.js';
+import type * as ReportView from '../../../../ui/components/report_view/report_view.js';
 
 import * as PreloadingComponents from './components.js';
 
@@ -27,12 +27,13 @@ const zip2 = <T, S>(xs: T[], ys: S[]) => {
 };
 
 const renderPreloadingDetailsReportView =
-    async (data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData) => {
+    async (data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData,
+           renderOptions?: Parameters<typeof renderElementIntoDOM>[1]) => {
   const component = new PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportView();
   component.data = data;
-  renderElementIntoDOM(component);
-  assert.isNotNull(component.shadowRoot);
-  await RenderCoordinator.done();
+  renderElementIntoDOM(component, renderOptions);
+  await component.updateComplete;
+  assert.isNotNull(component.contentElement);
 
   return component;
 };
@@ -44,8 +45,8 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     const data = null;
 
     const component = await renderPreloadingDetailsReportView(data);
-    assert.isNotNull(component.shadowRoot);
-    const placeholder = component.shadowRoot.querySelector('.empty-state');
+    assert.isNotNull(component.contentElement);
+    const placeholder = component.contentElement.querySelector('.empty-state');
 
     assert.include(placeholder?.textContent, 'Select an element for more details');
   });
@@ -106,14 +107,14 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
       ['Rule set', 'example.com/'],
     ]);
   });
@@ -145,7 +146,7 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
 
     const report = await renderPreloadingDetailsReportView(data);
 
-    assert.isTrue(report.shadowRoot?.textContent?.includes('Form submissionYes'));
+    assert.isTrue(report.contentElement.textContent?.includes('Form submissionYes'));
   });
 
   it('renders prerendering details with target hint blank', async () => {
@@ -189,14 +190,14 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
       ['Target hint', '_blank'],
       ['Rule set', 'example.com/'],
     ]);
@@ -243,14 +244,14 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
       ['Target hint', '_self'],
       ['Rule set', 'example.com/'],
     ]);
@@ -296,14 +297,14 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
       ['Rule set', 'example.com/'],
     ]);
   });
@@ -366,17 +367,17 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender (automatically fell back to prefetch)'],
-      ['Status', 'Speculative load failed, but fallback to prefetch succeeded.'],
+      ['Status', 'Speculative load failed, but fallback to prefetch succeeded'],
       [
         'Failure reason',
-        'The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
+        'The prerendered page used a forbidden JavaScript API that isn’t currently supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
       ],
       ['Rule set', 'example.com/'],
     ]);
@@ -427,15 +428,15 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', ''],
       ['Action', 'Prefetch'],
-      ['Status', 'Speculative load failed.'],
-      ['Failure reason', 'The prefetch failed because of a non-2xx HTTP response status code.'],
+      ['Status', 'Speculative load failed'],
+      ['Failure reason', 'The prefetch failed because of a non-2xx HTTP response status code'],
       ['Rule set', 'example.com/'],
     ]);
   });
@@ -490,15 +491,15 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', ''],
       ['Action', 'Prefetch'],
-      ['Status', 'Speculative load failed.'],
-      ['Failure reason', 'The prefetch failed because of a non-2xx HTTP response status code (404).'],
+      ['Status', 'Speculative load failed'],
+      ['Failure reason', 'The prefetch failed because of a non-2xx HTTP response status code (404)'],
       ['Rule set', 'example.com/'],
     ]);
   });
@@ -555,15 +556,15 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender'],
-      ['Status', 'Speculative load failed.'],
-      ['Failure reason', 'The prerendering navigation failed because of a non-2xx HTTP response status code (404).'],
+      ['Status', 'Speculative load failed'],
+      ['Failure reason', 'The prerendering navigation failed because of a non-2xx HTTP response status code (404)'],
       ['Rule set', 'example.com/'],
     ]);
   });
@@ -614,14 +615,14 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', ''],
       ['Action', 'Prefetch'],
-      ['Status', 'Speculative load finished and the result is ready for the next navigation.'],
+      ['Status', 'Speculative load finished and the result is ready for the next navigation'],
       ['Rule set', 'example.com/speculation-rules.json'],
     ]);
   });
@@ -672,7 +673,7 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
@@ -682,7 +683,7 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prefetch'],
-      ['Status', 'Speculative load attempt is not yet triggered.'],
+      ['Status', 'Speculative load attempt isn’t yet triggered'],
       ['Rule set', 'example.com/'],
     ]);
     assert.isNull(requestLinkIcon);
@@ -730,17 +731,60 @@ describeWithEnvironment('PreloadingDetailsReportView', () => {
     };
 
     const component = await renderPreloadingDetailsReportView(data);
-    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+    const report = component.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
       ['Action', 'Prerender until script'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
       ['Rule set', 'example.com/'],
     ]);
   });
 
-  // TODO: Add test for pipeline
+  it('renders a screenshot of prerendering details', async () => {
+    const url = urlString`https://example.com/prerendered.html`;
+    const data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData = {
+      pipeline: SDK.PreloadingModel.PreloadPipeline.newFromAttemptsForTesting([
+        {
+          action: Protocol.Preload.SpeculationAction.Prerender,
+          key: {
+            loaderId: 'loaderId' as Protocol.Network.LoaderId,
+            action: Protocol.Preload.SpeculationAction.Prerender,
+            url,
+            targetHint: undefined,
+          },
+          pipelineId: 'pipelineId:1' as Protocol.Preload.PreloadPipelineId,
+          status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
+          prerenderStatus: null,
+          disallowedMojoInterface: null,
+          mismatchedHeaders: null,
+          ruleSetIds: ['ruleSetId'] as Protocol.Preload.RuleSetId[],
+          nodeIds: [1] as Protocol.DOM.BackendNodeId[],
+        },
+      ]),
+      ruleSets: [
+        {
+          id: 'ruleSetId' as Protocol.Preload.RuleSetId,
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          sourceText: `
+{
+  "prerender": [
+    {
+      "source": "list",
+      "urls": ["prerendered.html"]
+    }
+  ]
+}
+`,
+        },
+      ],
+      pageURL: urlString`https://example.com/`,
+    };
+
+    await renderPreloadingDetailsReportView(data, {includeCommonStyles: true});
+
+    await assertScreenshot('preloading/details_report.png');
+  });
 });

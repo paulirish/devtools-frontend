@@ -30,14 +30,14 @@ export const UIStrings = {
    * @description Description of an insight that recommends avoiding chaining critical requests.
    */
   description:
-      '[Avoid chaining critical requests](https://developer.chrome.com/docs/performance/insights/network-dependency-tree) by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load.',
+      '[Avoid chaining critical requests](https://developer.chrome.com/docs/performance/insights/network-dependency-tree) by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load',
   /**
    * @description Description of the warning that recommends avoiding chaining critical requests.
    */
   warningDescription:
-      'Avoid chaining critical requests by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load.',
+      'Avoid chaining critical requests by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load',
   /**
-   * @description Text status indicating that there isn't long chaining critical network requests.
+   * @description Text status indicating that there aren’t long chaining critical network requests.
    */
   noNetworkDependencyTree: 'No rendering tasks impacted by network dependencies',
   /**
@@ -45,9 +45,13 @@ export const UIStrings = {
    * the browser must download before it can render the page.
    */
   maxCriticalPathLatency: 'Max critical path latency:',
-  /** Label for a column in a data table; entries will be the network request */
+  /**
+   * @description Label for a column in a data table; entries will be the network request.
+   */
   columnRequest: 'Request',
-  /** Label for a column in a data table; entries will be the time from main document till current network request. */
+  /**
+   * @description Label for a column in a data table; entries will be the time from main document till current network request.
+   */
   columnTime: 'Time',
   /**
    * @description Title of the table of the detected preconnect origins.
@@ -59,9 +63,9 @@ export const UIStrings = {
   preconnectOriginsTableDescription:
       '[preconnect](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) hints help the browser establish a connection earlier in the page load, saving time when the first request for that origin is made. The following are the origins that the page preconnected to.',
   /**
-   * @description Text status indicating that there isn't any preconnected origins.
+   * @description Text status indicating that no origins were preconnected.
    */
-  noPreconnectOrigins: 'no origins were preconnected',
+  noPreconnectOrigins: 'No origins were preconnected',
   /**
    * @description A warning message that is shown when found more than 4 preconnected links. "preconnect" should not be translated.
    */
@@ -72,15 +76,15 @@ export const UIStrings = {
    */
   unusedWarning: 'Unused preconnect. Only use `preconnect` for origins that the page is likely to request.',
   /**
-   * @description A warning message that is shown when the user forget to set the `crossorigin` HTML attribute, or setting it to an incorrect value, on the link is a common mistake when adding preconnect links. "preconnect" should not be translated.
-   * */
+   * @description A warning message that is shown when the user forgets to set the `crossorigin` HTML attribute, or setting it to an incorrect value, on the link is a common mistake when adding preconnect links. "preconnect" should not be translated.
+   */
   crossoriginWarning: 'Unused preconnect. Check that the `crossorigin` attribute is used properly.',
   /**
    * @description Label for a column in a data table; entries will be the source of the origin.
    */
   columnSource: 'Source',
   /**
-   * @description Text status indicating that there isn't preconnect candidates.
+   * @description Text status indicating that there aren’t preconnect candidates.
    */
   noPreconnectCandidates: 'No additional origins are good candidates for preconnecting',
   /**
@@ -91,9 +95,9 @@ export const UIStrings = {
    * @description Description of the table that recommends preconnecting to the origins to save time. "preconnect" should not be translated.
    */
   estSavingTableDescription:
-      'Add [preconnect](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) hints to your most important origins, but try to use no more than 4.',
+      'Add [preconnect](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) hints to your most important origins, but try to use no more than 4',
   /**
-   * @description Label for a column in a data table; entries will be the origin of a web resource
+   * @description Label for a column in a data table; entries will be the origin of a web resource.
    */
   columnOrigin: 'Origin',
   /**
@@ -103,7 +107,7 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/NetworkDependencyTree.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 // XHRs are fetched at High priority, but we exclude them, as they are unlikely to be critical
 // Images are also non-critical.
@@ -673,7 +677,7 @@ export function isNetworkDependencyTreeInsight(model: InsightModel): model is Ne
 
 export function generateInsight(
     data: Handlers.Types.HandlerData, context: InsightSetContext): NetworkDependencyTreeInsightModel {
-  if (!context.navigation) {
+  if (!context.navigation || !('navigationId' in context)) {
     return finalize({
       rootNodes: [],
       maxTime: 0 as Types.Timing.Micro,

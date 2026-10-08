@@ -3,16 +3,18 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
-import type * as Platform from '../../../core/platform/platform.js';
+import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import {createConsoleInsightWidget} from '../../../testing/ConsoleInsightHelpers.js';
 import {
   assertScreenshot,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment, updateHostConfig} from '../../../testing/EnvironmentHelpers.js';
+import {setupUserMetricHooks} from '../../../testing/UserMetricsHelpers.js';
 import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as Console from '../../console/console.js';
@@ -21,6 +23,7 @@ import * as Explain from '../explain.js';
 type Insight = Extract<Explain.ViewInput['state'], {type: Explain.State.INSIGHT}>;
 
 describeWithEnvironment('ConsoleInsight', () => {
+  setupUserMetricHooks();
   let component: Explain.ConsoleInsight|undefined;
 
   const containerCss = `
@@ -34,12 +37,12 @@ describeWithEnvironment('ConsoleInsight', () => {
 
   afterEach(() => {
     component?.detach();
-    Common.Settings.settingForTest('console-insights-enabled').set(true);
-    Common.Settings.settingForTest('console-insights-onboarding-finished').set(true);
+    Common.Settings.Settings.instance().settingForTest('console-insights-enabled').set(true);
+    Common.Settings.Settings.instance().settingForTest('console-insights-onboarding-finished').set(true);
   });
 
   it('shows opt-in teaser when setting is turned off', async () => {
-    Common.Settings.settingForTest('console-insights-enabled').set(false);
+    Common.Settings.Settings.instance().settingForTest('console-insights-enabled').set(false);
     const {view, component} = await createConsoleInsightWidget();
 
     assert.strictEqual(view.input.state.type, Explain.State.LOADING);
@@ -71,7 +74,7 @@ describeWithEnvironment('ConsoleInsight', () => {
   });
 
   it('generates an explanation when the user logs in', async () => {
-    const {view, component, stubAidaCheckAccessPreconditions} = await createConsoleInsightWidget({
+    const {view, component} = await createConsoleInsightWidget({
       aidaAvailability: Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL,
     });
 
@@ -79,24 +82,18 @@ describeWithEnvironment('ConsoleInsight', () => {
 
     component.wasShown();
 
-    stubAidaCheckAccessPreconditions(Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
     Host.AidaClient.HostConfigTracker.instance().dispatchEventToListeners(
-        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED);
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
 
     const nextInput = await view.nextInput;
 
     assert.strictEqual(nextInput.state.type, Explain.State.INSIGHT);
   });
 
-  it('shows opt-in teaser when setting is disabled via disabledCondition', async () => {
-    const setting = Common.Settings.settingForTest('console-insights-enabled');
-    setting.setRegistration({
-      settingName: 'console-insights-enabled',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: true,
-      disabledCondition: () => {
-        return {disabled: true, reasons: ['disabled for test' as Platform.UIString.LocalizedString]};
-      },
+  it('shows opt-in teaser when setting is disabled via isAvailable', async () => {
+    const stub = sinon.stub(AiAssistanceModel.AiUtils.consoleInsightsEnabledSettingDescriptor, 'isAvailable').returns({
+      status: Common.Settings.SettingAvailability.DISABLED,
+      reason: [AiAssistanceModel.AiUtils.DisabledReason.POLICY_RESTRICTED],
     });
 
     const {view, component} = await createConsoleInsightWidget();
@@ -107,16 +104,11 @@ describeWithEnvironment('ConsoleInsight', () => {
     const nextInput = await view.nextInput;
 
     assert.strictEqual(nextInput.state.type, Explain.State.SETTING_IS_NOT_TRUE);
-
-    setting.setRegistration({
-      settingName: 'console-insights-enabled',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-    });
+    stub.restore();
   });
 
   it('shows reminder on first run of console insights', async () => {
-    Common.Settings.settingForTest('console-insights-onboarding-finished').set(false);
+    Common.Settings.Settings.instance().settingForTest('console-insights-onboarding-finished').set(false);
     const {view, component} = await createConsoleInsightWidget();
 
     assert.strictEqual(view.input.state.type, Explain.State.LOADING);
@@ -520,7 +512,7 @@ after
       onReminderSettingsLink: () => {},
       onEnableInsightsInSettingsLink: () => {},
       onReferencesOpen: () => {},
-    }
+    },
   };
 
   const createViewOutput = (): Explain.ViewOutput => ({
@@ -551,6 +543,9 @@ after
         },
         createViewOutput(), target);
 
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     await assertScreenshot('explain/console_insight_optin.png');
   });
 
@@ -563,98 +558,107 @@ after
         },
         createViewOutput(), target);
 
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     await assertScreenshot('explain/console_insight_reminder.png');
   });
 
   const rendersInsight = (noLogging: boolean, golden: string) => async () => {
     const target = createTarget('574px', '530px');
-    Explain.DEFAULT_VIEW(
-        {
-          ...DEFAULT_INPUT,
-          noLogging,
-          state: {
-            type: Explain.State.INSIGHT,
+    Explain.DEFAULT_VIEW({
+      ...DEFAULT_INPUT,
+      noLogging,
+      state: {
+        type: Explain.State.INSIGHT,
+        tokens: [
+          {
+            type: 'heading',
+            raw: '## Result\n\n',
+            depth: 2,
+            text: 'Result',
+            tokens: [{type: 'text', raw: 'Result', text: 'Result'}],
+          },
+          {
+            type: 'paragraph',
+            raw: 'Some text with `code`. Some code:\n',
+            text: 'Some text with `code`. Some code:',
             tokens: [
-              {
-                type: 'heading',
-                raw: '## Result\n\n',
-                depth: 2,
-                text: 'Result',
-                tokens: [{type: 'text', raw: 'Result', text: 'Result'}]
-              },
-              {
-                type: 'paragraph',
-                raw: 'Some text with `code`. Some code:\n',
-                text: 'Some text with `code`. Some code:',
-                tokens: [
-                  {type: 'text', raw: 'Some text with ', text: 'Some text with '},
-                  {type: 'codespan', raw: '`code`', text: 'code'},
-                  {type: 'text', raw: '. Some code:', text: '. Some code:'}
-                ]
-              },
-              {
-                type: 'code',
-                raw: '```ts\nconsole.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';\n```',
-                lang: 'ts',
-                text: 'console.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';'
-              },
-              {type: 'space', raw: '\n\n'}, {
-                type: 'code',
-                raw:
-                    '```\n<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>\n```',
-                lang: '',
-                text: '<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>'
-              },
-              {type: 'space', raw: '\n\n'}, {
-                type: 'paragraph',
-                raw:
-                    'Links: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)\n',
-                text:
-                    'Links: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)',
-                tokens: [
-                  {type: 'text', raw: 'Links: ', text: 'Links: '}, {
-                    type: 'link',
-                    raw: '[https://example.com](https://example.com)',
-                    href: 'https://example.com',
-                    title: null,
-                    text: 'https://example.com',
-                    tokens: [{type: 'text', raw: 'https://example.com', text: 'https://example.com'}]
-                  },
-                  {type: 'text', raw: '\nImages: ', text: '\nImages: '}, {
-                    type: 'image',
-                    raw: '![https://example.com](https://example.com)',
-                    href: 'https://example.com',
-                    title: null,
-                    text: 'https://example.com'
-                  }
-                ]
-              }
+              {type: 'text', raw: 'Some text with ', text: 'Some text with '},
+              {type: 'codespan', raw: '`code`', text: 'code'},
+              {type: 'text', raw: '. Some code:', text: '. Some code:'},
             ],
-            validMarkdown: true,
-            explanation:
-                '## Result\n\nSome text with `code`. Some code:\n```ts\nconsole.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';\n```\n\n```\n<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>\n```\n\nLinks: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)\n',
-            sources:
-                [
-                  {
-                    type: Console.PromptBuilder.SourceType.MESSAGE,
-                    value: 'Something went wrong\n\nSomething went wrong'
-                  },
-                  {type: Console.PromptBuilder.SourceType.STACKTRACE, value: 'Stacktrace line1\nStacketrace line2'},
-                  {type: Console.PromptBuilder.SourceType.RELATED_CODE, value: 'RelatedCode'}, {
-                    type: Console.PromptBuilder.SourceType.NETWORK_REQUEST,
-                    value:
-                        'Request: https://example.com/data.html\n\nRequest headers:\n:authority: example.com\nuser-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36\n\nResponse headers:\nResponse status: 404'
-                  }
-                ],
-            metadata: {},
-            isPageReloadRecommended: false,
-            completed: true,
-            directCitationUrls: [],
-            relatedUrls: []
-          }
-        },
-        createViewOutput(), target);
+          },
+          {
+            type: 'code',
+            raw: '```ts\nconsole.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';\n```',
+            lang: 'ts',
+            text: 'console.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';',
+          },
+          {type: 'space', raw: '\n\n'},
+          {
+            type: 'code',
+            raw:
+                '```\n<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>\n```',
+            lang: '',
+            text: '<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>',
+          },
+          {type: 'space', raw: '\n\n'},
+          {
+            type: 'paragraph',
+            raw:
+                'Links: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)\n',
+            text:
+                'Links: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)',
+            tokens: [
+              {type: 'text', raw: 'Links: ', text: 'Links: '},
+              {
+                type: 'link',
+                raw: '[https://example.com](https://example.com)',
+                href: 'https://example.com',
+                title: null,
+                text: 'https://example.com',
+                tokens: [{type: 'text', raw: 'https://example.com', text: 'https://example.com'}],
+              },
+              {type: 'text', raw: '\nImages: ', text: '\nImages: '},
+              {
+                type: 'image',
+                raw: '![https://example.com](https://example.com)',
+                href: 'https://example.com',
+                title: null,
+                text: 'https://example.com',
+              },
+            ],
+          },
+        ],
+        validMarkdown: true,
+        explanation:
+            '## Result\n\nSome text with `code`. Some code:\n```ts\nconsole.log(\'test\');\ndocument.querySelector(\'test\').style = \'black\';\n```\n\n```\n<!DOCTYPE html>\n<div>Hello world</div>\n<script>\n  console.log(\'Hello World\');\n</script>\n```\n\nLinks: [https://example.com](https://example.com)\nImages: ![https://example.com](https://example.com)\n',
+        sources: [
+          {
+            type: Console.PromptBuilder.SourceType.MESSAGE,
+            value: 'Something went wrong\n\nSomething went wrong',
+          },
+          {type: Console.PromptBuilder.SourceType.STACKTRACE, value: 'Stacktrace line1\nStacketrace line2'},
+          {type: Console.PromptBuilder.SourceType.RELATED_CODE, value: 'RelatedCode'},
+          {
+            type: Console.PromptBuilder.SourceType.NETWORK_REQUEST,
+            value:
+                'Request: https://example.com/data.html\n\nRequest headers:\n:authority: example.com\nuser-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36\n\nResponse headers:\nResponse status: 404',
+          },
+        ],
+        metadata: {},
+        isPageReloadRecommended: false,
+        completed: true,
+        directCitationUrls: [],
+        relatedUrls: [],
+      },
+    },
+                         createViewOutput(), target);
 
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     await assertScreenshot(golden);
   };
 
@@ -673,110 +677,118 @@ after
 
   it('renders insights with references', async () => {
     const target = createTarget('576px', '463px');
-    Explain.DEFAULT_VIEW(
-        {
-          ...DEFAULT_INPUT,
-          areReferenceDetailsOpen: true,
-          state: {
-            type: Explain.State.INSIGHT,
+    Explain.DEFAULT_VIEW({
+      ...DEFAULT_INPUT,
+      areReferenceDetailsOpen: true,
+      state: {
+        type: Explain.State.INSIGHT,
+        tokens: [
+          {
+            type: 'heading',
+            raw: '## Result\n\n',
+            depth: 2,
+            text: 'Result',
+            tokens: [{type: 'text', raw: 'Result', text: 'Result'}],
+          },
+          {
+            type: 'paragraph',
+            raw: 'Here is a text which contains both direct[^1] and indirect citations.',
+            text: 'Here is a text which contains both direct[^1] and indirect citations.',
             tokens: [
               {
-                type: 'heading',
-                raw: '## Result\n\n',
-                depth: 2,
-                text: 'Result',
-                tokens: [{type: 'text', raw: 'Result', text: 'Result'}]
+                type: 'text',
+                raw: 'Here is a text which contains both direct',
+                text: 'Here is a text which contains both direct',
+              },
+              {type: 'citation', raw: '[^1]', linkText: 1},
+              {type: 'text', raw: ' and indirect citations.', text: ' and indirect citations.'},
+            ],
+          },
+          {type: 'space', raw: '\n\n'},
+          {
+            type: 'paragraph',
+            raw: 'An indirect citation is a link to a reference which applies to the whole response.',
+            text: 'An indirect citation is a link to a reference which applies to the whole response.',
+            tokens: [{
+              type: 'text',
+              raw: 'An indirect citation is a link to a reference which applies to the whole response.',
+              text: 'An indirect citation is a link to a reference which applies to the whole response.',
+            }],
+          },
+          {type: 'space', raw: '\n\n'},
+          {
+            type: 'paragraph',
+            raw:
+                'A direct citation[^2] is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.\n',
+            text:
+                'A direct citation[^2] is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.',
+            tokens: [
+              {type: 'text', raw: 'A direct citation', text: 'A direct citation'},
+              {type: 'citation', raw: '[^2]', linkText: 2},
+              {
+                type: 'text',
+                raw:
+                    ' is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.',
+                text:
+                    ' is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.',
+              },
+            ],
+          },
+        ],
+        validMarkdown: true,
+        explanation:
+            '## Result\n\nHere is a text which contains both direct and indirect citations.\n\nAn indirect citation is a link to a reference which applies to the whole response.\n\nA direct citation is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.\n',
+        sources: [
+          {type: Console.PromptBuilder.SourceType.MESSAGE, value: 'Something went wrong\n\nSomething went wrong'},
+          {type: Console.PromptBuilder.SourceType.STACKTRACE, value: 'Stacktrace line1\nStacketrace line2'},
+          {type: Console.PromptBuilder.SourceType.RELATED_CODE, value: 'RelatedCode'},
+          {
+            type: Console.PromptBuilder.SourceType.NETWORK_REQUEST,
+            value:
+                'Request: https://example.com/data.html\n\nRequest headers:\n:authority: example.com\nuser-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36\n\nResponse headers:\nResponse status: 404',
+          },
+        ],
+        metadata: {
+          attributionMetadata: {
+            attributionAction: Host.AidaClient.RecitationAction.CITE,
+            citations: [
+              {
+                startIndex: 20,
+                endIndex: 50,
+                uri: 'https://www.direct-citation.dev',
+                sourceType: Host.AidaClient.CitationSourceType.WORLD_FACTS,
               },
               {
-                type: 'paragraph',
-                raw: 'Here is a text which contains both direct[^1] and indirect citations.',
-                text: 'Here is a text which contains both direct[^1] and indirect citations.',
-                tokens: [
-                  {
-                    type: 'text',
-                    raw: 'Here is a text which contains both direct',
-                    text: 'Here is a text which contains both direct'
-                  },
-                  {type: 'citation', raw: '[^1]', linkText: 1},
-                  {type: 'text', raw: ' and indirect citations.', text: ' and indirect citations.'}
-                ]
+                startIndex: 170,
+                endIndex: 176,
+                uri: 'https://www.another-direct-citation.dev',
+                sourceType: Host.AidaClient.CitationSourceType.WORLD_FACTS,
               },
-              {type: 'space', raw: '\n\n'}, {
-                type: 'paragraph',
-                raw: 'An indirect citation is a link to a reference which applies to the whole response.',
-                text: 'An indirect citation is a link to a reference which applies to the whole response.',
-                tokens: [{
-                  type: 'text',
-                  raw: 'An indirect citation is a link to a reference which applies to the whole response.',
-                  text: 'An indirect citation is a link to a reference which applies to the whole response.'
-                }]
-              },
-              {type: 'space', raw: '\n\n'}, {
-                type: 'paragraph',
-                raw:
-                    'A direct citation[^2] is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.\n',
-                text:
-                    'A direct citation[^2] is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.',
-                tokens: [
-                  {type: 'text', raw: 'A direct citation', text: 'A direct citation'},
-                  {type: 'citation', raw: '[^2]', linkText: 2}, {
-                    type: 'text',
-                    raw:
-                        ' is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.',
-                    text:
-                        ' is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.'
-                  }
-                ]
-              }
             ],
-            validMarkdown: true,
-            explanation:
-                '## Result\n\nHere is a text which contains both direct and indirect citations.\n\nAn indirect citation is a link to a reference which applies to the whole response.\n\nA direct citation is a link to a reference, but it only applies to a specific part of the response. Direct citations are numbered and are shown as a number within square brackets in the response text.\n',
-            sources: [
-              {type: Console.PromptBuilder.SourceType.MESSAGE, value: 'Something went wrong\n\nSomething went wrong'},
-              {type: Console.PromptBuilder.SourceType.STACKTRACE, value: 'Stacktrace line1\nStacketrace line2'},
-              {type: Console.PromptBuilder.SourceType.RELATED_CODE, value: 'RelatedCode'}, {
-                type: Console.PromptBuilder.SourceType.NETWORK_REQUEST,
-                value:
-                    'Request: https://example.com/data.html\n\nRequest headers:\n:authority: example.com\nuser-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36\n\nResponse headers:\nResponse status: 404'
-              }
+          },
+          factualityMetadata: {
+            facts: [
+              {sourceUri: 'https://www.indirect-citation.dev'},
+              {sourceUri: 'https://www.the-whole-world.dev'},
+              {sourceUri: 'https://www.even-more-content.dev'},
             ],
-            metadata: {
-              attributionMetadata: {
-                attributionAction: Host.AidaClient.RecitationAction.CITE,
-                citations: [
-                  {
-                    startIndex: 20,
-                    endIndex: 50,
-                    uri: 'https://www.direct-citation.dev',
-                    sourceType: Host.AidaClient.CitationSourceType.WORLD_FACTS,
-                  },
-                  {
-                    startIndex: 170,
-                    endIndex: 176,
-                    uri: 'https://www.another-direct-citation.dev',
-                    sourceType: Host.AidaClient.CitationSourceType.WORLD_FACTS,
-                  }
-                ]
-              },
-              factualityMetadata: {
-                facts: [
-                  {sourceUri: 'https://www.indirect-citation.dev'}, {sourceUri: 'https://www.the-whole-world.dev'},
-                  {sourceUri: 'https://www.even-more-content.dev'}
-                ]
-              }
-            },
-            isPageReloadRecommended: false,
-            completed: true,
-            directCitationUrls: ['https://www.direct-citation.dev', 'https://www.another-direct-citation.dev'],
-            relatedUrls: [
-              'https://www.indirect-citation.dev', 'https://www.the-whole-world.dev',
-              'https://www.even-more-content.dev'
-            ]
-          }
+          },
         },
-        createViewOutput(), target);
+        isPageReloadRecommended: false,
+        completed: true,
+        directCitationUrls: ['https://www.direct-citation.dev', 'https://www.another-direct-citation.dev'],
+        relatedUrls: [
+          'https://www.indirect-citation.dev',
+          'https://www.the-whole-world.dev',
+          'https://www.even-more-content.dev',
+        ],
+      },
+    },
+                         createViewOutput(), target);
 
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     await assertScreenshot('explain/console_insight_references.png');
   });
 });

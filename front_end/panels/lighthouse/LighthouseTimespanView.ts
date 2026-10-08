@@ -4,8 +4,8 @@
 /* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, render} from '../../ui/lit/lit.js';
 
@@ -24,7 +24,7 @@ const UIStrings = {
   /**
    * @description Call to action for the user to interact with the web page.
    */
-  interactWithPage: 'Interact with the page.',
+  interactWithPage: 'Interact with the page',
   /**
    * @description Label for a button that ends a Lighthouse timespan. "timespan" is a Lighthouse mode that analyzes user interactions over a period of time.
    */

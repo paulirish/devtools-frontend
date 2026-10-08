@@ -7,15 +7,15 @@ import("../../../../../scripts/build/ninja/devtools_module.gni")
 import("../../../../../scripts/build/typescript/typescript.gni")
 import("../../../visibility.gni")
 
-devtools_module("types") {
+devtools_foundation_module("types") {
   sources = [ "Lantern.ts" ]
 
-  deps = [ "../../../../generated" ]
+  ts_deps = [ "../../../../generated" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "types.ts"
-  deps = [ ":types" ]
+  ts_deps = [ ":types" ]
   visibility = [
     ":*",
     "../*",

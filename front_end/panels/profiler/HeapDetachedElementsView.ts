@@ -7,33 +7,35 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import type * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 
-import {HeapDetachedElementsDataGrid, HeapDetachedElementsDataGridNode} from './HeapDetachedElementsDataGrid.js';
+import {HeapDetachedElementsDataGrid} from './HeapDetachedElementsDataGrid.js';
 import {
   type DataDisplayDelegate,
   ProfileEvents as ProfileTypeEvents,
   type ProfileHeader,
   ProfileType,
 } from './ProfileHeader.js';
-import {WritableProfileHeader} from './ProfileView.js';
+import {WritableProfileHeader} from './WritableProfileHeader.js';
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
-   * @description Button text to obtain the detached elements retained by JS
+   * @description Button text to get the detached elements retained by JavaScript.
    */
-  startDetachedElements: 'Obtain detached elements',
+  startDetachedElements: 'Get detached elements',
   /**
    * @description The title for the collection of profiles that are gathered from various snapshots of the heap, using a sampling (e.g. every 1/100) technique.
    */
   detachedElementsTitle: 'Detached elements',
   /**
-   * @description Description in Heap Profile View of a profiler tool
+   * @description Description for the detached elements profiling option in the Memory panel.
    */
-  detachedElementsDescription: 'Detached elements shows objects that are retained by a JS reference.',
+  detachedElementsDescription: 'Detached elements show objects retained by a JS reference',
   /**
-   * @description Name of a profile
+   * @description Name of a profile.
    * @example {2} PH1
    */
   detachedElementProfile: 'Detached elements {PH1}',
@@ -43,7 +45,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class DetachedElementsProfileView extends UI.View.SimpleView implements DataDisplayDelegate {
   readonly selectedSizeText: UI.Toolbar.ToolbarText;
-  dataGrid: DataGrid.DataGrid.DataGridImpl<unknown>;
+  dataGrid: HeapDetachedElementsDataGrid;
   profile: DetachedElementsProfileHeader;
   readonly parentDataDisplayDelegate: DataDisplayDelegate;
 
@@ -57,8 +59,8 @@ export class DetachedElementsProfileView extends UI.View.SimpleView implements D
     this.parentDataDisplayDelegate = dataDisplayDelegate;
     this.selectedSizeText = new UI.Toolbar.ToolbarText();
     this.dataGrid = new HeapDetachedElementsDataGrid();
+    this.dataGrid.show(this.element);
     this.populateElementsGrid(profile.detachedElements);
-    this.dataGrid.asWidget().show(this.element);
   }
 
   showProfile(profile: ProfileHeader|null): UI.Widget.Widget|null {
@@ -84,18 +86,21 @@ export class DetachedElementsProfileView extends UI.View.SimpleView implements D
       return;
     }
 
-    for (const detachedElement of detachedElements) {
-      this.dataGrid.rootNode().appendChild(new HeapDetachedElementsDataGridNode(detachedElement, domModel));
-    }
+    this.dataGrid.data = {detachedElements, domModel};
   }
 
-  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
-    return [...await super.toolbarItems(), this.selectedSizeText];
+  override async toolbarItems(): Promise<Lit.TemplateResult> {
+    return html`${this.selectedSizeText.element}`;
   }
 }
 
-export class DetachedElementsProfileType extends
-    Common.ObjectWrapper.eventMixin<DetachedElementsProfileType.EventTypes, typeof ProfileType>(ProfileType) {
+const DetachedElementsProfileTypeBase:
+    Common.ObjectWrapper.EventMixin<DetachedElementsProfileType.EventTypes, typeof ProfileType> =
+    Common.ObjectWrapper.eventMixin(
+        ProfileType,
+    );
+
+export class DetachedElementsProfileType extends DetachedElementsProfileTypeBase {
   constructor(typeId?: string, description?: string) {
     super(
         typeId || i18nString(UIStrings.detachedElementsTitle),

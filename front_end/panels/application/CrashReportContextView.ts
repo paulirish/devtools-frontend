@@ -7,8 +7,8 @@ import '../../ui/legacy/legacy.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../generated/protocol.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, render} from '../../ui/lit/lit.js';
@@ -18,19 +18,19 @@ import * as ApplicationComponents from './components/components.js';
 
 const UIStrings = {
   /**
-   * @description Placeholder text when no context is detected.
+   * @description Header text in an empty state view when no context entries are detected in the crash report context view of the Application panel.
    */
-  noContext: 'No context entries detected across frames.',
+  noContext: 'No context entries detected across frames',
   /**
-   * @description Fallback label when a frame has no URL.
+   * @description Fallback label when a frame has no URL in the crash report context view of the Application panel.
    */
-  unknownFrame: 'Unknown Frame',
+  unknownFrame: 'Unknown frame',
   /**
-   * @description Placeholder for a search field in a toolbar
+   * @description Placeholder text for the filter input in the crash report context view of the Application panel.
    */
   filterByText: 'Filter by key or value',
   /**
-   * @description Text to refresh the page
+   * @description Tooltip text for the refresh button in the toolbar of the crash report context view in the Application panel.
    */
   refresh: 'Refresh',
 } as const;
@@ -107,7 +107,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: undefined, target: HTMLE
                          .iconName=${'refresh'}
                          .variant=${Buttons.Button.Variant.TOOLBAR}
                          jslog=${VisualLogging.action('refresh').track({
-                           click: true
+                           click: true,
                          })}>
         </devtools-button>
         <devtools-toolbar-input type="filter" placeholder=${i18nString(UIStrings.filterByText)}
@@ -127,8 +127,8 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: undefined, target: HTMLE
                     data: {
                       entries: frame.entries.map(e => ({key: e.key, value: e.value})),
                       selectedKey: input.selectedKey || undefined,
-                      filters: input.filters
-                    }
+                      filters: input.filters,
+                    },
                   })}
                   @select=${(e: CustomEvent<string>) => input.onRowSelected(e.detail)}>
                 </devtools-widget>
@@ -213,7 +213,6 @@ export class CrashReportContextView extends UI.Widget.VBox {
             frameId,
             displayName,
             isMain: frame?.isMainFrame() ?? false,
-            origin: frame?.securityOrigin || '',
             entries: frameEntries,
           };
         })

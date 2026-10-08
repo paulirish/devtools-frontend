@@ -6,16 +6,31 @@ import("../scripts/build/ninja/copy.gni")
 import("../scripts/build/typescript/typescript.gni")
 
 group("test") {
+  testonly = true
   deps = [
+    ":api_tests",
     ":run",
     ":unittests",
+    "ai_evals",
+    "api",
     "e2e",
     "perf",
     "shared",
   ]
 }
 
+group("api_tests") {
+  testonly = true
+  deps = [
+    "../front_end:api_test_inputs",
+    "../front_end:api_tests",
+    "api",
+    "api:run_devtools_api_tests",
+  ]
+}
+
 group("unittests") {
+  testonly = true
   deps = [
     "../front_end:test_inputs",
     "../front_end:unittests",
@@ -23,18 +38,28 @@ group("unittests") {
     "../mcp:foundation_unittests",
     "shared",
     "unit:karma",
+    "unit:mocha",
+    "unit:run_devtools_node_unit_tests",
+    "unit:run_devtools_unit_tests",
   ]
 }
 
 node_ts_library("run") {
   sources = [ "run.ts" ]
 
-  deps = [ "shared" ]
+  inputs = typescript_yargs_types_inputs
+
+  ts_deps = [ "conductor:implementation" ]
 }
 
-source_root = rebase_path("//$devtools_location", target_gen_dir)
-checkout_root = rebase_path("//", target_gen_dir)
-build_root = rebase_path(root_build_dir, target_gen_dir)
-write_file(
-    "$target_gen_dir/build.js",
-    "export default {SOURCE_ROOT: '$source_root', CHECKOUT_ROOT: '$checkout_root', BUILD_ROOT: '$build_root', BUILD_WITH_CHROMIUM: $build_with_chromium};")
+generated_file("build_config") {
+  outputs = [ "$target_gen_dir/build.json" ]
+  data = [ "$target_gen_dir/build.json" ]
+  output_conversion = "json"
+  contents = {
+    SOURCE_ROOT = rebase_path("//$devtools_location", target_gen_dir)
+    CHECKOUT_ROOT = rebase_path("//", target_gen_dir)
+    BUILD_ROOT = rebase_path(root_build_dir, target_gen_dir)
+    BUILD_WITH_CHROMIUM = build_with_chromium
+  }
+}

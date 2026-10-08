@@ -20,10 +20,8 @@ group("legacy_test_runner") {
 ts_library("legacy_test_runner-source") {
   sources = [ "legacy_test_runner.ts" ]
 
-  deps = [
+  ts_deps = [
     "../entrypoints/devtools_app:entrypoint",
-    "../panels/console_counters:bundle",
-    "../panels/event_listeners:bundle",
     "test_runner:bundle",
   ]
 }

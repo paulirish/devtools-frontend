@@ -19,10 +19,29 @@ import * as UI from '../ui/legacy/legacy.js';
 import {checkForPendingActivity} from './TrackAsyncOperations.js';
 
 export const TEST_CONTAINER_ID = '__devtools-test-container-id';
+export {setTestUniverseForWidgets} from './DOMHooks.js';
 
 interface RenderOptions {
   allowMultipleChildren?: boolean;
+  /**
+   * Injects standard Inspector and text button stylesheets into the test DOM.
+   * This is typically needed for testing legacy components or widget wrappers that do
+   * not use Shadow DOM and instead rely on global stylesheets.
+   */
   includeCommonStyles?: boolean;
+  /**
+   * Additional stylesheets to inject into the test DOM container. Use this to supply
+   * component-specific stylesheet strings during DOM/screenshot testing.
+   */
+  extraStyles?: CSSInJS[];
+  /**
+   * Sets the width of the test DOM container.
+   */
+  width?: string|number;
+  /**
+   * Sets the height of the test DOM container.
+   */
+  height?: string|number;
 }
 
 /**
@@ -44,6 +63,20 @@ export function renderElementIntoDOM<E extends Node|UI.Widget.AnyWidget>(
   if (renderOptions.includeCommonStyles) {
     container.appendChild(document.createElement('style')).textContent = UI.inspectorCommonStyles;
     container.appendChild(document.createElement('style')).textContent = Buttons.textButtonStyles;
+  }
+  if (renderOptions.extraStyles) {
+    for (const style of renderOptions.extraStyles) {
+      container.appendChild(document.createElement('style')).textContent = style;
+    }
+  }
+  if (renderOptions.width !== undefined) {
+    container.style.width = typeof renderOptions.width === 'number' ? `${renderOptions.width}px` : renderOptions.width;
+  }
+  if (renderOptions.height !== undefined) {
+    container.style.height =
+        typeof renderOptions.height === 'number' ? `${renderOptions.height}px` : renderOptions.height;
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
   }
   if (element instanceof Node) {
     container.appendChild(element);
@@ -83,7 +116,7 @@ export function assertElements<T extends Element>(
 }
 
 export function getElementWithinComponent<T extends HTMLElement, V extends Element>(
-    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>) {
+    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>): V {
   assert.isNotNull(component.shadowRoot);
   const element = component.shadowRoot.querySelector(selector);
   assert.instanceOf(element, elementClass);
@@ -91,7 +124,7 @@ export function getElementWithinComponent<T extends HTMLElement, V extends Eleme
 }
 
 export function getElementsWithinComponent<T extends HTMLElement, V extends Element>(
-    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>) {
+    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>): NodeListOf<V> {
   assert.isNotNull(component.shadowRoot);
   const elements = component.shadowRoot.querySelectorAll(selector);
   assertElements(elements, elementClass);
@@ -129,27 +162,27 @@ export function waitForScrollLeft<T extends Element>(element: T, desiredScrollLe
 /**
  * Dispatches a mouse click event.
  */
-export function dispatchClickEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchClickEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const clickEvent = new MouseEvent('click', options);
   element.dispatchEvent(clickEvent);
 }
 
-export function dispatchMouseUpEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchMouseUpEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const clickEvent = new MouseEvent('mouseup', options);
   element.dispatchEvent(clickEvent);
 }
 
-export function dispatchBlurEvent<T extends Element>(element: T, options: FocusEventInit = {}) {
+export function dispatchBlurEvent<T extends Element>(element: T, options: FocusEventInit = {}): void {
   const focusEvent = new FocusEvent('blur', options);
   element.dispatchEvent(focusEvent);
 }
 
-export function dispatchFocusEvent<T extends Element>(element: T, options: FocusEventInit = {}) {
+export function dispatchFocusEvent<T extends Element>(element: T, options: FocusEventInit = {}): void {
   const focusEvent = new FocusEvent('focus', options);
   element.dispatchEvent(focusEvent);
 }
 
-export function dispatchFocusOutEvent<T extends Element>(element: T, options: FocusEventInit = {}) {
+export function dispatchFocusOutEvent<T extends Element>(element: T, options: FocusEventInit = {}): void {
   const focusEvent = new FocusEvent('focusout', options);
   element.dispatchEvent(focusEvent);
 }
@@ -157,13 +190,13 @@ export function dispatchFocusOutEvent<T extends Element>(element: T, options: Fo
 /**
  * Dispatches a keydown event. Errors if the event was not dispatched successfully.
  */
-export function dispatchKeyDownEvent<T extends Element>(element: T, options: KeyboardEventInit = {}) {
+export function dispatchKeyDownEvent<T extends Element>(element: T, options: KeyboardEventInit = {}): void {
   const clickEvent = new KeyboardEvent('keydown', options);
   const success = element.dispatchEvent(clickEvent);
   assert.isOk(success, 'Failed to trigger keydown event successfully.');
 }
 
-export function dispatchInputEvent<T extends Element>(element: T, options: InputEventInit = {}) {
+export function dispatchInputEvent<T extends Element>(element: T, options: InputEventInit = {}): void {
   const inputEvent = new InputEvent('input', options);
   element.dispatchEvent(inputEvent);
 }
@@ -171,14 +204,14 @@ export function dispatchInputEvent<T extends Element>(element: T, options: Input
 /**
  * Dispatches a mouse over event.
  */
-export function dispatchMouseOverEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchMouseOverEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const moveEvent = new MouseEvent('mouseover', options);
   element.dispatchEvent(moveEvent);
 }
 /**
  * Dispatches a mouse out event.
  */
-export function dispatchMouseOutEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchMouseOutEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const moveEvent = new MouseEvent('mouseout', options);
   element.dispatchEvent(moveEvent);
 }
@@ -186,7 +219,7 @@ export function dispatchMouseOutEvent<T extends Element>(element: T, options: Mo
 /**
  * Dispatches a mouse move event.
  */
-export function dispatchMouseMoveEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchMouseMoveEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const moveEvent = new MouseEvent('mousemove', options);
   element.dispatchEvent(moveEvent);
 }
@@ -194,7 +227,7 @@ export function dispatchMouseMoveEvent<T extends Element>(element: T, options: M
 /**
  * Dispatches a mouse leave event.
  */
-export function dispatchMouseLeaveEvent<T extends Element>(element: T, options: MouseEventInit = {}) {
+export function dispatchMouseLeaveEvent<T extends Element>(element: T, options: MouseEventInit = {}): void {
   const leaveEvent = new MouseEvent('mouseleave', options);
   element.dispatchEvent(leaveEvent);
 }
@@ -202,7 +235,7 @@ export function dispatchMouseLeaveEvent<T extends Element>(element: T, options: 
 /**
  * Dispatches a clipboard copy event.
  */
-export function dispatchCopyEvent<T extends Element>(element: T, options: ClipboardEventInit = {}) {
+export function dispatchCopyEvent<T extends Element>(element: T, options: ClipboardEventInit = {}): void {
   const copyEvent = new ClipboardEvent('copy', options);
   element.dispatchEvent(copyEvent);
 }
@@ -210,7 +243,7 @@ export function dispatchCopyEvent<T extends Element>(element: T, options: Clipbo
 /**
  * Dispatches a clipboard paste event.
  */
-export function dispatchPasteEvent<T extends Element>(element: T, options: ClipboardEventInit = {}) {
+export function dispatchPasteEvent<T extends Element>(element: T, options: ClipboardEventInit = {}): void {
   const pasteEvent = new ClipboardEvent('paste', options);
   element.dispatchEvent(pasteEvent);
 }
@@ -227,11 +260,11 @@ export function getEventPromise<T extends Event>(element: EventTarget, eventName
   });
 }
 
-export async function doubleRaf() {
+export async function doubleRaf(): Promise<number> {
   return await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
-export async function raf() {
+export async function raf(): Promise<number> {
   return await new Promise(resolve => requestAnimationFrame(resolve));
 }
 
@@ -241,7 +274,7 @@ export async function raf() {
  * static parts of a template, and we don't want our tests full of noise
  * from those.
  */
-export function stripLitHtmlCommentNodes(text: string) {
+export function stripLitHtmlCommentNodes(text: string): string {
   /**
    * Lit comments take the form of:
    * <!--?lit$1234?--> or:
@@ -279,7 +312,7 @@ export function cleanTextContent(input: string): string {
   return input.trim().replace(/[ \n]{2,}/g, ' ');
 }
 
-export function assertNodeTextContent(component: NodeText.NodeText.NodeText, expectedContent: string) {
+export function assertNodeTextContent(component: NodeText.NodeText.NodeText, expectedContent: string): void {
   assert.isNotNull(component.shadowRoot);
   const content = Array.from(component.shadowRoot.querySelectorAll('span')).map(span => span.textContent).join('');
   assert.strictEqual(content, expectedContent);
@@ -310,9 +343,12 @@ declare global {
  * Currently, it only asserts screenshots match goldens on Linux.
  * The function relies on the bindings exposed via the karma config.
  */
-export async function assertScreenshot(filename: string) {
+export async function assertScreenshot(filename: string): Promise<void> {
   // To avoid a lot of empty space in the screenshot.
-  document.getElementById(TEST_CONTAINER_ID)!.style.width = 'fit-content';
+  const container = document.getElementById(TEST_CONTAINER_ID)!;
+  if (!container.style.width) {
+    container.style.width = 'fit-content';
+  }
   let frame: Window|null = window;
   while (frame) {
     frame.scrollTo(0, 0);

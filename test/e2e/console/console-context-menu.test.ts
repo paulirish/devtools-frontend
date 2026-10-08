@@ -9,6 +9,8 @@ import {clickOnContextMenu, CONSOLE_TAB_SELECTOR, focusConsolePrompt} from '../h
 
 describe('The Console Tab', function() {
   const RESULT_SELECTOR = '.console-message-text';
+  // Targets the root tree element of object previews (like Maps and Sets) in the Console
+  const OBJECT_SELECTOR = '.object-properties-section-root-element';
   const LINE_END = platform === 'win32' ? '\r\n' : '\n';
 
   it('can copy contents for strings', async ({devToolsPage}) => {
@@ -17,7 +19,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('\'string\\ncontent\'\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-string-contents', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-string-contents');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, `string${LINE_END}content`);
   });
@@ -27,7 +29,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('\'string\\ncontent\'\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-string-as-js-literal', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-string-as-js-literal');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, '\'string\\ncontent\'');
   });
@@ -37,7 +39,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('\'string\\ncontent\'\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-string-as-json-literal', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-string-as-json-literal');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, '"string\\ncontent"');
   });
@@ -47,7 +49,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('500\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-primitive', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-primitive');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, '500');
   });
@@ -57,7 +59,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('500n\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-primitive', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-primitive');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, '500n');
   });
@@ -67,7 +69,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('true\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-primitive', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-primitive');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, 'true');
   });
@@ -77,7 +79,7 @@ describe('The Console Tab', function() {
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('undefined\n');
     await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-primitive', devToolsPage);
+    await clickOnContextMenu(devToolsPage, RESULT_SELECTOR, 'copy-primitive');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, 'undefined');
   });
@@ -86,8 +88,8 @@ describe('The Console Tab', function() {
     await devToolsPage.click(CONSOLE_TAB_SELECTOR);
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('new Map([["key1","value1"],["key2","value2"]])\n');
-    await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-object', devToolsPage);
+    await devToolsPage.waitFor(OBJECT_SELECTOR);
+    await clickOnContextMenu(devToolsPage, OBJECT_SELECTOR, 'copy-object');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(
         copiedContent,
@@ -99,8 +101,8 @@ describe('The Console Tab', function() {
     await devToolsPage.click(CONSOLE_TAB_SELECTOR);
     await focusConsolePrompt(devToolsPage);
     await devToolsPage.typeText('new Set(["a","b","c"])\n');
-    await devToolsPage.waitFor(RESULT_SELECTOR);
-    await clickOnContextMenu(RESULT_SELECTOR, 'copy-object', devToolsPage);
+    await devToolsPage.waitFor(OBJECT_SELECTOR);
+    await clickOnContextMenu(devToolsPage, OBJECT_SELECTOR, 'copy-object');
     const copiedContent = await devToolsPage.readClipboard();
     assert.deepEqual(copiedContent, `new Set([${LINE_END}    "a",${LINE_END}    "b",${LINE_END}    "c"${LINE_END}])`);
   });

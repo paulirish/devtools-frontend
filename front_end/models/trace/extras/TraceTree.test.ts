@@ -5,17 +5,17 @@
 import {assert} from 'chai';
 
 import type * as Protocol from '../../../generated/protocol.js';
-import * as Timeline from '../../../panels/timeline/timeline.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {
   getMainThread,
   makeCompleteEvent,
   makeProfileCall,
-} from '../../../testing/TraceHelpers.js';
+} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
-describeWithEnvironment('TraceTree', () => {
+describe('TraceTree', () => {
+  setupLocaleHooks();
   describe('TopDownRootNode', () => {
     it('builds the root node and its children properly from an event tree', () => {
       // This builds the following tree:
@@ -363,15 +363,77 @@ describeWithEnvironment('TraceTree', () => {
       assert.strictEqual(nodeB.selfTime, Trace.Helpers.Timing.microToMilli(nodeBSelfTime));
     });
 
+    it('creates a node for an event with an empty name and attributes self time correctly', () => {
+      // This builds the following tree:
+      // |------------ROOT-----------|
+      // |------P------|
+      //    |-''-|
+      const eventP = makeCompleteEvent('P', 0, 100_000);
+      const eventEmpty = makeCompleteEvent('', 20_000, 30_000);
+      const root = new Trace.Extras.TraceTree.BottomUpRootNode([eventP, eventEmpty], {
+        textFilter: new Trace.Extras.TraceFilter.InvisibleEventsFilter([]),
+        filters: [],
+        startTime: Trace.Types.Timing.Milli(0),
+        endTime: Trace.Types.Timing.Milli(200),
+      });
+
+      const rootChildren = root.children();
+      const nodeP = rootChildren.get('P');
+      const nodeEmpty = rootChildren.get('');
+      assert.exists(nodeP);
+      assert.exists(nodeEmpty);
+      assert.strictEqual(nodeP.selfTime, 70);
+      assert.strictEqual(nodeP.totalTime, 100);
+      assert.strictEqual(nodeEmpty.selfTime, 30);
+      assert.strictEqual(nodeEmpty.totalTime, 30);
+      assert.isTrue(nodeEmpty.hasChildren());
+      assert.strictEqual(root.selfTime, 100);
+    });
+
+    it('does not double count total time of nested same-name events around an event with an empty name', () => {
+      // This builds the following tree:
+      // |------------ROOT-----------|
+      // |----------X----------|
+      //   |---X---|  |-X-|
+      //     |-''-|
+      const outerX = makeCompleteEvent('X', 0, 100_000);
+      const innerX = makeCompleteEvent('X', 10_000, 30_000);
+      const eventEmpty = makeCompleteEvent('', 20_000, 10_000);
+      const laterX = makeCompleteEvent('X', 50_000, 10_000);
+      const root = new Trace.Extras.TraceTree.BottomUpRootNode([outerX, innerX, eventEmpty, laterX], {
+        textFilter: new Trace.Extras.TraceFilter.InvisibleEventsFilter([]),
+        filters: [],
+        startTime: Trace.Types.Timing.Milli(0),
+        endTime: Trace.Types.Timing.Milli(200),
+      });
+
+      const rootChildren = root.children();
+      const nodeX = rootChildren.get('X');
+      const nodeEmpty = rootChildren.get('');
+      assert.exists(nodeX);
+      assert.exists(nodeEmpty);
+      // The outermost X spans 0-100 ms, which contains every other X.
+      assert.strictEqual(nodeX.totalTime, 100);
+      assert.strictEqual(nodeX.selfTime, 90);
+      assert.strictEqual(nodeEmpty.totalTime, 10);
+      assert.strictEqual(nodeEmpty.selfTime, 10);
+      assert.strictEqual(root.selfTime, 100);
+    });
+
     it('correctly keeps ProfileCall nodes and uses them to build up the tree', async function() {
       const {data} = await TraceLoader.traceEngine(this, 'mainWasm_profile.json.gz');
       const mainThread = getMainThread(data.Renderer);
       const bounds = Trace.Helpers.Timing.traceWindowMilliSeconds(data.Meta.traceBounds);
 
       // Replicate the filters as they would be when rendering in the actual panel.
-      const textFilter = new Timeline.TimelineFilters.TimelineRegExp();
+      class AcceptAllFilter extends Trace.Extras.TraceFilter.TraceFilter {
+        accept(): boolean {
+          return true;
+        }
+      }
+      const textFilter = new AcceptAllFilter();
       const modelFilters = [
-        Timeline.TimelineUIUtils.TimelineUIUtils.visibleEventsFilter(),
+        new Trace.Extras.TraceFilter.VisibleEventsFilter(Trace.Styles.visibleTypes()),
         new Trace.Extras.TraceFilter.ExclusiveNameFilter([
           Trace.Types.Events.Name.RUN_TASK,
         ]),

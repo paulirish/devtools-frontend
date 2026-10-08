@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as SDK from '../../core/sdk/sdk.js';
+import type * as SDK from '../../core/sdk/sdk.js';
 
-import {resolveScopeChain} from './NamesResolver.js';
+import {Events as ScopeChainResolverEvents, type ScopeChainResolver} from './ScopeChainResolver.js';
 
 /**
  * This class is responsible for resolving / updating the scope chain for a specific {@link SDK.DebuggerModel.CallFrame}
@@ -17,48 +17,44 @@ import {resolveScopeChain} from './NamesResolver.js';
  *
  * Source maps can be enabled/disabled dynamically and debugger plugins can attach debug info after the fact.
  *
- * This class tracks all that and sends events with the latest scope chain for a specific call frame.
+ * The {@link ScopeChainResolver} tracks all that and invalidates its cache accordingly. This class
+ * sends events with the latest scope chain for a specific call frame.
  */
 export class ScopeChainModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   readonly #callFrame: SDK.DebuggerModel.CallFrame;
+  readonly #scopeChainResolver: ScopeChainResolver;
 
   /** We use the `Throttler` here to make sure that `#boundUpdate` is not run multiple times simultanously */
   readonly #throttler = new Common.Throttler.Throttler(5);
   readonly #boundUpdate = this.#update.bind(this);
 
-  constructor(callFrame: SDK.DebuggerModel.CallFrame) {
+  constructor(callFrame: SDK.DebuggerModel.CallFrame, scopeChainResolver: ScopeChainResolver) {
     super();
     this.#callFrame = callFrame;
-    this.#callFrame.debuggerModel.addEventListener(
-        SDK.DebuggerModel.Events.DebugInfoAttached, this.#debugInfoAttached, this);
-    this.#callFrame.debuggerModel.sourceMapManager().addEventListener(
-        SDK.SourceMapManager.Events.SourceMapAttached, this.#sourceMapAttached, this);
+    this.#scopeChainResolver = scopeChainResolver;
+    this.#scopeChainResolver.addEventListener(ScopeChainResolverEvents.SCOPE_CHAIN_INVALIDATED,
+                                              this.#scopeChainInvalidated, this);
 
     void this.#throttler.schedule(this.#boundUpdate);
   }
 
   dispose(): void {
-    this.#callFrame.debuggerModel.removeEventListener(
-        SDK.DebuggerModel.Events.DebugInfoAttached, this.#debugInfoAttached, this);
-    this.#callFrame.debuggerModel.sourceMapManager().removeEventListener(
-        SDK.SourceMapManager.Events.SourceMapAttached, this.#sourceMapAttached, this);
+    this.#scopeChainResolver.removeEventListener(ScopeChainResolverEvents.SCOPE_CHAIN_INVALIDATED,
+                                                 this.#scopeChainInvalidated, this);
     this.listeners?.clear();
   }
 
+  resolveScopeChain(): Promise<SDK.DebuggerModel.ScopeChainEntry[]> {
+    return this.#scopeChainResolver.resolveScopeChain(this.#callFrame);
+  }
+
   async #update(): Promise<void> {
-    const scopeChain = await resolveScopeChain(this.#callFrame);
+    const scopeChain = await this.resolveScopeChain();
     this.dispatchEventToListeners(Events.SCOPE_CHAIN_UPDATED, new ScopeChain(scopeChain));
   }
 
-  #debugInfoAttached(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
+  #scopeChainInvalidated(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
     if (event.data === this.#callFrame.script) {
-      void this.#throttler.schedule(this.#boundUpdate);
-    }
-  }
-
-  #sourceMapAttached(event: Common.EventTarget
-                         .EventTargetEvent<{client: SDK.Script.Script, sourceMap: SDK.SourceMap.SourceMap}>): void {
-    if (event.data.client === this.#callFrame.script) {
       void this.#throttler.schedule(this.#boundUpdate);
     }
   }

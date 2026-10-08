@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -23,46 +24,42 @@ import {
   describeWithEnvironment,
   registerActions,
   registerNoopActions,
-  stubNoopSettings,
 } from '../../testing/EnvironmentHelpers.js';
 import {expectCalled} from '../../testing/ExpectStubCall.js';
 import {stubFileManager} from '../../testing/FileManagerHelpers.js';
-import {
-  describeWithMockConnection,
-  dispatchEvent,
-  setMockConnectionResponseHandler
-} from '../../testing/MockConnection.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {dispatchEvent} from '../../testing/MockConnection.js';
+import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
 import {activate} from '../../testing/ResourceTreeHelpers.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
+import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Settings from '../../ui/settings/settings.js';
 
 import * as Network from './network.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-describeWithMockConnection('NetworkLogView', () => {
+describeWithEnvironment('NetworkLogView', () => {
   let target: SDK.Target.Target;
+  let tabTarget: SDK.Target.Target;
+  let connection: MockCDPConnection;
   let networkLogView: Network.NetworkLogView.NetworkLogView;
   let networkLog: Logs.NetworkLog.NetworkLog;
 
   beforeEach(() => {
-    setMockConnectionResponseHandler('Debugger.enable', () => ({} as Protocol.Debugger.EnableResponse));
-    setMockConnectionResponseHandler('Storage.getStorageKey', () => ({} as Protocol.Storage.GetStorageKeyResponse));
+    connection = new MockCDPConnection();
+    connection.setSuccessHandler('Debugger.enable', () => ({} as Protocol.Debugger.EnableResponse));
+    connection.setSuccessHandler('Storage.getStorageKey', () => ({} as Protocol.Storage.GetStorageKeyResponse));
     const dummyStorage = new Common.Settings.SettingsStorage({});
 
-    for (const settingName of ['network-color-code-resource-types', 'network.group-by-frame']) {
-      Common.Settings.registerSettingExtension({
-        settingName,
-        settingType: Common.Settings.SettingType.BOOLEAN,
-        defaultValue: false,
-      });
-    }
     Common.Settings.Settings.instance({
       forceNew: true,
       syncedStorage: dummyStorage,
       globalStorage: dummyStorage,
       localStorage: dummyStorage,
       settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
+      console: Common.Console.Console.instance(),
     });
     registerNoopActions(['network.toggle-recording', 'inspector-main.reload']);
 
@@ -71,15 +68,17 @@ describeWithMockConnection('NetworkLogView', () => {
       shortcutsForAction: () => [],
     } as unknown as UI.ShortcutRegistry.ShortcutRegistry);
     networkLog = Logs.NetworkLog.NetworkLog.instance();
-    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
+    tabTarget = createTarget({type: SDK.Target.Type.TAB, connection});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
   });
 
   afterEach(() => {
     if (networkLogView) {
       networkLogView.detach();
     }
+    Logs.NetworkLog.NetworkLog.removeInstance();
   });
 
   let nextId = 0;
@@ -112,6 +111,24 @@ describeWithMockConnection('NetworkLogView', () => {
     return request;
   }
 
+  function createWebSocketRequest(url: string, options: {
+    target?: SDK.Target.Target,
+  } = {}): SDK.NetworkRequest.NetworkRequest {
+    const effectiveTarget = options.target || target;
+    const networkManager = effectiveTarget.model(SDK.NetworkManager.NetworkManager);
+    assert.exists(networkManager);
+    let request: SDK.NetworkRequest.NetworkRequest|undefined;
+    const onRequestStarted = (event: Common.EventTarget.EventTargetEvent<SDK.NetworkManager.RequestStartedEvent>) => {
+      request = event.data.request;
+    };
+    networkManager.addEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+    dispatchEvent(effectiveTarget, 'Network.webSocketCreated',
+                  {requestId: `request${++nextId}`, url} as unknown as Protocol.Network.WebSocketCreatedEvent);
+    networkManager.removeEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+    assert.exists(request);
+    return request;
+  }
+
   function createEnvironment() {
     const filterBar = new UI.FilterBar.FilterBar('network-panel', true);
     networkLogView = createNetworkLogView(filterBar);
@@ -120,6 +137,30 @@ describeWithMockConnection('NetworkLogView', () => {
 
     return {rootNode, filterBar, networkLogView};
   }
+
+  it('places the request-number column first when it is visible', () => {
+    Common.Settings.Settings.instance().createSetting('network-log-columns', {}).set({
+      'request-number': {visible: true},
+    });
+    networkLogView = createNetworkLogView();
+    networkLogView.columns().switchViewMode(true);
+    const visibleColumns = networkLogView.columns().dataGrid().visibleColumnsArray;
+    assert.strictEqual(visibleColumns[0].id, 'request-number');
+  });
+
+  it('keeps the request icon on the name cell when request-number is pinned first', () => {
+    Common.Settings.Settings.instance().createSetting('network-log-columns', {}).set({
+      'request-number': {visible: true},
+    });
+    createNetworkRequest('http://localhost/foo.js', {});
+    networkLogView = createNetworkLogView();
+    networkLogView.columns().switchViewMode(true);
+    renderElementIntoDOM(networkLogView);
+    const node =
+        networkLogView.columns().dataGrid().rootNode().children[0] as Network.NetworkDataGridNode.NetworkRequestNode;
+    assert.exists(node.createCell('name').querySelector('devtools-icon'));
+    assert.isNull(node.createCell('request-number').querySelector('devtools-icon'));
+  });
 
   it('generates a valid curl command when some headers don\'t have values', async () => {
     const request = createNetworkRequest(urlString`http://localhost`, {
@@ -130,7 +171,7 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     const actual = await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix');
     const expected =
-        'curl \'http://localhost\' \\\n  -H \'header-with-value: some value\' \\\n  -H \'no-value-header;\'';
+        'curl --url \'http://localhost\' \\\n  -H \'header-with-value: some value\' \\\n  -H \'no-value-header;\'';
     assert.strictEqual(actual, expected);
   });
 
@@ -144,7 +185,7 @@ describeWithMockConnection('NetworkLogView', () => {
       ],
     });
     const actual = await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix');
-    const expected = 'curl \'http://localhost\'';
+    const expected = 'curl --url \'http://localhost\'';
     assert.strictEqual(actual, expected);
   });
 
@@ -154,11 +195,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b \'eva=\"Sg4=\"\'',
+        'curl --url \'http://localhost\' -b \'eva=\"Sg4=\"\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -b ^"eva=^\\^"Sg4=^\\^"^"',
+        'curl --url ^"http://localhost^" -b ^"eva=^\\^"Sg4=^\\^"^"',
     );
   });
 
@@ -168,11 +209,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -H \'cookie: namelesscookie\'',
+        'curl --url \'http://localhost\' -H \'cookie: namelesscookie\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -H ^"cookie: namelesscookie^"',
+        'curl --url ^"http://localhost^" -H ^"cookie: namelesscookie^"',
     );
   });
 
@@ -182,11 +223,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b \'name=value\'',
+        'curl --url \'http://localhost\' -b \'name=value\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -b ^"name=value^"',
+        'curl --url ^"http://localhost^" -b ^"name=value^"',
     );
   });
 
@@ -196,11 +237,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b \'\\\\attacker.com\\share\\leak=foo\'',
+        'curl --url \'http://localhost\' -b \'\\\\attacker.com\\share\\leak=foo\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -b ^"^\\^\\^\\^\\attacker.com^\\^\\share^\\^\\leak=foo^"',
+        'curl --url ^"http://localhost^" -b ^"^\\^\\^\\^\\attacker.com^\\^\\share^\\^\\leak=foo^"',
     );
   });
 
@@ -210,11 +251,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b \'eva=%22Sg4%3D%22\'',
+        'curl --url \'http://localhost\' -b \'eva=%22Sg4%3D%22\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -b ^"eva=^%^22Sg4^%^3D^%^22^"',
+        'curl --url ^"http://localhost^" -b ^"eva=^%^22Sg4^%^3D^%^22^"',
     );
   });
 
@@ -224,11 +265,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b $\'query=evil\\n\\n & cmd /c calc.exe \\n\\n\'',
+        'curl --url \'http://localhost\' -b $\'query=evil\\n\\n & cmd /c calc.exe \\n\\n\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^\"http://localhost^\" -b ^\"query=evil^\n\n^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
+        'curl --url ^\"http://localhost^\" -b ^\"query=evil^\n\n^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
     );
   });
 
@@ -238,11 +279,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b $\'query=evil\\r\\n & cmd /c calc.exe \\n\\n\'',
+        'curl --url \'http://localhost\' -b $\'query=evil\\r\\n & cmd /c calc.exe \\n\\n\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^\"http://localhost^\" -b ^\"query=evil^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
+        'curl --url ^\"http://localhost^\" -b ^\"query=evil^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
     );
   });
 
@@ -252,11 +293,11 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b $\'query=evil\\u0009\\u000b\\u000c\\r\\n & cmd /c calc.exe \\n\\n\'',
+        'curl --url \'http://localhost\' -b $\'query=evil\\u0009\\u000b\\u000c\\r\\n & cmd /c calc.exe \\n\\n\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^\"http://localhost^\" -b ^\"query=evil   ^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
+        'curl --url ^\"http://localhost^\" -b ^\"query=evil   ^\n\n ^& cmd /c calc.exe ^\n\n^\n\n^\"',
     );
   });
 
@@ -266,11 +307,25 @@ describeWithMockConnection('NetworkLogView', () => {
     });
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -b $\'query=evil\\r & cmd /c calc.exe\'',
+        'curl --url \'http://localhost\' -b $\'query=evil\\r & cmd /c calc.exe\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^\"http://localhost^\" -b ^\"query=evil^\n\n ^& cmd /c calc.exe^\"',
+        'curl --url ^\"http://localhost^\" -b ^\"query=evil^\n\n ^& cmd /c calc.exe^\"',
+    );
+  });
+
+  it('generates a valid curl command when header values contain dollar, parentheses and backtick', async () => {
+    const request = createNetworkRequest(urlString`http://localhost`, {
+      requestHeaders: [{name: 'cookie', value: 'query=$(calc)`whoami`'}],
+    });
+    assert.strictEqual(
+        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
+        'curl --url \'http://localhost\' -b \'query=$(calc)`whoami`\'',
+    );
+    assert.strictEqual(
+        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
+        'curl --url ^"http://localhost^" -b ^"query=^$^(calc^)^`whoami^`^"',
     );
   });
 
@@ -280,11 +335,10 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '123');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' --data-raw \'123\'',
+        'curl --url \'http://localhost\' --data-raw \'123\'',
     );
-    assert.strictEqual(
-        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" --data-raw ^"123^"');
+    assert.strictEqual(await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
+                       'curl --url ^"http://localhost^" --data-raw ^"123^"');
   });
 
   it('generates a valid curl command for a POST request with urlencoded data', async () => {
@@ -295,11 +349,11 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '1&b');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' \\\n  -H \'Content-Type: application/x-www-form-urlencoded\' \\\n  --data-raw \'1&b\'',
+        'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/x-www-form-urlencoded\' \\\n  --data-raw \'1&b\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" ^\n  -H ^"Content-Type: application/x-www-form-urlencoded^" ^\n  --data-raw ^"1^&b^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/x-www-form-urlencoded^" ^\n  --data-raw ^"1^&b^"');
   });
 
   it('generates a valid curl command for a POST request with JSON data', async () => {
@@ -310,11 +364,11 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '{"a":1}');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' \\\n  -H \'Content-Type: application/json\' \\\n  --data-raw \'{"a":1}\'',
+        'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/json\' \\\n  --data-raw \'{"a":1}\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" ^\n  -H ^"Content-Type: application/json^" ^\n  --data-raw ^"^{^\\^"a^\\^":1^}^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/json^" ^\n  --data-raw ^"^{^\\^"a^\\^":1^}^"');
   });
 
   it('generates a valid curl command for a POST request with binary data', async () => {
@@ -325,11 +379,11 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '1234\r\n00\x02\x03\x04\x05\'"!');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' \\\n  -H \'Content-Type: application/binary\' \\\n  --data-raw $\'1234\\r\\n00\\u0002\\u0003\\u0004\\u0005\\\'"\\u0021\'',
+        'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/binary\' \\\n  --data-raw $\'1234\\r\\n00\\u0002\\u0003\\u0004\\u0005\\\'"\\u0021\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"1234^\n\n00^ ^ ^ ^ \'^\\^"^!^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"1234^\n\n00^ ^ ^ ^ \'^\\^"^!^"');
   });
 
   it('generates a valid curl command for a POST request with binary data containing %', async () => {
@@ -340,21 +394,32 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '%OS%\\r\\n%%OS%%\\r\\n"\\\\"\'$&!');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' \\\n  -H \'Content-Type: application/binary\' \\\n  --data-raw $\'%OS%\\\\r\\\\n%%OS%%\\\\r\\\\n"\\\\\\\\"\\\'$&\\u0021\'');
+        'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/binary\' \\\n  --data-raw $\'%OS%\\\\r\\\\n%%OS%%\\\\r\\\\n"\\\\\\\\"\\\'$&\\u0021\'');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"^%^OS^%^\\^\\r^\\^\\n^%^%^OS^%^%^\\^\\r^\\^\\n^\\^"^\\^\\^\\^\\^\\^"\'^$^&^!^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"^%^OS^%^\\^\\r^\\^\\n^%^%^OS^%^%^\\^\\r^\\^\\n^\\^"^\\^\\^\\^\\^\\^"\'^$^&^!^"');
   });
 
   it('generates a valid curl command for a URL with special characters', async () => {
     const request = createNetworkRequest(urlString`http://example.com/?a=[]{}`, {});
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://example.com/?a=\\[\\]\\{\\}\'',
+        'curl --url \'http://example.com/?a=\\[\\]\\{\\}\'',
+    );
+    assert.strictEqual(await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
+                       'curl --url ^"http://example.com/?a=^\\[^\\]^\\{^\\}^"');
+  });
+
+  it('returns unsupported URL scheme for a URL starting with a dash', async () => {
+    const request = createNetworkRequest(urlString`-http://example.com/`, {});
+    assert.strictEqual(
+        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
+        '# Unsupported URL scheme',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://example.com/?a=^\\[^\\]^\\{^\\}^"');
+        '# Unsupported URL scheme',
+    );
   });
 
   it('generates a valid curl command stripping pseudo-headers', async () => {
@@ -365,7 +430,7 @@ describeWithMockConnection('NetworkLogView', () => {
       ],
     });
     const actual = await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix');
-    const expected = 'curl \'http://localhost\'';
+    const expected = 'curl --url \'http://localhost\'';
     assert.strictEqual(actual, expected);
   });
 
@@ -374,11 +439,10 @@ describeWithMockConnection('NetworkLogView', () => {
     request.requestMethod = '|evilcommand|';
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' -X \'|evilcommand|\'',
+        'curl --url \'http://localhost\' -X \'|evilcommand|\'',
     );
-    assert.strictEqual(
-        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^"http://localhost^" -X ^"^|evilcommand^|^"');
+    assert.strictEqual(await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
+                       'curl --url ^"http://localhost^" -X ^"^|evilcommand^|^"');
   });
 
   it('generates a valid curl command for urlencoded data starting with @', async () => {
@@ -389,11 +453,11 @@ describeWithMockConnection('NetworkLogView', () => {
     request.setRequestFormData(true, '@/etc/passwd');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
-        'curl \'http://localhost\' \\\n  -H \'Content-Type: application/x-www-form-urlencoded\' \\\n  --data-raw \'@/etc/passwd\'',
+        'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/x-www-form-urlencoded\' \\\n  --data-raw \'@/etc/passwd\'',
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl ^\"http://localhost^\" ^\n  -H ^\"Content-Type: application/x-www-form-urlencoded^\" ^\n  --data-raw ^\"^@/etc/passwd^\"',
+        'curl --url ^\"http://localhost^\" ^\n  -H ^\"Content-Type: application/x-www-form-urlencoded^\" ^\n  --data-raw ^\"^@/etc/passwd^\"',
     );
   });
 
@@ -521,7 +585,7 @@ describeWithMockConnection('NetworkLogView', () => {
   describe('out of scope', tests(false));
 
   const handlesSwitchingScope = (preserveLog: boolean) => async () => {
-    Common.Settings.Settings.instance().moduleSetting('network-log.preserve-log').set(preserveLog);
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.preserveNetworkLogSettingDescriptor).set(preserveLog);
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     const anotherTarget = createTarget();
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
@@ -544,11 +608,11 @@ describeWithMockConnection('NetworkLogView', () => {
         preserveLog ? [request1, request2, request3] : [request3]);
   };
 
-  it('replaces requests when switching scope with preserve log off', handlesSwitchingScope(false));
-  it('appends requests when switching scope with preserve log on', handlesSwitchingScope(true));
+  it('replaces requests when switching scope with keep log off', handlesSwitchingScope(false));
+  it('appends requests when switching scope with keep log on', handlesSwitchingScope(true));
 
-  it('appends requests on prerender activation with preserve log on', async () => {
-    Common.Settings.Settings.instance().moduleSetting('network-log.preserve-log').set(true);
+  it('appends requests on prerender activation with keep log on', async () => {
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.preserveNetworkLogSettingDescriptor).set(true);
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     const anotherTarget = createTarget();
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
@@ -711,8 +775,8 @@ describeWithMockConnection('NetworkLogView', () => {
   });
 
   it('correctly shows/hides "Copy all as HAR (with sensitive data)" menu item', async () => {
-    const networkShowOptionsToGenerateHarWithSensitiveDataSetting = Common.Settings.Settings.instance().createSetting(
-        'network.show-options-to-generate-har-with-sensitive-data', false);
+    const networkShowOptionsToGenerateHarWithSensitiveDataSetting = Common.Settings.Settings.instance().resolve(
+        Settings.NetworkSettings.showOptionsToGenerateHarWithSensitiveDataSettingDescriptor);
     createNetworkRequest('url1', {target});
     networkLogView = createNetworkLogView(new UI.FilterBar.FilterBar('network-panel', true));
     renderElementIntoDOM(networkLogView);
@@ -760,11 +824,42 @@ describeWithMockConnection('NetworkLogView', () => {
     assert.strictEqual((networkColumnWidget).showMode(), UI.SplitWidget.ShowMode.BOTH);
   });
 
+  it('persists waterfall and custom header column visibility across reloads', async () => {
+    const columnSettings = Common.Settings.Settings.instance().createSetting<Record<string, {
+      visible: boolean,
+      title?: string,
+    }>>('network-log-columns', {});
+    columnSettings.set({
+      'response-header-content-type': {visible: false, title: 'Content-Type'},
+      waterfall: {visible: true, title: 'Waterfall'},
+    });
+
+    // First open of NetworkLogView loads custom columns and settings.
+    networkLogView = createNetworkLogView();
+    let columns = networkLogView.columns();
+    columns.switchViewMode(true);
+    let networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
+    assert.strictEqual(networkColumnWidget.showMode(), UI.SplitWidget.ShowMode.BOTH);
+    assert.isFalse(columns.dataGrid().visibleColumnsArray.some(c => c.id === 'response-header-content-type'));
+
+    // Second open of NetworkLogView (simulating closing and reopening DevTools) should preserve visibility.
+    networkLogView = createNetworkLogView();
+    columns = networkLogView.columns();
+    columns.switchViewMode(true);
+    networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
+    assert.strictEqual(networkColumnWidget.showMode(), UI.SplitWidget.ShowMode.BOTH);
+    assert.isFalse(columns.dataGrid().visibleColumnsArray.some(c => c.id === 'response-header-content-type'));
+    assert.isTrue(columnSettings.get()['waterfall'].visible);
+    assert.isFalse(columnSettings.get()['response-header-content-type'].visible);
+  });
+
   function createOverrideRequests() {
-    const urlNotOverridden = urlString`url-not-overridden`;
-    const urlHeaderOverridden = urlString`url-header-overridden`;
-    const urlContentOverridden = urlString`url-content-overridden`;
-    const urlHeaderAndContentOverridden = urlString`url-header-und-content-overridden`;
+    const urlNotOverridden = urlString`https://url-not-overridden`;
+    const urlHeaderOverridden = urlString`https://url-header-overridden`;
+    const urlContentOverridden = urlString`https://url-content-overridden`;
+    const urlHeaderAndContentOverridden = urlString`https://url-header-and-content-overridden`;
 
     createNetworkRequest(urlNotOverridden, {target});
     const r2 = createNetworkRequest(urlHeaderOverridden, {target});
@@ -861,6 +956,46 @@ describeWithMockConnection('NetworkLogView', () => {
     ]);
   });
 
+  it('can apply filter - is:preloaded', async () => {
+    const urlPreloaded = urlString`https://example.com/preloaded`;
+    const urlNotPreloaded = urlString`https://example.com/not-preloaded`;
+
+    const requestPreloaded = createNetworkRequest(urlPreloaded, {target});
+    requestPreloaded.setIsLinkPreload(true);
+    createNetworkRequest(urlNotPreloaded, {target});
+
+    const filterBar = new UI.FilterBar.FilterBar('network-panel', true);
+    networkLogView = createNetworkLogView(filterBar);
+    networkLogView.setTextFilterValue('is:preloaded');
+
+    renderElementIntoDOM(networkLogView);
+    const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+    assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+      urlPreloaded,
+    ]);
+  });
+
+  it('can apply negated filter - -is:preloaded', async () => {
+    const urlPreloaded = urlString`https://example.com/preloaded`;
+    const urlNotPreloaded = urlString`https://example.com/not-preloaded`;
+
+    const requestPreloaded = createNetworkRequest(urlPreloaded, {target});
+    requestPreloaded.setIsLinkPreload(true);
+    createNetworkRequest(urlNotPreloaded, {target});
+
+    const filterBar = new UI.FilterBar.FilterBar('network-panel', true);
+    networkLogView = createNetworkLogView(filterBar);
+    networkLogView.setTextFilterValue('-is:preloaded');
+
+    renderElementIntoDOM(networkLogView);
+    const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+    assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+      urlNotPreloaded,
+    ]);
+  });
+
   function createRequestsWithAndWithoutTestHeader() {
     const urlWithTestHeader = urlString`https://example.com/request-with-test-header`;
     const urlWithoutTestHeader = urlString`https://example.com/request-without-test-header`;
@@ -937,6 +1072,22 @@ describeWithMockConnection('NetworkLogView', () => {
     assert.deepEqual(shownRequestUrls(), ['urlFetch']);
   });
 
+  it('can apply substring filter on same-site domain', async () => {
+    target.setInspectedURL(urlString`http://example.com`);
+    const sameSiteRequest = createNetworkRequest(urlString`http://example.com/api/data`, {});
+    const crossSiteRequest = createNetworkRequest(urlString`http://cross-site.com/api/data`, {});
+
+    const filterBar = new UI.FilterBar.FilterBar('network-panel', true);
+    networkLogView = createNetworkLogView(filterBar);
+    networkLogView.setTextFilterValue('example.com');
+    renderElementIntoDOM(networkLogView);
+    const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+    const visibleUrls = rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url());
+    assert.deepEqual(visibleUrls, [sameSiteRequest.url()]);
+    assert.notInclude(visibleUrls, crossSiteRequest.url());
+  });
+
   it('"Copy all" commands respects filters', async () => {
     createOverrideRequests();
 
@@ -967,8 +1118,8 @@ describeWithMockConnection('NetworkLogView', () => {
     contextMenu.invokeHandler(copyAllURLs.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`url-header-overridden
-url-header-und-content-overridden`]);
+    assert.deepEqual(copyText.lastCall.args, [`https://url-header-overridden
+https://url-header-and-content-overridden`]);
     copyText.resetHistory();
 
     const copyAllCurlCommands = findMenuItemWithLabel(
@@ -977,8 +1128,8 @@ url-header-und-content-overridden`]);
     contextMenu.invokeHandler(copyAllCurlCommands.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`curl 'url-header-overridden' ;
-curl 'url-header-und-content-overridden'`]);
+    assert.deepEqual(copyText.lastCall.args, [`curl --url 'https://url-header-overridden' ;
+curl --url 'https://url-header-and-content-overridden'`]);
     copyText.resetHistory();
 
     const copyAllFetchCall = findMenuItemWithLabel(footerSection, 'Copy all listed as fetch');
@@ -986,13 +1137,13 @@ curl 'url-header-und-content-overridden'`]);
     contextMenu.invokeHandler(copyAllFetchCall.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`fetch("url-header-overridden", {
+    assert.deepEqual(copyText.lastCall.args, [`fetch("https://url-header-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
   "credentials": "omit"
 }); ;
-fetch("url-header-und-content-overridden", {
+fetch("https://url-header-and-content-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
@@ -1005,8 +1156,9 @@ fetch("url-header-und-content-overridden", {
     contextMenu.invokeHandler(copyAllPowerShell.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`Invoke-WebRequest -UseBasicParsing -Uri "url-header-overridden";\r
-Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
+    assert.deepEqual(copyText.lastCall.args,
+                     [`Invoke-WebRequest -UseBasicParsing -Uri "https://url-header-overridden";\r
+Invoke-WebRequest -UseBasicParsing -Uri "https://url-header-and-content-overridden"`]);
     // Clear network filter
     networkLogView.setTextFilterValue('');
     copyText.resetHistory();
@@ -1014,43 +1166,43 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     contextMenu.invokeHandler(copyAllURLs.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`url-not-overridden
-url-header-overridden
-url-content-overridden
-url-header-und-content-overridden`]);
+    assert.deepEqual(copyText.lastCall.args, [`https://url-not-overridden
+https://url-header-overridden
+https://url-content-overridden
+https://url-header-and-content-overridden`]);
     copyText.resetHistory();
 
     contextMenu.invokeHandler(copyAllCurlCommands.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`curl 'url-not-overridden' ;
-curl 'url-header-overridden' ;
-curl 'url-content-overridden' ;
-curl 'url-header-und-content-overridden'`]);
+    assert.deepEqual(copyText.lastCall.args, [`curl --url 'https://url-not-overridden' ;
+curl --url 'https://url-header-overridden' ;
+curl --url 'https://url-content-overridden' ;
+curl --url 'https://url-header-and-content-overridden'`]);
     copyText.resetHistory();
 
     contextMenu.invokeHandler(copyAllFetchCall.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`fetch("url-not-overridden", {
+    assert.deepEqual(copyText.lastCall.args, [`fetch("https://url-not-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
   "credentials": "omit"
 }); ;
-fetch("url-header-overridden", {
+fetch("https://url-header-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
   "credentials": "omit"
 }); ;
-fetch("url-content-overridden", {
+fetch("https://url-content-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
   "credentials": "omit"
 }); ;
-fetch("url-header-und-content-overridden", {
+fetch("https://url-header-and-content-overridden", {
   "body": null,
   "method": "GET",
   "mode": "cors",
@@ -1061,10 +1213,10 @@ fetch("url-header-und-content-overridden", {
     contextMenu.invokeHandler(copyAllPowerShell.id());
     await expectCalled(copyText);
     sinon.assert.callCount(copyText, 1);
-    assert.deepEqual(copyText.lastCall.args, [`Invoke-WebRequest -UseBasicParsing -Uri "url-not-overridden";\r
-Invoke-WebRequest -UseBasicParsing -Uri "url-header-overridden";\r
-Invoke-WebRequest -UseBasicParsing -Uri "url-content-overridden";\r
-Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
+    assert.deepEqual(copyText.lastCall.args, [`Invoke-WebRequest -UseBasicParsing -Uri "https://url-not-overridden";\r
+Invoke-WebRequest -UseBasicParsing -Uri "https://url-header-overridden";\r
+Invoke-WebRequest -UseBasicParsing -Uri "https://url-content-overridden";\r
+Invoke-WebRequest -UseBasicParsing -Uri "https://url-header-and-content-overridden"`]);
     copyText.resetHistory();
   });
 
@@ -1125,8 +1277,34 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     assert.exists(customResponseHeaderItem, 'Custom response header item should be in the "Response headers" submenu');
   });
 
+  it('sorts requests by the value of a custom response header column', async () => {
+    const columnSettings = Common.Settings.Settings.instance().createSetting('network-log-columns', {});
+    columnSettings.set({
+      'response-header-age': {visible: true, title: 'Age'},
+    });
+
+    const r1 = createNetworkRequest(urlString`https://a.com/`, {target});
+    const r2 = createNetworkRequest(urlString`https://b.com/`, {target});
+    const r3 = createNetworkRequest(urlString`https://c.com/`, {target});
+    r1.responseHeaders = [{name: 'age', value: '30'}];
+    r2.responseHeaders = [{name: 'age', value: '10'}];
+    r3.responseHeaders = [{name: 'age', value: '20'}];
+
+    networkLogView = createNetworkLogView();
+    renderElementIntoDOM(networkLogView);
+    const columns = networkLogView.columns();
+    const dataGrid = columns.dataGrid();
+    dataGrid.markColumnAsSortedBy('response-header-age', DataGrid.DataGrid.Order.Ascending);
+    columns.sortByCurrentColumn();
+
+    const rootNode = dataGrid.rootNode();
+    assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+                     [urlString`https://b.com/`, urlString`https://c.com/`, urlString`https://a.com/`]);
+  });
+
   describe('Request blocking and throttling', () => {
     beforeEach(() => {
+      Common.Settings.Settings.instance().createSetting('network-blocked-urls', []).set([]);
       SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
     });
     async function invokeMenuItem(menu: string, action: string): Promise<void> {
@@ -1156,7 +1334,8 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     it('can unblock a request URL', async () => {
       const showView = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView');
       const conditions = SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions;
-      conditions.add(SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com/bar', enabled: true}));
+      conditions.add(SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com/bar', enabled: true},
+                                                                           Common.Settings.Settings.instance()));
       await invokeMenuItem('Block requests', 'Unblock *://foo.com/bar');
       assert.strictEqual(conditions.count, 0);
       sinon.assert.calledOnceWithExactly(showView, 'network.blocked-urls');
@@ -1176,7 +1355,8 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     it('can unblock a request domain', async () => {
       const showView = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView');
       const conditions = SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions;
-      conditions.add(SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com', enabled: true}));
+      conditions.add(SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com', enabled: true},
+                                                                           Common.Settings.Settings.instance()));
       await invokeMenuItem('Block requests', 'Unblock *://foo.com');
       assert.strictEqual(conditions.count, 0);
       sinon.assert.calledOnceWithExactly(showView, 'network.blocked-urls');
@@ -1209,7 +1389,8 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     it('can change from blocking to throttling', async () => {
       const showView = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView');
       SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions.add(
-          SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com/bar', enabled: true}));
+          SDK.NetworkManager.RequestCondition.createFromSetting({url: '*://foo.com/bar', enabled: true},
+                                                                Common.Settings.Settings.instance()));
       await invokeMenuItem('Throttle requests', 'Throttle request URL');
       assert.isTrue(SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions.conditionsEnabled);
       const conditions = SDK.NetworkManager.MultitargetNetworkManager.instance().requestConditions.conditions.toArray();
@@ -1238,17 +1419,15 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
   });
 
   it('displays throttled requests correctly', async () => {
-    setMockConnectionResponseHandler('Network.setBlockedURLs', () => ({}));
-    setMockConnectionResponseHandler('Network.overrideNetworkState', () => ({}));
-    setMockConnectionResponseHandler(
+    connection.setSuccessHandler('Network.setBlockedURLs', () => ({}));
+    connection.setSuccessHandler('Network.overrideNetworkState', () => ({}));
+    connection.setSuccessHandler(
         'Network.emulateNetworkConditionsByRule',
         params => params.matchedNetworkConditions.length > 0 ? {ruleIds: [ruleId]} : {ruleIds: []});
 
     SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
     networkLogView = createNetworkLogView();
-    const container = renderElementIntoDOM(document.createElement('div'), {includeCommonStyles: true});
-    networkLogView.markAsRoot();
-    networkLogView.show(container);
+    renderElementIntoDOM(networkLogView, {includeCommonStyles: true, width: 400, height: 100});
     networkLogView.columns().switchViewMode(true);
     networkLogView.setRecording(true);
     const ruleId = 'rule-id';
@@ -1282,7 +1461,7 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
       pushStart: 0,
       pushEnd: 0,
       receiveHeadersStart: 0,
-      receiveHeadersEnd: 0
+      receiveHeadersEnd: 0,
     };
     request.endTime = 100;
     request.addExtraRequestInfo({
@@ -1296,14 +1475,12 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     assert.exists(networkManager);
     networkLog.modelAdded(networkManager);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.LoadingFinished, request);
-    networkLogView.element.style.height = '100px';
-    networkLogView.element.style.width = '400px';
     networkLogView.columns().dataGrid().updateInstantly();
 
     await assertScreenshot('network-log/throttled-request.png');
 
     await RenderCoordinator.done();
-    const icons = Array.from(container.querySelectorAll('devtools-icon'));
+    const icons = Array.from(networkLogView.element.querySelectorAll('devtools-icon'));
     assert.deepEqual(icons.map(e => e.title), ['Other (throttled to 3G)', 'Request was throttled (3G)']);
 
     const appliedConditions = SDK.NetworkManager.MultitargetNetworkManager.instance().appliedRequestConditions(request);
@@ -1312,15 +1489,252 @@ Invoke-WebRequest -UseBasicParsing -Uri "url-header-und-content-overridden"`]);
     icons[1].click();
     sinon.assert.calledOnceWithExactly(revealStub, appliedConditions, false);
   });
+
+  it('preserves selection when a WebSocket frame is received', async () => {
+    const {rootNode, networkLogView} = createEnvironment();
+
+    const request = createWebSocketRequest('ws://localhost:8880/echo');
+
+    await RenderCoordinator.done();
+
+    const dataGrid = networkLogView.columns().dataGrid();
+    const node = rootNode.children.find(n => (n as Network.NetworkDataGridNode.NetworkNode).request() === request);
+    assert.exists(node);
+
+    node.select();
+    assert.strictEqual(dataGrid.selectedNode, node);
+
+    dispatchEvent(target, 'Network.webSocketFrameReceived', {
+      requestId: request.requestId(),
+      timestamp: 0,
+      response: {
+        opcode: 1,
+        mask: false,
+        payloadData: 'test',
+      },
+    } as unknown as Protocol.Network.WebSocketFrameReceivedEvent);
+
+    await RenderCoordinator.done();
+
+    assert.strictEqual(dataGrid.selectedNode, node);
+  });
 });
 
-describeWithMockConnection('NetworkLogView placeholder', () => {
+describeWithEnvironment('Edit and resend as fetch', () => {
+  let target: SDK.Target.Target;
+  let networkLogView: Network.NetworkLogView.NetworkLogView;
+  let connection: MockCDPConnection;
+
+  beforeEach(() => {
+    connection = new MockCDPConnection();
+    connection.setSuccessHandler('Debugger.enable', () => ({} as Protocol.Debugger.EnableResponse));
+    connection.setSuccessHandler('Storage.getStorageKey', () => ({} as Protocol.Storage.GetStorageKeyResponse));
+    const dummyStorage = new Common.Settings.SettingsStorage({});
+
+    Common.Settings.Settings.instance({
+      forceNew: true,
+      syncedStorage: dummyStorage,
+      globalStorage: dummyStorage,
+      localStorage: dummyStorage,
+      settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
+      console: Common.Console.Console.instance(),
+    });
+    registerNoopActions(['network.toggle-recording', 'inspector-main.reload']);
+
+    sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
+      shortcutTitleForAction: () => {},
+      shortcutsForAction: () => [],
+    } as unknown as UI.ShortcutRegistry.ShortcutRegistry);
+
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB, connection});
+    createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+    target = createTarget({parentTarget: tabTarget});
+  });
+
+  afterEach(() => {
+    if (networkLogView) {
+      networkLogView.detach();
+    }
+  });
+
+  function createRequest(url: string): SDK.NetworkRequest.NetworkRequest {
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assert.exists(networkManager);
+    let request: SDK.NetworkRequest.NetworkRequest|undefined;
+    const onRequestStarted = (event: Common.EventTarget.EventTargetEvent<SDK.NetworkManager.RequestStartedEvent>) => {
+      request = event.data.request;
+    };
+    networkManager.addEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+    dispatchEvent(target, 'Network.requestWillBeSent',
+                  {requestId: `resendTest${Date.now()}`, loaderId: 'loaderId', request: {url}} as unknown as
+                      Protocol.Network.RequestWillBeSentEvent);
+    networkManager.removeEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+    assert.exists(request);
+    request.requestMethod = 'GET';
+    request.setResourceType(Common.ResourceType.resourceTypes.Fetch);
+    return request;
+  }
+
+  function createNetworkLogViewForTest(): Network.NetworkLogView.NetworkLogView {
+    const filterBar = new UI.FilterBar.FilterBar('network-test');
+    return new Network.NetworkLogView.NetworkLogView(
+        filterBar, document.createElement('div'),
+        Common.Settings.Settings.instance().createSetting('network-log-large-rows', false));
+  }
+
+  it('context menu shows \'Edit and resend as fetch\' for eligible requests', () => {
+    networkLogView = createNetworkLogViewForTest();
+    const request = createRequest('https://example.com/api');
+
+    const event = new Event('contextmenu');
+    sinon.stub(event, 'target').value(document);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+
+    networkLogView.handleContextMenuForRequest(contextMenu, request);
+
+    const item = findMenuItemWithLabel(contextMenu.debugSection(), 'Edit and resend as fetch');
+    assert.exists(item);
+  });
+
+  it('Copy as fetch filters headers using the forbidden-header rules', async () => {
+    networkLogView = createNetworkLogViewForTest();
+    const request = createRequest('https://example.com/api');
+    request.setRequestHeaders([
+      {name: 'Sec-Fetch-Mode', value: 'cors'},
+      {name: 'X-HTTP-Method', value: 'TRACE'},
+      {name: 'X-HTTP-Method-Override', value: 'PATCH'},
+      {name: 'X-Custom', value: 'value'},
+      {name: 'User-Agent', value: 'custom'},
+    ]);
+    const copyText = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'copyText').resolves();
+
+    const event = new Event('contextmenu');
+    sinon.stub(event, 'target').value(document);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    networkLogView.handleContextMenuForRequest(contextMenu, request);
+
+    const copyMenu = contextMenu.clipboardSection().items[0] as UI.ContextMenu.SubMenu;
+    const item = findMenuItemWithLabel(copyMenu.defaultSection(), 'Copy as fetch');
+    assert.exists(item);
+    contextMenu.invokeHandler(item.id());
+    await expectCalled(copyText);
+
+    const fetchCall = copyText.lastCall.args[0] as string;
+    assert.notInclude(fetchCall, 'sec-fetch-mode');
+    assert.notInclude(fetchCall, 'x-http-method": "TRACE');
+    assert.notInclude(fetchCall, 'user-agent');
+    assert.include(fetchCall, 'x-http-method-override": "PATCH');
+    assert.include(fetchCall, 'x-custom": "value');
+  });
+
+  it('resendFromConsole generates fetch with await prefix', async () => {
+    networkLogView = createNetworkLogViewForTest();
+    const request = createRequest('https://example.com/data');
+    request.setRequestHeaders([{name: 'Host', value: 'example.com'}]);
+
+    // Stub InspectorView and ViewManager to avoid real UI interaction
+    sinon.stub(UI.InspectorView.InspectorView.instance(), 'showDrawer');
+    const fakeWidget = {insertIntoPrompt: sinon.stub()};
+    const fakeView = {widget: sinon.stub().resolves(fakeWidget)};
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'view').returns(fakeView as unknown as UI.View.View);
+
+    // Trigger via context menu
+    const event = new Event('contextmenu');
+    sinon.stub(event, 'target').value(document);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    networkLogView.handleContextMenuForRequest(contextMenu, request);
+
+    const item = findMenuItemWithLabel(contextMenu.debugSection(), 'Edit and resend as fetch');
+    assert.exists(item);
+    contextMenu.invokeHandler(item.id());
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    sinon.assert.calledOnce(fakeWidget.insertIntoPrompt);
+    const injected = fakeWidget.insertIntoPrompt.firstCall.args[0] as string;
+    assert.isTrue(injected.includes('await fetch('), 'should include await fetch(');
+    assert.isFalse(injected.includes('await await'), 'should not contain double await');
+    assert.include(injected, '// "host": "example.com"', 'should comment forbidden headers');
+  });
+
+  it('resendFromConsole logs console message with affectedResources', async () => {
+    networkLogView = createNetworkLogViewForTest();
+    const request = createRequest('https://example.com/api/data');
+
+    // Stub InspectorView and ViewManager
+    sinon.stub(UI.InspectorView.InspectorView.instance(), 'showDrawer');
+    const fakeWidget = {insertIntoPrompt: sinon.stub()};
+    const fakeView = {widget: sinon.stub().resolves(fakeWidget)};
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'view').returns(fakeView as unknown as UI.View.View);
+
+    // Spy on console model
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assert.exists(consoleModel);
+    const addMessageSpy = sinon.spy(consoleModel, 'addMessage');
+
+    // Trigger via context menu
+    const event = new Event('contextmenu');
+    sinon.stub(event, 'target').value(document);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    networkLogView.handleContextMenuForRequest(contextMenu, request);
+
+    const item = findMenuItemWithLabel(contextMenu.debugSection(), 'Edit and resend as fetch');
+    assert.exists(item);
+    contextMenu.invokeHandler(item.id());
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    sinon.assert.calledOnce(addMessageSpy);
+    const message = addMessageSpy.firstCall.args[0];
+    assert.exists(message.getAffectedResources());
+    assert.strictEqual(message.getAffectedResources()?.requestId, request.requestId());
+    assert.include(message.messageText, 'GET');
+  });
+
+  it('resendFromConsole clears stackTrace/url from associated message', async () => {
+    networkLogView = createNetworkLogViewForTest();
+    const request = createRequest('https://example.com/api/data');
+
+    // Stub InspectorView and ViewManager
+    sinon.stub(UI.InspectorView.InspectorView.instance(), 'showDrawer');
+    const fakeWidget = {insertIntoPrompt: sinon.stub()};
+    const fakeView = {widget: sinon.stub().resolves(fakeWidget)};
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'view').returns(fakeView as unknown as UI.View.View);
+
+    // Spy on console model
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assert.exists(consoleModel);
+    const addMessageSpy = sinon.spy(consoleModel, 'addMessage');
+
+    // Trigger via context menu
+    const event = new Event('contextmenu');
+    sinon.stub(event, 'target').value(document);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    networkLogView.handleContextMenuForRequest(contextMenu, request);
+
+    const item = findMenuItemWithLabel(contextMenu.debugSection(), 'Edit and resend as fetch');
+    assert.exists(item);
+    contextMenu.invokeHandler(item.id());
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    sinon.assert.calledOnce(addMessageSpy);
+    const message = addMessageSpy.firstCall.args[0];
+    assert.isUndefined(message.url);
+    assert.strictEqual(message.line, 0);
+    assert.strictEqual(message.column, 0);
+    assert.isUndefined(message.stackTrace);
+  });
+});
+
+describeWithEnvironment('NetworkLogView placeholder', () => {
   const START_RECORDING_ID = 'network.toggle-recording';
   const RELOAD_ID = 'inspector-main.reload';
 
   beforeEach(() => {
-    stubNoopSettings();
-
     registerActions([
       {
         actionId: START_RECORDING_ID,
@@ -1333,7 +1747,7 @@ describeWithMockConnection('NetworkLogView placeholder', () => {
         category: UI.ActionRegistration.ActionCategory.NETWORK,
         title: () => 'mock' as Platform.UIString.LocalizedString,
         toggleable: true,
-      }
+      },
     ]);
     sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
       shortcutTitleForAction: () => 'Ctrl',
@@ -1346,7 +1760,7 @@ describeWithMockConnection('NetworkLogView placeholder', () => {
     const networkLogView = createNetworkLogView();
     testPlaceholderText(
         networkLogView, 'No network activity recorded',
-        'Record network log to display network activity by using the \"Start recording\" button or by pressing Ctrl.');
+        'Record network log to display network activity by using the \"Start recording\" button or by pressing Ctrl');
     testPlaceholderButton(networkLogView, 'Start recording', START_RECORDING_ID);
   });
 
@@ -1354,16 +1768,14 @@ describeWithMockConnection('NetworkLogView placeholder', () => {
     const networkLogView = createNetworkLogView();
     networkLogView.setRecording(true);
 
-    testPlaceholderText(
-        networkLogView, 'Currently recording network activity',
-        'Perform a request or reload the page by using the \"Reload page\" button or by pressing Ctrl.');
+    testPlaceholderText(networkLogView, 'Currently recording network activity',
+                        'Perform a request or reload the page by using the \"Reload page\" button or by pressing Ctrl');
     testPlaceholderButton(networkLogView, 'Reload page', RELOAD_ID);
   });
 });
 
 describeWithEnvironment('NetworkLogView', () => {
   it('renders when actions aren\'t registered', async () => {
-    stubNoopSettings();
     sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
       shortcutTitleForAction: () => 'Ctrl',
       shortcutsForAction: () => [new UI.KeyboardShortcut.KeyboardShortcut(
@@ -1377,7 +1789,6 @@ describeWithEnvironment('NetworkLogView', () => {
   });
 
   it('shows Debug with AI menu and submenu items when the flag is on', () => {
-    stubNoopSettings();
     registerActions([{
       actionId: 'drjones.network-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
@@ -1388,9 +1799,7 @@ describeWithEnvironment('NetworkLogView', () => {
     const progressBarContainer = document.createElement('div');
     const setting = Common.Settings.Settings.instance().createSetting('network-log-large-rows', false);
     const networkLogView = new Network.NetworkLogView.NetworkLogView(filterBar, progressBarContainer, setting);
-    const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/script.js`,
-        Platform.DevToolsPath.urlString``, null, null, null);
+    const request = createNetworkRequest({url: 'https://www.example.com/script.js'});
 
     const event = new Event('contextmenu');
     sinon.stub(event, 'target').value(document);
@@ -1404,12 +1813,38 @@ describeWithEnvironment('NetworkLogView', () => {
         debugWithAiItem?.subItems?.map(item => item.label),
         ['Start a chat', 'Explain purpose', 'Explain slowness', 'Explain failures', 'Assess security headers']);
   });
+
+  it('configures visual logging for preloaded column in header context menu', () => {
+    SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
+    const networkLogView = createNetworkLogView(new UI.FilterBar.FilterBar('network-test'));
+    renderElementIntoDOM(networkLogView);
+
+    const nameHeaderCell = networkLogView.columns().dataGrid().element.querySelector('th.name-column');
+    assert.instanceOf(nameHeaderCell, HTMLTableCellElement);
+    const contextMenu = getContextMenuForElement(nameHeaderCell);
+    const preloadedItem = contextMenu.buildDescriptor().subItems?.find(item => item.jslogContext === 'is-preloaded');
+    assert.exists(preloadedItem);
+  });
+
+  it('dispatches RequestSelected with null when reset', () => {
+    const networkLogView = createNetworkLogView();
+    const dispatchEventSpy = sinon.spy(networkLogView, 'dispatchEventToListeners');
+
+    Logs.NetworkLog.NetworkLog.instance().dispatchEventToListeners(Logs.NetworkLog.Events.Reset,
+                                                                   {clearIfPreserved: false});
+
+    const call =
+        dispatchEventSpy.getCalls().find(c => c.args[0] === Network.NetworkDataGridNode.Events.RequestSelected);
+    assert.exists(call);
+    assert.isNull(call.args[1]);
+  });
 });
 
 function testPlaceholderText(
     networkLogView: Network.NetworkLogView.NetworkLogView, expectedHeaderText: string,
     expectedDescriptionText: string) {
-  const emptyWidget = networkLogView.element.querySelector('.empty-state');
+  const emptyWidgetHost = networkLogView.element.querySelector('.network-status-pane');
+  const emptyWidget = emptyWidgetHost?.shadowRoot;
 
   const header = emptyWidget?.querySelector('.empty-state-header')?.textContent;
   const description = emptyWidget?.querySelector('.empty-state-description > span')?.textContent;
@@ -1420,7 +1855,8 @@ function testPlaceholderText(
 
 function testPlaceholderButton(
     networkLogView: Network.NetworkLogView.NetworkLogView, expectedButtonText: string, actionId: string) {
-  const button = networkLogView.element.querySelector('.empty-state devtools-button');
+  const emptyWidgetHost = networkLogView.element.querySelector('.network-status-pane');
+  const button = emptyWidgetHost?.querySelector('devtools-button');
   assert.exists(button);
   assert.deepEqual(button.textContent, expectedButtonText);
 

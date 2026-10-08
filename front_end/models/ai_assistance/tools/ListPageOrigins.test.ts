@@ -1,0 +1,282 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import {assert} from 'chai';
+import sinon from 'sinon';
+
+import * as Platform from '../../../core/platform/platform.js';
+import * as SDK from '../../../core/sdk/sdk.js';
+import {
+  assertIsError,
+  assertIsResult,
+} from '../../../testing/AiAssistanceHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../../testing/TestUniverse.js';
+import * as AiAssistance from '../ai_assistance.js';
+
+const {urlString} = Platform.DevToolsPath;
+
+function createMockFrame(origin: string, outermostTarget: SDK.Target.Target):
+    sinon.SinonStubbedInstance<SDK.ResourceTreeModel.ResourceTreeFrame> {
+  const resourceTreeModel = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeModel);
+  const target = sinon.createStubInstance(SDK.Target.Target);
+  target.outermostTarget.returns(outermostTarget);
+  resourceTreeModel.target.returns(target);
+
+  const mockFrame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+  mockFrame.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+  mockFrame.resourceTreeModel.returns(resourceTreeModel);
+
+  return mockFrame;
+}
+
+describe('ListPageOriginsTool', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+  });
+
+  it('lists active frame origins successfully when allowed', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+    primaryTarget.outermostTarget.returns(primaryTarget);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const mockFrame1 = createMockFrame('http://example.com', primaryTarget);
+    const mockFrame2 = createMockFrame('http://example.com', primaryTarget);
+
+    sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'frames').returns([
+      mockFrame1,
+      mockFrame2,
+    ]);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsResult(response);
+    assert.deepEqual(response.result, {
+      origins: ['http://example.com'],
+    });
+  });
+
+  it('filters out subdomain and cross-origin frames', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+    primaryTarget.outermostTarget.returns(primaryTarget);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const sameOriginFrame = createMockFrame('http://example.com', primaryTarget);
+    const subdomainFrame = createMockFrame('http://sub.example.com', primaryTarget);
+    const crossOriginFrame = createMockFrame('http://blocked-origin.com', primaryTarget);
+
+    sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'frames').returns([
+      sameOriginFrame,
+      subdomainFrame,
+      crossOriginFrame,
+    ]);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsResult(response);
+    assert.deepEqual(response.result, {
+      origins: ['http://example.com'],
+    });
+  });
+
+  it('filters out frames from other outermost targets/tabs', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+    primaryTarget.outermostTarget.returns(primaryTarget);
+
+    const blockedTarget = sinon.createStubInstance(SDK.Target.Target);
+    blockedTarget.inspectedURL.returns(urlString`http://blocked-origin.com/index.html`);
+    blockedTarget.outermostTarget.returns(blockedTarget);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const mockFrame1 = createMockFrame('http://example.com', primaryTarget);
+    const mockFrame2 = createMockFrame('http://example.com', blockedTarget);
+
+    sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'frames').returns([
+      mockFrame1,
+      mockFrame2,
+    ]);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsResult(response);
+    assert.deepEqual(response.result, {
+      origins: ['http://example.com'],
+    });
+  });
+
+  it('filters out opaque origins', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+    primaryTarget.outermostTarget.returns(primaryTarget);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const mockFrame1 = createMockFrame('http://example.com', primaryTarget);
+    const mockFrame2 = createMockFrame('data:', primaryTarget);
+    const mockFrame3 = createMockFrame('null', primaryTarget);
+
+    sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'frames').returns([
+      mockFrame1,
+      mockFrame2,
+      mockFrame3,
+    ]);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsResult(response);
+    assert.deepEqual(response.result, {
+      origins: ['http://example.com'],
+    });
+  });
+
+  it('allows primary target origin when established origin matches', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+    primaryTarget.outermostTarget.returns(primaryTarget);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const mockFrame1 = createMockFrame('http://example.com', primaryTarget);
+
+    sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'frames').returns([
+      mockFrame1,
+    ]);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsResult(response);
+    assert.deepEqual(response.result, {
+      origins: ['http://example.com'],
+    });
+  });
+
+  it('returns error if primary page target origin is different from the allowed origin', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://blocked-origin.com/index.html`);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.create('http://example.com'),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsError(response);
+    assert.strictEqual(response.error, 'No origin available or not allowed.');
+  });
+
+  it('returns error when allowed origin is opaque', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({
+        status: 'ESTABLISHED_ORIGIN',
+        origin: SDK.SecurityOrigin.SecurityOrigin.createUniqueOpaque(),
+      }),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsError(response);
+    assert.strictEqual(response.error, 'No origin available or not allowed.');
+  });
+
+  it('returns error when origin lock is uninitialized', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({status: 'UNINITIALIZED'}),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsError(response);
+    assert.strictEqual(response.error, 'No origin established for this conversation.');
+  });
+
+  it('returns error when origin lock is blocked', async () => {
+    const targetManager = universe.targetManager;
+    const primaryTarget = sinon.createStubInstance(SDK.Target.Target);
+    primaryTarget.inspectedURL.returns(urlString`http://example.com/index.html`);
+
+    sinon.stub(targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+    const tool = new AiAssistance.ListPageOrigins.ListPageOriginsTool();
+    const context = {
+      getOriginLock: sinon.stub().returns({status: 'BLOCKED_BY_NAVIGATION'}),
+    };
+
+    const response = await tool.handler({}, context);
+    assertIsError(response);
+    assert.strictEqual(response.error, 'Cross-origin access blocked due to navigation.');
+  });
+});

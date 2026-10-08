@@ -9,7 +9,7 @@ import './Toolbar.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import {html, render} from '../lit/lit.js';
+import {html, nothing, render} from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -20,31 +20,31 @@ import {VBox} from './Widget.js';
 
 const UIStrings = {
   /**
-   * @description Text on a button to start editing text
+   * @description Tooltip text for the edit button in a list widget.
    */
   editString: 'Edit',
   /**
-   * @description Label for an item to remove something
+   * @description Tooltip text for the remove button in a list widget.
    */
   removeString: 'Remove',
   /**
-   * @description Text to save something
+   * @description Button text to save changes when editing an item in a list widget.
    */
   saveString: 'Save',
   /**
-   * @description Text to add something
+   * @description Button text to add a new item in a list widget.
    */
   addString: 'Add',
   /**
-   * @description Text to cancel something
+   * @description Button text to cancel editing an item in a list widget.
    */
   cancelString: 'Cancel',
   /**
-   * @description Text for screen reader to announce that an item has been saved.
+   * @description Announcement text for screen readers when changes to a list widget item are saved.
    */
   changesSaved: 'Changes to item have been saved',
   /**
-   * @description Text for screen reader to announce that an item has been removed.
+   * @description Announcement text for screen readers when a list widget item is removed.
    */
   removedItem: 'Item has been removed',
 } as const;
@@ -64,6 +64,7 @@ export class ListWidget<T> extends VBox {
   private editElement: HTMLElement|null;
   private emptyPlaceholder: Element|null;
   private isTable: boolean;
+  private headerElement: Element|null = null;
   constructor(delegate: Delegate<T>, delegatesFocus = true, isTable = false) {
     super({useShadowDom: true, delegatesFocus});
     this.registerRequiredCSS(listWidgetStyles);
@@ -100,13 +101,25 @@ export class ListWidget<T> extends VBox {
     this.elements = [];
     this.lastSeparator = false;
     this.list.removeChildren();
+    if (this.headerElement) {
+      this.list.appendChild(this.headerElement);
+    }
     this.updatePlaceholder();
     this.stopEditing();
+  }
+
+  setHeader(header: Element): void {
+    if (this.headerElement) {
+      this.headerElement.remove();
+    }
+    this.headerElement = header;
+    this.list.insertBefore(header, this.list.firstChild);
   }
 
   updateItem(index: number, newItem: T, editable: boolean, focusable = true, controlLabels: {
     edit?: string,
     delete?: string,
+    hideEdit?: boolean,
   } = {}): void {
     if (index < 0 || index >= this.#items.length) {
       this.appendItem(newItem, editable, focusable, controlLabels);
@@ -130,7 +143,8 @@ export class ListWidget<T> extends VBox {
     }
   }
 
-  appendItem(item: T, editable: boolean, focusable = true, controlLabels: {edit?: string, delete?: string} = {}): void {
+  appendItem(item: T, editable: boolean, focusable = true,
+             controlLabels: {edit?: string, delete?: string, hideEdit?: boolean} = {}): void {
     if (this.lastSeparator && this.#items.length) {
       const element = document.createElement('div');
       element.classList.add('list-separator');
@@ -204,7 +218,8 @@ export class ListWidget<T> extends VBox {
     this.updatePlaceholder();
   }
 
-  private createControls(item: T, element: HTMLElement, controlLabels: {edit?: string, delete?: string}): Element {
+  private createControls(item: T, element: HTMLElement,
+                         controlLabels: {edit?: string, delete?: string, hideEdit?: boolean}): Element {
     const controls = document.createElement('div');
     controls.classList.add('controls-container');
     controls.classList.add('fill');
@@ -214,12 +229,12 @@ export class ListWidget<T> extends VBox {
       <div class="controls-gradient"></div>
       <div class="controls-buttons">
         <devtools-toolbar>
-          <devtools-button class=toolbar-button
+          ${controlLabels?.hideEdit ? nothing : html`<devtools-button class=toolbar-button
                            .iconName=${'edit'}
                            .jslogContext=${'edit-item'}
                            .title=${controlLabels?.edit ?? i18nString(UIStrings.editString)}
                            .variant=${Buttons.Button.Variant.ICON}
-                           @click=${onEditClicked}></devtools-button>
+                           @click=${onEditClicked}></devtools-button>`}
           <devtools-button class=toolbar-button
                            .iconName=${'bin'}
                            .jslogContext=${'remove-item'}

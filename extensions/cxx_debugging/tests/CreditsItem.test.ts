@@ -4,6 +4,7 @@
 
 import '../src/CreditsItem.js';
 
+import {assert} from 'chai';
 import {html, render, type TemplateResult} from 'lit-html';
 
 import type {CreditsItem, CreditsItemData} from '../src/CreditsItem.js';
@@ -20,31 +21,49 @@ async function createItem(text: TemplateResult): Promise<CreditsItem> {
 
 describe('CreditsItem', () => {
   it('is accessible', async () => {
-    const el = await createItem(html`<devtools-cxx-debugging-credits-item></devtools-cxx-debugging-credits-item>`);
-    expect(el.shadowRoot).to.not.be.null;
+    const el = await createItem(
+        html`<devtools-cxx-debugging-credits-item></devtools-cxx-debugging-credits-item>`,
+    );
+    assert.isNotNull(el.shadowRoot);
   });
 
   it('can get and set data correctly', async () => {
     const data: CreditsItemData = {
       title: 'My awesome project',
       homepage: 'https://www.example.com',
-      license: 'Do whatever you want!'
+      license: 'Do whatever you want!',
     };
     const el = await createItem(
-        html`<devtools-cxx-debugging-credits-item .data=${data}></devtools-cxx-debugging-credits-item>`);
-    expect(el.data).to.equal(data);
+        html`<devtools-cxx-debugging-credits-item
+        .data=${data}
+      ></devtools-cxx-debugging-credits-item>`,
+    );
+    assert.strictEqual(el.data, data);
 
     el.data = {title: 'title', homepage: 'homepage', license: 'license'};
-    expect(el.data.title).to.equal('title');
-    expect(el.data.homepage).to.equal('homepage');
-    expect(el.data.license).to.equal('license');
+    assert.strictEqual(el.data.title, 'title');
+    assert.strictEqual(el.data.homepage, 'homepage');
+    assert.strictEqual(el.data.license, 'license');
   });
 
   it('renders title and homepage correctly', async () => {
-    const data: CreditsItemData = {title: 'My project', homepage: 'https://www.example.com', license: '3-BSD License'};
+    const data: CreditsItemData = {
+      title: 'My project',
+      homepage: 'https://www.example.com',
+      license: '3-BSD License',
+    };
     const el = await createItem(
-        html`<devtools-cxx-debugging-credits-item .data=${data}></devtools-cxx-debugging-credits-item>`);
-    expect(el.shadowRoot?.querySelector('.title')?.textContent).to.eql(data.title);
-    expect(el.shadowRoot?.querySelector('a')?.getAttribute('href')).to.eql(data.homepage);
+        html`<devtools-cxx-debugging-credits-item
+        .data=${data}
+      ></devtools-cxx-debugging-credits-item>`,
+    );
+    assert.deepEqual(
+        el.shadowRoot?.querySelector('.title')?.textContent,
+        data.title,
+    );
+    assert.deepEqual(
+        el.shadowRoot?.querySelector('a')?.getAttribute('href'),
+        data.homepage,
+    );
   });
 });

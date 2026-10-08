@@ -16,43 +16,43 @@ import performanceMonitorStyles from './performanceMonitor.css.js';
 
 const UIStrings = {
   /**
-   * @description Aria accessible name in Performance Monitor of the Performance monitor tab
+   * @description Aria accessible name in Performance monitor of the Performance monitor tab.
    */
   graphsDisplayingARealtimeViewOf: 'Graphs displaying a real-time view of performance metrics',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   paused: 'Paused',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   cpuUsage: 'CPU usage',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   jsHeapSize: 'JS heap size',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
-  domNodes: 'DOM Nodes',
+  domNodes: 'DOM nodes',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   jsEventListeners: 'JS event listeners',
   /**
-   * @description Text for documents, a type of resources
+   * @description Text for documents, a type of resource.
    */
   documents: 'Documents',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
-  documentFrames: 'Document Frames',
+  documentFrames: 'Document frames',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   layoutsSec: 'Layouts / sec',
   /**
-   * @description Text in Performance Monitor of the Performance monitor tab
+   * @description Text in Performance monitor of the Performance monitor tab.
    */
   styleRecalcsSec: 'Style recalcs / sec',
 } as const;
@@ -84,10 +84,11 @@ const DEFAULT_VIEW: PerformanceMonitorView = (input, output, target) => {
     <devtools-widget ${widget(ControlPane, {
       onMetricChanged: input.onMetricChanged,
       chartsInfo: input.chartsInfo,
-      metrics: input.metrics
+      metrics: input.metrics,
     })} class=${classMap({suspended: input.suspended})}></devtools-widget>
-    <div class="perfmon-chart-container ${classMap({suspended: input.suspended})}">
+    <div class="perfmon-chart-container ${classMap({suspended: input.suspended})}" jslog=${VisualLogging.section('perfmon-chart')}>
       <canvas tabindex="-1" aria-label=${i18nString(UIStrings.graphsDisplayingARealtimeViewOf)}
+          jslog=${VisualLogging.canvas('perfmon-canvas')}
           .width=${Math.round(input.width * window.devicePixelRatio)} .height=${input.height}
           style="height:${input.height / window.devicePixelRatio}px" ${ref(e => {
             if (e) {
@@ -126,7 +127,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox<ShadowRoot> implement
   private suspended = false;
   private graphRenderingContext: CanvasRenderingContext2D|null = null;
 
-  constructor(pollIntervalMs = 500, view = DEFAULT_VIEW) {
+  constructor(pollIntervalMs = 500, view: PerformanceMonitorView = DEFAULT_VIEW) {
     super({useShadowDom: 'pure'});
     this.view = view;
     this.registerRequiredCSS(performanceMonitorStyles);
@@ -649,7 +650,7 @@ export class ControlPane extends UI.Widget.VBox {
   readonly #metricValues = new Map<string, number>();
   readonly #view: ControlPaneView;
 
-  constructor(element: HTMLElement, view = CONTROL_PANE_DEFAULT_VIEW) {
+  constructor(element: HTMLElement, view: ControlPaneView = CONTROL_PANE_DEFAULT_VIEW) {
     super(element, {useShadowDom: false});
     this.#view = view;
 
@@ -745,7 +746,7 @@ function renderMetricIndicator(
   // clang-format on
 }
 
-export const format = new Intl.NumberFormat('en-US', {maximumFractionDigits: 1});
+export const format: Intl.NumberFormat = new Intl.NumberFormat('en-US', {maximumFractionDigits: 1});
 export interface MetricInfo {
   name: string;
   color: string;

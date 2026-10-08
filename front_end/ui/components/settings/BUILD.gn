@@ -9,38 +9,31 @@ import("../../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
 generate_css("css_files") {
-  sources = [
-    "settingCheckbox.css",
-    "settingDeprecationWarning.css",
-  ]
+  sources = [ "settingCheckbox.css" ]
 }
 
 devtools_ui_module("settings") {
-  sources = [
-    "SettingCheckbox.ts",
-    "SettingDeprecationWarning.ts",
-  ]
+  sources = [ "SettingCheckbox.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/i18n:bundle",
     "../../kit:bundle",
     "../../lit:bundle",
+    "../../settings:bundle",
     "../../visual_logging:bundle",
     "../buttons:bundle",
     "../input:bundle",
     "../tooltips:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "settings.ts"
 
-  deps = [
-    ":css_files",
-    ":settings",
-  ]
+  ts_deps = [ ":settings" ]
 
   visibility = default_components_visibility + [ "../../legacy/*" ]
 }
@@ -48,15 +41,10 @@ devtools_entrypoint("bundle") {
 devtools_ui_module("unittests") {
   testonly = true
 
-  sources = [
-    "SettingCheckbox.test.ts",
-    "SettingDeprecationWarning.test.ts",
-  ]
+  sources = [ "SettingCheckbox.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../../core/common:bundle",
-    "../../../core/platform:bundle",
     "../../../core/root:bundle",
     "../../../testing",
   ]

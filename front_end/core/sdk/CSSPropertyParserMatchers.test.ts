@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -219,6 +220,14 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
     checkFailure('insrgb shorter hue', 'red 35%', 'blue');
     checkFailure('/*asd*/srgb in', 'red 35%', 'blue');
     checkFailure('in srgb', '0% red', 'blue 0%');
+
+    const {ast, match, text} =
+        matchSingleValue('color', 'color-mix(red, blue)', new SDK.CSSPropertyParserMatchers.ColorMixMatcher());
+    assert.exists(ast, text);
+    assert.exists(match, text);
+    assert.isEmpty(match.space, text);
+    assert.strictEqual(match.color1.map(n => ast.text(n)).join(' '), 'red', text);
+    assert.strictEqual(match.color2.map(n => ast.text(n)).join(' '), 'blue', text);
   });
 
   it('parses contrast-color', () => {
@@ -302,13 +311,19 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
     assert.deepEqual(match('font-palette', 'first'), ['first']);
     {
       assert.deepEqual(match('position-try-fallbacks', 'flip-block'), []);
+      assert.deepEqual(match('position-try-fallbacks', '--'), []);
       assert.deepEqual(match('position-try-fallbacks', '--one'), ['--one']);
+      assert.deepEqual(match('position-try-fallbacks', '---three'), ['---three']);
       assert.deepEqual(match('position-try-fallbacks', '--one, --two'), ['--one', '--two']);
+      assert.deepEqual(match('position-try-fallbacks', '--one, ---two'), ['--one', '---two']);
     }
     {
       assert.deepEqual(match('position-try', 'flip-block'), []);
+      assert.deepEqual(match('position-try', '--'), []);
       assert.deepEqual(match('position-try', '--one'), ['--one']);
+      assert.deepEqual(match('position-try', '---three'), ['---three']);
       assert.deepEqual(match('position-try', '--one, --two'), ['--one', '--two']);
+      assert.deepEqual(match('position-try', '--one, ---two'), ['--one', '---two']);
     }
     {
       assert.deepEqual(match('list-style-type', 'custom'), ['custom']);
@@ -557,6 +572,11 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       assert.exists(anchorMatch, anchorText);
       assert.strictEqual(anchorMatch.text, '--dashed-ident');
 
+      const {match: tripleDashMatch, text: tripleDashText} = matchSingleValue(
+          'left', 'anchor(---dashed-ident left)', new SDK.CSSPropertyParserMatchers.AnchorFunctionMatcher());
+      assert.exists(tripleDashMatch, tripleDashText);
+      assert.strictEqual(tripleDashMatch.text, '---dashed-ident');
+
       const {match: anchorSizeMatch, text: anchorSizeText} = matchSingleValue(
           'width', 'anchor-size(--dashed-ident width)', new SDK.CSSPropertyParserMatchers.AnchorFunctionMatcher());
       assert.exists(anchorSizeMatch, anchorSizeText);
@@ -582,12 +602,21 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           'position-anchor', '--dashed-ident', new SDK.CSSPropertyParserMatchers.PositionAnchorMatcher());
       assert.exists(match, text);
       assert.strictEqual(match.text, '--dashed-ident');
+
+      const {match: tripleDashMatch, text: tripleDashText} = matchSingleValue(
+          'position-anchor', '---dashed-ident', new SDK.CSSPropertyParserMatchers.PositionAnchorMatcher());
+      assert.exists(tripleDashMatch, tripleDashText);
+      assert.strictEqual(tripleDashMatch.text, '---dashed-ident');
     });
 
     it('should not match `position-anchor` property when it is not a dashed identifier', () => {
       const {match} = matchSingleValue(
           'position-anchor', 'something-non-dashed', new SDK.CSSPropertyParserMatchers.PositionAnchorMatcher());
       assert.isNull(match);
+
+      const {match: emptyDashMatch} =
+          matchSingleValue('position-anchor', '--', new SDK.CSSPropertyParserMatchers.PositionAnchorMatcher());
+      assert.isNull(emptyDashMatch);
     });
   });
 
@@ -645,7 +674,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
 
   describe('CustomFunctionMatcher', () => {
     it('matches custom functions', () => {
-      const success = ['--darklight(blue, green)', '--riemann-zeta(2.0, 1.0)'];
+      const success = ['--darklight(blue, green)', '--riemann-zeta(2.0, 1.0)', '---triple-dash(1px)'];
       for (const value of success) {
         const {match, text} =
             matchSingleValue('width', value, new SDK.CSSPropertyParserMatchers.CustomFunctionMatcher());
@@ -655,7 +684,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
         assert.isAbove(match.args.length, 0);
       }
 
-      const failure = ['clamp(1px, 2px, 3px)', '-foo()'];
+      const failure = ['clamp(1px, 2px, 3px)', '-foo()', '--(1px)'];
       for (const value of failure) {
         const {match, text} =
             matchSingleValue('width', value, new SDK.CSSPropertyParserMatchers.CustomFunctionMatcher());
@@ -811,6 +840,98 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           matchSingleValue('--env', bad, new SDK.CSSPropertyParserMatchers.EnvFunctionMatcher(matchedStyles));
       assert.notExists(match, text);
       assert.exists(ast, text);
+    }
+  });
+
+  it('matches variable names in style queries', () => {
+    const matchedStyles = sinon.createStubInstance(SDK.CSSMatchedStyles.CSSMatchedStyles);
+    const style = sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration);
+
+    {
+      // Simple inline if() with style query
+      const {match} = matchSingleValue('width', 'if(style(--foo: bar): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--foo');
+    }
+
+    {
+      // Query if property exists
+      const {match} = matchSingleValue('width', 'if(style(--foo): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--foo');
+    }
+
+    {
+      // Parenthesized boolean subexpression
+      const {match} = matchSingleValue('width', 'if(not (style(--a: b) and style(--c: d)): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--a');
+    }
+
+    {
+      // Ensure variables in value positions are NOT matched by VariableNameMatcher
+      const {match} = matchSingleValue('width', 'if((style((calc(var(--a)) > 10px) and not (--c: d))): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--c');
+    }
+
+    {
+      // LHS of range comparison
+      const {match} = matchSingleValue('width', 'if(style(--q > 3): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--q');
+    }
+
+    {
+      // RHS of range comparison
+      const {match} = matchSingleValue('width', 'if(style(3 = --q): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--q');
+    }
+
+    {
+      // Range comparisons with calculations inside style() calling var()
+      const {match} = matchSingleValue('width', 'if(style(--foo > calc(var(--bar) + 10px)): 10px)',
+                                       new SDK.CSSPropertyParserMatchers.VariableNameMatcher(matchedStyles, style));
+      assert.exists(match);
+      assert.strictEqual(match.text, '--foo');
+    }
+  });
+
+  it('matches position-area declarations', () => {
+    for (const valid
+             of ['top', 'top left', 'center', 'span-all', 'inline-start block-end', 'self-start', 'top self-end']) {
+      const {match, text} =
+          matchSingleValue('position-area', valid, new SDK.CSSPropertyParserMatchers.PositionAreaMatcher());
+      assert.exists(match, text);
+      assert.strictEqual(match.text, valid);
+    }
+
+    // Accepts legacy inset-area property
+    {
+      const {match, text} =
+          matchSingleValue('inset-area', 'top left', new SDK.CSSPropertyParserMatchers.PositionAreaMatcher());
+      assert.exists(match, text);
+      assert.strictEqual(match.text, 'top left');
+    }
+
+    // Does not match CSS-wide keywords
+    for (const wide of ['inherit', 'initial', 'unset', 'revert', 'revert-layer']) {
+      const {match, text} =
+          matchSingleValue('position-area', wide, new SDK.CSSPropertyParserMatchers.PositionAreaMatcher());
+      assert.isNull(match, text);
+    }
+
+    // Does not match other properties
+    {
+      const {match, text} = matchSingleValue('color', 'red', new SDK.CSSPropertyParserMatchers.PositionAreaMatcher());
+      assert.isNull(match, text);
     }
   });
 });

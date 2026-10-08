@@ -9,82 +9,84 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../../core/text_utils/text_utils.js';
 import * as Formatter from '../../../../models/formatter/formatter.js';
-import * as TextUtils from '../../../../models/text_utils/text_utils.js';
-import * as PanelCommon from '../../../../panels/common/common.js';
 import * as CodeMirror from '../../../../third_party/codemirror.next/codemirror.next.js';
 import * as CodeHighlighter from '../../../components/code_highlighter/code_highlighter.js';
+import * as Dialogs from '../../../components/dialogs/dialogs.js';
 import * as TextEditor from '../../../components/text_editor/text_editor.js';
+import {html, type TemplateResult} from '../../../lit/lit.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
 const UIStrings = {
   /**
-   * @description Text for the source of something
+   * @description Title of the source frame view tab.
    */
   source: 'Source',
   /**
-   * @description Text to pretty print a file
+   * @description Tooltip text for the pretty print button in the toolbar.
    */
   prettyPrint: 'Pretty print',
   /**
-   * @description Text when something is loading
+   * @description Tooltip text for the progress indicator while content is loading in the source frame.
    */
   loading: 'Loading…',
   /**
-   * @description Shown at the bottom of the Sources panel when the user has made multiple
-   * simultaneous text selections in the text editor.
+   * @description Placeholder text shown in the editor while formatting content.
+   */
+  formatting: 'Formatting…',
+  /**
+   * @description Status bar text in the source frame showing the number of active selection regions.
    * @example {2} PH1
    */
   dSelectionRegions: '{PH1} selection regions',
   /**
-   * @description Position indicator in Source Frame of the Sources panel. The placeholder is a
-   * hexadecimal number value, which is why it is prefixed with '0x'.
+   * @description Status bar text in the source frame showing the current bytecode offset position. The placeholder is a hexadecimal number value, which is why it is prefixed with '0x'.
    * @example {abc} PH1
    */
   bytecodePositionXs: 'Bytecode position `0x`{PH1}',
   /**
-   * @description Text in Source Frame of the Sources panel
+   * @description Status bar text in the source frame showing the cursor line and column position.
    * @example {2} PH1
    * @example {2} PH2
    */
-  lineSColumnS: 'Line {PH1}, Column {PH2}',
+  lineSColumnS: 'Line {PH1}, column {PH2}',
   /**
-   * @description Text in Source Frame of the Sources panel
+   * @description Status bar text in the source frame showing the number of characters selected.
    * @example {2} PH1
    */
   dCharactersSelected: '{PH1} characters selected',
   /**
-   * @description Text in Source Frame of the Sources panel
+   * @description Status bar text in the source frame showing the number of lines and characters selected.
    * @example {2} PH1
    * @example {2} PH2
    */
   dLinesDCharactersSelected: '{PH1} lines, {PH2} characters selected',
   /**
-   * @description Headline of warning shown to users when pasting text/code into DevTools.
+   * @description Title of warning dialog shown to users when pasting code into DevTools.
    */
   doYouTrustThisCode: 'Do you trust this code?',
   /**
-   * @description Warning shown to users when pasting text/code into DevTools. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
+   * @description Warning message shown to users when pasting code into DevTools. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
    * @example {allow pasting} PH1
    */
   doNotPaste:
-      'Don\'t paste code you do not understand or have not reviewed yourself into DevTools. This could allow attackers to steal your identity or take control of your computer. Please type “{PH1}” below to allow pasting.',
+      'Don’t paste code you don’t understand or haven’t reviewed yourself into DevTools. This could allow attackers to steal your identity or take control of your computer. Type "{PH1}" below to allow pasting.',
   /**
-   * @description Text a user needs to type in order to confirm that they are aware of the danger of pasting code into the DevTools console.
+   * @description Text the user needs to type to confirm they want to paste code into DevTools.
    */
   allowPasting: 'allow pasting',
   /**
    * @description Input box placeholder which instructs the user to type 'allow pasting' into the input box. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
    * @example {allow pasting} PH1
    */
-  typeAllowPasting: 'Type “{PH1}”',
+  typeAllowPasting: 'Type "{PH1}"',
   /**
-   * @description Error message shown when the user tries to open a file that contains non-readable data. "Editor" refers to
-   * a text editor.
+   * @description Error message shown in the text editor when binary data cannot be displayed.
    */
   binaryContentError:
-      'Editor can\'t show binary data. Use the "Response" tab in the "Network" panel to inspect this resource.',
+      'Editor can’t show binary data. Use the Response tab in the Network panel to inspect this resource.',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/SourceFrame.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -106,8 +108,8 @@ export interface EventTypes {
   [Events.EDITOR_SCROLL]: void;
 }
 
-type FormatFn = (lineNo: number, state: CodeMirror.EditorState) => string;
-export const LINE_NUMBER_FORMATTER = CodeMirror.Facet.define<FormatFn, FormatFn>({
+export type FormatFn = (lineNo: number, state: CodeMirror.EditorState) => string;
+export const LINE_NUMBER_FORMATTER: CodeMirror.Facet<FormatFn, FormatFn> = CodeMirror.Facet.define<FormatFn, FormatFn>({
   combine(value): FormatFn {
     if (value.length === 0) {
       return (lineNo: number) => lineNo.toString();
@@ -116,8 +118,14 @@ export const LINE_NUMBER_FORMATTER = CodeMirror.Facet.define<FormatFn, FormatFn>
   },
 });
 
-export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.View.SimpleView>(
-    UI.View.SimpleView) implements UI.SearchableView.Searchable, UI.SearchableView.Replaceable, Transformer {
+const SourceFrameImplBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.View.SimpleView> =
+    Common.ObjectWrapper.eventMixin(
+        UI.View.SimpleView,
+    );
+
+export class SourceFrameImpl extends SourceFrameImplBase implements UI.SearchableView.Searchable,
+                                                                    UI.SearchableView.Replaceable,
+                                                                    UI.SearchableView.SearchTarget, Transformer {
   private readonly lazyContent: () => Promise<TextUtils.ContentData.ContentDataOrError>;
   private prettyInternal: boolean;
   private rawContent: string|CodeMirror.Text|null;
@@ -137,7 +145,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   private searchRegex: UI.SearchableView.SearchRegexResult|null;
   private loadError: boolean;
   private readonly sourcePosition: UI.Toolbar.ToolbarText;
-  private searchableView: UI.SearchableView.SearchableView|null;
+  private searchableView: UI.SearchableView.SearchResultsListener|null;
   private editable: boolean;
   private positionToReveal: {
     to: {lineNumber: number, columnNumber: number},
@@ -147,15 +155,16 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   private lineToScrollTo: number|null;
   private selectionToSet: TextUtils.TextRange.TextRange|null;
   private loadedInternal: boolean;
+  private positionPercentageToReveal: number|null = null;
   private contentRequested: boolean;
   private wasmDisassemblyInternal: TextUtils.WasmDisassembly.WasmDisassembly|null;
   contentSet: boolean;
   private selfXssWarningDisabledSetting: Common.Settings.Setting<boolean>;
 
-  constructor(
-      lazyContent: () => Promise<TextUtils.ContentData.ContentDataOrError>,
-      private readonly options: SourceFrameOptions = {}) {
-    super({
+  constructor(lazyContent: () => Promise<TextUtils.ContentData.ContentDataOrError>,
+              private readonly options: SourceFrameOptions = {}, element?: HTMLElement) {
+    // @ts-expect-error
+    super(...(element ? [element] : []), {
       title: i18nString(UIStrings.source),
       viewId: 'source',
     });
@@ -257,6 +266,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         focus: () => this.onFocus(),
         blur: () => this.onBlur(),
         paste: () => this.onPaste(),
+        drop: event => event.preventDefault(),
         scroll: () => this.dispatchEventToListeners(Events.EDITOR_SCROLL),
         contextmenu: event => this.onContextMenu(event),
       }),
@@ -264,16 +274,15 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         domEventHandlers:
             {contextmenu: (_view, block, event) => this.onLineGutterContextMenu(block.from, event as MouseEvent)},
       }),
-      CodeMirror.EditorView.updateListener.of(
-          (update):
-              void => {
-                if (update.selectionSet || update.docChanged) {
-                  this.updateSourcePosition();
-                }
-                if (update.docChanged) {
-                  this.onTextChanged();
-                }
-              }),
+      CodeMirror.EditorView.updateListener.of((update):
+                                                  void => {
+                                                    if (update.selectionSet || update.docChanged) {
+                                                      this.updateSourcePosition();
+                                                    }
+                                                    if (update.docChanged) {
+                                                      this.onTextChanged();
+                                                    }
+                                                  }),
       activeSearchState,
       CodeMirror.Prec.lowest(searchHighlighter),
       config.language.of([]),
@@ -308,7 +317,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   async showSelfXssWarning(): Promise<void> {
-    const allowPasting = await PanelCommon.TypeToAllowDialog.show({
+    const allowPasting = await Dialogs.TypeToAllowDialog.TypeToAllowDialog.show({
       jslogContext: {
         dialog: 'self-xss-warning',
         input: 'allow-pasting',
@@ -316,7 +325,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       header: i18nString(UIStrings.doYouTrustThisCode),
       message: i18nString(UIStrings.doNotPaste, {PH1: i18nString(UIStrings.allowPasting)}),
       typePhrase: i18nString(UIStrings.allowPasting),
-      inputPlaceholder: i18nString(UIStrings.typeAllowPasting, {PH1: i18nString(UIStrings.allowPasting)})
+      inputPlaceholder: i18nString(UIStrings.typeAllowPasting, {PH1: i18nString(UIStrings.allowPasting)}),
     });
     if (allowPasting) {
       this.selfXssWarningDisabledSetting.set(true);
@@ -387,7 +396,9 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     if (this.prettyInternal) {
       const content =
           this.rawContent instanceof CodeMirror.Text ? this.rawContent.sliceString(0) : this.rawContent || '';
-      const formatInfo = await Formatter.ScriptFormatter.formatScriptContent(this.contentType, content);
+      this.textEditor.state = this.placeholderEditorState(i18nString(UIStrings.formatting));
+      const formatInfo = await Formatter.ScriptFormatter.formatScriptContent(Common.Settings.Settings.instance(),
+                                                                             this.contentType, content);
       this.formattedMap = formatInfo.formattedMapping;
       await this.setContent(formatInfo.formattedContent);
       this.prettyBaseDoc = textEditor.state.doc;
@@ -488,8 +499,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.clearPositionToReveal();
   }
 
-  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
-    return [this.prettyToggle, this.sourcePosition, this.progressToolbarItem];
+  override async toolbarItems(): Promise<TemplateResult> {
+    return html`${this.prettyToggle.element}${this.sourcePosition.element}${this.progressToolbarItem.element}`;
   }
 
   get loaded(): boolean {
@@ -577,6 +588,35 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     }
   }
 
+  getPositionPercentage(): number {
+    const {textEditor} = this;
+    if (!textEditor) {
+      return 0;
+    }
+    const docLength = textEditor.state.doc.length;
+    if (docLength === 0) {
+      return 0;
+    }
+    const pos = textEditor.state.selection.main.head;
+    return pos / docLength;
+  }
+
+  setPositionPercentage(percentage: number): void {
+    this.positionPercentageToReveal = percentage;
+    this.#setPercentagePositionIfNeeded();
+  }
+
+  #setPercentagePositionIfNeeded(): void {
+    if (this.positionPercentageToReveal !== null && this.loadedInternal) {
+      const docLength = this.textEditor.state.doc.length;
+      if (docLength > 0) {
+        const pos = Math.floor(docLength * this.positionPercentageToReveal);
+        this.revealPosition(pos);
+      }
+      this.positionPercentageToReveal = null;
+    }
+  }
+
   revealPosition(position: RevealPosition, shouldHighlight?: boolean): void {
     this.lineToScrollTo = null;
     this.selectionToSet = null;
@@ -658,6 +698,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   private wasShownOrLoaded(): void {
+    this.#setPercentagePositionIfNeeded();
     this.#revealPositionIfNeeded();
     this.#setSelectionIfNeeded();
     this.#scrollToLineIfNeeded();
@@ -752,7 +793,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     }
   }
 
-  setSearchableView(view: UI.SearchableView.SearchableView|null): void {
+  setSearchableView(view: UI.SearchableView.SearchResultsListener|null): void {
     this.searchableView = view;
   }
 
@@ -1145,7 +1186,8 @@ const nonBreakableLineMark = new (class extends CodeMirror.GutterMarker {
 })();
 
 /** Effect to add lines (by position) to the set of non-breakable lines. **/
-export const addNonBreakableLines = CodeMirror.StateEffect.define<readonly number[]>();
+export const addNonBreakableLines: CodeMirror.StateEffectType<readonly number[]> =
+    CodeMirror.StateEffect.define<readonly number[]>();
 
 const nonBreakableLines = CodeMirror.StateField.define<CodeMirror.RangeSet<CodeMirror.GutterMarker>>({
   create(): CodeMirror.RangeSet<CodeMirror.GutterMarker> {
@@ -1225,8 +1267,10 @@ export interface SourceFrameInfobar {
 }
 
 /** Infobar panel state, used to show additional panels below the editor. **/
-export const addSourceFrameInfobar = CodeMirror.StateEffect.define<SourceFrameInfobar>();
-export const removeSourceFrameInfobar = CodeMirror.StateEffect.define<SourceFrameInfobar>();
+export const addSourceFrameInfobar: CodeMirror.StateEffectType<SourceFrameInfobar> =
+    CodeMirror.StateEffect.define<SourceFrameInfobar>();
+export const removeSourceFrameInfobar: CodeMirror.StateEffectType<SourceFrameInfobar> =
+    CodeMirror.StateEffect.define<SourceFrameInfobar>();
 
 const sourceFrameInfobarState = CodeMirror.StateField.define<SourceFrameInfobar[]>({
   create(): SourceFrameInfobar[] {

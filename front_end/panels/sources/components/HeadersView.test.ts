@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -26,6 +27,7 @@ import {createFileSystemUISourceCode} from '../../../testing/UISourceCodeHelpers
 import {
   recordedMetricsContain,
   resetRecordedMetrics,
+  setupUserMetricHooks,
 } from '../../../testing/UserMetricsHelpers.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 
@@ -34,6 +36,7 @@ import * as SourcesComponents from './components.js';
 const {urlString} = Platform.DevToolsPath;
 
 describe('HeadersView', () => {
+  setupUserMetricHooks();
   const commitWorkingCopySpy = sinon.spy();
 
   before(async () => {
@@ -198,7 +201,7 @@ describe('HeadersView', () => {
     await RenderCoordinator.done();
 
     const errorHeader = editor.shadowRoot.querySelector('.error-header');
-    assert.strictEqual(errorHeader?.textContent, 'Error when parsing \'.headers\'.');
+    assert.strictEqual(errorHeader?.textContent, 'Error when parsing \'.headers\'');
   });
 
   it('displays data and allows editing', async () => {

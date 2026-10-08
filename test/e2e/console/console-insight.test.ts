@@ -11,7 +11,7 @@ import {
   clickOnContextMenu,
   CONSOLE_TAB_SELECTOR,
 } from '../helpers/console-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 describe('ConsoleInsight', function() {
   const CLICK_TARGET_SELECTOR = '.console-message-text';
@@ -73,7 +73,7 @@ describe('ConsoleInsight', function() {
     await inspectedPage.evaluate(() => {
       console.error(new Error('Unexpected error'));
     });
-    await clickOnContextMenu(CLICK_TARGET_SELECTOR, EXPLAIN_ACTION_ID, devToolsPage);
+    await clickOnContextMenu(devToolsPage, CLICK_TARGET_SELECTOR, EXPLAIN_ACTION_ID);
 
     await devToolsPage.waitFor('.devtools-console-insight');
   });
@@ -190,6 +190,9 @@ describe('ConsoleInsight', function() {
     // Check for the citation link within the code block
     const citationSelector = '.citation';
     const citation = await devToolsPage.waitFor(citationSelector);
+    await devToolsPage.waitForNone('devtools-spinner');
+    await devToolsPage.waitForNone('.pending');
+    await devToolsPage.waitForNone('.animating');
     const citationText = await citation.evaluate(el => (el as HTMLElement).innerText);
     assert.strictEqual(citationText, '[1]');
 

@@ -9,13 +9,13 @@ import("../../../scripts/build/typescript/typescript.gni")
 devtools_module("trace_bounds") {
   sources = [ "TraceBounds.ts" ]
 
-  deps = [ "../../models/trace:bundle" ]
+  ts_deps = [ "../../models/trace:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "trace_bounds.ts"
 
-  deps = [ ":trace_bounds" ]
+  ts_deps = [ ":trace_bounds" ]
 
   visibility = [ "*" ]
 }
@@ -25,7 +25,7 @@ ts_library("unittests") {
 
   sources = [ "TraceBounds.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../models/trace:bundle",
   ]

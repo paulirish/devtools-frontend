@@ -4,8 +4,8 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
@@ -14,7 +14,8 @@ import {Models} from './insights.js';
 // Root cause invalidation window.
 const INVALIDATION_WINDOW = Helpers.Timing.secondsToMicro(Types.Timing.Seconds(0.5));
 
-describeWithEnvironment('CLSCulprits', function() {
+describe('CLSCulprits', function() {
+  setupLocaleHooks();
   describe('non composited animations', function() {
     it('gets the correct non composited animations', async function() {
       const {data, insights} = await processTrace(this, 'non-composited-animation.json.gz');
@@ -50,6 +51,9 @@ describeWithEnvironment('CLSCulprits', function() {
     });
 
     it('gets the correct non composited animations for shift', async function() {
+      if (this.timeout() > 0) {
+        this.timeout(45_000);
+      }
       const {data, insights} = await processTrace(this, 'non-composited-animation-shift.json.gz');
       const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('CLSCulprits', insights, firstNav);
@@ -84,7 +88,7 @@ describeWithEnvironment('CLSCulprits', function() {
           name: 'simple-animation',
           failureReasons: [
             Models.CLSCulprits.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
-            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY
+            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
           ],
           unsupportedProperties: ['height', 'color', 'top'],
           animation: simpleAnimation,
@@ -93,7 +97,7 @@ describeWithEnvironment('CLSCulprits', function() {
           name: 'top',
           failureReasons: [
             Models.CLSCulprits.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
-            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY
+            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
           ],
           unsupportedProperties: ['top'],
           animation: top,

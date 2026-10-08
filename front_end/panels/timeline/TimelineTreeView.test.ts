@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import * as Trace from '../../models/trace/trace.js';
 import {assertScreenshot} from '../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {deinitializeGlobalVars, initializeGlobalVars} from '../../testing/EnvironmentHelpers.js';
 import {allThreadEntriesInTrace, renderWidgetInVbox} from '../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
@@ -27,7 +27,21 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
   element = document.createElement('div');
 }
 
-describeWithEnvironment('TimelineTreeView', function() {
+describe('TimelineTreeView', function() {
+  let syncLikeTimingsParsedTrace: Trace.TraceModel.ParsedTrace;
+  let userTimingsParsedTrace: Trace.TraceModel.ParsedTrace;
+  let webDevWithCommitParsedTrace: Trace.TraceModel.ParsedTrace;
+
+  before(async function() {
+    await initializeGlobalVars();
+    syncLikeTimingsParsedTrace = await TraceLoader.traceEngine(null, 'sync-like-timings.json.gz');
+    userTimingsParsedTrace = await TraceLoader.traceEngine(null, 'user-timings.json.gz');
+    webDevWithCommitParsedTrace = await TraceLoader.traceEngine(null, 'web-dev-with-commit.json.gz');
+  });
+
+  after(async () => {
+    await deinitializeGlobalVars();
+  });
   const mockViewDelegate = new MockViewDelegate();
 
   describe('EventsTimelineTreeView', function() {
@@ -36,8 +50,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.hidden = false;
     });
 
-    it('Creates a tree from nestable async events', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+    it('Creates a tree from nestable async events', function() {
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const eventTreeView = new Timeline.EventsTimelineTreeView.EventsTimelineTreeView(mockViewDelegate);
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
       eventTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: null};
@@ -53,8 +67,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       assert.strictEqual(bottomNode.event?.name, 'second console time');
     });
 
-    it('shows instant events as nodes', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'user-timings.json.gz');
+    it('shows instant events as nodes', function() {
+      const parsedTrace = userTimingsParsedTrace;
       const eventTreeView = new Timeline.EventsTimelineTreeView.EventsTimelineTreeView(mockViewDelegate);
       const consoleTimings = [...parsedTrace.data.UserTimings.performanceMarks];
       eventTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: null};
@@ -67,8 +81,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       assert.strictEqual(secondNode.event?.name, 'mark3');
     });
 
-    it('can filter events by text', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'user-timings.json.gz');
+    it('can filter events by text', function() {
+      const parsedTrace = userTimingsParsedTrace;
       const eventTreeView = new Timeline.EventsTimelineTreeView.EventsTimelineTreeView(mockViewDelegate);
       const consoleTimings = [...parsedTrace.data.UserTimings.performanceMarks];
       eventTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: null};
@@ -85,8 +99,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       assert.deepEqual(newTopLevelChildren, ['mark1']);
     });
 
-    it('can filter and hide entire categories', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'user-timings.json.gz');
+    it('can filter and hide entire categories', function() {
+      const parsedTrace = userTimingsParsedTrace;
       const eventTreeView = new Timeline.EventsTimelineTreeView.EventsTimelineTreeView(mockViewDelegate);
       const performanceTimingEvents = [...parsedTrace.data.UserTimings.performanceMeasures];
       eventTreeView.model = {selectedEvents: performanceTimingEvents, parsedTrace, entityMapper: null};
@@ -108,7 +122,7 @@ describeWithEnvironment('TimelineTreeView', function() {
 
   describe('BottomUpTimelineTreeView', function() {
     it('Creates a bottom up tree from nestable events', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
       const bottomUpTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
@@ -120,6 +134,11 @@ describeWithEnvironment('TimelineTreeView', function() {
       bottomUpTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: mapper};
 
       await RenderCoordinator.done();
+      // Ensure the datagrid or row does not have focus. If a row is focused,
+      // Chromium can match :focus-visible (if previous tests in the runner
+      // dispatched keyboard events), rendering a focus ring outline and
+      // focused selection colors.
+      (document.activeElement as HTMLElement | null)?.blur();
       await assertScreenshot('timeline/bottom_up_tree_view.png');
 
       const tree = bottomUpTreeView.buildTree();
@@ -138,7 +157,7 @@ describeWithEnvironment('TimelineTreeView', function() {
     });
 
     it('Limits the number of rows when maxRows is set', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
       const bottomUpTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
@@ -154,12 +173,11 @@ describeWithEnvironment('TimelineTreeView', function() {
 
       assert.lengthOf(bottomUpTreeView.dataGrid.rootNode().children, 2);
     });
-
   });
 
   describe('CallTreeTimelineTreeView', function() {
     it('Creates a call tree from nestable events', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.CallTreeTimelineTreeView();
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
@@ -183,11 +201,56 @@ describeWithEnvironment('TimelineTreeView', function() {
       const childNode = firstNode.children().values().next().value as Trace.Extras.TraceTree.Node;
       assert.strictEqual(childNode.event?.name, 'second console time');
     });
+
+    it('preserves expanded node state when wasShown is called', async function() {
+      const parsedTrace = syncLikeTimingsParsedTrace;
+      const callTreeView = new Timeline.TimelineTreeView.CallTreeTimelineTreeView();
+      const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
+      const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
+      const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.max);
+
+      renderWidgetInVbox(callTreeView, {flexAuto: true});
+      callTreeView.setRange(startTime, endTime);
+      callTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: null};
+
+      await RenderCoordinator.done();
+
+      const rootNode = callTreeView.dataGrid.rootNode();
+      assert.isAbove(rootNode.children.length, 0);
+      const firstChild = rootNode.children[0];
+      firstChild.expand();
+      assert.isTrue(firstChild.expanded);
+
+      callTreeView.wasShown();
+      assert.strictEqual(callTreeView.dataGrid.rootNode().children[0], firstChild);
+      assert.isTrue(firstChild.expanded);
+    });
+
+    it('renders the tree on wasShown when data was configured while detached', async function() {
+      const parsedTrace = syncLikeTimingsParsedTrace;
+      const callTreeView = new Timeline.TimelineTreeView.CallTreeTimelineTreeView();
+      const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
+      const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
+      const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.max);
+
+      // Set data while detached from the DOM.
+      callTreeView.setRange(startTime, endTime);
+      callTreeView.model = {selectedEvents: consoleTimings, parsedTrace, entityMapper: null};
+
+      // Data grid should not have children yet because the widget was detached.
+      assert.lengthOf(callTreeView.dataGrid.rootNode().children, 0);
+
+      // Attaching and showing the widget triggers a refresh for dirty state.
+      renderWidgetInVbox(callTreeView, {flexAuto: true});
+      await RenderCoordinator.done();
+
+      assert.isAbove(callTreeView.dataGrid.rootNode().children.length, 0);
+    });
   });
 
   describe('event grouping', function() {
-    it('groups events by category in the Call Tree view', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+    it('groups events by category in the Call Tree view', function() {
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.CallTreeTimelineTreeView();
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
@@ -208,8 +271,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       assert.strictEqual(children.next().value!.event.name, 'first console time');
       assert.strictEqual(children.next().value!.event.name, 'third console time');
     });
-    it('groups events by category in the Bottom up Tree view', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+    it('groups events by category in the Bottom up Tree view', function() {
+      const parsedTrace = syncLikeTimingsParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const consoleTimings = [...parsedTrace.data.UserTimings.consoleTimings];
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
@@ -232,8 +295,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       assert.strictEqual(children.next().value!.event.name, 'third console time');
     });
 
-    it('can group entries by domain', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    it('can group entries by domain', function() {
+      const parsedTrace = webDevWithCommitParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.max);
@@ -257,8 +320,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       ]);
     });
 
-    it('can group entries by third parties', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    it('can group entries by third parties', function() {
+      const parsedTrace = webDevWithCommitParsedTrace;
       const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
       const callTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
@@ -284,8 +347,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       ]);
     });
 
-    it('can group entries by frame', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    it('can group entries by frame', function() {
+      const parsedTrace = webDevWithCommitParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.max);
@@ -304,8 +367,8 @@ describeWithEnvironment('TimelineTreeView', function() {
       ]);
     });
 
-    it('can group entries by URL', async function() {
-      const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    it('can group entries by URL', function() {
+      const parsedTrace = webDevWithCommitParsedTrace;
       const callTreeView = new Timeline.TimelineTreeView.BottomUpTimelineTreeView();
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.min);
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.data.Meta.traceBounds.max);
@@ -350,7 +413,7 @@ describeWithEnvironment('TimelineTreeView', function() {
         'https://web-dev.imgix.net/image/SZHNhsfjU9RbCestTGZU6N7JEWs1/VwL892KEz6bakZMlq10D.png?auto=format&w=740',
         'https://web.dev/images/android-chrome-192x192.png',
         'https://web.dev/images/favicon.ico',
-        'https://region1.google-analytics.com/g/collect?v=2&tid=G-18JR3Q8PJ8&gtm=45je3a40&_p=68725886&cid=1874137241.1685438100&ul=en-gb&sr=3360x1890&uaa=arm&uab=64&uafvl=Not_A%2520Brand%3B8.0.0.0%7CChromium%3B120.0.6049.0%7CGoogle%2520Chrome%3B120.0.6049.0&uamb=0&uam=&uap=macOS&uapv=13.6.0&uaw=0&are=1&dl=https%3A%2F%2Fweb.dev%2F&dp=&sid=1696581003&sct=2&seg=1&dt=web.dev&_s=1'
+        'https://region1.google-analytics.com/g/collect?v=2&tid=G-18JR3Q8PJ8&gtm=45je3a40&_p=68725886&cid=1874137241.1685438100&ul=en-gb&sr=3360x1890&uaa=arm&uab=64&uafvl=Not_A%2520Brand%3B8.0.0.0%7CChromium%3B120.0.6049.0%7CGoogle%2520Chrome%3B120.0.6049.0&uamb=0&uam=&uap=macOS&uapv=13.6.0&uaw=0&are=1&dl=https%3A%2F%2Fweb.dev%2F&dp=&sid=1696581003&sct=2&seg=1&dt=web.dev&_s=1',
       ]);
     });
   });

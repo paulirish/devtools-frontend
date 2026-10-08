@@ -12,6 +12,7 @@ import type {
 } from '../api/Browser.js';
 
 import type {ConnectionTransport} from './ConnectionTransport.js';
+import type {Logger} from './Debug.js';
 import type {DownloadBehavior} from './DownloadBehavior.js';
 import type {Viewport} from './Viewport.js';
 
@@ -42,10 +43,40 @@ export interface SupportedWebDriverCapabilities {
  * @public
  */
 export type ChromeReleaseChannel =
-  | 'chrome'
-  | 'chrome-beta'
-  | 'chrome-canary'
-  | 'chrome-dev';
+  'chrome' | 'chrome-beta' | 'chrome-canary' | 'chrome-dev';
+
+/**
+ * Options for the WebSocket connection to the browser.
+ *
+ * @remarks
+ * Only used in the Node.js environment.
+ *
+ * @public
+ */
+export interface WsOptions {
+  /**
+   * Headers to use for the web socket connection.
+   */
+  headers?: Record<string, string>;
+
+  /**
+   * Whether to send WebSocket pings and drop the connection when a pong does
+   * not come back within the same interval. Detects a connection that died
+   * without a close frame, which otherwise leaves calls hanging until
+   * `protocolTimeout`.
+   *
+   * @defaultValue `false`
+   */
+  keepAlive?: boolean;
+
+  /**
+   * Ping period in milliseconds. Only used when {@link WsOptions.keepAlive} is
+   * set.
+   *
+   * @defaultValue `30_000`
+   */
+  keepAliveIntervalMs?: number;
+}
 
 /**
  * Generic browser options that can be passed when launching any browser or when
@@ -136,6 +167,15 @@ export interface ConnectOptions {
    */
   protocolTimeout?: number;
 
+  /**
+   * Options for the WebSocket connection to the browser.
+   *
+   * @remarks
+   * Only used in the Node.js environment. The browser build has no ping frame
+   * API, so the keep-alive options are ignored there.
+   */
+  wsOptions?: WsOptions;
+
   browserWSEndpoint?: string;
   browserURL?: string;
   transport?: ConnectionTransport;
@@ -151,6 +191,10 @@ export interface ConnectOptions {
    * Headers to use for the web socket connection.
    * @remarks
    * Only works in the Node.js environment.
+   *
+   * @deprecated Use {@link WsOptions.headers} via
+   * {@link ConnectOptions.wsOptions} instead. When both are set,
+   * `wsOptions.headers` wins.
    */
   headers?: Record<string, string>;
 
@@ -165,26 +209,32 @@ export interface ConnectOptions {
   /**
    * A list of URL patterns to block.
    *
-   * This option allows you to restrict the browser from accessing specific
-   * URLs or origins. It uses the standard [URLPattern](https://urlpattern.spec.whatwg.org/) API to match URLs.
+   * This option allows you to restrict the browser from accessing specific URLs
+   * or origins. It uses the standard
+   * [URLPattern](https://urlpattern.spec.whatwg.org/) API to match URLs.
    *
-   * When connecting to an existing browser, Puppeteer will silently detach from any
-   * already open targets that violate the patterns.
+   * When connecting to an existing browser, Puppeteer will silently detach from
+   * any already open targets that violate the patterns.
    *
    * For any network requests made by the browser (including navigations and
    * subresources like images or scripts), the request will fail with an error
    * if the URL matches a blocked pattern.
    *
-   * @example Pattern to block a specific domain:
-   * `*://example.com/*`
+   * @example Pattern to block a specific domain: `*://example.com/*`
    *
-   * @example Pattern to block all subdomains:
-   * `*://*.evil.com/*`
+   * @example Pattern to block all subdomains: `*://*.evil.com/*`
    *
    * @remarks
-   * Currently only supported for CDP connections.
+   * Currently only supported for Chrome.
    *
-   * Inner `<iframe>` content loading is currently not blocked.
+   * The feature works while Puppeteer is attached to the CDP targets.
+   * It intercepts requests in the network service in Chrome.
+   * Chrome may perform some network access in other ways or
+   * some web features may omit the network service.
+   * The feature is meant as an additional guardrails to LLM-based
+   * usage under Puppeteer control and not a complete network sandbox.
+   * For complete network sandboxing, we recommend using
+   * container/OS-level sandbox mechanism.
    *
    * Cannot be used along with {@link ConnectOptions.allowlist}.
    *
@@ -214,13 +264,39 @@ export interface ConnectOptions {
    * `*://*.example.com/*`
    *
    * @remarks
-   * Currently only supported for CDP connections.
+   * Currently only supported for Chrome.
    *
-   * Inner `<iframe>` content loading is currently not blocked.
+   * The feature works while Puppeteer is attached to the CDP targets.
+   * It intercepts requests in the network service in Chrome.
+   * Chrome may perform some network access in other ways or
+   * some web features may omit the network service.
+   * The feature is meant as an additional guardrails to LLM-based
+   * usage under Puppeteer control and not a complete network sandbox.
+   * For complete network sandboxing, we recommend using
+   * container/OS-level sandbox mechanism.
    *
    * Cannot be used along with {@link ConnectOptions.blocklist}.
    *
    * @experimental
    */
   allowlist?: string[];
+  /**
+   * When provided, Puppeteer calls the logger with a debug channel prefix
+   * {@link DebugPrefix}. If the logger returns a
+   * {@link LoggerFunction}, Puppeteer uses it to log details for that channel.
+   *
+   * @example
+   *
+   * ```ts
+   * const browser = await puppeteer.connect({
+   *   browserWSEndpoint,
+   *   logger: prefix => {
+   *     return (...args) => console.log(`[${prefix}]`, ...args);
+   *   },
+   * });
+   * ```
+   *
+   * @experimental The API may change in future releases.
+   */
+  logger?: Logger;
 }

@@ -17,7 +17,7 @@ export default createRule({
       requiredEndTag: 'Custom elements should not be self-closing.',
     },
     fixable: 'code',
-    schema: []  // no options
+    schema: [],  // no options
   },
   defaultOptions: [],
   create: function(context) {
@@ -25,6 +25,10 @@ export default createRule({
       TaggedTemplateExpression(node) {
         const isLitHtmlCall = isLitHtmlTemplateCall(node);
         if (!isLitHtmlCall) {
+          return;
+        }
+
+        if (!node.quasi.quasis.some(templatePart => templatePart.value.raw.includes('/>'))) {
           return;
         }
 
@@ -38,5 +42,5 @@ export default createRule({
         }
       },
     };
-  }
+  },
 });

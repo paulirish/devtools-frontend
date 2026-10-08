@@ -13,9 +13,12 @@ import {
   WebWorkerEvent,
   type WebWorkerEvents,
 } from '../api/WebWorker.js';
+import type {Logger} from '../common/Debug.js';
+import {DEBUG_PREFIXES} from '../common/Debug.js';
 import {EventEmitter} from '../common/EventEmitter.js';
 import {TimeoutSettings} from '../common/TimeoutSettings.js';
-import {debugError} from '../common/util.js';
+import type {EvaluateFunc, HandleFor} from '../index-browser.js';
+import {Deferred} from '../util/Deferred.js';
 
 import {ExecutionContext} from './ExecutionContext.js';
 import {IsolatedWorld} from './IsolatedWorld.js';
@@ -38,7 +41,9 @@ export class CdpWebWorker extends WebWorker {
   #client: CDPSession;
   readonly #id: string;
   readonly #targetType: TargetType;
+  #logger: Logger;
   readonly #emitter: EventEmitter<WebWorkerEvents>;
+  #workerLoaded = new Deferred<void>();
 
   get internalEmitter(): EventEmitter<WebWorkerEvents> {
     return this.#emitter;
@@ -50,20 +55,31 @@ export class CdpWebWorker extends WebWorker {
     targetId: string,
     targetType: TargetType,
     exceptionThrown: ExceptionThrownCallback,
-    networkManager?: NetworkManager,
+    networkManager: NetworkManager | undefined,
+    logger: Logger,
   ) {
     super(url);
     this.#id = targetId;
     this.#client = client;
+    this.#logger = logger;
     this.#targetType = targetType;
-    this.#world = new IsolatedWorld(this, new TimeoutSettings(), MAIN_WORLD);
-    this.#emitter = new EventEmitter<WebWorkerEvents>();
+    this.#world = new IsolatedWorld(
+      this,
+      new TimeoutSettings(),
+      MAIN_WORLD,
+      logger,
+    );
+    this.#emitter = new EventEmitter<WebWorkerEvents>(undefined, logger);
 
     this.#client.once('Runtime.executionContextCreated', async event => {
       this.#world.setContext(
-        new ExecutionContext(client, event.context, this.#world),
+        new ExecutionContext(client, event.context, this.#world, logger),
       );
     });
+    this.#client.once('Inspector.workerScriptLoaded', () => {
+      this.#workerLoaded.resolve();
+    });
+
     this.#world.emitter.on('consoleapicalled', async event => {
       try {
         const values = event.args.map(arg => {
@@ -79,7 +95,9 @@ export class CdpWebWorker extends WebWorker {
           // eslint-disable-next-line max-len -- The comment is long.
           // eslint-disable-next-line @puppeteer/use-using -- These are not owned by this function.
           for (const value of values) {
-            void value.dispose().catch(debugError);
+            void value.dispose().catch((err: Error) => {
+              return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+            });
           }
           return;
         }
@@ -90,7 +108,7 @@ export class CdpWebWorker extends WebWorker {
           this.emit(WebWorkerEvent.Console, consoleMessages);
         }
       } catch (err) {
-        debugError(err);
+        this.#logger?.(DEBUG_PREFIXES.error)?.(err);
       }
     });
     this.#client.on('Runtime.exceptionThrown', exceptionThrown);
@@ -99,8 +117,12 @@ export class CdpWebWorker extends WebWorker {
     });
 
     // This might fail if the target is closed before we receive all execution contexts.
-    networkManager?.addClient(this.#client).catch(debugError);
-    this.#client.send('Runtime.enable').catch(debugError);
+    networkManager?.addClient(this.#client).catch((err: Error) => {
+      return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+    });
+    this.#client.send('Runtime.enable').catch((err: Error) => {
+      return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+    });
   }
 
   mainRealm(): Realm {
@@ -135,5 +157,24 @@ export class CdpWebWorker extends WebWorker {
           self.close();
         });
     }
+  }
+
+  override async evaluate<
+    Params extends unknown[],
+    Func extends EvaluateFunc<Params> = EvaluateFunc<Params>,
+  >(func: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>> {
+    await this.#workerLoaded.valueOrThrow();
+    return await super.evaluate(func, ...args);
+  }
+
+  override async evaluateHandle<
+    Params extends unknown[],
+    Func extends EvaluateFunc<Params> = EvaluateFunc<Params>,
+  >(
+    func: Func | string,
+    ...args: Params
+  ): Promise<HandleFor<Awaited<ReturnType<Func>>>> {
+    await this.#workerLoaded.valueOrThrow();
+    return await super.evaluateHandle(func, ...args);
   }
 }

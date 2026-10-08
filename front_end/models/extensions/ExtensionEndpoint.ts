@@ -2,36 +2,59 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Platform from '../../core/platform/platform.js';
+
 interface Response {
   requestId: number;
   result: unknown;
   error: Error|null;
 }
 
-interface Event {
+interface EventMessage {
   event: string;
 }
 
-type Message = MessageEvent<Response|Event>;
+interface Message {
+  data: Response|EventMessage;
+}
+type ResultValidator<T> = (result: unknown) => result is T;
+
+const isUndefined = (result: unknown): result is undefined => result === undefined;
 
 export class ExtensionEndpoint {
-  private readonly port: MessagePort;
+  private readonly port: Platform.HostRuntime.WorkerMessagePort;
   private nextRequestId = 0;
   private pendingRequests: Map<number, {
     resolve: (arg: unknown) => void,
     reject: (error: Error) => void,
   }>;
 
-  constructor(port: MessagePort) {
+  constructor(port: Platform.HostRuntime.WorkerMessagePort) {
     this.port = port;
-    this.port.onmessage = this.onResponse.bind(this);
+    this.port.addEventListener('message', (event: unknown) => this.onResponse(event as Message));
+    (this.port as {start?: () => void}).start?.();
+    (this.port as {unref?: () => void}).unref?.();
     this.pendingRequests = new Map();
   }
 
-  sendRequest<ReturnType>(method: string, parameters: unknown): Promise<ReturnType> {
-    return new Promise((resolve, reject) => {
+  sendRequest(method: string, parameters: unknown): Promise<void>;
+  sendRequest<ReturnType>(method: string, parameters: unknown,
+                          validate: ResultValidator<ReturnType>): Promise<ReturnType>;
+  sendRequest<ReturnType>(method: string, parameters: unknown,
+                          validate: ResultValidator<ReturnType>|
+                          ResultValidator<undefined> = isUndefined): Promise<ReturnType|void> {
+    return new Promise<ReturnType|void>((resolve, reject) => {
       const requestId = this.nextRequestId++;
-      this.pendingRequests.set(requestId, {resolve: resolve as (arg: unknown) => void, reject});
+      this.pendingRequests.set(requestId, {
+        resolve: (result: unknown) => {
+          if (!validate(result)) {
+            reject(new Error(`Extension returned malformed ${method} result`));
+            return;
+          }
+          resolve(result);
+        },
+        reject,
+      });
       this.port.postMessage({requestId, method, parameters});
     });
   }
@@ -44,7 +67,8 @@ export class ExtensionEndpoint {
     this.port.close();
   }
 
-  private onResponse({data}: Message): void {
+  private onResponse(event: Message): void {
+    const data = event.data;
     if ('event' in data) {
       this.handleEvent(data);
       return;
@@ -63,7 +87,7 @@ export class ExtensionEndpoint {
     }
   }
 
-  protected handleEvent(_event: Event): void {
+  protected handleEvent(_event: EventMessage): void {
     throw new Error('handleEvent is not implemented');
   }
 }

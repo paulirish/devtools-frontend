@@ -3,6 +3,7 @@
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
+import { URLPattern } from '../../third_party/urlpattern-polyfill/urlpattern-polyfill.js';
 import { _connectToBiDiBrowser } from '../bidi/BrowserConnector.js';
 import { _connectToCdpBrowser } from '../cdp/BrowserConnector.js';
 import { environment, isNode } from '../environment.js';
@@ -28,25 +29,42 @@ export function assertSupportedUrlRestrictions(options) {
         (options.blocklist || options.allowlist)) {
         throw new Error('blocklist and allowlist are only supported with the CDP protocol');
     }
+    if (options.blocklist) {
+        for (const rule of options.blocklist) {
+            new URLPattern(rule);
+        }
+    }
+    if (options.allowlist) {
+        for (const rule of options.allowlist) {
+            new URLPattern(rule);
+        }
+    }
 }
+/**
+ * @internal
+ */
 export async function _connectToBrowser(options) {
     assertSupportedUrlRestrictions(options);
     const { connectionTransport, endpointUrl } = await getConnectionTransport(options);
     if (options.protocol === 'webDriverBiDi') {
-        const bidiBrowser = await _connectToBiDiBrowser(connectionTransport, endpointUrl, options);
+        const bidiBrowser = await _connectToBiDiBrowser(connectionTransport, endpointUrl, options, options.logger);
         return bidiBrowser;
     }
     else {
-        const cdpBrowser = await _connectToCdpBrowser(connectionTransport, endpointUrl, options);
+        const cdpBrowser = await _connectToCdpBrowser(connectionTransport, endpointUrl, options, options.logger);
         return cdpBrowser;
     }
 }
 /**
  * Establishes a websocket connection by given options and returns both transport and
  * endpoint url the transport is connected to.
+ * @internal
  */
 async function getConnectionTransport(options) {
-    const { browserWSEndpoint, browserURL, channel, transport, headers = {}, } = options;
+    const { browserWSEndpoint, browserURL, channel, transport } = options;
+    // `wsOptions.headers` supersedes the deprecated top-level `headers`.
+    const headers = options.wsOptions?.headers ?? options.headers ?? {};
+    const wsOptions = options.wsOptions ?? {};
     assert(Number(!!browserWSEndpoint) +
         Number(!!browserURL) +
         Number(!!transport) +
@@ -57,16 +75,16 @@ async function getConnectionTransport(options) {
     }
     else if (browserWSEndpoint) {
         const WebSocketClass = await getWebSocketTransportClass();
-        const connectionTransport = await WebSocketClass.create(browserWSEndpoint, headers);
+        const connectionTransport = await WebSocketClass.create(browserWSEndpoint, headers, options.logger, wsOptions);
         return {
             connectionTransport: connectionTransport,
             endpointUrl: browserWSEndpoint,
         };
     }
     else if (browserURL) {
-        const connectionURL = await getWSEndpoint(browserURL);
+        const connectionURL = await getWSEndpoint(browserURL, headers);
         const WebSocketClass = await getWebSocketTransportClass();
-        const connectionTransport = await WebSocketClass.create(connectionURL);
+        const connectionTransport = await WebSocketClass.create(connectionURL, headers, options.logger, wsOptions);
         return {
             connectionTransport: connectionTransport,
             endpointUrl: connectionURL,
@@ -83,7 +101,7 @@ async function getConnectionTransport(options) {
         const userDataDir = resolveDefaultUserDataDir(Browser.CHROME, platform, convertPuppeteerChannelToBrowsersChannel(options.channel));
         const portPath = join(userDataDir, 'DevToolsActivePort');
         try {
-            const fileContent = await environment.value.fs.promises.readFile(portPath, 'ascii');
+            const fileContent = await environment.value.readFile(portPath, 'ascii');
             const [rawPort, rawPath] = fileContent
                 .split('\n')
                 .map(line => {
@@ -101,7 +119,7 @@ async function getConnectionTransport(options) {
             }
             const browserWSEndpoint = `ws://localhost:${port}${rawPath}`;
             const WebSocketClass = await getWebSocketTransportClass();
-            const connectionTransport = await WebSocketClass.create(browserWSEndpoint, headers);
+            const connectionTransport = await WebSocketClass.create(browserWSEndpoint, headers, options.logger, wsOptions);
             return {
                 connectionTransport: connectionTransport,
                 endpointUrl: browserWSEndpoint,
@@ -115,11 +133,12 @@ async function getConnectionTransport(options) {
     }
     throw new Error('Invalid connection options');
 }
-async function getWSEndpoint(browserURL) {
+async function getWSEndpoint(browserURL, headers) {
     const endpointURL = new URL('/json/version', browserURL);
     try {
         const result = await globalThis.fetch(endpointURL.toString(), {
             method: 'GET',
+            headers,
         });
         if (!result.ok) {
             throw new Error(`HTTP ${result.statusText}`);

@@ -11,7 +11,6 @@ export interface ParsedFrameInfo {
   readonly isConstructor?: boolean;
   readonly isEval?: boolean;
   readonly evalOrigin?: RawFrame;
-  readonly isWasm?: boolean;
   readonly wasmModuleName?: string;
   readonly wasmFunctionIndex?: number;
   readonly typeName?: string;
@@ -30,6 +29,7 @@ export interface RawFrame {
   readonly columnNumber: number;
 
   readonly parsedFrameInfo?: ParsedFrameInfo;
+  readonly isWasm?: boolean;
 }
 
 /**
@@ -39,6 +39,25 @@ export interface RawFrame {
 export function isBuiltinFrame(rawFrame: RawFrame): boolean {
   return rawFrame.lineNumber === -1 && rawFrame.columnNumber === -1 && !Boolean(rawFrame.scriptId) &&
       !Boolean(rawFrame.url);
+}
+
+/** How a single raw frame participates in stack traces. Context-free: it only depends on the raw frame itself. */
+export const enum FrameKind {
+  /** Shown as is. */
+  VISIBLE = 'VISIBLE',
+  /** Code of an authored function that the compiler moved into a separate function. Merged with its caller(s). */
+  OUTLINED = 'OUTLINED',
+  /** Compiler helper without authored counterpart. Never shown. */
+  HIDDEN = 'HIDDEN',
+}
+
+/**
+ * Opaque identities of authored functions, compared only for equality.
+ * `top` identifies the function of `frames[0]`, `bottom` the function of `frames.at(-1)`.
+ */
+export interface FunctionKeys {
+  readonly top: string;
+  readonly bottom: string;
 }
 
 export class EvalOrigin {
@@ -64,7 +83,15 @@ export class FrameNode implements FrameNodeBase<FrameNode, AnyFrameNode> {
   readonly children: FrameNode[] = [];
 
   readonly rawFrame: RawFrame;
+  /** Context-free translation: [top, ...inlinedCallers]. Empty iff `kind === HIDDEN` (or not translated yet). */
   frames: FrameImpl[] = [];
+  kind: FrameKind = FrameKind.VISIBLE;
+  /** Set iff `kind` is OUTLINED, or VISIBLE and translated with scopes information. */
+  functionKeys?: FunctionKeys;
+  /** True iff the translation shows generated code because no authored code is known for the frame (incl. builtins). */
+  isUnmapped = false;
+  /** False until a translation was stored. Stays false if translation threw, so it will be retried. */
+  isTranslated = false;
 
   fragment?: FragmentImpl;
   parsedFrameInfo?: ParsedFrameInfo;

@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as ComputedStyle from '../../models/computed_style/computed_style.js';
+import * as Workspace from '../../models/workspace/workspace.js';
 import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {
   createTarget,
@@ -17,14 +21,18 @@ import {
 } from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
-import {describeWithMockConnection, setMockConnectionResponseHandler} from '../../testing/MockConnection.js';
-import {createStubbedDomNodeWithModels, getMatchedStyles} from '../../testing/StyleHelpers.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {createStubbedDomNodeWithModels, getMatchedStyles, ruleMatch} from '../../testing/StyleHelpers.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import type {Icon} from '../../ui/kit/kit.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as PanelsCommon from '../common/common.js';
 
+import type * as ElementsComponents from './components/components.js';
 import * as Elements from './elements.js';
 
 describe('StylesSidebarPane', () => {
@@ -34,9 +42,11 @@ describe('StylesSidebarPane', () => {
     UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node);
   });
 
-  describeWithMockConnection('StylesSidebarPane', () => {
+  describeWithEnvironment('StylesSidebarPane', () => {
+    let connection: MockCDPConnection;
     beforeEach(() => {
-      const target = createTarget();
+      connection = new MockCDPConnection();
+      const target = createTarget({connection});
       const cssModel = target.model(SDK.CSSModel.CSSModel);
       sinon.stub(ComputedStyle.ComputedStyleModel.ComputedStyleModel.prototype, 'cssModel').returns(cssModel);
       sinon.stub(Host.AidaClient.HostConfigTracker, 'instance').returns({
@@ -47,34 +57,318 @@ describe('StylesSidebarPane', () => {
     });
 
     it('unescapes CSS strings', () => {
-      assert.strictEqual(
-          Elements.StylesSidebarPane.unescapeCssString(
-              String.raw`"I\F1 t\EB rn\E2 ti\F4 n\E0 liz\E6 ti\F8 n\2603 \1F308  can be \t\r\ic\k\y"`),
-          '"I\xF1t\xEBrn\xE2ti\xF4n\xE0liz\xE6ti\xF8n\u2603\u{1F308} can be tricky"');
+      assert.strictEqual(Elements.StylesSidebarPane.unescapeCssString(
+                             String.raw`"I\F1 t\EB rn\E2 ti\F4 n\E0 liz\E6 ti\F8 n\2603 \1F308  can be \t\r\ic\k\y"`),
+                         '"I\xF1t\xEBrn\xE2ti\xF4n\xE0liz\xE6ti\xF8n\u2603\u{1F308} can be tricky"');
       assert.strictEqual(
           Elements.StylesSidebarPane.unescapeCssString(String.raw`"_\DBFF_\\DBFF_\\\DBFF_\\\\DBFF_\\\\\DBFF_"`),
           '"_\uFFFD_\\DBFF_\\\\DBFF_\\\\\\DBFF_\\\\\\\\DBFF_"');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.unescapeCssString(String.raw`"\0_\DBFF_\DFFF_\110000"`),
-          '"\uFFFD_\uFFFD_\uFFFD_\uFFFD"', 'U+0000, lone surrogates, and values above U+10FFFF should become U+FFFD');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.unescapeCssString(String.raw`"_\D83C\DF08_"`), '"_\uFFFD\uFFFD_"',
-          'surrogates should not be combined');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.unescapeCssString('"_\\41\n_\\41\t_\\41\x20_"'), '"_A_A_A_"',
-          'certain trailing whitespace characters should be consumed as part of the escape sequence');
+      assert.strictEqual(Elements.StylesSidebarPane.unescapeCssString(String.raw`"\0_\DBFF_\DFFF_\110000"`),
+                         '"\uFFFD_\uFFFD_\uFFFD_\uFFFD"',
+                         'U+0000, lone surrogates, and values above U+10FFFF should become U+FFFD');
+      assert.strictEqual(Elements.StylesSidebarPane.unescapeCssString(String.raw`"_\D83C\DF08_"`), '"_\uFFFD\uFFFD_"',
+                         'surrogates should not be combined');
+      assert.strictEqual(Elements.StylesSidebarPane.unescapeCssString('"_\\41\n_\\41\t_\\41\x20_"'), '"_A_A_A_"',
+                         'certain trailing whitespace characters should be consumed as part of the escape sequence');
     });
 
     it('escapes URL as CSS comments', () => {
       assert.strictEqual(Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/'), 'https://abc.com/');
       assert.strictEqual(Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/'), 'https://abc.com/*/');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*'), 'https://abc.com/*/?q=*');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*/'), 'https://abc.com/*/?q=*%2F');
-      assert.strictEqual(
-          Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*/#hash'),
-          'https://abc.com/*/?q=*%2F#hash');
+      assert.strictEqual(Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*'),
+                         'https://abc.com/*/?q=*');
+      assert.strictEqual(Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*/'),
+                         'https://abc.com/*/?q=*%2F');
+      assert.strictEqual(Elements.StylesSidebarPane.escapeUrlAsCssComment('https://abc.com/*/?q=*/#hash'),
+                         'https://abc.com/*/?q=*%2F#hash');
+    });
+
+    describe('mergeOrderedItems', () => {
+      interface TestItem {
+        id: string;
+        inactive?: boolean;
+      }
+
+      const toggleActive = (item: TestItem, active: boolean) => {
+        if (active) {
+          delete item.inactive;
+        } else {
+          item.inactive = true;
+        }
+      };
+      it('preserves the relative ordering of inactive items when some items become inactive', () => {
+        const oldItems: TestItem[] = [{id: 'a'}, {id: 'b'}, {id: 'c'}];
+        const newItems: TestItem[] = [{id: 'a'}, {id: 'c'}];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'a'},
+          {id: 'b', inactive: true},
+          {id: 'c'},
+        ]);
+      });
+
+      it('appends and inserts new items into the sequence', () => {
+        const oldItems: TestItem[] = [{id: 'a'}, {id: 'c'}];
+        const newItems: TestItem[] = [{id: 'a'}, {id: 'b'}, {id: 'c'}, {id: 'd'}];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'a'},
+          {id: 'b'},
+          {id: 'c'},
+          {id: 'd'},
+        ]);
+      });
+
+      it('reorders items when new active items appear in a different order', () => {
+        const oldItems: TestItem[] = [{id: 'a'}, {id: 'b'}];
+        const newItems: TestItem[] = [{id: 'b'}, {id: 'a'}];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'b'},
+          {id: 'a'},
+        ]);
+      });
+
+      it('restores previously inactive items to active state when matched again', () => {
+        const itemB: TestItem = {id: 'b', inactive: true};
+        const oldItems: TestItem[] = [{id: 'a'}, itemB, {id: 'c'}];
+        const newItems: TestItem[] = [{id: 'a'}, {id: 'b'}, {id: 'c'}];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'a'},
+          {id: 'b'},
+          {id: 'c'},
+        ]);
+        assert.strictEqual(merged[1], itemB);
+      });
+
+      it('handles empty old items list', () => {
+        const oldItems: TestItem[] = [];
+        const newItems: TestItem[] = [{id: 'a'}, {id: 'b'}];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'a'},
+          {id: 'b'},
+        ]);
+      });
+
+      it('handles empty new items list by marking all old items inactive', () => {
+        const oldItems: TestItem[] = [{id: 'a'}, {id: 'b'}];
+        const newItems: TestItem[] = [];
+
+        const merged = Elements.StylesSidebarPane.mergeOrderedItems(
+            oldItems,
+            newItems,
+            item => item.id,
+            toggleActive,
+        );
+
+        assert.deepEqual(merged, [
+          {id: 'a', inactive: true},
+          {id: 'b', inactive: true},
+        ]);
+      });
+    });
+
+    describe('update', () => {
+      it('does not update when a selector is being edited', () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+
+        const requestUpdateSpy = sinon.spy(stylesSidebarPane, 'requestUpdate');
+        const event = {data: null} as unknown as
+            Common.EventTarget.EventTargetEvent<ComputedStyle.ComputedStyleModel.CSSModelChangedEvent>;
+
+        // The pane should update when a selector is not being edited.
+        stylesSidebarPane.onCSSModelChanged(event);
+        sinon.assert.calledOnce(requestUpdateSpy);
+
+        requestUpdateSpy.resetHistory();
+
+        // The pane shouldn't update when a selector is being edited.
+        stylesSidebarPane.setEditingStyle(true);
+        stylesSidebarPane.onCSSModelChanged(event);
+        sinon.assert.notCalled(requestUpdateSpy);
+      });
+
+      it('maintains focus if changes occur while editing', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+
+        // @ts-expect-error
+        sinon.stub(stylesSidebarPane, 'fetchMatchedCascade').resolves(null);
+        // @ts-expect-error
+        sinon.stub(stylesSidebarPane, 'fetchComputedStylesFor').resolves(new Map());
+        // @ts-expect-error
+        sinon.stub(stylesSidebarPane, 'fetchComputedStyleExtraFieldsFor').resolves(null);
+
+        const resetFocusSpy = sinon.spy(stylesSidebarPane, 'resetFocus');
+
+        // Verify that innerRebuildUpdate is not called to reset focus
+        // if an update was already scheduled before editing started.
+        stylesSidebarPane.setEditingStyle(true);
+        await stylesSidebarPane.performUpdate();
+
+        sinon.assert.notCalled(resetFocusSpy);
+      });
+    });
+
+    describe('createNewRuleInViaInspectorStyleSheet', () => {
+      it('creates a new rule in the via inspector stylesheet and starts editing the selector', async () => {
+        (node.frameId as sinon.SinonStub).returns('frame-id' as Protocol.Page.FrameId);
+        (node.nodeType as sinon.SinonStub).returns(Node.ELEMENT_NODE);
+        (node.nodeName as sinon.SinonStub).returns('div');
+        (node.simpleSelector as sinon.SinonStub).returns('div');
+        sinon.stub(Components.Linkifier.Linkifier.prototype, 'linkifyCSSLocation')
+            .returns(document.createElement('div'));
+
+        const inlineStyle: Protocol.CSS.CSSStyle = {
+          styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+          cssProperties: [{name: 'color', value: 'blue'}],
+          shorthandEntries: [],
+        };
+
+        const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+        computedStyleModel.node = node;
+
+        const cssModel = computedStyleModel.cssModel() as SDK.CSSModel.CSSModel;
+
+        const matchedStyles = await SDK.CSSMatchedStyles.CSSMatchedStyles.create({
+          cssModel,
+          node,
+          inlinePayload: inlineStyle,
+          attributesPayload: null,
+          matchedPayload: [],
+          pseudoPayload: [],
+          inheritedPayload: [],
+          inheritedPseudoPayload: [],
+          animationsPayload: [],
+          parentLayoutNodeId: undefined as unknown as Protocol.DOM.NodeId,
+          positionTryRules: [],
+          propertyRules: [],
+          functionRules: [],
+          cssPropertyRegistrations: [],
+          atRules: [],
+          activePositionFallbackIndex: -1,
+          animationStylesPayload: [],
+          inheritedAnimatedPayload: [],
+          transitionsStylePayload: null,
+        });
+
+        sinon.stub(cssModel, 'getMatchedStyles').resolves(matchedStyles);
+        const styleSheetHeader = sinon.createStubInstance(SDK.CSSStyleSheetHeader.CSSStyleSheetHeader);
+        styleSheetHeader.cssModel.returns(cssModel);
+        styleSheetHeader.lineNumberInSource.callsFake(line => line);
+        styleSheetHeader.columnNumberInSource.callsFake((line, column) => column);
+        (styleSheetHeader.id as string) = '0';
+        sinon.stub(cssModel, 'requestViaInspectorStylesheet').resolves(styleSheetHeader);
+        styleSheetHeader.requestContentData.resolves(new TextUtils.ContentData.ContentData('', false, 'text/css'));
+
+        const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+        renderElementIntoDOM(stylesSidebarPane);
+
+        stylesSidebarPane.forceUpdate();
+
+        await new Promise<void>(resolve => {
+          stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED,
+                                             () => resolve(), {once: true});
+        });
+
+        assert.isFalse(UI.UIUtils.isEditing());
+
+        await stylesSidebarPane.createNewRuleInViaInspectorStyleSheet();
+
+        assert.isTrue(UI.UIUtils.isEditing());
+
+        const allSections = stylesSidebarPane.allSections();
+        assert.instanceOf(allSections[1], Elements.StylePropertiesSection.BlankStylePropertiesSection);
+
+        stylesSidebarPane.detach();
+      });
+      it('uses the selected node classes as the default selector of the new rule', async () => {
+        (node.frameId as sinon.SinonStub).returns('frame-id' as Protocol.Page.FrameId);
+        (node.nodeType as sinon.SinonStub).returns(Node.ELEMENT_NODE);
+        (node.nodeName as sinon.SinonStub).returns('DIV');
+        (node.localName as sinon.SinonStub).returns('div');
+        (node.getAttribute as sinon.SinonStub).callsFake(name => name === 'class' ? ' a  b ' : undefined);
+        (node.simpleSelector as sinon.SinonStub).callsFake(SDK.DOMModel.DOMNode.prototype.simpleSelector);
+        sinon.stub(Components.Linkifier.Linkifier.prototype, 'linkifyCSSLocation')
+            .returns(document.createElement('div'));
+
+        const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+        computedStyleModel.node = node;
+        const cssModel = computedStyleModel.cssModel() as SDK.CSSModel.CSSModel;
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel,
+          node,
+          inlinePayload: {
+            styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+            cssProperties: [{name: 'color', value: 'blue'}],
+            shorthandEntries: [],
+          },
+        });
+        sinon.stub(cssModel, 'getMatchedStyles').resolves(matchedStyles);
+        const styleSheetHeader = sinon.createStubInstance(SDK.CSSStyleSheetHeader.CSSStyleSheetHeader);
+        styleSheetHeader.cssModel.returns(cssModel);
+        styleSheetHeader.lineNumberInSource.callsFake(line => line);
+        styleSheetHeader.columnNumberInSource.callsFake((_line, column) => column);
+        (styleSheetHeader.id as string) = '0';
+        sinon.stub(cssModel, 'requestViaInspectorStylesheet').resolves(styleSheetHeader);
+        styleSheetHeader.requestContentData.resolves(new TextUtils.ContentData.ContentData('', false, 'text/css'));
+
+        const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+        renderElementIntoDOM(stylesSidebarPane);
+        stylesSidebarPane.forceUpdate();
+        await new Promise<void>(resolve => {
+          stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED,
+                                             () => resolve(), {once: true});
+        });
+
+        await stylesSidebarPane.createNewRuleInViaInspectorStyleSheet();
+
+        const blankSection = stylesSidebarPane.allSections()[1];
+        assert.instanceOf(blankSection, Elements.StylePropertiesSection.BlankStylePropertiesSection);
+        assert.strictEqual(blankSection.headerText(), '.a.b');
+        assert.strictEqual(blankSection.element.querySelector('.selector')?.textContent, '.a.b');
+
+        stylesSidebarPane.detach();
+      });
     });
 
     describe('rebuildSectionsForMatchedStyleRulesForTest', () => {
@@ -82,6 +376,7 @@ describe('StylesSidebarPane', () => {
         const stylesSidebarPane =
             new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
           positionTryRules: [{
@@ -115,6 +410,7 @@ describe('StylesSidebarPane', () => {
         parentNode.nodeName.returns('body');
 
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [{
@@ -184,11 +480,247 @@ describe('StylesSidebarPane', () => {
         assert.isFalse(inheritedBlock.titleElement()?.classList.contains('hidden'));
         assert.isFalse(layerBlock.titleElement()?.classList.contains('hidden'));
       });
+
+      it('hides sidebar separators when filtering results', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        sinon.stub(stylesSidebarPane, 'performUpdate').resolves();
+
+        const firstNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        firstNode.nodeName.returns('div');
+        firstNode.nodeNameInCorrectCase.returns('div');
+        firstNode.id = 101 as Protocol.DOM.NodeId;
+        firstNode.nodeType.returns(Node.ELEMENT_NODE);
+        firstNode.pseudoType.returns(undefined);
+        firstNode.pseudoElements.returns(new Map());
+        firstNode.getAttribute.withArgs('id').returns('first');
+
+        const secondNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        secondNode.nodeName.returns('div');
+        secondNode.nodeNameInCorrectCase.returns('div');
+        secondNode.id = 102 as Protocol.DOM.NodeId;
+        secondNode.nodeType.returns(Node.ELEMENT_NODE);
+        secondNode.pseudoType.returns(undefined);
+        secondNode.pseudoElements.returns(new Map());
+        secondNode.parentNode = firstNode;
+        secondNode.getAttribute.withArgs('id').returns('second');
+
+        const thirdNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        thirdNode.nodeName.returns('div');
+        thirdNode.nodeNameInCorrectCase.returns('div');
+        thirdNode.id = 103 as Protocol.DOM.NodeId;
+        thirdNode.nodeType.returns(Node.ELEMENT_NODE);
+        thirdNode.pseudoType.returns(undefined);
+        thirdNode.pseudoElements.returns(new Map());
+        thirdNode.parentNode = secondNode;
+        thirdNode.getAttribute.withArgs('id').returns('third');
+
+        const matchedPayload = [
+          ruleMatch('#third', {'font-family': 'times', display: 'block'}),
+        ];
+
+        const inheritedPayload: Protocol.CSS.InheritedStyleEntry[] = [
+          {
+            matchedCSSRules: [
+              ruleMatch('#second', {'font-family': 'helvetica'}),
+            ],
+          },
+          {
+            matchedCSSRules: [
+              ruleMatch('#first', {'font-family': 'arial', display: 'block'}),
+            ],
+          },
+        ];
+
+        const pseudoPayload: Protocol.CSS.PseudoElementMatches[] = [
+          {
+            pseudoType: Protocol.DOM.PseudoType.Before,
+            matches: [
+              ruleMatch('#third::before', {content: '"uno-1"'}),
+            ],
+          },
+          {
+            pseudoType: Protocol.DOM.PseudoType.After,
+            matches: [
+              ruleMatch('#third::after', {content: '"dos-2"', display: 'block'}),
+            ],
+          },
+        ];
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node: thirdNode,
+          matchedPayload,
+          inheritedPayload,
+          pseudoPayload,
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+
+        // Define the expected blocks and their indices.
+        // Block 0 represents active node styles (#third) and has no title element.
+        // Block 1 represents styles inherited from div#second.
+        // Block 2 represents styles inherited from div#first.
+        // Block 3 represents the pseudo ::before element.
+        // Block 4 represents the pseudo ::after element.
+        assert.lengthOf(sectionBlocks, 5);
+
+        assert.isNull(sectionBlocks[0].titleElement());
+        assert.exists(sectionBlocks[1].titleElement());
+        assert.exists(sectionBlocks[2].titleElement());
+        assert.exists(sectionBlocks[3].titleElement());
+        assert.exists(sectionBlocks[4].titleElement());
+
+        // Define a helper function to assert the visibility of block title elements.
+        const assertBlockVisibility = (expectedVisibilities: boolean[]) => {
+          for (let i = 1; i < sectionBlocks.length; i++) {
+            const titleEl = sectionBlocks[i].titleElement();
+            if (titleEl) {
+              const isHidden = titleEl.classList.contains('hidden');
+              assert.strictEqual(!isHidden, expectedVisibilities[i - 1], `Block ${i} visibility mismatch`);
+            }
+          }
+        };
+
+        // Initially, all blocks should be visible when the filter is null.
+        stylesSidebarPane.setFilter(null);
+        sectionBlocks.forEach(block => block.updateFilter());
+        assertBlockVisibility([true, true, true, true]);
+
+        // Filter by 'font-family'.
+        // The secondNode has 'font-family: helvetica' and should be visible.
+        // The firstNode has 'font-family: arial' and should be visible.
+        // The ::before element has only 'content' and should be hidden.
+        // The ::after element has 'content' and 'display' and should be hidden.
+        stylesSidebarPane.setFilter(/font-family/i);
+        sectionBlocks.forEach(block => block.updateFilter());
+        assertBlockVisibility([true, true, false, false]);
+
+        // Filter by 'content'.
+        // The secondNode should be hidden.
+        // The firstNode should be hidden.
+        // The ::before element has 'content' and should be visible.
+        // The ::after element has 'content' and should be visible.
+        stylesSidebarPane.setFilter(/content/i);
+        sectionBlocks.forEach(block => block.updateFilter());
+        assertBlockVisibility([false, false, true, true]);
+
+        // Filter by 'display'.
+        // The secondNode should be hidden.
+        // The firstNode has 'display' and should be visible.
+        // The ::before element should be hidden.
+        // The ::after element has 'display' and should be visible.
+        stylesSidebarPane.setFilter(/display/i);
+        sectionBlocks.forEach(block => block.updateFilter());
+        assertBlockVisibility([false, true, false, true]);
+      });
+
+      it('renders media queries', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node,
+          matchedPayload: [{
+            rule: {
+              selectorList: {selectors: [{text: '#main'}], text: '#main'},
+              origin: Protocol.CSS.StyleSheetOrigin.Regular,
+              style: {
+                cssProperties: [{name: 'background', value: 'blue'}],
+                shorthandEntries: [],
+              },
+              media: [{
+                text: '(max-width: 100px)',
+                source: Protocol.CSS.CSSMediaSource.MediaRule,
+              }],
+              ruleTypes: [Protocol.CSS.CSSRuleType.MediaRule],
+            },
+            matchingSelectors: [0],
+          }],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+
+        assert.lengthOf(sectionBlocks, 1);
+        const sections = sectionBlocks[0].sections;
+        assert.lengthOf(sections, 1);
+        const section = sections[0];
+
+        const mediaQueryElements = section.element.querySelectorAll('devtools-css-query');
+        assert.lengthOf(mediaQueryElements, 1);
+        const mediaQueryElement = mediaQueryElements[0] as ElementsComponents.CSSQuery.CSSQuery;
+
+        const queryDiv = mediaQueryElement.shadowRoot?.querySelector('.query');
+        assert.exists(queryDiv);
+        assert.strictEqual(queryDiv?.textContent?.trim().replace(/\s+/g, ' '), '@media (max-width: 100px) {');
+      });
+
+      it('renders multiple media queries (imported stylesheet)', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node,
+          matchedPayload: [{
+            rule: {
+              selectorList: {selectors: [{text: '#main'}], text: '#main'},
+              origin: Protocol.CSS.StyleSheetOrigin.Regular,
+              style: {
+                cssProperties: [{name: 'border', value: '1px solid black'}],
+                shorthandEntries: [],
+              },
+              media: [
+                {
+                  text: '(min-width: 200px)',
+                  source: Protocol.CSS.CSSMediaSource.MediaRule,
+                },
+                {
+                  text: '(orientation: landscape)',
+                  source: Protocol.CSS.CSSMediaSource.ImportRule,
+                },
+              ],
+              ruleTypes: [Protocol.CSS.CSSRuleType.MediaRule, Protocol.CSS.CSSRuleType.MediaRule],
+            },
+            matchingSelectors: [0],
+          }],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+
+        assert.lengthOf(sectionBlocks, 1);
+        const sections = sectionBlocks[0].sections;
+        assert.lengthOf(sections, 1);
+        const section = sections[0];
+
+        const mediaQueryElements = section.element.querySelectorAll('devtools-css-query');
+        assert.lengthOf(mediaQueryElements, 2);
+
+        const queryTexts = Array.from(mediaQueryElements).map(el => {
+          const queryDiv = el.shadowRoot?.querySelector('.query');
+          return queryDiv?.textContent?.trim().replace(/\s+/g, ' ');
+        });
+
+        assert.deepEqual(queryTexts, ['@import (orientation: landscape) {', '@media (min-width: 200px) {']);
+      });
     });
 
     describe('collapsing non-contributing sections', () => {
       const enableCollapse = () =>
-          Common.Settings.Settings.instance().moduleSetting('collapse-non-contributing-css-rules').set(true);
+          Common.Settings.Settings.instance()
+              .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
+              .set(true);
 
       it('collapses a section where all properties are overloaded', async () => {
         enableCollapse();
@@ -197,6 +729,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -242,28 +775,86 @@ describe('StylesSidebarPane', () => {
         if (!overloadedProperty) {
           assert.fail('Expected overloaded section to have at least one property');
         }
-        assert.strictEqual(
-            matchedStyles.propertyState(overloadedProperty), SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
-            'Expected div{color:blue} to be overloaded by #id{color:red}');
+        assert.strictEqual(matchedStyles.propertyState(overloadedProperty),
+                           SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
+                           'Expected div{color:blue} to be overloaded by #id{color:red}');
 
         // The section with all overloaded properties should be collapsed.
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section with all overloaded properties should have collapsed class');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsed'),
+                      'Section with all overloaded properties should have collapsed class');
 
         // The section with active properties should NOT be collapsed.
-        assert.isFalse(
-            activeSection.element.classList.contains('collapsed'),
-            'Section with active properties should not be collapsed');
+        assert.isFalse(activeSection.element.classList.contains('collapsed'),
+                       'Section with active properties should not be collapsed');
+      });
+
+      it('does not leak LiveLocations when rebuilding styles multiple times', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+        const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+        const origin = Protocol.CSS.StyleSheetOrigin.Regular;
+
+        const matchedPayload = [{
+          rule: {
+            selectorList: {selectors: [{text: 'div'}], text: 'div'},
+            origin,
+            style: {
+              cssProperties: [{name: 'color', value: 'red'}],
+              shorthandEntries: [],
+              styleSheetId,
+              range: {startLine: 0, startColumn: 0, endLine: 0, endColumn: 15},
+            },
+          },
+          matchingSelectors: [0],
+        }];
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node,
+          matchedPayload,
+        });
+
+        const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+        const targetManager = SDK.TargetManager.TargetManager.instance();
+        const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+        Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance({forceNew: true, resourceMapping, targetManager});
+
+        // Initialize the LiveLocation objects for the test.
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+
+        function countLiveLocations(): number {
+          let locationsCount = 0;
+          const modelInfos = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().modelToInfo.values();
+          for (const modelInfo of modelInfos) {
+            locationsCount += modelInfo.locations.valuesArray().length;
+          }
+          return locationsCount;
+        }
+
+        const initialCount = countLiveLocations();
+
+        for (let i = 0; i < 5; i++) {
+          stylesSidebarPane.linkifier.reset();
+          await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+        }
+
+        const finalCount = countLiveLocations();
+        assert.strictEqual(finalCount, initialCount, 'LiveLocations count is growing');
       });
 
       it('does not collapse non-contributing sections when the setting is disabled', async () => {
-        Common.Settings.Settings.instance().moduleSetting('collapse-non-contributing-css-rules').set(false);
+        Common.Settings.Settings.instance()
+            .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
+            .set(false);
         const stylesSidebarPane =
             new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -300,12 +891,10 @@ describe('StylesSidebarPane', () => {
           assert.fail('Expected div section to exist');
         }
 
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section with all overloaded properties should not collapse when the setting is disabled');
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsible'),
-            'Section should not be marked collapsible when automatic collapsing is disabled');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsed'),
+                       'Section with all overloaded properties should not collapse when the setting is disabled');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsible'),
+                       'Section should not be marked collapsible when automatic collapsing is disabled');
       });
 
       it('collapses an empty section (no leading properties)', async () => {
@@ -315,6 +904,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -353,8 +943,8 @@ describe('StylesSidebarPane', () => {
         const emptySection = sectionBlocks[0].sections[1];   // .empty - no properties
 
         assert.isTrue(emptySection.element.classList.contains('collapsed'), 'Empty section should be collapsed');
-        assert.isFalse(
-            activeSection.element.classList.contains('collapsed'), 'Non-empty section should not be collapsed');
+        assert.isFalse(activeSection.element.classList.contains('collapsed'),
+                       'Non-empty section should not be collapsed');
       });
 
       it('does NOT collapse a section containing only disabled properties', async () => {
@@ -364,6 +954,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -402,9 +993,8 @@ describe('StylesSidebarPane', () => {
 
         // A section with disabled properties should NOT be collapsed.
         // Disabled properties are user-intentional and should remain visible.
-        assert.isFalse(
-            disabledSection.element.classList.contains('collapsed'),
-            'Section with disabled properties should not be collapsed');
+        assert.isFalse(disabledSection.element.classList.contains('collapsed'),
+                       'Section with disabled properties should not be collapsed');
       });
 
       it('does NOT collapse a section with at least one active property', async () => {
@@ -414,6 +1004,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -453,9 +1044,8 @@ describe('StylesSidebarPane', () => {
         assert.lengthOf(sectionBlocks[0].sections, 2);
         const mixedSection = sectionBlocks[0].sections[1];  // div - has one active, one overloaded
 
-        assert.isFalse(
-            mixedSection.element.classList.contains('collapsed'),
-            'Section with at least one active property should not be collapsed');
+        assert.isFalse(mixedSection.element.classList.contains('collapsed'),
+                       'Section with at least one active property should not be collapsed');
       });
 
       it('expands a collapsed section when jump-to targets it', async () => {
@@ -465,6 +1055,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -515,20 +1106,19 @@ describe('StylesSidebarPane', () => {
         if (!overloadedProperty) {
           assert.fail('Expected overloaded section to have at least one property');
         }
-        assert.strictEqual(
-            matchedStyles.propertyState(overloadedProperty), SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
-            'Expected div{color:blue} to be overloaded by #id{color:red}');
+        assert.strictEqual(matchedStyles.propertyState(overloadedProperty),
+                           SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
+                           'Expected div{color:blue} to be overloaded by #id{color:red}');
 
         // Verify section is initially collapsed.
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsed'), 'Section should be initially collapsed');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsed'),
+                      'Section should be initially collapsed');
 
         stylesSidebarPane.revealProperty(overloadedProperty);
 
         // After reveal, the section should be expanded (not collapsed).
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section should be expanded after revealProperty');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsed'),
+                       'Section should be expanded after revealProperty');
       });
 
       it('can be manually expanded and re-collapsed via toggle', async () => {
@@ -538,6 +1128,7 @@ describe('StylesSidebarPane', () => {
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -576,30 +1167,29 @@ describe('StylesSidebarPane', () => {
 
         // Initially collapsed.
         assert.isTrue(overloadedSection.isCollapsed(), 'Section should be initially collapsed');
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsible'), 'Section should have collapsible class');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsible'),
+                      'Section should have collapsible class');
 
         // Expand manually.
         overloadedSection.expand();
         assert.isFalse(overloadedSection.isCollapsed(), 'Section should be expanded after expand()');
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section should not have collapsed class after expand()');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsed'),
+                       'Section should not have collapsed class after expand()');
         // Still marked collapsible so the icon remains visible.
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsible'),
-            'Section should retain collapsible class after manual expand');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsible'),
+                      'Section should retain collapsible class after manual expand');
       });
 
       it('reacts to toggling the collapse-non-contributing-css-rules setting at runtime', async () => {
         enableCollapse();
-        const collapseSetting =
-            Common.Settings.Settings.instance().moduleSetting('collapse-non-contributing-css-rules');
+        const collapseSetting = Common.Settings.Settings.instance().resolve(
+            SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor);
         const stylesSidebarPane =
             new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
         const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
         node.id = 1 as Protocol.DOM.NodeId;
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -639,25 +1229,20 @@ describe('StylesSidebarPane', () => {
           assert.fail('Expected div section to exist');
         }
 
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section should be collapsed while the setting is enabled');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsed'),
+                      'Section should be collapsed while the setting is enabled');
 
         collapseSetting.set(false);
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section should expand when the setting is turned off');
-        assert.isFalse(
-            overloadedSection.element.classList.contains('collapsible'),
-            'Section should drop the collapsible marker when the setting is turned off');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsed'),
+                       'Section should expand when the setting is turned off');
+        assert.isFalse(overloadedSection.element.classList.contains('collapsible'),
+                       'Section should drop the collapsible marker when the setting is turned off');
 
         collapseSetting.set(true);
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsed'),
-            'Section should collapse again when the setting is re-enabled');
-        assert.isTrue(
-            overloadedSection.element.classList.contains('collapsible'),
-            'Section should be marked collapsible again when the setting is re-enabled');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsed'),
+                      'Section should collapse again when the setting is re-enabled');
+        assert.isTrue(overloadedSection.element.classList.contains('collapsible'),
+                      'Section should be marked collapsible again when the setting is re-enabled');
       });
 
       it('expands collapsed sections before adding a new blank property', async () => {
@@ -669,6 +1254,7 @@ describe('StylesSidebarPane', () => {
         const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
 
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [
@@ -730,6 +1316,7 @@ describe('StylesSidebarPane', () => {
         parentNode.nodeName.returns('body');
 
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node,
           matchedPayload: [{
@@ -773,15 +1360,148 @@ describe('StylesSidebarPane', () => {
         if (!inheritedProperty) {
           assert.fail('Expected inherited section to have at least one property');
         }
-        assert.strictEqual(
-            matchedStyles.propertyState(inheritedProperty), SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
-            'Expected inherited color to be overloaded by element color');
+        assert.strictEqual(matchedStyles.propertyState(inheritedProperty),
+                           SDK.CSSMatchedStyles.PropertyState.OVERLOADED,
+                           'Expected inherited color to be overloaded by element color');
 
         // The inherited section's color property is overloaded by the div rule,
         // so it should be collapsed.
-        assert.isTrue(
-            inheritedSection.element.classList.contains('collapsed'),
-            'Inherited section with all overloaded properties should be collapsed');
+        assert.isTrue(inheritedSection.element.classList.contains('collapsed'),
+                      'Inherited section with all overloaded properties should be collapsed');
+      });
+    });
+
+    describe('overloaded properties', () => {
+      it('correctly identifies overloaded properties', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.nodeName.returns('DIV');
+        node.id = 1 as Protocol.DOM.NodeId;
+
+        const parentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        parentNode.nodeName.returns('DIV');
+        parentNode.id = 2 as Protocol.DOM.NodeId;
+
+        node.parentNode = parentNode;
+
+        // Mock the CSS rules and properties.
+        const inspectProperties: Protocol.CSS.CSSProperty[] = [
+          {name: 'margin-top', value: '1px', text: 'margin-top: 1px;'},
+          {name: 'margin-left', value: '1px', text: 'margin-left: 1px;'},
+          {name: 'margin-right', value: '1px', text: 'margin-right: 1px;'},
+          {name: 'margin-bottom', value: '1px', text: 'margin-bottom: 1px;'},
+          {name: 'font', value: '10px Arial', text: 'font: 10px Arial;'},
+          {name: 'font-size', value: '10px', implicit: true},
+          {name: 'font-family', value: 'Arial', implicit: true},
+        ];
+        const inspectRuleMatch = ruleMatch('#inspect', inspectProperties, {
+          styleSheetId: '1' as Protocol.DOM.StyleSheetId,
+        });
+
+        const divProperties: Protocol.CSS.CSSProperty[] = [
+          {name: 'margin', value: '1px', text: 'margin: 1px;'},
+          {name: 'margin-top', value: '1px', implicit: true},
+          {name: 'margin-left', value: '1px', implicit: true},
+          {name: 'margin-right', value: '1px', implicit: true},
+          {name: 'margin-bottom', value: '1px', implicit: true},
+          {name: 'border', value: '1px solid black', text: 'border: 1px solid black;'},
+          {name: 'border-top-width', value: '1px', implicit: true},
+          {name: 'border-right-width', value: '1px', implicit: true},
+          {name: 'border-bottom-width', value: '1px', implicit: true},
+          {name: 'border-left-width', value: '1px', implicit: true},
+          {name: 'border-top-style', value: 'solid', implicit: true},
+          {name: 'border-right-style', value: 'solid', implicit: true},
+          {name: 'border-bottom-style', value: 'solid', implicit: true},
+          {name: 'border-left-style', value: 'solid', implicit: true},
+          {name: 'border-top-color', value: 'black', implicit: true},
+          {name: 'border-right-color', value: 'black', implicit: true},
+          {name: 'border-bottom-color', value: 'black', implicit: true},
+          {name: 'border-left-color', value: 'black', implicit: true},
+        ];
+        const divRuleMatch = ruleMatch('div', divProperties, {
+          styleSheetId: '1' as Protocol.DOM.StyleSheetId,
+        });
+
+        const containerProperties: Protocol.CSS.CSSProperty[] = [
+          {name: 'font-size', value: '10px', text: 'font-size: 10px;'},
+          {name: 'border', value: '0', text: 'border: 0;'},
+        ];
+        const containerRuleMatch = ruleMatch('.container', containerProperties, {
+          styleSheetId: '1' as Protocol.DOM.StyleSheetId,
+        });
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node,
+          matchedPayload: [divRuleMatch, inspectRuleMatch],
+          inheritedPayload: [{
+            matchedCSSRules: [divRuleMatch, containerRuleMatch],
+          }],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+
+        assert.lengthOf(sectionBlocks, 2);
+
+        const elementBlock = sectionBlocks[0];
+        const inheritedBlock = sectionBlocks[1];
+
+        assert.lengthOf(elementBlock.sections, 2);
+        const inspectSection = elementBlock.sections.find(s => s.headerText() === '#inspect');
+        const divSection = elementBlock.sections.find(s => s.headerText() === 'div');
+
+        assert.exists(inspectSection);
+        assert.exists(divSection);
+
+        const containerSection = inheritedBlock.sections.find(s => s.headerText() === '.container');
+        assert.exists(containerSection);
+
+        // Verify overloaded properties in the div section of the element block.
+        const divMargin = divSection.style().leadingProperties().find(p => p.name === 'margin');
+        assert.exists(divMargin);
+        assert.strictEqual(matchedStyles.propertyState(divMargin), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+        const divBorder = divSection.style().leadingProperties().find(p => p.name === 'border');
+        assert.exists(divBorder);
+        assert.strictEqual(matchedStyles.propertyState(divBorder), SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+
+        // Verify overloaded properties in the container section of the inherited block.
+        const containerFontSize = containerSection.style().leadingProperties().find(p => p.name === 'font-size');
+        assert.exists(containerFontSize);
+        assert.strictEqual(matchedStyles.propertyState(containerFontSize),
+                           SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+        // Verify the inheritance status in the UI using StylePropertyTreeElement.
+        inspectSection.onpopulate();
+        divSection.onpopulate();
+        containerSection.onpopulate();
+
+        const containerTreeElements = containerSection.propertiesTreeOutline.rootElement().children();
+
+        const fontSizeTreeElement =
+            containerTreeElements.find((el): el is Elements.StylePropertyTreeElement.StylePropertyTreeElement =>
+                                           el instanceof Elements.StylePropertyTreeElement.StylePropertyTreeElement &&
+                                           el.property.name === 'font-size');
+        assert.exists(fontSizeTreeElement);
+        // `font-size` is truly inherited. In the UI, truly inherited properties
+        // in inherited sections are rendered as active (not dimmed). This
+        // corresponds to `inherited() === false` due to the reversed meaning
+        // used for styling.
+        assert.isFalse(fontSizeTreeElement.inherited());
+
+        const borderTreeElement =
+            containerTreeElements.find((el): el is Elements.StylePropertyTreeElement.StylePropertyTreeElement =>
+                                           el instanceof Elements.StylePropertyTreeElement.StylePropertyTreeElement &&
+                                           el.property.name === 'border');
+        assert.exists(borderTreeElement);
+        // `border` is not truly inherited. In the UI, non-inherited properties
+        // in inherited sections are rendered as dimmed. This corresponds to
+        // `inherited() === true` (which adds the `.inherited` class for dimming)
+        // due to the reversed meaning used for styling.
+        assert.isTrue(borderTreeElement.inherited());
       });
     });
 
@@ -789,6 +1509,7 @@ describe('StylesSidebarPane', () => {
       const stylesSidebarPane =
           new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
       const matchedStyles = await getMatchedStyles({
+        connection,
         cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
         node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
         atRules: [
@@ -844,6 +1565,7 @@ describe('StylesSidebarPane', () => {
       const stylesSidebarPane =
           new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
       const matchedStyles = await getMatchedStyles({
+        connection,
         cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
         node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
         functionRules: [{
@@ -879,7 +1601,7 @@ describe('StylesSidebarPane', () => {
                                 style: {
                                   cssProperties: [{name: 'result', value: 'var(--y)'}],
                                   shorthandEntries: [],
-                                }
+                                },
                               },
                             ],
                           },
@@ -894,7 +1616,7 @@ describe('StylesSidebarPane', () => {
               style: {
                 cssProperties: [{name: 'result', value: 'var(--x)'}],
                 shorthandEntries: [],
-              }
+              },
             },
           ],
         }],
@@ -912,9 +1634,160 @@ describe('StylesSidebarPane', () => {
           '--f(--x, --y) { @media (width > 400px) { @container --foo (width > 300px) { @supports (color: red) { result: var(--y); } } } result: var(--x);}');
     });
 
+    it('should add @functions with same name but different tree scope depths', async () => {
+      const stylesSidebarPane =
+          new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+
+      const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      node.id = 1 as Protocol.DOM.NodeId;
+      node.backendNodeId.returns(1 as Protocol.DOM.BackendNodeId);
+
+      const parent = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      parent.id = 2 as Protocol.DOM.NodeId;
+      parent.backendNodeId.returns(2 as Protocol.DOM.BackendNodeId);
+      node.parentNode = parent;
+
+      const grandparent = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      grandparent.id = 3 as Protocol.DOM.NodeId;
+      grandparent.backendNodeId.returns(3 as Protocol.DOM.BackendNodeId);
+      parent.parentNode = grandparent;
+
+      node.getTreeRoot.returns(node);
+
+      const matchedStyles = await getMatchedStyles({
+        connection,
+        cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+        node,
+        functionRules: [
+          {
+            name: {text: '--f'},
+            parameters: [],
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            children: [{
+              style: {
+                cssProperties: [{name: 'result', value: 'red'}],
+                shorthandEntries: [],
+              },
+            }],
+            originTreeScopeNodeId: 2 as Protocol.DOM.BackendNodeId,
+          },
+          {
+            name: {text: '--f'},
+            parameters: [],
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            children: [{
+              style: {
+                cssProperties: [{name: 'result', value: 'blue'}],
+                shorthandEntries: [],
+              },
+            }],
+            originTreeScopeNodeId: 3 as Protocol.DOM.BackendNodeId,
+          },
+        ],
+      });
+
+      const sectionBlocks =
+          await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+
+      assert.lengthOf(sectionBlocks, 2);
+      assert.strictEqual(sectionBlocks[1].titleElement()?.textContent, '@function');
+      assert.lengthOf(sectionBlocks[1].sections, 2);
+      assert.instanceOf(sectionBlocks[1].sections[0], Elements.StylePropertiesSection.FunctionRuleSection);
+      assert.instanceOf(sectionBlocks[1].sections[1], Elements.StylePropertiesSection.FunctionRuleSection);
+
+      assert.strictEqual(sectionBlocks[1].sections[0].element.deepTextContent().replaceAll(/\s+/g, ' ').trim(),
+                         '--f() { result: red;}');
+      assert.strictEqual(sectionBlocks[1].sections[1].element.deepTextContent().replaceAll(/\s+/g, ' ').trim(),
+                         '--f() { result: blue;}');
+
+      assert.strictEqual(sectionBlocks[1].sections[0].treeScopeDistance(), 1);
+      assert.strictEqual(sectionBlocks[1].sections[1].treeScopeDistance(), 2);
+    });
+
+    describe('Adding a new rule', () => {
+      it('fails silently when adding a new rule with an invalid selector', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+        node.simpleSelector.returns('div');
+        sinon.stub(stylesSidebarPane, 'node').returns(node);
+
+        const cssModel = stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel;
+        const addRuleStub = sinon.stub(cssModel, 'addRule').resolves(null);
+
+        const styleSheetHeader = sinon.createStubInstance(SDK.CSSStyleSheetHeader.CSSStyleSheetHeader);
+        styleSheetHeader.id = '1' as Protocol.DOM.StyleSheetId;
+        styleSheetHeader.cssModel.returns(cssModel);
+        styleSheetHeader.lineNumberInSource.returns(0);
+        styleSheetHeader.columnNumberInSource.returns(0);
+
+        sinon.stub(stylesSidebarPane.linkifier, 'linkifyCSSLocation').returns(document.createElement('div'));
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel,
+          node,
+          matchedPayload: [
+            {
+              rule: {
+                selectorList: {selectors: [{text: 'div'}], text: 'div'},
+                origin: Protocol.CSS.StyleSheetOrigin.Regular,
+                style: {
+                  cssProperties: [{name: 'color', value: 'blue'}],
+                  shorthandEntries: [],
+                },
+              },
+              matchingSelectors: [0],
+            },
+          ],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+        (stylesSidebarPane as unknown as {sectionBlocks: Elements.StylesSidebarPane.SectionBlock[]}).sectionBlocks =
+            sectionBlocks;
+
+        const insertAfterSection = sectionBlocks[0].sections[0];
+        assert.exists(insertAfterSection);
+
+        sinon.stub(stylesSidebarPane, 'performUpdate').resolves();
+
+        // Add a blank section.
+        const range = {
+          startLine: 0,
+          startColumn: 0,
+          endLine: 0,
+          endColumn: 0,
+          rebaseAfterTextEdit: () => range,
+        } as unknown as Parameters<typeof stylesSidebarPane.addBlankSection>[2];
+        stylesSidebarPane.addBlankSection(insertAfterSection, styleSheetHeader, range);
+
+        const blankSection =
+            sectionBlocks[0].sections[1] as Elements.StylePropertiesSection.BlankStylePropertiesSection;
+        assert.exists(blankSection);
+        assert.isTrue(blankSection.isBlank);
+
+        // Commit with an invalid selector.
+        blankSection.editingSelectorCommitted(blankSection.element, '@keyframes shake', '@keyframes shake', undefined,
+                                              'forward');
+
+        // Wait for the async addRule to complete and microtasks to process.
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        // The addRule should have been called.
+        sinon.assert.calledOnce(addRuleStub);
+
+        // Since it returned null (invalid selector), the blank section should have been removed.
+        assert.lengthOf(sectionBlocks[0].sections, 1);
+        assert.strictEqual(sectionBlocks[0].sections[0], insertAfterSection);
+      });
+    });
+
     describe('Animation styles', () => {
       function mockGetAnimatedComputedStyles(response: Partial<Protocol.CSS.GetAnimatedStylesForNodeResponse>) {
-        setMockConnectionResponseHandler('CSS.getAnimatedStylesForNode', () => response);
+        connection.setHandler('CSS.getAnimatedStylesForNode', null);
+        connection.setSuccessHandler('CSS.getAnimatedStylesForNode', () => response);
       }
 
       beforeEach(() => {
@@ -931,6 +1804,7 @@ describe('StylesSidebarPane', () => {
         const stylesSidebarPane =
             new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
         const matchedStyles = await getMatchedStyles({
+          connection,
           cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
           node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
           animationStylesPayload: [
@@ -962,10 +1836,13 @@ describe('StylesSidebarPane', () => {
 
       it('should render transition & animation styles when the animations panel is not visible but the css-animations-only-when-animations-tab-open setting is disabled',
          async () => {
-           Common.Settings.Settings.instance().moduleSetting('css-animations-only-when-animations-tab-open').set(false);
+           Common.Settings.Settings.instance()
+               .resolve(SettingsUI.ElementsSettings.cssAnimationsOnlyWhenAnimationsTabOpenSettingDescriptor)
+               .set(false);
            const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(
                new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
            const matchedStyles = await getMatchedStyles({
+             connection,
              cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
              node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
              animationStylesPayload: [
@@ -1001,6 +1878,7 @@ describe('StylesSidebarPane', () => {
            const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(
                new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
            const matchedStyles = await getMatchedStyles({
+             connection,
              cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
              node: sinon.createStubInstance(SDK.DOMModel.DOMNode),
              animationStylesPayload: [
@@ -1063,6 +1941,7 @@ describe('StylesSidebarPane', () => {
                 new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
             const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
             const matchedStyles = await getMatchedStyles({
+              connection,
               cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
               node,
               transitionsStylePayload: null,
@@ -1078,6 +1957,57 @@ describe('StylesSidebarPane', () => {
             await handledComputedStyleChanged;
 
             sinon.assert.called(resetUpdateSpy);
+          });
+
+          it('suppresses the trailing post-edit reset once and allows subsequent resets', async () => {
+            mockGetAnimatedComputedStyles({
+              transitionsStyle: {
+                cssProperties: [{
+                  name: 'color',
+                  value: 'red',
+                }],
+                shorthandEntries: [],
+              },
+            });
+            const {node} = createStubbedDomNodeWithModels({nodeId: 1});
+
+            const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(
+                new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
+            const matchedStyles = await getMatchedStyles({
+              connection,
+              cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+              node,
+              transitionsStylePayload: null,
+            });
+            stylesSidebarPane.setMatchedStylesForTest(matchedStyles);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const resetThrottlerSpy = sinon.spy((stylesSidebarPane as any).resetUpdateThrottler, 'schedule');
+            const handledStub = sinon.stub(stylesSidebarPane, 'handledComputedStyleChangedForTest');
+
+            // 1. Start editing and suppress resets.
+            stylesSidebarPane.setEditingStyle(true);
+            stylesSidebarPane.suppressResets();
+
+            // A computed style change arriving while still editing should not consume isSuppressingResets.
+            let handledComputedStyleChanged = expectCall(handledStub);
+            stylesSidebarPane.onComputedStyleChanged();
+            await handledComputedStyleChanged;
+            sinon.assert.notCalled(resetThrottlerSpy);
+
+            // 2. Finish editing. The trailing computed style change from the edit should be suppressed
+            // and should clear isSuppressingResets.
+            stylesSidebarPane.setEditingStyle(false);
+            handledComputedStyleChanged = expectCall(handledStub);
+            stylesSidebarPane.onComputedStyleChanged();
+            await handledComputedStyleChanged;
+            sinon.assert.notCalled(resetThrottlerSpy);
+
+            // 3. Subsequent computed style changes should no longer be suppressed.
+            handledComputedStyleChanged = expectCall(handledStub);
+            stylesSidebarPane.onComputedStyleChanged();
+            await handledComputedStyleChanged;
+            sinon.assert.calledOnce(resetThrottlerSpy);
           });
 
           it('should update value only when there was a transition style before', async () => {
@@ -1096,6 +2026,7 @@ describe('StylesSidebarPane', () => {
                 new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
             const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
             const matchedStyles = await getMatchedStyles({
+              connection,
               cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
               node,
               transitionsStylePayload: {
@@ -1110,16 +2041,16 @@ describe('StylesSidebarPane', () => {
             const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
                 matchedStyles, new Map(), new Map(), null);
             assert.lengthOf(sectionBlocks[0].sections, 1);
-            assert.include(
-                sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: blue;');
+            assert.include(sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent,
+                           'color: blue;');
 
             const handledComputedStyleChanged =
                 expectCall(sinon.stub(stylesSidebarPane, 'handledComputedStyleChangedForTest'));
             stylesSidebarPane.onComputedStyleChanged();
             await handledComputedStyleChanged;
 
-            assert.include(
-                sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: red;');
+            assert.include(sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent,
+                           'color: red;');
             sinon.assert.notCalled(resetUpdateSpy);
           });
         });
@@ -1144,6 +2075,7 @@ describe('StylesSidebarPane', () => {
                 new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
             const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
             const matchedStyles = await getMatchedStyles({
+              connection,
               cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
               node,
               animationStylesPayload: [],
@@ -1171,6 +2103,7 @@ describe('StylesSidebarPane', () => {
                 new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
             const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
             const matchedStyles = await getMatchedStyles({
+              connection,
               cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
               node,
               animationStylesPayload: [{
@@ -1214,6 +2147,7 @@ describe('StylesSidebarPane', () => {
                 new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
             const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
             const matchedStyles = await getMatchedStyles({
+              connection,
               cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
               node,
               animationStylesPayload: [{
@@ -1230,16 +2164,16 @@ describe('StylesSidebarPane', () => {
             const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
                 matchedStyles, new Map(), new Map(), null);
             assert.lengthOf(sectionBlocks[0].sections, 1);
-            assert.include(
-                sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: blue;');
+            assert.include(sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent,
+                           'color: blue;');
 
             const handledComputedStyleChanged =
                 expectCall(sinon.stub(stylesSidebarPane, 'handledComputedStyleChangedForTest'));
             stylesSidebarPane.onComputedStyleChanged();
             await handledComputedStyleChanged;
 
-            assert.include(
-                sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: red;');
+            assert.include(sectionBlocks[0].sections[0].propertiesTreeOutline.contentElement.textContent,
+                           'color: red;');
             sinon.assert.notCalled(resetUpdateSpy);
           });
         });
@@ -1266,6 +2200,7 @@ describe('StylesSidebarPane', () => {
                      new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
                  const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
                  const matchedStyles = await getMatchedStyles({
+                   connection,
                    cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
                    node,
                  });
@@ -1302,6 +2237,7 @@ describe('StylesSidebarPane', () => {
                      new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
                  const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
                  const matchedStyles = await getMatchedStyles({
+                   connection,
                    cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
                    node,
                  });
@@ -1338,6 +2274,7 @@ describe('StylesSidebarPane', () => {
                      new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node));
                  const resetUpdateSpy = sinon.spy(stylesSidebarPane, 'scheduleResetUpdateIfNotEditingCalledForTest');
                  const matchedStyles = await getMatchedStyles({
+                   connection,
                    cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
                    node,
                    inheritedPayload: [{
@@ -1357,16 +2294,16 @@ describe('StylesSidebarPane', () => {
                  const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
                      matchedStyles, new Map(), new Map(), null);
                  assert.lengthOf(sectionBlocks[1].sections, 1);
-                 assert.include(
-                     sectionBlocks[1].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: blue;');
+                 assert.include(sectionBlocks[1].sections[0].propertiesTreeOutline.contentElement.textContent,
+                                'color: blue;');
 
                  const handledComputedStyleChanged =
                      expectCall(sinon.stub(stylesSidebarPane, 'handledComputedStyleChangedForTest'));
                  stylesSidebarPane.onComputedStyleChanged();
                  await handledComputedStyleChanged;
 
-                 assert.include(
-                     sectionBlocks[1].sections[0].propertiesTreeOutline.contentElement.textContent, 'color: red;');
+                 assert.include(sectionBlocks[1].sections[0].propertiesTreeOutline.contentElement.textContent,
+                                'color: red;');
                  sinon.assert.notCalled(resetUpdateSpy);
                });
           });
@@ -1480,6 +2417,28 @@ describe('StylesSidebarPane', () => {
 
         sinon.assert.notCalled(updateCitationsSpy);
       });
+
+      it('safely handles onFeatureEnabled when not yet attached to style-panes-wrapper and creates toolbar upon show',
+         async () => {
+           const unattachedPane = new Elements.StylesSidebarPane.StylesSidebarPane(
+               new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+           const config = unattachedPane.aiCodeCompletionConfig;
+           assert.exists(config);
+
+           // Enabling before show() should not throw
+           assert.doesNotThrow(() => {
+             config.onFeatureEnabled();
+           });
+
+           const wrapper = new UI.Widget.VBox();
+           wrapper.element.classList.add('style-panes-wrapper');
+           wrapper.markAsRoot();
+           renderElementIntoDOM(wrapper);
+           unattachedPane.show(wrapper.element);
+
+           assert.exists(wrapper.contentElement.querySelector('div.ai-code-completion-summary-toolbar-container'));
+           wrapper.detach();
+         });
     });
   });
 
@@ -1589,7 +2548,7 @@ describe('StylesSidebarPane', () => {
               sinon.createStubInstance(Elements.StylesAiCodeCompletionProvider.StylesAiCodeCompletionProvider);
           pane.aiCodeCompletionProvider = aiCodeCompletionProvider;
           return pane;
-        }
+        },
       } as unknown as Elements.StylePropertyTreeElement.StylePropertyTreeElement;
     });
 
@@ -1684,7 +2643,7 @@ describe('StylesSidebarPane', () => {
             enabled: true,
             blockedByAge: false,
             blockedByGeo: false,
-          }
+          },
         });
 
         attachedElement = document.createElement('div');
@@ -1723,6 +2682,29 @@ describe('StylesSidebarPane', () => {
         sinon.assert.calledOnce(triggerAiCodeCompletionStub);
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[0], 'backgrou');
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[1], 8);
+        clock.restore();
+      });
+
+      it('cancels pending requests and clears suggestions on deletion', async () => {
+        const clock = sinon.useFakeTimers();
+        const triggerAiCodeCompletionStub = aiCodeCompletionProvider.triggerAiCodeCompletion.resolves();
+        cssPropertyPrompt.attachAndStartEditing(attachedElement, noop);
+
+        // First call triggerAiCodeCompletion by typing a letter
+        cssPropertyPrompt.setText('b');
+        cssPropertyPrompt.onInput(new Event('input'));
+
+        // Perform deletion
+        cssPropertyPrompt.setText('');
+        const deleteEvent = new InputEvent('input', {inputType: 'deleteContentBackward'});
+        cssPropertyPrompt.onInput(deleteEvent);
+
+        await clock.tickAsync(TextEditor.AiCodeCompletionProvider.AIDA_REQUEST_DEBOUNCE_TIMEOUT_MS + 1);
+
+        // Verify no request was made
+        sinon.assert.notCalled(triggerAiCodeCompletionStub);
+        // Verify active suggestion was cleared
+        assert.isUndefined(mockTreeItem.section().activeAiSuggestion);
         clock.restore();
       });
 
@@ -1780,7 +2762,8 @@ color: pink !important;`;
           {name: 'background-image', value: 'url("https://example.com/image;v=1?query:part=true")'},
           {name: 'content', value: '"This is a semicolon; and this is a colon: inside a string"'},
           {name: '--custom-property', value: 'var(--other, "fallback;value")'},
-          {name: 'width', value: 'calc(100% - 20px)'}, {name: 'color', value: 'pink !important'}
+          {name: 'width', value: 'calc(100% - 20px)'},
+          {name: 'color', value: 'pink !important'},
         ]);
       });
 
@@ -1908,6 +2891,23 @@ color: pink !important;`;
           // On second Tab, the AI suggestion is committed.
           sinon.assert.calledOnce(section.commitActiveAiSuggestion);
         });
+
+        it('accepts traditional autocomplete suggestion on Tab when suggest box is hidden but inline suggestion is active',
+           async () => {
+             const cssPropertyPrompt = new CSSPropertyPrompt(mockTreeItem, true);
+             cssPropertyPrompt.attachAndStartEditing(attachedElement, noop);
+
+             cssPropertyPrompt.setText('flex-g');
+             await cssPropertyPrompt.complete(true);
+
+             assert.isFalse(cssPropertyPrompt.isSuggestBoxVisible());
+             assert.strictEqual(cssPropertyPrompt.currentSuggestion()?.text, 'flex-grow');
+
+             const tabEvent = new KeyboardEvent('keydown', {key: 'Tab'});
+             cssPropertyPrompt.onKeyDown(tabEvent);
+
+             assert.strictEqual(cssPropertyPrompt.text(), 'flex-grow');
+           });
       });
 
       describe('updateAiCodeSuggestion', () => {
@@ -1999,6 +2999,1959 @@ color: pink !important;`;
           assert.deepEqual(section.activeAiSuggestion.properties, [{name: 'color', value: 'pink'}]);
         });
       });
+    });
+  });
+
+  describeWithEnvironment('UpdatesFromJS', () => {
+    let connection: MockCDPConnection;
+    let domModel: SDK.DOMModel.DOMModel;
+    let cssModel: SDK.CSSModel.CSSModel;
+    let stylesSidebarPane: Elements.StylesSidebarPane.StylesSidebarPane;
+
+    beforeEach(() => {
+      connection = new MockCDPConnection();
+      const target = createTarget({connection});
+      domModel = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+      cssModel = target.model(SDK.CSSModel.CSSModel) as SDK.CSSModel.CSSModel;
+      sinon.stub(ComputedStyle.ComputedStyleModel.ComputedStyleModel.prototype, 'cssModel').returns(cssModel);
+    });
+
+    it('updates inline styles when style attribute is modified', async () => {
+      const CONTAINER_NODE_ID = 1 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: 0 as Protocol.DOM.NodeId,
+        backendNodeId: 0 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: CONTAINER_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: Node.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            attributes: ['id', 'container', 'style', 'font-weight:bold'],
+            nodeValue: '',
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const containerNode = domModel.nodeForId(CONTAINER_NODE_ID);
+      assert.exists(containerNode);
+
+      UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, containerNode);
+
+      const inlineStyle: Protocol.CSS.CSSStyle = {
+        styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [{name: 'font-weight', value: 'bold'}],
+        shorthandEntries: [],
+      };
+
+      const matchedStylesPayload: Protocol.CSS.GetMatchedStylesForNodeResponse = {
+        inlineStyle,
+        matchedCSSRules: [],
+        pseudoElements: [],
+        inherited: [],
+        inheritedPseudoElements: [],
+        cssKeyframesRules: [],
+        cssPositionTryRules: [],
+        cssPropertyRules: [],
+        cssPropertyRegistrations: [],
+        cssAtRules: [],
+        activePositionFallbackIndex: -1,
+        cssFunctionRules: [],
+        getError: () => undefined,
+      };
+
+      connection.setSuccessHandler('CSS.getMatchedStylesForNode', () => matchedStylesPayload);
+
+      const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+      computedStyleModel.node = containerNode;
+      stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+      renderElementIntoDOM(stylesSidebarPane);
+
+      stylesSidebarPane.forceUpdate();
+
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      let sections = stylesSidebarPane.allSections();
+      assert.lengthOf(sections, 1);
+      assert.strictEqual(sections[0].headerText(), 'element.style');
+      assert.lengthOf(sections[0].style().leadingProperties(), 1);
+      assert.strictEqual(sections[0].style().leadingProperties()[0].name, 'font-weight');
+      assert.strictEqual(sections[0].style().leadingProperties()[0].value, 'bold');
+
+      matchedStylesPayload.inlineStyle = {
+        styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [
+          {name: 'color', value: 'rgb(218, 192, 222)'},
+          {name: 'border', value: '1px solid black'},
+        ],
+        shorthandEntries: [],
+      };
+
+      connection.dispatchEvent('DOM.attributeModified', {
+        nodeId: CONTAINER_NODE_ID,
+        name: 'style',
+        value: 'color: #daC0DE; border: 1px solid black;',
+      },
+                               undefined);
+
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.STYLES_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      sections = stylesSidebarPane.allSections();
+      assert.lengthOf(sections, 1);
+      const properties = sections[0].style().leadingProperties();
+      assert.lengthOf(properties, 2);
+      assert.strictEqual(properties[0].name, 'color');
+      assert.strictEqual(properties[0].value, 'rgb(218, 192, 222)');
+      assert.strictEqual(properties[1].name, 'border');
+      assert.strictEqual(properties[1].value, '1px solid black');
+    });
+
+    it('updates styles when ancestor class is modified', async () => {
+      const CONTAINER_NODE_ID = 1 as Protocol.DOM.NodeId;
+      const CHILD_NODE_ID = 2 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: 0 as Protocol.DOM.NodeId,
+        backendNodeId: 0 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: CONTAINER_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: Node.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            attributes: ['id', 'container'],
+            nodeValue: '',
+            childNodeCount: 1,
+            children: [
+              {
+                nodeId: CHILD_NODE_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: Node.ELEMENT_NODE,
+                nodeName: 'div',
+                localName: 'div',
+                attributes: ['id', 'child'],
+                nodeValue: '',
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const childNode = domModel.nodeForId(CHILD_NODE_ID);
+      assert.exists(childNode);
+
+      UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, childNode);
+
+      const matchedStylesPayload: Protocol.CSS.GetMatchedStylesForNodeResponse = {
+        inlineStyle: undefined,
+        matchedCSSRules: [],
+        pseudoElements: [],
+        inherited: [],
+        inheritedPseudoElements: [],
+        cssKeyframesRules: [],
+        cssPositionTryRules: [],
+        cssPropertyRules: [],
+        cssPropertyRegistrations: [],
+        cssAtRules: [],
+        activePositionFallbackIndex: -1,
+        cssFunctionRules: [],
+        getError: () => undefined,
+      };
+
+      connection.setSuccessHandler('CSS.getMatchedStylesForNode', () => matchedStylesPayload);
+
+      const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+      computedStyleModel.node = childNode;
+      stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+      renderElementIntoDOM(stylesSidebarPane);
+
+      stylesSidebarPane.forceUpdate();
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      let sections = stylesSidebarPane.allSections();
+      assert.isUndefined(sections.find(s => s.headerText() === '.red div:first-child'));
+
+      matchedStylesPayload.matchedCSSRules = [
+        ruleMatch('.red div:first-child', {'background-color': 'red'}),
+      ];
+
+      connection.dispatchEvent('DOM.attributeModified', {
+        nodeId: CONTAINER_NODE_ID,
+        name: 'class',
+        value: 'red',
+      },
+                               undefined);
+
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.STYLES_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      sections = stylesSidebarPane.allSections();
+      const redSection = sections.find(s => s.headerText() === '.red div:first-child');
+      assert.exists(redSection);
+      assert.strictEqual(redSection.style().leadingProperties()[0].name, 'background-color');
+      assert.strictEqual(redSection.style().leadingProperties()[0].value, 'red');
+    });
+
+    it('updates styles when sibling attribute is modified', async () => {
+      const CONTAINER_NODE_ID = 1 as Protocol.DOM.NodeId;
+      const CHILD_NODE_ID = 2 as Protocol.DOM.NodeId;
+      const SIBLING_NODE_ID = 3 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: 0 as Protocol.DOM.NodeId,
+        backendNodeId: 0 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: CONTAINER_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: Node.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            attributes: ['id', 'container'],
+            nodeValue: '',
+            childNodeCount: 2,
+            children: [
+              {
+                nodeId: CHILD_NODE_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: Node.ELEMENT_NODE,
+                nodeName: 'div',
+                localName: 'div',
+                attributes: ['id', 'child'],
+                nodeValue: '',
+              },
+              {
+                nodeId: SIBLING_NODE_ID,
+                backendNodeId: 4 as Protocol.DOM.BackendNodeId,
+                nodeType: Node.ELEMENT_NODE,
+                nodeName: 'div',
+                localName: 'div',
+                attributes: ['id', 'childSibling'],
+                nodeValue: '',
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const siblingNode = domModel.nodeForId(SIBLING_NODE_ID);
+      assert.exists(siblingNode);
+
+      UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, siblingNode);
+
+      const matchedStylesPayload: Protocol.CSS.GetMatchedStylesForNodeResponse = {
+        inlineStyle: undefined,
+        matchedCSSRules: [],
+        pseudoElements: [],
+        inherited: [],
+        inheritedPseudoElements: [],
+        cssKeyframesRules: [],
+        cssPositionTryRules: [],
+        cssPropertyRules: [],
+        cssPropertyRegistrations: [],
+        cssAtRules: [],
+        activePositionFallbackIndex: -1,
+        cssFunctionRules: [],
+        getError: () => undefined,
+      };
+
+      connection.setSuccessHandler('CSS.getMatchedStylesForNode', () => matchedStylesPayload);
+
+      const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+      computedStyleModel.node = siblingNode;
+      stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+      renderElementIntoDOM(stylesSidebarPane);
+
+      stylesSidebarPane.forceUpdate();
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      let sections = stylesSidebarPane.allSections();
+      assert.isUndefined(sections.find(s => s.headerText() === 'div[foo="bar"] + div'));
+
+      matchedStylesPayload.matchedCSSRules = [
+        ruleMatch('div[foo="bar"] + div', {'background-color': 'blue'}),
+      ];
+
+      connection.dispatchEvent('DOM.attributeModified', {
+        nodeId: CHILD_NODE_ID,
+        name: 'foo',
+        value: 'bar',
+      },
+                               undefined);
+
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.STYLES_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+
+      sections = stylesSidebarPane.allSections();
+      const siblingSection = sections.find(s => s.headerText() === 'div[foo="bar"] + div');
+      assert.exists(siblingSection);
+      assert.strictEqual(siblingSection.style().leadingProperties()[0].name, 'background-color');
+      assert.strictEqual(siblingSection.style().leadingProperties()[0].value, 'blue');
+    });
+
+    async function showStylesForContainer(matchedStylesPayload: Protocol.CSS.GetMatchedStylesForNodeResponse,
+                                          attributes: string[] = ['id', 'container']): Promise<SDK.DOMModel.DOMNode> {
+      domModel.setDocumentForTest({
+        nodeId: 0 as Protocol.DOM.NodeId,
+        backendNodeId: 0 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        childNodeCount: 1,
+        children: [{
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: Node.ELEMENT_NODE,
+          nodeName: 'div',
+          localName: 'div',
+          attributes,
+          nodeValue: '',
+        }],
+      } as Protocol.DOM.Node);
+      const containerNode = domModel.nodeForId(1 as Protocol.DOM.NodeId);
+      assert.exists(containerNode);
+      UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, containerNode);
+      connection.setSuccessHandler('CSS.getMatchedStylesForNode', () => matchedStylesPayload);
+      const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+      computedStyleModel.node = containerNode;
+      stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+      renderElementIntoDOM(stylesSidebarPane);
+      stylesSidebarPane.forceUpdate();
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+      await UI.Widget.Widget.allUpdatesComplete;
+      return containerNode;
+    }
+
+    async function stylesUpdateCompleted(): Promise<void> {
+      await new Promise<void>(resolve => {
+        stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.STYLES_UPDATE_COMPLETED, () => resolve(),
+                                           {once: true});
+      });
+      await UI.Widget.Widget.allUpdatesComplete;
+    }
+
+    function emptyMatchedStylesPayload(): Protocol.CSS.GetMatchedStylesForNodeResponse {
+      return {
+        inlineStyle: undefined,
+        matchedCSSRules: [],
+        pseudoElements: [],
+        inherited: [],
+        inheritedPseudoElements: [],
+        cssKeyframesRules: [],
+        cssPositionTryRules: [],
+        cssPropertyRules: [],
+        cssPropertyRegistrations: [],
+        cssAtRules: [],
+        activePositionFallbackIndex: -1,
+        cssFunctionRules: [],
+        getError: () => undefined,
+      };
+    }
+
+    it('refreshes the inline style section when the style attribute is removed', async () => {
+      const matchedStylesPayload = emptyMatchedStylesPayload();
+      matchedStylesPayload.inlineStyle = {
+        styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [{name: 'color', value: 'red'}],
+        shorthandEntries: [],
+      };
+      const containerNode =
+          await showStylesForContainer(matchedStylesPayload, ['id', 'container', 'style', 'color: red']);
+      assert.lengthOf(stylesSidebarPane.allSections()[0].style().leadingProperties(), 1);
+
+      matchedStylesPayload
+          .inlineStyle = {styleSheetId: '0' as Protocol.DOM.StyleSheetId, cssProperties: [], shorthandEntries: []};
+      const updated = stylesUpdateCompleted();
+      connection.dispatchEvent('DOM.attributeRemoved', {nodeId: containerNode.id, name: 'style'}, undefined);
+      await updated;
+
+      assert.isUndefined(containerNode.getAttribute('style'));
+      const sections = stylesSidebarPane.allSections();
+      assert.strictEqual(sections[0].headerText(), 'element.style');
+      assert.lengthOf(sections[0].style().leadingProperties(), 0);
+      assert.strictEqual(sections[0].propertiesTreeOutline.rootElement().childCount(), 0);
+    });
+
+    it('refreshes the inline style section when the inline style is invalidated', async () => {
+      // Removing the style through CSSOM fires DOM.inlineStyleInvalidated.
+      const matchedStylesPayload = emptyMatchedStylesPayload();
+      matchedStylesPayload.inlineStyle = {
+        styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [{name: 'color', value: 'red'}],
+        shorthandEntries: [],
+      };
+      const containerNode =
+          await showStylesForContainer(matchedStylesPayload, ['id', 'container', 'style', 'color: red']);
+      assert.lengthOf(stylesSidebarPane.allSections()[0].style().leadingProperties(), 1);
+
+      matchedStylesPayload
+          .inlineStyle = {styleSheetId: '0' as Protocol.DOM.StyleSheetId, cssProperties: [], shorthandEntries: []};
+      connection.setSuccessHandler('DOM.getAttributes', () => ({attributes: ['id', 'container']}));
+      const updated = stylesUpdateCompleted();
+      connection.dispatchEvent('DOM.inlineStyleInvalidated', {nodeIds: [containerNode.id]}, undefined);
+      await updated;
+
+      assert.isUndefined(containerNode.getAttribute('style'));
+      assert.lengthOf(stylesSidebarPane.allSections()[0].style().leadingProperties(), 0);
+    });
+
+    it('re-fetches styles when CSS.mediaQueryResultChanged is received', async () => {
+      // Emulating print media makes the backend report a media query change.
+      const matchedStylesPayload = emptyMatchedStylesPayload();
+      matchedStylesPayload.matchedCSSRules = [ruleMatch('#container', {color: 'red'})];
+      await showStylesForContainer(matchedStylesPayload);
+      assert.deepEqual(stylesSidebarPane.allSections().map(section => section.headerText()), ['#container']);
+
+      const printRule = ruleMatch('#container', {color: 'black'});
+      printRule.rule.media = [{text: 'print', source: Protocol.CSS.CSSMediaSource.MediaRule}];
+      printRule.rule.ruleTypes = [Protocol.CSS.CSSRuleType.MediaRule];
+      matchedStylesPayload.matchedCSSRules = [ruleMatch('#container', {color: 'red'}), printRule];
+      const updated = stylesUpdateCompleted();
+      connection.dispatchEvent('CSS.mediaQueryResultChanged', undefined, undefined);
+      await updated;
+
+      const sections = stylesSidebarPane.allSections();
+      assert.lengthOf(sections, 2);
+      assert.isTrue(sections.some(section => section.style().leadingProperties()[0]?.value === 'black'));
+      assert.isTrue(sections.some(
+          section => (section.style().parentRule as SDK.CSSRule.CSSStyleRule | null)?.media[0]?.text === 'print'));
+    });
+
+    it('rebases the ranges and origin links of every section, including pseudo-element blocks, after an edit',
+       async () => {
+         const styleSheetId = 'update-links' as Protocol.DOM.StyleSheetId;
+         const origin = Protocol.CSS.StyleSheetOrigin.Regular;
+         const sheetText = '.r1 { color: red; } .r2 { color: blue; }\n.r3::after { content: "x"; }';
+         cssModel.styleSheetAdded({
+           styleSheetId,
+           frameId: 'frame' as Protocol.Page.FrameId,
+           sourceURL: 'http://example.com/update-links.css',
+           origin,
+           title: '',
+           disabled: false,
+           isInline: false,
+           isMutable: true,
+           isConstructed: false,
+           startLine: 0,
+           startColumn: 0,
+           length: sheetText.length,
+           endLine: 1,
+           endColumn: 28,
+         });
+         const range = (startLine: number, startColumn: number, endLine: number, endColumn: number) =>
+             ({startLine, startColumn, endLine, endColumn});
+         const rule = (selector: string, selectorRange: Protocol.CSS.SourceRange, styleRange: Protocol.CSS.SourceRange,
+                       name: string, value: string): Protocol.CSS.RuleMatch => ({
+           rule: {
+             selectorList: {selectors: [{text: selector, range: selectorRange}], text: selector},
+             origin,
+             styleSheetId,
+             style: {styleSheetId, range: styleRange, cssProperties: [{name, value}], shorthandEntries: []},
+           },
+           matchingSelectors: [0],
+         });
+         const matchedStylesPayload = emptyMatchedStylesPayload();
+         matchedStylesPayload.matchedCSSRules = [
+           rule('.r1', range(0, 0, 0, 3), range(0, 5, 0, 18), 'color', 'red'),
+           rule('.r2', range(0, 20, 0, 23), range(0, 25, 0, 39), 'color', 'blue'),
+         ];
+         matchedStylesPayload.pseudoElements = [{
+           pseudoType: Protocol.DOM.PseudoType.After,
+           matches: [rule('.r3::after', range(1, 0, 1, 10), range(1, 12, 1, 27), 'content', '"x"')],
+         }];
+         const linkifyStub = sinon.stub(Components.Linkifier.Linkifier.prototype, 'linkifyCSSLocation')
+                                 .callsFake(() => document.createElement('span'));
+         await showStylesForContainer(matchedStylesPayload);
+         const sectionFor = (headerText: string) => {
+           const section = stylesSidebarPane.allSections().find(section => section.headerText() === headerText);
+           assert.exists(section);
+           return section;
+         };
+         const r1 = sectionFor('.r1');
+         const r2 = sectionFor('.r2');
+         const r3 = sectionFor('.r3::after');
+         assert.notStrictEqual(stylesSidebarPane.sectionBlocks.find(block => block.sections.includes(r3)),
+                               stylesSidebarPane.sectionBlocks.find(block => block.sections.includes(r1)));
+
+         connection.setSuccessHandler('CSS.getStyleSheetText', () => ({text: sheetText}));
+         connection.setSuccessHandler('DOM.markUndoableState', () => ({}));
+         const newStyleText = ' color: red;\n  margin: 0; ';
+         connection.setSuccessHandler('CSS.setStyleTexts', () => ({
+                                                             styles: [{
+                                                               styleSheetId,
+                                                               range: range(0, 5, 1, 13),
+                                                               cssText: newStyleText,
+                                                               cssProperties: [
+                                                                 {name: 'color', value: 'red'},
+                                                                 {name: 'margin', value: '0'},
+                                                               ],
+                                                               shorthandEntries: [],
+                                                             }],
+                                                           }));
+         linkifyStub.resetHistory();
+         // Editing the first rule inserts a line break into the first line.
+         assert.isTrue(await cssModel.setStyleText(
+             styleSheetId, TextUtils.TextRange.TextRange.fromObject(range(0, 5, 0, 18)), newStyleText, true));
+
+         const selectorRange = (section: Elements.StylePropertiesSection.StylePropertiesSection) =>
+             (section.style().parentRule as SDK.CSSRule.CSSStyleRule).selectors[0].range?.serializeToObject();
+         assert.deepEqual(r1.style().range?.serializeToObject(), range(0, 5, 1, 13));
+         assert.deepEqual(selectorRange(r1), range(0, 0, 0, 3));
+         // The rule that followed the edit on the same line moves to the next line with a shifted column.
+         assert.deepEqual(r2.style().range?.serializeToObject(), range(1, 20, 1, 34));
+         assert.deepEqual(selectorRange(r2), range(1, 15, 1, 18));
+         // The ::after rule moves one line down.
+         assert.deepEqual(r3.style().range?.serializeToObject(), range(2, 12, 2, 27));
+         assert.deepEqual(selectorRange(r3), range(2, 0, 2, 10));
+
+         // Every section re-rendered its origin link with the rebased location.
+         const locations =
+             linkifyStub.getCalls().map(call => `${call.args[0].lineNumber}:${call.args[0].columnNumber}`);
+         assert.includeMembers(locations, ['0:5', '1:20', '2:12']);
+       });
+    describe('Mouse interaction', () => {
+      let stylesSidebarPane: Elements.StylesSidebarPane.StylesSidebarPane;
+      let matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
+      let cssModel: SDK.CSSModel.CSSModel;
+
+      beforeEach(async () => {
+        (node.frameId as sinon.SinonStub).returns('frame-id' as Protocol.Page.FrameId);
+        (node.nodeType as sinon.SinonStub).returns(Node.ELEMENT_NODE);
+        (node.nodeName as sinon.SinonStub).returns('DIV');
+        (node.simpleSelector as sinon.SinonStub).returns('#inspected');
+        sinon.stub(Components.Linkifier.Linkifier.prototype, 'linkifyCSSLocation')
+            .returns(document.createElement('div'));
+
+        const inlineStyle: Protocol.CSS.CSSStyle = {
+          styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+          cssProperties: [],
+          shorthandEntries: [],
+          range: {startLine: 0, startColumn: 0, endLine: 0, endColumn: 0},
+        };
+
+        const cssText = '\n  color: blue;\n  background-color: red;\n';
+        const matchedPayload: Protocol.CSS.RuleMatch[] = [
+          ruleMatch('#inspected',
+                    [
+                      {
+                        name: 'color',
+                        value: 'blue',
+                        range: {startLine: 1, startColumn: 2, endLine: 1, endColumn: 14},
+                        text: 'color: blue;',
+                      },
+                      {
+                        name: 'background-color',
+                        value: 'red',
+                        range: {startLine: 2, startColumn: 2, endLine: 2, endColumn: 24},
+                        text: 'background-color: red;',
+                      },
+                    ],
+                    {
+                      styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+                      range: {startLine: 0, startColumn: 12, endLine: 3, endColumn: 0},
+                    }),
+        ];
+        matchedPayload[0].rule.style.cssText = cssText;
+
+        const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+        computedStyleModel.node = node;
+
+        cssModel = computedStyleModel.cssModel() as SDK.CSSModel.CSSModel;
+
+        matchedStyles = await SDK.CSSMatchedStyles.CSSMatchedStyles.create({
+          cssModel,
+          node,
+          inlinePayload: inlineStyle,
+          attributesPayload: null,
+          matchedPayload,
+          pseudoPayload: [],
+          inheritedPayload: [],
+          inheritedPseudoPayload: [],
+          animationsPayload: [],
+          parentLayoutNodeId: undefined as unknown as Protocol.DOM.NodeId,
+          positionTryRules: [],
+          propertyRules: [],
+          functionRules: [],
+          cssPropertyRegistrations: [],
+          atRules: [],
+          activePositionFallbackIndex: -1,
+          animationStylesPayload: [],
+          inheritedAnimatedPayload: [],
+          transitionsStylePayload: null,
+        });
+
+        sinon.stub(cssModel, 'getMatchedStyles').resolves(matchedStyles);
+
+        stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+        renderElementIntoDOM(stylesSidebarPane);
+
+        stylesSidebarPane.forceUpdate();
+
+        await new Promise<void>(resolve => {
+          stylesSidebarPane.addEventListener(Elements.StylesSidebarPane.Events.INITIAL_UPDATE_COMPLETED,
+                                             () => resolve(), {once: true});
+        });
+      });
+
+      afterEach(() => {
+        stylesSidebarPane.detach();
+      });
+
+      it('starts editing value on click', () => {
+        const mySection = stylesSidebarPane.allSections()[1] as Elements.StylePropertiesSection.StylePropertiesSection;
+        assert.exists(mySection);
+
+        const colorTreeElement = mySection.propertiesTreeOutline.rootElement().childAt(0) as
+            Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+        assert.exists(colorTreeElement);
+
+        const valueElement = colorTreeElement.valueElement;
+        assert.exists(valueElement);
+
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+
+        // Click on the value.
+        valueElement.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+        valueElement.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+
+        assert.isTrue(stylesSidebarPane.isEditingStyle);
+        assert.isTrue(UI.UIUtils.isBeingEdited(valueElement));
+      });
+
+      it('starts editing name on click', () => {
+        const mySection = stylesSidebarPane.allSections()[1] as Elements.StylePropertiesSection.StylePropertiesSection;
+        assert.exists(mySection);
+
+        const colorTreeElement = mySection.propertiesTreeOutline.rootElement().childAt(0) as
+            Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+        assert.exists(colorTreeElement);
+
+        const nameElement = colorTreeElement.nameElement;
+        assert.exists(nameElement);
+
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+
+        // Click on the name.
+        nameElement.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+        nameElement.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+
+        assert.isTrue(stylesSidebarPane.isEditingStyle);
+        assert.isTrue(UI.UIUtils.isBeingEdited(nameElement));
+      });
+
+      it('toggles property enabled state on checkbox click', async () => {
+        const mySection = stylesSidebarPane.allSections()[1] as Elements.StylePropertiesSection.StylePropertiesSection;
+        assert.exists(mySection);
+
+        const colorTreeElement = mySection.propertiesTreeOutline.rootElement().childAt(0) as
+            Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+        assert.exists(colorTreeElement);
+
+        const checkbox = colorTreeElement.listItemElement.querySelector('.enabled-button') as HTMLInputElement;
+        assert.exists(checkbox);
+        assert.isTrue(checkbox.checked);
+
+        // Mock CDP calls for disabling.
+        connection.setSuccessHandler('CSS.getStyleSheetText',
+                                     () => ({text: '#inspected {\n  color: blue;\n  background-color: red;\n}'}));
+        connection.setSuccessHandler('CSS.setStyleTexts', () => {
+          return {
+            styles: [{
+              styleSheetId: '0' as Protocol.DOM.StyleSheetId,
+              cssProperties: [
+                {
+                  name: 'color',
+                  value: 'blue',
+                  disabled: true,
+                  range: {startLine: 1, startColumn: 2, endLine: 1, endColumn: 20},
+                  text: '/* color: blue; */',
+                },
+                {
+                  name: 'background-color',
+                  value: 'red',
+                  range: {startLine: 2, startColumn: 2, endLine: 2, endColumn: 24},
+                  text: 'background-color: red;',
+                },
+              ],
+              shorthandEntries: [],
+              range: {startLine: 0, startColumn: 12, endLine: 3, endColumn: 0},
+            }],
+          };
+        });
+
+        const sendSpy = sinon.spy(connection, 'send');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toggleSpy = sinon.spy(colorTreeElement as any, 'toggleDisabled');
+
+        checkbox.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        // We need to wait for the async toggleDisabled to complete.
+        await new Promise<void>(resolve => {
+          sinon.stub(colorTreeElement, 'styleTextAppliedForTest').callsFake(() => {
+            resolve();
+          });
+        });
+
+        sinon.assert.calledOnceWithExactly(toggleSpy, true);
+
+        const setStyleTextsCall = sendSpy.getCalls().find(call => call.args[0] === 'CSS.setStyleTexts');
+        assert.exists(setStyleTextsCall);
+        const args = setStyleTextsCall.args[1] as Protocol.CSS.SetStyleTextsRequest;
+        assert.deepEqual(args.edits[0].text, '\n  /* color: blue; */\n  background-color: red;\n');
+      });
+
+      it('cancels editing on clicking empty space when editing', async () => {
+        const mySection = stylesSidebarPane.allSections()[1] as Elements.StylePropertiesSection.StylePropertiesSection;
+        const colorTreeElement = mySection.propertiesTreeOutline.rootElement().childAt(0) as
+            Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+        const valueElement = colorTreeElement.valueElement;
+        assert.exists(valueElement);
+
+        // Start editing.
+        valueElement.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+        valueElement.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+        assert.isTrue(stylesSidebarPane.isEditingStyle);
+
+        const sectionElement = mySection.element;
+
+        // Simulate a click on the empty space.
+        sectionElement.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+
+        // Manually trigger blur to simulate a focus change.
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+
+        sectionElement.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+        assert.strictEqual(mySection.propertiesTreeOutline.rootElement().childCount(), 2);
+      });
+
+      it('creates new property on clicking empty space when not editing', () => {
+        const mySection = stylesSidebarPane.allSections()[1] as Elements.StylePropertiesSection.StylePropertiesSection;
+        const sectionElement = mySection.element;
+
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+        assert.strictEqual(mySection.propertiesTreeOutline.rootElement().childCount(), 2);
+
+        // Click on the empty space.
+        sectionElement.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+        sectionElement.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+
+        assert.isTrue(stylesSidebarPane.isEditingStyle);
+        assert.strictEqual(mySection.propertiesTreeOutline.rootElement().childCount(), 3);
+
+        const newProperty = mySection.propertiesTreeOutline.rootElement().childAt(2) as
+            Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+        assert.exists(newProperty);
+        assert.strictEqual(newProperty.name, '');
+        assert.strictEqual(newProperty.value, '');
+        assert.isTrue(UI.UIUtils.isBeingEdited(newProperty.nameElement));
+      });
+    });
+  });
+});
+
+describeWithEnvironment('StylesSidebarPane Inactive Styles', () => {
+  let connection: MockCDPConnection;
+  let computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel;
+  let stylesSidebarPane: Elements.StylesSidebarPane.StylesSidebarPane;
+  let cssModel: SDK.CSSModel.CSSModel;
+  let node: SDK.DOMModel.DOMNode;
+
+  beforeEach(() => {
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
+        .set(true);
+    connection = new MockCDPConnection();
+    const target = createTarget({connection});
+    cssModel = target.model(SDK.CSSModel.CSSModel)!;
+    computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+    stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+    node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    node.id = 1 as Protocol.DOM.NodeId;
+    stylesSidebarPane.setNodeForTest(node);
+  });
+
+  it('does not preserve inactive rules when setting is disabled', async () => {
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
+        .set(false);
+
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const rangeA = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+    const rangeB = {startLine: 1, startColumn: 0, endLine: 1, endColumn: 10};
+
+    // 1. Initial match: Rule A and Rule B
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.a'}], text: '.a'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: [], range: rangeA},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.b'}], text: '.b'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'blue'}], shorthandEntries: [], range: rangeB},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+      ],
+    });
+
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1[0].sections, 2);
+    const sectionA = blocks1[0].sections[0];
+    const sectionB = blocks1[0].sections[1];
+    assert.strictEqual(sectionA.headerText(), '.b');
+    assert.strictEqual(sectionB.headerText(), '.a');
+
+    // 2. Update: Only Rule A matches. Rule B should NOT be preserved when setting is disabled.
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.a'}], text: '.a'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: [], range: rangeA},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+      ],
+    });
+
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+
+    assert.lengthOf(blocks2[0].sections, 1);
+    assert.strictEqual(blocks2[0].sections[0].headerText(), '.a');
+    assert.isFalse(blocks2[0].sections[0].element.classList.contains('styles-section-inactive'));
+  });
+
+  it('preserves sections as inactive when they no longer match', async () => {
+    // Initial match: Rule A and Rule B
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const rangeA = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+    const rangeB = {startLine: 1, startColumn: 0, endLine: 1, endColumn: 10};
+
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.a'}], text: '.a'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: [], range: rangeA},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.b'}], text: '.b'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'blue'}], shorthandEntries: [], range: rangeB},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+      ],
+    });
+
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+
+    // Wire blocks into the pane so it can preserve them in the next update
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1[0].sections, 2);
+    const sectionA = blocks1[0].sections[0];
+    const sectionB = blocks1[0].sections[1];
+    assert.strictEqual(sectionA.headerText(), '.b');
+    assert.strictEqual(sectionB.headerText(), '.a');
+
+    // Update 1: Only Rule A matches. Rule B should become inactive.
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.a'}], text: '.a'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: [], range: rangeA},
+            styleSheetId,
+          },
+          matchingSelectors: [0],
+        },
+      ],
+    });
+
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+
+    assert.lengthOf(blocks2[0].sections, 2, 'Inactive section should be preserved');
+    assert.strictEqual(blocks2[0].sections[0].headerText(), '.b');
+    assert.strictEqual(blocks2[0].sections[1].headerText(), '.a');
+    assert.isTrue(blocks2[0].sections[0].element.classList.contains('styles-section-inactive'));
+    assert.isFalse(blocks2[0].sections[1].element.classList.contains('styles-section-inactive'));
+
+    const statusIconB =
+        blocks2[0].sections[0].element.querySelector('devtools-icon.styles-section-status') as HTMLElement;
+    const statusIconA =
+        blocks2[0].sections[1].element.querySelector('devtools-icon.styles-section-status') as HTMLElement;
+    assert.isNotNull(statusIconB);
+    assert.isFalse(statusIconB.classList.contains('hidden'));
+    assert.strictEqual((statusIconB as Icon).name, 'warning');
+    assert.strictEqual(statusIconB.title, 'This rule doesn’t currently match the selected element');
+    assert.isTrue(statusIconA.classList.contains('hidden'));
+  });
+
+  it('restores inactive sections to active when they match again', async () => {
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const rangeA = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+
+    // 1. Rule A matches.
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [ruleMatch('.a', {color: 'red'}, {range: rangeA, styleSheetId})],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    // 2. Rule A stops matching.
+    const matchedStyles2 = await getMatchedStyles({connection, cssModel, node, matchedPayload: []});
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+    assert.isTrue(blocks2[0].sections[0].element.classList.contains('styles-section-inactive'));
+
+    // 3. Rule A matches again.
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    assert.isFalse(blocks3[0].sections[0].element.classList.contains('styles-section-inactive'));
+    assert.lengthOf(blocks3[0].sections, 1);
+  });
+
+  it('maintains stable relative ordering of inactive rules', async () => {
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const rangeA = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+    const rangeB = {startLine: 1, startColumn: 0, endLine: 1, endColumn: 10};
+    const rangeC = {startLine: 2, startColumn: 0, endLine: 2, endColumn: 10};
+
+    const matchA = ruleMatch('.a', {color: 'red'}, {range: rangeA, styleSheetId});
+    const matchB = ruleMatch('.b', {color: 'blue'}, {range: rangeB, styleSheetId});
+    const matchC = ruleMatch('.c', {color: 'green'}, {range: rangeC, styleSheetId});
+
+    // 1. Initial: A, B, C matches.
+    const matchedStylesABC =
+        await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA, matchB, matchC]});
+    const blocks1 = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStylesABC, new Map(),
+                                                                                       new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    // 2. Update: A and C match. B becomes inactive.
+    const matchedStylesAC = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA, matchC]});
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStylesAC, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+
+    assert.strictEqual(blocks2[0].sections[0].headerText(), '.c');
+    assert.strictEqual(blocks2[0].sections[1].headerText(), '.b');  // Inactive, but in original relative order
+    assert.strictEqual(blocks2[0].sections[2].headerText(), '.a');
+    assert.isTrue(blocks2[0].sections[1].element.classList.contains('styles-section-inactive'));
+
+    // 3. Update: Only C matches. A and B inactive.
+    const matchedStylesC = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchC]});
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStylesC, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks3;
+
+    assert.strictEqual(blocks3[0].sections[0].headerText(), '.c');
+    assert.strictEqual(blocks3[0].sections[1].headerText(), '.b');
+    assert.strictEqual(blocks3[0].sections[2].headerText(), '.a');
+    assert.isFalse(blocks3[0].sections[0].element.classList.contains('styles-section-inactive'));
+    assert.isTrue(blocks3[0].sections[1].element.classList.contains('styles-section-inactive'));
+    assert.isTrue(blocks3[0].sections[2].element.classList.contains('styles-section-inactive'));
+  });
+
+  it('clears inactive rules on node change', async () => {
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const rangeA = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+
+    // 1. Match Rule A.
+    const matchedStylesA = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [ruleMatch('.a', {color: 'red'}, {range: rangeA, styleSheetId})],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStylesA, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    // 2. Stop matching (Rule A inactive).
+    const blocks2 = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+        await getMatchedStyles({connection, cssModel, node}), new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+    assert.lengthOf(blocks2[0].sections, 1);
+    assert.isTrue(blocks2[0].sections[0].element.classList.contains('styles-section-inactive'));
+
+    // 3. Change node.
+    const newNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    newNode.id = 2 as Protocol.DOM.NodeId;
+    stylesSidebarPane.setNodeForTest(newNode);
+
+    // 4. Update for new node. Inactive rules from previous node should be gone.
+    const blocks3 = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+        await getMatchedStyles({connection, cssModel, node: newNode}), new Map(), new Map(), null);
+    assert.lengthOf(blocks3[0].sections, 0);
+  });
+
+  it('collapses inactive sections when collapse-non-contributing-css-rules is enabled', async () => {
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
+        .set(true);
+
+    const styleSheetIdA = '0' as Protocol.DOM.StyleSheetId;
+    const styleSheetIdB = '1' as Protocol.DOM.StyleSheetId;
+
+    // 1. Initial match: Rule A and Rule B with non-conflicting properties
+    const matchA = ruleMatch('.a', {color: 'red'}, {styleSheetId: styleSheetIdA});
+    const matchB = ruleMatch('.b', {'background-color': 'blue'}, {styleSheetId: styleSheetIdB});
+    const matchedStyles1 = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA, matchB]});
+
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    const sectionB = blocks1[0].sections[0];
+    const sectionA = blocks1[0].sections[1];
+    assert.strictEqual(sectionB.headerText(), '.b');
+    assert.strictEqual(sectionA.headerText(), '.a');
+    assert.isFalse(sectionB.isCollapsed(), 'Rule B should not be collapsed initially');
+    assert.isFalse(sectionA.isCollapsed(), 'Rule A should not be collapsed initially');
+
+    // 2. Update: Only Rule A matches. Rule B becomes inactive and should collapse.
+    const matchedStyles2 = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA]});
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+
+    const sectionB2 = blocks2[0].sections[0];
+    const sectionA2 = blocks2[0].sections[1];
+    assert.isTrue(sectionB2.isInactive());
+    assert.isTrue(sectionB2.isCollapsed(), 'Inactive section should be collapsed when setting is enabled');
+    assert.isFalse(sectionA2.isInactive());
+    assert.isFalse(sectionA2.isCollapsed());
+
+    // 3. User manually expands section B while it is inactive.
+    sectionB2.expand();
+    assert.isFalse(sectionB2.isCollapsed(), 'User manually expanded the inactive section');
+
+    // 4. Update: Still only Rule A matches (Rule B remains inactive).
+    // The previous collapse state (expanded by user) should be preserved because its inactive state did not change.
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks3;
+
+    const sectionB3 = blocks3[0].sections[0];
+    assert.isTrue(sectionB3.isInactive());
+    assert.isFalse(sectionB3.isCollapsed(), 'Manual expansion should be preserved when inactive state did not change');
+
+    // 5. Update: Rule B matches again (transitions from inactive back to active).
+    // Since inactive changed from true to false, it should update its collapsed state to expanded.
+    const blocks4 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks4;
+
+    const sectionB4 = blocks4[0].sections[0];
+    assert.isFalse(sectionB4.isInactive());
+    assert.isFalse(sectionB4.isCollapsed(), 'Section should be uncollapsed when matching again');
+  });
+
+  it('does not collapse inactive sections when collapse-non-contributing-css-rules is disabled', async () => {
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
+        .set(false);
+
+    const styleSheetIdA = '0' as Protocol.DOM.StyleSheetId;
+    const styleSheetIdB = '1' as Protocol.DOM.StyleSheetId;
+
+    // 1. Initial match: Rule A and Rule B
+    const matchA = ruleMatch('.a', {color: 'red'}, {styleSheetId: styleSheetIdA});
+    const matchB = ruleMatch('.b', {'background-color': 'blue'}, {styleSheetId: styleSheetIdB});
+    const matchedStyles1 = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA, matchB]});
+
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    // 2. Update: Only Rule A matches. Rule B becomes inactive.
+    const matchedStyles2 = await getMatchedStyles({connection, cssModel, node, matchedPayload: [matchA]});
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+
+    const sectionB = blocks2[0].sections[0];
+    assert.isTrue(sectionB.isInactive());
+    assert.isFalse(sectionB.isCollapsed(), 'Inactive section should not be collapsed when setting is disabled');
+  });
+
+  it('preserves the relative ordering of section blocks across inactive state transitions', async () => {
+    const propertyRule = {
+      propertyName: '--my-prop',
+      style: {
+        cssProperties: [{name: 'syntax', value: '"<color>"'}, {name: 'inherits', value: 'true'}],
+        shorthandEntries: [],
+      },
+    };
+    const keyframesRule = {
+      animationName: {text: 'my-animation'},
+      keyframes: [{
+        keyText: {text: '100%'},
+        style: {cssProperties: [{name: 'opacity', value: '1'}], shorthandEntries: []},
+      }],
+    };
+
+    // 1. Initial State: Only @property matches
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      propertyRules: [propertyRule as unknown as Protocol.CSS.CSSPropertyRule],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1, 2);
+    assert.strictEqual(blocks1[1].titleElement()?.textContent, '@property');
+
+    // 2. State 2: Animation starts. @keyframes matches in addition to @property.
+    // In CSS cascade order, @keyframes appears before @property.
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      animationsPayload: [keyframesRule as unknown as Protocol.CSS.CSSKeyframesRule],
+      propertyRules: [propertyRule as unknown as Protocol.CSS.CSSPropertyRule],
+    });
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+
+    assert.lengthOf(blocks2, 3);
+    assert.strictEqual(blocks2[1].titleElement()?.textContent, '@keyframes my-animation');
+    assert.strictEqual(blocks2[2].titleElement()?.textContent, '@property');
+
+    // 3. State 3: Animation stops. @keyframes becomes inactive.
+    // The relative ordering of blocks (@keyframes before @property) should be preserved.
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks3;
+
+    assert.lengthOf(blocks3, 3);
+    assert.strictEqual(blocks3[1].titleElement()?.textContent, '@keyframes my-animation');
+    assert.strictEqual(blocks3[2].titleElement()?.textContent, '@property');
+    assert.isTrue(blocks3[1].sections[0].isInactive(), '@keyframes section should be marked inactive');
+    assert.isFalse(blocks3[2].sections[0].isInactive(), '@property section should remain active');
+  });
+
+  it('distinguishes inherited section blocks across different ancestor nodes without collisions', async () => {
+    const parentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    parentNode.id = 2 as Protocol.DOM.NodeId;
+    const grandParentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    grandParentNode.id = 3 as Protocol.DOM.NodeId;
+    node.parentNode = parentNode;
+    parentNode.parentNode = grandParentNode;
+
+    const grandParentRule = ruleMatch('.grandparent', {color: 'red'});
+    const parentRule = ruleMatch('.parent:focus-within', {'font-weight': 'bold'});
+
+    // 1. Unfocused: only grandParent has inherited styles (parent has empty matchedCSSRules)
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inheritedPayload: [
+        {matchedCSSRules: []},
+        {matchedCSSRules: [grandParentRule]},
+      ],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1, 2);
+    assert.strictEqual(blocks1[1].id, 'inherited-node:3');
+    assert.lengthOf(blocks1[1].sections, 1);
+    assert.strictEqual(blocks1[1].sections[0].headerText(), '.grandparent');
+    assert.isFalse(blocks1[1].sections[0].isInactive());
+
+    // 2. Focused: parent also matches an inherited rule
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inheritedPayload: [
+        {matchedCSSRules: [parentRule]},
+        {matchedCSSRules: [grandParentRule]},
+      ],
+    });
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+
+    assert.lengthOf(blocks2, 3);
+    assert.strictEqual(blocks2[1].id, 'inherited-node:2');
+    assert.lengthOf(blocks2[1].sections, 1, 'Parent block should only contain parent rule, not grandparent rule');
+    assert.strictEqual(blocks2[1].sections[0].headerText(), '.parent:focus-within');
+    assert.isFalse(blocks2[1].sections[0].isInactive());
+
+    assert.strictEqual(blocks2[2].id, 'inherited-node:3');
+    assert.lengthOf(blocks2[2].sections, 1);
+    assert.strictEqual(blocks2[2].sections[0].headerText(), '.grandparent');
+    assert.isFalse(blocks2[2].sections[0].isInactive());
+
+    // 3. Unfocused again: parent rule becomes inactive in its own block
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks3;
+
+    assert.lengthOf(blocks3, 3);
+    assert.strictEqual(blocks3[1].id, 'inherited-node:2');
+    assert.isTrue(blocks3[1].sections[0].isInactive());
+    assert.strictEqual(blocks3[2].id, 'inherited-node:3');
+    assert.isFalse(blocks3[2].sections[0].isInactive());
+  });
+
+  it('preserves outer and nested @starting-style rules as inactive', async () => {
+    const normalRule = ruleMatch('.target', {color: 'green'});
+    const outerStartingRule: Protocol.CSS.RuleMatch = {
+      rule: {
+        selectorList: {selectors: [{text: '.target'}], text: '.target'},
+        origin: Protocol.CSS.StyleSheetOrigin.Regular,
+        style: {cssProperties: [{name: 'color', value: 'yellow'}], shorthandEntries: []},
+        ruleTypes: [Protocol.CSS.CSSRuleType.StartingStyleRule],
+        startingStyles: [{} as Protocol.CSS.CSSStartingStyle],
+      },
+      matchingSelectors: [0],
+    };
+    const nestedStartingRule: Protocol.CSS.RuleMatch = {
+      rule: {
+        selectorList: {selectors: [], text: ''},
+        origin: Protocol.CSS.StyleSheetOrigin.Regular,
+        style: {cssProperties: [{name: 'background-color', value: 'red'}], shorthandEntries: []},
+        nestingSelectors: ['.target'],
+        ruleTypes: [Protocol.CSS.CSSRuleType.StartingStyleRule, Protocol.CSS.CSSRuleType.StyleRule],
+        startingStyles: [{} as Protocol.CSS.CSSStartingStyle],
+      },
+      matchingSelectors: [],
+    };
+
+    // 1. @starting-style forced on: all 3 rules match
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [normalRule, nestedStartingRule, outerStartingRule],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1[0].sections, 3);
+
+    // 2. @starting-style forced off: only normalRule matches
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [normalRule],
+    });
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+
+    assert.lengthOf(blocks2[0].sections, 3);
+    const [outerSection, nestedSection, normalSection] = blocks2[0].sections;
+    assert.isTrue(outerSection.isInactive(), 'Outer @starting-style rule should be inactive');
+    assert.isTrue(nestedSection.isInactive(), 'Nested @starting-style rule should be inactive');
+    assert.isFalse(normalSection.isInactive(), 'Normal rule should remain active');
+
+    const cssQuery = nestedSection.element.querySelector('devtools-css-query');
+    assert.isNotNull(cssQuery);
+    assert.isNotNull(cssQuery.querySelector('devtools-icon.styles-section-status'));
+    assert.isNotNull(cssQuery.querySelector('devtools-icon.section-collapse-icon'));
+  });
+
+  it('preserves manually toggled collapsed state of an inactive rule when it becomes active again', async () => {
+    const focusRule = ruleMatch('.target:focus', {color: 'red'});
+    const baseRule = ruleMatch('.target', {color: 'blue'});
+
+    // Step 1: Both .target:focus and .target are active
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [baseRule, focusRule],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+    assert.lengthOf(blocks1[0].sections, 2);
+
+    // Step 2: .target:focus becomes inactive (collapsible, expanded by default when collapse-non-contributing-css-rules is off)
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [baseRule],
+    });
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+    assert.lengthOf(blocks2[0].sections, 2);
+    const inactiveFocusSection = blocks2[0].sections[0];
+    assert.isTrue(inactiveFocusSection.isInactive());
+    assert.isTrue(inactiveFocusSection.element.classList.contains('collapsible'));
+    assert.isFalse(inactiveFocusSection.element.classList.contains('collapsed'));
+
+    // User manually collapses the inactive rule by clicking its collapse icon
+    const collapseIcon = inactiveFocusSection.element.querySelector<HTMLElement>('devtools-icon.section-collapse-icon');
+    assert.isNotNull(collapseIcon);
+    collapseIcon.click();
+    assert.isTrue(inactiveFocusSection.element.classList.contains('collapsed'));
+
+    // Step 3: .target:focus becomes active again -> should reuse section and preserve manual collapsed state!
+    const matchedStyles3 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [baseRule, focusRule],
+    });
+    const blocks3 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles3, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks3;
+    assert.lengthOf(blocks3[0].sections, 2);
+    const reactivatedFocusSection = blocks3[0].sections[0];
+    assert.strictEqual(reactivatedFocusSection, inactiveFocusSection);
+    assert.isFalse(reactivatedFocusSection.isInactive());
+    assert.isTrue(reactivatedFocusSection.element.classList.contains('collapsed'),
+                  'Manually collapsed state should be preserved when rule becomes active again');
+  });
+
+  it('updates childBlocks on reused parent SectionBlock when new @layer child blocks match', async () => {
+    const parentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    parentNode.id = 2 as Protocol.DOM.NodeId;
+    node.parentNode = parentNode;
+
+    const baseInheritedRule = ruleMatch('.parent', {color: 'red'});
+    const layeredInheritedRule: Protocol.CSS.RuleMatch = {
+      rule: {
+        selectorList: {selectors: [{text: '.parent-layered'}], text: '.parent-layered'},
+        origin: Protocol.CSS.StyleSheetOrigin.Regular,
+        style: {cssProperties: [{name: 'font-size', value: '20px'}], shorthandEntries: []},
+        layers: [{text: 'my-layer', range: {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10}}],
+      },
+      matchingSelectors: [0],
+    };
+
+    // 1. Initial match: inherited parent block has no layer child blocks yet.
+    const matchedStyles1 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inheritedPayload: [{matchedCSSRules: [baseInheritedRule]}],
+    });
+    const blocks1 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles1, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks1;
+
+    assert.lengthOf(blocks1, 2);
+    const inheritedBlock1 = blocks1[1];
+    assert.strictEqual(inheritedBlock1.id, 'inherited-node:2');
+    assert.isEmpty(inheritedBlock1.childBlocks);
+
+    // 2. Update: a new @layer rule matches on the inherited parent, creating a new child SectionBlock.
+    const matchedStyles2 = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inheritedPayload: [{matchedCSSRules: [layeredInheritedRule, baseInheritedRule]}],
+    });
+    const blocks2 =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles2, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks2;
+
+    assert.lengthOf(blocks2, 3);
+    const inheritedBlock2 = blocks2[1];
+    const layerBlock2 = blocks2[2];
+    assert.strictEqual(inheritedBlock2, inheritedBlock1, 'Inherited parent block should be reused');
+    assert.strictEqual(layerBlock2.id, 'layer:inherited-node:2:my-layer');
+    assert.deepEqual(inheritedBlock2.childBlocks, [layerBlock2]);
+
+    // Verify filtering by a property only in the child layer block keeps the inherited parent block's title visible.
+    stylesSidebarPane.setFilter(/font-size/i);
+    assert.isFalse(inheritedBlock2.titleElement()?.classList.contains('hidden'),
+                   'Parent block title should remain visible when child block has a matching section');
+  });
+});
+
+describeWithEnvironment('StylesSidebarPane updates, completions, and media/keyframes rules', () => {
+  let connection: MockCDPConnection;
+  let computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel;
+  let stylesSidebarPane: Elements.StylesSidebarPane.StylesSidebarPane;
+  let cssModel: SDK.CSSModel.CSSModel;
+  let node: SDK.DOMModel.DOMNode;
+
+  beforeEach(() => {
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
+        .set(false);
+    connection = new MockCDPConnection();
+    const target = createTarget({connection});
+    cssModel = target.model(SDK.CSSModel.CSSModel)!;
+    sinon.stub(ComputedStyle.ComputedStyleModel.ComputedStyleModel.prototype, 'cssModel').returns(cssModel);
+    sinon.stub(Host.AidaClient.HostConfigTracker, 'instance').returns({
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispose: () => {},
+    } as unknown as Host.AidaClient.HostConfigTracker);
+    computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel();
+    stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+    node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    node.id = 1 as Protocol.DOM.NodeId;
+    (node.nodeType as sinon.SinonStub).returns(Node.ELEMENT_NODE);
+    (node.nodeName as sinon.SinonStub).returns('DIV');
+    (node.domModel as sinon.SinonStub).returns(target.model(SDK.DOMModel.DOMModel)!);
+    stylesSidebarPane.setNodeForTest(node);
+  });
+
+  it('refreshes StylesSidebarPane cleanly when removing style attribute on selected node', async () => {
+    const matchedWithInline = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inlinePayload: {
+        styleSheetId: 'inline-0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [{name: 'color', value: 'red'}],
+        shorthandEntries: [],
+      },
+    });
+    const blocks1 = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedWithInline, new Map(),
+                                                                                       new Map(), null);
+    assert.lengthOf(blocks1[0].sections[0].style().leadingProperties(), 1);
+
+    const matchedWithoutInline = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      inlinePayload: {
+        styleSheetId: 'inline-0' as Protocol.DOM.StyleSheetId,
+        cssProperties: [],
+        shorthandEntries: [],
+      },
+    });
+    const blocks2 = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedWithoutInline, new Map(),
+                                                                                       new Map(), null);
+    assert.lengthOf(blocks2[0].sections[0].style().leadingProperties(), 0);
+  });
+
+  it('supports keyboard arrow navigation between sections in StylesSidebarPane', async () => {
+    renderElementIntoDOM(stylesSidebarPane);
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        ruleMatch('.first', {color: 'red'}),
+        ruleMatch('.second', {color: 'blue'}),
+        ruleMatch('.third', {color: 'green'}),
+      ],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks;
+    const container = stylesSidebarPane.contentElement.querySelector('.vbox') as HTMLElement;
+    for (const section of blocks[0].sections) {
+      container.appendChild(section.element);
+    }
+    const [sec0, sec1, sec2] = blocks[0].sections;
+    sec0.element.focus();
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec1.element);
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec2.element);
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'Home', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec0.element);
+    stylesSidebarPane.detach();
+  });
+
+  it('supports ArrowUp, typing, Enter and Escape on focused sections', async () => {
+    sinon.stub(Components.Linkifier.Linkifier.prototype, 'linkifyCSSLocation').returns(document.createElement('div'));
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns({
+      propertyUILocation: () => null,
+    } as unknown as Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding);
+    renderElementIntoDOM(stylesSidebarPane);
+    const styleSheetId = 'nav-sheet' as Protocol.DOM.StyleSheetId;
+    const range = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 11};
+    cssModel.styleSheetAdded({
+      styleSheetId,
+      frameId: '' as Protocol.Page.FrameId,
+      sourceURL: 'http://example.com/nav.css',
+      origin: Protocol.CSS.StyleSheetOrigin.Regular,
+      title: '',
+      disabled: false,
+      isInline: false,
+      isMutable: true,
+      isConstructed: false,
+      startLine: 0,
+      startColumn: 0,
+      length: 50,
+      endLine: 0,
+      endColumn: 50,
+    });
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        ruleMatch('.first', [{name: 'color', value: 'red', range}], {styleSheetId, range}),
+        ruleMatch('.second', [{name: 'color', value: 'blue', range}], {styleSheetId, range}),
+        ruleMatch('.third', [{name: 'color', value: 'green', range}], {styleSheetId, range}),
+      ],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    stylesSidebarPane.sectionBlocks = blocks;
+    const container = stylesSidebarPane.contentElement.querySelector('.vbox') as HTMLElement;
+    for (const section of blocks[0].sections) {
+      container.appendChild(section.element);
+    }
+    const [sec0, sec1, sec2] = blocks[0].sections;
+    assert.strictEqual(sec1.headerText(), '.second');
+
+    sec2.element.focus();
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec1.element);
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec0.element);
+    container.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
+    assert.strictEqual(UI.DOMUtilities.deepActiveElement(document), sec1.element);
+
+    // Typing a printable character on a focused section starts editing a new first property.
+    assert.isFalse(UI.UIUtils.isEditing());
+    sec1.element.dispatchEvent(new KeyboardEvent('keydown', {key: 't', bubbles: true}));
+    assert.isTrue(UI.UIUtils.isEditing());
+    const newProperty = sec1.propertiesTreeOutline.firstChild();
+    assert.instanceOf(newProperty, Elements.StylePropertyTreeElement.StylePropertyTreeElement);
+    assert.strictEqual(newProperty.property.name, '');
+    assert.isTrue(UI.UIUtils.isBeingEdited(newProperty.nameElement));
+    assert.strictEqual(sec1.propertiesTreeOutline.rootElement().childCount(), 2);
+
+    // Escape cancels editing and removes the blank property.
+    newProperty.nameElement?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    assert.isFalse(UI.UIUtils.isEditing());
+    assert.strictEqual(sec1.propertiesTreeOutline.rootElement().childCount(), 1);
+    sec1.element.focus();
+
+    // Enter on a focused section starts editing its selector.
+    sec1.element.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+    assert.isTrue(UI.UIUtils.isEditing());
+    const selectorElement = sec1.element.querySelector('.selector');
+    assert.isTrue(UI.UIUtils.isBeingEdited(selectorElement));
+    assert.strictEqual(selectorElement?.textContent, '.second');
+    selectorElement?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    assert.isFalse(UI.UIUtils.isEditing());
+    stylesSidebarPane.detach();
+  });
+
+  it('coalesces StylesSidebarPane.update() rebuilds during rapid SelectedNodeChanged events', async () => {
+    const performUpdateSpy = sinon.stub(stylesSidebarPane, 'performUpdate').resolves();
+    const node2 = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    const node3 = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node);
+    UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node2);
+    UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node3);
+    await stylesSidebarPane.updateComplete;
+    sinon.assert.calledOnce(performUpdateSpy);
+  });
+
+  it('throttles StylesSidebarPane updates across consecutive style and node mutations', async () => {
+    const performUpdateSpy = sinon.stub(stylesSidebarPane, 'performUpdate').resolves();
+    const event = {data: null} as unknown as
+        Common.EventTarget.EventTargetEvent<ComputedStyle.ComputedStyleModel.CSSModelChangedEvent>;
+    stylesSidebarPane.onCSSModelChanged(event);
+    stylesSidebarPane.onCSSModelChanged(event);
+    stylesSidebarPane.onCSSModelChanged(event);
+    await stylesSidebarPane.updateComplete;
+    sinon.assert.calledOnce(performUpdateSpy);
+  });
+
+  it('preserves uppercase and lowercase user prefix casing in CSSPropertyPrompt completions', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [ruleMatch('div', {'--customVar': '10px', color: 'red'})],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    const section = blocks[0].sections[0];
+    const treeElement =
+        section.propertiesTreeOutline.firstChild() as Elements.StylePropertyTreeElement.StylePropertyTreeElement;
+    const prompt = new Elements.StylesSidebarPane.CSSPropertyPrompt(treeElement, true);
+    const buildCompletions = (prompt as unknown as {
+                               buildPropertyCompletions: (expr: string, query: string, force?: boolean) =>
+                                   Promise<UI.SuggestBox.Suggestions>,
+                             }).buildPropertyCompletions.bind(prompt);
+    const lowerResults = await buildCompletions('co', 'co', true);
+    assert.isTrue(lowerResults.some(item => item.text === 'color'));
+    const upperResults = await buildCompletions('CO', 'CO', true);
+    assert.isTrue(upperResults.some(item => item.text === 'COLOR'));
+    assert.isTrue(upperResults.every(item => item.text.startsWith('--') || item.text === item.text.toUpperCase()));
+    const varResults = await buildCompletions('--CU', '--CU', true);
+    assert.isTrue(varResults.some(item => item.text === '--customVar'));
+  });
+
+  it('updates StylesSidebarPane when editing inspector stylesheet UISourceCode working copy', async () => {
+    const styleSheetId = 'inspector-sheet' as Protocol.DOM.StyleSheetId;
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [{
+        rule: {
+          selectorList: {selectors: [{text: 'div'}], text: 'div'},
+          origin: Protocol.CSS.StyleSheetOrigin.Inspector,
+          styleSheetId,
+          style: {cssProperties: [{name: 'color', value: 'purple'}], shorthandEntries: [], styleSheetId},
+        },
+        matchingSelectors: [0],
+      }],
+    });
+    const requestUpdateSpy = sinon.spy(stylesSidebarPane, 'requestUpdate');
+    stylesSidebarPane.onCSSModelChanged({
+      data: {styleSheetId},
+    } as unknown as Common.EventTarget.EventTargetEvent<ComputedStyle.ComputedStyleModel.CSSModelChangedEvent>);
+    sinon.assert.calledOnce(requestUpdateSpy);
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    assert.strictEqual(blocks[0].sections[0].style().leadingProperties()[0].value, 'purple');
+  });
+
+  it('triggers StylesSidebarPane update when CSSModel dispatches MediaQueryResultChanged', () => {
+    const requestUpdateSpy = sinon.spy(stylesSidebarPane, 'requestUpdate');
+    stylesSidebarPane.onCSSModelChanged(
+        {data: undefined} as unknown as
+        Common.EventTarget.EventTargetEvent<ComputedStyle.ComputedStyleModel.CSSModelChangedEvent>);
+    sinon.assert.calledOnce(requestUpdateSpy);
+  });
+
+  it('renders @media queries accurately when multiple <style> tags share the document URL', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.box'}], text: '.box'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            styleSheetId: 'inline-1' as Protocol.DOM.StyleSheetId,
+            media: [{
+              text: '(min-width: 500px)',
+              source: Protocol.CSS.CSSMediaSource.MediaRule,
+              sourceURL: 'http://example.com/index.html',
+            }],
+            ruleTypes: [Protocol.CSS.CSSRuleType.MediaRule],
+            style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: []},
+          },
+          matchingSelectors: [0],
+        },
+        {
+          rule: {
+            selectorList: {selectors: [{text: '.box'}], text: '.box'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            styleSheetId: 'inline-2' as Protocol.DOM.StyleSheetId,
+            media: [{
+              text: '(max-width: 900px)',
+              source: Protocol.CSS.CSSMediaSource.MediaRule,
+              sourceURL: 'http://example.com/index.html',
+            }],
+            ruleTypes: [Protocol.CSS.CSSRuleType.MediaRule],
+            style: {cssProperties: [{name: 'color', value: 'blue'}], shorthandEntries: []},
+          },
+          matchingSelectors: [0],
+        },
+      ],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    const q1 = blocks[0].sections[0].element.querySelector('devtools-css-query')?.shadowRoot?.querySelector('.query');
+    const q2 = blocks[0].sections[1].element.querySelector('devtools-css-query')?.shadowRoot?.querySelector('.query');
+    assert.include(q1?.textContent ?? '', '(max-width: 900px)');
+    assert.include(q2?.textContent ?? '', '(min-width: 500px)');
+  });
+
+  it('renders @keyframes sections in StylesSidebarPane for animated elements', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      animationsPayload: [{
+        animationName: {text: 'fadeIn'},
+        keyframes: [
+          {
+            keyText: {text: '0%'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'opacity', value: '0'}], shorthandEntries: []},
+          },
+          {
+            keyText: {text: '100%'},
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {cssProperties: [{name: 'opacity', value: '1'}], shorthandEntries: []},
+          },
+        ],
+      }],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    assert.lengthOf(blocks, 2);
+    assert.strictEqual(blocks[1].titleElement()?.textContent, '@keyframes fadeIn');
+    assert.lengthOf(blocks[1].sections, 2);
+    assert.strictEqual(blocks[1].sections[0].headerText(), '0%');
+    assert.strictEqual(blocks[1].sections[1].headerText(), '100%');
+  });
+
+  it('renders @keyframes sections even when target element has display: none', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [ruleMatch('.hidden-anim', {display: 'none'})],
+      animationsPayload: [{
+        animationName: {text: 'slide'},
+        keyframes: [{
+          keyText: {text: '50%'},
+          origin: Protocol.CSS.StyleSheetOrigin.Regular,
+          style: {cssProperties: [{name: 'transform', value: 'translateX(10px)'}], shorthandEntries: []},
+        }],
+      }],
+    });
+    const blocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+        matchedStyles, new Map([['display', 'none']]), new Map(), null);
+    assert.lengthOf(blocks, 2);
+    assert.strictEqual(blocks[1].titleElement()?.textContent, '@keyframes slide');
+    assert.strictEqual(blocks[1].sections[0].headerText(), '50%');
+  });
+
+  it('marks earlier duplicate and shorthand properties within the same rule as OVERLOADED', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [{
+        rule: {
+          selectorList: {selectors: [{text: 'div'}], text: 'div'},
+          origin: Protocol.CSS.StyleSheetOrigin.Regular,
+          style: {
+            cssProperties: [
+              {name: 'color', value: 'red'},
+              {name: 'color', value: 'green'},
+            ],
+            shorthandEntries: [],
+          },
+        },
+        matchingSelectors: [0],
+      }],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    const props = blocks[0].sections[0].style().leadingProperties();
+    assert.lengthOf(props, 2);
+    assert.strictEqual(matchedStyles.propertyState(props[0]), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    assert.strictEqual(matchedStyles.propertyState(props[1]), SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+  });
+
+  it('marks an earlier duplicate shorthand and empty unknown properties as OVERLOADED', async () => {
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [
+        ruleMatch('#main', [{name: '-x', value: '', text: '-x:', parsedOk: false}]),
+        ruleMatch('#main', [{name: '-x', value: '', text: '-x:', parsedOk: false}]),
+        ruleMatch('#main',
+                  [
+                    {name: 'height', value: '100px'},
+                    {name: 'background', value: '#000'},
+                    {name: 'background', value: '#bada55'},
+                  ]),
+      ],
+    });
+    const blocks =
+        await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
+    const [main, unknown2, unknown1] = blocks[0].sections;
+    for (const section of [unknown1, unknown2]) {
+      const [property] = section.style().leadingProperties();
+      assert.strictEqual(property.name, '-x');
+      assert.strictEqual(matchedStyles.propertyState(property), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      const treeElement = section.propertiesTreeOutline.firstChild();
+      assert.instanceOf(treeElement, Elements.StylePropertyTreeElement.StylePropertyTreeElement);
+      assert.isTrue(treeElement.overloaded());
+    }
+    const [height, background1, background2] = main.style().leadingProperties();
+    assert.strictEqual(matchedStyles.propertyState(height), SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+    assert.strictEqual(matchedStyles.propertyState(background1), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    assert.strictEqual(matchedStyles.propertyState(background2), SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+    const treeElements = main.propertiesTreeOutline.rootElement().children() as
+        Elements.StylePropertyTreeElement.StylePropertyTreeElement[];
+    assert.deepEqual(treeElements.map(treeElement => treeElement.overloaded()), [false, true, false]);
+  });
+
+  describe('setActiveProperty', () => {
+    let overlayModel: sinon.SinonStubbedInstance<SDK.OverlayModel.OverlayModel>;
+    let matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
+
+    beforeEach(async () => {
+      const stubbed = createStubbedDomNodeWithModels({nodeId: 1});
+      node = stubbed.node;
+      overlayModel = sinon.createStubInstance(SDK.OverlayModel.OverlayModel);
+      stubbed.domModel.overlayModel.returns(overlayModel);
+      computedStyleModel.node = node;
+      stylesSidebarPane.setNodeForTest(node);
+      matchedStyles = await getMatchedStyles({
+        connection,
+        cssModel,
+        node,
+        matchedPayload: [ruleMatch('div', {})],
+      });
+    });
+
+    function createTreeElement(name: string,
+                               value: string): Elements.StylePropertyTreeElement.StylePropertyTreeElement {
+      const style = matchedStyles.nodeStyles()[0];
+      const property = new SDK.CSSProperty.CSSProperty(style, style.pastLastSourcePropertyIndex(), name, value, true,
+                                                       false, true, false, '', undefined, []);
+      const section = sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection);
+      return new Elements.StylePropertyTreeElement.StylePropertyTreeElement({
+        stylesContainer: stylesSidebarPane,
+        section,
+        matchedStyles,
+        property,
+        isShorthand: false,
+        inherited: false,
+        overloaded: false,
+        newProperty: false,
+      });
+    }
+
+    it('highlights position-area, anchor-positioning, and insets properties with their respective modes', () => {
+      stylesSidebarPane.setActiveProperty(createTreeElement('position-area', 'top left'));
+      sinon.assert.calledOnceWithExactly(overlayModel.highlightInOverlay, {node, selectorList: 'div'}, 'position-area');
+
+      overlayModel.highlightInOverlay.resetHistory();
+      stylesSidebarPane.setActiveProperty(createTreeElement('position-anchor', '--my-anchor'));
+      sinon.assert.calledOnceWithExactly(overlayModel.highlightInOverlay, {node, selectorList: 'div'},
+                                         'anchor-positioning');
+
+      overlayModel.highlightInOverlay.resetHistory();
+      stylesSidebarPane.setActiveProperty(createTreeElement('inset-block-start', '10px'));
+      sinon.assert.calledOnceWithExactly(overlayModel.highlightInOverlay, {node, selectorList: 'div'}, 'insets');
+    });
+
+    it('highlights properties whose values use anchor() or anchor-size() in anchor-positioning mode', () => {
+      stylesSidebarPane.setActiveProperty(createTreeElement('width', 'anchor-size(width)'));
+      sinon.assert.calledOnceWithExactly(overlayModel.highlightInOverlay, {node, selectorList: 'div'},
+                                         'anchor-positioning');
+
+      overlayModel.highlightInOverlay.resetHistory();
+      stylesSidebarPane.setActiveProperty(createTreeElement('margin-top', 'calc(anchor(bottom) + 4px)'));
+      sinon.assert.calledOnceWithExactly(overlayModel.highlightInOverlay, {node, selectorList: 'div'},
+                                         'anchor-positioning');
+    });
+
+    it('preserves active property highlight while editing style and clears it when editing finishes', () => {
+      const hideHighlightSpy = sinon.stub(SDK.OverlayModel.OverlayModel, 'hideDOMNodeHighlight');
+
+      stylesSidebarPane.setActiveProperty(createTreeElement('position-area', 'top left'));
+      sinon.assert.calledOnce(overlayModel.highlightInOverlay);
+      sinon.assert.notCalled(hideHighlightSpy);
+
+      stylesSidebarPane.setEditingStyle(true);
+      sinon.assert.notCalled(hideHighlightSpy);
+
+      stylesSidebarPane.setActiveProperty(null);
+      sinon.assert.notCalled(hideHighlightSpy);
+
+      stylesSidebarPane.setActiveProperty(createTreeElement('top', '10px'));
+      sinon.assert.calledOnce(overlayModel.highlightInOverlay);
+
+      stylesSidebarPane.setEditingStyle(false);
+      sinon.assert.calledOnce(hideHighlightSpy);
     });
   });
 });

@@ -1,0 +1,11 @@
+import("../../../../scripts/build/ninja/devtools_pre_built.gni")
+
+devtools_pre_built("ahem") {
+  testonly = true
+  sources_are_release = false
+
+  sources = [
+    "ahem.d.ts",
+    "ahem.js",
+  ]
+}

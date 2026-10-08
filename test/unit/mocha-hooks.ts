@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-exports.mochaHooks = {
-  afterEach() {
-    sinon.clock?.runToLast();
+import sinon from 'sinon';
+
+export const mochaHooks = {
+  async afterEach(): Promise<void> {
+    await sinon.clock?.runAllAsync();
     sinon.restore();
   },
 };

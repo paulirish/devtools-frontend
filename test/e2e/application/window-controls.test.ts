@@ -5,7 +5,6 @@
 import {assert} from 'chai';
 import type {ElementHandle} from 'puppeteer-core';
 
-import {selectOption} from '../../shared/helper.js';
 import {navigateToApplicationTab} from '../helpers/application-helpers.js';
 
 const TEST_HTML_FILE = 'window-controls';
@@ -22,9 +21,9 @@ describe('The Window Controls Overlay', () => {
 
   it('shows emulation controls when manifest with property display_overide is present',
      async ({devToolsPage, inspectedPage}) => {
-       await navigateToApplicationTab(TEST_HTML_FILE, devToolsPage, inspectedPage);
+       await navigateToApplicationTab(devToolsPage, inspectedPage, TEST_HTML_FILE);
        const windowControlsCheckbox =
-           await (await devToolsPage.waitFor('[title="Emulate the Window Controls Overlay on"]')).toElement('input');
+           await (await devToolsPage.waitFor('[title="Emulate Window Controls Overlay"]')).toElement('input');
        const controlsDropDown = await devToolsPage.waitFor('select');
 
        // Verify dropdown options
@@ -33,7 +32,7 @@ describe('The Window Controls Overlay', () => {
        assert.deepEqual(values, ['Windows', 'Mac', 'Linux']);
 
        // Verify selecting an option
-       void selectOption(await controlsDropDown.toElement('select'), 'Linux');
+       void (await controlsDropDown.toElement('select')).select('Linux');
        const selectedOption = await controlsDropDown.evaluate(input => input.value);
        assert.strictEqual(selectedOption, 'Linux');
 

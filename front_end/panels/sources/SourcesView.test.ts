@@ -3,29 +3,24 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {
-  createTarget,
-  describeWithEnvironment,
-} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {assertScreenshot, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {
   createContentProviderUISourceCodes,
   createFileSystemUISourceCode,
 } from '../../testing/UISourceCodeHelpers.js';
-import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
+import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import * as SourcesComponents from './components/components.js';
 import * as Sources from './sources.js';
 
 const {urlString} = Platform.DevToolsPath;
@@ -49,127 +44,23 @@ describeWithEnvironment('SourcesView', () => {
       targetManager,
       workspace,
       debuggerWorkspaceBinding,
-      settings: Common.Settings.Settings.instance()
+      settings: Common.Settings.Settings.instance(),
     });
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
   });
 
-  it('creates new source view of updated type when renamed file requires a different viewer', async () => {
+  it('renders the placeholder correctly', async () => {
     const sourcesView = new Sources.SourcesView.SourcesView();
-    renderElementIntoDOM(sourcesView);
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-    const {uiSourceCode, project} = createFileSystemUISourceCode({
-      url: urlString`file:///path/to/overrides/example.html`,
-      mimeType: 'text/html',
-    });
-    project.canSetFileContent = () => true;
-    project.rename =
-        (_uiSourceCode: Workspace.UISourceCode.UISourceCode, newName: string,
-         callback: (
-             arg0: boolean, arg1?: string, arg2?: Platform.DevToolsPath.UrlString,
-             arg3?: Common.ResourceType.ResourceType) => void) => {
-          const newURL = urlString`${'file:///path/to/overrides/' + newName}`;
-          let newContentType = Common.ResourceType.resourceTypes.Document;
-          if (newName.endsWith('.jpg')) {
-            newContentType = Common.ResourceType.resourceTypes.Image;
-          } else if (newName.endsWith('.woff')) {
-            newContentType = Common.ResourceType.resourceTypes.Font;
-          }
-          callback(true, newName, newURL, newContentType);
-        };
-
-    sourcesView.viewForFile(uiSourceCode);
-
-    assert.instanceOf(sourcesView.getSourceView(uiSourceCode), Sources.UISourceCodeFrame.UISourceCodeFrame);
-
-    // Rename, but contentType stays the same
-    await uiSourceCode.rename('newName.html' as Platform.DevToolsPath.RawPathString);
-    assert.instanceOf(sourcesView.getSourceView(uiSourceCode), Sources.UISourceCodeFrame.UISourceCodeFrame);
-
-    // Rename which changes contentType
-    await uiSourceCode.rename('image.jpg' as Platform.DevToolsPath.RawPathString);
-    assert.instanceOf(sourcesView.getSourceView(uiSourceCode), SourceFrame.ImageView.ImageView);
-
-    // Rename which changes contentType
-    await uiSourceCode.rename('font.woff' as Platform.DevToolsPath.RawPathString);
-    assert.instanceOf(sourcesView.getSourceView(uiSourceCode), SourceFrame.FontView.FontView);
-    workspace.removeProject(project);
+    renderElementIntoDOM(sourcesView, {includeCommonStyles: true});
+    await sourcesView.updateComplete;
+    await assertScreenshot('sources/sources-view-placeholder.png');
     sourcesView.detach();
-  });
-
-  it('creates a HeadersView when the filename is \'.headers\'', async () => {
-    const sourcesView = new Sources.SourcesView.SourcesView();
-    const uiSourceCode = new Workspace.UISourceCode.UISourceCode(
-        {} as Persistence.FileSystemWorkspaceBinding.FileSystem,
-        urlString`file:///path/to/overrides/www.example.com/.headers`, Common.ResourceType.resourceTypes.Document);
-    sinon.stub(uiSourceCode, 'mimeType').returns('text/plain');
-    sourcesView.viewForFile(uiSourceCode);
-    assert.instanceOf(sourcesView.getSourceView(uiSourceCode), SourcesComponents.HeadersView.HeadersView);
-  });
-
-  it('shows and hides an infobar which warns about AI-generated changes', async () => {
-    const attachSpy = sinon.spy(Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin.prototype, 'attachInfobar');
-    const removeSpy = sinon.spy(Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin.prototype, 'removeInfobar');
-
-    const sourcesView = new Sources.SourcesView.SourcesView();
-    const {uiSourceCode} = createFileSystemUISourceCode({
-      url: urlString`file:///path/to/project/example.ts`,
-      mimeType: 'text/typescript',
-      content: 'export class Foo {}',
-    });
-
-    // Mock an AI-generated edit
-    uiSourceCode.setWorkingCopy('export class Bar {}');
-    uiSourceCode.setContainsAiChanges(true);
-
-    const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
-    const widget = sourcesView.viewForFile(uiSourceCode);
-    assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
-    const uiSourceCodeFrame = widget;
-
-    // Only load the AiWarningInfobarPlugin
-    sinon.stub(Sources.UISourceCodeFrame.UISourceCodeFrame, 'sourceFramePlugins').returns([
-      Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin
-    ]);
-    uiSourceCodeFrame.wasShown();
-
-    await contentLoadedPromise;
-
-    sinon.assert.called(attachSpy);
-    sinon.assert.notCalled(removeSpy);
-
-    uiSourceCode.commitWorkingCopy();
-    sinon.assert.called(removeSpy);
-  });
-
-  describe('viewForFile', () => {
-    it('records the correct media type in the DevTools.SourcesPanelFileOpened metric', async () => {
-      const sourcesView = new Sources.SourcesView.SourcesView();
-      const {uiSourceCode} = createFileSystemUISourceCode({
-        url: urlString`file:///path/to/project/example.ts`,
-        mimeType: 'text/typescript',
-        content: 'export class Foo {}',
-      });
-      const sourcesPanelFileOpenedSpy = sinon.spy(Host.userMetrics, 'sourcesPanelFileOpened');
-      const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
-      const widget = sourcesView.viewForFile(uiSourceCode);
-      assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
-      const uiSourceCodeFrame = widget;
-
-      // Skip creating the DebuggerPlugin, which times out and simulate DOM attach/showing.
-      sinon.stub(uiSourceCodeFrame, 'loadPlugins' as keyof typeof uiSourceCodeFrame);
-      uiSourceCodeFrame.wasShown();
-
-      await contentLoadedPromise;
-
-      sinon.assert.calledWithExactly(sourcesPanelFileOpenedSpy, 'text/typescript');
-    });
   });
 });
 
-describeWithMockConnection('SourcesView', () => {
+describeWithEnvironment('SourcesView', () => {
   let target1: SDK.Target.Target;
   let target2: SDK.Target.Target;
 
@@ -197,18 +88,13 @@ describeWithMockConnection('SourcesView', () => {
       targetManager,
       workspace,
       debuggerWorkspaceBinding,
-      settings: Common.Settings.Settings.instance()
+      settings: Common.Settings.Settings.instance(),
     });
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
   });
 
-  it('creates editor tabs only for in-scope uiSourceCodes', () => {
-    const addUISourceCodeSpy =
-        sinon.spy(Sources.TabbedEditorContainer.TabbedEditorContainer.prototype, 'addUISourceCode');
-    const removeUISourceCodesSpy =
-        sinon.spy(Sources.TabbedEditorContainer.TabbedEditorContainer.prototype, 'removeUISourceCodes');
-
+  it('creates editor tabs only for in-scope uiSourceCodes', async () => {
     createContentProviderUISourceCodes({
       items: [
         {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
@@ -228,29 +114,187 @@ describeWithMockConnection('SourcesView', () => {
       target: target2,
     });
 
-    new Sources.SourcesView.SourcesView();
-    let addedURLs = addUISourceCodeSpy.args.map(args => args[0].url());
-    assert.deepEqual(addedURLs, ['http://example.com/a.js', 'http://example.com/b.js']);
-    sinon.assert.notCalled(removeUISourceCodesSpy);
+    const view = createViewFunctionStub(Sources.SourcesView.SourcesView);
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+    let urls = [...view.input.uiSourceCodes].map(c => c.url());
+    assert.deepEqual(urls, ['http://example.com/a.js', 'http://example.com/b.js']);
 
-    addUISourceCodeSpy.resetHistory();
     target2.targetManager().setScopeTarget(target2);
-    addedURLs = addUISourceCodeSpy.args.map(args => args[0].url());
-    assert.deepEqual(addedURLs, ['http://foo.com/script.js']);
-    const removedURLs = removeUISourceCodesSpy.args.map(args => args[0][0].url());
-    assert.deepEqual(removedURLs, ['http://example.com/a.js', 'http://example.com/b.js']);
+    await sourcesView.updateComplete;
+    urls = [...view.input.uiSourceCodes].map(c => c.url());
+    assert.deepEqual(urls, ['http://foo.com/script.js']);
+    sourcesView.detach();
   });
 
-  it('doesn\'t remove non-network UISourceCodes when changing the scope target', () => {
+  it('doesn\'t remove non-network UISourceCodes when changing the scope target', async () => {
     createFileSystemUISourceCode({
       url: urlString`snippet:///foo.js`,
       mimeType: 'application/javascript',
       type: Persistence.PlatformFileSystem.PlatformFileSystemType.SNIPPETS,
     });
 
-    const sourcesView = new Sources.SourcesView.SourcesView();
-    const removeUISourceCodesSpy = sinon.spy(sourcesView.editorContainer, 'removeUISourceCodes');
+    const view = createViewFunctionStub(Sources.SourcesView.SourcesView);
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
     target2.targetManager().setScopeTarget(target2);
-    sinon.assert.notCalled(removeUISourceCodesSpy);
+    await sourcesView.updateComplete;
+    const urls = [...view.input.uiSourceCodes].map(c => c.url());
+    assert.deepEqual(urls, ['snippet:///foo.js']);
+    sourcesView.detach();
+  });
+
+  it('passes sourceLocation and updates active editor state via view input callbacks', async () => {
+    const {uiSourceCode} = createFileSystemUISourceCode({
+      url: urlString`file:///path/to/file.js`,
+      mimeType: 'application/javascript',
+    });
+
+    const view = createViewFunctionStub(Sources.SourcesView.SourcesView);
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    await sourcesView.showSourceLocation(uiSourceCode, {lineNumber: 5, columnNumber: 2}, true, false);
+    assert.deepEqual(view.input.sourceLocation, {
+      uiSourceCode,
+      location: {lineNumber: 5, columnNumber: 2},
+      omitFocus: true,
+      omitHighlight: false,
+    });
+
+    const sourceFrame = new Sources.UISourceCodeFrame.UISourceCodeFrame(uiSourceCode);
+    sinon.stub(sourceFrame, 'canEditSource').returns(true);
+    view.input.onEditorSelected({
+      currentFile: uiSourceCode,
+      currentView: sourceFrame,
+      previousView: null,
+      userGesture: true,
+    });
+    await sourcesView.updateComplete;
+    assert.strictEqual(sourcesView.currentUISourceCode(), uiSourceCode);
+    assert.strictEqual(sourcesView.currentSourceFrame(), sourceFrame);
+    assert.isTrue(view.input.isSearchReplaceable);
+    assert.strictEqual(view.input.searchTarget, sourceFrame);
+
+    view.input.onEditorClosed(uiSourceCode);
+    await sourcesView.updateComplete;
+    assert.isNull(sourcesView.currentUISourceCode());
+    assert.isNull(sourcesView.visibleView());
+    assert.isNull(view.input.searchTarget);
+    sourcesView.detach();
+  });
+
+  it('updates layout mode and breakpoints active state in view input', async () => {
+    const view = createViewFunctionStub(Sources.SourcesView.SourcesView);
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    assert.isTrue(view.input.breakpointsActive);
+    assert.isFalse(view.input.isVertical);
+    assert.isTrue(view.input.isInWrapper);
+
+    sourcesView.setLayoutMode(true, false);
+    sourcesView.toggleBreakpointsActiveState(false);
+    await sourcesView.updateComplete;
+
+    assert.isFalse(view.input.breakpointsActive);
+    assert.isTrue(view.input.isVertical);
+    assert.isFalse(view.input.isInWrapper);
+    sourcesView.detach();
+  });
+
+  it('returns the searchableView populated by the view output', async () => {
+    const dummySearchableView = {} as UI.SearchableView.SearchableView;
+    const view: Sources.SourcesView.View = (_input, output) => {
+      output.searchableView = dummySearchableView;
+    };
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    assert.strictEqual(sourcesView.searchableView(), dummySearchableView);
+    sourcesView.detach();
+  });
+
+  it('reveals and focuses the source location synchronously', async () => {
+    const {uiSourceCode} = createFileSystemUISourceCode({
+      url: urlString`snippet:///foo.js`,
+      mimeType: 'application/javascript',
+      type: Persistence.PlatformFileSystem.PlatformFileSystemType.SNIPPETS,
+    });
+
+    const sourcesView = new Sources.SourcesView.SourcesView();
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+    const showSourceLocationSpy =
+        sinon.spy(Sources.TabbedEditorContainer.TabbedEditorContainer.prototype, 'showSourceLocation');
+
+    // Input that immediately follows the reveal (e.g. typing after committing
+    // a new snippet name) must go to the editor, so the editor has to be
+    // revealed and focused before `showSourceLocation` yields.
+    const revealed = sourcesView.showSourceLocation(uiSourceCode);
+    sinon.assert.calledOnceWithExactly(showSourceLocationSpy, uiSourceCode, undefined, undefined, undefined);
+    assert.strictEqual(sourcesView.currentUISourceCode(), uiSourceCode);
+    await revealed;
+    sourcesView.detach();
+  });
+
+  it('clears current UISourceCode and visibleView when closed tab has a duplicate script selected', async () => {
+    createContentProviderUISourceCodes({
+      items: [
+        {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
+      ],
+      projectId: 'projectId1',
+      projectType: Workspace.Workspace.projectTypes.Network,
+      target: target1,
+    });
+
+    createContentProviderUISourceCodes({
+      items: [
+        {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
+      ],
+      projectId: 'projectId2',
+      projectType: Workspace.Workspace.projectTypes.Network,
+      target: target2,
+    });
+
+    const sourcesView = new Sources.SourcesView.SourcesView();
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const uiSourceCodeA = workspace.uiSourceCodes().find(code => code.url() === urlString`http://example.com/a.js` &&
+                                                             code.project().id() === 'projectId1')!;
+    const uiSourceCodeB = workspace.uiSourceCodes().find(code => code.url() === urlString`http://example.com/a.js` &&
+                                                             code.project().id() === 'projectId2')!;
+    assert.isDefined(uiSourceCodeA);
+    assert.isDefined(uiSourceCodeB);
+    assert.notStrictEqual(uiSourceCodeA, uiSourceCodeB);
+
+    await sourcesView.showSourceLocation(uiSourceCodeA);
+    await sourcesView.showSourceLocation(uiSourceCodeB);
+    assert.strictEqual(sourcesView.currentUISourceCode(), uiSourceCodeB);
+    const sourceFrameB = sourcesView.currentSourceFrame();
+    assert.isNotNull(sourceFrameB);
+    assert.isTrue(sourceFrameB.isShowing());
+    const disposeSpy = sinon.spy(sourceFrameB, 'dispose');
+    const editorClosedSpy = sinon.spy();
+    sourcesView.addEventListener(Sources.SourcesView.Events.EDITOR_CLOSED, editorClosedSpy);
+
+    const tabbedEditorContainer =
+        UI.Context.Context.instance().flavor(Sources.TabbedEditorContainer.TabbedEditorContainer);
+    assert.isNotNull(tabbedEditorContainer);
+    tabbedEditorContainer.closeFile(uiSourceCodeA);
+
+    assert.isNull(sourcesView.currentUISourceCode());
+    assert.isNull(sourcesView.visibleView());
+    sinon.assert.calledOnce(disposeSpy);
+    sinon.assert.calledOnce(editorClosedSpy);
+    assert.isTrue(editorClosedSpy.firstCall.args[0].data.wasSelected);
+    sourcesView.detach();
   });
 });

@@ -5,13 +5,11 @@
 import {assert} from 'chai';
 import type {Page} from 'puppeteer-core';
 
-import type {StepChanged} from '../../../front_end/panels/recorder/components/StepView.js';
-import type {RecorderActions} from '../../../front_end/panels/recorder/recorder-actions/recorder-actions.js';
 import {
   changeNetworkConditions,
   fillCreateRecordingForm,
   getCurrentRecording,
-  getRecordingController,
+  getRecordingPanel,
   onRecorderAttachedToTarget,
   openRecorderPanel,
   processAndVerifyBaseRecording,
@@ -23,23 +21,13 @@ import {
 
 describe('Recorder', function() {
   it('should capture the initial page as the url of the first section', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
     const recording = await stopRecording(devToolsPage);
     assert.deepEqual(processAndVerifyBaseRecording(recording), {steps: []});
   });
 
   it('should capture clicks on buttons', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#test');
@@ -59,20 +47,15 @@ describe('Recorder', function() {
                 ['xpath///*[@id="test"]'],
                 ['pierce/#test'],
                 ['text/Test Button'],
-              ]
-            }
-          ]
+              ],
+            },
+          ],
         },
     );
   });
 
   it('should capture multiple clicks with duration', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
 
@@ -99,12 +82,7 @@ describe('Recorder', function() {
   });
 
   it('should capture non-primary clicks and double clicks', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#mouse-button', {button: 'middle'});
@@ -126,7 +104,7 @@ describe('Recorder', function() {
             ['pierce/#mouse-button'],
             ['text/Mouse click button'],
           ],
-          button: 'auxiliary'
+          button: 'auxiliary',
         },
         {
           type: 'click',
@@ -138,7 +116,7 @@ describe('Recorder', function() {
             ['pierce/#mouse-button'],
             ['text/Mouse click button'],
           ],
-          button: 'secondary'
+          button: 'secondary',
         },
         {
           type: 'click',
@@ -150,7 +128,7 @@ describe('Recorder', function() {
             ['pierce/#mouse-button'],
             ['text/Mouse click button'],
           ],
-          button: 'forward'
+          button: 'forward',
         },
         {
           type: 'click',
@@ -162,7 +140,7 @@ describe('Recorder', function() {
             ['pierce/#mouse-button'],
             ['text/Mouse click button'],
           ],
-          button: 'back'
+          button: 'back',
         },
         {
           type: 'doubleClick',
@@ -173,14 +151,14 @@ describe('Recorder', function() {
             ['xpath///*[@id="mouse-button"]'],
             ['pierce/#mouse-button'],
             ['text/Mouse click button'],
-          ]
-        }
-      ]
+          ],
+        },
+      ],
     });
   });
 
   it('should capture clicks on input buttons', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#reset');
@@ -202,7 +180,7 @@ describe('Recorder', function() {
                 ['#reset'],
                 ['xpath///*[@id="reset"]'],
                 ['pierce/#reset'],
-              ]
+              ],
             },
             {
               type: 'click',
@@ -221,21 +199,16 @@ describe('Recorder', function() {
                 ['xpath///*[@id="button"]'],
                 ['pierce/#button'],
               ],
-            }
-          ]
+            },
+          ],
         },
     );
   });
 
   it('should capture clicks on buttons with custom selector attribute', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        {
-          selectorAttribute: 'data-devtools-test',
-        },
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', {
+      selectorAttribute: 'data-devtools-test',
+    });
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#selector-attribute');
@@ -254,20 +227,15 @@ describe('Recorder', function() {
               ['pierce/[data-devtools-test=\'selector-attribute\']'],
               ['aria/Custom selector attribute'],
               ['text/Custom selector'],
-            ]
-          }]
+            ],
+          }],
         },
 
     );
   });
 
   it('should capture Enter key presses on buttons', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     const button = await inspectedPage.waitForSelector('#test');
@@ -287,14 +255,14 @@ describe('Recorder', function() {
               type: 'keyUp',
               key: 'Enter',
               target: 'main',
-            }
-          ]
+            },
+          ],
         },
     );
   });
 
   it('should not capture synthetic events', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#synthetic');
@@ -312,14 +280,14 @@ describe('Recorder', function() {
               ['xpath///*[@id="synthetic"]'],
               ['pierce/#synthetic'],
               ['text/Trigger Synthetic'],
-            ]
-          }]
+            ],
+          }],
         },
     );
   });
 
   it('should capture implicit form submissions', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/form.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/form.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#name');
@@ -345,7 +313,7 @@ describe('Recorder', function() {
                 ['#name'],
                 ['xpath///*[@id="name"]'],
                 ['pierce/#name'],
-              ]
+              ],
             },
             {
               type: 'change',
@@ -356,7 +324,7 @@ describe('Recorder', function() {
                 ['xpath///*[@id="name"]'],
                 ['pierce/#name'],
               ],
-              target: 'main'
+              target: 'main',
             },
             {
               type: 'keyDown',
@@ -365,27 +333,22 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/form.html?name=test',
-                title: ''
-              }]
+                title: '',
+              }],
             },
             {
               type: 'keyUp',
               key: 'Enter',
               target: 'main',
-            }
-          ]
+            },
+          ],
         },
     );
   });
 
   it('should capture clicks on submit buttons inside of forms as click steps',
      async ({inspectedPage, devToolsPage}) => {
-       await startRecording(
-           'recorder/recorder.html',
-           undefined,
-           devToolsPage,
-           inspectedPage,
-       );
+       await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
        await inspectedPage.bringToFront();
        await inspectedPage.page.click('#form-button');
@@ -403,20 +366,15 @@ describe('Recorder', function() {
                  ['xpath///*[@id="form-button"]'],
                  ['pierce/#form-button'],
                  ['text/Form Button'],
-               ]
-             }]
+               ],
+             }],
            },
        );
      });
 
   it('should build an ARIA selector for the parent element that is interactive',
      async ({inspectedPage, devToolsPage}) => {
-       await startRecording(
-           'recorder/recorder.html',
-           undefined,
-           devToolsPage,
-           inspectedPage,
-       );
+       await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
        await inspectedPage.bringToFront();
        await inspectedPage.page.click('#span');
@@ -431,19 +389,14 @@ describe('Recorder', function() {
              ['#span'],
              ['xpath///*[@id="span"]'],
              ['pierce/#span'],
-           ]
-         }]
+           ],
+         }],
        });
      });
 
   it('should fall back to a css selector if an element does not have an accessible and interactive parent',
      async ({devToolsPage, inspectedPage}) => {
-       await startRecording(
-           'recorder/recorder.html',
-           undefined,
-           devToolsPage,
-           inspectedPage,
-       );
+       await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
        await inspectedPage.bringToFront();
        await inspectedPage.page.click('#span2');
@@ -460,14 +413,14 @@ describe('Recorder', function() {
                  ['xpath///*[@id="span2"]'],
                  ['pierce/#span2'],
                ],
-             }]
+             }],
            },
        );
      });
 
   it('should create an aria selector even if the element is within a shadow root',
      async ({inspectedPage, devToolsPage}) => {
-       await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+       await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
        await inspectedPage.bringToFront();
        await inspectedPage.page.click('pierce/#inner-span');
@@ -483,14 +436,14 @@ describe('Recorder', function() {
                  ['#shadow-root > span', '#inner-span'],
                  ['pierce/#inner-span'],
                ],
-             }]
+             }],
            },
        );
      });
 
   it('should record clicks on shadow DOM elements with slots containing text nodes only',
      async ({inspectedPage, devToolsPage}) => {
-       await startRecording('recorder/shadow-text-node.html', undefined, devToolsPage, inspectedPage);
+       await startRecording(devToolsPage, inspectedPage, 'recorder/shadow-text-node.html', undefined);
 
        await inspectedPage.bringToFront();
        await inspectedPage.page.click('custom-button');
@@ -508,14 +461,14 @@ describe('Recorder', function() {
                  ['custom-button'],
                  ['xpath//html/body/custom-button'],
                  ['pierce/custom-button'],
-               ]
-             }]
+               ],
+             }],
            },
        );
      });
 
   it('should record interactions with elements within iframes', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.mainFrame().childFrames()[0].click('#in-iframe');
@@ -536,7 +489,7 @@ describe('Recorder', function() {
                 ['pierce/#in-iframe'],
                 ['text/iframe button'],
               ],
-              frame: [0]
+              frame: [0],
             },
             {
               type: 'click',
@@ -548,15 +501,15 @@ describe('Recorder', function() {
                 ['pierce/#inner-iframe'],
                 ['text/Inner iframe'],
               ],
-              frame: [0, 0]
-            }
-          ]
+              frame: [0, 0],
+            },
+          ],
         },
     );
   });
 
   it('should wait for navigations in the generated scripts', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('aria/Page 2');
@@ -590,8 +543,8 @@ describe('Recorder', function() {
           assertedEvents: [{
             type: 'navigation',
             url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder2.html',
-            title: ''
-          }]
+            title: '',
+          }],
         },
         {
           type: 'click',
@@ -606,27 +559,22 @@ describe('Recorder', function() {
           assertedEvents: [{
             type: 'navigation',
             url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder.html',
-            title: ''
-          }]
-        }
-      ]
+            title: '',
+          }],
+        },
+      ],
     });
   });
 
   it('should also record network conditions', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        {
-          networkCondition: '3G',
-        },
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', {
+      networkCondition: '3G',
+    });
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#test');
     await devToolsPage.bringToFront();
-    await changeNetworkConditions('Slow 4G', devToolsPage);
+    await changeNetworkConditions(devToolsPage, 'Slow 4G');
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#test');
     await devToolsPage.bringToFront();
@@ -653,7 +601,7 @@ describe('Recorder', function() {
               deviceScaleFactor: 1,
               isMobile: false,
               hasTouch: false,
-              isLandscape: false
+              isLandscape: false,
             },
             {
               type: 'navigate',
@@ -661,8 +609,8 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder.html',
-                title: ''
-              }]
+                title: '',
+              }],
             },
             {
               type: 'click',
@@ -690,15 +638,15 @@ describe('Recorder', function() {
                 ['xpath///*[@id="test"]'],
                 ['pierce/#test'],
                 ['text/Test Button'],
-              ]
-            }
-          ]
+              ],
+            },
+          ],
         },
     );
   });
 
   it('should capture keyboard events on inputs', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.keyboard.press('Tab');
@@ -734,7 +682,7 @@ describe('Recorder', function() {
                 ['xpath///*[@id="one"]'],
                 ['pierce/#one'],
               ],
-              target: 'main'
+              target: 'main',
             },
             {
               type: 'keyDown',
@@ -754,15 +702,15 @@ describe('Recorder', function() {
                 ['xpath///*[@id="two"]'],
                 ['pierce/#two'],
               ],
-              target: 'main'
-            }
-          ]
+              target: 'main',
+            },
+          ],
         },
     );
   });
 
   it('should capture keyboard events on non-text inputs', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     const color = await inspectedPage.waitForSelector('#color');
@@ -790,7 +738,7 @@ describe('Recorder', function() {
                 ['xpath///*[@id="color"]'],
                 ['pierce/#color'],
                 ['text/#000000'],
-              ]
+              ],
             },
             {
               type: 'change',
@@ -801,15 +749,15 @@ describe('Recorder', function() {
                 ['pierce/#color'],
                 ['text/#000000'],
               ],
-              target: 'main'
-            }
-          ]
+              target: 'main',
+            },
+          ],
         },
     );
   });
 
   it('should capture navigation without change', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.pressKey('Tab');
@@ -851,14 +799,14 @@ describe('Recorder', function() {
               type: 'keyUp',
               key: 'Shift',
               target: 'main',
-            }
-          ]
+            },
+          ],
         },
     );
   });
 
   it('should capture a change that causes navigation without blur or change', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/programmatic-navigation-on-keydown.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/programmatic-navigation-on-keydown.html', undefined);
     await inspectedPage.bringToFront();
     await inspectedPage.waitForSelector('input:focus');
     await inspectedPage.page.keyboard.press('1', {delay: 50});
@@ -866,9 +814,16 @@ describe('Recorder', function() {
     await inspectedPage.page.keyboard.down('Enter');
 
     await devToolsPage.waitForFunction(async logger => {
-      const controller = await getRecordingController(devToolsPage);
-      const steps = await controller.evaluate(
-          c => c.getCurrentRecordingForTesting()?.flow.steps.length,
+      const panel = await getRecordingPanel(devToolsPage);
+      const steps = await panel.evaluate(
+          async c => {
+            const path = './ui/legacy/legacy.js';
+            const UI = await import(path);
+            const widget = UI.Widget.Widget.get(c);
+            return (widget as {getCurrentRecordingForTesting(): {flow: {steps: unknown[]}} | undefined})
+                .getCurrentRecordingForTesting()
+                ?.flow.steps.length;
+          },
       );
       logger.log(`Recorded ${steps} steps`);
       return steps === 4;
@@ -891,7 +846,7 @@ describe('Recorder', function() {
                 ['xpath//html/body/input'],
                 ['pierce/input'],
               ],
-              target: 'main'
+              target: 'main',
             },
             {
               type: 'keyDown',
@@ -900,21 +855,21 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/input.html',
-                title: ''
-              }]
+                title: '',
+              }],
             },
             {
               type: 'keyUp',
               key: 'Enter',
               target: 'main',
-            }
-          ]
+            },
+          ],
         },
     );
   });
 
   it('should associate events with right navigations', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/multiple-navigations.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/multiple-navigations.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('button');
@@ -941,15 +896,15 @@ describe('Recorder', function() {
             assertedEvents: [{
               type: 'navigation',
               url: 'https://localhost:<test-port>/test/e2e/resources/recorder/input.html',
-              title: ''
-            }]
-          }]
+              title: '',
+            }],
+          }],
         },
     );
   });
 
   it('should work for select elements', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/select.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/select.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#select');
@@ -970,7 +925,7 @@ describe('Recorder', function() {
                 ['#select'],
                 ['xpath///*[@id="select"]'],
                 ['pierce/#select'],
-              ]
+              ],
             },
             {
               type: 'change',
@@ -981,15 +936,15 @@ describe('Recorder', function() {
                 ['xpath///*[@id="select"]'],
                 ['pierce/#select'],
               ],
-              target: 'main'
-            }
-          ]
+              target: 'main',
+            },
+          ],
         },
     );
   });
 
   it('should work for checkbox elements', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/checkbox.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/checkbox.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#checkbox');
@@ -1008,14 +963,14 @@ describe('Recorder', function() {
               ['#checkbox'],
               ['xpath///*[@id="checkbox"]'],
               ['pierce/#checkbox'],
-            ]
-          }]
+            ],
+          }],
         },
     );
   });
 
   it('should work for elements modified on mousedown', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#to-be-modified');
@@ -1033,14 +988,14 @@ describe('Recorder', function() {
               ['#to-be-modified'],
               ['xpath///*[@id="to-be-modified"]'],
               ['pierce/#to-be-modified'],
-            ]
-          }]
+            ],
+          }],
         },
     );
   });
 
   it('should record OOPIF interactions', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/oopif.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/oopif.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     const frame = inspectedPage.page.frames().find(frame => frame.url().endsWith('iframe1.html'));
@@ -1067,14 +1022,14 @@ describe('Recorder', function() {
         assertedEvents: [{
           type: 'navigation',
           url: 'https://devtools.oopif.test:<test-port>/test/e2e/resources/recorder/iframe2.html',
-          title: ''
-        }]
-      }]
+          title: '',
+        }],
+      }],
     });
   });
 
   it('should capture and store screenshots for every section', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
     await inspectedPage.bringToFront();
     await devToolsPage.raf();
     await stopRecording(devToolsPage);
@@ -1082,7 +1037,7 @@ describe('Recorder', function() {
   });
 
   it('should record interactions with popups', async ({inspectedPage, devToolsPage, browser}) => {
-    await startRecording('recorder/recorder.html', {untrustedEvents: true}, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', {untrustedEvents: true});
 
     await inspectedPage.bringToFront();
     const openPopupButton = await inspectedPage.waitForSelector('aria/Open Popup');
@@ -1092,9 +1047,16 @@ describe('Recorder', function() {
     const recorderHandledPopup = onRecorderAttachedToTarget(devToolsPage);
     await openPopupButton?.click();
     await devToolsPage.waitForFunction(async () => {
-      const controller = await getRecordingController(devToolsPage);
-      return await controller.evaluate(c => {
-        const steps = c.getCurrentRecordingForTesting()?.flow.steps;
+      const panel = await getRecordingPanel(devToolsPage);
+      return await panel.evaluate(async c => {
+        const path = './ui/legacy/legacy.js';
+        const UI = await import(path);
+        const widget = UI.Widget.Widget.get(c);
+        const steps =
+            (widget as
+             {getCurrentRecordingForTesting(): {flow: {steps: Array<{assertedEvents?: unknown[]}>}} | undefined})
+                .getCurrentRecordingForTesting()
+                ?.flow.steps;
         return steps?.length === 3 && steps[1].assertedEvents?.length === 1;
       });
     });
@@ -1112,9 +1074,16 @@ describe('Recorder', function() {
     await buttonInPopup!.click();
     await devToolsPage.bringToFront();
     await devToolsPage.waitForFunction(async () => {
-      const controller = await getRecordingController(devToolsPage);
-      return await controller.evaluate(
-          c => c.getCurrentRecordingForTesting()?.flow.steps.length === 4,
+      const panel = await getRecordingPanel(devToolsPage);
+      return await panel.evaluate(
+          async c => {
+            const path = './ui/legacy/legacy.js';
+            const UI = await import(path);
+            const widget = UI.Widget.Widget.get(c);
+            return (widget as {getCurrentRecordingForTesting(): {flow: {steps: unknown[]}} | undefined})
+                       .getCurrentRecordingForTesting()
+                       ?.flow.steps.length === 4;
+          },
       );
     });
 
@@ -1132,7 +1101,7 @@ describe('Recorder', function() {
                 ['xpath///*[@id="popup"]'],
                 ['pierce/#popup'],
                 ['text/Open Popup'],
-              ]
+              ],
             },
             {
               type: 'click',
@@ -1143,15 +1112,15 @@ describe('Recorder', function() {
                 ['xpath//html/body/button'],
                 ['pierce/button'],
                 ['text/Button in Popup'],
-              ]
-            }
-          ]
+              ],
+            },
+          ],
         },
     );
   });
 
   it('should break out shifts in text controls', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.keyboard.press('Tab');
@@ -1160,58 +1129,57 @@ describe('Recorder', function() {
     await inspectedPage.page.keyboard.type('d');
 
     const recording = await stopRecording(devToolsPage);
-    assert.deepEqual(
-        processAndVerifyBaseRecording(recording, {
-          resource: 'recorder/input.html',
-        }),
-        {
-          steps: [
-            {
-              type: 'keyDown',
-              target: 'main',
-              key: 'Tab',
-            },
-            {
-              type: 'keyUp',
-              key: 'Tab',
-              target: 'main',
-            },
-            {
-              type: 'change',
-              value: '1',
-              selectors: [
-                ['#one'],
-                ['xpath///*[@id="one"]'],
-                ['pierce/#one'],
-              ],
-              target: 'main'
-            },
-            {
-              type: 'keyDown',
-              target: 'main',
-              key: 'Shift',
-            },
-            {
-              type: 'keyUp',
-              key: 'Shift',
-              target: 'main',
-            },
-            {
-              type: 'change',
-              value: '1d',
-              selectors: [
-                ['#one'],
-                ['xpath///*[@id="one"]'],
-                ['pierce/#one'],
-              ],
-              target: 'main'
-            }
-          ]
-        });
+    assert.deepEqual(processAndVerifyBaseRecording(recording, {
+                       resource: 'recorder/input.html',
+                     }),
+                     {
+                       steps: [
+                         {
+                           type: 'keyDown',
+                           target: 'main',
+                           key: 'Tab',
+                         },
+                         {
+                           type: 'keyUp',
+                           key: 'Tab',
+                           target: 'main',
+                         },
+                         {
+                           type: 'change',
+                           value: '1',
+                           selectors: [
+                             ['#one'],
+                             ['xpath///*[@id="one"]'],
+                             ['pierce/#one'],
+                           ],
+                           target: 'main',
+                         },
+                         {
+                           type: 'keyDown',
+                           target: 'main',
+                           key: 'Shift',
+                         },
+                         {
+                           type: 'keyUp',
+                           key: 'Shift',
+                           target: 'main',
+                         },
+                         {
+                           type: 'change',
+                           value: '1d',
+                           selectors: [
+                             ['#one'],
+                             ['xpath///*[@id="one"]'],
+                             ['pierce/#one'],
+                           ],
+                           target: 'main',
+                         },
+                       ],
+                     });
   });
 
   it('should work with contiguous inputs', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/input.html', undefined);
 
     await inspectedPage.bringToFront();
 
@@ -1238,7 +1206,7 @@ describe('Recorder', function() {
                 ['xpath///*[@id="contiguous-field-1"]'],
                 ['pierce/#contiguous-field-1'],
               ],
-              target: 'main'
+              target: 'main',
             },
             {
               type: 'change',
@@ -1248,50 +1216,49 @@ describe('Recorder', function() {
                 ['xpath///*[@id="contiguous-field-2"]'],
                 ['pierce/#contiguous-field-2'],
               ],
-              target: 'main'
-            }
-          ]
+              target: 'main',
+            },
+          ],
         },
     );
   });
 
   it('should work with shadow inputs', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/shadow-input.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/shadow-input.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('custom-input');
     await inspectedPage.page.keyboard.type('works');
 
     const recording = await stopRecording(devToolsPage);
-    assert.deepEqual(
-        processAndVerifyBaseRecording(recording, {
-          resource: 'recorder/shadow-input.html',
-        }),
-        {
-          steps: [
-            {
-              type: 'click',
-              target: 'main',
-              selectors: [
-                ['custom-input', 'input'],
-                ['pierce/input'],
-              ],
-            },
-            {
-              type: 'change',
-              value: 'works',
-              selectors: [
-                ['custom-input', 'input'],
-                ['pierce/input'],
-              ],
-              target: 'main'
-            }
-          ]
-        });
+    assert.deepEqual(processAndVerifyBaseRecording(recording, {
+                       resource: 'recorder/shadow-input.html',
+                     }),
+                     {
+                       steps: [
+                         {
+                           type: 'click',
+                           target: 'main',
+                           selectors: [
+                             ['custom-input', 'input'],
+                             ['pierce/input'],
+                           ],
+                         },
+                         {
+                           type: 'change',
+                           value: 'works',
+                           selectors: [
+                             ['custom-input', 'input'],
+                             ['pierce/input'],
+                           ],
+                           target: 'main',
+                         },
+                       ],
+                     });
   });
 
   it('should edit while recording', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     const steps = await devToolsPage.waitForFunction(async () => {
       const steps = await devToolsPage.$$('.step-view-widget');
@@ -1326,7 +1293,7 @@ describe('Recorder', function() {
               deviceScaleFactor: 1,
               isMobile: false,
               hasTouch: false,
-              isLandscape: false
+              isLandscape: false,
             },
             {
               type: 'click',
@@ -1337,50 +1304,59 @@ describe('Recorder', function() {
                 ['xpath///*[@id="test"]'],
                 ['pierce/#test'],
                 ['text/Test Button'],
-              ]
-            }
-          ]
+              ],
+            },
+          ],
         },
     );
   });
 
   it('should edit the type while recording', async ({inspectedPage, devToolsPage}) => {
-    await startRecording('recorder/recorder.html', undefined, devToolsPage, inspectedPage);
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     await inspectedPage.bringToFront();
     await inspectedPage.page.click('#test');
 
     await devToolsPage.bringToFront();
-    const steps = await devToolsPage.waitForFunction(async () => {
+    const step = await devToolsPage.waitForFunction(async () => {
       const steps = await devToolsPage.$$('.step-view-widget');
-      return steps.length === 5 ? steps : undefined;
+      for (const s of steps) {
+        const title = await devToolsPage.$('.main-title', s);
+        const text = await title?.evaluate(el => el.textContent);
+        if (text?.includes('Click')) {
+          return s;
+        }
+      }
+      return undefined;
     });
-    const step = steps.pop();
     assert.isOk(step);
     const title = await step.waitForSelector(':scope >>>> .main-title');
     await title!.click();
 
     const input = await step.waitForSelector(
-        ':scope >>>> devtools-recorder-step-editor >>>> div:nth-of-type(1) > devtools-suggestion-input');
+        ':scope >>>> .details devtools-widget >>>> div:nth-of-type(1) > devtools-suggestion-input');
     await input!.click();
-
-    const eventPromise = step.evaluate(element => {
-      return new Promise(resolve => {
-        element.addEventListener('stepchanged', event => {
-          resolve((event as StepChanged).newStep);
-        }, {once: true});
-      });
-    });
 
     await devToolsPage.page.keyboard.type('emulateNetworkConditions');
     await devToolsPage.page.keyboard.press('Enter');
 
-    assert.deepEqual(await eventPromise, {
-      download: 1000,
-      latency: 25,
-      type: 'emulateNetworkConditions',
-      upload: 1000,
-    });
+    const downloadRow =
+        await step.waitForSelector(':scope >>>> .details devtools-widget >>>> div[data-attribute="download"]');
+    const downloadInput = await downloadRow!.waitForSelector(':scope >>>> devtools-suggestion-input');
+    const downloadValue = await downloadInput!.evaluate(el => (el as HTMLElement & {value: string}).value);
+    assert.strictEqual(downloadValue, '1000');
+
+    const latencyRow =
+        await step.waitForSelector(':scope >>>> .details devtools-widget >>>> div[data-attribute="latency"]');
+    const latencyInput = await latencyRow!.waitForSelector(':scope >>>> devtools-suggestion-input');
+    const latencyValue = await latencyInput!.evaluate(el => (el as HTMLElement & {value: string}).value);
+    assert.strictEqual(latencyValue, '25');
+
+    const uploadRow =
+        await step.waitForSelector(':scope >>>> .details devtools-widget >>>> div[data-attribute="upload"]');
+    const uploadInput = await uploadRow!.waitForSelector(':scope >>>> devtools-suggestion-input');
+    const uploadValue = await uploadInput!.evaluate(el => (el as HTMLElement & {value: string}).value);
+    assert.strictEqual(uploadValue, '1000');
 
     const recording = await stopRecording(devToolsPage);
     assert.deepEqual(processAndVerifyBaseRecording(recording), {
@@ -1389,17 +1365,12 @@ describe('Recorder', function() {
         download: 1000,
         latency: 25,
         upload: 1000,
-      }]
+      }],
     });
   });
 
   it('should add an assertion through the button', async ({inspectedPage, devToolsPage}) => {
-    await startRecording(
-        'recorder/recorder.html',
-        undefined,
-        devToolsPage,
-        inspectedPage,
-    );
+    await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
     // Find the button.
     await devToolsPage.click('.add-assertion-button');
@@ -1424,21 +1395,28 @@ describe('Recorder', function() {
         selectors: [
           ['.cls'],
         ],
-      }]
+      }],
     });
   });
 
   describe('Shortcuts', () => {
     it('should not open create a new recording while recording', async ({inspectedPage, devToolsPage}) => {
-      await startRecordingViaShortcut('recorder/recorder.html', devToolsPage, inspectedPage);
-      const controller = await getRecordingController(devToolsPage);
-      await controller.evaluate(element => {
-        return element.handleActions(
-            'chrome-recorder.create-recording' as RecorderActions.CREATE_RECORDING,
-        );
+      await startRecordingViaShortcut(devToolsPage, inspectedPage, 'recorder/recorder.html');
+      const panel = await getRecordingPanel(devToolsPage);
+      await panel.evaluate(async element => {
+        const path = './ui/legacy/legacy.js';
+        const UI = await import(path);
+        const widget = UI.Widget.Widget.get(element);
+        return (widget as {handleActions(action: string): unknown})
+            .handleActions(
+                'chrome-recorder.create-recording',
+            );
       });
-      const page = await controller.evaluate(element => {
-        return element.getCurrentPageForTesting();
+      const page = await panel.evaluate(async element => {
+        const path = './ui/legacy/legacy.js';
+        const UI = await import(path);
+        const widget = UI.Widget.Widget.get(element);
+        return (widget as {getCurrentPageForTesting(): unknown}).getCurrentPageForTesting();
       });
 
       assert.notStrictEqual(page, 'CreateRecordingPage');
@@ -1447,15 +1425,15 @@ describe('Recorder', function() {
     });
 
     it('should start with keyboard shortcut while on the create page', async ({inspectedPage, devToolsPage}) => {
-      await fillCreateRecordingForm('recorder/recorder.html', devToolsPage, inspectedPage);
-      await startOrStopRecordingShortcut('devToolsPage', devToolsPage, inspectedPage);
+      await fillCreateRecordingForm(devToolsPage, inspectedPage, 'recorder/recorder.html');
+      await startOrStopRecordingShortcut(devToolsPage, inspectedPage, 'devToolsPage');
       const recording = await stopRecording(devToolsPage);
       assert.deepEqual(processAndVerifyBaseRecording(recording), {steps: []});
     });
 
     it('should stop with keyboard shortcut without recording it', async ({inspectedPage, devToolsPage}) => {
-      await startRecordingViaShortcut('recorder/recorder.html', devToolsPage, inspectedPage);
-      const recording = await startOrStopRecordingShortcut('devToolsPage', devToolsPage, inspectedPage);
+      await startRecordingViaShortcut(devToolsPage, inspectedPage, 'recorder/recorder.html');
+      const recording = await startOrStopRecordingShortcut(devToolsPage, inspectedPage, 'devToolsPage');
       assert.deepEqual(
           processAndVerifyBaseRecording({
             ...recording,
@@ -1466,22 +1444,13 @@ describe('Recorder', function() {
     });
 
     it('should stop recording with shortcut on the target', async ({inspectedPage, devToolsPage}) => {
-      await startRecording(
-          'recorder/recorder.html',
-          undefined,
-          devToolsPage,
-          inspectedPage,
-      );
+      await startRecording(devToolsPage, inspectedPage, 'recorder/recorder.html', undefined);
 
       await inspectedPage.bringToFront();
       await inspectedPage.page.keyboard.down('e');
       await inspectedPage.page.keyboard.up('e');
 
-      const recording = await startOrStopRecordingShortcut(
-          'inspectedPage',
-          devToolsPage,
-          inspectedPage,
-      );
+      const recording = await startOrStopRecordingShortcut(devToolsPage, inspectedPage, 'inspectedPage');
       assert.deepEqual(processAndVerifyBaseRecording(recording), {
         steps: [
           {
@@ -1493,8 +1462,8 @@ describe('Recorder', function() {
             type: 'keyUp',
             key: 'e',
             target: 'main',
-          }
-        ]
+          },
+        ],
       });
     });
   });

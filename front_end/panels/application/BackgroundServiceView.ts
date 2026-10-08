@@ -1,9 +1,9 @@
 // Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
+import '../../ui/legacy/components/data_grid/data_grid.js';
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -11,11 +11,11 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import * as Workspace from '../../models/workspace/workspace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
-// eslint-disable-next-line @devtools/es-modules-import
-import emptyWidgetStyles from '../../ui/legacy/emptyWidget.css.js';
+import * as Input from '../../ui/components/input/input.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type BackgroundServiceModel, Events} from './BackgroundServiceModel.js';
@@ -23,139 +23,298 @@ import backgroundServiceViewStyles from './backgroundServiceView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Name of the background fetch service in the background service view of the Application panel.
    */
   backgroundFetch: 'Background fetch',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Name of the background sync service in the background service view of the Application panel.
    */
   backgroundSync: 'Background sync',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Name of the push messaging service in the background service view of the Application panel.
    */
   pushMessaging: 'Push messaging',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Name of the notifications service in the background service view of the Application panel.
    */
   notifications: 'Notifications',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Name of the payment handler service in the background service view of the Application panel.
    */
   paymentHandler: 'Payment handler',
   /**
-   * @description Text in the Periodic Background Service View of the Application panel
+   * @description Name of the periodic background sync service in the background service view of the Application panel.
    */
   periodicBackgroundSync: 'Periodic background sync',
   /**
-   * @description Text to clear content
+   * @description Tooltip text for the clear button in the toolbar of the background service view in the Application panel.
    */
   clear: 'Clear',
   /**
-   * @description Tooltip text that appears when hovering over the largeicon download button in the Background Service View of the Application panel
+   * @description Tooltip text for the save button in the toolbar of the background service view in the Application panel.
    */
   saveEvents: 'Save events',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Label text for the checkbox to show events from other domains in the background service view of the Application panel.
    */
   showEventsFromOtherDomains: 'Show events from other domains',
   /**
-   * @description Text of a checkbox to show events for other storage keys
+   * @description Label text for the checkbox to show events from other storage partitions in the background service view of the Application panel.
    */
   showEventsForOtherStorageKeys: 'Show events from other storage partitions',
   /**
-   * @description Title of an action under the Background Services category that can be invoked through the Command Menu
+   * @description Tooltip and action title to stop recording events in the background service view of the Application panel.
    */
   stopRecordingEvents: 'Stop recording events',
   /**
-   * @description Title of an action under the Background Services category that can be invoked through the Command Menu
+   * @description Tooltip, button label, and action title to start recording events in the background service view of the Application panel.
    */
   startRecordingEvents: 'Start recording events',
   /**
-   * @description Text for timestamps of items
+   * @description Table column header for event timestamps in the background service view of the Application panel.
    */
   timestamp: 'Timestamp',
   /**
-   * @description Text that refers to some events
+   * @description Table column header for event names in the background service view of the Application panel.
    */
   event: 'Event',
   /**
-   * @description Text for the origin of something
+   * @description Table column header for event origins in the background service view of the Application panel.
    */
   origin: 'Origin',
   /**
-   * @description Text for the storage key of something
+   * @description Table column header for storage keys in the background service view of the Application panel.
    */
-  storageKey: 'Storage Key',
+  storageKey: 'Storage key',
   /**
-   * @description Text in Background Service View of the Application panel. The Scope is a URL associated with the Service Worker, which limits which pages/sites the Service Worker operates on.
+   * @description Table column header for Service Worker scopes in the background service view of the Application panel.
    */
-  swScope: 'Service Worker Scope',
+  swScope: 'Service Worker scope',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Table column header for instance IDs in the background service view of the Application panel.
    */
   instanceId: 'Instance ID',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Accessible name for the background services datagrid in the Application panel.
    */
   backgroundServices: 'Background services',
   /**
-   * @description Text in Background Service View of the Application panel.
-   *             An event here refers to a background service event that is an entry in a table.
+   * @description Header text in the preview sidebar of the background service view when no event is selected.
    */
   noEventSelected: 'No event selected',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Text in the preview sidebar of the background service view instructing the user to select an event to view its metadata.
    */
   selectAnEventToViewMetadata: 'Select an event to view its metadata',
   /**
-   * @description Text in Background Service View of the Application panel
-   * @example {Background Fetch} PH1
+   * @description Header text in the background service view when recording service activity.
+   * @example {background fetch} PH1
    */
   recordingSActivity: 'Recording {PH1} activity…',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Header text in the background service view when no recording has been started yet.
    */
   noRecording: 'No recording yet',
   /**
-   * @description Inform users that DevTools are recording/waiting for events in the Periodic Background Sync tool of the Application panel
-   * @example {Background Fetch} PH1
+   * @description Informational text in the background service view explaining that DevTools records service activity for up to 3 days.
+   * @example {background fetch} PH1
    */
+  // eslint-disable-next-line @devtools/l10n-uistrings-sentence-punctuation -- Concatenated with recordingSActivity in UI to form a multi-sentence message.
   devtoolsWillRecordAllSActivity: 'DevTools will record all {PH1} activity for up to 3 days, even when closed.',
   /**
-   * @description Text in Background Service View of the Application panel to instruct the user on how to start a recording for
-   * background services.
+   * @description Informational text in the background service view explaining how to start recording background service events.
    * @example {Start recording events} PH1
    * @example {Ctrl + E} PH2
    */
-  startRecordingToDebug: 'Start to debug background services by using the "{PH1}" button or by pressing {PH2}.',
+  startRecordingToDebug: 'Start to debug background services by using the "{PH1}" button or by pressing {PH2}',
   /**
-   * @description Text to show an item is empty
+   * @description Text indicating that a metadata value is empty in the background service view of the Application panel.
    */
   empty: 'empty',
   /**
-   * @description Text in Background Service View of the Application panel
+   * @description Text shown in the preview sidebar when the selected event has no metadata in the background service view of the Application panel.
    */
   noMetadataForThisEvent: 'No metadata for this event',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/BackgroundServiceView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class BackgroundServiceView extends UI.Widget.VBox {
-  private readonly serviceName: Protocol.BackgroundService.ServiceName;
-  private readonly model: BackgroundServiceModel;
-  private readonly serviceWorkerManager: SDK.ServiceWorkerManager.ServiceWorkerManager|null;
-  private readonly securityOriginManager: SDK.SecurityOriginManager.SecurityOriginManager;
-  private readonly storageKeyManager: SDK.StorageKeyManager.StorageKeyManager;
-  private recordAction: UI.ActionRegistration.Action;
-  private recordButton!: UI.Toolbar.ToolbarToggle;
-  private originCheckbox!: UI.Toolbar.ToolbarCheckbox;
-  private storageKeyCheckbox!: UI.Toolbar.ToolbarCheckbox;
-  private saveButton!: UI.Toolbar.ToolbarButton;
-  private readonly toolbar: UI.Toolbar.Toolbar;
-  private readonly splitWidget: UI.SplitWidget.SplitWidget;
-  private readonly dataGrid: DataGrid.DataGrid.DataGridImpl<EventData>;
-  private readonly previewPanel: UI.Widget.VBox;
-  private selectedEventNode: EventDataNode|null;
-  private preview: UI.Widget.Widget|null;
+
+export interface ViewInput {
+  serviceName: Protocol.BackgroundService.ServiceName;
+  isRecording: boolean;
+  selectedEvent: EventData|null;
+  events: EventData[];
+  onClear: () => void;
+  onSave: () => void;
+  toggleRecording: () => void;
+  onSelectEvent: (event: EventData) => void;
+  onOriginCheckboxChanged: (event: Event) => void;
+  onStorageKeyCheckboxChanged: (event: Event) => void;
+  isOriginCheckboxChecked: boolean;
+  isStorageKeyCheckboxChecked: boolean;
+  createLearnMoreLink: () => Platform.DevToolsPath.UrlString;
+}
+
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW = (input: ViewInput, output: undefined, target: HTMLElement): void => {
+  const recordShortcuts =
+      UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('background-service.toggle-recording')[0];
+  const startRecordingText = i18nString(UIStrings.startRecordingToDebug, {
+    PH1: i18nString(UIStrings.startRecordingEvents),
+    PH2: recordShortcuts ? recordShortcuts.title() : '',
+  });
+  const featureName = BackgroundServiceView.getUIString(input.serviceName).toLowerCase();
+
+  // Toolbar state
+  const buttonTooltip =
+      input.isRecording ? i18nString(UIStrings.stopRecordingEvents) : i18nString(UIStrings.startRecordingEvents);
+
+  const dataGridTemplate = html`
+    <table>
+      <tr>
+        <th id="id" weight="1">${'#' as Common.UIString.LocalizedString}</th>
+        <th id="timestamp" weight="7">${i18nString(UIStrings.timestamp)}</th>
+        <th id="event-name" weight="8">${i18nString(UIStrings.event)}</th>
+        <th id="origin" weight="8">${i18nString(UIStrings.origin)}</th>
+        <th id="storage-key" weight="8">${i18nString(UIStrings.storageKey)}</th>
+        <th id="sw-scope" weight="4">${i18nString(UIStrings.swScope)}</th>
+        <th id="instance-id" weight="8">${i18nString(UIStrings.instanceId)}</th>
+      </tr>
+      ${input.events.map(event => html`
+        <tr @select=${() => input.onSelectEvent(event)}
+            class=${event === input.selectedEvent ? 'selected' : ''}
+            ?selected=${event === input.selectedEvent}>
+          <td>${event.id}</td>
+          <td>${event.timestamp}</td>
+          <td>${event['event-name']}</td>
+          <td>${event.origin}</td>
+          <td>${event['storage-key']}</td>
+          <td>${event['sw-scope']}</td>
+          <td>${event['instance-id']}</td>
+        </tr>
+      `)}
+    </table>
+  `;
+
+  // clang-format off
+  render(html`
+    <style>${backgroundServiceViewStyles}</style>
+    <style>${Input.checkboxStyles}</style>
+    <div class="background-service-view">
+      <devtools-toolbar class="background-service-toolbar" jslog=${VisualLogging.toolbar()}>
+        <devtools-button title=${buttonTooltip}
+            class="toolbar-button"
+            .iconName=${'record-start'}
+            .toggledIconName=${'record-stop'}
+            .toggleType=${Buttons.Button.ToggleType.PRIMARY}
+            .toggled=${input.isRecording}
+            @click=${input.toggleRecording}
+            .variant=${Buttons.Button.Variant.TOOLBAR}
+            .jslogContext=${'background-service.toggle-recording'}></devtools-button>
+        <devtools-button title=${i18nString(UIStrings.clear)} @click=${input.onClear}
+            class="toolbar-button"
+            .iconName=${'clear'} .variant=${Buttons.Button.Variant.TOOLBAR}
+            .jslogContext=${'background-service.clear'}></devtools-button>
+        <div class="toolbar-divider"></div>
+        <devtools-button title=${i18nString(UIStrings.saveEvents)}
+            class="toolbar-button"
+            @click=${input.onSave}
+            .disabled=${input.events.length === 0}
+            .iconName=${'download'} .variant=${Buttons.Button.Variant.TOOLBAR}
+            .jslogContext=${'background-service.save-events'}></devtools-button>
+        <div class="toolbar-divider"></div>
+        <label title=${i18nString(UIStrings.showEventsFromOtherDomains)} class="checkbox-label"
+            jslog=${VisualLogging.toggle('show-events-from-other-domains').track({click: true})}
+        >
+          <input type="checkbox" .checked=${input.isOriginCheckboxChecked} @change=${input.onOriginCheckboxChanged}>
+          ${i18nString(UIStrings.showEventsFromOtherDomains)}
+        </label>
+        <label title=${i18nString(UIStrings.showEventsForOtherStorageKeys)} class="checkbox-label"
+            jslog=${VisualLogging.toggle('show-events-from-other-partitions').track({click: true})}
+        >
+          <input type="checkbox" .checked=${input.isStorageKeyCheckboxChecked}
+              @change=${input.onStorageKeyCheckboxChanged}
+          >
+          ${i18nString(UIStrings.showEventsForOtherStorageKeys)}
+        </label>
+      </devtools-toolbar>
+      ${input.events.length === 0 ? (input.isRecording ? html`
+        ${UI.Widget.widget(UI.EmptyWidget.EmptyWidget, {
+          header: i18nString(UIStrings.recordingSActivity, {PH1: featureName}),
+          text: i18nString(UIStrings.devtoolsWillRecordAllSActivity, {PH1: featureName}),
+        })}
+      ` : html`
+        <devtools-widget ${UI.Widget.widget(UI.EmptyWidget.EmptyWidget, {
+          header: i18nString(UIStrings.noRecording),
+          text: startRecordingText,
+          link: input.createLearnMoreLink(),
+        })}>
+          <devtools-button class="start-recording-button" .variant=${Buttons.Button.Variant.TONAL} jslogContext=${'start-recording'} @click=${input.toggleRecording}>
+            ${i18nString(UIStrings.startRecordingEvents)}
+          </devtools-button>
+        </devtools-widget>
+      `) : html`
+        <devtools-split-view sidebar-position="second" direction="row">
+          <div slot="main" class="data-grid-container">
+            <devtools-data-grid class="data-grid" striped
+                name=${i18nString(UIStrings.backgroundServices)}
+                style="outline: none;"
+            >
+              ${dataGridTemplate}
+            </devtools-data-grid>
+          </div>
+          <div slot="sidebar" class="preview-panel empty-state-container"
+              jslog=${VisualLogging.pane('preview').track({resize: true})}
+          >
+            ${input.selectedEvent ? html`
+              <div class="background-service-metadata" jslog=${VisualLogging.section('metadata')}>
+                ${input.selectedEvent.eventMetadata.length > 0 ? input.selectedEvent.eventMetadata.map(entry => html`
+                  <div class="background-service-metadata-entry">
+                    <div class="background-service-metadata-name">${entry.key}: </div>${
+                      entry.value ?
+                      html`<div class="background-service-metadata-value source-code">${entry.value}</div>` :
+                      html`<div class="background-service-metadata-value background-service-empty-value">${i18nString(UIStrings.empty)}</div>`}
+                  </div>
+                `) : html`
+                  <div class="background-service-metadata-entry">
+                    <div class="background-service-metadata-name background-service-empty-value">${i18nString(UIStrings.noMetadataForThisEvent)}</div>
+                  </div>
+                `}
+              </div>
+            ` : html`
+              ${UI.Widget.widget(UI.EmptyWidget.EmptyWidget, {
+                header: i18nString(UIStrings.noEventSelected),
+                text: i18nString(UIStrings.selectAnEventToViewMetadata),
+              })}
+            `}
+          </div>
+        </devtools-split-view>
+      `}
+    </div>
+  `, target, {
+    container: {
+      attributes: {
+        jslog: `${VisualLogging.pane().context(Platform.StringUtilities.toKebabCase(input.serviceName))}`,
+      },
+    },
+  });
+  // clang-format on
+};
+
+export class BackgroundServiceView extends UI.Widget.Widget {
+  #serviceName?: Protocol.BackgroundService.ServiceName;
+  #model?: BackgroundServiceModel;
+  #serviceWorkerManager?: SDK.ServiceWorkerManager.ServiceWorkerManager;
+  #securityOriginManager?: SDK.SecurityOriginManager.SecurityOriginManager;
+  #storageKeyManager?: SDK.StorageKeyManager.StorageKeyManager;
+
+  #isRecording = false;
+  #selectedEvent: EventData|null = null;
+  #events: EventData[] = [];
+  #isOriginCheckboxChecked = false;
+  #isStorageKeyCheckboxChecked = false;
+  readonly #view: View;
 
   static getUIString(serviceName: string): string {
     switch (serviceName) {
@@ -176,106 +335,65 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     }
   }
 
-  constructor(serviceName: Protocol.BackgroundService.ServiceName, model: BackgroundServiceModel) {
-    super({
-      jslog: `${VisualLogging.pane().context(Platform.StringUtilities.toKebabCase(serviceName))}`,
-      useShadowDom: true,
-    });
-    this.registerRequiredCSS(emptyWidgetStyles, backgroundServiceViewStyles);
-
-    this.serviceName = serviceName;
-
-    this.model = model;
-    this.model.addEventListener(Events.RecordingStateChanged, this.onRecordingStateChanged, this);
-    this.model.addEventListener(Events.BackgroundServiceEventReceived, this.onEventReceived, this);
-    this.model.enable(this.serviceName);
-
-    this.serviceWorkerManager = this.model.target().model(SDK.ServiceWorkerManager.ServiceWorkerManager);
-
-    this.securityOriginManager = this.model.target().model(SDK.SecurityOriginManager.SecurityOriginManager) as
-        SDK.SecurityOriginManager.SecurityOriginManager;
-    if (!this.securityOriginManager) {
-      throw new Error('SecurityOriginManager instance is missing');
-    }
-    this.securityOriginManager.addEventListener(
-        SDK.SecurityOriginManager.Events.MainSecurityOriginChanged, () => this.onOriginChanged());
-
-    this.storageKeyManager =
-        this.model.target().model(SDK.StorageKeyManager.StorageKeyManager) as SDK.StorageKeyManager.StorageKeyManager;
-    if (!this.storageKeyManager) {
-      throw new Error('StorageKeyManager instance is missing');
-    }
-    this.storageKeyManager.addEventListener(
-        SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED, () => this.onStorageKeyChanged());
-
-    this.recordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('background-service.toggle-recording');
-
-    this.toolbar = this.contentElement.createChild('devtools-toolbar', 'background-service-toolbar');
-    this.toolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
-    void this.setupToolbar();
-
-    /**
-     * This will contain the DataGrid for displaying events, and a panel at the bottom for showing
-     * extra metadata related to the selected event.
-     */
-    this.splitWidget = new UI.SplitWidget.SplitWidget(/* isVertical= */ false, /* secondIsSidebar= */ true);
-    this.splitWidget.show(this.contentElement);
-
-    this.dataGrid = this.createDataGrid();
-
-    this.previewPanel = new UI.Widget.VBox();
-    this.previewPanel.element.setAttribute('jslog', `${VisualLogging.pane('preview').track({resize: true})}`);
-
-    this.selectedEventNode = null;
-
-    this.preview = null;
-
-    this.splitWidget.setMainWidget(this.dataGrid.asWidget());
-    this.splitWidget.setSidebarWidget(this.previewPanel);
-    this.splitWidget.hideMain();
-
-    this.showPreview(null);
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element);
+    this.#view = view;
   }
 
-  getDataGrid(): DataGrid.DataGrid.DataGridImpl<EventData> {
-    return this.dataGrid;
+  get serviceName(): Protocol.BackgroundService.ServiceName|undefined {
+    return this.#serviceName;
   }
 
-  /**
-   * Creates the toolbar UI element.
-   */
-  private async setupToolbar(): Promise<void> {
-    this.toolbar.wrappable = true;
-    this.recordButton = (UI.Toolbar.Toolbar.createActionButton(this.recordAction) as UI.Toolbar.ToolbarToggle);
-    this.recordButton.toggleOnClick(false);
-    this.toolbar.appendToolbarItem(this.recordButton);
+  set serviceName(serviceName: Protocol.BackgroundService.ServiceName) {
+    if (this.#serviceName === serviceName) {
+      return;
+    }
+    this.#serviceName = serviceName;
+    if (this.#model) {
+      this.#model.enable(this.#serviceName);
+    }
+    this.requestUpdate();
+  }
 
-    const clearButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'clear', undefined, 'background-service.clear');
-    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => this.clearEvents());
-    this.toolbar.appendToolbarItem(clearButton);
+  get model(): BackgroundServiceModel|undefined {
+    return this.#model;
+  }
 
-    this.toolbar.appendSeparator();
+  set model(model: BackgroundServiceModel) {
+    if (this.#model === model) {
+      return;
+    }
+    if (this.#model) {
+      this.#model.removeEventListener(Events.RecordingStateChanged, this.onRecordingStateChanged, this);
+      this.#model.removeEventListener(Events.BackgroundServiceEventReceived, this.onEventReceived, this);
+    }
+    this.#model = model;
+    this.#model.addEventListener(Events.RecordingStateChanged, this.onRecordingStateChanged, this);
+    this.#model.addEventListener(Events.BackgroundServiceEventReceived, this.onEventReceived, this);
+    if (this.#serviceName) {
+      this.#model.enable(this.#serviceName);
+    }
 
-    this.saveButton = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.saveEvents), 'download', undefined, 'background-service.save-events');
-    this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, _event => {
-      void this.saveToFile();
-    });
-    this.saveButton.setEnabled(false);
-    this.toolbar.appendToolbarItem(this.saveButton);
+    this.#serviceWorkerManager = this.#model.target().model(SDK.ServiceWorkerManager.ServiceWorkerManager) ?? undefined;
 
-    this.toolbar.appendSeparator();
+    this.#securityOriginManager =
+        this.#model.target().model(SDK.SecurityOriginManager.SecurityOriginManager) ?? undefined;
+    if (this.#securityOriginManager) {
+      this.#securityOriginManager.addEventListener(SDK.SecurityOriginManager.Events.MainSecurityOriginChanged,
+                                                   () => this.onOriginChanged());
+    }
 
-    this.originCheckbox = new UI.Toolbar.ToolbarCheckbox(
-        i18nString(UIStrings.showEventsFromOtherDomains), i18nString(UIStrings.showEventsFromOtherDomains),
-        () => this.refreshView(), 'show-events-from-other-domains');
-    this.toolbar.appendToolbarItem(this.originCheckbox);
+    this.#storageKeyManager = this.#model.target().model(SDK.StorageKeyManager.StorageKeyManager) ?? undefined;
+    if (this.#storageKeyManager) {
+      this.#storageKeyManager.addEventListener(SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED,
+                                               () => this.onStorageKeyChanged());
+    }
+    this.requestUpdate();
+  }
 
-    this.storageKeyCheckbox = new UI.Toolbar.ToolbarCheckbox(
-        i18nString(UIStrings.showEventsForOtherStorageKeys), i18nString(UIStrings.showEventsForOtherStorageKeys),
-        () => this.refreshView(), 'show-events-from-other-partitions');
-    this.toolbar.appendToolbarItem(this.storageKeyCheckbox);
+  override wasShown(): void {
+    super.wasShown();
+    this.requestUpdate();
   }
 
   /**
@@ -283,7 +401,10 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    */
   private refreshView(): void {
     this.clearView();
-    const events = this.model.getEvents(this.serviceName).filter(event => this.acceptEvent(event));
+    if (!this.#model || !this.#serviceName) {
+      return;
+    }
+    const events = this.#model.getEvents(this.#serviceName).filter(event => this.acceptEvent(event));
     for (const event of events) {
       this.addEvent(event);
     }
@@ -293,26 +414,26 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    * Clears the grid and panel.
    */
   private clearView(): void {
-    this.selectedEventNode = null;
-    this.dataGrid.rootNode().removeChildren();
-    this.splitWidget.hideMain();
-    this.saveButton.setEnabled(false);
-    this.showPreview(null);
+    this.#selectedEvent = null;
+    this.#events = [];
+    this.requestUpdate();
   }
 
   /**
    * Called when the `Toggle Record` button is clicked.
    */
   toggleRecording(): void {
-    const isRecording = !this.recordButton.isToggled();
-    this.model.setRecording(isRecording, this.serviceName);
-    const featureName = BackgroundServiceView.getUIString(this.serviceName).toLowerCase();
+    if (!this.#model || !this.#serviceName) {
+      return;
+    }
+    const isRecording = !this.#isRecording;
+    this.#model.setRecording(isRecording, this.#serviceName);
+    const featureName = BackgroundServiceView.getUIString(this.#serviceName).toLowerCase();
 
     if (isRecording) {
       UI.ARIAUtils.LiveAnnouncer.alert(
           i18nString(UIStrings.recordingSActivity, {PH1: featureName}) + ' ' +
           i18nString(UIStrings.devtoolsWillRecordAllSActivity, {PH1: featureName}));
-      this.preview?.focus();
     }
   }
 
@@ -320,28 +441,23 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    * Called when the `Clear` button is clicked.
    */
   private clearEvents(): void {
-    this.model.clearEvents(this.serviceName);
+    if (this.#model && this.#serviceName) {
+      this.#model.clearEvents(this.#serviceName);
+    }
     this.clearView();
   }
 
   private onRecordingStateChanged({data: state}: Common.EventTarget.EventTargetEvent<RecordingState>): void {
-    if (state.serviceName !== this.serviceName) {
+    if (state.serviceName !== this.#serviceName) {
       return;
     }
 
-    if (state.isRecording === this.recordButton.isToggled()) {
+    if (state.isRecording === this.#isRecording) {
       return;
     }
 
-    this.recordButton.setToggled(state.isRecording);
-    this.updateRecordButtonTooltip();
-    this.showPreview(this.selectedEventNode);
-  }
-
-  private updateRecordButtonTooltip(): void {
-    const buttonTooltip = this.recordButton.isToggled() ? i18nString(UIStrings.stopRecordingEvents) :
-                                                          i18nString(UIStrings.startRecordingEvents);
-    this.recordButton.setTitle(buttonTooltip, 'background-service.toggle-recording');
+    this.#isRecording = state.isRecording;
+    this.requestUpdate();
   }
 
   private onEventReceived({
@@ -355,14 +471,14 @@ export class BackgroundServiceView extends UI.Widget.VBox {
 
   private onOriginChanged(): void {
     // No need to refresh the view if we are already showing all events.
-    if (this.originCheckbox.checked()) {
+    if (this.#isOriginCheckboxChecked) {
       return;
     }
     this.refreshView();
   }
 
   private onStorageKeyChanged(): void {
-    if (this.storageKeyCheckbox.checked()) {
+    if (this.#isStorageKeyCheckboxChecked) {
       return;
     }
     this.refreshView();
@@ -370,39 +486,9 @@ export class BackgroundServiceView extends UI.Widget.VBox {
 
   private addEvent(serviceEvent: Protocol.BackgroundService.BackgroundServiceEvent): void {
     const data = this.createEventData(serviceEvent);
-    const dataNode = new EventDataNode(data, serviceEvent.eventMetadata);
-    this.dataGrid.rootNode().appendChild(dataNode);
+    this.#events.push(data);
 
-    if (this.splitWidget.showMode() !== UI.SplitWidget.ShowMode.BOTH) {
-      this.splitWidget.showBoth();
-    }
-
-    if (this.dataGrid.rootNode().children.length === 1) {
-      this.saveButton.setEnabled(true);
-      this.showPreview(this.selectedEventNode);
-    }
-  }
-
-  private createDataGrid(): DataGrid.DataGrid.DataGridImpl<EventData> {
-    const columns: DataGrid.DataGrid.ColumnDescriptor[] = [
-      {id: 'id', title: '#' as Common.UIString.LocalizedString, weight: 1, sortable: false},
-      {id: 'timestamp', title: i18nString(UIStrings.timestamp), weight: 7, sortable: false},
-      {id: 'event-name', title: i18nString(UIStrings.event), weight: 8, sortable: false},
-      {id: 'origin', title: i18nString(UIStrings.origin), weight: 8, sortable: false},
-      {id: 'storage-key', title: i18nString(UIStrings.storageKey), weight: 8, sortable: false},
-      {id: 'sw-scope', title: i18nString(UIStrings.swScope), weight: 4, sortable: false},
-      {id: 'instance-id', title: i18nString(UIStrings.instanceId), weight: 8, sortable: false},
-    ];
-    const dataGrid = new DataGrid.DataGrid.DataGridImpl({
-      displayName: i18nString(UIStrings.backgroundServices),
-      columns,
-    });
-    dataGrid.setStriped(true);
-
-    dataGrid.addEventListener(
-        DataGrid.DataGrid.Events.SELECTED_NODE, event => this.showPreview((event.data as EventDataNode)));
-
-    return dataGrid;
+    this.requestUpdate();
   }
 
   /**
@@ -412,21 +498,22 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     let swScope = '';
 
     // Try to get the scope of the Service Worker registration to be more user-friendly.
-    const registration = this.serviceWorkerManager ?
-        this.serviceWorkerManager.registrations().get(serviceEvent.serviceWorkerRegistrationId) :
+    const registration = this.#serviceWorkerManager ?
+        this.#serviceWorkerManager.registrations().get(serviceEvent.serviceWorkerRegistrationId) :
         undefined;
     if (registration) {
       swScope = registration.scopeURL.substr(registration.securityOrigin.length);
     }
 
     return {
-      id: this.dataGrid.rootNode().children.length + 1,
+      id: this.#events.length + 1,
       timestamp: UI.UIUtils.formatTimestamp(serviceEvent.timestamp * 1000, /* full= */ true),
       origin: serviceEvent.origin,
       'storage-key': serviceEvent.storageKey,
       'sw-scope': swScope,
       'event-name': serviceEvent.eventName,
       'instance-id': serviceEvent.instanceId,
+      eventMetadata: serviceEvent.eventMetadata.sort((m1, m2) => Platform.StringUtilities.compare(m1.key, m2.key)),
     };
   }
 
@@ -434,11 +521,11 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    * Filtration function to know whether event should be shown or not.
    */
   private acceptEvent(event: Protocol.BackgroundService.BackgroundServiceEvent): boolean {
-    if (event.service !== this.serviceName) {
+    if (event.service !== this.#serviceName) {
       return false;
     }
 
-    if (this.originCheckbox.checked() || this.storageKeyCheckbox.checked()) {
+    if (this.#isOriginCheckboxChecked || this.#isStorageKeyCheckboxChecked) {
       return true;
     }
 
@@ -446,14 +533,14 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     const origin = event.origin.substr(0, event.origin.length - 1);
     const storageKey = event.storageKey;
 
-    return this.securityOriginManager.securityOrigins().includes(origin) ||
-        this.storageKeyManager.storageKeys().includes(storageKey);
+    return Boolean(this.#securityOriginManager?.securityOrigins().includes(origin) ||
+                   this.#storageKeyManager?.storageKeys().includes(storageKey));
   }
 
   private createLearnMoreLink(): Platform.DevToolsPath.UrlString {
     let url = 'https://developer.chrome.com/docs/devtools/javascript/background-services/';
 
-    switch (this.serviceName) {
+    switch (this.#serviceName) {
       case Protocol.BackgroundService.ServiceName.BackgroundFetch:
         url += '#fetch';
         break;
@@ -473,108 +560,58 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     return url as Platform.DevToolsPath.UrlString;
   }
 
-  private showPreview(dataNode: EventDataNode|null): void {
-    if (this.selectedEventNode && this.selectedEventNode === dataNode) {
+  override performUpdate(): void {
+    if (!this.#serviceName || !this.#model) {
       return;
     }
-
-    this.selectedEventNode = dataNode;
-
-    if (this.preview) {
-      this.preview.detach();
-    }
-
-    if (this.selectedEventNode) {
-      this.preview = this.selectedEventNode.createPreview();
-      this.preview.show(this.previewPanel.contentElement);
-      return;
-    }
-
-    let emptyWidget: UI.EmptyWidget.EmptyWidget;
-    if (this.dataGrid.rootNode().children.length) {
-      emptyWidget = new UI.EmptyWidget.EmptyWidget(
-          i18nString(UIStrings.noEventSelected), i18nString(UIStrings.selectAnEventToViewMetadata));
-    } else if (this.recordButton.isToggled()) {
-      // Inform users that we are recording/waiting for events.
-      const featureName = BackgroundServiceView.getUIString(this.serviceName).toLowerCase();
-      emptyWidget = new UI.EmptyWidget.EmptyWidget(
-          i18nString(UIStrings.recordingSActivity, {PH1: featureName}),
-          i18nString(UIStrings.devtoolsWillRecordAllSActivity, {PH1: featureName}));
-    } else {
-      const recordShortcuts =
-          UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('background-service.toggle-recording')[0];
-      emptyWidget = new UI.EmptyWidget.EmptyWidget(
-          i18nString(UIStrings.noRecording), i18nString(UIStrings.startRecordingToDebug, {
-            PH1: i18nString(UIStrings.startRecordingEvents),
-            PH2: recordShortcuts.title(),
-          }));
-      emptyWidget.link = this.createLearnMoreLink();
-
-      const button = UI.UIUtils.createTextButton(
-          i18nString(UIStrings.startRecordingEvents), () => this.toggleRecording(),
-          {jslogContext: 'start-recording', variant: Buttons.Button.Variant.TONAL});
-      emptyWidget.contentElement.appendChild(button);
-    }
-    emptyWidget.setDefaultFocusedElement(emptyWidget.contentElement);
-    this.preview = emptyWidget;
-    this.preview.show(this.previewPanel.contentElement);
+    const viewInput = {
+      serviceName: this.#serviceName,
+      isRecording: this.#isRecording,
+      selectedEvent: this.#selectedEvent,
+      events: this.#events,
+      onClear: () => this.clearEvents(),
+      onSave: () => void this.saveToFile(),
+      onSelectEvent: (event: EventData) => {
+        this.#selectedEvent = event;
+        this.requestUpdate();
+      },
+      onOriginCheckboxChanged: (event: Event) => {
+        const checkbox = event.target as HTMLInputElement;
+        this.#isOriginCheckboxChecked = checkbox.checked;
+        this.refreshView();
+      },
+      onStorageKeyCheckboxChanged: (event: Event) => {
+        const checkbox = event.target as HTMLInputElement;
+        this.#isStorageKeyCheckboxChecked = checkbox.checked;
+        this.refreshView();
+      },
+      isOriginCheckboxChecked: this.#isOriginCheckboxChecked,
+      isStorageKeyCheckboxChecked: this.#isStorageKeyCheckboxChecked,
+      toggleRecording: () => this.toggleRecording(),
+      createLearnMoreLink: () => this.createLearnMoreLink(),
+    };
+    this.#view(viewInput, undefined, this.contentElement);
   }
 
   /**
    * Saves all currently displayed events in a file (JSON format).
    */
   private async saveToFile(): Promise<void> {
-    const fileName = `${this.serviceName}-${Platform.DateUtilities.toISO8601Compact(new Date())}.json` as
+    if (!this.#serviceName || !this.#model) {
+      return;
+    }
+    const fileName = `${this.#serviceName}-${Platform.DateUtilities.toISO8601Compact(new Date())}.json` as
         Platform.DevToolsPath.RawPathString;
-    const stream = new Bindings.FileUtils.FileOutputStream();
+    const stream = new Bindings.FileUtils.FileOutputStream(Workspace.FileManager.FileManager.instance());
 
     const accepted = await stream.open(fileName);
     if (!accepted) {
       return;
     }
 
-    const events = this.model.getEvents(this.serviceName).filter(event => this.acceptEvent(event));
+    const events = this.#model.getEvents(this.#serviceName).filter(event => this.acceptEvent(event));
     await stream.write(JSON.stringify(events, undefined, 2));
     void stream.close();
-  }
-}
-
-export class EventDataNode extends DataGrid.DataGrid.DataGridNode<EventData> {
-  private readonly eventMetadata: Protocol.BackgroundService.EventMetadata[];
-
-  constructor(data: EventData, eventMetadata: Protocol.BackgroundService.EventMetadata[]) {
-    super(data);
-
-    this.eventMetadata = eventMetadata.sort((m1, m2) => Platform.StringUtilities.compare(m1.key, m2.key));
-  }
-
-  createPreview(): UI.Widget.VBox {
-    const preview = new UI.Widget.VBox();
-    preview.element.classList.add('background-service-metadata');
-    preview.element.setAttribute('jslog', `${VisualLogging.section('metadata')}`);
-
-    for (const entry of this.eventMetadata) {
-      const div = document.createElement('div');
-      div.classList.add('background-service-metadata-entry');
-      div.createChild('div', 'background-service-metadata-name').textContent = entry.key + ': ';
-      if (entry.value) {
-        div.createChild('div', 'background-service-metadata-value source-code').textContent = entry.value;
-      } else {
-        div.createChild('div', 'background-service-metadata-value background-service-empty-value').textContent =
-            i18nString(UIStrings.empty);
-      }
-      preview.element.appendChild(div);
-    }
-
-    if (!preview.element.children.length) {
-      const div = document.createElement('div');
-      div.classList.add('background-service-metadata-entry');
-      div.createChild('div', 'background-service-metadata-name background-service-empty-value').textContent =
-          i18nString(UIStrings.noMetadataForThisEvent);
-      preview.element.appendChild(div);
-    }
-
-    return preview;
   }
 }
 
@@ -605,4 +642,5 @@ export interface EventData {
   'sw-scope': string;
   'event-name': string;
   'instance-id': string;
+  eventMetadata: Protocol.BackgroundService.EventMetadata[];
 }

@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Protocol from '../../generated/protocol.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 
 import * as SDK from './sdk.js';
 
@@ -47,6 +49,139 @@ describe('ServiceWorkerVersion', () => {
     assert.deepEqual(version.controlledClients, VERSION_PAYLOAD.controlledClients);
     assert.strictEqual(version.targetId, VERSION_PAYLOAD.targetId);
     assert.deepEqual(version.routerRules, expectedRouterRules);
+  });
+
+  it('initializes with a given payload containing typedRouterRules', () => {
+    const TYPED_ROUTER_RULES_PAYLOAD = {
+      ...VERSION_PAYLOAD,
+      routerRules: undefined,
+      typedRouterRules: [
+        {
+          condition: {
+            requestMethod: 'POST',
+            urlPattern:
+                '{"hash":"*","hostname":"*","password":"*","pathname":"/example","port":"*","protocol":"*","search":"*","username":"*"}',
+          },
+          source: {
+            type: 'network' as Protocol.ServiceWorker.ServiceWorkerRouterSourceType,
+          },
+          id: 1,
+        },
+      ],
+    } as Protocol.ServiceWorker.ServiceWorkerVersion;
+
+    const version = makeVersion(REGISTRATION_PAYLOAD, TYPED_ROUTER_RULES_PAYLOAD);
+
+    const expectedRouterRules = [{
+      condition:
+          '{"requestMethod":"POST","urlPattern":{"hash":"*","hostname":"*","password":"*","pathname":"/example","port":"*","protocol":"*","search":"*","username":"*"}}',
+      source: '"network"',
+      id: 1,
+    } as SDK.ServiceWorkerManager.ServiceWorkerRouterRule];
+
+    assert.deepEqual(version.routerRules, expectedRouterRules);
+  });
+
+  it('initializes with typedRouterRules containing plain string urlPattern', () => {
+    const TYPED_ROUTER_RULES_PAYLOAD = {
+      ...VERSION_PAYLOAD,
+      routerRules: undefined,
+      typedRouterRules: [
+        {
+          condition: {
+            requestMethod: 'GET',
+            urlPattern: 'https://example.com/api/*',
+          },
+          source: {
+            type: 'network' as Protocol.ServiceWorker.ServiceWorkerRouterSourceType,
+          },
+          id: 1,
+        },
+      ],
+    } as Protocol.ServiceWorker.ServiceWorkerVersion;
+
+    const version = makeVersion(REGISTRATION_PAYLOAD, TYPED_ROUTER_RULES_PAYLOAD);
+
+    const expectedRouterRules =
+        [{condition: '{"requestMethod":"GET","urlPattern":"https://example.com/api/*"}', source: '"network"', id: 1} as
+         SDK.ServiceWorkerManager.ServiceWorkerRouterRule];
+
+    assert.deepEqual(version.routerRules, expectedRouterRules);
+  });
+
+  it('initializes with typedRouterRules with sourceDict source', () => {
+    const TYPED_ROUTER_RULES_PAYLOAD = {
+      ...VERSION_PAYLOAD,
+      routerRules: undefined,
+      typedRouterRules: [
+        {
+          condition: {
+            requestMethod: 'GET',
+          },
+          source: {
+            type: 'sourceDict' as Protocol.ServiceWorker.ServiceWorkerRouterSourceType,
+            sourceDict: {
+              cacheName: 'v1',
+            },
+          },
+          id: 1,
+        },
+      ],
+    } as Protocol.ServiceWorker.ServiceWorkerVersion;
+
+    const version = makeVersion(REGISTRATION_PAYLOAD, TYPED_ROUTER_RULES_PAYLOAD);
+
+    const expectedRouterRules = [{condition: '{"requestMethod":"GET"}', source: '{"cacheName":"v1"}', id: 1} as
+                                 SDK.ServiceWorkerManager.ServiceWorkerRouterRule];
+
+    assert.deepEqual(version.routerRules, expectedRouterRules);
+  });
+
+  it('fails to parse typedRouterRules when sourceDict is missing for SourceDict source type', () => {
+    const TYPED_ROUTER_RULES_PAYLOAD = {
+      ...VERSION_PAYLOAD,
+      routerRules: undefined,
+      typedRouterRules: [
+        {
+          condition: {
+            requestMethod: 'GET',
+          },
+          source: {
+            type: 'sourceDict' as Protocol.ServiceWorker.ServiceWorkerRouterSourceType,
+          },
+          id: 1,
+        },
+      ],
+    } as Protocol.ServiceWorker.ServiceWorkerVersion;
+
+    const version = makeVersion(REGISTRATION_PAYLOAD, TYPED_ROUTER_RULES_PAYLOAD);
+
+    assert.isNull(version.routerRules);
+  });
+
+  it('fails to parse typedRouterRules when sourceDict is present for non-SourceDict source type', () => {
+    const TYPED_ROUTER_RULES_PAYLOAD = {
+      ...VERSION_PAYLOAD,
+      routerRules: undefined,
+      typedRouterRules: [
+        {
+          condition: {
+            requestMethod: 'GET',
+          },
+          source: {
+            type: 'network' as Protocol.ServiceWorker.ServiceWorkerRouterSourceType,
+            sourceDict: {
+              cacheName: 'v1',
+            },
+          },
+          id: 1,
+        },
+      ],
+    } as Protocol.ServiceWorker.ServiceWorkerVersion;
+
+    const version = makeVersion(REGISTRATION_PAYLOAD, TYPED_ROUTER_RULES_PAYLOAD);
+
+    assert.isNull(version.routerRules);
   });
 
   it('should update the version with the given payload', () => {
@@ -286,4 +421,29 @@ describe('ServiceWorkerVersion', () => {
 
     assert.isNull(version.routerRules);
   });
+});
+
+describe('ServiceWorkerManager', () => {
+  it('disables forceUpdateOnPageLoad when DevTools is offline even if service-worker-update-on-reload setting is enabled',
+     () => {
+       const universe = new TestUniverse();
+       const target = universe.createTarget({type: SDK.Target.Type.FRAME});
+       const serviceWorkerAgent = target.serviceWorkerAgent();
+       const setForceUpdateSpy = sinon.spy(serviceWorkerAgent, 'invoke_setForceUpdateOnPageLoad');
+       const updateOnReloadSetting = universe.settings.createSetting('service-worker-update-on-reload', false);
+
+       const manager = new SDK.ServiceWorkerManager.ServiceWorkerManager(target);
+       sinon.assert.notCalled(setForceUpdateSpy);
+
+       updateOnReloadSetting.set(true);
+       sinon.assert.calledWith(setForceUpdateSpy, {forceUpdateOnPageLoad: true});
+
+       universe.multitargetNetworkManager.setNetworkConditions(SDK.NetworkManager.OfflineConditions);
+       sinon.assert.calledWith(setForceUpdateSpy, {forceUpdateOnPageLoad: false});
+
+       universe.multitargetNetworkManager.setNetworkConditions(SDK.NetworkManager.NoThrottlingConditions);
+       sinon.assert.calledWith(setForceUpdateSpy, {forceUpdateOnPageLoad: true});
+
+       manager.dispose();
+     });
 });

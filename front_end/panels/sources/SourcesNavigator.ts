@@ -11,9 +11,9 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as uiI18n from '../../ui/i18n/i18n.js';
 import {Link} from '../../ui/kit/kit.js';
@@ -25,67 +25,67 @@ import sourcesNavigatorStyles from './sourcesNavigator.css.js';
 
 const UIStrings = {
   /**
-   * @description Text to show if no workspaces are set up. https://goo.gle/devtools-workspace
+   * @description Text to show if no workspaces are set up. Learn more at https://goo.gle/devtools-workspace.
    */
   noWorkspace: 'No workspaces set up',
   /**
-   * @description Text to explain the Workspace feature in the Sources panel. https://goo.gle/devtools-workspace
+   * @description Text to explain the workspace feature in the Sources panel. Learn more at https://goo.gle/devtools-workspace.
    */
-  explainWorkspace: 'Set up workspaces to sync edits directly to the sources you develop.',
+  explainWorkspace: 'Set up workspaces to sync edits directly to the sources you develop',
   /**
-   * @description Text to show if no local overrides are set up. https://goo.gle/devtools-overrides
+   * @description Text to show if no local overrides are set up. Learn more at https://goo.gle/devtools-overrides.
    */
   noLocalOverrides: 'No local overrides set up',
   /**
-   * @description Text to explain the Local Overrides feature. https://goo.gle/devtools-overrides
+   * @description Text to explain the local overrides feature. Learn more at https://goo.gle/devtools-overrides.
    */
-  explainLocalOverrides: 'Override network requests and web content locally to mock remote resources.',
+  explainLocalOverrides: 'Override network requests and web content locally to mock remote resources',
   /**
-   * @description Tooltip text that appears when hovering over the largeicon clear button in the Sources Navigator of the Sources panel
+   * @description Tooltip text that appears when hovering over the clear button in the Sources navigator of the Sources panel.
    */
   clearConfiguration: 'Clear configuration',
   /**
-   * @description Text in Sources Navigator of the Sources panel
+   * @description Text in Sources navigator of the Sources panel.
    */
   selectFolderForOverrides: 'Select folder for overrides',
   /**
-   * @description Text to show if no content scripts can be found in the Sources panel. https://developer.chrome.com/extensions/content_scripts
+   * @description Text to show if no content scripts can be found in the Sources panel. Learn more at https://developer.chrome.com/extensions/content_scripts.
    */
   noContentScripts: 'No content scripts detected',
   /**
-   * @description Text to explain the content scripts pane in the Sources panel
+   * @description Text to explain the content scripts sidebar in the Sources panel.
    */
-  explainContentScripts: 'View content scripts served by extensions.',
+  explainContentScripts: 'View content scripts served by extensions',
   /**
-   * @description Text to show if no snippets were created and saved in the Sources panel https://goo.gle/devtools-snippets
+   * @description Text to show if no snippets were created and saved in the Sources panel. Learn more at https://goo.gle/devtools-snippets.
    */
   noSnippets: 'No snippets saved',
   /**
-   * @description Text to explain the Snippets feature in the Sources panel https://goo.gle/devtools-snippets
+   * @description Text to explain the snippets feature in the Sources panel. Learn more at https://goo.gle/devtools-snippets.
    */
-  explainSnippets: 'Save the JavaScript code you run often in a snippet to run it again anytime.',
+  explainSnippets: 'Save the JavaScript code you run often in a snippet to run it again anytime',
   /**
-   * @description Text in Sources Navigator of the Sources panel
+   * @description Text in Sources navigator of the Sources panel.
    */
   newSnippet: 'New snippet',
   /**
-   * @description Title of an action in the sources tool to create snippet
+   * @description Title of an action in the sources tool to create a snippet.
    */
   createNewSnippet: 'Create new snippet',
   /**
-   * @description A context menu item in the Sources Navigator of the Sources panel
+   * @description A context menu item in the Sources navigator of the Sources panel.
    */
   run: 'Run',
   /**
-   * @description A context menu item in the Navigator View of the Sources panel
+   * @description A context menu item in the Navigator view of the Sources panel.
    */
   rename: 'Rename…',
   /**
-   * @description Label for an item to remove something
+   * @description Label for an item to remove something.
    */
   remove: 'Remove',
   /**
-   * @description Text to save content as a specific file type
+   * @description Text to save content as a specific file type.
    */
   saveAs: 'Save as…',
   /**
@@ -93,12 +93,12 @@ const UIStrings = {
    *              the "Save as…" context menu in the Sources panel and the operation
    *              fails.
    */
-  saveAsFailed: 'Failed to save file to disk.',
+  saveAsFailed: 'Failed to save file to disk',
   /**
    * @description Message shown in the Workspace tab of the Sources panel to nudge
    *              developers into utilizing the Automatic Workspace Folders feature
-   *              in Chrome DevTools by setting up a `com.chrome.devtools.json`
-   *              file / endpoint in their project. This nudge is only shown when
+   *              in Chrome DevTools by setting up a com.chrome.devtools.json
+   *              file or endpoint in their project. This nudge is only shown when
    *              the feature is enabled and there's no automatic workspace folder
    *              detected.
    * @example {com.chrome.devtools.json} PH1
@@ -110,8 +110,8 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let networkNavigatorViewInstance: NetworkNavigatorView;
 
 export class NetworkNavigatorView extends NavigatorView {
-  private constructor() {
-    super('navigator-network', true);
+  private constructor(networkProjectManager: Bindings.NetworkProject.NetworkProjectManager) {
+    super('navigator-network', networkProjectManager, true);
     this.registerRequiredCSS(sourcesNavigatorStyles);
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.INSPECTED_URL_CHANGED, this.inspectedURLChanged, this);
@@ -123,10 +123,11 @@ export class NetworkNavigatorView extends NavigatorView {
 
   static instance(opts: {
     forceNew: boolean|null,
-  } = {forceNew: null}): NetworkNavigatorView {
-    const {forceNew} = opts;
+    networkProjectManager: Bindings.NetworkProject.NetworkProjectManager,
+  }): NetworkNavigatorView {
+    const {forceNew, networkProjectManager} = opts;
     if (!networkNavigatorViewInstance || forceNew) {
-      networkNavigatorViewInstance = new NetworkNavigatorView();
+      networkNavigatorViewInstance = new NetworkNavigatorView(networkProjectManager);
     }
 
     return networkNavigatorViewInstance;
@@ -181,8 +182,8 @@ export class FilesNavigatorView extends NavigatorView {
   #eventListeners: Common.EventTarget.EventDescriptor[] = [];
   #automaticFileSystemNudge: HTMLSpanElement;
 
-  constructor() {
-    super('navigator-files');
+  constructor(networkProjectManager: Bindings.NetworkProject.NetworkProjectManager) {
+    super('navigator-files', networkProjectManager);
     this.registerRequiredCSS(sourcesNavigatorStyles);
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noWorkspace), i18nString(UIStrings.explainWorkspace));
@@ -262,8 +263,8 @@ let overridesNavigatorViewInstance: OverridesNavigatorView;
 
 export class OverridesNavigatorView extends NavigatorView {
   private readonly toolbar: UI.Toolbar.Toolbar;
-  private constructor() {
-    super('navigator-overrides');
+  private constructor(networkProjectManager: Bindings.NetworkProject.NetworkProjectManager) {
+    super('navigator-overrides', networkProjectManager);
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noLocalOverrides), i18nString(UIStrings.explainLocalOverrides));
     this.setPlaceholder(placeholder);
@@ -276,6 +277,8 @@ export class OverridesNavigatorView extends NavigatorView {
 
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().addEventListener(
         Persistence.NetworkPersistenceManager.Events.PROJECT_CHANGED, this.updateProjectAndUI, this);
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().addEventListener(
+        Persistence.NetworkPersistenceManager.Events.LOCAL_OVERRIDES_PROJECT_UPDATED, this.updateProjectAndUI, this);
     this.workspace().addEventListener(Workspace.Workspace.Events.ProjectAdded, this.onProjectAddOrRemoved, this);
     this.workspace().addEventListener(Workspace.Workspace.Events.ProjectRemoved, this.onProjectAddOrRemoved, this);
     this.updateProjectAndUI();
@@ -283,10 +286,11 @@ export class OverridesNavigatorView extends NavigatorView {
 
   static instance(opts: {
     forceNew: boolean|null,
-  } = {forceNew: null}): OverridesNavigatorView {
-    const {forceNew} = opts;
+    networkProjectManager: Bindings.NetworkProject.NetworkProjectManager,
+  }): OverridesNavigatorView {
+    const {forceNew, networkProjectManager} = opts;
     if (!overridesNavigatorViewInstance || forceNew) {
-      overridesNavigatorViewInstance = new OverridesNavigatorView();
+      overridesNavigatorViewInstance = new OverridesNavigatorView(networkProjectManager);
     }
 
     return overridesNavigatorViewInstance;
@@ -314,14 +318,16 @@ export class OverridesNavigatorView extends NavigatorView {
     this.toolbar.removeToolbarItems();
     const project = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project();
     if (project) {
-      const enableCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
-          Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled'));
+      const enableCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(Common.Settings.Settings.instance().resolve(
+          Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor));
       this.toolbar.appendToolbarItem(enableCheckbox);
 
       this.toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(true));
       const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearConfiguration), 'clear');
       clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-        Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(false);
+        Common.Settings.Settings.instance()
+            .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+            .set(false);
         project.remove();
       });
       this.toolbar.appendToolbarItem(clearButton);
@@ -330,18 +336,20 @@ export class OverridesNavigatorView extends NavigatorView {
     const title = i18nString(UIStrings.selectFolderForOverrides);
     const setupButton = new UI.Toolbar.ToolbarButton(title, 'plus', title);
     setupButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, _event => {
-      void this.setupNewWorkspace();
+      void OverridesNavigatorView.setupNewWorkspace();
     }, this);
     this.toolbar.appendToolbarItem(setupButton);
   }
 
-  async setupNewWorkspace(): Promise<void> {
+  static async setupNewWorkspace(): Promise<void> {
     const fileSystem =
         await Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance().addFileSystem('overrides');
     if (!fileSystem) {
       return;
     }
-    Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(true);
+    Common.Settings.Settings.instance()
+        .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+        .set(true);
   }
 
   override sourceSelected(uiSourceCode: Workspace.UISourceCode.UISourceCode, focusSource: boolean): void {
@@ -355,8 +363,8 @@ export class OverridesNavigatorView extends NavigatorView {
 }
 
 export class ContentScriptsNavigatorView extends NavigatorView {
-  constructor() {
-    super('navigator-content-scripts');
+  constructor(networkProjectManager: Bindings.NetworkProject.NetworkProjectManager) {
+    super('navigator-content-scripts', networkProjectManager);
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noContentScripts), i18nString(UIStrings.explainContentScripts));
     this.setPlaceholder(placeholder);
@@ -369,8 +377,8 @@ export class ContentScriptsNavigatorView extends NavigatorView {
 }
 
 export class SnippetsNavigatorView extends NavigatorView {
-  constructor() {
-    super('navigator-snippets');
+  constructor(networkProjectManager: Bindings.NetworkProject.NetworkProjectManager) {
+    super('navigator-snippets', networkProjectManager);
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noSnippets), i18nString(UIStrings.explainSnippets));
     this.setPlaceholder(placeholder);

@@ -4,118 +4,133 @@
 
 import * as i18n from '../i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
-import * as Root from '../root/root.js';
 
 import type {SettingStorageType} from './Settings.js';
 
 const UIStrings = {
   /**
-   * @description Title of the Elements Panel
+   * @description Title of the Elements panel.
    */
   elements: 'Elements',
   /**
-   * @description Text for DevTools AI
+   * @description Text for DevTools AI.
    */
   ai: 'AI',
   /**
-   * @description Text for DevTools appearance
+   * @description Text for DevTools appearance.
    */
   appearance: 'Appearance',
   /**
-   * @description Name of the Sources panel
+   * @description Title of the Sources panel.
    */
   sources: 'Sources',
   /**
-   * @description Title of the Network tool
+   * @description Title of the Network panel.
    */
   network: 'Network',
   /**
-   * @description Text for the performance of something
+   * @description Title of the Performance panel.
    */
   performance: 'Performance',
   /**
-   * @description Title of the Console tool
+   * @description Title of the Console panel.
    */
   console: 'Console',
   /**
-   * @description A title of the 'Persistence' setting category
+   * @description Title of the Persistence setting category.
    */
   persistence: 'Persistence',
   /**
-   * @description Text that refers to the debugger
+   * @description Title of the Debugger setting category.
    */
   debugger: 'Debugger',
   /**
-   * @description Text describing global shortcuts and settings that are available throughout the DevTools
+   * @description Title of the Global setting category for shortcuts and settings available throughout DevTools.
    */
   global: 'Global',
   /**
-   * @description Title of the Rendering tool
+   * @description Title of the Rendering tool.
    */
   rendering: 'Rendering',
   /**
-   * @description Title of a section on CSS Grid tooling
+   * @description Title of the Grid setting category for CSS Grid tooling.
    */
   grid: 'Grid',
   /**
-   * @description Text for the mobile platform, as opposed to desktop
+   * @description Title of the Mobile setting category.
    */
   mobile: 'Mobile',
   /**
-   * @description Text for the memory of the page
+   * @description Title of the Memory panel setting category.
    */
   memory: 'Memory',
   /**
-   * @description Text for the extension of the page
+   * @description Title of the Extension setting category.
    */
   extension: 'Extension',
   /**
-   * @description Text for the adorner of the page
+   * @description Title of the Adorner setting category.
    */
   adorner: 'Adorner',
   /**
-   * @description Header for the "Account" section in the settings UI. The "Account"
-   * section allows users see their signed in account and configure which DevTools data is synced via Chrome Sync.
+   * @description Header for the Account section in the settings UI. The Account
+   * section allows users to see their signed-in account and configure which DevTools data is synced via Chrome Sync.
    */
   account: 'Account',
-  /**
-   * @description Text for the privacy section of the page.
-   */
-  privacy: 'Privacy',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('core/common/SettingRegistration.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let registeredSettings: SettingRegistration[] = [];
 const settingNameSet = new Set<string>();
+const orderValuesBySettingCategory = new Map<SettingCategory, Set<number>>();
+
+export function registerCategoryOrder(category?: SettingCategory, order?: number): void {
+  if (category && typeof order === 'number') {
+    let orderValues = orderValuesBySettingCategory.get(category);
+    if (!orderValues) {
+      orderValues = new Set();
+      orderValuesBySettingCategory.set(category, orderValues);
+    }
+    if (orderValues.has(order)) {
+      throw new Error(`Duplicate order value '${order}' for settings category '${category}'`);
+    }
+    orderValues.add(order);
+  }
+}
+
+export function removeCategoryOrder(category?: SettingCategory, order?: number): void {
+  if (category && typeof order === 'number') {
+    orderValuesBySettingCategory.get(category)?.delete(order);
+  }
+}
 
 export function registerSettingExtension(registration: SettingRegistration): void {
   const settingName = registration.settingName;
   if (settingNameSet.has(settingName)) {
     throw new Error(`Duplicate setting name '${settingName}'`);
   }
+  registerCategoryOrder(registration.category, registration.order);
   settingNameSet.add(settingName);
   registeredSettings.push(registration);
 }
 
 export function getRegisteredSettings(): SettingRegistration[] {
-  return registeredSettings.filter(setting => Root.Runtime.Runtime.isDescriptorEnabled(setting));
+  return registeredSettings;
 }
 
 export function registerSettingsForTest(settings: SettingRegistration[], forceReset = false): void {
   if (registeredSettings.length === 0 || forceReset) {
-    registeredSettings = settings;
-    settingNameSet.clear();
+    resetSettings();
     for (const setting of settings) {
-      const settingName = setting.settingName;
-      if (settingNameSet.has(settingName)) {
-        throw new Error(`Duplicate setting name '${settingName}'`);
-      }
-      settingNameSet.add(settingName);
+      registerSettingExtension(setting);
     }
   }
 }
 
 export function resetSettings(): void {
+  for (const setting of registeredSettings) {
+    removeCategoryOrder(setting.category, setting.order);
+  }
   registeredSettings = [];
   settingNameSet.clear();
 }
@@ -125,7 +140,8 @@ export function maybeRemoveSettingExtension(settingName: string): boolean {
   if (settingIndex < 0 || !settingNameSet.delete(settingName)) {
     return false;
   }
-  registeredSettings.splice(settingIndex, 1);
+  const [removed] = registeredSettings.splice(settingIndex, 1);
+  removeCategoryOrder(removed.category, removed.order);
   return true;
 }
 
@@ -149,7 +165,6 @@ export const enum SettingCategory {
   EXTENSIONS = 'EXTENSIONS',
   ADORNER = 'ADORNER',
   ACCOUNT = 'ACCOUNT',
-  PRIVACY = 'PRIVACY',
 }
 
 export function getLocalizedSettingsCategory(category: SettingCategory): Platform.UIString.LocalizedString {
@@ -192,8 +207,6 @@ export function getLocalizedSettingsCategory(category: SettingCategory): Platfor
       return i18n.i18n.lockedString('');
     case SettingCategory.ACCOUNT:
       return i18nString(UIStrings.account);
-    case SettingCategory.PRIVACY:
-      return i18nString(UIStrings.privacy);
   }
 }
 
@@ -268,37 +281,7 @@ export interface SettingRegistration {
    * Determines if the setting value is stored in the global, local or session storage.
    */
   storageType?: SettingStorageType;
-  /**
-   * A condition that, when present in the queryParamsObject of Runtime, constraints the value
-   * of the setting to be changed only if the user set it.
-   */
-  userActionCondition?: string;
-  /**
-   * The name of the experiment a setting is associated with. Enabling and disabling the declared
-   * experiment will enable and disable the setting respectively.
-   */
-  experiment?: Root.ExperimentNames.ExperimentName;
-  /**
-   * A condition is a function that will make the setting available if it
-   * returns true, and not available, otherwise. Make sure that objects you
-   * access from inside the condition function are ready at the time when the
-   * setting conditions are checked.
-   */
-  condition?: Root.Runtime.Condition;
 
-  /**
-   * A function that returns true if the setting should be disabled, along with
-   * the reason why.
-   */
-  disabledCondition?: (config?: Root.Runtime.HostConfig) => DisabledConditionResult;
-
-  /**
-   * If a setting is deprecated, define this notice to show an appropriate warning according to the `warning` property.
-   * If `disabled` is set, the setting will be disabled in the settings UI. In that case, `experiment` optionally can be
-   * set to link to an experiment (by experiment name). The information icon in the settings UI can then be clicked to
-   * jump to the experiment. If a setting is not disabled, the experiment entry will be ignored.
-   */
-  deprecationNotice?: {disabled: boolean, warning: () => Platform.UIString.LocalizedString, experiment?: string};
   /**
    * See {@link LearnMore} for more info.
    */
@@ -336,7 +319,3 @@ interface RawSettingExtensionOption {
   raw: true;
 }
 export type SettingExtensionOption = LocalizedSettingExtensionOption|RawSettingExtensionOption;
-export type DisabledConditionResult = {
-  disabled: true,
-  reasons: Platform.UIString.LocalizedString[],
-}|{disabled: false};

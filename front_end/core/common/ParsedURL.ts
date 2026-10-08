@@ -47,6 +47,61 @@ export function schemeIs(url: Platform.DevToolsPath.UrlString|URL, scheme: strin
 }
 
 /**
+ * Schemes safe for unprivileged web contexts (matching ChildProcessSecurityPolicyImpl::RegisterDefaultSchemes).
+ */
+const WEB_SAFE_SCHEMES = new Set([
+  'http:',
+  'https:',
+  'ws:',
+  'wss:',
+  'data:',
+]);
+
+function parseUnwrappedURL(url: Platform.DevToolsPath.UrlString|URL|string): URL|null {
+  try {
+    let parsed = new URL(url);
+    // Iteratively unwrap nested `blob:` and `filesystem:` URLs (e.g. `blob:filesystem:https://...`)
+    // to inspect the underlying origin's protocol.
+    while (parsed.protocol === 'blob:' || parsed.protocol === 'filesystem:') {
+      parsed = new URL(parsed.href.slice(parsed.protocol.length));
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns true if the URL uses an unprivileged web-safe scheme (or is a `blob:`/`filesystem:` URL wrapping one).
+ */
+export function hasWebSafeScheme(url: Platform.DevToolsPath.UrlString|URL|string): boolean {
+  const parsed = parseUnwrappedURL(url);
+  return parsed !== null && WEB_SAFE_SCHEMES.has(parsed.protocol);
+}
+
+/**
+ * Privileged browser and local schemes that must not be opened via external/new-tab links by default.
+ */
+const PRIVILEGED_SCHEMES = new Set([
+  'chrome:',
+  'chrome-error:',
+  'chrome-extension:',
+  'chrome-search:',
+  'chrome-untrusted:',
+  'devtools:',
+  'file:',
+  'isolated-app:',
+]);
+
+/**
+ * Returns true if the URL uses a privileged scheme (or is a `blob:`/`filesystem:` URL wrapping one).
+ */
+export function isPrivilegedScheme(url: Platform.DevToolsPath.UrlString|URL|string): boolean {
+  const parsed = parseUnwrappedURL(url);
+  return parsed !== null && PRIVILEGED_SCHEMES.has(parsed.protocol);
+}
+
+/**
  * File paths in DevTools that are represented either as unencoded absolute or relative paths, or encoded paths, or URLs.
  * @example
  * RawPathString: “/Hello World/file.js”
@@ -179,7 +234,11 @@ export class ParsedURL {
         preEncodedPath = 'file:///' + preEncodedPath;
       }
     }
-    return new URL(preEncodedPath).toString() as Platform.DevToolsPath.UrlString;
+    let url = new URL(preEncodedPath).toString();
+    while (url.endsWith('/') && url.length > 'file:///'.length) {
+      url = url.substring(0, url.length - 1);
+    }
+    return url as Platform.DevToolsPath.UrlString;
   }
 
   static relativePathToUrlString(
@@ -533,7 +592,11 @@ export class ParsedURL {
       return 'data:' as Platform.DevToolsPath.UrlString;
     }
     const scheme = this.isBlobURL() ? this.blobInnerScheme : this.scheme;
-    return scheme + '://' + this.domain() as Platform.DevToolsPath.UrlString;
+    const domain = this.domain();
+    if (!scheme && !domain) {
+      return '' as Platform.DevToolsPath.UrlString;
+    }
+    return scheme + '://' + domain as Platform.DevToolsPath.UrlString;
   }
 
   urlWithoutScheme(): string {

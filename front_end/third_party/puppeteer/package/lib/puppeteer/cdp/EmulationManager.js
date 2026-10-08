@@ -37,7 +37,7 @@ var __setFunctionName = (this && this.__setFunctionName) || function (f, name, p
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
 import { CDPSessionEvent } from '../api/CDPSession.js';
-import { debugError } from '../common/util.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { assert } from '../util/assert.js';
 import { invokeAtMostOnceForArguments } from '../util/decorators.js';
 import { isErrorLike } from '../util/ErrorLike.js';
@@ -78,6 +78,8 @@ let EmulationManager = (() => {
     let _private_emulateIdleState_descriptor;
     let _private_emulateTimezone_decorators;
     let _private_emulateTimezone_descriptor;
+    let _private_emulateLocale_decorators;
+    let _private_emulateLocale_descriptor;
     let _private_emulateVisionDeficiency_decorators;
     let _private_emulateVisionDeficiency_descriptor;
     let _private_emulateCpuThrottling_decorators;
@@ -100,6 +102,7 @@ let EmulationManager = (() => {
             _private_applyViewport_decorators = [invokeAtMostOnceForArguments];
             _private_emulateIdleState_decorators = [invokeAtMostOnceForArguments];
             _private_emulateTimezone_decorators = [invokeAtMostOnceForArguments];
+            _private_emulateLocale_decorators = [invokeAtMostOnceForArguments];
             _private_emulateVisionDeficiency_decorators = [invokeAtMostOnceForArguments];
             _private_emulateCpuThrottling_decorators = [invokeAtMostOnceForArguments];
             _private_emulateMediaFeatures_decorators = [invokeAtMostOnceForArguments];
@@ -115,7 +118,9 @@ let EmulationManager = (() => {
                             client.send('Emulation.setTouchEmulationEnabled', {
                                 enabled: false,
                             }),
-                        ]).catch(debugError);
+                        ]).catch(err => {
+                            return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+                        });
                         return;
                     }
                     const { viewport } = viewportState;
@@ -138,7 +143,7 @@ let EmulationManager = (() => {
                         })
                             .catch(err => {
                             if (err.message.includes('Target does not support metrics override')) {
-                                debugError(err);
+                                this.#logger?.(DEBUG_PREFIXES.error)?.(err);
                                 return;
                             }
                             throw err;
@@ -178,6 +183,14 @@ let EmulationManager = (() => {
                         throw error;
                     }
                 }, "#emulateTimezone") }, _private_emulateTimezone_decorators, { kind: "method", name: "#emulateTimezone", static: false, private: true, access: { has: obj => #emulateTimezone in obj, get: obj => obj.#emulateTimezone }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, _private_emulateLocale_descriptor = { value: __setFunctionName(async function (client, localeState) {
+                    if (!localeState.active) {
+                        return;
+                    }
+                    await client.send('Emulation.setLocaleOverride', {
+                        locale: localeState.locale,
+                    });
+                }, "#emulateLocale") }, _private_emulateLocale_decorators, { kind: "method", name: "#emulateLocale", static: false, private: true, access: { has: obj => #emulateLocale in obj, get: obj => obj.#emulateLocale }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, _private_emulateVisionDeficiency_descriptor = { value: __setFunctionName(async function (client, visionDeficiency) {
                     if (!visionDeficiency.active) {
                         return;
@@ -261,6 +274,9 @@ let EmulationManager = (() => {
         #timezoneState = new EmulatedState({
             active: false,
         }, this, this.#emulateTimezone);
+        #localeState = new EmulatedState({
+            active: false,
+        }, this, this.#emulateLocale);
         #visionDeficiencyState = new EmulatedState({
             active: false,
         }, this, this.#emulateVisionDeficiency);
@@ -288,7 +304,9 @@ let EmulationManager = (() => {
             active: false,
         }, this, this.#emulateFocus);
         #secondaryClients = new Set();
-        constructor(client) {
+        #logger;
+        constructor(client, logger) {
+            this.#logger = logger;
             this.#client = client;
         }
         updateClient(client) {
@@ -309,7 +327,9 @@ let EmulationManager = (() => {
             // We don't await here because we want to register all state changes before
             // the target is unpaused.
             void Promise.all(this.#states.map(s => {
-                return s.sync().catch(debugError);
+                return s.sync().catch(err => {
+                    return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+                });
             }));
         }
         get javascriptEnabled() {
@@ -347,6 +367,13 @@ let EmulationManager = (() => {
         async emulateTimezone(timezoneId) {
             await this.#timezoneState.setState({
                 timezoneId,
+                active: true,
+            });
+        }
+        get #emulateLocale() { return _private_emulateLocale_descriptor.value; }
+        async emulateLocale(locale) {
+            await this.#localeState.setState({
+                locale,
                 active: true,
             });
         }

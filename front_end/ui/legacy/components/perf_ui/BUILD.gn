@@ -22,7 +22,6 @@ generate_css("css_files") {
 
 devtools_ui_module("perf_ui") {
   sources = [
-    "BrickBreaker.ts",
     "CanvasHelper.ts",
     "ChartViewport.ts",
     "FilmStripView.ts",
@@ -38,7 +37,7 @@ devtools_ui_module("perf_ui") {
     "TimelineOverviewPane.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/host:bundle",
     "../../../../core/i18n:bundle",
@@ -54,6 +53,7 @@ devtools_ui_module("perf_ui") {
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/theme_support:bundle",
     "../../../../ui/lit:bundle",
+    "../../../../ui/settings:bundle",
     "../../../components/buttons:bundle",
     "../../../components/render_coordinator:bundle",
     "../../../components/snackbars:bundle",
@@ -62,15 +62,13 @@ devtools_ui_module("perf_ui") {
   ]
 
   visibility = [ "../../../../component_docs/perf_piechart" ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "perf_ui.ts"
 
-  deps = [
-    ":css_files",
-    ":perf_ui",
-  ]
+  ts_deps = [ ":perf_ui" ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/legacy/*,
@@ -78,6 +76,7 @@ devtools_entrypoint("bundle") {
     # and the business logic should never depend on the UI modules.
     ":*",
     "../../../../entrypoints/main/*",
+    "../../../../panels/ai_assistance/*",
     "../../../../panels/application/*",
     "../../../../panels/layer_viewer/*",
     "../../../../panels/media/*",
@@ -96,12 +95,12 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "perf_ui-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../../core/common:bundle",
     "../../../../core/i18n:bundle",
-    "../../../../core/root:bundle",
     "../../../../ui/legacy:bundle",
+    "../../../../ui/settings:bundle",
   ]
 
   visibility = [ "../../../../entrypoints/*" ]
@@ -120,9 +119,11 @@ devtools_ui_module("unittests") {
     "TimelineOverviewCalculator.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../..:bundle",
     "../../../../core/common:bundle",
+    "../../../../core/host:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/sdk:bundle",
     "../../../../generated",
@@ -132,5 +133,6 @@ devtools_ui_module("unittests") {
     "../../../../panels/timeline/extensions:bundle",
     "../../../../testing",
     "../../../visual_logging:bundle",
+    "../../theme_support:bundle",
   ]
 }

@@ -20,7 +20,6 @@ import {getAnnotationEntries, getAnnotationWindow} from './AnnotationHelpers.js'
 import type * as TimelineComponents from './components/components.js';
 import * as TimelineInsights from './components/insights/insights.js';
 import {CountersGraph} from './CountersGraph.js';
-import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import * as OverlayComponents from './overlays/components/components.js';
 import * as Overlays from './overlays/overlays.js';
@@ -41,7 +40,7 @@ import {
   selectionIsEvent,
   selectionIsRange,
   selectionsEqual,
-  type TimelineSelection
+  type TimelineSelection,
 } from './TimelineSelection.js';
 import {AggregatedTimelineTreeView, TimelineTreeView} from './TimelineTreeView.js';
 import type {TimelineMarkerStyle} from './TimelineUIUtils.js';
@@ -49,7 +48,7 @@ import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
-   * @description Text in Timeline Flame Chart View of the Performance panel
+   * @description Accessible title for a timeline marker at a given timestamp in the Performance panel.
    * @example {Frame} PH1
    * @example {10ms} PH2
    */
@@ -69,9 +68,10 @@ export const SORT_ORDER_PAGE_LOAD_MARKERS: Readonly<Record<string, number>> = {
   [Trace.Types.Events.Name.SOFT_NAVIGATION_START]: 1,
   [Trace.Types.Events.Name.MARK_LOAD]: 2,
   [Trace.Types.Events.Name.MARK_FCP]: 3,
-  [Trace.Types.Events.Name.MARK_DOM_CONTENT]: 4,
-  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE]: 5,
-  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION]: 6,
+  [Trace.Types.Events.Name.MARK_SOFT_FCP]: 4,
+  [Trace.Types.Events.Name.MARK_DOM_CONTENT]: 5,
+  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE]: 6,
+  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION]: 7,
 };
 
 // Threshold to match up overlay markers that are off by a tiny amount so they aren't rendered
@@ -88,8 +88,13 @@ interface FlameChartDimmer {
   outline: boolean|{main: number[] | boolean, network: number[]|boolean};
 }
 
-export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements PerfUI.FlameChart.FlameChartDelegate, UI.SearchableView.Searchable {
+const TimelineFlameChartViewBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class TimelineFlameChartView extends TimelineFlameChartViewBase implements PerfUI.FlameChart.FlameChartDelegate,
+                                                                                  UI.SearchableView.Searchable {
   private readonly delegate: TimelineModeViewDelegate;
   /**
    * Tracks the indexes of matched entries when the user searches the panel.
@@ -97,7 +102,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
    */
   private searchResults: PerfUI.FlameChart.DataProviderSearchResult[]|undefined = undefined;
   private eventListeners: Common.EventTarget.EventDescriptor[];
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   private readonly networkSplitWidget: UI.SplitWidget.SplitWidget;
   private mainDataProvider: TimelineFlameChartDataProvider;
   private readonly mainFlameChart: PerfUI.FlameChart.FlameChart;
@@ -106,7 +110,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   private readonly networkPane: UI.Widget.VBox;
   private readonly splitResizer: HTMLElement;
   private readonly chartSplitWidget: UI.SplitWidget.SplitWidget;
-  private brickGame?: PerfUI.BrickBreaker.BrickBreaker;
   private readonly countersView: CountersGraph;
   private readonly detailsSplitWidget: UI.SplitWidget.SplitWidget;
   private readonly detailsView: TimelineDetailsPane;
@@ -127,9 +130,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   readonly #boundRefreshAfterIgnoreList: () => void;
   /** This is sorted by ts. */
   #selectedEvents: Trace.Types.Events.Event[]|null;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly groupBySetting: Common.Settings.Setting<any>;
+  private readonly groupBySetting: Common.Settings.Setting<AggregatedTimelineTreeView.GroupBy>;
   private searchableView!: UI.SearchableView.SearchableView;
   private needsResizeToPreferredHeights?: boolean;
   private selectedSearchResult?: PerfUI.FlameChart.DataProviderSearchResult;
@@ -138,8 +139,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   #eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null = null;
   #selectedGroupName: string|null = null;
   #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
-  #gameKeyMatches = 0;
-  #gameTimeout = setTimeout(() => ({}), 0);
+  #overlaysUpdateScheduled = false;
+  #debouncedUpdateSearchResults: () => void = Common.Debouncer.debounce(() => this.updateSearchResults(false, false),
+                                                                        100);
 
   #overlaysContainer: HTMLElement = document.createElement('div');
   #overlays: Overlays.Overlays.Overlays;
@@ -243,7 +245,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       selectedElementOutline: false,
       tooltipElement: this.#tooltipElement,
       useOverlaysForCursorRuler: true,
-      canvasVELogContext: 'timeline.flamechart.main'
+      canvasVELogContext: 'timeline.flamechart.main',
     });
     this.mainFlameChart.alwaysShowVerticalScroll();
     this.mainFlameChart.enableRuler(false);
@@ -251,7 +253,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.LATEST_DRAW_DIMENSIONS, dimensions => {
       this.#overlays.updateChartDimensions('main', dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
-      void this.#overlays.update();
+      this.#scheduleOverlaysUpdate();
     });
 
     this.networkDataProvider = new TimelineFlameChartNetworkDataProvider();
@@ -261,13 +263,13 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       selectedElementOutline: false,
       tooltipElement: this.#tooltipElement,
       useOverlaysForCursorRuler: true,
-      canvasVELogContext: 'timeline.flamechart.network'
+      canvasVELogContext: 'timeline.flamechart.network',
     });
     this.networkFlameChart.alwaysShowVerticalScroll();
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.LATEST_DRAW_DIMENSIONS, dimensions => {
       this.#overlays.updateChartDimensions('network', dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
-      void this.#overlays.update();
+      this.#scheduleOverlaysUpdate();
 
       // If the height of the network chart has changed, we need to tell the
       // main flame chart because its tooltips are positioned based in part on
@@ -504,7 +506,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       mainChartIndices: [],
       networkChartIndices: [],
       inclusive: opts.inclusive,
-      outline: opts.outline
+      outline: opts.outline,
     };
     this.#flameChartDimmers.push(dimmer);
     return dimmer;
@@ -676,7 +678,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
             event.name === Trace.Types.Events.Name.SOFT_NAVIGATION_START ||
             event.name === Trace.Types.Events.Name.MARK_LCP_CANDIDATE ||
             event.name === Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION ||
-            event.name === Trace.Types.Events.Name.MARK_FCP ||
+            event.name === Trace.Types.Events.Name.MARK_FCP || event.name === Trace.Types.Events.Name.MARK_SOFT_FCP ||
             event.name === Trace.Types.Events.Name.MARK_DOM_CONTENT ||
             event.name === Trace.Types.Events.Name.MARK_LOAD);
 
@@ -1066,8 +1068,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   }
 
   #keydownHandler(event: KeyboardEvent): void {
-    const keyCombo = 'fixme';
-
     // `CREATION_NOT_STARTED` is only true in the state when both empty label and button to create connection are
     // created at the same time. If any key is typed in that state, it means that the label is in focus and the key
     // is typed into the label. This tells us that the user chose to create the
@@ -1096,36 +1096,10 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       event.stopPropagation();
       return;
     }
-
-    if (event.key === keyCombo[this.#gameKeyMatches]) {
-      this.#gameKeyMatches++;
-      clearTimeout(this.#gameTimeout);
-      this.#gameTimeout = setTimeout(() => {
-        this.#gameKeyMatches = 0;
-      }, 2000);
-    } else {
-      this.#gameKeyMatches = 0;
-      clearTimeout(this.#gameTimeout);
-    }
-    if (this.#gameKeyMatches !== keyCombo.length) {
-      return;
-    }
-    this.runBrickBreakerGame();
   }
 
   forceAnimationsForTest(): void {
     this.#checkReducedMotion = false;
-  }
-  runBrickBreakerGame(): void {
-    if (!SHOULD_SHOW_EASTER_EGG) {
-      return;
-    }
-    if ([...this.element.childNodes].find(child => child instanceof PerfUI.BrickBreaker.BrickBreaker)) {
-      return;
-    }
-    this.brickGame = new PerfUI.BrickBreaker.BrickBreaker(this.mainFlameChart);
-    this.brickGame.classList.add('brick-game');
-    this.element.append(this.brickGame);
   }
 
   #onTraceBoundsChange(event: TraceBounds.TraceBounds.StateChangedEvent): void {
@@ -1145,11 +1119,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     this.mainFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max, shouldAnimate);
     this.networkDataProvider.setWindowTimes(visibleWindow.min, visibleWindow.max);
     this.networkFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max, shouldAnimate);
-    // Updating search results can be very expensive. Debounce to avoid over-calling it.
-    const debouncedUpdate = Common.Debouncer.debounce(() => {
-      this.updateSearchResults(false, false);
-    }, 100);
-    debouncedUpdate();
+    this.#debouncedUpdateSearchResults();
   }
 
   getLinkSelectionAnnotation(): Trace.Types.File.EntriesLinkAnnotation|null {
@@ -1421,7 +1391,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   }
 
   private onEntryHovered(commonEvent: Common.EventTarget.EventTargetEvent<number>): void {
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     const entryIndex = commonEvent.data;
     const event = this.mainDataProvider.eventByIndex(entryIndex);
     if (!event || !this.#parsedTrace) {
@@ -1599,6 +1569,26 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     if (this.detailsView) {
       await this.detailsView.setSelection(selection);
     }
+  }
+
+  /**
+   * Schedules an update pass for the overlays via a microtask.
+   *
+   * Both the main flame chart and network flame chart emit LATEST_DRAW_DIMENSIONS
+   * when they redraw (e.g. during zoom or pan). Scheduling via a microtask
+   * ensures that if both charts redraw in the same animation frame or event loop
+   * turn, their dimensions are recorded first and the overlay positioning pass
+   * runs only once before the browser paints.
+   */
+  #scheduleOverlaysUpdate(): void {
+    if (this.#overlaysUpdateScheduled) {
+      return;
+    }
+    this.#overlaysUpdateScheduled = true;
+    queueMicrotask(() => {
+      this.#overlaysUpdateScheduled = false;
+      void this.#overlays.update();
+    });
   }
 
   /**

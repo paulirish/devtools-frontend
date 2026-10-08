@@ -10,6 +10,7 @@ import * as RenderCoordinator from '../../ui/components/render_coordinator/rende
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as Settings from '../../ui/settings/settings.js';
 
 import type {NetworkNode} from './NetworkDataGridNode.js';
 import {RequestTimeRangeNameToColor} from './NetworkOverview.js';
@@ -98,7 +99,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     this.textLayers = [];
   }
 
-  private static buildRequestTimeRangeStyle(): Map<NetworkTimeCalculator.RequestTimeRangeNames, LayerStyle> {
+  static buildRequestTimeRangeStyle(): Map<NetworkTimeCalculator.RequestTimeRangeNames, LayerStyle> {
     const styleMap = new Map<NetworkTimeCalculator.RequestTimeRangeNames, LayerStyle>();
     styleMap.set(
         NetworkTimeCalculator.RequestTimeRangeNames.CONNECTING,
@@ -112,9 +113,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     styleMap.set(
         NetworkTimeCalculator.RequestTimeRangeNames.PROXY,
         {fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.PROXY]});
-    styleMap.set(
-        NetworkTimeCalculator.RequestTimeRangeNames.BLOCKING,
-        {fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.BLOCKING]});
+    styleMap.set(NetworkTimeCalculator.RequestTimeRangeNames.BLOCKING, {fillStyle: '--network-waterfall-blocking'});
     styleMap.set(
         NetworkTimeCalculator.RequestTimeRangeNames.PUSH,
         {fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.PUSH]});
@@ -139,10 +138,17 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
         NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER,
         {fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER]});
     styleMap.set(NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_PREPARATION, {
-      fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_PREPARATION]
+      fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_PREPARATION],
     });
     styleMap.set(NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_RESPOND_WITH, {
       fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_RESPOND_WITH],
+    });
+    styleMap.set(NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_ROUTER_EVALUATION, {
+      fillStyle:
+          RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_ROUTER_EVALUATION],
+    });
+    styleMap.set(NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_CACHE_LOOKUP, {
+      fillStyle: RequestTimeRangeNameToColor[NetworkTimeCalculator.RequestTimeRangeNames.SERVICE_WORKER_CACHE_LOOKUP],
     });
     return styleMap;
   }
@@ -244,8 +250,9 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     if (!request) {
       return null;
     }
-    const useTimingBars =
-        !Common.Settings.Settings.instance().moduleSetting('network-color-code-resource-types').get() &&
+    const useTimingBars = !Common.Settings.Settings.instance()
+                               .resolve(Settings.NetworkSettings.colorCodeResourceTypesSettingDescriptor)
+                               .get() &&
         !this.calculator.startAtZero;
     let range;
     let start;
@@ -395,8 +402,9 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
   }
 
   private draw(): void {
-    const useTimingBars =
-        !Common.Settings.Settings.instance().moduleSetting('network-color-code-resource-types').get() &&
+    const useTimingBars = !Common.Settings.Settings.instance()
+                               .resolve(Settings.NetworkSettings.colorCodeResourceTypesSettingDescriptor)
+                               .get() &&
         !this.calculator.startAtZero;
     const nodes = this.nodes;
     const context = (this.canvas.getContext('2d'));
@@ -612,8 +620,14 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
         continue;
       }
 
-      const style = (this.styleForTimeRangeName.get(range.name) as LayerStyle);
-      const path = (this.pathForStyle.get(style) as Path2D);
+      const style = this.styleForTimeRangeName.get(range.name);
+      if (!style) {
+        continue;
+      }
+      const path = this.pathForStyle.get(style);
+      if (!path) {
+        continue;
+      }
       const lineWidth = style.lineWidth || 0;
       const height = this.getBarHeight(range.name);
       const middleBarY = y + Math.floor(this.rowHeight / 2 - height / 2) + lineWidth / 2;

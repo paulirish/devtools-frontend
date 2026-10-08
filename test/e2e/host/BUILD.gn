@@ -10,7 +10,7 @@ ts_e2e_library("host") {
     "user-metrics.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../helpers",
     "../shared",
   ]

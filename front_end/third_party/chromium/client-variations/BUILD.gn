@@ -13,14 +13,13 @@ devtools_pre_built("client-variations") {
   sources = [
     "ClientVariations.d.ts",
     "ClientVariations.js",
-    "client-variations-tsconfig.json",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "client-variations.ts"
 
-  deps = [ ":client-variations" ]
+  ts_deps = [ ":client-variations" ]
 
   visibility = [
     ":*",
@@ -35,5 +34,5 @@ ts_library("unittests") {
 
   sources = [ "ClientVariations.test.ts" ]
 
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 }

@@ -23,9 +23,12 @@ const UISTRINGS_REGEX = /(UIStrings = .*?\}) as const;\n/s;
 
 export const IGNORED_PATH_COMPONENTS = [
   '**/.git/**',
+  '**/node_modules/**',
   '**/*_test_runner/**',
   '**/third_party/**',
   '**/*.test.ts',
+  '**/*.test.api.ts',
+  '**/*.docs.ts',
 ];
 
 /**
@@ -725,7 +728,7 @@ export function collectAllStringsInDir(directory) {
  * @param {string} locale
  * @param {Record<string, CtcMessage>} strings
  */
-export function writeStringsToCtcFiles(directory, locale, strings) {
+export async function writeStringsToCtcFiles(directory, locale, strings) {
   const fullPath = path.join(directory, `${locale}.ctc.json`);
   /** @type {Record<string, CtcMessage>} */
   const output = {};
@@ -736,7 +739,7 @@ export function writeStringsToCtcFiles(directory, locale, strings) {
     output[key] = defn;
   }
 
-  writeIfChanged(fullPath, JSON.stringify(output, null, 2) + '\n');
+  await writeIfChanged(fullPath, JSON.stringify(output, null, 2) + '\n');
 }
 
 // @ts-ignore Test if called from the CLI or as a module.
@@ -758,5 +761,5 @@ if (import.meta.main) {
   }
 
   const outputDirectory = path.join(OUTPUT_ROOT, 'core/i18n/locales');
-  writeStringsToCtcFiles(outputDirectory, 'en-US', collectedStrings);
+  await writeStringsToCtcFiles(outputDirectory, 'en-US', collectedStrings);
 }

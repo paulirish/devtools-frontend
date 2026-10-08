@@ -58,17 +58,16 @@ const {bindToSetting} = UI.UIUtils;
 const UIStrings = {
   /**
    * @description Text for a checkbox setting that controls whether the user-supplied filter text
-   * excludes all CSS propreties which are filtered out, or just greys them out. In Computed Style
-   * Widget of the Elements panel
+   * excludes all CSS properties which are filtered out, or just grays them out. In the Computed styles
+   * tab of the Elements panel.
    */
   showAll: 'Show all',
   /**
    * @description Text for a checkbox setting that controls whether similar CSS properties should be
-   * grouped together or not. In Computed Style Widget of the Elements panel.
+   * grouped together or not. In the Computed styles tab of the Elements panel.
    */
   group: 'Group',
   /**
-   * [
    * @description Text shown to the user when a filter is applied to the computed CSS properties, but
    * no properties matched the filter and thus no results were returned.
    */
@@ -88,22 +87,23 @@ const UIStrings = {
    * @example {example} PH1
    * @example {5} PH2
    */
-  filterUpdateAriaText: `Filter applied: {PH1}. Total Results: {PH2}`,
+  filterUpdateAriaText: 'Filter applied: {PH1}. Total results: {PH2}',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ComputedStyleWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 function matchProperty(name: string, value: string): SDK.CSSPropertyParser.BottomUpTreeMatching|null {
   return SDK.CSSPropertyParser.matchDeclaration(name, value, [
-    new SDK.CSSPropertyParserMatchers.ColorMatcher(), new SDK.CSSPropertyParserMatchers.URLMatcher(),
-    new SDK.CSSPropertyParserMatchers.StringMatcher()
+    new SDK.CSSPropertyParserMatchers.ColorMatcher(),
+    new SDK.CSSPropertyParserMatchers.URLMatcher(),
+    new SDK.CSSPropertyParserMatchers.StringMatcher(),
   ]);
 }
 
-function renderPropertyContents(
-    node: SDK.DOMModel.DOMNode, cache: Map<string, {name: Element, value: Element}>, propertyName: string,
-    propertyValue: string): {name: Element, value: Element} {
-  const cacheKey = propertyName + ':' + propertyValue;
+function renderPropertyContents(node: SDK.DOMModel.DOMNode, cache: Map<string, {name: Element, value: Element}>,
+                                propertyName: string, propertyValue: string,
+                                category?: Category): {name: Element, value: Element} {
+  const cacheKey = category ? `${category}:${propertyName}:${propertyValue}` : `${propertyName}:${propertyValue}`;
   const valueFromCache = cache.get(cacheKey);
   if (valueFromCache) {
     return valueFromCache;
@@ -127,9 +127,9 @@ function renderPropertyContents(
 const createPropertyElement =
     (node: SDK.DOMModel.DOMNode, cache: Map<string, {name: Element, value: Element}>, propertyName: string,
      propertyValue: string, traceable: boolean, inherited: boolean,
-     activeProperty: SDK.CSSProperty.CSSProperty|undefined,
-     onContextMenu: ((event: Event) => void)): Lit.TemplateResult => {
-      const {name, value} = renderPropertyContents(node, cache, propertyName, propertyValue);
+     activeProperty: SDK.CSSProperty.CSSProperty|undefined, onContextMenu: ((event: Event) => void),
+     category?: Category): Lit.TemplateResult => {
+      const {name, value} = renderPropertyContents(node, cache, propertyName, propertyValue, category);
       // clang-format off
       return html`<devtools-computed-style-property
         .traceable=${traceable}
@@ -239,6 +239,7 @@ type ComputedStyleData = {
   propertyName: string,
   propertyValue: string,
   inherited: boolean,
+  category?: Category,
 }|{
   tag: 'traceElement',
   property: SDK.CSSProperty.CSSProperty,
@@ -255,7 +256,8 @@ interface ComputedStyleWidgetInput {
   groupComputedStylesSetting: Common.Settings.Setting<boolean>;
   onFilterChanged: (event: CustomEvent<string>) => void;
   filterText: string;
-  onRegexToggled: () => void;
+  filterIsRegex: boolean;
+  onRegexToggled: (event: CustomEvent<boolean>) => void;
   includeToolbar: boolean;
 }
 
@@ -272,6 +274,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
             type="filter"
             autofocus
             ?regex=${true}
+            ?regex-toggled=${input.filterIsRegex}
             value=${input.filterText}
             @change=${input.onFilterChanged}
             @regextoggle=${input.onRegexToggled}
@@ -336,15 +339,12 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
 
   /**
    * TODO(b/407751272): the state here is confusing (3 instance variables relating to filtering).
-   * There is also a bug where the Toolbar Input's regex flag cannot be
-   * controlled, so if you set a regex filter here, the toolbar might not
-   * reflect it.
    */
   #filterText = '';
   #filterIsRegex = false;
   #allowUserControl = true;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.#view = view;
 
@@ -428,18 +428,18 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
    * @param input.hasMatches Whether any properties matched the current filter (or if any properties exist at all).
    */
   #updateView({hasMatches}: {hasMatches: boolean}): void {
-    this.#view(
-        {
-          computedStylesTree: this.#computedStylesTree,
-          includeToolbar: this.#allowUserControl,
-          hasMatches,
-          showInheritedComputedStylePropertiesSetting: this.showInheritedComputedStylePropertiesSetting,
-          groupComputedStylesSetting: this.groupComputedStylesSetting,
-          onFilterChanged: this.onFilterChanged.bind(this),
-          filterText: this.#filterText,
-          onRegexToggled: this.onRegexToggled.bind(this),
-        },
-        null, this.contentElement);
+    this.#view({
+      computedStylesTree: this.#computedStylesTree,
+      includeToolbar: this.#allowUserControl,
+      hasMatches,
+      showInheritedComputedStylePropertiesSetting: this.showInheritedComputedStylePropertiesSetting,
+      groupComputedStylesSetting: this.groupComputedStylesSetting,
+      onFilterChanged: this.onFilterChanged.bind(this),
+      filterText: this.#filterText,
+      filterIsRegex: this.#filterIsRegex,
+      onRegexToggled: this.onRegexToggled.bind(this),
+    },
+               null, this.contentElement);
   }
 
   get nodeStyle(): ComputedStyleModule.ComputedStyleModel.ComputedStyle|null {
@@ -590,7 +590,7 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
           const propertyValue = nodeStyle.computedStyle.get(propertyName) || '';
           const canonicalName = SDK.CSSMetadata.cssMetadata().canonicalPropertyName(propertyName);
           const isInherited = !nonInheritedProperties.has(canonicalName);
-          propertyNodes.push(this.buildTreeNode(propertyTraces, propertyName, propertyValue, isInherited));
+          propertyNodes.push(this.buildTreeNode(propertyTraces, propertyName, propertyValue, isInherited, category));
         }
         tree.push({id: category, treeNodeData: {tag: 'category', name: category}, children: async () => propertyNodes});
       }
@@ -604,16 +604,17 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
     return await this.filterGroupLists();
   }
 
-  private buildTraceNode(property: SDK.CSSProperty.CSSProperty):
-      TreeOutline.TreeOutlineUtils.TreeNode<ComputedStyleData> {
+  private buildTraceNode(property: SDK.CSSProperty.CSSProperty,
+                         category?: Category): TreeOutline.TreeOutlineUtils.TreeNode<ComputedStyleData> {
     const rule = property.ownerStyle.parentRule;
+    const id = (rule?.origin || '') + ': ' + property.ownerStyle.styleSheetId + (property.range || property.name);
     return {
       treeNodeData: {
         tag: 'traceElement',
         property,
         rule,
       },
-      id: (rule?.origin || '') + ': ' + property.ownerStyle.styleSheetId + (property.range || property.name),
+      id: category ? `${category}:${id}` : id,
     };
   }
 
@@ -630,13 +631,13 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
         const trace = propertyTraces.get(data.propertyName);
         const activeProperty = trace?.find(
             property => matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.ACTIVE);
-        const propertyElement = createPropertyElement(
-            domNode, this.#propertyElementsCache, data.propertyName, data.propertyValue,
-            propertyTraces.has(data.propertyName), data.inherited, activeProperty, event => {
-              if (activeProperty) {
-                this.handleContextMenuEvent(matchedStyles, activeProperty, event);
-              }
-            });
+        const propertyElement =
+            createPropertyElement(domNode, this.#propertyElementsCache, data.propertyName, data.propertyValue,
+                                  propertyTraces.has(data.propertyName), data.inherited, activeProperty, event => {
+                                    if (activeProperty) {
+                                      this.handleContextMenuEvent(matchedStyles, activeProperty, event);
+                                    }
+                                  }, data.category);
         return propertyElement;
       }
       if (data.tag === 'traceElement') {
@@ -652,29 +653,31 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
     };
   }
 
-  private buildTreeNode(
-      propertyTraces: Map<string, SDK.CSSProperty.CSSProperty[]>, propertyName: string, propertyValue: string,
-      isInherited: boolean): TreeOutline.TreeOutlineUtils.TreeNode<ComputedStyleData> {
+  private buildTreeNode(propertyTraces: Map<string, SDK.CSSProperty.CSSProperty[]>, propertyName: string,
+                        propertyValue: string, isInherited: boolean,
+                        category?: Category): TreeOutline.TreeOutlineUtils.TreeNode<ComputedStyleData> {
     const treeNodeData: ComputedStyleData = {
       tag: 'property',
       propertyName,
       propertyValue,
       inherited: isInherited,
+      category,
     };
     const trace = propertyTraces.get(propertyName);
     const jslogContext = propertyName.startsWith('--') ? 'custom-property' : propertyName;
+    const id = category ? `${category}:${propertyName}` : propertyName;
     if (!trace) {
       return {
         treeNodeData,
         jslogContext,
-        id: propertyName,
+        id,
       };
     }
     return {
       treeNodeData,
       jslogContext,
-      id: propertyName,
-      children: async () => trace.map(this.buildTraceNode),
+      id,
+      children: async () => trace.map(t => this.buildTraceNode(t, category)),
     };
   }
 
@@ -725,8 +728,9 @@ export class ComputedStyleWidget extends UI.Widget.VBox {
     return new RegExp(Platform.StringUtilities.escapeForRegExp(text), 'i');
   }
 
-  private async onRegexToggled(): Promise<void> {
-    this.#filterIsRegex = !this.#filterIsRegex;
+  private async onRegexToggled(event: CustomEvent<boolean>): Promise<void> {
+    this.#filterIsRegex = event.detail;
+    this.requestUpdate();
     await this.filterComputedStyles(this.#buildFilterRegex(this.#filterText));
   }
 

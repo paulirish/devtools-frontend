@@ -9,14 +9,14 @@ import {
   selectRequestByName,
   setCacheDisabled,
   setTextFilter,
-  waitForSomeRequestsToAppear
+  waitForSomeRequestsToAppear,
 } from '../helpers/network-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 const NETWORK_VIEW_SELECTOR = '.network-item-view';
 const HEADERS_TAB_SELECTOR = '[aria-label=Headers].tabbed-pane-header-tab';
 const ACTIVE_HEADERS_TAB_SELECTOR = '[aria-label=Headers].tabbed-pane-header-tab[aria-selected=true]';
-const RESPONSE_HEADERS_SELECTOR = '[aria-label="Request Headers"]';
+const RESPONSE_HEADERS_SELECTOR = '[aria-label="Request headers"]';
 const HEADER_ROW_SELECTOR = '.row';
 
 async function assertChecked(checkbox: ElementHandle<HTMLInputElement>, expected: boolean) {
@@ -52,12 +52,12 @@ describe('Network emulation', () => {
     await uaDropdown.click();
     await devToolsPage.click('[aria-label="Close drawer"]');
 
-    await setCacheDisabled(true, devToolsPage);
+    await setCacheDisabled(devToolsPage, true);
     await inspectedPage.goToResource('application/service-worker-network.html');
-    await setTextFilter('is:service-worker-initiated', devToolsPage);
+    await setTextFilter(devToolsPage, 'is:service-worker-initiated');
 
-    await waitForSomeRequestsToAppear(2, devToolsPage);
-    await selectRequestByName('⚙ main.css', {}, devToolsPage);
+    await waitForSomeRequestsToAppear(devToolsPage, 2);
+    await selectRequestByName(devToolsPage, '⚙ main.css', {});
     await openHeadersTab(devToolsPage);
 
     const responseHeaderSection = await devToolsPage.waitFor(RESPONSE_HEADERS_SELECTOR);

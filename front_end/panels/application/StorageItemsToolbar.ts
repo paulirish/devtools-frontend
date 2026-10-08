@@ -16,19 +16,19 @@ import * as ApplicationComponents from './components/components.js';
 
 const UIStrings = {
   /**
-   * @description Text to refresh the page
+   * @description Tooltip text for the refresh button in the storage items toolbar of the Application panel.
    */
   refresh: 'Refresh',
   /**
-   * @description Text to clear everything
+   * @description Tooltip text for the clear all button in the storage items toolbar of the Application panel.
    */
-  clearAll: 'Clear All',
+  clearAll: 'Clear all',
   /**
-   * @description Tooltip text that appears when hovering over the largeicon delete button in the Service Worker Cache Views of the Application panel
+   * @description Tooltip text for the delete selected button in the storage items toolbar of the Application panel.
    */
-  deleteSelected: 'Delete Selected',
+  deleteSelected: 'Delete selected',
   /**
-   * @description Text that informs screen reader users that the storage table has been refreshed
+   * @description Screen reader announcement when the storage table is refreshed.
    */
   refreshedStatus: 'Table refreshed',
 } as const;
@@ -59,7 +59,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElem
                         jslog=${VisualLogging.toolbar()}>
         <devtools-button title=${i18nString(UIStrings.refresh)}
                          jslog=${VisualLogging.action('storage-items-view.refresh').track({
-        click: true
+        click: true,
       })}
                          @click=${input.onRefresh}
                          .iconName=${'refresh'}
@@ -74,7 +74,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElem
                          id=storage-items-delete-all
                          ?disabled=${!input.deleteAllButtonEnabled}
                          jslog=${VisualLogging.action('storage-items-view.clear-all').track({
-        click: true
+        click: true,
       })}
                          .iconName=${input.deleteAllButtonIconName}
                          .variant=${Buttons.Button.Variant.TOOLBAR}></devtools-button>
@@ -82,7 +82,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElem
                          @click=${input.onDeleteSelected}
                          ?disabled=${!input.deleteSelectedButtonDisabled}
                          jslog=${VisualLogging.action('storage-items-view.delete-selected').track({
-        click: true
+        click: true,
       })}
                          .iconName=${'cross'}
                          .variant=${Buttons.Button.Variant.TOOLBAR}></devtools-button>
@@ -95,8 +95,12 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElem
 
 export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
 
-export class StorageItemsToolbar extends
-    Common.ObjectWrapper.eventMixin<StorageItemsToolbar.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
+const StorageItemsToolbarBase: Common.ObjectWrapper.EventMixin<StorageItemsToolbar.EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class StorageItemsToolbar extends StorageItemsToolbarBase {
   filterRegex: RegExp|null;
   #metadataView: ApplicationComponents.StorageMetadataView.StorageMetadataView|undefined;
   readonly #view: View;

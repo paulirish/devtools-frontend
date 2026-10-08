@@ -1,12 +1,12 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -14,27 +14,27 @@ import linearMemoryNavigatorStyles from './linearMemoryNavigator.css.js';
 
 const UIStrings = {
   /**
-   * @description Tooltip text that appears when hovering over a valid memory address (e.g. 0x0) in the address line in the Linear memory inspector.
+   * @description Tooltip text that appears when hovering over a valid memory address (for example, 0x0) in the address line in the Memory inspector panel.
    */
   enterAddress: 'Enter address',
   /**
-   * @description Tooltip text that appears when hovering over the button to go back in history in the Linear Memory Navigator
+   * @description Tooltip text that appears when hovering over the button to go back in history in the Memory inspector panel.
    */
   goBackInAddressHistory: 'Go back in address history',
   /**
-   * @description Tooltip text that appears when hovering over the button to go forward in history in the Linear Memory Navigator
+   * @description Tooltip text that appears when hovering over the button to go forward in history in the Memory inspector panel.
    */
   goForwardInAddressHistory: 'Go forward in address history',
   /**
-   * @description Tooltip text that appears when hovering over the page back icon in the Linear Memory Navigator
+   * @description Tooltip text that appears when hovering over the page back icon in the Memory inspector panel.
    */
   previousPage: 'Previous page',
   /**
-   * @description Tooltip text that appears when hovering over the next page icon in the Linear Memory Navigator
+   * @description Tooltip text that appears when hovering over the next page icon in the Memory inspector panel.
    */
   nextPage: 'Next page',
   /**
-   * @description Text to refresh the page
+   * @description Tooltip text that appears when hovering over the refresh button in the Memory inspector panel.
    */
   refresh: 'Refresh',
 } as const;
@@ -46,43 +46,6 @@ const {render, html, Directives: {ifDefined}} = Lit;
 export const enum Navigation {
   BACKWARD = 'Backward',
   FORWARD = 'Forward',
-}
-
-export class AddressInputChangedEvent extends Event {
-  static readonly eventName = 'addressinputchanged';
-  data: {address: string, mode: Mode};
-
-  constructor(address: string, mode: Mode) {
-    super(AddressInputChangedEvent.eventName);
-    this.data = {address, mode};
-  }
-}
-
-export class PageNavigationEvent extends Event {
-  static readonly eventName = 'pagenavigation';
-  data: Navigation;
-
-  constructor(navigation: Navigation) {
-    super(PageNavigationEvent.eventName, {});
-    this.data = navigation;
-  }
-}
-
-export class HistoryNavigationEvent extends Event {
-  static readonly eventName = 'historynavigation';
-  data: Navigation;
-
-  constructor(navigation: Navigation) {
-    super(HistoryNavigationEvent.eventName, {});
-    this.data = navigation;
-  }
-}
-
-export class RefreshRequestedEvent extends Event {
-  static readonly eventName = 'refreshrequested';
-  constructor() {
-    super(RefreshRequestedEvent.eventName, {});
-  }
 }
 
 export interface LinearMemoryNavigatorData {
@@ -100,108 +63,225 @@ export const enum Mode {
   INVALID_SUBMIT = 'InvalidSubmit',
 }
 
-export class LinearMemoryNavigator extends HTMLElement {
-  readonly #shadow = this.attachShadow({mode: 'open'});
+export interface ViewInput extends LinearMemoryNavigatorData {
+  onAddressChange?: (address: string, mode: Mode) => void;
+  onNavigatePage?: (navigation: Navigation) => void;
+  onNavigateHistory?: (navigation: Navigation) => void;
+  onRefreshRequest?: () => void;
+}
+
+export type View = (input: ViewInput, output: undefined, target: HTMLElement|ShadowRoot) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  // Disabled until https://crbug.com/1079231 is fixed.
+  // clang-format off
+  const result = html`
+    <style>${linearMemoryNavigatorStyles}</style>
+    <div class="navigator">
+      <div class="navigator-item">
+        ${createButton({icon: 'undo', title: i18nString(UIStrings.goBackInAddressHistory),
+            onClick: () => input.onNavigateHistory?.(Navigation.BACKWARD), enabled: input.canGoBackInHistory,
+            jslogContext:'linear-memory-inspector.history-back'})}
+        ${createButton({icon: 'redo', title: i18nString(UIStrings.goForwardInAddressHistory),
+            onClick: () => input.onNavigateHistory?.(Navigation.FORWARD), enabled: input.canGoForwardInHistory,
+            jslogContext:'linear-memory-inspector.history-forward'})}
+      </div>
+      <div class="navigator-item">
+        ${createButton({icon: 'chevron-left', title: i18nString(UIStrings.previousPage),
+            onClick: () => input.onNavigatePage?.(Navigation.BACKWARD), enabled: true,
+            jslogContext:'linear-memory-inspector.previous-page'})}
+        ${createAddressInput(input)}
+        ${createButton({icon: 'chevron-right', title: i18nString(UIStrings.nextPage),
+            onClick: () => input.onNavigatePage?.(Navigation.FORWARD), enabled: true,
+            jslogContext:'linear-memory-inspector.next-page'})}
+      </div>
+      ${createButton({icon: 'refresh', title: i18nString(UIStrings.refresh),
+          onClick: () => input.onRefreshRequest?.(), enabled: true,
+          jslogContext:'linear-memory-inspector.refresh'})}
+    </div>
+    `;
+    render(result, target);
+  // clang-format on
+};
+
+function createAddressInput(data: ViewInput): Lit.TemplateResult {
+  const classMap = {
+    'address-input': true,
+    invalid: !data.valid,
+  };
+  return html`<input
+    class=${Lit.Directives.classMap(classMap)}
+    data-input="true"
+    .value=${data.address}
+    jslog=${VisualLogging.textField('linear-memory-inspector.address').track({
+    change: true,
+  })}
+    title=${
+      ifDefined(
+          data.valid ? i18nString(UIStrings.enterAddress) : data.error,
+          )}
+    @change=${(e: Event) => data.onAddressChange?.((e.target as HTMLInputElement).value, Mode.SUBMITTED)}
+    @input=${(e: Event) => data.onAddressChange?.((e.target as HTMLInputElement).value, Mode.EDIT)}
+    ${Lit.Directives.ref((el: Element|undefined) => {
+    if (el) {
+      const inputEl = el as HTMLInputElement;
+      if (data.mode === Mode.SUBMITTED) {
+        inputEl.blur();
+      } else if (data.mode === Mode.INVALID_SUBMIT) {
+        inputEl.select();
+      }
+    }
+  })}
+  />`;
+}
+
+function createButton(data: {
+  icon: string,
+  title: string,
+  onClick: () => void,
+  enabled: boolean,
+  jslogContext: string,
+}): Lit.TemplateResult {
+  return html`
+    <devtools-button class="navigator-button"
+      .data=${{variant: Buttons.Button.Variant.ICON,
+               iconName: data.icon,
+               disabled: !data.enabled} as Buttons.Button.ButtonData}
+      jslog=${VisualLogging.action().track({click: true, keydown: 'Enter'}).context(data.jslogContext)}
+      title=${data.title}
+      @click=${data.onClick}
+    ></devtools-button>`;
+}
+
+export class LinearMemoryNavigator extends UI.Widget.Widget {
+  readonly #view: View;
   #address = '0';
   #error: string|undefined = undefined;
   #valid = true;
   #canGoBackInHistory = false;
   #canGoForwardInHistory = false;
+  #mode = Mode.SUBMITTED;
 
-  set data(data: LinearMemoryNavigatorData) {
-    this.#address = data.address;
-    this.#error = data.error;
-    this.#valid = data.valid;
-    this.#canGoBackInHistory = data.canGoBackInHistory;
-    this.#canGoForwardInHistory = data.canGoForwardInHistory;
-    this.#render();
+  #onRefreshRequest?: () => void;
+  #onAddressChange?: (address: string, mode: Mode) => void;
+  #onNavigatePage?: (navigation: Navigation) => void;
+  #onNavigateHistory?: (navigation: Navigation) => void;
 
-    const addressInput = this.#shadow.querySelector<HTMLInputElement>('.address-input');
-    if (addressInput) {
-      if (data.mode === Mode.SUBMITTED) {
-        addressInput.blur();
-      } else if (data.mode === Mode.INVALID_SUBMIT) {
-        addressInput.select();
-      }
+  get onRefreshRequest(): (() => void)|undefined {
+    return this.#onRefreshRequest;
+  }
+
+  set onRefreshRequest(callback: (() => void)|undefined) {
+    this.#onRefreshRequest = callback;
+    this.performUpdate();
+  }
+
+  get onAddressChange(): ((address: string, mode: Mode) => void)|undefined {
+    return this.#onAddressChange;
+  }
+
+  set onAddressChange(callback: ((address: string, mode: Mode) => void)|undefined) {
+    this.#onAddressChange = callback;
+    this.performUpdate();
+  }
+
+  get onNavigatePage(): ((navigation: Navigation) => void)|undefined {
+    return this.#onNavigatePage;
+  }
+
+  set onNavigatePage(callback: ((navigation: Navigation) => void)|undefined) {
+    this.#onNavigatePage = callback;
+    this.performUpdate();
+  }
+
+  get onNavigateHistory(): ((navigation: Navigation) => void)|undefined {
+    return this.#onNavigateHistory;
+  }
+
+  set onNavigateHistory(callback: ((navigation: Navigation) => void)|undefined) {
+    this.#onNavigateHistory = callback;
+    this.performUpdate();
+  }
+
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element);
+    this.#view = view;
+    if (!this.element.shadowRoot) {
+      this.element.attachShadow({mode: 'open'});
     }
   }
 
-  #render(): void {
-    // Disabled until https://crbug.com/1079231 is fixed.
-    // clang-format off
-    const result = html`
-      <style>${linearMemoryNavigatorStyles}</style>
-      <div class="navigator">
-        <div class="navigator-item">
-          ${this.#createButton({icon: 'undo', title: i18nString(UIStrings.goBackInAddressHistory),
-              event: new HistoryNavigationEvent(Navigation.BACKWARD), enabled: this.#canGoBackInHistory,
-              jslogContext:'linear-memory-inspector.history-back'})}
-          ${this.#createButton({icon: 'redo', title: i18nString(UIStrings.goForwardInAddressHistory),
-              event: new HistoryNavigationEvent(Navigation.FORWARD), enabled: this.#canGoForwardInHistory,
-              jslogContext:'linear-memory-inspector.history-forward'})}
-        </div>
-        <div class="navigator-item">
-          ${this.#createButton({icon: 'chevron-left', title: i18nString(UIStrings.previousPage),
-              event: new PageNavigationEvent(Navigation.BACKWARD), enabled: true,
-              jslogContext:'linear-memory-inspector.previous-page'})}
-          ${this.#createAddressInput()}
-          ${this.#createButton({icon: 'chevron-right', title: i18nString(UIStrings.nextPage),
-              event: new PageNavigationEvent(Navigation.FORWARD), enabled: true,
-              jslogContext:'linear-memory-inspector.next-page'})}
-        </div>
-        ${this.#createButton({icon: 'refresh', title: i18nString(UIStrings.refresh),
-            event: new RefreshRequestedEvent(), enabled: true,
-            jslogContext:'linear-memory-inspector.refresh'})}
-      </div>
-      `;
-      render(result, this.#shadow, {host: this});
-    // clang-format on
+  get address(): string {
+    return this.#address;
   }
 
-  #createAddressInput(): Lit.TemplateResult {
-    const classMap = {
-      'address-input': true,
-      invalid: !this.#valid,
+  set address(address: string) {
+    this.#address = address;
+    this.requestUpdate();
+  }
+
+  get error(): string|undefined {
+    return this.#error;
+  }
+
+  set error(error: string|undefined) {
+    this.#error = error;
+    this.requestUpdate();
+  }
+
+  get valid(): boolean {
+    return this.#valid;
+  }
+
+  set valid(valid: boolean) {
+    this.#valid = valid;
+    this.requestUpdate();
+  }
+
+  get canGoBackInHistory(): boolean {
+    return this.#canGoBackInHistory;
+  }
+
+  set canGoBackInHistory(canGoBackInHistory: boolean) {
+    this.#canGoBackInHistory = canGoBackInHistory;
+    this.requestUpdate();
+  }
+
+  get canGoForwardInHistory(): boolean {
+    return this.#canGoForwardInHistory;
+  }
+
+  set canGoForwardInHistory(canGoForwardInHistory: boolean) {
+    this.#canGoForwardInHistory = canGoForwardInHistory;
+    this.requestUpdate();
+  }
+
+  get mode(): Mode {
+    return this.#mode;
+  }
+
+  set mode(mode: Mode) {
+    this.#mode = mode;
+    this.requestUpdate();
+  }
+
+  override performUpdate(): void {
+    const shadowRoot = this.element.shadowRoot;
+    if (!shadowRoot) {
+      return;
+    }
+    const viewInput: ViewInput = {
+      address: this.#address,
+      error: this.#error,
+      valid: this.#valid,
+      canGoBackInHistory: this.#canGoBackInHistory,
+      canGoForwardInHistory: this.#canGoForwardInHistory,
+      mode: this.#mode,
+      onAddressChange: this.onAddressChange,
+      onNavigatePage: this.onNavigatePage,
+      onNavigateHistory: this.onNavigateHistory,
+      onRefreshRequest: this.onRefreshRequest,
     };
-    return html`<input
-      class=${Lit.Directives.classMap(classMap)}
-      data-input="true"
-      .value=${this.#address}
-      jslog=${VisualLogging.textField('linear-memory-inspector.address').track({
-      change: true,
-    })}
-      title=${
-        ifDefined(
-            this.#valid ? i18nString(UIStrings.enterAddress) : this.#error,
-            )}
-      @change=${this.#onAddressChange.bind(this, Mode.SUBMITTED)}
-      @input=${this.#onAddressChange.bind(this, Mode.EDIT)}
-    />`;
-  }
-
-  #onAddressChange(mode: Mode, event: Event): void {
-    const addressInput = event.target as HTMLInputElement;
-    this.dispatchEvent(new AddressInputChangedEvent(addressInput.value, mode));
-  }
-
-  #createButton(data: {icon: string, title: string, event: Event, enabled: boolean, jslogContext: string}):
-      Lit.TemplateResult {
-    return html`
-      <devtools-button class="navigator-button"
-        .data=${
-        {variant: Buttons.Button.Variant.ICON, iconName: data.icon, disabled: !data.enabled} as
-        Buttons.Button.ButtonData}
-        jslog=${VisualLogging.action().track({click: true, keydown: 'Enter'}).context(data.jslogContext)}
-        data-button=${data.event.type} title=${data.title}
-        @click=${this.dispatchEvent.bind(this, data.event)}
-      ></devtools-button>`;
-  }
-}
-
-customElements.define('devtools-linear-memory-inspector-navigator', LinearMemoryNavigator);
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-linear-memory-inspector-navigator': LinearMemoryNavigator;
+    this.#view(viewInput, undefined, shadowRoot);
   }
 }

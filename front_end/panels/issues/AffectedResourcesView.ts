@@ -25,17 +25,17 @@ import type {IssueView} from './IssueView.js';
 
 const UIStrings = {
   /**
-   * @description Text in Object Properties Section
+   * @description Fallback text in the Issues panel when a frame URL is unknown in the affected resources table.
    */
-  unknown: 'unknown',
+  unknown: 'Unknown',
   /**
-   * @description Tooltip for button linking to the Elements panel
+   * @description Tooltip in the Issues panel for the button to reveal a frame's DOM node in the Elements panel.
    */
-  clickToRevealTheFramesDomNodeIn: 'Click to reveal the frame\'s DOM node in the Elements panel',
+  clickToRevealTheFramesDomNodeIn: 'Click to reveal the frame’s DOM node in the Elements panel',
   /**
-   * @description Replacement text for a link to an HTML element which is not available (anymore).
+   * @description Fallback text in the Issues panel when an HTML element is unavailable in the affected resources table.
    */
-  unavailable: 'unavailable',
+  unavailable: 'Unavailable',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/issues/AffectedResourcesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -84,7 +84,7 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
 
     this.affectedResources = this.createAffectedResources();
     this.#affectedResourcesCount = 0;
-    this.requestResolver = new Logs.RequestResolver.RequestResolver();
+    this.requestResolver = new Logs.RequestResolver.RequestResolver(Logs.NetworkLog.NetworkLog.instance());
     this.#frameListeners = [];
     this.#unresolvedFrameIds = new Set();
   }
@@ -205,7 +205,8 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
         void frame.highlight();
       }
     };
-    frameCell.onmouseleave = () => SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    frameCell.onmouseleave = () =>
+        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     return frameCell;
   }
 
@@ -252,7 +253,7 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
       const linkifier = new Components.Linkifier.Linkifier(UI.UIUtils.MaxLengthForDisplayedURLsInConsole);
       const sourceAnchor = linkifier.linkifyScriptLocation(
           target || null, sourceLocation.scriptId || null, sourceLocation.url as Platform.DevToolsPath.UrlString,
-          sourceLocation.lineNumber, {columnNumber: sourceLocation.columnNumber, inlineFrameIndex: 0});
+          sourceLocation.lineNumber, {columnNumber: sourceLocation.columnNumber});
       sourceAnchor.setAttribute('jslog', `${VisualLogging.link('source-location').track({click: true})}`);
       sourceCodeLocation.appendChild(sourceAnchor);
     }

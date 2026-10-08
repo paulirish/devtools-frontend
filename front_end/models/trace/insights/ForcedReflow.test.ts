@@ -4,11 +4,12 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getInsightOrError} from '../../../testing/InsightHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 
-describeWithEnvironment('ForcedReflow', function() {
+describe('ForcedReflow', function() {
+  setupLocaleHooks();
   async function processTrace(context: Mocha.Suite|Mocha.Context, traceFile: string) {
     const {data, insights} = await TraceLoader.traceEngine(context, traceFile);
     if (!insights) {
@@ -19,6 +20,9 @@ describeWithEnvironment('ForcedReflow', function() {
   }
 
   it('generates call stacks', async function() {
+    if (this.timeout() > 0) {
+      this.timeout(45_000);
+    }
     const {data, insights} = await processTrace(this, 'forced-reflow.json.gz');
     assert.strictEqual(insights.size, 1);
     const insight =

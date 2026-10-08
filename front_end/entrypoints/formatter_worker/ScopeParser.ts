@@ -3,17 +3,21 @@
 // found in the LICENSE file.
 
 import * as Acorn from '../../third_party/acorn/acorn.js';
+import {DefinitionKind, ScopeKind, type ScopeTreeNode} from '../formatter_actions/formatter_actions.js';
 
 import {ECMA_VERSION} from './AcornTokenizer.js';
-import {DefinitionKind, ScopeKind, type ScopeTreeNode} from './FormatterActions.js';
 
 export function parseScopes(expression: string, sourceType: 'module'|'script' = 'script'): Scope|null {
   // Parse the expression and find variables and scopes.
   let root: Acorn.ESTree.Node|null = null;
   try {
-    root = Acorn.parse(
-               expression, {ecmaVersion: ECMA_VERSION, allowAwaitOutsideFunction: true, ranges: false, sourceType}) as
-        Acorn.ESTree.Node;
+    root = Acorn.parse(expression, {
+      ecmaVersion: ECMA_VERSION,
+      allowAwaitOutsideFunction: true,
+      checkPrivateFields: false,
+      ranges: false,
+      sourceType,
+    }) as Acorn.ESTree.Node;
   } catch {
     return null;
   }
@@ -32,7 +36,7 @@ export interface VariableUses {
 }
 
 export class Scope {
-  readonly variables = new Map<string, VariableUses>();
+  readonly variables: Map<string, VariableUses> = new Map();
   readonly parent: Scope|null;
   readonly start: number;
   readonly end: number;

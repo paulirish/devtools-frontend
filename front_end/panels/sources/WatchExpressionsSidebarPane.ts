@@ -1,7 +1,6 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) IBM Corp. 2009  All rights reserved.
@@ -39,17 +38,17 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as Formatter from '../../models/formatter/formatter.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as StackTrace from '../../models/stack_trace/stack_trace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-// eslint-disable-next-line @devtools/es-modules-import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {Directives, html, render, type TemplateResult} from '../../ui/lit/lit.js';
+import {Directives, html, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {UISourceCodeFrame} from './UISourceCodeFrame.js';
@@ -57,7 +56,7 @@ import watchExpressionsSidebarPaneStyles from './watchExpressionsSidebarPane.css
 
 const UIStrings = {
   /**
-   * @description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel
+   * @description A context menu item in the watch expressions sidebar of the Sources panel.
    */
   addWatchExpression: 'Add watch expression',
   /**
@@ -65,49 +64,245 @@ const UIStrings = {
    */
   refreshWatchExpressions: 'Refresh watch expressions',
   /**
-   * @description Empty element text content in Watch Expressions Sidebar Pane of the Sources panel
+   * @description Empty element text content in watch expressions sidebar of the Sources panel.
    */
   noWatchExpressions: 'No watch expressions',
   /**
-   * @description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel
+   * @description A context menu item in the watch expressions sidebar of the Sources panel.
    */
   deleteAllWatchExpressions: 'Delete all watch expressions',
   /**
-   * @description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel
+   * @description A context menu item in the watch expressions sidebar of the Sources panel.
    */
   addPropertyPathToWatch: 'Add property path to watch',
   /**
-   * @description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel
+   * @description A context menu item in the watch expressions sidebar of the Sources panel.
    */
   deleteWatchExpression: 'Delete watch expression',
   /**
-   * @description Value element text content in Watch Expressions Sidebar Pane of the Sources panel
+   * @description Value element text content in watch expressions sidebar of the Sources panel.
    */
   notAvailable: '<not available>',
   /**
-   * @description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel and Network pane request.
+   * @description A context menu item in the watch expressions sidebar of the Sources panel and Network panel request.
    */
   copyValue: 'Copy value',
-  /**
-   * @description announcement for when watch expression is deleted
-   */
-  watchExpressionDeleted: 'Watch expression deleted',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/WatchExpressionsSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let watchExpressionsSidebarPaneInstance: WatchExpressionsSidebarPane;
-const {repeat} = Directives;
+const {classMap, ifDefined} = Directives;
+const {widget} = UI.Widget;
 interface ViewInput {
+  linkifier: Components.Linkifier.Linkifier;
+  onFinishEditing(watchExpression: WatchExpression, detail: string|null): void;
+  onStartEditing(watchExpression: WatchExpression): void;
+  onDelete(watchExpression: WatchExpression): void;
   onCopyWatchExpression(watchExpression: WatchExpression): void;
   onDeleteAll(): unknown;
   onAddExpression(): unknown;
+  onExpand(e: WatchExpression, expanded: boolean): unknown;
   watchExpressions: WatchExpression[];
 }
+export interface WatchExpressionPromptViewInput {
+  expression?: WatchExpression;
+  linkifier?: Components.Linkifier.Linkifier;
+  completionsId: string;
+  completions: string[];
+  onCommit: (detail: string) => void;
+  onCancel: () => void;
+  onBeforeAutoComplete: (event: UI.TextPrompt.TextPromptElement.BeforeAutoCompleteEvent) => void;
+  onStartEditing: () => void;
+  onDelete: () => void;
+  onContextMenu: (event: Event) => void;
+}
+
+type PromptView = (input: WatchExpressionPromptViewInput, output: undefined, target: HTMLElement) => void;
+
+export const DEFAULT_PROMPT_VIEW: PromptView = (input, _output, target) => {
+  const e = input.expression;
+  if (!e) {
+    render(nothing, target);
+    return;
+  }
+
+  const stopPropagationIfEditing = (event: Event): void => {
+    if (e.editing) {
+      event.stopPropagation();
+    }
+  };
+
+  const renderNameElement = (): TemplateResult => ObjectUI.ObjectPropertiesSection.renderPropertyName(
+      e.expression, /* isPrivate= */ false, e.expression ?? undefined);
+
+  // clang-format off
+  render(
+      html`
+        <devtools-prompt
+            class=${classMap({
+              monospace: true,
+              'watch-expression': true,
+              'watch-expression-text-prompt-proxy': Boolean(e.editing),
+            })}
+            value=${e.expression ?? ''}
+            ?editing=${Boolean(e.editing)}
+            completions=${input.completionsId}
+            @commit=${(event: UI.TextPrompt.TextPromptElement.CommitEvent) => input.onCommit(event.detail)}
+            @cancel=${() => input.onCancel()}
+            @beforeautocomplete=${input.onBeforeAutoComplete}
+            @mousedown=${stopPropagationIfEditing}
+            @click=${stopPropagationIfEditing}
+            @dblclick=${stopPropagationIfEditing}>
+          <div class=${classMap({
+                 'watch-expression-header': true,
+                 'watch-expression-object-header': !e.exceptionDetails && e.result !== undefined &&
+                                                   e.result.hasChildren && !e.result.object.customPreview(),
+               })}
+               @contextmenu=${input.onContextMenu}
+               @dblclick=${input.onStartEditing}>
+            <div class=${classMap({'watch-expression-title': true,
+                                   'tree-element-title': true,
+                                   dimmed: Boolean(e.exceptionDetails) && !e.result})}>
+              <devtools-button
+                .data=${{
+                  variant: Buttons.Button.Variant.ICON,
+                  iconName: 'bin',
+                  size: Buttons.Button.Size.SMALL,
+                  jslogContext: 'delete-watch-expression',
+                } as Buttons.Button.ButtonData}
+                class=watch-expression-delete-button
+                title=${i18nString(UIStrings.deleteWatchExpression)}
+                @click=${input.onDelete}></devtools-button>
+              ${renderNameElement()}
+              <span class=watch-expressions-separator>: </span>
+              ${e.exceptionDetails || !e.result
+                  ? html`<span
+                    class="watch-expression-error value"
+                    title=${ifDefined(e.exceptionDetails?.exception?.description)}
+                    >${i18nString(UIStrings.notAvailable)}</span>`
+                  : ObjectUI.ObjectPropertiesSection.renderPropertyValue(
+                    e.result.object, Boolean(e.exceptionDetails), false /* showPreview */, input.linkifier,
+                    false /* isSyntheticProperty */, undefined /* variableName */,
+                    undefined /* includeNullOrUndefined */, /* useCustomPreview */ true)}
+            </div>
+          </div>
+          ${e.editing ? html`
+            <datalist id=${input.completionsId}>
+              ${input.completions.map(c => html`<option>${c}</option>`)}
+            </datalist>
+          ` : nothing}
+        </devtools-prompt>
+      `,
+      target);
+  // clang-format on
+};
+
+export class WatchExpressionPromptWidget extends UI.Widget.Widget {
+  #expression?: WatchExpression;
+  #linkifier?: Components.Linkifier.Linkifier;
+  #completions: string[] = [];
+  #completionsId = '';
+  #view: PromptView;
+
+  onCommit?: (value: string) => void;
+  onCancel?: () => void;
+  onStartEditing?: () => void;
+  onDelete?: () => void;
+  onContextMenu?: (event: Event) => void;
+
+  set expression(expression: WatchExpression|undefined) {
+    if (this.#expression !== expression) {
+      this.#completions = [];
+      this.#expression = expression;
+    }
+    this.requestUpdate();
+  }
+
+  get expression(): WatchExpression|undefined {
+    return this.#expression;
+  }
+
+  set linkifier(linkifier: Components.Linkifier.Linkifier|undefined) {
+    if (this.#linkifier === linkifier) {
+      return;
+    }
+    this.#linkifier = linkifier;
+    this.requestUpdate();
+  }
+
+  get linkifier(): Components.Linkifier.Linkifier|undefined {
+    return this.#linkifier;
+  }
+
+  set completionsId(completionsId: string) {
+    if (this.#completionsId === completionsId) {
+      return;
+    }
+    this.#completionsId = completionsId;
+    this.requestUpdate();
+  }
+
+  get completionsId(): string {
+    return this.#completionsId;
+  }
+
+  constructor(element?: HTMLElement, view: PromptView = DEFAULT_PROMPT_VIEW) {
+    super(element);
+    this.#view = view;
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    this.requestUpdate();
+  }
+
+  override wasHidden(): void {
+    super.wasHidden();
+    this.#completions = [];
+  }
+
+  #handleBeforeAutoComplete = async(event: UI.TextPrompt.TextPromptElement.BeforeAutoCompleteEvent): Promise<void> => {
+    const suggestions =
+        await TextEditor.JavaScript.completeInContext(event.detail.expression, event.detail.filter, event.detail.force);
+    this.#completions = suggestions.map(v => v.text);
+    this.requestUpdate();
+  };
+
+  override performUpdate(): void {
+    if (!this.#expression?.editing) {
+      this.#completions = [];
+    }
+    const viewInput: WatchExpressionPromptViewInput = {
+      expression: this.#expression,
+      linkifier: this.#linkifier,
+      completionsId: this.#completionsId,
+      completions: this.#completions,
+      onCommit: (detail: string) => {
+        this.#completions = [];
+        this.requestUpdate();
+        this.onCommit?.(detail);
+      },
+      onCancel: () => {
+        this.#completions = [];
+        this.requestUpdate();
+        this.onCancel?.();
+      },
+      onBeforeAutoComplete: (event: UI.TextPrompt.TextPromptElement.BeforeAutoCompleteEvent) => {
+        void this.#handleBeforeAutoComplete(event);
+      },
+      onStartEditing: () => this.onStartEditing?.(),
+      onDelete: () => this.onDelete?.(),
+      onContextMenu: (event: Event) => this.onContextMenu?.(event),
+    };
+    this.#view(viewInput, undefined, this.contentElement);
+  }
+}
+
 type View = (input: ViewInput, output: object, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const onContextMenu = (watchExpression: WatchExpression|undefined, event: Event): void => {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    const isEditing = input.watchExpressions.some(e => e.isEditing());
+    const isEditing = input.watchExpressions.some(e => e.editing);
 
     if (!isEditing) {
       contextMenu.debugSection().appendItem(
@@ -121,14 +316,14 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     }
 
     if (watchExpression) {
-      if (!watchExpression.isEditing()) {
-        contextMenu.editSection().appendItem(
-            i18nString(UIStrings.deleteWatchExpression), watchExpression.updateExpression.bind(watchExpression, null),
-            {jslogContext: 'delete-watch-expression'});
+      if (!watchExpression.editing) {
+        contextMenu.editSection().appendItem(i18nString(UIStrings.deleteWatchExpression),
+                                             () => input.onDelete(watchExpression),
+                                             {jslogContext: 'delete-watch-expression'});
       }
 
-      if (!watchExpression.isEditing() && watchExpression.result &&
-          (watchExpression.result.type === 'number' || watchExpression.result.type === 'string')) {
+      if (!watchExpression.editing && watchExpression.result &&
+          (watchExpression.result.object.type === 'number' || watchExpression.result.object.type === 'string')) {
         contextMenu.clipboardSection().appendItem(
             i18nString(UIStrings.copyValue), () => input.onCopyWatchExpression(watchExpression),
             {jslogContext: 'copy-watch-expression-value'});
@@ -140,10 +335,41 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     event.consume();
   };
 
-  for (const watchExpression of input.watchExpressions) {
-    watchExpression.treeElement().listItemElement.oncontextmenu = onContextMenu.bind(undefined, watchExpression);
-    watchExpression.treeElement().childrenListElement.oncontextmenu = onContextMenu.bind(undefined, watchExpression);
-  }
+  const onExpressionKeydown = (expression: WatchExpression, event: KeyboardEvent): void => {
+    if (event.key === 'Enter' && !expression.editing) {
+      event.consume(true);
+      input.onStartEditing(expression);
+    } else if (event.key === 'Delete' && !expression.editing) {
+      event.consume(true);
+      input.onDelete(expression);
+    }
+  };
+
+  const renderTreeElement = (e: WatchExpression): TemplateResult => {
+    const completionsId = `watch-expression-completions-${input.watchExpressions.indexOf(e)}`;
+    // clang-format off
+    return html`<li
+          class=${classMap({'watch-expression-tree-item': true, 'watch-expression-editing': e.editing })}
+          ?open=${Boolean(e.result?.expanded)}
+          @keydown=${onExpressionKeydown.bind(undefined, e)}
+          @expand=${(event: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onExpand(e, event.detail.expanded)}
+          role=treeitem>
+            <devtools-widget ${widget(WatchExpressionPromptWidget, {
+              expression: e,
+              linkifier: input.linkifier,
+              completionsId,
+              onCommit: (detail: string) => input.onFinishEditing(e, detail),
+              onCancel: () => input.onFinishEditing(e, null),
+              onStartEditing: () => input.onStartEditing(e),
+              onDelete: () => input.onDelete(e),
+              onContextMenu: (event: Event) => onContextMenu(e, event),
+            })}></devtools-widget>
+        ${e.editing || !e.result || e.exceptionDetails ||
+          !e.result.hasChildren || e.result.object.customPreview() ? nothing :
+          ObjectUI.ObjectPropertiesSection.renderObjectTree(e.result, input.linkifier)}
+      </li>`;
+    // clang-format on
+  };
 
   render(
       // clang-format off
@@ -152,13 +378,12 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
         ? html`<div class=gray-info-message tabindex=-1 >
         ${i18nString(UIStrings.noWatchExpressions)}
         </div>`
-        : html`<devtools-tree hide-overflow show-selection-on-keyboard-focus .template=${html`
+        : html`<devtools-tree autofocus hide-overflow show-selection-on-keyboard-focus toggle-on-click .template=${html`
         <ul role=tree class="source-code object-properties-section">
           <style>${ObjectUI.ObjectPropertiesSection.objectValueStyles}</style>
           <style>${ObjectUI.ObjectPropertiesSection.objectPropertiesSectionStyles}</style>
           <style>${watchExpressionsSidebarPaneStyles}</style>
-          ${repeat(input.watchExpressions,
-               e => html`<devtools-tree-wrapper .treeElement=${e.treeElement()}></devtools-tree-wrapper>`)}
+          ${input.watchExpressions.map(renderTreeElement)}
         </ul>`}>
       </devtools-tree>`
       }`,
@@ -168,10 +393,10 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
           classes: ['watch-expressions'],
           attributes: {
             jslog: `${VisualLogging.section('sources.watch')}`,
-            'aria-label': i18nString(UIStrings.addWatchExpression)
+            'aria-label': i18nString(UIStrings.addWatchExpression),
           },
-          listeners: {contextmenu: onContextMenu.bind(undefined, undefined)}
-        }
+          listeners: {contextmenu: onContextMenu.bind(undefined, undefined)},
+        },
       });
 };
 
@@ -181,7 +406,7 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
   #watchExpressionsSetting: Common.Settings.Setting<string[]>;
   private readonly linkifier: Components.Linkifier.Linkifier;
   #view: View;
-  #expandControllers = new Map<string, ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker>();
+  #expansionTrackers = new Map<string, ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker>();
   constructor() {
     super({useShadowDom: true});
     this.registerRequiredCSS(watchExpressionsSidebarPaneStyles, objectValueStyles);
@@ -196,7 +421,7 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
         StackTrace.StackTrace.DebuggableFrameFlavor, this.#refreshExpressions, this);
     this.linkifier = new Components.Linkifier.Linkifier();
     this.#view = DEFAULT_VIEW;
-    this.#refreshExpressions();
+    void this.#refreshExpressions();
   }
 
   static instance(): WatchExpressionsSidebarPane {
@@ -233,10 +458,10 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
     // clang-format on
   }
 
-  private saveExpressions(): void {
+  saveExpressions(): void {
     const toSave = [];
     for (let i = 0; i < this.#watchExpressions.length; i++) {
-      const expression = this.#watchExpressions[i].expression();
+      const expression = this.#watchExpressions[i].expression;
       if (expression) {
         toSave.push(expression);
       }
@@ -248,104 +473,116 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
   private async addButtonClicked(event?: Event): Promise<void> {
     event?.consume(true);
     await UI.ViewManager.ViewManager.instance().showView('sources.watch');
-    const watchExpression = this.createWatchExpression(null);
+    const watchExpression = new WatchExpression();
+    this.#watchExpressions.push(watchExpression);
+    watchExpression.editing = true;
     this.requestUpdate();
-    // This synchronization is only needed because startEditing is imperative and
-    // requires the tree element to be in the DOM. This can be removed once the
-    // prompt is migrated to Lit.
-    await this.updateComplete;
-    watchExpression.startEditing();
   }
 
   private refreshButtonClicked(event: Event): void {
     event.consume(true);
-    this.#refreshExpressions();
+    void this.#refreshExpressions();
   }
-
-  #refreshExpressions(): void {
+  async #refreshExpressions(): Promise<void> {
     this.linkifier.reset();
-    for (const expression of this.#watchExpressions) {
-      expression.removeEventListener(Events.EXPRESSION_UPDATED, this.watchExpressionUpdated, this);
-    }
     this.#watchExpressions = [];
     const watchExpressionStrings = this.#watchExpressionsSetting.get();
 
-    const oldExpandControllers = this.#expandControllers;
-    this.#expandControllers = new Map();
+    const oldExpansionTrackers = this.#expansionTrackers;
+    this.#expansionTrackers = new Map();
 
+    const promises = [];
     for (let i = 0; i < watchExpressionStrings.length; ++i) {
       const expression = watchExpressionStrings[i];
       if (!expression) {
         continue;
       }
 
-      const controller = oldExpandControllers.get(expression);
-      if (controller) {
-        this.#expandControllers.set(expression, controller);
+      const tracker = oldExpansionTrackers.get(expression);
+      if (tracker) {
+        this.#expansionTrackers.set(expression, tracker);
       }
 
-      this.createWatchExpression(expression);
+      const watchExpression = new WatchExpression();
+      this.#watchExpressions.push(watchExpression);
+      promises.push(watchExpression.setExpression(expression, this.#getExpansionTracker(expression)));
     }
+    await Promise.all(promises);
     this.requestUpdate();
   }
 
   override async performUpdate(): Promise<void> {
-    await Promise.all(this.#watchExpressions.map(we => we.updateComplete));
-    this.#view(
-        {
-          watchExpressions: this.watchExpressions,
-          onDeleteAll: this.deleteAllButtonClicked.bind(this),
-          onAddExpression: this.addButtonClicked.bind(this),
-          onCopyWatchExpression: watchExpression => {
-            if (watchExpression.result?.description) {
-              Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(watchExpression.result.description);
-            }
+    this.#view({
+      watchExpressions: this.watchExpressions,
+      linkifier: this.linkifier,
+      onDeleteAll: this.#onDeleteAll.bind(this),
+      onAddExpression: this.addButtonClicked.bind(this),
+      onCopyWatchExpression: watchExpression => {
+        if (watchExpression.result?.object.description) {
+          Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(watchExpression.result.object.description);
+        }
+      },
+      onFinishEditing: async (watchExpression: WatchExpression, expression: string|null) => {
+        if (!watchExpression.editing) {
+          return;
+        }
+        watchExpression.editing = false;
+        this.requestUpdate();
+        if (expression === '' || (expression === null && !watchExpression.expression)) {
+          Platform.ArrayUtilities.removeElement(this.#watchExpressions, watchExpression);
+        } else if (expression) {
+          if (watchExpression.expression && watchExpression.expression !== expression) {
+            this.#getExpansionTracker(watchExpression.expression).clear();
+            this.#getExpansionTracker(expression).clear();
           }
-        },
-        {}, this.contentElement);
+          await watchExpression.setExpression(expression, this.#getExpansionTracker(expression));
+        }
+        this.saveExpressions();
+        this.requestUpdate();
+      },
+      onStartEditing: (watchExpression: WatchExpression): void => {
+        watchExpression.editing = true;
+        this.requestUpdate();
+      },
+      onDelete: (watchExpression: WatchExpression): void => {
+        Platform.ArrayUtilities.removeElement(this.#watchExpressions, watchExpression);
+        this.saveExpressions();
+        this.requestUpdate();
+      },
+      onExpand: (e: WatchExpression, expanded: boolean): void => {
+        if (e.result) {
+          e.result.expanded = expanded;
+        }
+      },
+    },
+               {}, this.contentElement);
   }
 
-  #getExpandController(expression: string|null): ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker {
+  #getExpansionTracker(expression: string): ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker {
     if (expression === null) {
       return new ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker();
     }
-    let expandController = this.#expandControllers.get(expression);
-    if (!expandController) {
-      expandController = new ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker();
-      this.#expandControllers.set(expression, expandController);
+    let expansionTracker = this.#expansionTrackers.get(expression);
+    if (!expansionTracker) {
+      expansionTracker = new ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker();
+      this.#expansionTrackers.set(expression, expansionTracker);
     }
-    return expandController;
+    return expansionTracker;
   }
 
-  private createWatchExpression(expression: string|null): WatchExpression {
-    const expandController = this.#getExpandController(expression);
-    const watchExpression = new WatchExpression(expression, expandController, this.linkifier);
-    watchExpression.addEventListener(Events.EXPRESSION_UPDATED, this.watchExpressionUpdated, this);
-    this.#watchExpressions.push(watchExpression);
-    return watchExpression;
-  }
-
-  private watchExpressionUpdated({data: watchExpression}: Common.EventTarget.EventTargetEvent<WatchExpression>): void {
-    const expression = watchExpression.expression();
-    if (!expression) {
-      Platform.ArrayUtilities.removeElement(this.#watchExpressions, watchExpression);
-    }
-
-    this.saveExpressions();
-    this.requestUpdate();
-  }
-
-  private deleteAllButtonClicked(): void {
+  #onDeleteAll(): void {
     this.#watchExpressions = [];
     this.saveExpressions();
-    this.#refreshExpressions();
+    void this.#refreshExpressions();
   }
 
-  private async focusAndAddExpressionToWatch(expression: string): Promise<void> {
+  async #focusAndAddExpressionToWatch(expression: string): Promise<void> {
     await UI.ViewManager.ViewManager.instance().showView('sources.watch');
-    this.createWatchExpression(expression);
+    const watchExpression = new WatchExpression();
+    await watchExpression.setExpression(expression, this.#getExpansionTracker(expression));
+    this.watchExpressions.push(watchExpression);
     this.saveExpressions();
-    this.#refreshExpressions();
+    await this.#refreshExpressions();
   }
 
   handleAction(_context: UI.Context.Context, _actionId: string): boolean {
@@ -355,18 +592,17 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
     }
     const {state} = frame.textEditor;
     const text = state.sliceDoc(state.selection.main.from, state.selection.main.to);
-    void this.focusAndAddExpressionToWatch(text);
+    void this.#focusAndAddExpressionToWatch(text);
     return true;
   }
 
-  appendApplicableItems(
-      _event: Event, contextMenu: UI.ContextMenu.ContextMenu,
-      target: ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement|UISourceCodeFrame): void {
-    if (target instanceof ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement) {
-      if (!target.property.property.synthetic) {
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.addPropertyPathToWatch), () => this.focusAndAddExpressionToWatch(target.path()),
-            {jslogContext: 'add-property-path-to-watch'});
+  appendApplicableItems(_event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+                        target: ObjectUI.ObjectPropertiesSection.ObjectTreeNode|UISourceCodeFrame): void {
+    if (target instanceof ObjectUI.ObjectPropertiesSection.ObjectTreeNode) {
+      if (!target.property.synthetic) {
+        contextMenu.debugSection().appendItem(i18nString(UIStrings.addPropertyPathToWatch),
+                                              () => this.#focusAndAddExpressionToWatch(target.path),
+                                              {jslogContext: 'add-property-path-to-watch'});
       }
       return;
     }
@@ -379,63 +615,40 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
   }
 }
 
-class ObjectPropertyPrompt extends UI.TextPrompt.TextPrompt {
-  constructor() {
-    super();
-    this.initialize(TextEditor.JavaScript.completeInContext);
-  }
-}
+export class WatchExpression {
+  editing = false;
+  #exceptionDetails: Protocol.Runtime.ExceptionDetails|undefined = undefined;
+  #result: ObjectUI.ObjectPropertiesSection.ObjectTree|undefined = undefined;
+  #expression: string|null = null;
 
-export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
-  #treeElement!: UI.TreeOutline.TreeElement;
-  private nameElement!: Element;
-  private valueElement!: Element;
-  #expression: string|null;
-  readonly #expandController: ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker;
-  private element: HTMLDivElement;
-  private editing: boolean;
-  private linkifier: Components.Linkifier.Linkifier;
-  private textPrompt?: ObjectPropertyPrompt;
-  #result?: SDK.RemoteObject.RemoteObject|null;
-  private preventClickTimeout?: number;
-  #updateComplete: Promise<void> = Promise.resolve();
-  constructor(
-      expression: string|null, expandController: ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker,
-      linkifier: Components.Linkifier.Linkifier) {
-    super();
-
-    this.#expression = expression;
-    this.#expandController = expandController;
-    this.element = document.createElement('div');
-    this.element.classList.add('watch-expression');
-    this.element.classList.add('monospace');
-    this.editing = false;
-    this.linkifier = linkifier;
-
-    void this.createWatchExpression();
-    this.update();
+  get exceptionDetails(): Protocol.Runtime.ExceptionDetails|undefined {
+    return this.#exceptionDetails;
   }
 
-  get result(): SDK.RemoteObject.RemoteObject|null {
-    return this.#result ?? null;
-  }
-  get updateComplete(): Promise<void> {
-    return this.#updateComplete;
+  get result(): ObjectUI.ObjectPropertiesSection.ObjectTree|undefined {
+    return this.#result;
   }
 
-  treeElement(): UI.TreeOutline.TreeElement {
-    return this.#treeElement;
-  }
-
-  expression(): string|null {
+  get expression(): string|null {
     return this.#expression;
   }
 
-  async #evaluateExpression(executionContext: SDK.RuntimeModel.ExecutionContext, expression: string):
-      Promise<SDK.RuntimeModel.EvaluationResult> {
+  async setExpression(
+      expression: string,
+      expandController: ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker,
+      ): Promise<void> {
+    this.#exceptionDetails = this.#result = undefined;
+    this.#expression = expression;
+
+    const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
+    if (!expression || !executionContext) {
+      return;
+    }
+
     const callFrame = executionContext.debuggerModel.selectedCallFrame();
     if (callFrame?.script.isJavaScript()) {
-      const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);
+      const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(
+          callFrame, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance());
       try {
         expression =
             await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(expression, nameMap);
@@ -443,231 +656,30 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       }
     }
 
-    return await executionContext.evaluate(
-        {
-          expression,
-          objectGroup: WatchExpression.watchObjectGroupId,
-          includeCommandLineAPI: false,
-          silent: true,
-          returnByValue: false,
-          generatePreview: false,
-        },
-        /* userGesture */ false,
-        /* awaitPromise */ false);
-  }
-
-  update(): void {
-    const currentExecutionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
-    if (currentExecutionContext && this.#expression) {
-      this.#updateComplete = this.#evaluateExpression(currentExecutionContext, this.#expression)
-                                 .then(async result => {
-                                   if ('object' in result) {
-                                     await this.createWatchExpression(result.object, result.exceptionDetails);
-                                   } else {
-                                     await this.createWatchExpression();
-                                   }
-                                 })
-                                 .catch(() => {});
-    } else {
-      this.#updateComplete = this.createWatchExpression();
-    }
-  }
-
-  startEditing(): void {
-    this.editing = true;
-    this.#treeElement.setDisableSelectFocus(true);
-    this.element.removeChildren();
-    const newDiv = this.element.createChild('div');
-    newDiv.textContent = this.nameElement.textContent;
-    this.textPrompt = new ObjectPropertyPrompt();
-    this.textPrompt.renderAsBlock();
-    const proxyElement = (this.textPrompt.attachAndStartEditing(newDiv, this.finishEditing.bind(this)) as HTMLElement);
-    this.#treeElement.listItemElement.classList.add('watch-expression-editing');
-    this.#treeElement.collapse();
-    proxyElement.classList.add('watch-expression-text-prompt-proxy');
-    proxyElement.addEventListener('keydown', this.promptKeyDown.bind(this), false);
-    const selection = this.element.getComponentSelection();
-    if (selection) {
-      selection.selectAllChildren(newDiv);
-    }
-  }
-
-  isEditing(): boolean {
-    return Boolean(this.editing);
-  }
-
-  private finishEditing(event: Event, canceled?: boolean): void {
-    if (event) {
-      event.consume(canceled);
-    }
-
-    this.editing = false;
-    this.#treeElement.setDisableSelectFocus(false);
-    this.#treeElement.listItemElement.classList.remove('watch-expression-editing');
-    if (this.textPrompt) {
-      const text = this.textPrompt.text();
-      this.textPrompt.detach();
-      const newExpression = canceled ? this.#expression : text;
-      this.textPrompt = undefined;
-      this.element.removeChildren();
-      this.updateExpression(newExpression);
-    }
-  }
-
-  private dblClickOnWatchExpression(event: Event): void {
-    event.consume();
-    if (!this.isEditing()) {
-      this.startEditing();
-    }
-  }
-
-  updateExpression(newExpression: string|null): void {
-    if (this.#expression !== newExpression && newExpression) {
-      this.#expandController.clear();
-    }
-    this.#expression = newExpression;
-    this.update();
-    this.dispatchEventToListeners(Events.EXPRESSION_UPDATED, this);
-  }
-
-  private deleteWatchExpression(event: Event): void {
-    event.consume(true);
-    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.watchExpressionDeleted));
-    this.updateExpression(null);
-  }
-
-  async createWatchExpression(
-      result?: SDK.RemoteObject.RemoteObject, exceptionDetails?: Protocol.Runtime.ExceptionDetails): Promise<void> {
-    this.#result = result || null;
-
-    this.element.removeChildren();
-    const oldTreeElement = this.#treeElement;
-    await this.#createWatchExpressionTreeElement(result, exceptionDetails);
-    if (oldTreeElement?.parent) {
-      const root = oldTreeElement.parent;
-      const index = root.indexOfChild(oldTreeElement);
-      root.removeChild(oldTreeElement);
-      root.insertChild(this.#treeElement, index);
-    }
-    this.#treeElement.select();
-  }
-
-  private createWatchExpressionHeader(
-      expressionValue?: SDK.RemoteObject.RemoteObject, exceptionDetails?: Protocol.Runtime.ExceptionDetails): Element {
-    const headerElement = this.element.createChild('div', 'watch-expression-header');
-    const deleteButton = new Buttons.Button.Button();
-    deleteButton.data = {
-      variant: Buttons.Button.Variant.ICON,
-      iconName: 'bin',
-      size: Buttons.Button.Size.SMALL,
-      jslogContext: 'delete-watch-expression',
-    };
-    deleteButton.className = 'watch-expression-delete-button';
-    UI.Tooltip.Tooltip.install(deleteButton, i18nString(UIStrings.deleteWatchExpression));
-    deleteButton.addEventListener('click', this.deleteWatchExpression.bind(this), false);
-    deleteButton.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        this.deleteWatchExpression(event);
+    try {
+      const result = await executionContext.evaluateWithSelectedFrameFallback({
+        expression,
+        objectGroup: WatchExpression.watchObjectGroupId,
+        includeCommandLineAPI: false,
+        silent: true,
+        returnByValue: false,
+        generatePreview: false,
+      },
+                                                                              /* userGesture */ false,
+                                                                              /* awaitPromise */ false);
+      if ('object' in result) {
+        const objectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(result.object, {
+          readOnly: true,
+          propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
+          expansionTracker: expandController,
+        });
+        await expandController.apply(objectTree);
+        this.#result = objectTree;
+        this.#exceptionDetails = result.exceptionDetails;
       }
-    });
-
-    const titleElement = headerElement.createChild('div', 'watch-expression-title tree-element-title');
-    titleElement.appendChild(deleteButton);
-    this.nameElement = ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.createNameElement(this.#expression);
-    UI.Tooltip.Tooltip.install(this.nameElement as HTMLElement, this.#expression);
-    if (Boolean(exceptionDetails) || !expressionValue) {
-      this.valueElement = document.createElement('span');
-      this.valueElement.classList.add('watch-expression-error');
-      this.valueElement.classList.add('value');
-      titleElement.classList.add('dimmed');
-      this.valueElement.textContent = i18nString(UIStrings.notAvailable);
-      if (exceptionDetails?.exception?.description !== undefined) {
-        UI.Tooltip.Tooltip.install(this.valueElement as HTMLElement, exceptionDetails.exception.description);
-      }
-    } else {
-      const propertyValue =
-          ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.createPropertyValueWithCustomSupport(
-              expressionValue, Boolean(exceptionDetails), false /* showPreview */, this.linkifier);
-      this.valueElement = propertyValue;
-    }
-    const separatorElement = document.createElement('span');
-    separatorElement.classList.add('watch-expressions-separator');
-    separatorElement.textContent = ': ';
-    titleElement.append(this.nameElement, separatorElement, this.valueElement);
-
-    return headerElement;
-  }
-
-  async #createWatchExpressionTreeElement(
-      expressionValue?: SDK.RemoteObject.RemoteObject,
-      exceptionDetails?: Protocol.Runtime.ExceptionDetails): Promise<void> {
-    const headerElement = this.createWatchExpressionHeader(expressionValue, exceptionDetails);
-
-    if (!exceptionDetails && expressionValue && expressionValue.hasChildren && !expressionValue.customPreview()) {
-      headerElement.classList.add('watch-expression-object-header');
-      const objectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(expressionValue, {
-        readOnly: true,
-        propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
-        expansionTracker: this.#expandController,
-      });
-      await this.#expandController.apply(objectTree);
-      this.#treeElement = new ObjectUI.ObjectPropertiesSection.RootElement(objectTree, this.linkifier);
-      this.#treeElement.toggleOnClick = false;
-      this.#treeElement.listItemElement.addEventListener('click', this.onSectionClick.bind(this), false);
-      this.#treeElement.listItemElement.addEventListener('dblclick', this.dblClickOnWatchExpression.bind(this));
-    } else {
-      headerElement.addEventListener('dblclick', this.dblClickOnWatchExpression.bind(this));
-      this.#treeElement = new UI.TreeOutline.TreeElement();
-    }
-    this.#treeElement.title = this.element;
-    this.#treeElement.listItemElement.classList.add('watch-expression-tree-item');
-    this.#treeElement.listItemElement.addEventListener('keydown', event => {
-      if (event.key === 'Enter' && !this.isEditing()) {
-        this.startEditing();
-        event.consume(true);
-      } else if (event.key === 'Delete' && !this.isEditing()) {
-        this.deleteWatchExpression(event);
-      }
-    });
-  }
-
-  private onSectionClick(event: MouseEvent): void {
-    event.consume(true);
-    const mouseEvent = event;
-    if (mouseEvent.detail === 1) {
-      this.preventClickTimeout = window.setTimeout(handleClick.bind(this), 333);
-    } else if (this.preventClickTimeout !== undefined) {
-      window.clearTimeout(this.preventClickTimeout);
-      this.preventClickTimeout = undefined;
-    }
-
-    function handleClick(this: WatchExpression): void {
-      if (!this.#treeElement) {
-        return;
-      }
-
-      if (this.#treeElement.expanded) {
-        this.#treeElement.collapse();
-      } else if (!this.editing) {
-        this.#treeElement.expand();
-      }
-    }
-  }
-
-  private promptKeyDown(event: KeyboardEvent): void {
-    const isEscapeKey = Platform.KeyboardUtilities.isEscKey(event);
-    if (event.key === 'Enter' || isEscapeKey) {
-      this.finishEditing(event, isEscapeKey);
+    } catch {
     }
   }
 
   private static readonly watchObjectGroupId = 'watch-group';
-}
-
-const enum Events {
-  EXPRESSION_UPDATED = 'ExpressionUpdated',
-}
-
-interface EventTypes {
-  [Events.EXPRESSION_UPDATED]: WatchExpression;
 }

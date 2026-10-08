@@ -3,20 +3,21 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import * as Common from '../../core/common/common.js';  // Added this
+import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import * as Elements from './elements.js';
 
 const {EventListenersWidget, DispatchFilterBy} = Elements.EventListenersWidget;
 
-describeWithMockConnection('EventListenersWidget', () => {
+describeWithEnvironment('EventListenersWidget', () => {
   let target: SDK.Target.Target;
 
   beforeEach(() => {
@@ -55,8 +56,8 @@ describeWithMockConnection('EventListenersWidget', () => {
 
   it('updates on framework listeners setting change', async () => {
     const view = await setup();
-    const showFrameworkListenersSetting =
-        Common.Settings.Settings.instance().settingForTest('show-frameowkr-listeners');
+    const showFrameworkListenersSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.ElementsSettings.showFrameworkListenersSettingDescriptor);
     showFrameworkListenersSetting.set(false);
     let input = await view.nextInput;
     assert.isFalse(input.filter.showFramework);
@@ -68,8 +69,8 @@ describeWithMockConnection('EventListenersWidget', () => {
 
   it('updates on ancestor setting change', async () => {
     const view = await setup();
-    const showForAncestorsSetting =
-        Common.Settings.Settings.instance().moduleSetting('show-event-listeners-for-ancestors');
+    const showForAncestorsSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.ElementsSettings.showEventListenersForAncestorsSettingDescriptor);
 
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
@@ -91,7 +92,7 @@ describeWithMockConnection('EventListenersWidget', () => {
     sinon.stub(parent, 'resolveToObject').withArgs('event-listeners-panel').resolves(parentRemoteObject);
     sinon.stub(grandParent, 'resolveToObject').withArgs('event-listeners-panel').resolves(grandParentRemoteObject);
     const executionContext = sinon.createStubInstance(SDK.RuntimeModel.ExecutionContext);
-    executionContext.evaluate.resolves({object: windowRemoteObject});
+    executionContext.evaluateWithSelectedFrameFallback.resolves({object: windowRemoteObject});
     sinon.stub(runtimeModel, 'executionContexts').returns([executionContext]);
 
     // Set flavor, which will trigger an update.
@@ -120,10 +121,12 @@ describeWithMockConnection('EventListenersWidget', () => {
 
     const windowRemoteObject = sinon.createStubInstance(SDK.RemoteObject.RemoteObject);
     const executionContext = sinon.createStubInstance(SDK.RuntimeModel.ExecutionContext);
-    executionContext.evaluate.resolves({object: windowRemoteObject});
+    executionContext.evaluateWithSelectedFrameFallback.resolves({object: windowRemoteObject});
     sinon.stub(runtimeModel, 'executionContexts').returns([executionContext]);
 
-    Common.Settings.Settings.instance().moduleSetting('show-event-listeners-for-ancestors').set(true);
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.showEventListenersForAncestorsSettingDescriptor)
+        .set(true);
     UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node1);
     const input = await view.nextInput;
     assert.deepEqual(input.eventListenerObjects, [node1RemoteObject, windowRemoteObject]);

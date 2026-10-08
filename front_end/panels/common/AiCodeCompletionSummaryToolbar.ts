@@ -6,20 +6,20 @@ import '../../ui/components/spinners/spinners.js';
 import '../../ui/components/tooltips/tooltips.js';
 import '../../ui/kit/kit.js';
 
+import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
+import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, nothing, render} from '../../ui/lit/lit.js';
 
-import {AiCodeCompletionDisclaimer} from './AiCodeCompletionDisclaimer.js';
 import styles from './aiCodeCompletionSummaryToolbar.css.js';
 
 const UIStringsNotTranslate = {
   /**
    * @description Text for recitation notice
    */
-  generatedCodeMayBeSubjectToALicense: 'Generated code may be subject to a license.',
+  generatedCodeMayBeSubjectToALicense: 'Generated code may be subject to a license',
   /**
    * @description Text for citations
    */
@@ -34,7 +34,7 @@ export interface AiCodeCompletionSummaryToolbarProps {
   disclaimerTooltipId?: string;
   spinnerTooltipId?: string;
   hasTopBorder?: boolean;
-  panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
+  disclaimerTextVariant?: TextEditor.AiCodeCompletionDisclaimer.DisclaimerTextVariant;
 }
 
 export interface ViewInput {
@@ -45,7 +45,7 @@ export interface ViewInput {
   loading: boolean;
   hasTopBorder: boolean;
   aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
-  panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
+  disclaimerTextVariant?: TextEditor.AiCodeCompletionDisclaimer.DisclaimerTextVariant;
 }
 
 export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
@@ -65,11 +65,11 @@ export const DEFAULT_SUMMARY_TOOLBAR_VIEW: View = (input, _output, target) => {
   // clang-format off
   const disclaimer = input.disclaimerTooltipId && input.spinnerTooltipId ?
     html`<devtools-widget
-            ${widget(AiCodeCompletionDisclaimer, {
+            ${widget(TextEditor.AiCodeCompletionDisclaimer.AiCodeCompletionDisclaimer, {
       disclaimerTooltipId: input.disclaimerTooltipId,
       spinnerTooltipId: input.spinnerTooltipId,
       loading: input.loading,
-      panel: input.panel,
+      disclaimerTextVariant: input.disclaimerTextVariant,
     })} class="disclaimer-widget"></devtools-widget>` : nothing;
 
   const recitationNotice = input.citations && input.citations.size > 0 ?
@@ -113,10 +113,11 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
   #citations = new Set<string>();
   #loading = false;
   #hasTopBorder = false;
-  #panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
+  #disclaimerTextVariant?: TextEditor.AiCodeCompletionDisclaimer.DisclaimerTextVariant;
 
   #aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
-  #boundOnAidaAvailabilityChange: () => Promise<void>;
+  #boundOnAidaAvailabilityChange:
+      (ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>) => void;
 
   constructor(props: AiCodeCompletionSummaryToolbarProps, view?: View) {
     super();
@@ -124,18 +125,21 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
     this.#spinnerTooltipId = props.spinnerTooltipId;
     this.#citationsTooltipId = props.citationsTooltipId;
     this.#hasTopBorder = props.hasTopBorder ?? false;
-    this.#panel = props.panel;
+    this.#disclaimerTextVariant = props.disclaimerTextVariant;
     this.#boundOnAidaAvailabilityChange = this.#onAidaAvailabilityChange.bind(this);
     this.#view = view ?? DEFAULT_SUMMARY_TOOLBAR_VIEW;
     this.requestUpdate();
   }
 
-  async #onAidaAvailabilityChange(): Promise<void> {
-    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
-    if (currentAidaAvailability !== this.#aidaAvailability) {
-      this.#aidaAvailability = currentAidaAvailability;
+  #updateAidaAvailability(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): void {
+    if (aidaAvailability !== this.#aidaAvailability) {
+      this.#aidaAvailability = aidaAvailability;
       this.requestUpdate();
     }
+  }
+
+  #onAidaAvailabilityChange(ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>): void {
+    this.#updateAidaAvailability(ev.data);
   }
 
   setLoading(loading: boolean): void {
@@ -154,25 +158,27 @@ export class AiCodeCompletionSummaryToolbar extends UI.Widget.Widget {
   }
 
   override performUpdate(): void {
-    this.#view(
-        {
-          disclaimerTooltipId: this.#disclaimerTooltipId,
-          spinnerTooltipId: this.#spinnerTooltipId,
-          citations: this.#citations,
-          citationsTooltipId: this.#citationsTooltipId,
-          loading: this.#loading,
-          hasTopBorder: this.#hasTopBorder,
-          aidaAvailability: this.#aidaAvailability,
-          panel: this.#panel,
-        },
-        undefined, this.contentElement);
+    this.#view({
+      disclaimerTooltipId: this.#disclaimerTooltipId,
+      spinnerTooltipId: this.#spinnerTooltipId,
+      citations: this.#citations,
+      citationsTooltipId: this.#citationsTooltipId,
+      loading: this.#loading,
+      hasTopBorder: this.#hasTopBorder,
+      aidaAvailability: this.#aidaAvailability,
+      disclaimerTextVariant: this.#disclaimerTextVariant,
+    },
+               undefined, this.contentElement);
   }
 
   override wasShown(): void {
     super.wasShown();
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
-    void this.#onAidaAvailabilityChange();
+    const initialAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (initialAvailability !== undefined) {
+      this.#updateAidaAvailability(initialAvailability);
+    }
   }
 
   override willHide(): void {

@@ -3,27 +3,36 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Platform from '../../../core/platform/platform.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as Trace from '../../../models/trace/trace.js';
+import {deinitializeGlobalVars} from '../../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
-import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
-import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
 import {SnapshotTester} from '../../../testing/SnapshotTester.js';
+import {TestUniverse} from '../../../testing/TestUniverse.js';
+import {
+  createTraceExtensionDataFromPerformanceAPITestInput,
+  getBaseTraceHandlerData,
+  type PerformanceAPIExtensionTestData,
+} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
-import * as TextUtils from '../../text_utils/text_utils.js';
 import type * as Workspace from '../../workspace/workspace.js';
 import {AICallTree, AIContext, PerformanceTraceFormatter} from '../ai_assistance.js';
 
-async function createFormatter(context: Mocha.Context|Mocha.Suite|null, name: string): Promise<
-    {formatter: PerformanceTraceFormatter.PerformanceTraceFormatter, parsedTrace: Trace.TraceModel.ParsedTrace}> {
-  const parsedTrace = await TraceLoader.traceEngine(context, name, undefined, {
-    withTimelinePanel: false,
-  });
+async function createFormatter(
+    context: Mocha.Context|Mocha.Suite|null,
+    name: string,
+    cruxManager: CrUXManager.CrUXManager,
+    ):
+    Promise<
+        {formatter: PerformanceTraceFormatter.PerformanceTraceFormatter, parsedTrace: Trace.TraceModel.ParsedTrace}> {
+  const parsedTrace = await TraceLoader.traceEngine(context, name);
   assert.isOk(parsedTrace.insights);
   const focus = AIContext.AgentFocus.fromParsedTrace(parsedTrace);
-  const formatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus);
+  const formatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus, null, cruxManager);
   // Don't need an implementation, gonna mock it anyway.
   formatter.resolveFunctionCode = async () => {
     return null;
@@ -47,7 +56,7 @@ function stubResolveFunctionCode(formatter: PerformanceTraceFormatter.Performanc
             uiSourceCode: {
               url() {
                 return url;
-              }
+              },
             } as Workspace.UISourceCode.UISourceCode,
             range,
             name: '',
@@ -63,48 +72,56 @@ function stubResolveFunctionCode(formatter: PerformanceTraceFormatter.Performanc
 
 describe('PerformanceTraceFormatter', function() {
   setupLocaleHooks();
-  setupRuntimeHooks();
-  setupSettingsHooks();
 
   const snapshotTester = new SnapshotTester(this, import.meta);
 
+  let cruxManager: CrUXManager.CrUXManager;
+
+  beforeEach(() => {
+    const universe = new TestUniverse();
+    cruxManager = universe.cruxManager;
+    sinon.stub(CrUXManager.CrUXManager, 'instance').returns(cruxManager);
+  });
+
+  afterEach(async () => {
+    await deinitializeGlobalVars();
+  });
+
   describe('formatTraceSummary', () => {
     it('web-dev.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'web-dev.json.gz');
+      const {formatter} = await createFormatter(this, 'web-dev.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       snapshotTester.assert(this, output);
     });
 
     it('yahoo-news.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz');
+      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       snapshotTester.assert(this, output);
     });
 
     it('multiple-navigations-render-blocking.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz');
+      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       snapshotTester.assert(this, output);
     });
 
     it('deals with CrUX manager errors', async function() {
-      const {formatter} = await createFormatter(this, 'image-delivery.json.gz');
-      sinon.stub(CrUXManager.CrUXManager, 'instance').callsFake(() => {
-        throw new Error('something went wrong with CrUX Manager');
-      });
+      sinon.stub(cruxManager, 'getSelectedScope').throws(new Error('something went wrong with CrUX Manager'));
+      const {formatter} = await createFormatter(this, 'image-delivery.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       snapshotTester.assert(this, output);
     });
 
     // This one has field data.
     it('image-delivery.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'image-delivery.json.gz');
+      const {formatter} = await createFormatter(this, 'image-delivery.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       snapshotTester.assert(this, output);
     });
 
     it('includes INP insight when there is no navigation', async function() {
-      const {formatter} = await createFormatter(this, 'slow-interaction-button-click.json.gz');
+      const {formatter} = await createFormatter(this, 'slow-interaction-button-click.json.gz', cruxManager);
       const output = formatter.formatTraceSummary();
       assert.include(output, 'INP: 139 ms');
       assert.include(output, 'insight name: INPBreakdown');
@@ -112,16 +129,16 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('includes LCP insight of the provided deviceScope', async function() {
-      const {parsedTrace} = await createFormatter(this, 'crux.json.gz');
+      const {parsedTrace} = await createFormatter(this, 'crux.json.gz', cruxManager);
       const focus = AIContext.AgentFocus.fromParsedTrace(parsedTrace);
 
       // Test PHONE scope (LCP is 1082 in crux.json.gz)
-      const phoneFormatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus, 'PHONE');
+      const phoneFormatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus, 'PHONE', cruxManager);
       const phoneOutput = phoneFormatter.formatTraceSummary();
       assert.include(phoneOutput, 'LCP: 1082 ms');
 
       // Test DESKTOP scope (LCP is 883 in crux.json.gz)
-      const desktopFormatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus, 'DESKTOP');
+      const desktopFormatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus, 'DESKTOP', cruxManager);
       const desktopOutput = desktopFormatter.formatTraceSummary();
       assert.include(desktopOutput, 'LCP: 883 ms');
     });
@@ -129,13 +146,13 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatCriticalRequests', () => {
     it('render-blocking-requests.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'render-blocking-requests.json.gz');
+      const {formatter} = await createFormatter(this, 'render-blocking-requests.json.gz', cruxManager);
       const output = await formatter.formatCriticalRequests();
       snapshotTester.assert(this, output);
     });
 
     it('multiple-navigations-render-blocking.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz');
+      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz', cruxManager);
       const output = await formatter.formatCriticalRequests();
       snapshotTester.assert(this, output);
     });
@@ -143,13 +160,13 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatLongestTasks', () => {
     it('long-task-from-worker-thread.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'long-task-from-worker-thread.json.gz');
+      const {formatter} = await createFormatter(this, 'long-task-from-worker-thread.json.gz', cruxManager);
       const output = await formatter.formatLongestTasks();
       snapshotTester.assert(this, output);
     });
 
     it('multiple-navigations-render-blocking.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz');
+      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz', cruxManager);
       const output = await formatter.formatLongestTasks();
       snapshotTester.assert(this, output);
     });
@@ -157,13 +174,13 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatMainThreadBottomUpSummary', () => {
     it('yahoo-news.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz');
+      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz', cruxManager);
       const output = await formatter.formatMainThreadBottomUpSummary();
       snapshotTester.assert(this, output);
     });
 
     it('multiple-navigations-render-blocking.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz');
+      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz', cruxManager);
       const output = await formatter.formatMainThreadBottomUpSummary();
       snapshotTester.assert(this, output);
     });
@@ -171,30 +188,30 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatThirdPartySummary', () => {
     it('yahoo-news.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz');
+      const {formatter} = await createFormatter(this, 'yahoo-news.json.gz', cruxManager);
       const output = await formatter.formatThirdPartySummary();
       snapshotTester.assert(this, output);
     });
 
     it('multiple-navigations-render-blocking.json.gz', async function() {
-      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz');
+      const {formatter} = await createFormatter(this, 'multiple-navigations-render-blocking.json.gz', cruxManager);
       const output = await formatter.formatThirdPartySummary();
       snapshotTester.assert(this, output);
     });
   });
 
   it('formatMainThreadTrackSummary', async function() {
-    const {formatter, parsedTrace} = await createFormatter(this, 'yahoo-news.json.gz');
+    const {formatter, parsedTrace} = await createFormatter(this, 'yahoo-news.json.gz', cruxManager);
     const min = parsedTrace.data.Meta.traceBounds.min;
-    const max =
-        parsedTrace.data.Meta.traceBounds.min + parsedTrace.data.Meta.traceBounds.range / 2 as Trace.Types.Timing.Micro;
+    const max = (parsedTrace.data.Meta.traceBounds.min +
+                 Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000))) as Trace.Types.Timing.Micro;
     const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(min, max);
     const output = await formatter.formatMainThreadTrackSummary(bounds);
     snapshotTester.assert(this, output);
   });
 
   it('formatNetworkTrackSummary', async function() {
-    const {formatter, parsedTrace} = await createFormatter(this, 'yahoo-news.json.gz');
+    const {formatter, parsedTrace} = await createFormatter(this, 'yahoo-news.json.gz', cruxManager);
     // Just check the first 300 ms.
     const min = parsedTrace.data.Meta.traceBounds.min;
     const max = (parsedTrace.data.Meta.traceBounds.min +
@@ -206,7 +223,7 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatCallTree', () => {
     it('long-task-from-worker-thread.json.gz', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'long-task-from-worker-thread.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'long-task-from-worker-thread.json.gz', cruxManager);
       const event = new Trace.EventsSerializer.EventsSerializer().eventForKey('r-62', parsedTrace);
       const tree = AICallTree.AICallTree.fromEvent(event, parsedTrace);
       assert.exists(tree);
@@ -215,7 +232,7 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('web-dev.json.gz', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'web-dev.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'web-dev.json.gz', cruxManager);
       const event = new Trace.EventsSerializer.EventsSerializer().eventForKey(
           'p-73704-775-2074-418' as Trace.Types.File.SerializableKey, parsedTrace);
       const tree = AICallTree.AICallTree.fromEvent(event, parsedTrace);
@@ -227,7 +244,7 @@ describe('PerformanceTraceFormatter', function() {
 
   describe('formatNetworkRequests', () => {
     it('formats network requests that have redirects', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'bad-document-request-latency.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'bad-document-request-latency.json.gz', cruxManager);
       const requestUrl = 'http://localhost:3000/redirect3';
       const request = parsedTrace.data.NetworkRequests.byTime.find(r => r.args.data.url === requestUrl);
       assert.isOk(request);
@@ -236,7 +253,7 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('formats network requests in verbose mode', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'lcp-images.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'lcp-images.json.gz', cruxManager);
       const requestUrl = 'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800';
       const request = parsedTrace.data.NetworkRequests.byTime.find(r => r.args.data.url === requestUrl);
       assert.isOk(request);
@@ -245,7 +262,7 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('defaults to verbose mode when 1 request and verbose option is not defined', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'lcp-images.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'lcp-images.json.gz', cruxManager);
       const requestUrl = 'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800';
       const request = parsedTrace.data.NetworkRequests.byTime.find(r => r.args.data.url === requestUrl);
       assert.isOk(request);
@@ -254,7 +271,7 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('formats in compressed mode if a request is duplicated in the array', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'bad-document-request-latency.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'bad-document-request-latency.json.gz', cruxManager);
       const requests = parsedTrace.data.NetworkRequests.byTime;
       // Duplicate request so that the compressed format is used
       const output = formatter.formatNetworkRequests([requests[0], requests[0]]);
@@ -262,11 +279,543 @@ describe('PerformanceTraceFormatter', function() {
     });
 
     it('correctly formats an initiator chain for network-requests-initiators trace', async function() {
-      const {formatter, parsedTrace} = await createFormatter(this, 'network-requests-initiators.json.gz');
+      const {formatter, parsedTrace} = await createFormatter(this, 'network-requests-initiators.json.gz', cruxManager);
       const request = parsedTrace.data.NetworkRequests.byTime;
       assert.isOk(request);
       const output = formatter.formatNetworkRequests(request);
       snapshotTester.assert(this, output);
+    });
+
+    it('restricts cross-origin requests to CORS-safelisted headers and redacts redirect chains', () => {
+      Trace.Helpers.SyntheticEvents.SyntheticEventsManager.createAndActivate([]);
+      const parsedTrace = getBaseTraceHandlerData();
+      parsedTrace.insights = new Map();
+      (parsedTrace.data.Meta as {mainFrameURL: string}).mainFrameURL = 'https://attacker.example/index.html';
+      const makeSyntheticRequest = (overrides: Partial<Trace.Types.Events.SyntheticNetworkRequest['args']['data']>):
+                                       Trace.Types.Events.SyntheticNetworkRequest => ({
+        name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+        ph: Trace.Types.Events.Phase.COMPLETE,
+        cat: 'loading',
+        ts: Trace.Types.Timing.Micro(1000),
+        dur: Trace.Types.Timing.Micro(500),
+        pid: Trace.Types.Events.ProcessID(1),
+        tid: Trace.Types.Events.ThreadID(1),
+        rawSourceEvent: {
+          cat: 'loading',
+          name: 'ResourceSendRequest',
+          args: {data: {}},
+        },
+        args: {
+          data: {
+            url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+            requestId: 'req-1',
+            frame: 'frame-1',
+            requestingFrameUrl: 'https://attacker.example/index.html',
+            statusCode: 200,
+            mimeType: 'text/css',
+            protocol: 'h2',
+            priority: 'VeryHigh' as unknown as Trace.Types.Events.SyntheticNetworkRequest['args']['data']['priority'],
+            initialPriority: 'VeryHigh' as unknown as
+                Trace.Types.Events.SyntheticNetworkRequest['args']['data']['initialPriority'],
+            renderBlocking: 'blocking',
+            fromServiceWorker: false,
+            redirects: [
+              {
+                url: 'https://idp.victim.example/oauth/authorize',
+                priority: 'VeryHigh',
+                ts: Trace.Types.Timing.Micro(1000),
+                dur: Trace.Types.Timing.Micro(200),
+              },
+              {
+                url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+                priority: 'VeryHigh',
+                ts: Trace.Types.Timing.Micro(1200),
+                dur: Trace.Types.Timing.Micro(100),
+              },
+            ],
+            responseHeaders: [
+              {name: 'content-type', value: 'text/css'},
+              {name: 'cache-control', value: 'no-store'},
+              {name: 'link', value: '<https://internal.victim.example/?token=SECRET_LINK>; rel="preload"'},
+              {name: 'content-security-policy', value: 'default-src \'self\' internal.victim.example'},
+              {name: 'x-forwarded-host', value: 'internal-lb.victim.example'},
+            ],
+            syntheticData: {
+              sendStartTime: Trace.Types.Timing.Micro(1300),
+              downloadStart: Trace.Types.Timing.Micro(1400),
+              finishTime: Trace.Types.Timing.Micro(1450),
+            } as unknown as Trace.Types.Events.SyntheticNetworkRequest['args']['data']['syntheticData'],
+            ...overrides,
+          } as unknown as Trace.Types.Events.SyntheticNetworkRequest['args']['data'],
+        },
+      } as unknown as Trace.Types.Events.SyntheticNetworkRequest);
+
+      const crossOriginRequest = makeSyntheticRequest({});
+      const crossOriginInitiatedRequest = makeSyntheticRequest({
+        requestId: 'req-2',
+        url: 'https://app.victim.example/imported.css?secret=SUBRESOURCE_SECRET',
+        redirects: [],
+        initiator: {
+          type: 'parser' as unknown as
+              NonNullable<Trace.Types.Events.SyntheticNetworkRequest['args']['data']['initiator']>['type'],
+          fetchType: 'link',
+          url: 'https://app.victim.example/parent.css',
+        },
+      });
+      const crossOriginBounceRequest = makeSyntheticRequest({
+        requestId: 'req-3',
+        url: 'https://attacker.example/done?ticket=SECRET_BOUNCE_TICKET',
+        redirects: [
+          {
+            url: 'https://attacker.example/start',
+            priority: 'VeryHigh',
+            ts: Trace.Types.Timing.Micro(1000),
+            dur: Trace.Types.Timing.Micro(100),
+          },
+          {
+            url: 'https://idp.victim.example/sso?ticket=SECRET_BOUNCE_TICKET',
+            priority: 'VeryHigh',
+            ts: Trace.Types.Timing.Micro(1100),
+            dur: Trace.Types.Timing.Micro(100),
+          },
+        ],
+      });
+
+      const focus = AIContext.AgentFocus.fromParsedTrace(parsedTrace);
+      const formatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus);
+
+      const verboseOutput = formatter.formatNetworkRequests([crossOriginRequest], {verbose: true});
+      assert.include(verboseOutput, '## Network request: https://idp.victim.example/oauth/authorize');
+      assert.include(verboseOutput, 'Redirects: no redirects');
+      assert.include(verboseOutput, '- content-type: text/css');
+      assert.include(verboseOutput, '- cache-control: no-store');
+      assert.notInclude(verboseOutput, 'SECRET_OAUTH_CODE');
+      assert.notInclude(verboseOutput, 'SECRET_LINK');
+      assert.notInclude(verboseOutput, 'internal.victim.example');
+      assert.notInclude(verboseOutput, 'internal-lb.victim.example');
+
+      const compressedOutput = formatter.formatNetworkRequests(
+          [crossOriginRequest, crossOriginInitiatedRequest, crossOriginBounceRequest], {verbose: false});
+      assert.include(compressedOutput, 'https://idp.victim.example/oauth/authorize');
+      assert.include(compressedOutput, 'https://attacker.example/start');
+      assert.include(compressedOutput, '[content-type: text/css|cache-control: no-store]');
+      assert.notInclude(compressedOutput, 'SECRET_OAUTH_CODE');
+      assert.notInclude(compressedOutput, 'SECRET_BOUNCE_TICKET');
+      assert.notInclude(compressedOutput, 'SECRET_LINK');
+      assert.notInclude(compressedOutput, 'internal.victim.example');
+      assert.notInclude(compressedOutput, 'internal-lb.victim.example');
+    });
+  });
+
+  describe('custom tracks', () => {
+    async function createFormatterWithExtensionData(extensionData: PerformanceAPIExtensionTestData[]):
+        Promise<PerformanceTraceFormatter.PerformanceTraceFormatter> {
+      const extensionTraceData = await createTraceExtensionDataFromPerformanceAPITestInput(extensionData);
+      const parsedTrace = getBaseTraceHandlerData();
+      parsedTrace.insights = new Map();
+      (parsedTrace.data as {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        ExtensionTraceData: Trace.Handlers.ModelHandlers.ExtensionTraceData.ExtensionTraceData,
+      }).ExtensionTraceData = extensionTraceData;
+
+      const focus = AIContext.AgentFocus.fromParsedTrace(parsedTrace);
+      const formatter = new PerformanceTraceFormatter.PerformanceTraceFormatter(focus);
+      formatter.resolveFunctionCode = async () => null;
+      stubResolveFunctionCode(formatter);
+      return formatter;
+    }
+
+    it('formats trace summary with custom tracks', async () => {
+      const extensionData: PerformanceAPIExtensionTestData[] = [
+        {
+          detail: {
+            devtools: {
+              dataType: 'track-entry',
+              track: 'An extension track',
+              properties: [['Description', 'Something']],
+            },
+          },
+          name: 'An extension measurement',
+          ts: 100,
+          dur: 100,
+        },
+        {
+          detail: {
+            devtools: {
+              dataType: 'track-entry',
+              trackGroup: 'Group 1',
+              track: 'Track 1',
+            },
+          },
+          name: 'Grouped measurement',
+          ts: 200,
+          dur: 50,
+        },
+      ];
+      const formatter = await createFormatterWithExtensionData(extensionData);
+      const output = formatter.formatTraceSummary();
+      assert.include(output, '# Custom tracks');
+      assert.include(output, 'Track: An extension track');
+      assert.include(output, 'Group: Group 1');
+      assert.include(output, 'Track: Track 1');
+    });
+
+    it('formats custom track summary', async () => {
+      const extensionData: PerformanceAPIExtensionTestData[] = [
+        {
+          detail: {
+            devtools: {
+              dataType: 'track-entry',
+              track: 'An extension track',
+              properties: [['Description', 'Something']],
+            },
+          },
+          name: 'An extension measurement',
+          ts: 100,
+          dur: 100,
+        },
+        {
+          detail: {
+            devtools: {
+              dataType: 'track-entry',
+              trackGroup: 'Group 1',
+              track: 'Track 1',
+            },
+          },
+          name: 'Grouped measurement',
+          ts: 200,
+          dur: 50,
+        },
+      ];
+      const formatter = await createFormatterWithExtensionData(extensionData);
+      const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
+          Trace.Types.Timing.Micro(0),
+          Trace.Types.Timing.Micro(500),
+      );
+      const output = formatter.formatExtensionTrackSummary(bounds);
+      assert.include(output, '# Track: An extension track');
+      assert.include(output, 'Name: An extension measurement');
+      assert.include(output, 'duration: 0.1\u00a0ms');
+      assert.include(output, 'properties: {Description: "Something"}');
+      assert.include(output, '# Track Group: Group 1');
+      assert.include(output, '## Track: Track 1');
+      assert.include(output, 'Name: Grouped measurement');
+    });
+  });
+
+  describe('formatEventForAI', () => {
+    it('sanitizes headers for same-origin network requests', () => {
+      const parsedTrace = getBaseTraceHandlerData();
+      (parsedTrace.data.Meta as {mainFrameURL: string}).mainFrameURL = 'https://example.com/index.html';
+
+      const mockNetworkEvent = {
+        name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+        args: {
+          data: {
+            url: 'https://example.com/api',
+            redirects: [],
+            responseHeaders: [
+              {name: 'x-csrf-token', value: 'secret'},
+              {name: 'content-type', value: 'text/html'},
+              {name: 'server', value: 'custom-server'},
+            ],
+          },
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockNetworkEvent, parsedTrace);
+      const parsed = JSON.parse(output);
+      assert.deepEqual(parsed.args.data.responseHeaders, [
+        {name: 'x-csrf-token', value: '<redacted>'},
+        {name: 'content-type', value: 'text/html'},
+        {name: 'server', value: 'custom-server'},
+      ]);
+    });
+
+    it('restricts cross-origin network requests to CORS-safelisted headers and redacts redirect URLs', () => {
+      const parsedTrace = getBaseTraceHandlerData();
+      (parsedTrace.data.Meta as {mainFrameURL: string}).mainFrameURL = 'https://attacker.example/index.html';
+
+      const mockNetworkEvent = {
+        name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+        rawSourceEvent: {
+          name: 'ResourceSendRequest',
+          args: {
+            data: {
+              requestId: 'req-1',
+              url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+            },
+          },
+        },
+        args: {
+          data: {
+            requestId: 'req-1',
+            url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+            requestingFrameUrl: 'https://attacker.example/index.html',
+            redirects: [
+              {
+                url: 'https://idp.victim.example/oauth/authorize',
+                priority: 'VeryHigh',
+                ts: 1000,
+                dur: 200,
+              },
+            ],
+            responseHeaders: [
+              {name: 'x-csrf-token', value: 'secret'},
+              {name: 'link', value: '<https://internal.victim.example/?token=SECRET>; rel="preload"'},
+              {name: 'content-type', value: 'text/html'},
+              {name: 'cache-control', value: 'no-store'},
+            ],
+          },
+        },
+      } as unknown as Trace.Types.Events.SyntheticNetworkRequest;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockNetworkEvent, parsedTrace);
+      assert.notInclude(output, 'SECRET_OAUTH_CODE');
+      assert.notInclude(output, 'internal.victim.example');
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.args.data.url, 'https://idp.victim.example/oauth/authorize');
+      assert.strictEqual(parsed.rawSourceEvent.args.data.url, 'https://idp.victim.example/oauth/authorize');
+      assert.deepEqual(parsed.args.data.redirects, []);
+      assert.deepEqual(parsed.args.data.responseHeaders, [
+        {name: 'content-type', value: 'text/html'},
+        {name: 'cache-control', value: 'no-store'},
+      ]);
+    });
+
+    it('redacts post-redirect URLs on cross-origin ResourceSendRequest events while preserving same-origin hop URLs',
+       () => {
+         const parsedTrace = getBaseTraceHandlerData();
+         (parsedTrace.data.Meta as {mainFrameURL: string}).mainFrameURL = 'https://attacker.example/index.html';
+         (parsedTrace.data.NetworkRequests as {byTime: Trace.Types.Events.SyntheticNetworkRequest[]}).byTime = [
+           {
+             name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+             args: {
+               data: {
+                 requestId: 'req-redirect',
+                 url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+                 redirects: [
+                   {
+                     url: 'https://idp.victim.example/oauth/authorize',
+                     priority: 'VeryHigh',
+                     ts: 1000,
+                     dur: 200,
+                   },
+                 ],
+               },
+             },
+           } as unknown as Trace.Types.Events.SyntheticNetworkRequest,
+           {
+             name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+             args: {
+               data: {
+                 requestId: 'req-same-origin-redirect',
+                 url: 'https://attacker.example/final',
+                 redirects: [
+                   {
+                     url: 'https://attacker.example/start',
+                     priority: 'VeryHigh',
+                     ts: 1000,
+                     dur: 200,
+                   },
+                 ],
+               },
+             },
+           } as unknown as Trace.Types.Events.SyntheticNetworkRequest,
+         ];
+
+         const rawSendRequestEvent = {
+           name: 'ResourceSendRequest',
+           args: {
+             data: {
+               requestId: 'req-redirect',
+               url: 'https://app.victim.example/cb?code=SECRET_OAUTH_CODE',
+             },
+           },
+         } as unknown as Trace.Types.Events.Event;
+
+         const output = PerformanceTraceFormatter.formatEventForAI(rawSendRequestEvent, parsedTrace);
+         assert.notInclude(output, 'SECRET_OAUTH_CODE');
+         const parsed = JSON.parse(output);
+         assert.strictEqual(parsed.args.data.url, 'https://idp.victim.example/oauth/authorize');
+
+         const sameOriginInitialHopEvent = {
+           name: 'ResourceSendRequest',
+           args: {
+             data: {
+               requestId: 'req-same-origin-redirect',
+               url: 'https://attacker.example/start',
+             },
+           },
+         } as unknown as Trace.Types.Events.Event;
+
+         const sameOriginOutput = PerformanceTraceFormatter.formatEventForAI(sameOriginInitialHopEvent, parsedTrace);
+         const sameOriginParsed = JSON.parse(sameOriginOutput);
+         assert.strictEqual(sameOriginParsed.args.data.url, 'https://attacker.example/start');
+       });
+
+    it('sanitizes headers for ResourceReceiveResponse events', () => {
+      const mockReceiveResponseEvent = {
+        name: Trace.Types.Events.Name.RESOURCE_RECEIVE_RESPONSE,
+        args: {
+          data: {
+            requestId: 'req-1',
+            headers: [
+              {name: 'cookie', value: 'secret'},
+              {name: 'link', value: '<https://internal.example>; rel="preload"'},
+              {name: 'content-type', value: 'text/html'},
+              {name: 'cache-control', value: 'max-age=60'},
+            ],
+          },
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const parsedTrace = getBaseTraceHandlerData();
+      const crossOriginOutput = PerformanceTraceFormatter.formatEventForAI(mockReceiveResponseEvent, parsedTrace);
+      const crossOriginParsed = JSON.parse(crossOriginOutput);
+      assert.deepEqual(crossOriginParsed.args.data.headers, [
+        {name: 'content-type', value: 'text/html'},
+        {name: 'cache-control', value: 'max-age=60'},
+      ]);
+
+      (parsedTrace.data.Meta as {mainFrameURL: string}).mainFrameURL = 'https://example.com/index.html';
+      (parsedTrace.data.NetworkRequests as {byTime: Trace.Types.Events.SyntheticNetworkRequest[]}).byTime = [
+        {
+          name: Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
+          args: {
+            data: {
+              requestId: 'req-1',
+              url: 'https://example.com/page',
+              redirects: [],
+            },
+          },
+        } as unknown as Trace.Types.Events.SyntheticNetworkRequest,
+      ];
+      const sameOriginOutput = PerformanceTraceFormatter.formatEventForAI(mockReceiveResponseEvent, parsedTrace);
+      const sameOriginParsed = JSON.parse(sameOriginOutput);
+      assert.deepEqual(sameOriginParsed.args.data.headers, [
+        {name: 'cookie', value: '<redacted>'},
+        {name: 'link', value: '<https://internal.example>; rel="preload"'},
+        {name: 'content-type', value: 'text/html'},
+        {name: 'cache-control', value: 'max-age=60'},
+      ]);
+    });
+
+    it('redacts script source for RundownScriptSource events', () => {
+      const mockRundownEvent = {
+        name: 'ScriptCatchup',
+        cat: 'disabled-by-default-devtools.v8-source-rundown-sources',
+        args: {
+          data: {
+            isolate: 'isolate-1',
+            scriptId: 'script-1',
+            length: 100,
+            sourceText: 'function secret() { return 42; }',
+          },
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockRundownEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.isUndefined(parsed.args.data.sourceText);
+      assert.deepEqual(parsed.args.data, {
+        isolate: 'isolate-1',
+        scriptId: 'script-1',
+        length: 100,
+      });
+    });
+
+    it('redacts script source for RundownScriptSourceLarge events', () => {
+      const mockRundownLargeEvent = {
+        name: 'LargeScriptCatchup',
+        cat: 'disabled-by-default-devtools.v8-source-rundown-sources',
+        args: {
+          data: {
+            isolate: 'isolate-1',
+            scriptId: 'script-1',
+            splitIndex: 0,
+            splitCount: 2,
+            sourceText: 'function secret() { return 42; }',
+          },
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockRundownLargeEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.isUndefined(parsed.args.data.sourceText);
+      assert.deepEqual(parsed.args.data, {
+        isolate: 'isolate-1',
+        scriptId: 'script-1',
+        splitIndex: 0,
+        splitCount: 2,
+      });
+    });
+
+    it('redacts snapshot data for modern Screenshot events', () => {
+      const mockScreenshotEvent = {
+        name: Trace.Types.Events.Name.SCREENSHOT,
+        ph: Trace.Types.Events.Phase.INSTANT,
+        args: {
+          snapshot: 'base64rawimagedata...',
+          source_id: 1,
+          frame_sequence: 123,
+          expected_display_time: 456,
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockScreenshotEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.args.snapshot, '<redacted base64 image data>');
+      assert.strictEqual(parsed.args.source_id, 1);
+      assert.strictEqual(parsed.args.frame_sequence, 123);
+      assert.strictEqual(parsed.args.expected_display_time, 456);
+    });
+
+    it('redacts snapshot data for legacy Screenshot events', () => {
+      const mockLegacyScreenshotEvent = {
+        name: Trace.Types.Events.Name.SCREENSHOT,
+        ph: Trace.Types.Events.Phase.OBJECT_SNAPSHOT,
+        id: '0x1',
+        args: {
+          snapshot: 'legacybase64rawimagedata...',
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockLegacyScreenshotEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.args.snapshot, '<redacted base64 image data>');
+      assert.strictEqual(parsed.id, '0x1');
+    });
+
+    it('redacts dataUri data for legacy synthetic Screenshot events', () => {
+      const mockLegacySyntheticScreenshotEvent = {
+        name: Trace.Types.Events.Name.SCREENSHOT,
+        ph: Trace.Types.Events.Phase.OBJECT_SNAPSHOT,
+        args: {
+          dataUri: 'data:image/jpg;base64,legacybase64rawimagedata...',
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output =
+          PerformanceTraceFormatter.formatEventForAI(mockLegacySyntheticScreenshotEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.args.dataUri, '<redacted base64 image data>');
+    });
+
+    it('serializes other events as-is', () => {
+      const mockGenericEvent = {
+        name: 'generic-event',
+        ts: 1234,
+        args: {
+          data: {
+            someProp: 'value',
+          },
+        },
+      } as unknown as Trace.Types.Events.Event;
+
+      const output = PerformanceTraceFormatter.formatEventForAI(mockGenericEvent, getBaseTraceHandlerData());
+      const parsed = JSON.parse(output);
+      assert.deepEqual(parsed, mockGenericEvent);
     });
   });
 });

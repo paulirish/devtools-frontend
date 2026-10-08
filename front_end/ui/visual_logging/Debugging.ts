@@ -6,7 +6,7 @@
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 
 import type {Loggable} from './Loggable.js';
-import {type LoggingConfig, VisualElements} from './LoggingConfig.js';
+import {elementKey, type LoggingConfig, VisualElements} from './LoggingConfig.js';
 import {getLoggingState, type LoggingState} from './LoggingState.js';
 
 let veDebuggingEnabled = false;
@@ -406,10 +406,6 @@ function processImpressionsForAdHocAnalysisDebugLog(states: LoggingState[]): voi
   }
 }
 
-function elementKey(config: LoggingConfig): string {
-  return `${VisualElements[config.ve]}${config.context ? `: ${config.context}` : ''}`;
-}
-
 export function debugString(config: LoggingConfig): string {
   const components = [VisualElements[config.ve]];
   if (config.context) {
@@ -447,7 +443,8 @@ export const enum DebugLoggingFormat {
   AD_HOC_ANALYSIS = 'AdHocAnalysis',
 }
 
-export function setVeDebugLoggingEnabled(enabled: boolean, format = DebugLoggingFormat.INTUITIVE): void {
+export function setVeDebugLoggingEnabled(enabled: boolean,
+                                         format: DebugLoggingFormat = DebugLoggingFormat.INTUITIVE): void {
   if (enabled) {
     localStorage.setItem('veDebugLoggingEnabled', format);
   } else {

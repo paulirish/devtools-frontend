@@ -258,6 +258,16 @@ domain Emulation
     parameters
       SafeAreaInsets insets
 
+  # Overrides virtual keyboard geometry in CSS pixels, relative to the top-level viewport. The
+  # provided rect is used for navigator.virtualKeyboard.boundingRect, geometrychange events, and
+  # env(keyboard-inset-*) values on the inspected frame. The override applies independently of
+  # navigator.virtualKeyboard.overlaysContent so clients can preview overlay geometry without
+  # mutating page state. Values are rounded to the nearest CSS pixel. Omitting the rect clears the
+  # override.
+  experimental command setVirtualKeyboardGeometryOverride
+    parameters
+      optional DOM.Rect keyboardRect
+
   # Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
   # window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
   # query results).
@@ -312,6 +322,22 @@ domain Emulation
       # useful for emulating mobile device orientation lock behavior in
       # responsive design mode.
       experimental optional boolean screenOrientationLockEmulation
+      # Viewport meta tag behavior. Default: `default`. Note: if `mobile` is `true`,
+      # the viewport meta tag is always enabled.
+      experimental optional enum viewportMeta
+        # Enables viewport meta tag processing.
+        enable
+        # Restores the default viewport meta behavior (disabled on desktop,
+        # enabled on mobile).
+        default
+      # Text layout mode. Default: `default`. Note: if `mobile` is `true`,
+      # mobile text layout mode (text autosizing) is always enabled.
+      experimental optional enum textLayoutMode
+        # Enables mobile text layout mode (text autosizing / CSS text-size-adjust).
+        mobile
+        # Restores the default text layout mode behavior (disabled on desktop,
+        # enabled on mobile).
+        default
 
   # Start reporting the given posture value to the Device Posture API.
   # This override can also be set in setDeviceMetricsOverride().
@@ -559,6 +585,22 @@ domain Emulation
     parameters
       # Hardware concurrency to report
       integer hardwareConcurrency
+
+  # Overrides the value of navigator.cpuPerformance
+  experimental command setCPUPerformanceOverride
+    parameters
+      # Override value. Omitting the parameter disables the override.
+      optional enum performanceTier
+        # Tier 0: Unknown
+        unknown
+        # Tier 1: Low
+        low
+        # Tier 2: Mid
+        mid
+        # Tier 3: High
+        high
+        # Tier 4: Ultra
+        ultra
 
   # Allows overriding user agent with the given string.
   # `userAgentMetadata` must be set for Client Hint headers to be sent.

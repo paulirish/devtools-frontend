@@ -3,110 +3,230 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as i18n from '../i18n/i18n.js';
+import * as Protocol from '../../generated/protocol.js';
+import * as Root from '../root/root.js';
 
 import {EmulationModel} from './EmulationModel.js';
+import {cpuPerformanceSettingDescriptor} from './SDKSettings.js';
 import {type SDKModelObserver, TargetManager} from './TargetManager.js';
 
-const UIStrings = {
-  /**
-   * @description Text label for a menu item indicating that no throttling is applied.
-   */
-  noThrottling: 'No throttling',
-  /**
-   * @description Text label for a menu item indicating that a specific slowdown multiplier is applied.
-   * @example {2} PH1
-   */
-  dSlowdown: '{PH1}× slowdown',
-  /**
-   * @description Text label for a menu item indicating an average mobile device.
-   */
-  calibratedMidTierMobile: 'Mid-tier mobile',
-  /**
-   * @description Text label for a menu item indicating a below-average mobile device.
-   */
-  calibratedLowTierMobile: 'Low-tier mobile',
-  /**
-   * @description Text label indicating why an option is not available, because the user's device is not fast enough to emulate a device.
-   */
-  calibrationErrorDeviceTooWeak: 'Device is not powerful enough',
-} as const;
-const str_ = i18n.i18n.registerUIStrings('core/sdk/CPUThrottlingManager.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+export enum CalibrationError {
+  DEVICE_TOO_WEAK = 'DEVICE_TOO_WEAK',
+}
 
-let throttlingManagerInstance: CPUThrottlingManager|undefined;
+export interface CalibratedCPUThrottling {
+  low?: number|CalibrationError;
+  mid?: number|CalibrationError;
+  actualScore?: number;
+}
+
+export import CPUPerformanceTier = Protocol.Emulation.SetCPUPerformanceOverrideRequestPerformanceTier;
+
+export function numberToTier(value: number): CPUPerformanceTier {
+  switch (value) {
+    case 1:
+      return CPUPerformanceTier.Low;
+    case 2:
+      return CPUPerformanceTier.Mid;
+    case 3:
+      return CPUPerformanceTier.High;
+    case 4:
+      return CPUPerformanceTier.Ultra;
+    default:
+      // This defaults to UNKNOWN (0) if the value is out of range.
+      return CPUPerformanceTier.Unknown;
+  }
+}
+
+export function tierToNumber(tier: CPUPerformanceTier): number {
+  switch (tier) {
+    case CPUPerformanceTier.Unknown:
+      return 0;
+    case CPUPerformanceTier.Low:
+      return 1;
+    case CPUPerformanceTier.Mid:
+      return 2;
+    case CPUPerformanceTier.High:
+      return 3;
+    case CPUPerformanceTier.Ultra:
+      return 4;
+  }
+}
 
 export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDKModelObserver<EmulationModel> {
+  readonly #calibratedCpuThrottlingSetting: Common.Settings.Setting<CalibratedCPUThrottling>;
+  readonly #cpuPerformanceSetting: Common.Settings.Setting<string>;
   readonly #targetManager: TargetManager;
-  #cpuThrottlingOption: CPUThrottlingOption;
-  #calibratedThrottlingSetting: Common.Settings.Setting<CalibratedCPUThrottling>;
+  #cpuThrottlingRate: number;
   #hardwareConcurrency?: number;
+  #hostDefaultCPUPerformanceTier?: CPUPerformanceTier;
+  #manualCPUPerformanceOverride?: CPUPerformanceTier;
   #pendingMainTargetPromise?: (r: number) => void;
 
   constructor(settings: Common.Settings.Settings, targetManager: TargetManager) {
     super();
     this.#targetManager = targetManager;
-    this.#cpuThrottlingOption = NoThrottlingOption;
-    this.#calibratedThrottlingSetting = settings.createSetting<CalibratedCPUThrottling>(
+    this.#cpuThrottlingRate = 1;  // No throttling
+    this.#calibratedCpuThrottlingSetting = settings.createSetting<CalibratedCPUThrottling>(
         'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
-    this.#calibratedThrottlingSetting.addChangeListener(this.#onCalibratedSettingChanged, this);
-    targetManager.observeModels(EmulationModel, this);
+    this.#cpuPerformanceSetting = settings.resolve(cpuPerformanceSettingDescriptor);
   }
 
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): CPUThrottlingManager {
+  initialize(): void {
+    this.#targetManager.observeModels(EmulationModel, this);
+    this.#cpuPerformanceSetting.addChangeListener(this.#onCPUPerformanceSettingChanged, this);
+    this.#onCPUPerformanceSettingChanged();
+  }
+
+  static instance(opts: {
+    forceNew?: boolean|null,
+    settings?: Common.Settings.Settings,
+    targetManager?: TargetManager,
+  } = {forceNew: null}): CPUThrottlingManager {
     const {forceNew} = opts;
-    if (!throttlingManagerInstance || forceNew) {
-      throttlingManagerInstance =
-          new CPUThrottlingManager(Common.Settings.Settings.instance(), TargetManager.instance());
+    if (!Root.DevToolsContext.globalInstance().has(CPUThrottlingManager) || forceNew) {
+      /* eslint-disable @devtools/no-instance-of-migrated-singletons */
+      const manager = new CPUThrottlingManager(opts.settings ?? Common.Settings.Settings.instance(),
+                                               opts.targetManager ?? TargetManager.instance());
+      /* eslint-enable @devtools/no-instance-of-migrated-singletons */
+      manager.initialize();
+      Root.DevToolsContext.globalInstance().set(CPUThrottlingManager, manager);
     }
 
-    return throttlingManagerInstance;
+    return Root.DevToolsContext.globalInstance().get(CPUThrottlingManager);
   }
 
   static removeInstance(): void {
-    throttlingManagerInstance = undefined;
+    Root.DevToolsContext.globalInstance().delete(CPUThrottlingManager);
   }
 
   cpuThrottlingRate(): number {
-    return this.#cpuThrottlingOption.rate();
+    return this.#cpuThrottlingRate;
   }
 
-  cpuThrottlingOption(): CPUThrottlingOption {
-    return this.#cpuThrottlingOption;
+  calculatedCPUPerformanceTier(): CPUPerformanceTier|undefined {
+    // Return the calculated tier, based on the host hardware baseline and any active CPU throttling multiplier,
+    // ignoring any manual override via the sensors panel.
+    // https://docs.google.com/document/d/1cVUQxigT9GMJweyR4c5Gmj16DEE7GnMTWy-FFPMkl14
+    const NOMINAL_SCORES = {
+      LOW: 264,
+      MID: 1000,
+      HIGH: 2350,
+      ULTRA: 3000,
+    };
+
+    const calibratedSetting = this.#calibratedCpuThrottlingSetting.get();
+    const isCalibrated = typeof calibratedSetting.actualScore === 'number' && calibratedSetting.actualScore > 0;
+
+    let rLow: number;
+    let rMid: number;
+    let rHigh: number;
+    let rUltra: number;
+
+    if (isCalibrated) {
+      const sHost = calibratedSetting.actualScore as number;
+      rLow = typeof calibratedSetting.low === 'number' ? calibratedSetting.low : 1.0;
+      rMid = typeof calibratedSetting.mid === 'number' ? calibratedSetting.mid : 1.0;
+      rHigh = Math.min(rMid, Math.max(sHost / NOMINAL_SCORES.HIGH, 1.0));
+      rUltra = Math.min(rHigh, Math.max(sHost / NOMINAL_SCORES.ULTRA, 1.0));
+    } else {
+      // If the host default tier is undefined or unknown, return that.
+      const hostTier = this.#hostDefaultCPUPerformanceTier;
+      if (!hostTier || hostTier === CPUPerformanceTier.Unknown) {
+        return hostTier;
+      }
+
+      let sHost;
+      switch (hostTier) {
+        case CPUPerformanceTier.Low:
+          sHost = NOMINAL_SCORES.LOW;
+          break;
+        case CPUPerformanceTier.Mid:
+          sHost = NOMINAL_SCORES.MID;
+          break;
+        case CPUPerformanceTier.High:
+          sHost = NOMINAL_SCORES.HIGH;
+          break;
+        default:
+          sHost = NOMINAL_SCORES.ULTRA;
+          break;
+      }
+      rLow = Math.max(sHost / NOMINAL_SCORES.LOW, 1.0);
+      rMid = Math.max(sHost / NOMINAL_SCORES.MID, 1.0);
+      rHigh = Math.max(sHost / NOMINAL_SCORES.HIGH, 1.0);
+      rUltra = Math.max(sHost / NOMINAL_SCORES.ULTRA, 1.0);
+    }
+
+    const thetaLow = Math.sqrt(rLow * rMid);
+    const thetaMid = Math.sqrt(rMid * rHigh);
+    const thetaHigh = Math.sqrt(rHigh * rUltra);
+
+    if (this.#cpuThrottlingRate >= thetaLow) {
+      return CPUPerformanceTier.Low;
+    }
+    if (this.#cpuThrottlingRate >= thetaMid) {
+      return CPUPerformanceTier.Mid;
+    }
+    if (this.#cpuThrottlingRate >= thetaHigh) {
+      return CPUPerformanceTier.High;
+    }
+    return CPUPerformanceTier.Ultra;
   }
 
-  #onCalibratedSettingChanged(): void {
-    // If a calibrated option is selected, need to propagate new rate.
-    const currentOption = this.#cpuThrottlingOption;
-    if (!currentOption.calibratedDeviceType) {
-      return;
+  effectiveCPUPerformanceTier(): CPUPerformanceTier|undefined {
+    // Return the tier, applying the manual override, if any.
+    if (this.#manualCPUPerformanceOverride !== undefined) {
+      return this.#manualCPUPerformanceOverride;
     }
+    return this.calculatedCPUPerformanceTier();
+  }
 
-    const rate = this.#cpuThrottlingOption.rate();
-    if (rate === 0) {
-      // This calibrated option is no longer valid.
-      this.setCPUThrottlingOption(NoThrottlingOption);
-      return;
+  #onCPUPerformanceSettingChanged(): void {
+    const val = this.#cpuPerformanceSetting.get();
+    this.#manualCPUPerformanceOverride = val === 'no-override' ? undefined : val as CPUPerformanceTier;
+    this.#syncCPUPerformanceTier();
+    if (this.#hostDefaultCPUPerformanceTier === undefined) {
+      void this.updateHostDefaultCPUPerformanceTier();
     }
+  }
 
+  #activeCPUPerformanceOverride(): CPUPerformanceTier|undefined {
+    // If neither a manual override nor CPU throttling is enabled, no override is active.
+    if (this.#manualCPUPerformanceOverride === undefined && this.#cpuThrottlingRate === 1) {
+      return undefined;
+    }
+    return this.effectiveCPUPerformanceTier();
+  }
+
+  #syncCPUPerformanceTier(): void {
+    // Synchronize with Chromium backend, via CDP.
+    const activeOverride = this.#activeCPUPerformanceOverride();
     for (const emulationModel of this.#targetManager.models(EmulationModel)) {
-      void emulationModel.setCPUThrottlingRate(rate);
+      void emulationModel.setCPUPerformanceOverride(activeOverride);
     }
-    this.dispatchEventToListeners(Events.RATE_CHANGED, rate);
+    // Notify UI and other listeners.
+    this.dispatchEventToListeners(Events.CPU_PERFORMANCE_TIER_CHANGED, this.effectiveCPUPerformanceTier());
   }
 
-  setCPUThrottlingOption(option: CPUThrottlingOption): void {
-    if (option === this.#cpuThrottlingOption) {
+  setCPUThrottlingRate(rate: number): void {
+    if (rate === this.#cpuThrottlingRate) {
       return;
     }
 
-    this.#cpuThrottlingOption = option;
+    this.#cpuThrottlingRate = rate;
     for (const emulationModel of this.#targetManager.models(EmulationModel)) {
-      void emulationModel.setCPUThrottlingRate(this.#cpuThrottlingOption.rate());
+      void emulationModel.setCPUThrottlingRate(this.#cpuThrottlingRate);
     }
-    this.dispatchEventToListeners(Events.RATE_CHANGED, this.#cpuThrottlingOption.rate());
+    this.dispatchEventToListeners(Events.RATE_CHANGED, this.#cpuThrottlingRate);
+
+    // Propagate changes to the effective tier only if not manually overridden.
+    if (this.#manualCPUPerformanceOverride === undefined) {
+      this.#syncCPUPerformanceTier();
+      if (this.#hostDefaultCPUPerformanceTier === undefined) {
+        void this.updateHostDefaultCPUPerformanceTier();
+      }
+    }
   }
 
   setHardwareConcurrency(concurrency: number): void {
@@ -115,6 +235,10 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
       void emulationModel.setHardwareConcurrency(concurrency);
     }
     this.dispatchEventToListeners(Events.HARDWARE_CONCURRENCY_CHANGED, this.#hardwareConcurrency);
+  }
+
+  setCPUPerformanceTier(tier?: CPUPerformanceTier): void {
+    this.#cpuPerformanceSetting.set(tier ?? 'no-override');
   }
 
   hasPrimaryPageTargetSet(): boolean {
@@ -160,12 +284,42 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
     return result.value;
   }
 
+  async updateHostDefaultCPUPerformanceTier(): Promise<void> {
+    if (this.#activeCPUPerformanceOverride() !== undefined) {
+      // We do not want to update the host default tier if an override has already been sent
+      // to the backend (in which case, `navigator.cpuPerformance` would return the override).
+      return;
+    }
+    const target = this.#targetManager.primaryPageTarget();
+    if (!target) {
+      return;
+    }
+    const evalResult = await target.runtimeAgent().invoke_evaluate(
+        {expression: 'navigator.cpuPerformance', returnByValue: true, silent: true, throwOnSideEffect: true});
+    if (evalResult.getError()) {
+      return;
+    }
+    const {result, exceptionDetails} = evalResult;
+    if (exceptionDetails || typeof result.value !== 'number') {
+      return;
+    }
+    const detectedTier = numberToTier(result.value);
+    if (this.#hostDefaultCPUPerformanceTier !== detectedTier) {
+      this.#hostDefaultCPUPerformanceTier = detectedTier;
+      this.#syncCPUPerformanceTier();
+    }
+  }
+
   modelAdded(emulationModel: EmulationModel): void {
-    if (this.#cpuThrottlingOption !== NoThrottlingOption) {
-      void emulationModel.setCPUThrottlingRate(this.#cpuThrottlingOption.rate());
+    if (this.#cpuThrottlingRate !== 1) {
+      void emulationModel.setCPUThrottlingRate(this.#cpuThrottlingRate);
     }
     if (this.#hardwareConcurrency !== undefined) {
       void emulationModel.setHardwareConcurrency(this.#hardwareConcurrency);
+    }
+    const activeOverride = this.#activeCPUPerformanceOverride();
+    if (activeOverride !== undefined) {
+      void emulationModel.setCPUPerformanceOverride(activeOverride);
     }
 
     // If there are any callers blocked on a getHardwareConcurrency call, let's wake them now.
@@ -184,102 +338,11 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
 export const enum Events {
   RATE_CHANGED = 'RateChanged',
   HARDWARE_CONCURRENCY_CHANGED = 'HardwareConcurrencyChanged',
+  CPU_PERFORMANCE_TIER_CHANGED = 'CpuPerformanceTierChanged',
 }
 
 export interface EventTypes {
   [Events.RATE_CHANGED]: number;
   [Events.HARDWARE_CONCURRENCY_CHANGED]: number;
-}
-
-export enum CPUThrottlingRates {
-  NO_THROTTLING = 1,
-  MID_TIER_MOBILE = 4,
-  LOW_TIER_MOBILE = 6,
-  EXTRA_SLOW = 20,
-
-  // eslint-disable-next-line @typescript-eslint/naming-convention -- Used by web_tests.
-  MidTierMobile = MID_TIER_MOBILE,
-  // eslint-disable-next-line @typescript-eslint/naming-convention -- Used by web_tests.
-  LowEndMobile = LOW_TIER_MOBILE,
-}
-
-export type CalibratedDeviceType = 'low-tier-mobile'|'mid-tier-mobile';
-
-export interface CPUThrottlingOption {
-  title: () => string;
-  rate: () => number;
-  calibratedDeviceType?: CalibratedDeviceType;
-  jslogContext: string;
-}
-
-function makeFixedPresetThrottlingOption(rate: CPUThrottlingRates): CPUThrottlingOption {
-  return {
-    title: rate === 1 ? i18nLazyString(UIStrings.noThrottling) : i18nLazyString(UIStrings.dSlowdown, {PH1: rate}),
-    rate: () => rate,
-    jslogContext: rate === 1 ? 'cpu-no-throttling' : `cpu-throttled-${rate}`,
-  };
-}
-
-export const NoThrottlingOption = makeFixedPresetThrottlingOption(CPUThrottlingRates.NO_THROTTLING);
-export const MidTierThrottlingOption = makeFixedPresetThrottlingOption(CPUThrottlingRates.MID_TIER_MOBILE);
-export const LowTierThrottlingOption = makeFixedPresetThrottlingOption(CPUThrottlingRates.LOW_TIER_MOBILE);
-export const ExtraSlowThrottlingOption = makeFixedPresetThrottlingOption(CPUThrottlingRates.EXTRA_SLOW);
-
-function makeCalibratedThrottlingOption(calibratedDeviceType: CalibratedDeviceType): CPUThrottlingOption {
-  const getSettingValue = (): number|CalibrationError|null => {
-    const setting = Common.Settings.Settings.instance().createSetting<CalibratedCPUThrottling>(
-        'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
-    const value = setting.get();
-    if (calibratedDeviceType === 'low-tier-mobile') {
-      return value.low ?? null;
-    }
-    if (calibratedDeviceType === 'mid-tier-mobile') {
-      return value.mid ?? null;
-    }
-    return null;
-  };
-
-  return {
-    title(): string {
-      const typeString = calibratedDeviceType === 'low-tier-mobile' ? i18nString(UIStrings.calibratedLowTierMobile) :
-                                                                      i18nString(UIStrings.calibratedMidTierMobile);
-
-      const value = getSettingValue();
-      if (typeof value === 'number') {
-        return `${typeString} – ${value.toFixed(1)}×`;
-      }
-
-      return typeString;
-    },
-    rate(): number {
-      const value = getSettingValue();
-      if (typeof value === 'number') {
-        return value;
-      }
-      return 0;
-    },
-    calibratedDeviceType,
-    jslogContext: `cpu-throttled-calibrated-${calibratedDeviceType}`,
-  };
-}
-
-export const CalibratedLowTierMobileThrottlingOption = makeCalibratedThrottlingOption('low-tier-mobile');
-export const CalibratedMidTierMobileThrottlingOption = makeCalibratedThrottlingOption('mid-tier-mobile');
-
-export interface CalibratedCPUThrottling {
-  /** Either the CPU multiplier, or an error code for why it could not be determined. */
-  low?: number|CalibrationError;
-  mid?: number|CalibrationError;
-}
-
-export enum CalibrationError {
-  DEVICE_TOO_WEAK = 'DEVICE_TOO_WEAK',
-}
-
-export function calibrationErrorToString(error: CalibrationError): string {
-  if (error === CalibrationError.DEVICE_TOO_WEAK) {
-    return i18nString(UIStrings.calibrationErrorDeviceTooWeak);
-  }
-
-  return error;
+  [Events.CPU_PERFORMANCE_TIER_CHANGED]: CPUPerformanceTier|undefined;
 }

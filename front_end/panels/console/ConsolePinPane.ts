@@ -10,14 +10,13 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-// eslint-disable-next-line @devtools/es-modules-import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
-import * as PanelCommon from '../common/common.js';
 
 import consolePinPaneStyles from './consolePinPane.css.js';
 
@@ -26,36 +25,36 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description A context menu item in the Console Pin Pane of the Console panel
+   * @description A context menu item in the live expressions section of the Console panel.
    */
   removeExpression: 'Remove expression',
   /**
-   * @description A context menu item in the Console Pin Pane of the Console panel
+   * @description A context menu item in the live expressions section of the Console panel.
    */
   removeAllExpressions: 'Remove all expressions',
   /**
-   * @description Screen reader label for delete button on a non-blank live expression
+   * @description Screen reader label for delete button on a non-blank live expression.
    * @example {document} PH1
    */
   removeExpressionS: 'Remove expression: {PH1}',
   /**
-   * @description Screen reader label for delete button on a blank live expression
+   * @description Screen reader label for delete button on a blank live expression.
    */
   removeBlankExpression: 'Remove blank expression',
   /**
-   * @description Text in Console Pin Pane of the Console panel
+   * @description Text in the live expressions section of the Console panel.
    */
   liveExpressionEditor: 'Live expression editor',
   /**
-   * @description Text in Console Pin Pane of the Console panel
+   * @description Text in the live expressions section of the Console panel.
    */
   expression: 'Expression',
   /**
-   * @description Side effect label title in Console Pin Pane of the Console panel
+   * @description Side effect label title in the live expressions section of the Console panel.
    */
   evaluateAllowingSideEffects: 'Evaluate, allowing side effects',
   /**
-   * @description Text of a DOM element in Console Pin Pane of the Console panel
+   * @description Text of a DOM element in the live expressions section of the Console panel.
    */
   notAvailable: 'not available',
   /**
@@ -67,16 +66,16 @@ const UIStrings = {
    * @example {allow pasting} PH1
    */
   doNotPaste:
-      'Don\'t paste code you do not understand or have not reviewed yourself into DevTools. This could allow attackers to steal your identity or take control of your computer. Please type “{PH1}” below to allow pasting.',
+      'Don’t paste code you don’t understand or haven’t reviewed yourself into DevTools. This could allow attackers to steal your identity or take control of your computer. Type "{PH1}" below to allow pasting.',
   /**
-   * @description Text a user needs to type in order to confirm that they are aware of the danger of pasting code into the DevTools console.
+   * @description Text a user needs to type in order to confirm that they are aware of the danger of pasting code into the DevTools Console.
    */
   allowPasting: 'allow pasting',
   /**
    * @description Input box placeholder which instructs the user to type 'allow pasting' into the input box. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
    * @example {allow pasting} PH1
    */
-  typeAllowPasting: 'Type “{PH1}”',
+  typeAllowPasting: 'Type "{PH1}"',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsolePinPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -97,7 +96,7 @@ export const DEFAULT_PANE_VIEW = (input: PaneViewInput, _output: object, target:
           pin,
           focusOut: input.focusOut,
           onRemove: () => input.onRemove(pin),
-      })
+      }),
     )}
     </div>`, target);
   // clang-format on
@@ -109,7 +108,8 @@ export class ConsolePinPane extends UI.Widget.VBox {
   readonly #pinModel: ConsolePinModel;
   readonly #focusOut: () => void;
 
-  constructor(focusOut: () => void, view = DEFAULT_PANE_VIEW) {
+  constructor(focusOut: () => void,
+              view: (input: PaneViewInput, _output: object, target: HTMLElement) => void = DEFAULT_PANE_VIEW) {
     super({useShadowDom: true});
     this.#focusOut = focusOut;
     this.#view = view;
@@ -294,7 +294,8 @@ export class ConsolePinPresenter extends UI.Widget.Widget {
   #deletePinIcon!: Buttons.Button.Button;
   readonly #selfXssWarningDisabledSetting: Common.Settings.Setting<boolean>;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement,
+              view: (input: ViewInput, output: ViewOutput, target: HTMLElement) => void = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
 
@@ -403,6 +404,7 @@ export class ConsolePinPresenter extends UI.Widget.Widget {
       CodeMirror.EditorView.domEventHandlers({
         blur: (_e, view) => this.#onBlur(view),
         paste: () => this.#onPaste(),
+        drop: event => event.preventDefault(),
       }),
       TextEditor.Config.baseConfiguration(doc),
       TextEditor.Config.closeBrackets.instance(),
@@ -436,7 +438,7 @@ export class ConsolePinPresenter extends UI.Widget.Widget {
   }
 
   async #showSelfXssWarning(): Promise<void> {
-    const allowPasting = await PanelCommon.TypeToAllowDialog.show({
+    const allowPasting = await Dialogs.TypeToAllowDialog.TypeToAllowDialog.show({
       jslogContext: {
         dialog: 'self-xss-warning',
         input: 'allow-pasting',
@@ -458,7 +460,7 @@ export class ConsolePinPresenter extends UI.Widget.Widget {
     }
     this.#hovered = hovered;
     if (!hovered && this.#lastNode) {
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
   }
 
@@ -519,7 +521,7 @@ export class ConsolePinPresenter extends UI.Widget.Widget {
       if (node) {
         SDK.OverlayModel.OverlayModel.highlightObjectAsDOMNode(node);
       } else if (this.#lastNode) {
-        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
       }
     }
     this.#lastNode = node || null;

@@ -11,59 +11,52 @@ import {Icon} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as PanelsCommon from '../common/common.js';
 
-import {MobileThrottlingSelector} from './MobileThrottlingSelector.js';
-import {
-  type Conditions,
-  type ConditionsList,
-  type MobileThrottlingConditionsGroup,
-  ThrottlingPresets,
-} from './ThrottlingPresets.js';
+import {ThrottlingPresets} from './ThrottlingPresets.js';
+
+export import CPUPerformanceTier = SDK.CPUThrottlingManager.CPUPerformanceTier;
 
 export interface CPUThrottlingSelectorWrapper {
   control: UI.Toolbar.ToolbarComboBox;
-  updateRecommendedOption(recommendedOption: SDK.CPUThrottlingManager.CPUThrottlingOption|null): void;
+  updateRecommendedOption(recommendedOption: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption|null): void;
 }
 
 const UIStrings = {
   /**
-   *@description Text to indicate the network connectivity is offline
+   * @description Text to indicate the network connectivity is offline.
    */
   offline: 'Offline',
   /**
-   *@description Text in Throttling Manager of the Network panel
+   * @description Text in throttling manager of the Network panel.
    */
   forceDisconnectedFromNetwork: 'Force disconnected from network',
   /**
-   * @description Text for throttling the network
-   */
-  throttling: 'Throttling',
-  /**
-   * @description Icon title in Throttling Manager of the Network panel
+   * @description Icon title in throttling manager of the Network panel.
    */
   cpuThrottlingIsEnabled: 'CPU throttling is enabled',
   /**
-   * @description Screen reader label for a select box that chooses the CPU throttling speed in the Performance panel
+   * @description Screen reader label for a select box that chooses the CPU throttling speed in the Performance panel.
    */
   cpuThrottling: 'CPU throttling',
   /**
-   * @description Tooltip text in Throttling Manager of the Performance panel
+   * @description Tooltip text in throttling manager of the Performance panel.
    */
-  excessConcurrency: 'Exceeding the default value may degrade system performance.',
+  excessConcurrency: 'Exceeding the default value may degrade system performance',
   /**
-   * @description Tooltip text in Throttling Manager of the Performance panel
+   * @description Tooltip text in throttling manager of the Performance panel.
    */
   resetConcurrency: 'Reset to the default value',
   /**
-   * @description Label for an check box that neables overriding navigator.hardwareConcurrency
+   * @description Label for a checkbox that enables overriding navigator.hardwareConcurrency.
    */
   hardwareConcurrency: 'Hardware concurrency',
   /**
-   * @description Tooltip text for an input box that overrides navigator.hardwareConcurrency on the page
+   * @description Tooltip text for an input box that overrides navigator.hardwareConcurrency on the page.
    */
-  hardwareConcurrencySettingLabel: 'Override the value reported by navigator.hardwareConcurrency',
+  hardwareConcurrencySettingLabel: 'Override the value reported by `navigator.hardwareConcurrency`',
   /**
-   * @description Text label for a selection box showing that a specific option is recommended for CPU or Network throttling.
+   * @description Text label for a selection box showing that a specific option is recommended for CPU or network throttling.
    * @example {Fast 4G} PH1
    * @example {4x slowdown} PH1
    */
@@ -89,41 +82,32 @@ const UIStrings = {
    */
   saveDataOff: '\'Save-Data\': off',
   /**
-   * @description Tooltip text for an select element that overrides navigator.connection.saveData on the page
+   * @description Tooltip text for a select element that overrides navigator.connection.saveData on the page.
    */
-  saveDataSettingTooltip: 'Override the value reported by navigator.connection.saveData on the page',
+  saveDataSettingTooltip: 'Override the value reported by `navigator.connection.saveData` on the page',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/ThrottlingManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let throttlingManagerInstance: ThrottlingManager;
 
-class PromiseQueue<T> {
-  #promise = Promise.resolve();
-
-  push(promise: Promise<T>): Promise<T> {
-    return new Promise(r => {
-      this.#promise = this.#promise.then(async () => r(await promise));
-    });
-  }
-}
-
-export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<ThrottlingManager.EventTypes> {
+export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<void> {
   private readonly cpuThrottlingControls: Set<UI.Toolbar.ToolbarComboBox>;
-  private readonly cpuThrottlingOptions: SDK.CPUThrottlingManager.CPUThrottlingOption[];
+  private readonly cpuThrottlingOptions: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption[];
   private readonly customNetworkConditionsSetting: Common.Settings.Setting<SDK.NetworkManager.Conditions[]>;
   private readonly currentNetworkThrottlingConditionKeySetting:
       Common.Settings.Setting<SDK.NetworkManager.ThrottlingConditionKey>;
   private readonly calibratedCpuThrottlingSetting:
-      Common.Settings.Setting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>;
+      Common.Settings.Setting<PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling>;
   private lastNetworkThrottlingConditions!: SDK.NetworkManager.Conditions;
   private readonly cpuThrottlingManager: SDK.CPUThrottlingManager.CPUThrottlingManager;
   #hardwareConcurrencyOverrideEnabled = false;
-  readonly #emulationQueue = new PromiseQueue<void>();
+  #currentCPUThrottlingOption: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption =
+      PanelsCommon.CPUThrottlingOption.NoThrottlingOption;
   get hardwareConcurrencyOverrideEnabled(): boolean {
     return this.#hardwareConcurrencyOverrideEnabled;
   }
 
-  private constructor() {
+  private constructor(settings: Common.Settings.Settings) {
     super();
     this.cpuThrottlingManager = SDK.CPUThrottlingManager.CPUThrottlingManager.instance();
     this.cpuThrottlingManager.addEventListener(
@@ -131,13 +115,14 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
         (event: Common.EventTarget.EventTargetEvent<number>) => this.onCPUThrottlingRateChangedOnSDK(event.data));
     this.cpuThrottlingControls = new Set();
     this.cpuThrottlingOptions = ThrottlingPresets.cpuThrottlingPresets;
-    this.customNetworkConditionsSetting = SDK.NetworkManager.customUserNetworkConditionsSetting();
+    this.customNetworkConditionsSetting = SDK.NetworkManager.customUserNetworkConditionsSetting(settings);
 
-    this.currentNetworkThrottlingConditionKeySetting = SDK.NetworkManager.activeNetworkThrottlingKeySetting();
+    this.currentNetworkThrottlingConditionKeySetting = SDK.NetworkManager.activeNetworkThrottlingKeySetting(settings);
 
     this.calibratedCpuThrottlingSetting =
-        Common.Settings.Settings.instance().createSetting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>(
+        settings.createSetting<PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling>(
             'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
+    this.calibratedCpuThrottlingSetting.addChangeListener(this.onCalibratedSettingChanged, this);
 
     SDK.NetworkManager.MultitargetNetworkManager.instance().addEventListener(
         SDK.NetworkManager.MultitargetNetworkManager.Events.CONDITIONS_CHANGED, () => {
@@ -164,10 +149,11 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
     return custom ?? SDK.NetworkManager.NoThrottlingConditions;
   }
 
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ThrottlingManager {
-    const {forceNew} = opts;
+  static instance(opts: {forceNew: boolean|null, settings?: Common.Settings.Settings} = {forceNew: null}):
+      ThrottlingManager {
+    const {forceNew, settings} = opts;
     if (!throttlingManagerInstance || forceNew) {
-      throttlingManagerInstance = new ThrottlingManager();
+      throttlingManagerInstance = new ThrottlingManager(settings ?? Common.Settings.Settings.instance());
     }
 
     return throttlingManagerInstance;
@@ -201,72 +187,48 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
     return checkbox;
   }
 
-  createMobileThrottlingButton(): UI.Toolbar.ToolbarMenuButton {
-    const button = new UI.Toolbar.ToolbarMenuButton(appendItems, undefined, undefined, 'mobile-throttling');
-    button.setTitle(i18nString(UIStrings.throttling));
-    button.setDarkText();
-
-    let options: ConditionsList = [];
-    let selectedIndex = -1;
-    const selector = new MobileThrottlingSelector(populate, select);
-    return button;
-
-    function appendItems(contextMenu: UI.ContextMenu.ContextMenu): void {
-      for (let index = 0; index < options.length; ++index) {
-        const conditions = options[index];
-        if (!conditions) {
-          continue;
-        }
-        if (conditions.title === ThrottlingPresets.getCustomConditions().title &&
-            conditions.description === ThrottlingPresets.getCustomConditions().description) {
-          continue;
-        }
-        contextMenu.defaultSection().appendCheckboxItem(
-            conditions.title, selector.optionSelected.bind(selector, conditions as Conditions),
-            {checked: selectedIndex === index, jslogContext: conditions.jslogContext});
-      }
-    }
-
-    function populate(groups: MobileThrottlingConditionsGroup[]): ConditionsList {
-      options = [];
-      for (const group of groups) {
-        for (const conditions of group.items) {
-          options.push(conditions);
-        }
-        options.push(null);
-      }
-      return options;
-    }
-
-    function select(index: number): void {
-      selectedIndex = index;
-      const option = options[index];
-      if (option) {
-        button.setText(option.title);
-        button.setTitle(`${option.title}: ${option.description}`);
-      }
-    }
-  }
-
   private updatePanelIcon(): void {
     const warnings = [];
-    if (this.cpuThrottlingManager.cpuThrottlingRate() !== SDK.CPUThrottlingManager.CPUThrottlingRates.NO_THROTTLING) {
+    if (this.cpuThrottlingManager.cpuThrottlingRate() !==
+        PanelsCommon.CPUThrottlingOption.CPUThrottlingRates.NO_THROTTLING) {
       warnings.push(i18nString(UIStrings.cpuThrottlingIsEnabled));
     }
     UI.InspectorView.InspectorView.instance().setPanelWarnings('timeline', warnings);
   }
 
-  setCPUThrottlingOption(option: SDK.CPUThrottlingManager.CPUThrottlingOption): void {
-    // This will transitively call onCPUThrottlingRateChangedOnSDK.
-    this.cpuThrottlingManager.setCPUThrottlingOption(option);
+  cpuThrottlingOption(): PanelsCommon.CPUThrottlingOption.CPUThrottlingOption {
+    return this.#currentCPUThrottlingOption;
+  }
+
+  setCPUThrottlingOption(option: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption): void {
+    if (this.#currentCPUThrottlingOption === option) {
+      return;
+    }
+    this.#currentCPUThrottlingOption = option;
+    this.cpuThrottlingManager.setCPUThrottlingRate(option.rate());
+  }
+
+  private onCalibratedSettingChanged(): void {
+    if (!this.#currentCPUThrottlingOption.calibratedDeviceType) {
+      return;
+    }
+    const rate = this.#currentCPUThrottlingOption.rate();
+    if (rate === 0) {
+      this.setCPUThrottlingOption(PanelsCommon.CPUThrottlingOption.NoThrottlingOption);
+      return;
+    }
+    this.cpuThrottlingManager.setCPUThrottlingRate(rate);
   }
 
   onCPUThrottlingRateChangedOnSDK(rate: number): void {
-    if (rate !== SDK.CPUThrottlingManager.CPUThrottlingRates.NO_THROTTLING) {
+    if (rate !== PanelsCommon.CPUThrottlingOption.CPUThrottlingRates.NO_THROTTLING) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.CpuThrottlingEnabled);
     }
 
-    const index = this.cpuThrottlingOptions.indexOf(this.cpuThrottlingManager.cpuThrottlingOption());
+    const option = PanelsCommon.CPUThrottlingOption.determineOptionFromRate(rate, this.#currentCPUThrottlingOption);
+    this.#currentCPUThrottlingOption = option;
+
+    const index = this.cpuThrottlingOptions.indexOf(option);
     for (const control of this.cpuThrottlingControls) {
       control.setSelectedIndex(index);
     }
@@ -282,7 +244,7 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
 
     const optionSelected = (): void => {
       if (control.selectedIndex() === control.options().length - 1) {
-        const index = this.cpuThrottlingOptions.indexOf(this.cpuThrottlingManager.cpuThrottlingOption());
+        const index = this.cpuThrottlingOptions.indexOf(this.#currentCPUThrottlingOption);
         control.setSelectedIndex(index);
         void Common.Revealer.reveal(this.calibratedCpuThrottlingSetting);
       } else {
@@ -293,7 +255,7 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
     const control =
         new UI.Toolbar.ToolbarComboBox(optionSelected, i18nString(UIStrings.cpuThrottling), '', 'cpu-throttling');
     this.cpuThrottlingControls.add(control);
-    const currentOption = this.cpuThrottlingManager.cpuThrottlingOption();
+    const currentOption = this.#currentCPUThrottlingOption;
 
     const optionEls: HTMLOptionElement[] = [];
     const options = this.cpuThrottlingOptions;
@@ -317,7 +279,7 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
 
     return {
       control,
-      updateRecommendedOption(recommendedOption: SDK.CPUThrottlingManager.CPUThrottlingOption|null) {
+      updateRecommendedOption(recommendedOption: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption|null) {
         for (let i = 0; i < optionEls.length - 1; i++) {
           const option = options[i];
           optionEls[i].text = option === recommendedOption ?
@@ -329,19 +291,6 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
         optionEls[optionEls.length - 1].textContent = getCalibrationString();
       },
     };
-  }
-
-  setSaveDataOverride(selectedIndex: number): void {
-    let override = SDK.EmulationModel.DataSaverOverride.UNSET;
-    if (selectedIndex === 1) {
-      override = SDK.EmulationModel.DataSaverOverride.ENABLED;
-    } else if (selectedIndex === 2) {
-      override = SDK.EmulationModel.DataSaverOverride.DISABLED;
-    }
-    for (const emulationModel of SDK.TargetManager.TargetManager.instance().models(SDK.EmulationModel.EmulationModel)) {
-      void this.#emulationQueue.push(emulationModel.setDataSaverOverride(override));
-    }
-    this.dispatchEventToListeners(ThrottlingManager.Events.SAVE_DATA_OVERRIDE_CHANGED, selectedIndex);
   }
 
   createSaveDataOverrideSelector(className?: string): HTMLSelectElement {
@@ -429,6 +378,14 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
     this.cpuThrottlingManager.setHardwareConcurrency(concurrency);
   }
 
+  effectiveCPUPerformanceTier(): CPUPerformanceTier|undefined {
+    return this.cpuThrottlingManager.effectiveCPUPerformanceTier();
+  }
+
+  setCPUPerformanceTier(tier?: CPUPerformanceTier): void {
+    this.cpuThrottlingManager.setCPUPerformanceTier(tier);
+  }
+
   private isDirty(): boolean {
     const networkConditions = SDK.NetworkManager.MultitargetNetworkManager.instance().networkConditions();
     const knownCurrentConditions = this.#getCurrentNetworkConditions();
@@ -437,8 +394,8 @@ export class ThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Thrott
 }
 
 export interface SaveDataOverrideViewInput {
-  selectedIndex: number;
-  onSelect: (index: number) => void;
+  selectedOption: SDK.EmulationModel.DataSaverOverride;
+  onSelect: (selectedOption: SDK.EmulationModel.DataSaverOverride) => void;
 }
 
 export type SaveDataOverrideViewFunction =
@@ -447,48 +404,43 @@ export type SaveDataOverrideViewFunction =
 export const DEFAULT_SAVE_DATA_VIEW: SaveDataOverrideViewFunction = (input, _output, target) => {
   // clang-format off
   render(html`
-    <option value="unset" ?selected=${input.selectedIndex === 0}>${i18nString(UIStrings.noSaveDataOverride)}</option>
-    <option value="enabled" ?selected=${input.selectedIndex === 1}>${i18nString(UIStrings.saveDataOn)}</option>
-    <option value="disabled" ?selected=${input.selectedIndex === 2}>${i18nString(UIStrings.saveDataOff)}</option>
-  `, target, {container: {listeners: {change: (e: Event) => input.onSelect((e.target as HTMLSelectElement).selectedIndex)}}});
+    <option value=${SDK.EmulationModel.DataSaverOverride.UNSET} ?selected=${input.selectedOption === SDK.EmulationModel.DataSaverOverride.UNSET}>${i18nString(UIStrings.noSaveDataOverride)}</option>
+    <option value=${SDK.EmulationModel.DataSaverOverride.ENABLED} ?selected=${input.selectedOption === SDK.EmulationModel.DataSaverOverride.ENABLED}>${i18nString(UIStrings.saveDataOn)}</option>
+    <option value=${SDK.EmulationModel.DataSaverOverride.DISABLED} ?selected=${input.selectedOption === SDK.EmulationModel.DataSaverOverride.DISABLED}>${i18nString(UIStrings.saveDataOff)}</option>
+  `, target, {container: {listeners: {change: (e: Event) => input.onSelect((e.target as HTMLSelectElement).value as SDK.EmulationModel.DataSaverOverride)}}});
   // clang-format on
 };
 
-export class SaveDataOverrideSelect extends
-    Common.ObjectWrapper.eventMixin<ThrottlingManager.EventTypes, typeof UI.Widget.Widget<HTMLSelectElement>>(
-        UI.Widget.Widget) {
-  #selectedIndex = 0;
+export class SaveDataOverrideSelect extends UI.Widget.Widget<HTMLSelectElement> {
+  readonly #setting: Common.Settings.Setting<SDK.EmulationModel.DataSaverOverride>;
   readonly #view: SaveDataOverrideViewFunction;
 
-  constructor(element: HTMLElement, view = DEFAULT_SAVE_DATA_VIEW) {
+  constructor(element: HTMLElement, view: SaveDataOverrideViewFunction = DEFAULT_SAVE_DATA_VIEW) {
     super(element);
     this.#view = view;
-    ThrottlingManager.instance().addEventListener(ThrottlingManager.Events.SAVE_DATA_OVERRIDE_CHANGED, ({data}) => {
-      this.#selectedIndex = data;
-      this.requestUpdate();
-    });
+    this.#setting = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.dataSaverSettingDescriptor);
     this.performUpdate();
   }
 
+  override wasShown(): void {
+    super.wasShown();
+    this.#setting.addChangeListener(this.requestUpdate, this);
+    this.requestUpdate();
+  }
+
+  override willHide(): void {
+    super.willHide();
+    this.#setting.removeChangeListener(this.requestUpdate, this);
+  }
+
   override performUpdate(): void {
-    this.#view(
-        {
-          selectedIndex: this.#selectedIndex,
-          onSelect: index => {
-            ThrottlingManager.instance().setSaveDataOverride(index);
-          },
-        },
-        undefined, this.contentElement);
-  }
-}
-
-export namespace ThrottlingManager {
-  export const enum Events {
-    SAVE_DATA_OVERRIDE_CHANGED = 'SaveDataOverrideChanged',
-  }
-
-  export interface EventTypes {
-    [Events.SAVE_DATA_OVERRIDE_CHANGED]: number;
+    this.#view({
+      selectedOption: this.#setting.get(),
+      onSelect: selectedOption => {
+        this.#setting.set(selectedOption);
+      },
+    },
+               undefined, this.contentElement);
   }
 }
 

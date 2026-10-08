@@ -2,29 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
+import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import type * as AIAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
-import * as TextUtils from '../../../models/text_utils/text_utils.js';
+import * as AIAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import type * as Workspace from '../../../models/workspace/workspace.js';
-import {assertScreenshot, querySelectorErrorOnMissing, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import {
+  assertScreenshot,
+  querySelectorErrorOnMissing,
+  renderElementIntoDOM,
+} from '../../../testing/DOMHelpers.js';
 import {
   describeWithEnvironment,
   updateHostConfig,
   waitFor,
 } from '../../../testing/EnvironmentHelpers.js';
-import {makeFakeParsedTrace, microsecondsTraceWindow} from '../../../testing/TraceHelpers.js';
-import {createViewFunctionStub, type ViewFunctionStub} from '../../../testing/ViewFunctionHelpers.js';
-import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
+import {
+  getBaseTraceHandlerData,
+  makeFakeParsedTrace,
+  microsecondsTraceWindow,
+} from '../../../testing/TraceHelpers.js';
+import {
+  createViewFunctionStub,
+  type ViewFunctionStub,
+} from '../../../testing/ViewFunctionHelpers.js';
+import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
+import * as Lighthouse from '../../lighthouse/lighthouse.js';
 import * as AiAssistance from '../ai_assistance.js';
 
 describeWithEnvironment('ChatMessage', () => {
-  function createComponent(props: Partial<AiAssistance.ChatMessage.MessageInput> = {}):
-      [ViewFunctionStub<typeof AiAssistance.ChatMessage.ChatMessage>, AiAssistance.ChatMessage.ChatMessage] {
+  function createComponent(
+      props: Partial<AiAssistance.ChatMessage.MessageInput> = {},
+      ):
+      [
+        ViewFunctionStub<typeof AiAssistance.ChatMessage.ChatMessage>,
+        AiAssistance.ChatMessage.ChatMessage,
+      ] {
     const view = createViewFunctionStub(AiAssistance.ChatMessage.ChatMessage);
     const component = new AiAssistance.ChatMessage.ChatMessage(undefined, view);
     Object.assign(component, {
@@ -39,7 +58,6 @@ describeWithEnvironment('ChatMessage', () => {
       isLastMessage: true,
       isFirstMessage: false,
       prompt: 'test prompt',
-      shouldShowCSSChangeSummary: false,
       markdownRenderer: new AiAssistance.MarkdownRendererWithCodeBlock(),
       canShowFeedbackForm: true,
       onSuggestionClick: sinon.stub(),
@@ -60,8 +78,10 @@ describeWithEnvironment('ChatMessage', () => {
     inlineExpandedMessages: [],
   };
 
-  function renderView(props: Partial<AiAssistance.ChatMessage.ChatMessageViewInput>) {
-    const target = document.createElement('div');
+  function renderView(
+      props: Partial<AiAssistance.ChatMessage.ChatMessageViewInput>,
+      target = document.createElement('div'),
+  ) {
     AiAssistance.ChatMessage.DEFAULT_VIEW(
         {
           onRatingClick: () => {},
@@ -80,7 +100,6 @@ describeWithEnvironment('ChatMessage', () => {
           isLastMessage: true,
           isFirstMessage: false,
           prompt: 'test prompt',
-          shouldShowCSSChangeSummary: false,
           showActions: true,
           message: {
             entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
@@ -100,7 +119,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
           ...props,
         },
-        {}, target);
+        {},
+        target,
+    );
     return target;
   }
 
@@ -121,7 +142,9 @@ describeWithEnvironment('ChatMessage', () => {
         },
       } as AIAssistanceModel.AiAgent.AiWidget;
       assert.strictEqual(
-          AiAssistance.ChatMessage.getWidgetSignature(widget1), AiAssistance.ChatMessage.getWidgetSignature(widget2));
+          AiAssistance.ChatMessage.getWidgetSignature(widget1),
+          AiAssistance.ChatMessage.getWidgetSignature(widget2),
+      );
     });
 
     it('should generate different signatures for different widgets', () => {
@@ -140,7 +163,9 @@ describeWithEnvironment('ChatMessage', () => {
         },
       } as AIAssistanceModel.AiAgent.AiWidget;
       assert.notStrictEqual(
-          AiAssistance.ChatMessage.getWidgetSignature(widget1), AiAssistance.ChatMessage.getWidgetSignature(widget2));
+          AiAssistance.ChatMessage.getWidgetSignature(widget1),
+          AiAssistance.ChatMessage.getWidgetSignature(widget2),
+      );
     });
 
     it('should deduplicate identical widgets across the entire message', () => {
@@ -160,7 +185,7 @@ describeWithEnvironment('ChatMessage', () => {
           {
             type: 'step',
             step: {
-              isLoading: false,
+              state: {type: 'completed'},
               widgets: [widget],
             },
           },
@@ -170,9 +195,15 @@ describeWithEnvironment('ChatMessage', () => {
       const deduplicated = AiAssistance.ChatMessage.getDeduplicatedWidgetsMessage(message);
       assert.lengthOf(deduplicated.parts, 2);
       assert.strictEqual(deduplicated.parts[0].type, 'widget');
-      assert.lengthOf((deduplicated.parts[0] as AiAssistance.ChatMessage.WidgetPart).widgets, 1);
+      assert.lengthOf(
+          (deduplicated.parts[0] as AiAssistance.ChatMessage.WidgetPart).widgets,
+          1,
+      );
       assert.strictEqual(deduplicated.parts[1].type, 'step');
-      assert.lengthOf((deduplicated.parts[1] as AiAssistance.ChatMessage.StepPart).step.widgets!, 0);
+      assert.lengthOf(
+          (deduplicated.parts[1] as AiAssistance.ChatMessage.StepPart).step.widgets!,
+          0,
+      );
     });
 
     describe('getWidgetSignature', () => {
@@ -186,7 +217,10 @@ describeWithEnvironment('ChatMessage', () => {
             properties: [],
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'COMPUTED_STYLES:1');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'COMPUTED_STYLES:1',
+        );
       });
 
       it('should correctly handle CORE_VITALS widget', () => {
@@ -197,7 +231,10 @@ describeWithEnvironment('ChatMessage', () => {
             parsedTrace: makeFakeParsedTrace(),
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'CORE_VITALS:insight1');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'CORE_VITALS:insight1',
+        );
       });
 
       it('should correctly handle STYLE_PROPERTIES widget', () => {
@@ -208,7 +245,10 @@ describeWithEnvironment('ChatMessage', () => {
             selector: '.test',
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'STYLE_PROPERTIES:1:.test');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'STYLE_PROPERTIES:1:.test',
+        );
       });
 
       it('should correctly handle DOM_TREE widget', () => {
@@ -218,9 +258,14 @@ describeWithEnvironment('ChatMessage', () => {
             root: {
               backendNodeId: () => 1 as Protocol.DOM.BackendNodeId,
             } as unknown as AIAssistanceModel.AiAgent.DomTreeAiWidget['data']['root'],
+            title: 'Title' as Platform.UIString.LocalizedString,
+            accessibleRevealLabel: 'Label' as Platform.UIString.LocalizedString,
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'DOM_TREE:1');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'DOM_TREE:1',
+        );
       });
 
       it('should correctly handle PERFORMANCE_TRACE widget', () => {
@@ -230,7 +275,10 @@ describeWithEnvironment('ChatMessage', () => {
             parsedTrace: makeFakeParsedTrace(),
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERFORMANCE_TRACE');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'PERFORMANCE_TRACE',
+        );
       });
 
       it('should correctly handle PERF_INSIGHT widget', () => {
@@ -251,7 +299,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERF_INSIGHT:LCPBreakdown:LCPBreakdown:nav1');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'PERF_INSIGHT:LCPBreakdown:LCPBreakdown:nav1',
+        );
       });
 
       it('should correctly handle PERF_INSIGHT widget with render-blocking-request', () => {
@@ -272,7 +322,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'PERF_INSIGHT:RenderBlocking:RenderBlocking:nav1');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'PERF_INSIGHT:RenderBlocking:RenderBlocking:nav1',
+        );
       });
 
       it('should correctly handle TIMELINE_RANGE_SUMMARY widget', () => {
@@ -284,7 +336,10 @@ describeWithEnvironment('ChatMessage', () => {
             track: 'main',
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'TIMELINE_RANGE_SUMMARY:main:100-200');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'TIMELINE_RANGE_SUMMARY:main:100-200',
+        );
       });
 
       it('should correctly handle BOTTOM_UP_TREE widget', () => {
@@ -295,7 +350,24 @@ describeWithEnvironment('ChatMessage', () => {
             parsedTrace: makeFakeParsedTrace(),
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'BOTTOM_UP_TREE:100-200');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'BOTTOM_UP_TREE:100-200',
+        );
+      });
+
+      it('should correctly handle NETWORK_TRACK widget', () => {
+        const widget = {
+          name: 'NETWORK_TRACK',
+          data: {
+            bounds: microsecondsTraceWindow(100, 200),
+            parsedTrace: makeFakeParsedTrace(),
+          },
+        } as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'NETWORK_TRACK:100-200',
+        );
       });
 
       it('should correctly handle LIGHTHOUSE_REPORT widget', () => {
@@ -307,7 +379,10 @@ describeWithEnvironment('ChatMessage', () => {
             },
           },
         } as unknown as AIAssistanceModel.AiAgent.AiWidget;
-        assert.strictEqual(AiAssistance.ChatMessage.getWidgetSignature(widget), 'LIGHTHOUSE_REPORT:123456');
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'LIGHTHOUSE_REPORT:123456',
+        );
       });
 
       it('should correctly handle TIMELINE_EVENT_SUMMARY widget', () => {
@@ -321,7 +396,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as unknown as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'TIMELINE_EVENT_SUMMARY:1000000:MyTraceEvent');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'TIMELINE_EVENT_SUMMARY:1000000:MyTraceEvent',
+        );
       });
 
       it('should correctly handle SOURCE_CODE widget without line/column', () => {
@@ -333,7 +410,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_CODE:https://example.com/script.js::');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'SOURCE_CODE:https://example.com/script.js::',
+        );
       });
 
       it('should correctly handle SOURCE_CODE widget with line/column', () => {
@@ -347,7 +426,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_CODE:https://example.com/script.js:42:7');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'SOURCE_CODE:https://example.com/script.js:42:7',
+        );
       });
 
       it('should correctly handle SOURCE_FILE widget', () => {
@@ -360,7 +441,9 @@ describeWithEnvironment('ChatMessage', () => {
           },
         } as unknown as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
-            AiAssistance.ChatMessage.getWidgetSignature(widget), 'SOURCE_FILE:https://example.com/script.js');
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'SOURCE_FILE:https://example.com/script.js',
+        );
       });
 
       it('should correctly handle SOURCE_FILES_LIST widget', () => {
@@ -375,7 +458,26 @@ describeWithEnvironment('ChatMessage', () => {
         } as unknown as AIAssistanceModel.AiAgent.AiWidget;
         assert.strictEqual(
             AiAssistance.ChatMessage.getWidgetSignature(widget),
-            'SOURCE_FILES_LIST:https://example.com/script1.js,https://example.com/script2.js');
+            'SOURCE_FILES_LIST:https://example.com/script1.js,https://example.com/script2.js',
+        );
+      });
+
+      it('should correctly handle STORAGE_BREAKDOWN widget', () => {
+        const widget = {
+          name: 'STORAGE_BREAKDOWN',
+          data: {
+            totalUsageBytes: 1000,
+            totalQuotaBytes: 10000,
+            usageBreakdown: [
+              {storageType: 'indexeddb', bytes: 200},
+              {storageType: 'cookies', bytes: 15},
+            ],
+          },
+        } as unknown as AIAssistanceModel.AiAgent.AiWidget;
+        assert.strictEqual(
+            AiAssistance.ChatMessage.getWidgetSignature(widget),
+            'STORAGE_BREAKDOWN:1000:indexeddb_200,cookies_15',
+        );
       });
     });
   });
@@ -388,14 +490,14 @@ describeWithEnvironment('ChatMessage', () => {
     sinon.assert.callCount(view, 1);
 
     {
-      expect(view.input.showRateButtons).equals(true);
-      expect(view.input.isShowingFeedbackForm).equals(false);
+      assert.isTrue(view.input.showRateButtons);
+      assert.isFalse(view.input.isShowingFeedbackForm);
       view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
     }
 
     sinon.assert.callCount(view, 2);
     {
-      expect(view.input.isShowingFeedbackForm).equals(true);
+      assert.isTrue(view.input.isShowingFeedbackForm);
     }
   });
 
@@ -407,13 +509,13 @@ describeWithEnvironment('ChatMessage', () => {
     sinon.assert.callCount(view, 1);
 
     {
-      expect(view.input.isShowingFeedbackForm).equals(false);
+      assert.isFalse(view.input.isShowingFeedbackForm);
       view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
     }
 
     sinon.assert.callCount(view, 2);
     {
-      expect(view.input.isShowingFeedbackForm).equals(false);
+      assert.isFalse(view.input.isShowingFeedbackForm);
     }
   });
 
@@ -425,24 +527,24 @@ describeWithEnvironment('ChatMessage', () => {
     sinon.assert.callCount(view, 1);
 
     {
-      expect(view.input.isSubmitButtonDisabled).equals(true);
+      assert.isTrue(view.input.isSubmitButtonDisabled);
       view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
     }
 
     sinon.assert.callCount(view, 2);
 
     {
-      expect(view.input.isShowingFeedbackForm).equals(true);
+      assert.isTrue(view.input.isShowingFeedbackForm);
       view.input.onInputChange('test');
     }
 
     {
-      expect(view.input.isSubmitButtonDisabled).equals(false);
+      assert.isFalse(view.input.isSubmitButtonDisabled);
       view.input.onSubmit(new SubmitEvent('submit'));
     }
 
     {
-      expect(view.input.isSubmitButtonDisabled).equals(true);
+      assert.isTrue(view.input.isSubmitButtonDisabled);
     }
   });
 
@@ -456,7 +558,7 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     sinon.assert.callCount(view, 1);
-    expect(view.input.showRateButtons).equals(false);
+    assert.isFalse(view.input.showRateButtons);
   });
 
   it('should show actions when it is not the last message and it is loading', async () => {
@@ -466,7 +568,7 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     sinon.assert.callCount(view, 1);
-    expect(view.input.showActions).equals(true);
+    assert.isTrue(view.input.showActions);
   });
 
   it('should not show actions when it is the last message and it is loading', async () => {
@@ -476,7 +578,7 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     sinon.assert.callCount(view, 1);
-    expect(view.input.showActions).equals(false);
+    assert.isFalse(view.input.showActions);
   });
 
   it('should not show suggestions when it is not the last message', async () => {
@@ -497,7 +599,7 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     sinon.assert.callCount(view, 1);
-    expect(view.input.suggestions).equals(undefined);
+    assert.isUndefined(view.input.suggestions);
   });
 
   it('should show suggestions when it is the last message', async () => {
@@ -518,24 +620,22 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     sinon.assert.callCount(view, 1);
-    expect(view.input.suggestions).deep.equals(['suggestion']);
+    assert.deepEqual(view.input.suggestions, ['suggestion']);
   });
 
   describe('Walkthrough Rendering', () => {
-    beforeEach(() => {
-      updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
-    });
-
     const stepMessage: AiAssistance.ChatMessage.ModelChatMessage = {
       entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-      parts: [{
-        type: 'step',
-        step: {
-          isLoading: false,
-          title: 'Step 1',
-          code: 'console.log("test")',
+      parts: [
+        {
+          type: 'step',
+          step: {
+            state: {type: 'completed'},
+            title: 'Step 1',
+            code: 'console.log("test")',
+          },
         },
-      }],
+      ],
       rpcId: 99,
       id: '1',
     };
@@ -546,9 +646,12 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Show thinking');
     });
 
@@ -560,9 +663,12 @@ describeWithEnvironment('ChatMessage', () => {
           isExpanded: true,
           activeSidebarMessage: stepMessage,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Hide thinking');
     });
 
@@ -574,27 +680,32 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: false,
           isExpanded: false,
           activeSidebarMessage: stepMessage,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Show thinking');
     });
 
     it('renders "Hide agent walkthrough" when the walkthrough is open and has widgets', () => {
       const widgetMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Step with widget',
-            widgets: [
-              {
-                name: 'CORE_VITALS',
-              } as unknown as AIAssistanceModel.AiAgent.AiWidget,
-            ],
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'completed'},
+              title: 'Step with widget',
+              widgets: [
+                {
+                  name: 'CORE_VITALS',
+                } as unknown as AIAssistanceModel.AiAgent.AiWidget,
+              ],
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -606,23 +717,28 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: false,
           isExpanded: true,
           activeSidebarMessage: widgetMessage,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Hide agent walkthrough');
     });
 
     it('when the step is loading, the walkthrough CTA shows the title of the step', async () => {
       const loadingMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: true,
-            title: 'Investigating XYZ',
-            code: 'console.log("test")',
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'in_progress'},
+              title: 'Investigating XYZ',
+              code: 'console.log("test")',
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -632,23 +748,28 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Investigating XYZ');
     });
 
     it('accessible label shows the step title when loading', async () => {
       const loadingMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: true,
-            title: 'Investigating XYZ',
-            code: 'console.log("test")',
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'in_progress'},
+              title: 'Investigating XYZ',
+              code: 'console.log("test")',
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -658,10 +779,16 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
-      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Loading: Investigating XYZ');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
+      assert.strictEqual(
+          button.getAttribute('accessibleLabel'),
+          'Loading: Investigating XYZ',
+      );
     });
 
     it('accessible label defaults to visible text when generic', async () => {
@@ -671,10 +798,16 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
-      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Show thinking for prompt test prompt');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
+      assert.strictEqual(
+          button.getAttribute('accessibleLabel'),
+          'Show thinking for prompt test prompt',
+      );
     });
 
     it('accessible label defaults to visible text when expanded and not loading', async () => {
@@ -686,23 +819,31 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: false,
           isExpanded: true,
           activeSidebarMessage: stepMessage,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
-      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Hide thinking for prompt test prompt');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
+      assert.strictEqual(
+          button.getAttribute('accessibleLabel'),
+          'Hide thinking for prompt test prompt',
+      );
     });
 
     it('accessible label appends "Loading: " when expanded and loading', async () => {
       const loadingMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: true,
-            title: 'Investigating XYZ',
-            code: 'console.log("test")',
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'in_progress'},
+              title: 'Investigating XYZ',
+              code: 'console.log("test")',
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -714,10 +855,16 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: false,
           isExpanded: true,
           activeSidebarMessage: loadingMessage,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
-      assert.strictEqual(button.getAttribute('accessibleLabel'), 'Loading: Hide thinking');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
+      assert.strictEqual(
+          button.getAttribute('accessibleLabel'),
+          'Loading: Hide thinking',
+      );
     });
 
     it('does not render "Show thinking" button when inline', () => {
@@ -726,7 +873,7 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: true,
-        }
+        },
       });
       assert.isNull(target.querySelector('[data-show-walkthrough]'));
     });
@@ -734,14 +881,16 @@ describeWithEnvironment('ChatMessage', () => {
     it('makes the walkthrough button "Show thinking" if there are no widgets', async () => {
       const messageNoWidgets: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Investigating XYZ',
-            code: 'console.log("test")',
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'completed'},
+              title: 'Investigating XYZ',
+              code: 'console.log("test")',
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -751,25 +900,30 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Show thinking');
     });
 
     it('makes the walkthrough button "Show agent walkthrough" if there are widgets', async () => {
       const messageWithWidget: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Investigating XYZ',
-            code: 'console.log("test")',
-            // Don't need a proper widget for this test
-            widgets: [{} as AIAssistanceModel.AiAgent.ComputedStyleAiWidget],
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'completed'},
+              title: 'Investigating XYZ',
+              code: 'console.log("test")',
+              // Don't need a proper widget for this test
+              widgets: [{} as AIAssistanceModel.AiAgent.ComputedStyleAiWidget],
+            },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -779,9 +933,12 @@ describeWithEnvironment('ChatMessage', () => {
         walkthrough: {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
-        }
+        },
       });
-      const button = querySelectorErrorOnMissing(target, '[data-show-walkthrough]');
+      const button = querySelectorErrorOnMissing(
+          target,
+          '[data-show-walkthrough]',
+      );
       assert.strictEqual(button.innerText, 'Show agent walkthrough');
     });
 
@@ -792,7 +949,7 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: true,
           isExpanded: true,
-        }
+        },
       });
       const walkthrough = target.querySelector('.walkthrough-container');
       assert.isNotNull(walkthrough);
@@ -805,7 +962,7 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
           isExpanded: true,
-        }
+        },
       });
       const walkthrough = target.querySelector('.walkthrough-container');
       assert.isNull(walkthrough);
@@ -816,18 +973,22 @@ describeWithEnvironment('ChatMessage', () => {
 
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Side Effect Step',
-            code: 'doSomethingDangerous()',
-            requestApproval: {
-              description: sideEffectDescription,
-              onAnswer: () => {},
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {
+                type: 'needs_approval',
+                sideEffectDialog: {
+                  description: sideEffectDescription,
+                  onAnswer: () => {},
+                },
+              },
+              title: 'Side Effect Step',
+              code: 'doSomethingDangerous()',
             },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -839,10 +1000,13 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: false,
           isExpanded: false,
-        }
+        },
       });
       assert.isNotNull(targetClosed.querySelector('.side-effect-container'));
-      assert.include(targetClosed.querySelector('.side-effect-container')?.textContent, sideEffectDescription);
+      assert.include(
+          targetClosed.querySelector('.side-effect-container')?.textContent,
+          sideEffectDescription,
+      );
 
       // Test open state
       const targetOpen = renderView({
@@ -852,10 +1016,13 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: false,
           isExpanded: true,
           activeSidebarMessage: sideEffectMessage,
-        }
+        },
       });
       assert.isNotNull(targetOpen.querySelector('.side-effect-container'));
-      assert.include(targetOpen.querySelector('.side-effect-container')?.textContent, sideEffectDescription);
+      assert.include(
+          targetOpen.querySelector('.side-effect-container')?.textContent,
+          sideEffectDescription,
+      );
     });
 
     it('renders side effect confirmation in inline mode regardless of walkthrough expansion state', () => {
@@ -863,18 +1030,22 @@ describeWithEnvironment('ChatMessage', () => {
 
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Side Effect Step',
-            code: 'doSomethingDangerous()',
-            requestApproval: {
-              description: sideEffectDescription,
-              onAnswer: () => {},
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {
+                type: 'needs_approval',
+                sideEffectDialog: {
+                  description: sideEffectDescription,
+                  onAnswer: () => {},
+                },
+              },
+              title: 'Side Effect Step',
+              code: 'doSomethingDangerous()',
             },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -886,10 +1057,13 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: true,
           isExpanded: false,
-        }
+        },
       });
       assert.isNotNull(targetClosed.querySelector('.side-effect-container'));
-      assert.include(targetClosed.querySelector('.side-effect-container')?.textContent, sideEffectDescription);
+      assert.include(
+          targetClosed.querySelector('.side-effect-container')?.textContent,
+          sideEffectDescription,
+      );
 
       // Test open state
       const targetOpen = renderView({
@@ -899,10 +1073,13 @@ describeWithEnvironment('ChatMessage', () => {
           isInlined: true,
           isExpanded: true,
           inlineExpandedMessages: [sideEffectMessage],
-        }
+        },
       });
       assert.isNotNull(targetOpen.querySelector('.side-effect-container'));
-      assert.include(targetOpen.querySelector('.side-effect-container')?.textContent, sideEffectDescription);
+      assert.include(
+          targetOpen.querySelector('.side-effect-container')?.textContent,
+          sideEffectDescription,
+      );
     });
 
     it('renders side effect confirmation below the text output', () => {
@@ -919,13 +1096,15 @@ describeWithEnvironment('ChatMessage', () => {
           {
             type: 'step',
             step: {
-              isLoading: false,
+              state: {
+                type: 'needs_approval',
+                sideEffectDialog: {
+                  description: sideEffectDescription,
+                  onAnswer: () => {},
+                },
+              },
               title: 'Side Effect Step',
               code: 'doSomethingDangerous()',
-              requestApproval: {
-                description: sideEffectDescription,
-                onAnswer: () => {},
-              },
             },
           },
         ],
@@ -939,7 +1118,7 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: true,
           isExpanded: false,
-        }
+        },
       });
 
       const answerBody = target.querySelector('.answer-body-wrapper');
@@ -952,24 +1131,29 @@ describeWithEnvironment('ChatMessage', () => {
       const position = answerBody.compareDocumentPosition(sideEffect);
       assert.isTrue(
           Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING),
-          'Side effect confirmation should render after the text output');
+          'Side effect confirmation should render after the text output',
+      );
     });
 
     it('does not force walkthrough expansion when there are side-effect steps', () => {
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'step',
-          step: {
-            isLoading: false,
-            title: 'Side Effect Step',
-            code: 'doSomethingDangerous()',
-            requestApproval: {
-              description: 'Confirm!',
-              onAnswer: () => {},
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {
+                type: 'needs_approval',
+                sideEffectDialog: {
+                  description: 'Confirm!',
+                  onAnswer: () => {},
+                },
+              },
+              title: 'Side Effect Step',
+              code: 'doSomethingDangerous()',
             },
           },
-        }],
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -980,7 +1164,7 @@ describeWithEnvironment('ChatMessage', () => {
           ...DEFAULT_WALKTHROUGH,
           isInlined: true,
           isExpanded: false,
-        }
+        },
       });
 
       const walkthrough = target.querySelector('.walkthrough-inline');
@@ -989,7 +1173,166 @@ describeWithEnvironment('ChatMessage', () => {
       }
     });
 
-    it('renders widget name and top reveal button when widgetName is provided', async () => {
+    it('renders side effect step with aborted indicator when canceled', () => {
+      const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'step',
+            step: {
+              state: {type: 'canceled'},
+              title: 'Side Effect Step',
+              code: 'doSomethingDangerous()',
+            },
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const target = renderView({
+        message: sideEffectMessage,
+        walkthrough: {
+          ...DEFAULT_WALKTHROUGH,
+          isInlined: true,
+          isExpanded: false,
+        },
+      });
+
+      const indicator = target.querySelector('.side-effect-container devtools-icon.indicator');
+      assert.isNotNull(indicator);
+      assert.strictEqual(indicator?.getAttribute('aria-label'), 'Aborted');
+      assert.isNull(target.querySelector('.side-effect-confirmation'));
+    });
+
+    describe('permission prompt', () => {
+      function createPermissionPromptMessage(
+          dialog: Partial<AiAssistance.ChatMessage.ConfirmSideEffectDialog> = {},
+          ): AiAssistance.ChatMessage.ModelChatMessage {
+        return {
+          entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+          parts: [
+            {
+              type: 'step',
+              step: {
+                state: {
+                  type: 'needs_approval',
+                  sideEffectDialog: {
+                    description: 'The AI wants to read the cookie "session" on https://example.com.',
+                    permissionTitle: 'Allow reading cookie values?',
+                    permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE,
+                    onAnswer: () => {},
+                    ...dialog,
+                  },
+                },
+                title: 'Reading cookie values and metadata',
+                code: 'getCookieValues({cookieNames: ["session"]})',
+              },
+            },
+          ],
+          rpcId: 99,
+          id: '1',
+        };
+      }
+
+      function getButtons(target: HTMLElement): HTMLElement[] {
+        return Array.from(target.querySelectorAll<HTMLElement>('.permission-prompt devtools-button'));
+      }
+
+      beforeEach(() => {
+        updateHostConfig({devToolsAiNaturalLanguageInterface: {enabled: true}});
+      });
+
+      it('renders the legacy confirmation when the flag is off', () => {
+        updateHostConfig({devToolsAiNaturalLanguageInterface: {enabled: false}});
+        const target = renderView({message: createPermissionPromptMessage()});
+
+        assert.isNull(target.querySelector('.permission-prompt'));
+        assert.isNotNull(target.querySelector('.side-effect-confirmation'));
+      });
+
+      it('renders the title, description and code', () => {
+        const target = renderView({message: createPermissionPromptMessage()});
+        assert.isNull(target.querySelector('.side-effect-confirmation'));
+
+        const prompt = querySelectorErrorOnMissing(target, '.permission-prompt');
+        assert.strictEqual(prompt.querySelector('.permission-prompt-title')?.textContent,
+                           'Allow reading cookie values?');
+        assert.include(prompt.querySelector('.permission-prompt-description')?.textContent,
+                       'The AI wants to read the cookie "session"');
+
+        const codeBlock = querySelectorErrorOnMissing<HTMLElement&{code: string}>(prompt, 'devtools-code-block');
+        assert.strictEqual(codeBlock.code, 'getCookieValues({cookieNames: ["session"]})');
+        assert.strictEqual(codeBlock.shadowRoot?.querySelector('.heading-text')?.textContent, 'Code to execute');
+        assert.include(codeBlock.shadowRoot?.querySelector('.notice')?.textContent, 'Use code snippets with caution');
+      });
+
+      it('falls back to a generic title when the tool has none', () => {
+        const target = renderView({message: createPermissionPromptMessage({permissionTitle: undefined})});
+        assert.strictEqual(target.querySelector('.permission-prompt-title')?.textContent, 'Allow this action?');
+      });
+
+      it('offers Skip and Allow once for ALLOW_ONCE', () => {
+        const onAnswer = sinon.stub();
+        const target = renderView({message: createPermissionPromptMessage({onAnswer})});
+
+        const buttons = getButtons(target);
+        assert.deepEqual(buttons.map(b => b.textContent?.trim()), ['Skip', 'Yes, allow this time']);
+
+        buttons[0].click();
+        buttons[1].click();
+        assert.deepEqual(onAnswer.args.map(([decision]) => decision), [
+          AIAssistanceModel.Tool.PermissionDecision.REJECT,
+          AIAssistanceModel.Tool.PermissionDecision.ALLOW_ONCE,
+        ]);
+      });
+
+      it('offers Skip, Always allow and Allow once for ALLOW_ONCE_OR_ALWAYS', () => {
+        const onAnswer = sinon.stub();
+        const target = renderView({
+          message: createPermissionPromptMessage({
+            onAnswer,
+            permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE_OR_ALWAYS,
+          }),
+        });
+
+        const buttons = getButtons(target);
+        assert.deepEqual(buttons.map(b => b.textContent?.trim()),
+                         ['Skip', 'Yes, always allow', 'Yes, allow this time']);
+
+        buttons[1].click();
+        sinon.assert.calledOnceWithExactly(onAnswer, AIAssistanceModel.Tool.PermissionDecision.ALLOW_ALWAYS);
+      });
+
+      it('renders the data disclaimer', () => {
+        const target = renderView({message: createPermissionPromptMessage()});
+
+        const footer = querySelectorErrorOnMissing(target, '.permission-prompt-footer');
+        assert.strictEqual(footer.textContent?.trim(),
+                           'Relevant data is sent to Google. Change permissions in settings at any time.');
+      });
+
+      it('renders the ALLOW_ONCE prompt', async () => {
+        const target = document.createElement('div');
+        renderElementIntoDOM(target, {includeCommonStyles: true});
+        renderView({message: createPermissionPromptMessage()}, target);
+        await assertScreenshot('ai_assistance/permission_prompt_allow_once.png');
+      });
+
+      it('renders the ALLOW_ONCE_OR_ALWAYS prompt', async () => {
+        const target = document.createElement('div');
+        renderElementIntoDOM(target, {includeCommonStyles: true});
+        renderView({
+          message: createPermissionPromptMessage({
+            permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE_OR_ALWAYS,
+          }),
+        },
+                   target);
+        await assertScreenshot('ai_assistance/permission_prompt_allow_once_or_always.png');
+      });
+    });
+
+    it('renders widget title and reveal button label from widget data', async () => {
       const root = sinon.createStubInstance(SDK.DOMModel.DOMNodeSnapshot);
       const domModel = sinon.createStubInstance(SDK.DOMModel.DOMModel);
       const target = sinon.createStubInstance(SDK.Target.Target);
@@ -999,15 +1342,21 @@ describeWithEnvironment('ChatMessage', () => {
 
       const messageWithNamedWidget: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'widget',
-          widgets: [{
-            name: 'DOM_TREE',
-            data: {
-              root,
-            },
-          }],
-        }],
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'DOM_TREE',
+                data: {
+                  root,
+                  title: 'Custom Title' as Platform.UIString.LocalizedString,
+                  accessibleRevealLabel: 'Custom Reveal Label' as Platform.UIString.LocalizedString,
+                },
+              },
+            ],
+          },
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -1019,10 +1368,16 @@ describeWithEnvironment('ChatMessage', () => {
       // We need to wait for the async renderWidgets
       const widgetHeader = await waitFor('.widget-header', targetElement);
       assert.isNotNull(widgetHeader);
-      assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'LCP element');
+      assert.strictEqual(
+          widgetHeader.querySelector('.widget-name')?.textContent,
+          'Custom Title',
+      );
       const revealButton = widgetHeader.querySelector('.widget-reveal-button');
       assert.isNotNull(revealButton);
-      assert.strictEqual(revealButton.getAttribute('accessibleLabel'), 'Reveal LCP element');
+      assert.strictEqual(
+          revealButton.getAttribute('accessibleLabel'),
+          'Custom Reveal Label',
+      );
     });
 
     it('renders network request image using imageContent.asImagePreviewUrl()', async () => {
@@ -1033,27 +1388,35 @@ describeWithEnvironment('ChatMessage', () => {
       domModel.target.returns(target);
       root.backendNodeId.returns(1 as Protocol.DOM.BackendNodeId);
 
-      const mockContentData = sinon.createStubInstance(TextUtils.ContentData.ContentData);
+      const mockContentData = sinon.createStubInstance(
+          TextUtils.ContentData.ContentData,
+      );
       mockContentData.asImagePreviewUrl.returns('blob:http://localhost/123');
 
       const messageWithWidget: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'widget',
-          widgets: [{
-            name: 'DOM_TREE',
-            data: {
-              root,
-              networkRequest: {
-                url: 'https://example.com/image.png',
-                size: 100,
-                resourceType: 'Image' as Protocol.Network.ResourceType,
-                mimeType: 'image/png',
-                imageContent: mockContentData,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'DOM_TREE',
+                data: {
+                  root,
+                  title: 'Title' as Platform.UIString.LocalizedString,
+                  accessibleRevealLabel: 'Label' as Platform.UIString.LocalizedString,
+                  networkRequest: {
+                    url: 'https://example.com/image.png',
+                    size: 100,
+                    resourceType: 'Image' as Protocol.Network.ResourceType,
+                    mimeType: 'image/png',
+                    imageContent: mockContentData,
+                  },
+                },
               },
-            },
-          }],
-        }],
+            ],
+          },
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -1069,9 +1432,8 @@ describeWithEnvironment('ChatMessage', () => {
       sinon.assert.calledOnce(mockContentData.asImagePreviewUrl);
     });
 
-    it('renders the "Export for agents" button after action buttons and before suggestions when onExportClick is provided, it is the last message, and V2 is enabled',
+    it('renders the "Export for agents" button after action buttons and before suggestions when onExportClick is provided and it is the last message',
        async () => {
-         updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
          const onExportClick = sinon.stub();
          const target = renderView({
            onExportClick,
@@ -1092,83 +1454,31 @@ describeWithEnvironment('ChatMessage', () => {
            },
          });
 
-         const row = querySelectorErrorOnMissing(target, '.ai-assistance-feedback-row');
-         const exportButton = querySelectorErrorOnMissing(row, '.export-for-agents-button');
+         const row = querySelectorErrorOnMissing(
+             target,
+             '.ai-assistance-feedback-row',
+         );
+         const exportButton = querySelectorErrorOnMissing(
+             row,
+             '.export-for-agents-button',
+         );
 
-         assert.strictEqual(exportButton.textContent?.trim(), 'Copy to coding agent');
-         assert.strictEqual(exportButton.getAttribute('aria-label'), 'Copy to coding agent');
+         assert.strictEqual(
+             exportButton.textContent?.trim(),
+             'Copy to coding agent',
+         );
+         assert.strictEqual(
+             exportButton.getAttribute('aria-label'),
+             'Copy to coding agent',
+         );
          exportButton.click();
          sinon.assert.calledOnce(onExportClick);
        });
-
-    it('does not render the "Export for agents" button when V2 is disabled', async () => {
-      updateHostConfig({devToolsAiAssistanceV2: {enabled: false}});
-      const onExportClick = sinon.stub();
-      const target = renderView({
-        onExportClick,
-        isLastMessage: true,
-        showActions: true,
-      });
-
-      const exportButton = target.querySelector('.export-for-agents-button');
-      assert.isNull(exportButton);
-    });
   });
-
-  describe('CSS change summary', () => {
-    beforeEach(() => {
-      updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
-    });
-
-    it('should render devtools-code-block when hasAiV2 is true, changeSummary is present and shouldShowCSSChangeSummary is true',
-       async () => {
-         const target = renderView({
-           shouldShowCSSChangeSummary: true,
-           changeSummary: 'test summary',
-         });
-
-         const codeBlock = target.querySelector('devtools-code-block');
-         assert.instanceOf(codeBlock, MarkdownView.CodeBlock.CodeBlock);
-         assert.strictEqual(codeBlock.code, 'test summary');
-         assert.strictEqual(codeBlock.displayLimit, 11);
-       });
-
-    it('should NOT render devtools-code-block when changeSummary is missing', async () => {
-      const target = renderView({
-        shouldShowCSSChangeSummary: true,
-        changeSummary: undefined,
-      });
-
-      const codeBlock = target.querySelector('devtools-code-block');
-      assert.isNull(codeBlock);
-    });
-
-    it('should NOT render devtools-code-block when shouldShowCSSChangeSummary is false', async () => {
-      const target = renderView({
-        shouldShowCSSChangeSummary: false,
-        changeSummary: 'test summary',
-      });
-
-      const codeBlock = target.querySelector('devtools-code-block');
-      assert.isNull(codeBlock);
-    });
-
-    it('should NOT render devtools-code-block when hasAiV2 is false', async () => {
-      updateHostConfig({devToolsAiAssistanceV2: {enabled: false}});
-      const target = renderView({
-        shouldShowCSSChangeSummary: true,
-        changeSummary: 'test summary',
-      });
-
-      const codeBlock = target.querySelector('devtools-code-block');
-      assert.isNull(codeBlock);
-    });
-  });
-
   describe('view', () => {
     it('renders a minimal model message', async () => {
       const target = document.createElement('div');
-      renderElementIntoDOM(target);
+      renderElementIntoDOM(target, {includeCommonStyles: true});
       AiAssistance.ChatMessage.DEFAULT_VIEW(
           {
             onRatingClick: () => {},
@@ -1187,7 +1497,6 @@ describeWithEnvironment('ChatMessage', () => {
             isLastMessage: true,
             isFirstMessage: false,
             prompt: 'test prompt',
-            shouldShowCSSChangeSummary: false,
             showActions: true,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
@@ -1202,13 +1511,15 @@ describeWithEnvironment('ChatMessage', () => {
             currentRating: undefined,
             walkthrough: {...DEFAULT_WALKTHROUGH},
           },
-          {}, target);
+          {},
+          target,
+      );
       await assertScreenshot('ai_assistance/user_action_row_minimal.png');
     });
 
     it('renders a complete user message', async () => {
       const target = document.createElement('div');
-      renderElementIntoDOM(target);
+      renderElementIntoDOM(target, {includeCommonStyles: true});
       AiAssistance.ChatMessage.DEFAULT_VIEW(
           {
             onRatingClick: () => {},
@@ -1227,7 +1538,6 @@ describeWithEnvironment('ChatMessage', () => {
             isLastMessage: true,
             isFirstMessage: false,
             prompt: 'test prompt',
-            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.USER,
@@ -1241,7 +1551,9 @@ describeWithEnvironment('ChatMessage', () => {
             currentRating: undefined,
             walkthrough: {...DEFAULT_WALKTHROUGH},
           },
-          {}, target);
+          {},
+          target,
+      );
       await assertScreenshot('ai_assistance/user_action_row_user_message.png');
     });
 
@@ -1265,7 +1577,6 @@ describeWithEnvironment('ChatMessage', () => {
             isLastMessage: false,
             isFirstMessage: true,
             prompt: 'test prompt',
-            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.USER,
@@ -1279,8 +1590,13 @@ describeWithEnvironment('ChatMessage', () => {
             currentRating: undefined,
             walkthrough: {...DEFAULT_WALKTHROUGH},
           },
-          {}, userTarget);
-      const userMessage = querySelectorErrorOnMissing(userTarget, '.chat-message');
+          {},
+          userTarget,
+      );
+      const userMessage = querySelectorErrorOnMissing(
+          userTarget,
+          '.chat-message',
+      );
       assert.isTrue(userMessage.classList.contains('is-first-message'));
 
       const modelTarget = document.createElement('div');
@@ -1302,7 +1618,6 @@ describeWithEnvironment('ChatMessage', () => {
             isLastMessage: false,
             isFirstMessage: true,
             prompt: 'test prompt',
-            shouldShowCSSChangeSummary: false,
             showActions: false,
             message: {
               entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
@@ -1316,13 +1631,17 @@ describeWithEnvironment('ChatMessage', () => {
             currentRating: undefined,
             walkthrough: {...DEFAULT_WALKTHROUGH},
           },
-          {}, modelTarget);
-      const modelMessage = querySelectorErrorOnMissing(modelTarget, '.chat-message');
+          {},
+          modelTarget,
+      );
+      const modelMessage = querySelectorErrorOnMissing(
+          modelTarget,
+          '.chat-message',
+      );
       assert.isTrue(modelMessage.classList.contains('is-first-message'));
     });
 
     it('renders SOURCE_FILES_LIST widget with correct dynamic title', async () => {
-      updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
       function createMockFile(name: string) {
         return {
           name: () => name,
@@ -1331,18 +1650,25 @@ describeWithEnvironment('ChatMessage', () => {
         } as unknown as Workspace.UISourceCode.UISourceCode;
       }
 
-      const uiSourceCodes = [createMockFile('file1.js'), createMockFile('file2.js')];
+      const uiSourceCodes = [
+        createMockFile('file1.js'),
+        createMockFile('file2.js'),
+      ];
       const message: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-        parts: [{
-          type: 'widget',
-          widgets: [{
-            name: 'SOURCE_FILES_LIST',
-            data: {
-              uiSourceCodes,
-            },
-          }],
-        }],
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'SOURCE_FILES_LIST',
+                data: {
+                  uiSourceCodes,
+                },
+              },
+            ],
+          },
+        ],
         rpcId: 99,
         id: '1',
       };
@@ -1350,14 +1676,24 @@ describeWithEnvironment('ChatMessage', () => {
       const targetElement = renderView({message});
       const widgetHeader = await waitFor('.widget-header', targetElement);
       assert.isNotNull(widgetHeader);
-      assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'Inspected file names');
+      assert.strictEqual(
+          widgetHeader.querySelector('.widget-name')?.textContent,
+          'Inspected file names',
+      );
 
       // Inspected list items (all 2 files should be visible)
-      const listItems = targetElement.querySelectorAll('.source-files-widget .visible-file');
+      const listItems = targetElement.querySelectorAll(
+          '.source-files-widget .visible-file',
+      );
       assert.lengthOf(listItems, 2);
 
-      const fileNames = Array.from(listItems).map(item => item.textContent?.trim());
-      assert.deepEqual(fileNames, ['example.com/path/to/file1.js', 'example.com/path/to/file2.js']);
+      const fileNames = Array.from(listItems).map(
+          item => item.textContent?.trim(),
+      );
+      assert.deepEqual(fileNames, [
+        'example.com/path/to/file1.js',
+        'example.com/path/to/file2.js',
+      ]);
 
       // No details element since there are <= 10 files. We show collapse files list only if there are over 10 of them
       assert.isNull(targetElement.querySelector('.source-files-details'));
@@ -1365,7 +1701,6 @@ describeWithEnvironment('ChatMessage', () => {
 
     it('renders SOURCE_FILES_LIST widget with more than 10 files, limiting to 10 and using details element for the rest',
        async () => {
-         updateHostConfig({devToolsAiAssistanceV2: {enabled: true}});
          function createMockFile(name: string) {
            return {
              name: () => name,
@@ -1374,31 +1709,46 @@ describeWithEnvironment('ChatMessage', () => {
            } as unknown as Workspace.UISourceCode.UISourceCode;
          }
 
-         const uiSourceCodes = Array.from({length: 12}, (_, i) => createMockFile(`file${i + 1}.js`));
+         const uiSourceCodes = Array.from(
+             {length: 12},
+             (_, i) => createMockFile(`file${i + 1}.js`),
+         );
          const message: AiAssistance.ChatMessage.ModelChatMessage = {
            entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
-           parts: [{
-             type: 'widget',
-             widgets: [{
-               name: 'SOURCE_FILES_LIST',
-               data: {
-                 uiSourceCodes,
-               },
-             }],
-           }],
+           parts: [
+             {
+               type: 'widget',
+               widgets: [
+                 {
+                   name: 'SOURCE_FILES_LIST',
+                   data: {
+                     uiSourceCodes,
+                   },
+                 },
+               ],
+             },
+           ],
            rpcId: 99,
            id: '1',
          };
 
          const targetElement = renderView({message});
-         const widgetHeader = await waitFor('.widget-header', targetElement) as HTMLElement;
+         const widgetHeader = (await waitFor(
+                                  '.widget-header',
+                                  targetElement,
+                                  )) as HTMLElement;
          assert.isNotNull(widgetHeader);
-         assert.strictEqual(widgetHeader.querySelector('.widget-name')?.textContent, 'Inspected file names');
+         assert.strictEqual(
+             widgetHeader.querySelector('.widget-name')?.textContent,
+             'Inspected file names',
+         );
 
          // Header reveal button click should reveal the first file
          const revealStub = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').resolves();
-         const revealBtn =
-             querySelectorErrorOnMissing(widgetHeader, 'devtools-button.widget-reveal-button') as HTMLElement;
+         const revealBtn = querySelectorErrorOnMissing(
+                               widgetHeader,
+                               'devtools-button.widget-reveal-button',
+                               ) as HTMLElement;
          revealBtn.click();
          sinon.assert.calledWith(revealStub, uiSourceCodes[0]);
          revealStub.restore();
@@ -1412,12 +1762,358 @@ describeWithEnvironment('ChatMessage', () => {
          assert.strictEqual(summaryText, 'Show all 12 files');
 
          // Verify that there are exactly 10 visible files (with the class "visible-file").
-         const outerListItems = targetElement.querySelectorAll('.source-files-widget .visible-file');
+         const outerListItems = targetElement.querySelectorAll(
+             '.source-files-widget .visible-file',
+         );
          assert.lengthOf(outerListItems, 10);
 
          // Verify that the remaining 2 files are nested inside details and have the "collapsed-file" class.
          const innerListItems = details?.querySelectorAll('.collapsed-file');
          assert.lengthOf(innerListItems ?? [], 2);
        });
+
+    it('renders NETWORK_REQUESTS_LIST widget with less than 15 requests, not showing the expand button', async () => {
+      function createMockRequest(id: string) {
+        return {
+          requestId: () => id,
+          name: () => id,
+          statusCode: 200,
+          mimeType: 'text/html',
+          transferSize: 1000,
+          duration: 1,
+        } as unknown as SDK.NetworkRequest.NetworkRequest;
+      }
+
+      const requests = [createMockRequest('req1'), createMockRequest('req2')];
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'NETWORK_REQUESTS_LIST',
+                data: {
+                  requests,
+                },
+              } as unknown as AIAssistanceModel.AiAgent.AiWidget,
+            ],
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const widgetHeader = await waitFor('.widget-header', targetElement);
+      assert.isNotNull(widgetHeader);
+      assert.strictEqual(
+          widgetHeader.querySelector('.widget-name')?.textContent,
+          'Network requests',
+      );
+
+      const widgetContainer = (await waitFor(
+                                  '.network-requests-widget',
+                                  targetElement,
+                                  )) as HTMLElement;
+      assert.isNotNull(widgetContainer);
+
+      // Verify headers
+      const headers = Array
+                          .from(
+                              widgetContainer.querySelectorAll('table th'),
+                              )
+                          .map(th => th.id);
+      assert.deepEqual(headers, ['name', 'status', 'size', 'time']);
+
+      // Verify that all requests are displayed (table has 1 header row + 2 data rows = 3 rows)
+      const rows = widgetContainer.querySelectorAll('table tr');
+      assert.lengthOf(rows, 3);
+
+      // Verify that the expand button does NOT exist
+      const expandButton = widgetContainer.querySelector(
+          'button.show-all-widget-requests-button',
+      );
+      assert.isNull(expandButton);
+    });
+
+    it('renders NETWORK_REQUESTS_LIST widget with more than 15 requests, showing the expand button', async () => {
+      function createMockRequest(id: string) {
+        return {
+          requestId: () => id,
+          name: () => id,
+          statusCode: 200,
+          mimeType: 'text/html',
+          transferSize: 1000,
+          duration: 1,
+        } as unknown as SDK.NetworkRequest.NetworkRequest;
+      }
+
+      const requests = Array.from(
+          {length: 17},
+          (_, i) => createMockRequest(`req${i + 1}`),
+      );
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'NETWORK_REQUESTS_LIST',
+                data: {
+                  requests,
+                },
+              } as unknown as AIAssistanceModel.AiAgent.AiWidget,
+            ],
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const widgetHeader = await waitFor('.widget-header', targetElement);
+      assert.isNotNull(widgetHeader);
+      assert.strictEqual(
+          widgetHeader.querySelector('.widget-name')?.textContent,
+          'Network requests',
+      );
+
+      const widgetContainer = (await waitFor(
+                                  '.network-requests-widget',
+                                  targetElement,
+                                  )) as HTMLElement;
+      assert.isNotNull(widgetContainer);
+
+      // Verify headers
+      const headers = Array
+                          .from(
+                              widgetContainer.querySelectorAll('table th'),
+                              )
+                          .map(th => th.id);
+      assert.deepEqual(headers, ['name', 'status', 'size', 'time']);
+
+      // Verify that only the first 15 requests are displayed (table has 1 header row + 15 data rows = 16 rows)
+      const rowsBefore = widgetContainer.querySelectorAll('table tr');
+      assert.lengthOf(rowsBefore, 16);
+
+      // Verify that the expand button exists and has the correct text
+      const expandButton = querySelectorErrorOnMissing(
+                               widgetContainer,
+                               'button.show-all-widget-requests-button',
+                               ) as HTMLButtonElement;
+      assert.strictEqual(
+          expandButton.textContent?.trim(),
+          'Show all 17 network requests',
+      );
+    });
+
+    it('shows a snackbar with the error message when reveal fails', async () => {
+      const root = sinon.createStubInstance(SDK.DOMModel.DOMNodeSnapshot);
+      const domModel = sinon.createStubInstance(SDK.DOMModel.DOMModel);
+      const target = sinon.createStubInstance(SDK.Target.Target);
+      root.domModel.returns(domModel);
+      domModel.target.returns(target);
+      root.backendNodeId.returns(1 as Protocol.DOM.BackendNodeId);
+
+      const messageWithNamedWidget: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'DOM_TREE',
+                data: {
+                  root,
+                  title: 'Title' as Platform.UIString.LocalizedString,
+                  accessibleRevealLabel: 'Label' as Platform.UIString.LocalizedString,
+                },
+              },
+            ],
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({
+        message: messageWithNamedWidget,
+      });
+
+      const widgetHeader = (await waitFor(
+                               '.widget-header',
+                               targetElement,
+                               )) as HTMLElement;
+      assert.isNotNull(widgetHeader);
+      const revealBtn = querySelectorErrorOnMissing(
+                            widgetHeader,
+                            'devtools-button.widget-reveal-button',
+                            ) as HTMLElement;
+
+      const revealError = new Error(
+          'Node can’t be found in the current page',
+      );
+      const revealStub = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').rejects(revealError);
+      const snackbarShowStub = sinon.stub(Snackbars.Snackbar.Snackbar, 'show');
+
+      revealBtn.click();
+
+      // Since it's async, we need to wait for the promise microtask queue to drain
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      sinon.assert.calledOnceWithExactly(snackbarShowStub, {
+        message: 'Node can’t be found in the current page',
+      });
+
+      revealStub.restore();
+      snackbarShowStub.restore();
+    });
+    it('renders NETWORK_TRACK widget with correct header and widget element', async () => {
+      const parsedTrace = getBaseTraceHandlerData();
+      const bounds = microsecondsTraceWindow(100, 200);
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'NETWORK_TRACK',
+                data: {
+                  parsedTrace,
+                  bounds,
+                },
+              },
+            ],
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const widgetHeader = await waitFor('.widget-header', targetElement);
+      assert.isNotNull(widgetHeader);
+      assert.strictEqual(
+          widgetHeader.querySelector('.widget-name')?.textContent,
+          'Network activity',
+      );
+
+      const devtoolsWidget = await waitFor(
+          'devtools-performance-agent-network-track',
+          targetElement,
+      );
+      assert.isNotNull(devtoolsWidget);
+    });
+
+    it('renders quota error message', async () => {
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [],
+        error: AIAssistanceModel.AiAgent.ErrorType.QUOTA,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const errorP = targetElement.querySelector('.error');
+      assert.isNotNull(errorP);
+      assert.strictEqual(
+          errorP?.textContent,
+          'You reached your limit for AI assistance requests. Try again later.',
+      );
+    });
+
+    it('renders payload too large error message', async () => {
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [],
+        error: AIAssistanceModel.AiAgent.ErrorType.PAYLOAD_TOO_LARGE,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const errorP = targetElement.querySelector('.error');
+      assert.isNotNull(errorP);
+      assert.strictEqual(
+          errorP?.textContent,
+          'The request payload is too large. Please try a smaller image or a screenshot.',
+      );
+    });
+
+    it('renders LIGHTHOUSE_REPORT widget as revealer-only when score gauges cannot be rendered', async () => {
+      const mockReport = {
+        lighthouseVersion: '12.0.0',
+        fetchTime: '2026-08-13T09:00:00.000Z',
+        configSettings: {
+          gatherMode: 'snapshot',
+        },
+      } as unknown as Lighthouse.LighthousePanel.ActiveLighthouseReport['report'];
+
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'widget',
+            widgets: [
+              {
+                name: 'LIGHTHOUSE_REPORT',
+                data: {
+                  report: mockReport,
+                  snapshotReport: true,
+                },
+              },
+            ],
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      const revealerContainer =
+          await waitFor<HTMLElement>('.widget-and-revealer-container.revealer-only', targetElement);
+      assert.isNotNull(revealerContainer);
+
+      const revealBtn = querySelectorErrorOnMissing(
+                            revealerContainer,
+                            'devtools-button.widget-reveal-button',
+                            ) as HTMLElement;
+      assert.strictEqual(revealBtn.textContent?.trim(), 'Reveal Lighthouse report');
+      assert.strictEqual(revealBtn.getAttribute('accessiblelabel'), 'Reveal Lighthouse report');
+
+      const revealStub = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').resolves();
+      revealBtn.click();
+      sinon.assert.calledOnce(revealStub);
+      const [revealedObject] = revealStub.getCall(0).args;
+      assert.instanceOf(revealedObject, Lighthouse.LighthousePanel.ActiveLighthouseReport);
+      assert.strictEqual((revealedObject as Lighthouse.LighthousePanel.ActiveLighthouseReport).report, mockReport);
+      revealStub.restore();
+    });
+
+    it('does not render empty step-widgets-wrapper when step widgets return nothing', async () => {
+      const message: AiAssistance.ChatMessage.ModelChatMessage = {
+        entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+        parts: [
+          {
+            type: 'step',
+            step: {
+              title: 'Investigating',
+              state: {type: 'completed'},
+              output: 'result',
+              widgets: [],
+            },
+          },
+        ],
+        rpcId: 99,
+        id: '1',
+      };
+
+      const targetElement = renderView({message});
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const wrapper = targetElement.querySelector('.step-widgets-wrapper');
+      assert.isNull(wrapper);
+    });
   });
 });

@@ -6,8 +6,11 @@
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as EventListeners from '../event_listeners/event_listeners.js';
+
+const {html} = Lit;
 
 export class ObjectEventListenersSidebarPane extends UI.Widget.VBox implements UI.Toolbar.ItemsProvider {
   #lastRequestedContext?: SDK.RuntimeModel.ExecutionContext;
@@ -20,17 +23,15 @@ export class ObjectEventListenersSidebarPane extends UI.Widget.VBox implements U
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.global-listeners')}`);
 
     this.eventListenersView = new EventListeners.EventListenersView.EventListenersView();
-    this.eventListenersView.changeCallback = this.requestUpdate.bind(this);
-    this.eventListenersView.enableDefaultTreeFocus = true;
     this.eventListenersView.show(this.element);
     this.setDefaultFocusedChild(this.eventListenersView);
     this.requestUpdate();
   }
 
-  toolbarItems(): UI.Toolbar.ToolbarItem[] {
+  toolbarItems(): Lit.TemplateResult {
     const refreshButton = UI.Toolbar.Toolbar.createActionButton('browser-debugger.refresh-global-event-listeners');
     refreshButton.setSize(Buttons.Button.Size.SMALL);
-    return [refreshButton];
+    return html`${refreshButton.element}`;
   }
 
   override async performUpdate(): Promise<void> {
@@ -43,22 +44,22 @@ export class ObjectEventListenersSidebarPane extends UI.Widget.VBox implements U
     const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
     if (executionContext) {
       this.#lastRequestedContext = executionContext;
-      const result = await executionContext.evaluate(
-          {
-            expression: 'self',
-            objectGroup: objectGroupName,
-            includeCommandLineAPI: false,
-            silent: true,
-            returnByValue: false,
-            generatePreview: false,
-          },
-          /* userGesture */ false,
-          /* awaitPromise */ false);
+      const result = await executionContext.evaluateWithSelectedFrameFallback({
+        expression: 'self',
+        objectGroup: objectGroupName,
+        includeCommandLineAPI: false,
+        silent: true,
+        returnByValue: false,
+        generatePreview: false,
+      },
+                                                                              /* userGesture */ false,
+                                                                              /* awaitPromise */ false);
       if (!('error' in result) && !result.exceptionDetails) {
         windowObjects.push(result.object);
       }
     }
-    await this.eventListenersView.addObjects(windowObjects);
+    this.eventListenersView.objects = windowObjects;
+    await this.eventListenersView.updateComplete;
   }
 
   override wasShown(): void {

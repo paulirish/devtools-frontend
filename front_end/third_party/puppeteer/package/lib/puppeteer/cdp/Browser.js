@@ -5,6 +5,9 @@
  */
 import { Browser as BrowserBase, } from '../api/Browser.js';
 import { CDPSessionEvent } from '../api/CDPSession.js';
+import { EventEmitter } from '../common/EventEmitter.js';
+import { Deferred } from '../util/Deferred.js';
+import { DisposableStack } from '../util/disposable.js';
 import { CdpBrowserContext } from './BrowserContext.js';
 import { CdpExtension } from './Extension.js';
 import { DevToolsTarget, InitializationStatus, OtherTarget, PageTarget, WorkerTarget, } from './Target.js';
@@ -20,8 +23,8 @@ function isDevToolsPageTarget(url) {
  */
 export class CdpBrowser extends BrowserBase {
     protocol = 'cdp';
-    static async _create(connection, contextIds, acceptInsecureCerts, defaultViewport, downloadBehavior, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true, networkEnabled = true, issuesEnabled = true, handleDevToolsAsPage = false, blocklist, allowlist) {
-        const browser = new CdpBrowser(connection, contextIds, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets, networkEnabled, issuesEnabled, handleDevToolsAsPage, blocklist, allowlist);
+    static async _create(connection, contextIds, acceptInsecureCerts, defaultViewport = undefined, downloadBehavior = undefined, process = undefined, closeCallback = undefined, targetFilterCallback = undefined, isPageTargetCallback = undefined, waitForInitiallyDiscoveredTargets = true, networkEnabled = true, issuesEnabled = true, handleDevToolsAsPage = false, blocklist = undefined, allowlist = undefined, logger) {
+        const browser = new CdpBrowser(connection, contextIds, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets, networkEnabled, issuesEnabled, handleDevToolsAsPage, blocklist, allowlist, logger);
         if (allowlist) {
             const version = await browser.#getVersion();
             const majorVersion = parseInt(version.product.match(/\d+/)?.[0] ?? '0', 10);
@@ -50,8 +53,11 @@ export class CdpBrowser extends BrowserBase {
     #targetManager;
     #handleDevToolsAsPage = false;
     #extensions = new Map();
-    constructor(connection, contextIds, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true, networkEnabled = true, issuesEnabled = true, handleDevToolsAsPage = false, blocklist, allowlist) {
-        super();
+    #version;
+    #hasNetworkRestrictions = false;
+    #subscriptions = new DisposableStack();
+    constructor(connection, contextIds, defaultViewport = undefined, process = undefined, closeCallback = undefined, targetFilterCallback = undefined, isPageTargetCallback = undefined, waitForInitiallyDiscoveredTargets = true, networkEnabled = true, issuesEnabled = true, handleDevToolsAsPage = false, blocklist = undefined, allowlist = undefined, logger) {
+        super(logger);
         this.#networkEnabled = networkEnabled;
         this.#issuesEnabled = issuesEnabled;
         this.#defaultViewport = defaultViewport;
@@ -65,34 +71,34 @@ export class CdpBrowser extends BrowserBase {
                 });
         this.#handleDevToolsAsPage = handleDevToolsAsPage;
         this.#setIsPageTargetCallback(isPageTargetCallback);
-        connection.rejectEmulateNetworkConditionsCalls = Boolean((blocklist && blocklist.length > 0) ||
+        this.#hasNetworkRestrictions = Boolean((blocklist && blocklist.length > 0) ||
             (allowlist && allowlist.length > 0));
-        this.#targetManager = new TargetManager(connection, this.#createTarget, this.#targetFilterCallback, waitForInitiallyDiscoveredTargets, blocklist, allowlist);
-        this.#defaultContext = new CdpBrowserContext(this.#connection, this);
+        connection.rejectEmulateNetworkConditionsCalls =
+            this.#hasNetworkRestrictions;
+        this.#targetManager = new TargetManager(connection, this.#createTarget, this.#targetFilterCallback, waitForInitiallyDiscoveredTargets, blocklist, allowlist, logger);
+        this.#defaultContext = new CdpBrowserContext(this.#connection, this, undefined, logger);
         for (const contextId of contextIds) {
-            this.#contexts.set(contextId, new CdpBrowserContext(this.#connection, this, contextId));
+            this.#contexts.set(contextId, new CdpBrowserContext(this.#connection, this, contextId, logger));
         }
     }
     #emitDisconnected = () => {
         this.emit("disconnected" /* BrowserEvent.Disconnected */, undefined);
     };
     async _attach(downloadBehavior) {
-        this.#connection.on(CDPSessionEvent.Disconnected, this.#emitDisconnected);
+        const connectionEmitter = this.#subscriptions.use(new EventEmitter(this.#connection));
+        connectionEmitter.on(CDPSessionEvent.Disconnected, this.#emitDisconnected);
         if (downloadBehavior) {
             await this.#defaultContext.setDownloadBehavior(downloadBehavior);
         }
-        this.#targetManager.on("targetAvailable" /* TargetManagerEvent.TargetAvailable */, this.#onAttachedToTarget);
-        this.#targetManager.on("targetGone" /* TargetManagerEvent.TargetGone */, this.#onDetachedFromTarget);
-        this.#targetManager.on("targetChanged" /* TargetManagerEvent.TargetChanged */, this.#onTargetChanged);
-        this.#targetManager.on("targetDiscovered" /* TargetManagerEvent.TargetDiscovered */, this.#onTargetDiscovered);
+        const targetManagerEmitter = this.#subscriptions.use(new EventEmitter(this.#targetManager));
+        targetManagerEmitter.on("targetAvailable" /* TargetManagerEvent.TargetAvailable */, this.#onAttachedToTarget);
+        targetManagerEmitter.on("targetGone" /* TargetManagerEvent.TargetGone */, this.#onDetachedFromTarget);
+        targetManagerEmitter.on("targetChanged" /* TargetManagerEvent.TargetChanged */, this.#onTargetChanged);
+        targetManagerEmitter.on("targetDiscovered" /* TargetManagerEvent.TargetDiscovered */, this.#onTargetDiscovered);
         await this.#targetManager.initialize();
     }
     _detach() {
-        this.#connection.off(CDPSessionEvent.Disconnected, this.#emitDisconnected);
-        this.#targetManager.off("targetAvailable" /* TargetManagerEvent.TargetAvailable */, this.#onAttachedToTarget);
-        this.#targetManager.off("targetGone" /* TargetManagerEvent.TargetGone */, this.#onDetachedFromTarget);
-        this.#targetManager.off("targetChanged" /* TargetManagerEvent.TargetChanged */, this.#onTargetChanged);
-        this.#targetManager.off("targetDiscovered" /* TargetManagerEvent.TargetDiscovered */, this.#onTargetDiscovered);
+        this.#subscriptions.dispose();
     }
     process() {
         return this.#process ?? null;
@@ -121,7 +127,7 @@ export class CdpBrowser extends BrowserBase {
             proxyServer,
             proxyBypassList: proxyBypassList && proxyBypassList.join(','),
         });
-        const context = new CdpBrowserContext(this.#connection, this, browserContextId);
+        const context = new CdpBrowserContext(this.#connection, this, browserContextId, this.logger);
         if (downloadBehavior) {
             await context.setDownloadBehavior(downloadBehavior);
         }
@@ -154,16 +160,16 @@ export class CdpBrowser extends BrowserBase {
         const createSession = (isAutoAttachEmulated) => {
             return this.#connection._createSession(targetInfo, isAutoAttachEmulated);
         };
-        const otherTarget = new OtherTarget(targetInfo, session, context, this.#targetManager, createSession);
+        const otherTarget = new OtherTarget(targetInfo, session, context, this.#targetManager, createSession, this.logger);
         if (targetInfo.url && isDevToolsPageTarget(targetInfo.url)) {
-            return new DevToolsTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null);
+            return new DevToolsTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null, this.logger);
         }
         if (this.#isPageTargetCallback(otherTarget)) {
-            return new PageTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null);
+            return new PageTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null, this.logger);
         }
         if (targetInfo.type === 'service_worker' ||
             targetInfo.type === 'shared_worker') {
-            return new WorkerTarget(targetInfo, session, context, this.#targetManager, createSession);
+            return new WorkerTarget(targetInfo, session, context, this.#targetManager, createSession, this.logger);
         }
         return otherTarget;
     };
@@ -262,8 +268,11 @@ export class CdpBrowser extends BrowserBase {
         });
         return response.targetId;
     }
-    async installExtension(path) {
-        const { id } = await this.#connection.send('Extensions.loadUnpacked', { path });
+    async installExtension(path, options) {
+        const { id } = await this.#connection.send('Extensions.loadUnpacked', {
+            path,
+            enableInIncognito: options?.enabledInIncognito ?? false,
+        });
         this.#extensions.delete(id);
         return id;
     }
@@ -291,6 +300,67 @@ export class CdpBrowser extends BrowserBase {
         }
         await Promise.all(targetDestroyedPromises);
         this.#extensions.delete(id);
+    }
+    async installPWA(options) {
+        if (this.#hasNetworkRestrictions) {
+            throw new Error('PWA APIs are not supported when network restrictions are configured.');
+        }
+        await this.#connection.send('PWA.install', {
+            manifestId: options.manifestId,
+            installUrlOrBundleUrl: options.installUrlOrBundleUrl,
+        });
+        if (options.displayMode) {
+            await this.#connection.send('PWA.changeAppUserSettings', {
+                manifestId: options.manifestId,
+                displayMode: options.displayMode,
+            });
+        }
+        return options.manifestId;
+    }
+    async uninstallPWA(options) {
+        if (this.#hasNetworkRestrictions) {
+            throw new Error('PWA APIs are not supported when network restrictions are configured.');
+        }
+        await this.#connection.send('PWA.uninstall', {
+            manifestId: options.manifestId,
+        });
+    }
+    async launchPWA(options) {
+        if (this.#hasNetworkRestrictions) {
+            throw new Error('PWA APIs are not supported when network restrictions are configured.');
+        }
+        // `PWA.launch` resolves with the id of the launched *tab* target (see the
+        // CDP `PWA.LaunchResponse` docs). Tab targets sit above page targets in the
+        // target hierarchy and are not exposed through `browser.targets()`, so the
+        // returned id can't be awaited directly.
+        const { targetId: tabTargetId } = await this.#connection.send('PWA.launch', {
+            manifestId: options.manifestId,
+            url: options.url,
+        });
+        const target = (await this.waitForTarget(candidate => {
+            const tab = this.#targetManager.getAvailableTargets().get(tabTargetId);
+            if (tab?.type() !== 'tab') {
+                return false;
+            }
+            for (const child of tab._childTargets()) {
+                if (child === candidate) {
+                    return true;
+                }
+            }
+            return false;
+        }, { timeout: options.timeout }));
+        const page = await target.page();
+        if (!page) {
+            throw new Error(`Failed to create a page for the launched PWA (manifestId = ${options.manifestId})`);
+        }
+        return page;
+    }
+    async getPWAState(options) {
+        if (this.#hasNetworkRestrictions) {
+            throw new Error('PWA APIs are not supported when network restrictions are configured.');
+        }
+        const { badgeCount, fileHandlers } = await this.#connection.send('PWA.getOsAppState', { manifestId: options.manifestId });
+        return { badgeCount, fileHandlers };
     }
     async screens() {
         const { screenInfos } = await this.#connection.send('Emulation.getScreenInfos');
@@ -357,8 +427,17 @@ export class CdpBrowser extends BrowserBase {
     get connected() {
         return !this.#connection._closed;
     }
-    #getVersion() {
-        return this.#connection.send('Browser.getVersion');
+    async #getVersion() {
+        if (!this.#version) {
+            this.#version = Deferred.create();
+            try {
+                this.#version.resolve(await this.#connection.send('Browser.getVersion'));
+            }
+            catch (error) {
+                this.#version.reject(error);
+            }
+        }
+        return await this.#version.valueOrThrow();
     }
     get debugInfo() {
         return {
@@ -376,7 +455,7 @@ export class CdpBrowser extends BrowserBase {
                 extensionsMap.set(currExtension.id, this.#extensions.get(currExtension.id));
             }
             else {
-                const newExtension = new CdpExtension(currExtension.id, currExtension.version, currExtension.name, currExtension.path, currExtension.enabled, this);
+                const newExtension = new CdpExtension(currExtension.id, currExtension.version, currExtension.name, currExtension.path, currExtension.enabled, this, this.logger);
                 extensionsMap.set(currExtension.id, newExtension);
             }
         }

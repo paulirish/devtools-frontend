@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Protocol from '../../generated/protocol.js';
 import {
@@ -229,7 +230,7 @@ describe('PageResourceLoader', () => {
           callback({statusCode: 200});
         });
 
-    settings.moduleSetting('network.enable-remote-file-loading').set(true);
+    settings.resolve(SDK.SDKSettings.enableRemoteFileLoadingSettingDescriptor).set(true);
     const response = await loader.loadResource(urlString`file://host/source-map.js.map`, initiator);
 
     assert.strictEqual(response.content, 'content of the source map');
@@ -247,7 +248,7 @@ describe('PageResourceLoader', () => {
           callback({statusCode: 200});
         });
 
-    settings.moduleSetting('network.enable-remote-file-loading').set(true);
+    settings.resolve(SDK.SDKSettings.enableRemoteFileLoadingSettingDescriptor).set(true);
     const response = await loader.loadResource(urlString`file:////127.0.0.1/share/source-map.js.map`, initiator);
 
     assert.strictEqual(response.content, 'content of the source map');
@@ -283,7 +284,7 @@ describe('PageResourceLoader', () => {
     for (const disableCache of [true, false]) {
       it(`loads with ${disableCache ? 'disabled' : 'enabled'} cache based on the setting`, async () => {
         const {loader, settings, targetManager} = setup();
-        settings.moduleSetting('cache-disabled').set(disableCache);
+        settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(disableCache);
         const connection = new MockCDPConnection();
         const target = createTarget({connection, targetManager});
         const initiator = {target, frameId: null, initiatorUrl};
@@ -302,7 +303,7 @@ describe('PageResourceLoader', () => {
   describe('loadResource with CSP', () => {
     it('does not fall back to host bindings if frame has restrictive CSP', async () => {
       const {loader, settings, targetManager} = setup();
-      settings.moduleSetting('cache-disabled').set(false);
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
       const connection = new MockCDPConnection();
 
       connection.setSuccessHandler('Network.getSecurityIsolationStatus', () => {
@@ -344,7 +345,7 @@ describe('PageResourceLoader', () => {
 
     it('falls back to host bindings if frame has no restrictive CSP', async () => {
       const {loader, settings, targetManager} = setup();
-      settings.moduleSetting('cache-disabled').set(false);
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
       const connection = new MockCDPConnection();
 
       connection.setSuccessHandler('Network.getSecurityIsolationStatus', () => {
@@ -362,7 +363,14 @@ describe('PageResourceLoader', () => {
         };
       });
 
-      const target = createTarget({connection, targetManager});
+      const target = createTarget({connection, targetManager, url: 'https://example.com'});
+      const frame = {
+        id: '123' as Protocol.Page.FrameId,
+        securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'),
+      } as unknown as SDK.ResourceTreeModel.ResourceTreeFrame;
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel)!;
+      sinon.stub(resourceTreeModel, 'mainFrame').get(() => frame);
+      sinon.stub(resourceTreeModel, 'frameForId').withArgs('123' as Protocol.Page.FrameId).returns(frame);
       const initiator = {target, frameId: '123' as Protocol.Page.FrameId, initiatorUrl: urlString`https://example.com`};
       const url = urlString`https://example.com/source.map`;
 
@@ -377,6 +385,287 @@ describe('PageResourceLoader', () => {
       assert.strictEqual(result.content, 'fallback content');
       sinon.assert.calledOnce(loadHostBindingsStub);
     });
+
+    it('does not fall back to host bindings if security isolation status is unavailable (fail-closed)', async () => {
+      // If getSecurityIsolationStatus returns null (e.g. because the frame was removed before the query completed),
+      // the unsafe fallback must not execute.
+      const {loader, settings, targetManager} = setup();
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
+      const connection = new MockCDPConnection();
+
+      connection.setFailureHandler('Network.getSecurityIsolationStatus', () => {
+        return {
+          code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+          message: 'Frame not found',
+        };
+      });
+
+      connection.setFailureHandler('Network.loadNetworkResource', () => {
+        return {
+          code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+          message: 'Frame not found',
+        };
+      });
+
+      const target = createTarget({connection, targetManager});
+      const initiator = {target, frameId: '123' as Protocol.Page.FrameId, initiatorUrl: urlString`https://example.com`};
+      const url = urlString`https://example.com/source.map`;
+
+      const loadHostBindingsStub =
+          sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource');
+
+      try {
+        await loader.loadResource(url, initiator);
+        assert.fail('Expected loadResource to throw');
+      } catch (e) {
+        assert.strictEqual(e.message, 'Frame not found');
+      }
+
+      // Fallback must not be called, null status keeps the guard armed.
+      sinon.assert.notCalled(loadHostBindingsStub);
+    });
+
+    it('does not fall back to host bindings or retry without frameId when explicit frame status query fails',
+       async () => {
+         const {loader, settings, targetManager} = setup();
+         settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
+         const connection = new MockCDPConnection();
+         const requestedFrameIds: Array<Protocol.Page.FrameId|undefined> = [];
+
+         connection.setHandler('Network.getSecurityIsolationStatus', params => {
+           requestedFrameIds.push(params?.frameId);
+           if (params?.frameId) {
+             return {
+               error: {
+                 code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+                 message: 'Frame not found',
+               },
+             };
+           }
+           return {
+             result: {
+               status: {},
+             },
+           };
+         });
+
+         connection.setFailureHandler('Network.loadNetworkResource', () => {
+           return {
+             code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+             message: 'Frame not found',
+           };
+         });
+
+         const target = createTarget({connection, targetManager});
+         const initiator = {
+           target,
+           frameId: '123' as Protocol.Page.FrameId,
+           initiatorUrl: urlString`https://example.com`,
+         };
+         const url = urlString`https://example.com/source.map`;
+
+         const loadHostBindingsStub =
+             sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource');
+
+         try {
+           await loader.loadResource(url, initiator);
+           assert.fail('Expected loadResource to throw');
+         } catch (e) {
+           assert.strictEqual(e.message, 'Frame not found');
+         }
+
+         assert.deepEqual(requestedFrameIds, ['123' as Protocol.Page.FrameId]);
+         sinon.assert.notCalled(loadHostBindingsStub);
+       });
+
+    it('does not fall back to host bindings if security isolation status has no csp field', async () => {
+      const {loader, settings, targetManager} = setup();
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
+      const connection = new MockCDPConnection();
+
+      connection.setSuccessHandler('Network.getSecurityIsolationStatus', () => {
+        return {
+          status: {},
+        };
+      });
+
+      connection.setFailureHandler('Network.loadNetworkResource', () => {
+        return {
+          code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+          message: 'Frame not found',
+        };
+      });
+
+      const target = createTarget({connection, targetManager});
+      const initiator = {target, frameId: '123' as Protocol.Page.FrameId, initiatorUrl: urlString`https://example.com`};
+      const url = urlString`https://example.com/source.map`;
+
+      const loadHostBindingsStub =
+          sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource');
+
+      try {
+        await loader.loadResource(url, initiator);
+        assert.fail('Expected loadResource to throw');
+      } catch (e) {
+        assert.strictEqual(e.message, 'Frame not found');
+      }
+
+      sinon.assert.notCalled(loadHostBindingsStub);
+    });
+
+    it('uses parentFrameId from TargetInfo for subframe worker initiators without frameId', async () => {
+      const {loader, settings, targetManager} = setup();
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
+      const frameConnection = new MockCDPConnection();
+      const requestedFrameIdsForSecurity: Array<Protocol.Page.FrameId|undefined> = [];
+      const requestedFrameIdsForNetwork: Array<Protocol.Page.FrameId|undefined> = [];
+
+      frameConnection.setHandler('Network.getSecurityIsolationStatus', params => {
+        requestedFrameIdsForSecurity.push(params?.frameId);
+        return {
+          result: {
+            status: {
+              csp: [],
+            },
+          },
+        };
+      });
+
+      frameConnection.setHandler('Network.loadNetworkResource', params => {
+        requestedFrameIdsForNetwork.push(params?.frameId);
+        return {
+          error: {
+            code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+            message: 'Failed to load in target',
+          },
+        };
+      });
+
+      const frameTarget = createTarget({connection: frameConnection, targetManager, url: 'https://example.com'});
+      const resourceTreeModel = frameTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      sinon.stub(resourceTreeModel!, 'mainFrame').get(() => ({
+                                                        id: 'main-frame-123' as Protocol.Page.FrameId,
+                                                        securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create(
+                                                            'https://example.com'),
+                                                      }));
+      sinon.stub(resourceTreeModel!, 'frameForId').callsFake((id: Protocol.Page.FrameId) => {
+        if (id === 'subframe-123') {
+          return {securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')} as unknown as
+              SDK.ResourceTreeModel.ResourceTreeFrame;
+        }
+        return null;
+      });
+
+      // Simulates a worker created by a subframe. The targetInfo should have parentFrameId.
+      const workerTarget = createTarget({
+        targetManager,
+        parentTarget: frameTarget,
+        type: SDK.Target.Type.Worker,
+        url: 'https://example.com/worker.js',
+      });
+      sinon.stub(workerTarget, 'targetInfo').returns({
+        parentFrameId: 'subframe-123' as Protocol.Page.FrameId,
+        url: 'https://example.com/worker.js',
+      } as unknown as Protocol.Target.TargetInfo);
+
+      const initiator = {
+        target: workerTarget,
+        frameId: null,
+        initiatorUrl: urlString`https://example.com/worker.js`,
+      };
+      const url = urlString`https://example.com/worker.js.map`;
+
+      const loadHostBindingsStub =
+          sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource')
+              .callsFake((_url, _headers, streamId, callback) => {
+                Host.ResourceLoader.streamWrite(streamId, 'worker map content');
+                callback({statusCode: 200});
+              });
+
+      const result = await loader.loadResource(url, initiator);
+      assert.strictEqual(result.content, 'worker map content');
+      assert.deepEqual(requestedFrameIdsForSecurity, ['subframe-123' as Protocol.Page.FrameId]);
+      assert.deepEqual(requestedFrameIdsForNetwork, ['subframe-123' as Protocol.Page.FrameId]);
+      sinon.assert.calledOnce(loadHostBindingsStub);
+    });
+
+    it('blocks cross-origin fallback to loadFromHostBindings', async () => {
+      const {loader, settings, targetManager} = setup();
+      settings.resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor).set(false);
+      const frameConnection = new MockCDPConnection();
+
+      frameConnection.setHandler('Network.getSecurityIsolationStatus', () => {
+        return {
+          result: {
+            status: {
+              csp: [],
+            },
+          },
+        };
+      });
+
+      frameConnection.setFailureHandler('Network.loadNetworkResource', () => {
+        return {
+          code: -32000 as ProtocolClient.CDPConnection.CDPErrorStatus,
+          message: 'Target not supported',
+        };
+      });
+
+      const mainFrameTarget = createTarget({
+        id: 'main' as Protocol.Target.TargetID,
+        connection: frameConnection,
+        targetManager,
+        url: 'https://example.com',
+      });
+      const resourceTreeModel = mainFrameTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      sinon.stub(resourceTreeModel!, 'mainFrame').get(() => ({
+                                                        id: 'main-frame-123' as Protocol.Page.FrameId,
+                                                        securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create(
+                                                            'https://example.com'),
+                                                      }));
+
+      const subframeTarget = createTarget({
+        id: 'subframe' as Protocol.Target.TargetID,
+        parentTarget: mainFrameTarget,
+        targetManager,
+        url: 'https://cross-origin.com',
+      });
+      const subframeModel = subframeTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      sinon.stub(subframeModel!, 'mainFrame').get(() => ({
+                                                    id: 'subframe-123' as Protocol.Page.FrameId,
+                                                    securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create(
+                                                        'https://cross-origin.com'),
+                                                  }));
+
+      const initiator = {
+        target: subframeTarget,
+        frameId: 'subframe-123' as Protocol.Page.FrameId,
+        initiatorUrl: urlString`https://cross-origin.com/script.js`,
+      };
+
+      sinon.stub(subframeModel!, 'frameForId').callsFake((id: Protocol.Page.FrameId) => {
+        if (id === 'subframe-123') {
+          return {securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create('https://cross-origin.com')} as
+              unknown as SDK.ResourceTreeModel.ResourceTreeFrame;
+        }
+        return null;
+      });
+
+      const url = urlString`https://cross-origin.com/script.js.map`;
+
+      const loadHostBindingsStub =
+          sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource');
+
+      try {
+        await loader.loadResource(url, initiator);
+        assert.fail('Expected loadResource to throw');
+      } catch (e) {
+        assert.strictEqual(e.message, 'Target not supported');
+      }
+
+      sinon.assert.notCalled(loadHostBindingsStub);
+    });
+
   });
 });
 

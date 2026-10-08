@@ -3,20 +3,21 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {cleanTestDOM} from '../../testing/DOMHooks.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {spyCall} from '../../testing/ExpectStubCall.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import * as Elements from './elements.js';
 
-describeWithMockConnection('LayoutPane', () => {
+describeWithEnvironment('LayoutPane', () => {
   let target: SDK.Target.Target;
   let domModel: SDK.DOMModel.DOMModel;
   let overlayModel: SDK.OverlayModel.OverlayModel;
@@ -28,6 +29,11 @@ describeWithMockConnection('LayoutPane', () => {
     getNodesByStyle = sinon.stub(domModel, 'getNodesByStyle').resolves([]);
     overlayModel = target.model(SDK.OverlayModel.OverlayModel) as SDK.OverlayModel.OverlayModel;
     assert.exists(overlayModel);
+  });
+
+  afterEach(async () => {
+    cleanTestDOM();
+    await raf();
   });
 
   async function renderComponent() {
@@ -52,13 +58,6 @@ describeWithMockConnection('LayoutPane', () => {
   }
 
   it('renders settings', async () => {
-    Common.Settings.Settings.instance()
-        .moduleSetting('show-grid-line-labels')
-        .setTitle('Enum setting title' as Platform.UIString.LocalizedString);
-    Common.Settings.Settings.instance()
-        .moduleSetting('show-grid-track-sizes')
-        .setTitle('Boolean setting title' as Platform.UIString.LocalizedString);
-
     const component = await renderComponent();
     assert.deepEqual(
         queryLabels(component.contentElement, '[data-enum-setting]'), [{label: 'Enum setting title', input: 'SELECT'}]);
@@ -70,16 +69,37 @@ describeWithMockConnection('LayoutPane', () => {
     assert.deepEqual(checkboxesTitles, ['Boolean setting title', '', '']);
   });
 
-  it('stores a setting when changed', async () => {
-    const component = await renderComponent();
+  it('renders settings even when grid settings are not pre-registered in moduleSettings', async () => {
+    const settings = Common.Settings.Settings.instance();
+    for (const descriptor of [SDK.SDKSettings.showGridLineLabelsSettingDescriptor,
+                              SDK.SDKSettings.showGridTrackSizesSettingDescriptor,
+                              SDK.SDKSettings.showGridAreasSettingDescriptor,
+                              SDK.SDKSettings.extendGridLinesSettingDescriptor,
+    ]) {
+      settings.moduleSettings.delete(descriptor.name);
+      settings.settingNameSet.delete(descriptor.name);
+    }
 
-    assert.isTrue(Common.Settings.Settings.instance().moduleSetting('show-grid-track-sizes').get());
+    const component = await renderComponent();
+    assert.lengthOf(component.contentElement.querySelectorAll('[data-enum-setting]'), 1);
+    assert.lengthOf(component.contentElement.querySelectorAll('[data-boolean-setting]'), 3);
+  });
+
+  it('stores a setting when changed and updates UI when setting changes', async () => {
+    const component = await renderComponent();
+    const setting = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.showGridTrackSizesSettingDescriptor);
+
+    assert.isTrue(setting.get());
     const input = component.contentElement.querySelector('[data-boolean-setting]');
     assert.instanceOf(input, UI.UIUtils.CheckboxLabel);
+    assert.isTrue(input.checked);
 
+    const performUpdateSpy = spyCall(component, 'performUpdate');
     input.click();
+    await (await performUpdateSpy).result;
 
-    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('show-grid-track-sizes').get());
+    assert.isFalse(setting.get());
+    assert.isFalse(input.checked);
   });
 
   function makeNode(id: Protocol.DOM.NodeId) {
@@ -103,8 +123,10 @@ describeWithMockConnection('LayoutPane', () => {
   it('renders grid elements', async () => {
     getNodesByStyle
         .withArgs([
-          {name: 'display', value: 'grid'}, {name: 'display', value: 'inline-grid'},
-          {name: 'display', value: 'grid-lanes'}, {name: 'display', value: 'inline-grid-lanes'}
+          {name: 'display', value: 'grid'},
+          {name: 'display', value: 'inline-grid'},
+          {name: 'display', value: 'grid-lanes'},
+          {name: 'display', value: 'inline-grid-lanes'},
         ])
         .resolves([
           ID_1,
@@ -146,8 +168,10 @@ describeWithMockConnection('LayoutPane', () => {
   it('send an event when an element overlay is toggled', async () => {
     getNodesByStyle
         .withArgs([
-          {name: 'display', value: 'grid'}, {name: 'display', value: 'inline-grid'},
-          {name: 'display', value: 'grid-lanes'}, {name: 'display', value: 'inline-grid-lanes'}
+          {name: 'display', value: 'grid'},
+          {name: 'display', value: 'inline-grid'},
+          {name: 'display', value: 'grid-lanes'},
+          {name: 'display', value: 'inline-grid-lanes'},
         ])
         .resolves([
           ID_1,
@@ -166,8 +190,10 @@ describeWithMockConnection('LayoutPane', () => {
   it('send an event when an element’s Show element button is pressed', async () => {
     getNodesByStyle
         .withArgs([
-          {name: 'display', value: 'grid'}, {name: 'display', value: 'inline-grid'},
-          {name: 'display', value: 'grid-lanes'}, {name: 'display', value: 'inline-grid-lanes'}
+          {name: 'display', value: 'grid'},
+          {name: 'display', value: 'inline-grid'},
+          {name: 'display', value: 'grid-lanes'},
+          {name: 'display', value: 'inline-grid-lanes'},
         ])
         .resolves([
           ID_1,

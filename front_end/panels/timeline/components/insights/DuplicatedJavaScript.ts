@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type {DuplicatedJavaScriptInsightModel} from '../../../../models/trace/insights/DuplicatedJavaScript.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
@@ -20,7 +19,8 @@ const {UIStrings, i18nString} = Trace.Insights.Models.DuplicatedJavaScript;
 const {html} = Lit;
 const {widget} = UI.Widget;
 
-export class DuplicatedJavaScript extends BaseInsightComponent<DuplicatedJavaScriptInsightModel> {
+export class DuplicatedJavaScript extends
+    BaseInsightComponent<Trace.Insights.Models.DuplicatedJavaScript.DuplicatedJavaScriptInsightModel> {
   override internalName = 'duplicated-javascript';
   #treemapData: Utils.Treemap.TreemapData|null = null;
 
@@ -90,7 +90,7 @@ export class DuplicatedJavaScript extends BaseInsightComponent<DuplicatedJavaScr
                 ],
                 overlays,
               };
-            })
+            }),
           };
         });
 
@@ -99,7 +99,7 @@ export class DuplicatedJavaScript extends BaseInsightComponent<DuplicatedJavaScr
       treemapButton = html`<devtools-button
         .variant=${Buttons.Button.Variant.OUTLINED}
         jslog=${VisualLogging.action(`timeline.treemap.${this.internalName}-insight`).track({
-        click: true
+        click: true,
       })}
         @click=${this.#openTreemap.bind(this)}
       >View Treemap</devtools-button>`;

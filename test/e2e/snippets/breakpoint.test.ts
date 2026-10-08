@@ -22,12 +22,15 @@ describe('Snippets subpane', () => {
 
     await openSourcesPanel(devToolsPage);
     await openSnippetsSubPane(devToolsPage);
-    await createNewSnippet(snippetName, 'console.log(1);\nconsole.log(2);\nconsole.log(3);\n', devToolsPage);
+    await createNewSnippet(devToolsPage, snippetName, 'console.log(1);\nconsole.log(2);\nconsole.log(3);\n');
 
-    assert.deepEqual(await getOpenSources(devToolsPage), [snippetName]);
+    await devToolsPage.waitForFunction(async () => {
+      const openSources = await getOpenSources(devToolsPage);
+      return openSources.length === 1 && openSources[0] === snippetName;
+    });
 
-    await addBreakpointForLine(2, devToolsPage);
-    let decorators = await getBreakpointDecorators(false, 1, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 2);
+    let decorators = await getBreakpointDecorators(devToolsPage, false, 1);
     assert.deepEqual(decorators, [2]);
 
     await devToolsPage.click('[aria-label="Run snippet"]');
@@ -38,11 +41,15 @@ describe('Snippets subpane', () => {
     await executionLineHighlighted(devToolsPage);
 
     // The breakpoint is still visible
-    decorators = await getBreakpointDecorators(false, 1, devToolsPage);
+    decorators = await getBreakpointDecorators(devToolsPage, false, 1);
     assert.deepEqual(decorators, [2]);
-    assert.deepEqual(await getOpenSources(devToolsPage), [snippetName]);
+    await devToolsPage.waitForFunction(async () => {
+      const openSources = await getOpenSources(devToolsPage);
+      return openSources.length === 1 && openSources[0] === snippetName;
+    });
 
     await devToolsPage.click(RESUME_BUTTON);
+    await devToolsPage.waitForNone(RESUME_BUTTON);
     await devToolsPage.waitFor(PAUSE_BUTTON);
   });
 });

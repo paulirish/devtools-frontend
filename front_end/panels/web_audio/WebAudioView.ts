@@ -20,52 +20,55 @@ const {bindToAction} = UI.UIUtils;
 
 const UIStrings = {
   /**
-   * @description Text in Web Audio View if there is nothing to show.
+   * @description Text displayed in the WebAudio tool when no audio context is active.
    * Web Audio API is an API for controlling audio on the web.
    */
   noWebAudio: 'No Web Audio API usage detected',
   /**
-   * @description Text in Web Audio View
+   * @description Instructions displayed in the WebAudio tool when no audio context is active.
    */
-  openAPageThatUsesWebAudioApiTo: 'Open a page that uses Web Audio API to start monitoring.',
+  openAPageThatUsesWebAudioApiTo: 'Open a page that uses Web Audio API to start monitoring',
   /**
-   * @description Text that shows there is no recording
+   * @description Text shown in the audio context selector when no recordings exist.
    */
   noRecordings: '(no recordings)',
   /**
-   * @description Label prefix for an audio context selection
+   * @description Label prefix for an audio context selection.
    * @example {realtime (1e03ec)} PH1
    */
   audioContextS: 'Audio context: {PH1}',
   /**
-   * @description The current state of an item
+   * @description Label for the current state of an audio context.
    */
   state: 'State',
   /**
-   * @description Text in Web Audio View
+   * @description Label for the sample rate of an audio context.
    */
-  sampleRate: 'Sample Rate',
+  sampleRate: 'Sample rate',
   /**
-   * @description Text in Web Audio View
+   * @description Label for the callback buffer size of an audio context.
    */
-  callbackBufferSize: 'Callback Buffer Size',
+  callbackBufferSize: 'Callback buffer size',
   /**
-   * @description Label in the Web Audio View for the maximum number of output channels
-   * that this Audio Context has.
+   * @description Label for the render quantum size of an audio context.
    */
-  maxOutputChannels: 'Max Output Channels',
+  renderQuantumSize: 'Render quantum size',
   /**
-   * @description Text in Web Audio View
+   * @description Label in the WebAudio tool for the maximum number of output channels of an audio context.
    */
-  currentTime: 'Current Time',
+  maxOutputChannels: 'Max output channels',
   /**
-   * @description Text in Web Audio View
+   * @description Label for the current time in the audio context summary bar.
    */
-  callbackInterval: 'Callback Interval',
+  currentTime: 'Current time',
   /**
-   * @description Text in Web Audio View
+   * @description Label for the callback interval statistics in the audio context summary bar.
    */
-  renderCapacity: 'Render Capacity',
+  callbackInterval: 'Callback interval',
+  /**
+   * @description Label for the render capacity percentage in the audio context summary bar.
+   */
+  renderCapacity: 'Render capacity',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/web_audio/WebAudioView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -73,14 +76,14 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const WEBAUDIO_EXPLANATION_URL =
     'https://developer.chrome.com/docs/devtools/webaudio' as Platform.DevToolsPath.UrlString;
 
-interface ViewInput {
+export interface ViewInput {
   contexts: Protocol.WebAudio.BaseAudioContext[];
   selectedContextIndex: number;
   onContextSelectorSelectionChanged: (contextId: string) => void;
   contextRealtimeData: Protocol.WebAudio.ContextRealtimeData|null;
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement|DocumentFragment) => void;
+export type View = (input: ViewInput, output: object, target: HTMLElement|DocumentFragment) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   const {
@@ -129,7 +132,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
             link: WEBAUDIO_EXPLANATION_URL,
           })}
         </div>` : html`<div class="web-audio-details-container vbox flex-auto">
-          <div class="context-detail-container">
+          <div class="context-detail-container" jslog=${VisualLogging.section('audio-context-details')}>
             <div class="context-detail-header">
               <div class="context-detail-title">
                 ${selectedContext.contextType === 'realtime' ? i18n.i18n.lockedString('AudioContext')
@@ -137,20 +140,24 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
               </div>
               <div class="context-detail-subtitle">${selectedContext.contextId}</div>
             </div>
-            <div class="context-detail-row">
+            <div class="context-detail-row" jslog=${VisualLogging.item('detail-row')}>
               <div class="context-detail-row-entry">${i18nString(UIStrings.state)}</div>
               <div class="context-detail-row-value">${selectedContext.contextState}</div>
             </div>
-            <div class="context-detail-row">
+            <div class="context-detail-row" jslog=${VisualLogging.item('detail-row')}>
               <div class="context-detail-row-entry">${i18nString(UIStrings.sampleRate)}</div>
               <div class="context-detail-row-value">${selectedContext.sampleRate} Hz</div>
             </div>
             ${selectedContext.contextType === 'realtime' ? html`
-              <div class="context-detail-row">
+              <div class="context-detail-row" jslog=${VisualLogging.item('detail-row')}>
                 <div class="context-detail-row-entry">${i18nString(UIStrings.callbackBufferSize)}</div>
                 <div class="context-detail-row-value">${selectedContext.callbackBufferSize} frames</div>
               </div>` : ''}
-            <div class="context-detail-row">
+            <div class="context-detail-row" jslog=${VisualLogging.item('detail-row')}>
+              <div class="context-detail-row-entry">${i18nString(UIStrings.renderQuantumSize)}</div>
+              <div class="context-detail-row-value">${selectedContext.renderQuantumSize} frames</div>
+            </div>
+            <div class="context-detail-row" jslog=${VisualLogging.item('detail-row')}>
               <div class="context-detail-row-entry">${i18nString(UIStrings.maxOutputChannels)}</div>
               <div class="context-detail-row-value">${selectedContext.maxOutputChannelCount} ch</div>
             </div>
@@ -158,7 +165,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
         </div>`}
       <div class="web-audio-summary-container">
         ${contextRealtimeData ?
-            html`<div class="context-summary-container">
+            html`<div class="context-summary-container" jslog=${VisualLogging.section('audio-context-summary')}>
             <span>${i18nString(UIStrings.currentTime)}: ${contextRealtimeData.currentTime.toFixed(3)} s</span>
             <span>\u2758</span>
             <span>${i18nString(UIStrings.callbackInterval)}: μ = ${
@@ -182,7 +189,7 @@ export class WebAudioView extends UI.Widget.VBox<ShadowRoot> implements
   private selectedContextIndex = -1;
   private readonly pollRealtimeDataThrottler: Common.Throttler.Throttler;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super({useShadowDom: 'pure'});
     this.view = view;
 

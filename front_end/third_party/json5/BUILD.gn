@@ -10,7 +10,6 @@ devtools_pre_built("json5") {
   sources_are_release = false
 
   sources = [
-    "json5-tsconfig.json",
     "lib/index.d.ts",
     "lib/index.js",
     "package/lib/index.d.ts",
@@ -23,7 +22,7 @@ devtools_pre_built("json5") {
 devtools_entrypoint("bundle") {
   entrypoint = "json5.ts"
 
-  deps = [ ":json5" ]
+  ts_deps = [ ":json5" ]
 
   visibility = [ "../../panels/application/*" ]
 

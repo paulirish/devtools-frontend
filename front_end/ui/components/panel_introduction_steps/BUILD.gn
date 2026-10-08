@@ -13,19 +13,17 @@ generate_css("css_files") {
 
 devtools_ui_module("panel_introduction_steps") {
   sources = [ "PanelIntroductionSteps.ts" ]
-  deps = [
-    "../../../ui/components/helpers:bundle",
-    "../../../ui/lit:bundle",
+  ts_deps = [
+    "../../lit:bundle",
+    "../helpers:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "panel_introduction_steps.ts"
 
-  deps = [
-    ":css_files",
-    ":panel_introduction_steps",
-  ]
+  ts_deps = [ ":panel_introduction_steps" ]
 
   visibility = default_components_visibility
 }

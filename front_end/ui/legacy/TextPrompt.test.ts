@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Platform from '../../core/platform/platform.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
@@ -239,6 +240,46 @@ describe('TextPromptElement', () => {
     sinon.assert.notCalled(commitListener);
     sinon.assert.called(cancelListener);
   });
+
+  it('prevents double commit when commit listener triggers a synchronous blur', async () => {
+    const prompt = renderPrompt(html`<devtools-prompt editing></devtools-prompt>`);
+    const commitListener = sinon.stub().callsFake(() => {
+      const placeholder = prompt.shadowRoot?.querySelector('[contenteditable]') as HTMLElement | null;
+      placeholder?.blur();
+    });
+    prompt.addEventListener('commit', commitListener);
+
+    const placeholder = prompt.shadowRoot!.querySelector('[contenteditable]') as HTMLElement;
+    assert.exists(placeholder);
+    placeholder.textContent = 'foo';
+    placeholder.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+
+    sinon.assert.calledOnce(commitListener);
+  });
+
+  it('uses the value attribute when starting to edit instead of innerText', async () => {
+    const prompt = renderPrompt(html`<devtools-prompt value=${'Value content'}>Initial content</devtools-prompt>`);
+    prompt.setAttribute('editing', 'true');
+
+    assert.strictEqual(prompt.innerText, '');
+    assert.strictEqual(prompt.deepInnerText(), 'Value content');
+
+    const placeholder = prompt.shadowRoot?.querySelector('[contenteditable]');
+    assert.exists(placeholder);
+    assert.strictEqual(placeholder.textContent, 'Value content');
+    assert.strictEqual(window.getSelection()?.toString(), 'Value content');
+  });
+
+  it('allows setting value attribute dynamically', async () => {
+    const prompt = renderPrompt(html`<devtools-prompt>Initial content</devtools-prompt>`);
+    prompt.setAttribute('value', 'Updated value');
+    assert.strictEqual(prompt.getAttribute('value'), 'Updated value');
+
+    prompt.setAttribute('editing', 'true');
+    const placeholder = prompt.shadowRoot?.querySelector('[contenteditable]');
+    assert.exists(placeholder);
+    assert.strictEqual(placeholder.textContent, 'Updated value');
+  });
 });
 
 describe('TextPrompt', () => {
@@ -307,5 +348,195 @@ describe('TextPrompt', () => {
     assert.strictEqual(prompt.text(), 'the expression and query');
     assert.strictEqual(expression, 'the expression and ');
     assert.strictEqual(query, 'query');
+  });
+
+  it('updates hint as user types', async () => {
+    const suggestions = [{text: 'testTextPrompt'}];
+    prompt.initialize(async (expression, query) => suggestions.filter(s => s.text.startsWith(query)));
+    prompt.attachAndStartEditing(div);
+
+    prompt.setText('testT');
+    await prompt.complete();
+    assert.strictEqual(prompt.textWithCurrentSuggestion(), 'testTextPrompt');
+
+    prompt.setText('testTe');
+    await prompt.complete();
+    assert.strictEqual(prompt.textWithCurrentSuggestion(), 'testTextPrompt');
+
+    prompt.setText('testTez');
+    await prompt.complete();
+    assert.strictEqual(prompt.textWithCurrentSuggestion(), 'testTez');
+
+    prompt.setText('testTe');
+    await prompt.complete();
+    assert.strictEqual(prompt.textWithCurrentSuggestion(), 'testTextPrompt');
+
+    prompt.setText('something_before testT');
+    await prompt.complete();
+    assert.strictEqual(prompt.textWithCurrentSuggestion(), 'something_before testTextPrompt');
+  });
+
+  it('uses textbox role when completions are not initialized', () => {
+    prompt.attachAndStartEditing(div);
+    prompt.setPlaceholder('Filter');
+
+    assert.strictEqual(div.getAttribute('role'), 'textbox');
+    assert.strictEqual(div.getAttribute('aria-placeholder'), 'Filter');
+    assert.isFalse(div.hasAttribute('aria-autocomplete'));
+    assert.isFalse(div.hasAttribute('aria-haspopup'));
+    assert.isFalse(div.hasAttribute('aria-expanded'));
+
+    prompt.initialize(async () => suggestions);
+    assert.strictEqual(div.getAttribute('role'), 'combobox');
+    assert.isFalse(div.hasAttribute('aria-placeholder'));
+    assert.strictEqual(div.getAttribute('aria-label'), 'Filter');
+    assert.strictEqual(div.getAttribute('aria-autocomplete'), 'both');
+    assert.strictEqual(div.getAttribute('aria-haspopup'), 'listbox');
+    assert.strictEqual(div.getAttribute('aria-expanded'), 'false');
+  });
+
+  it('sets and cleans up combobox ARIA attributes for autocomplete', async () => {
+    prompt.initialize(async () => suggestions);
+    prompt.attachAndStartEditing(div);
+
+    assert.strictEqual(div.getAttribute('role'), 'combobox');
+    assert.strictEqual(div.getAttribute('aria-autocomplete'), 'both');
+    assert.strictEqual(div.getAttribute('aria-haspopup'), 'listbox');
+    assert.strictEqual(div.getAttribute('aria-expanded'), 'false');
+
+    prompt.setText('hey');
+    await prompt.complete();
+    assert.strictEqual(div.getAttribute('aria-expanded'), 'true');
+    assert.isTrue(div.hasAttribute('aria-controls'));
+
+    prompt.clearAutocomplete();
+    assert.strictEqual(div.getAttribute('aria-expanded'), 'false');
+
+    prompt.detach();
+    assert.isFalse(div.hasAttribute('role'));
+    assert.isFalse(div.hasAttribute('aria-autocomplete'));
+    assert.isFalse(div.hasAttribute('aria-haspopup'));
+    assert.isFalse(div.hasAttribute('aria-expanded'));
+  });
+
+  it('maintains cursor position when refocused after tab switch', async () => {
+    prompt.initialize(async () => []);
+    const proxy = prompt.attachAndStartEditing(div);
+    prompt.setText('filter-text');
+    prompt.focus();
+
+    const textNode = div.firstChild!;
+    const selection = div.getComponentSelection()!;
+    const selectionChanged =
+        new Promise<Event>(resolve => div.ownerDocument.addEventListener('selectionchange', resolve, {once: true}));
+    selection.setBaseAndExtent(textNode, 6, textNode, 6);
+    await selectionChanged;
+
+    const parent = proxy.parentElement!;
+    proxy.remove();
+    parent.appendChild(proxy);
+
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.rangeCount, 1);
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 6);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 6);
+  });
+
+  it('maintains forward and backward selection when refocused after tab switch', async () => {
+    prompt.initialize(async () => []);
+    const proxy = prompt.attachAndStartEditing(div);
+    prompt.setText('filter-text');
+    prompt.focus();
+
+    const textNode = div.firstChild!;
+    const selection = div.getComponentSelection()!;
+    const parent = proxy.parentElement!;
+
+    let selectionChanged =
+        new Promise<Event>(resolve => div.ownerDocument.addEventListener('selectionchange', resolve, {once: true}));
+    selection.setBaseAndExtent(textNode, 2, textNode, 8);
+    await selectionChanged;
+
+    proxy.remove();
+    parent.appendChild(proxy);
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.anchorOffset, 2);
+    assert.strictEqual(selection.focusOffset, 8);
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 2);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 8);
+
+    selectionChanged =
+        new Promise<Event>(resolve => div.ownerDocument.addEventListener('selectionchange', resolve, {once: true}));
+    selection.setBaseAndExtent(textNode, 8, textNode, 2);
+    await selectionChanged;
+
+    proxy.remove();
+    parent.appendChild(proxy);
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.anchorOffset, 8);
+    assert.strictEqual(selection.focusOffset, 2);
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 2);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 8);
+  });
+
+  it('places caret at offset 0 when cleared and refocused', () => {
+    prompt.initialize(async () => []);
+    const proxy = prompt.attachAndStartEditing(div);
+    const selection = div.getComponentSelection()!;
+    const parent = proxy.parentElement!;
+
+    prompt.setText('filter-text');
+    prompt.focus();
+    prompt.setText('');
+
+    proxy.remove();
+    parent.appendChild(proxy);
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 0);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 0);
+  });
+
+  it('clears saved selection on detach and defaults to end of prompt', () => {
+    prompt.initialize(async () => []);
+    prompt.attachAndStartEditing(div);
+    const selection = div.getComponentSelection()!;
+
+    prompt.setText('new-text');
+    prompt.setDOMSelection(3, 3);
+    prompt.detach();
+    prompt.attachAndStartEditing(div);
+    div.blur();
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 8);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 8);
+  });
+
+  it('preserves full selection from selectAll when refocused', () => {
+    prompt.initialize(async () => []);
+    const proxy = prompt.attachAndStartEditing(div);
+    const selection = div.getComponentSelection()!;
+    const parent = proxy.parentElement!;
+
+    prompt.setText('new-text');
+    prompt.setDOMSelection(3, 3);
+    prompt.selectAll();
+
+    proxy.remove();
+    parent.appendChild(proxy);
+    assert.isFalse(div.hasFocus());
+    prompt.focus();
+
+    assert.strictEqual(selection.getRangeAt(0).startOffset, 0);
+    assert.strictEqual(selection.getRangeAt(0).endOffset, 8);
   });
 });

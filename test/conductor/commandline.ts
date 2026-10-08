@@ -2,16 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as fs from 'node:fs';
 import type * as Yargs from 'yargs';
 
-export enum DiffBehaviors {
-  UPDATE = 'update',
-  THROW = 'throw',
-  NO_THROW = 'no-throw',
-  NO_UPDATE = 'no-update',
+export function expandResponseFiles(args: string[]): string[] {
+  const expanded: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith('@') && arg.length > 1) {
+      const rspPath = arg.substring(1);
+      if (fs.existsSync(rspPath)) {
+        const content = fs.readFileSync(rspPath, 'utf-8');
+        const lines =
+            content.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0 && !line.startsWith('#'));
+        for (const line of expandResponseFiles(lines)) {
+          expanded.push(line);
+        }
+      } else {
+        expanded.push(arg);
+      }
+    } else {
+      expanded.push(arg);
+    }
+  }
+  return expanded;
 }
 
-export function asArray(value?: string|string[]) {
+export const DiffBehaviors = {
+  UPDATE: 'update',
+  THROW: 'throw',
+  NO_THROW: 'no-throw',
+  NO_UPDATE: 'no-update',
+} as const;
+export type DiffBehaviors = typeof DiffBehaviors[keyof typeof DiffBehaviors];
+
+export function asArray(value?: string|string[]): string[] {
   if (!value) {
     return [];
   }
@@ -38,7 +62,31 @@ function validateDiffBehaviors(args?: string|string[]) {
   return asArray(args);
 }
 
-export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T>) {
+export interface CommandLineOptions {
+  debug: boolean;
+  headless?: boolean;
+  coverage: boolean;
+  'artifacts-dir'?: string;
+  'chrome-binary'?: string;
+  'on-diff'?: string[];
+  verbose: number;
+  shuffle: boolean;
+  repeat: number;
+  bail: boolean;
+  retries: number;
+  grep?: string;
+  fgrep?: string;
+  'invert-grep': boolean;
+  'cpu-throttle': number;
+  'shard-count': number;
+  'shard-number': number;
+  'shard-bias': number;
+  'expectations-file'?: string;
+  'force-screenshots': boolean;
+  'ota-username'?: string;
+}
+
+export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T>): Yargs.Argv<T&CommandLineOptions> {
   return yargs
       .parserConfiguration({
         'camel-case-expansion': false,
@@ -88,6 +136,12 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
         default: 1,
         desc: 'Reruns the test X number of times regardless of result (e2e tests only)',
       })
+      .option('bail', {
+        alias: ['fail-fast'],
+        type: 'boolean',
+        default: false,
+        desc: 'Stops the test run after the first test failure',
+      })
       .option('retries', {
         type: 'number',
         desc: 'Reruns the tests if upon failure at max X number of times',
@@ -133,5 +187,18 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
             're-sharding without changing the shard count.',
         implies: ['shard-count', 'shard-number'],  // shard-bias only makes sense if sharding is enabled
         default: 0,
+      })
+      .option('expectations-file', {
+        type: 'string',
+        desc: 'Path to a custom TestExpectations file',
+      })
+      .option('force-screenshots', {
+        type: 'boolean',
+        default: false,
+        desc: 'Force running screenshot tests on non-Linux platforms',
+      })
+      .option('ota-username', {
+        type: 'string',
+        desc: 'Test account username used for Ai authentication logic in testing.',
       });
 }

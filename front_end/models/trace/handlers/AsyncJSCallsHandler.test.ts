@@ -8,16 +8,18 @@ import {
   makeCompleteEvent,
   makeFlowEvents,
   makeProfileCall,
-} from '../../../testing/TraceHelpers.js';
+} from '../../../testing/TraceHelpersCore.js';
 import * as Trace from '../trace.js';
 const cat = 'mewtwo';
 const pid = 1;
 const tid = 1;
 async function buildAsyncJSCallsHandlerData(events: Trace.Types.Events.Event[]):
     Promise<ReturnType<typeof Trace.Handlers.ModelHandlers.AsyncJSCalls.data>> {
+  Trace.Handlers.ModelHandlers.Meta.reset();
   Trace.Handlers.ModelHandlers.Renderer.reset();
   Trace.Handlers.ModelHandlers.Flows.reset();
-  Trace.Handlers.ModelHandlers.Flows.reset();
+  Trace.Handlers.ModelHandlers.Samples.reset();
+  Trace.Handlers.ModelHandlers.AsyncJSCalls.reset();
   for (const event of events) {
     Trace.Handlers.ModelHandlers.Renderer.handleEvent(event);
     Trace.Handlers.ModelHandlers.Flows.handleEvent(event);
@@ -175,10 +177,16 @@ describe('AsyncJSCallsHandler', function() {
       // Create flow events in the same way perfetto does for traces (as separate pairs).
       // schedule -> run 1, run 1 -> run 2.
       const flowEvents = [
-        ...makeFlowEvents([asyncTaskScheduled, asyncTaskRun1], 0), ...makeFlowEvents([asyncTaskRun1, asyncTaskRun2], 1)
+        ...makeFlowEvents([asyncTaskScheduled, asyncTaskRun1], 0),
+        ...makeFlowEvents([asyncTaskRun1, asyncTaskRun2], 1),
       ];
       const rendererEvents = [
-        jsTaskScheduler, asyncTaskScheduled, asyncTaskRun1, jsTaskRunEntryPoint1, asyncTaskRun2, jsTaskRunEntryPoint2
+        jsTaskScheduler,
+        asyncTaskScheduled,
+        asyncTaskRun1,
+        jsTaskRunEntryPoint1,
+        asyncTaskRun2,
+        jsTaskRunEntryPoint2,
       ];
       const allEvents = [...rendererEvents, ...flowEvents];
 
@@ -257,11 +265,18 @@ describe('AsyncJSCallsHandler', function() {
       // Create flow events in the same way perfetto does for traces (as separate pairs).
       // schedule -> run 1, run 1 -> run 2.
       const flowEvents = [
-        ...makeFlowEvents([asyncTaskScheduled, asyncTaskRun1], 0), ...makeFlowEvents([asyncTaskRun1, asyncTaskRun2], 1)
+        ...makeFlowEvents([asyncTaskScheduled, asyncTaskRun1], 0),
+        ...makeFlowEvents([asyncTaskRun1, asyncTaskRun2], 1),
       ];
       const rendererEvents = [
-        jsTaskScheduler, asyncTaskScheduled, asyncTaskRun1, jsTaskRunEntryPoint1, asyncJSTask1, asyncTaskRun2,
-        jsTaskRunEntryPoint2, asyncJSTask2
+        jsTaskScheduler,
+        asyncTaskScheduled,
+        asyncTaskRun1,
+        jsTaskRunEntryPoint1,
+        asyncJSTask1,
+        asyncTaskRun2,
+        jsTaskRunEntryPoint2,
+        asyncJSTask2,
       ];
       const allEvents = [...rendererEvents, ...flowEvents];
 

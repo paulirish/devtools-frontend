@@ -38,8 +38,8 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     done = true;
 };
 import { Frame, FrameEvent, throwIfDetached } from '../api/Frame.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { UnsupportedOperation } from '../common/Errors.js';
-import { debugError } from '../common/util.js';
 import { Deferred } from '../util/Deferred.js';
 import { disposeSymbol } from '../util/disposable.js';
 import { isErrorLike } from '../util/ErrorLike.js';
@@ -85,20 +85,22 @@ let CdpFrame = (() => {
         accessibility;
         worlds;
         extensionWorlds = {};
-        constructor(frameManager, frameId, parentFrameId, client) {
-            super();
+        #logger;
+        constructor(frameManager, frameId, parentFrameId, client, logger) {
+            super(logger);
             this._frameManager = frameManager;
             this.#url = '';
             this._id = frameId;
             this._parentId = parentFrameId;
             this.#detached = false;
             this.#client = client;
+            this.#logger = logger;
             this._loaderId = '';
             this.worlds = {
-                [MAIN_WORLD]: new IsolatedWorld(this, this._frameManager.timeoutSettings, MAIN_WORLD),
-                [PUPPETEER_WORLD]: new IsolatedWorld(this, this._frameManager.timeoutSettings, PUPPETEER_WORLD),
+                [MAIN_WORLD]: new IsolatedWorld(this, this._frameManager.timeoutSettings, MAIN_WORLD, logger),
+                [PUPPETEER_WORLD]: new IsolatedWorld(this, this._frameManager.timeoutSettings, PUPPETEER_WORLD, logger),
             };
-            this.accessibility = new Accessibility(this.worlds[MAIN_WORLD], frameId);
+            this.accessibility = new Accessibility(this.worlds[MAIN_WORLD], frameId, logger);
             this.on(FrameEvent.FrameSwappedByActivation, () => {
                 // Emulate loading process for swapped frames.
                 this._onLoadingStarted();
@@ -228,8 +230,9 @@ let CdpFrame = (() => {
         }
         async setContent(html, options = {}) {
             const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), } = options;
-            // We rely upon the fact that document.open() will reset frame lifecycle with "init"
-            // lifecycle event. @see https://crrev.com/608658
+            // We rely upon the fact that the document is reopened, which resets the
+            // frame lifecycle with an "init" lifecycle event.
+            // @see https://crrev.com/608658
             await this.setFrameContent(html);
             const watcher = new LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout);
             const error = await Deferred.race([
@@ -240,6 +243,18 @@ let CdpFrame = (() => {
             if (error) {
                 throw error;
             }
+        }
+        /**
+         * @internal
+         */
+        async setFrameContent(content) {
+            // Writing the content from the page would go through document.write, which
+            // makes Chrome treat parser-blocking cross-site scripts in it as an
+            // intervention candidate and may block them outright.
+            await this.#client.send('Page.setDocumentContent', {
+                frameId: this._id,
+                html: content,
+            });
         }
         url() {
             return this.#url;
@@ -276,7 +291,9 @@ let CdpFrame = (() => {
                 this.#client.send('Runtime.addBinding', {
                     name: CDP_BINDING_PREFIX + binding.name,
                 }),
-                this.evaluate(binding.initSource).catch(debugError),
+                this.evaluate(binding.initSource).catch(error => {
+                    this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+                }),
             ]);
         }
         async removeExposedFunctionBinding(binding) {
@@ -293,7 +310,9 @@ let CdpFrame = (() => {
                     // Removes the dangling Puppeteer binding wrapper.
                     // @ts-expect-error: In a different context.
                     globalThis[name] = undefined;
-                }, binding.name).catch(debugError),
+                }, binding.name).catch(error => {
+                    this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+                }),
             ]);
         }
         async waitForDevicePrompt(options = {}) {
@@ -365,7 +384,7 @@ export { CdpFrame };
 export function referrerPolicyToProtocol(referrerPolicy) {
     // See
     // https://chromedevtools.github.io/devtools-protocol/tot/Page/#type-ReferrerPolicy
-    // We need to conver from Web-facing phase to CDP's camelCase.
+    // We need to convert from Web-facing phase to CDP's camelCase.
     return referrerPolicy.replaceAll(/-./g, match => {
         return match[1].toUpperCase();
     });

@@ -1,9 +1,10 @@
 import { CDPSessionEvent } from '../api/CDPSession.js';
 import { TargetType } from '../api/Target.js';
 import { WebWorker, WebWorkerEvent, } from '../api/WebWorker.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { TimeoutSettings } from '../common/TimeoutSettings.js';
-import { debugError } from '../common/util.js';
+import { Deferred } from '../util/Deferred.js';
 import { ExecutionContext } from './ExecutionContext.js';
 import { IsolatedWorld } from './IsolatedWorld.js';
 import { MAIN_WORLD } from './IsolatedWorlds.js';
@@ -16,19 +17,25 @@ export class CdpWebWorker extends WebWorker {
     #client;
     #id;
     #targetType;
+    #logger;
     #emitter;
+    #workerLoaded = new Deferred();
     get internalEmitter() {
         return this.#emitter;
     }
-    constructor(client, url, targetId, targetType, exceptionThrown, networkManager) {
+    constructor(client, url, targetId, targetType, exceptionThrown, networkManager, logger) {
         super(url);
         this.#id = targetId;
         this.#client = client;
+        this.#logger = logger;
         this.#targetType = targetType;
-        this.#world = new IsolatedWorld(this, new TimeoutSettings(), MAIN_WORLD);
-        this.#emitter = new EventEmitter();
+        this.#world = new IsolatedWorld(this, new TimeoutSettings(), MAIN_WORLD, logger);
+        this.#emitter = new EventEmitter(undefined, logger);
         this.#client.once('Runtime.executionContextCreated', async (event) => {
-            this.#world.setContext(new ExecutionContext(client, event.context, this.#world));
+            this.#world.setContext(new ExecutionContext(client, event.context, this.#world, logger));
+        });
+        this.#client.once('Inspector.workerScriptLoaded', () => {
+            this.#workerLoaded.resolve();
         });
         this.#world.emitter.on('consoleapicalled', async (event) => {
             try {
@@ -41,7 +48,9 @@ export class CdpWebWorker extends WebWorker {
                     // eslint-disable-next-line max-len -- The comment is long.
                     // eslint-disable-next-line @puppeteer/use-using -- These are not owned by this function.
                     for (const value of values) {
-                        void value.dispose().catch(debugError);
+                        void value.dispose().catch((err) => {
+                            return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+                        });
                     }
                     return;
                 }
@@ -52,7 +61,7 @@ export class CdpWebWorker extends WebWorker {
                 }
             }
             catch (err) {
-                debugError(err);
+                this.#logger?.(DEBUG_PREFIXES.error)?.(err);
             }
         });
         this.#client.on('Runtime.exceptionThrown', exceptionThrown);
@@ -60,8 +69,12 @@ export class CdpWebWorker extends WebWorker {
             this.#world.dispose();
         });
         // This might fail if the target is closed before we receive all execution contexts.
-        networkManager?.addClient(this.#client).catch(debugError);
-        this.#client.send('Runtime.enable').catch(debugError);
+        networkManager?.addClient(this.#client).catch((err) => {
+            return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+        });
+        this.#client.send('Runtime.enable').catch((err) => {
+            return this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+        });
     }
     mainRealm() {
         return this.#world;
@@ -93,6 +106,14 @@ export class CdpWebWorker extends WebWorker {
                     self.close();
                 });
         }
+    }
+    async evaluate(func, ...args) {
+        await this.#workerLoaded.valueOrThrow();
+        return await super.evaluate(func, ...args);
+    }
+    async evaluateHandle(func, ...args) {
+        await this.#workerLoaded.valueOrThrow();
+        return await super.evaluateHandle(func, ...args);
     }
 }
 //# sourceMappingURL=WebWorker.js.map

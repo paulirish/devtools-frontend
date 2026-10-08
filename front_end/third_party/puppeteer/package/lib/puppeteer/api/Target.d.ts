@@ -3,6 +3,7 @@
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
+import type { Logger } from '../common/Debug.js';
 import type { Browser } from './Browser.js';
 import type { BrowserContext } from './BrowserContext.js';
 import type { CDPSession } from './CDPSession.js';
@@ -27,15 +28,16 @@ export declare enum TargetType {
 /**
  * Target represents a
  * {@link https://chromedevtools.github.io/devtools-protocol/tot/Target/ | CDP target}.
- * In CDP a target is something that can be debugged such a frame, a page or a
+ * In CDP a target is something that can be debugged, such as a frame, a page or a
  * worker.
  * @public
  */
 export declare abstract class Target {
+    protected logger: Logger;
     /**
      * @internal
      */
-    protected constructor();
+    protected constructor(logger: Logger);
     /**
      * If the target is not of type `"service_worker"` or `"shared_worker"`, returns `null`.
      */

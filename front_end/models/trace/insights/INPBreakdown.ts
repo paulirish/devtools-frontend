@@ -5,7 +5,6 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
-import type {SyntheticInteractionPair} from '../types/TraceEvents.js';
 import type * as Types from '../types/types.js';
 
 import {
@@ -21,7 +20,7 @@ export const UIStrings = {
    * @description Text to tell the user about the longest user interaction.
    */
   description:
-      'Start investigating [how to improve INP](https://developer.chrome.com/docs/performance/insights/inp-breakdown) by looking at the longest subpart.',
+      'Start investigating [how to improve INP](https://developer.chrome.com/docs/performance/insights/inp-breakdown) by looking at the longest subpart',
   /**
    * @description Title for the performance insight "INP breakdown", which shows a breakdown of INP by subparts / sections.
    */
@@ -55,11 +54,11 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/INPBreakdown.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type INPBreakdownInsightModel = InsightModel<typeof UIStrings, {
-  longestInteractionEvent?: SyntheticInteractionPair,
-  highPercentileInteractionEvent?: SyntheticInteractionPair,
+  longestInteractionEvent?: Types.Events.SyntheticInteractionPair,
+  highPercentileInteractionEvent?: Types.Events.SyntheticInteractionPair,
 }>;
 
 export function isINPBreakdownInsight(insight: InsightModel): insight is INPBreakdownInsightModel {
@@ -101,7 +100,7 @@ export function generateInsight(
     return finalize({});
   }
 
-  const longestByInteractionId = new Map<number, SyntheticInteractionPair>();
+  const longestByInteractionId = new Map<number, Types.Events.SyntheticInteractionPair>();
   for (const event of interactionEvents) {
     const key = event.interactionId;
     const longest = longestByInteractionId.get(key);

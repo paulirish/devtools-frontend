@@ -32,7 +32,7 @@
   align-items: flex-start;
   flex: none;
   background-color: var(--sys-color-cdt-base-container);
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 
   & > :first-child {
     flex: 1 1 auto;
@@ -46,7 +46,7 @@
   row-gap: var(--sys-size-3);
   flex: none;
   background-color: var(--sys-color-cdt-base-container);
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 
   & > div {
     margin-left: 5px;
@@ -59,7 +59,7 @@
 #timeline-overview-panel {
   flex: none;
   position: relative;
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 }
 
 #timeline-overview-grid {
@@ -67,16 +67,16 @@
 }
 
 #timeline-overview-grid .timeline-grid-header {
-  height: 12px;
+  height: var(--sys-size-6);
 }
 
 #timeline-overview-grid .resources-dividers-label-bar {
   pointer-events: auto;
-  height: 12px;
+  height: var(--sys-size-6);
 }
 
 #timeline-overview-grid .resources-divider-label {
-  top: 1px;
+  top: var(--sys-size-1);
 }
 
 .timeline-details-split {
@@ -141,24 +141,14 @@
   width: 5px;
   height: 5px;
   margin-left: -3px;
-  margin-top: -2px;
+  margin-top: calc(-1 * var(--sys-size-2));
 }
 
 #memory-graphs-container .timeline-memory-header {
   flex: 0 0 26px;
   background-color: var(--sys-color-surface2);
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
   justify-content: space-between;
-}
-
-#memory-graphs-container .timeline-memory-header::after {
-  content: "";
-  /* stylelint-disable-next-line custom-property-pattern */
-  background-image: var(--image-file-toolbarResizerVertical);
-  background-repeat: no-repeat;
-  background-position: right center, center;
-  flex: 20px 0 0;
-  margin: 0 4px;
 }
 
 .timeline-memory-toolbar {
@@ -166,12 +156,12 @@
 }
 
 .memory-counter-value {
-  margin: 8px;
+  margin: var(--sys-size-5);
 }
 
 #counter-values-bar {
-  flex: 0 0 20px;
-  border-top: solid 1px var(--sys-color-divider);
+  flex: 0 0 var(--sys-size-9);
+  border-top: solid var(--sys-size-1) var(--sys-color-divider);
   width: 100%;
   overflow: hidden;
   line-height: 18px;
@@ -181,95 +171,21 @@
   overflow: hidden;
 }
 
-.brick-game {
-  background-color: var(--sys-color-neutral-container);
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9999; /* A high value to ensure it's on top */
-}
-
-.game-close-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 25px;
-  height: 25px;
-  position: absolute;
-  right: 15px;
-  top: 15px;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.scorePanel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  white-space: pre-line;
-  padding: 15px;
-  position: absolute;
-  left: 15px;
-  bottom: 15px;
-  border: double 7px transparent;
-  border-radius: 20px;
-  background-origin: border-box;
-  background-clip: content-box, border-box;
-  font-weight: 200;
-}
-
-.confetti-100 {
-  display: block;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.confetti-100 > .confetti-100-particle {
-  opacity: 0%;
-  position: fixed;
-  animation: confetti-100-animation 1s none ease-out;
-  font-size: 30px;
-}
-
-@keyframes confetti-100-animation {
-  0% {
-    opacity: 100%;
-    transform: translateY(0%) translateY(0%) rotate(0deg);
-  }
-
-  100% {
-    opacity: 0%;
-    /* stylelint-disable-next-line custom-property-pattern */
-    transform: translateY(var(--to-Y)) translateX(var(--to-X)) rotate(var(--rotation));
-  }
-}
-
-@media (prefers-reduced-motion) {
-  .confetti-100 > .confetti-100-particle {
-    animation-name: dissolve;
-  }
-}
-
 .timeline-layers-view-properties table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .timeline-layers-view-properties td {
-  border: 1px solid var(--sys-color-divider);
-  line-height: 22px;
+  border: var(--sys-size-1) solid var(--sys-color-divider);
+  line-height: var(--sys-size-10);
 }
 
 .timeline-filmstrip-preview > img {
   max-width: 500px;
   max-height: 300px;
   cursor: pointer;
-  border: 1px solid var(--sys-color-divider);
+  border: var(--sys-size-1) solid var(--sys-color-divider);
 }
 
 .timeline-details .filter-input-field {
@@ -279,10 +195,10 @@
 .timeline-stack-view-header {
   height: 27px;
   background-color: var(--sys-color-cdt-base-container);
-  padding: 6px 10px;
+  padding: var(--sys-size-4) 10px;
   color: var(--sys-color-on-surface);
   white-space: nowrap;
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 }
 
 .timeline-landing-page {
@@ -294,7 +210,7 @@
   justify-content: center;
   align-items: center;
   overflow: auto;
-  font-size: 13px;
+  font-size: var(--sys-typescale-body3-size);
   color: var(--sys-color-on-surface-subtle);
 }
 
@@ -370,8 +286,8 @@ devtools-toolbar {
         float: right;
         user-select: none;
         mask-image: var(--image-file-triangle-down);
-        width: 14px;
-        height: 14px;
+        width: var(--sys-size-7);
+        height: var(--sys-size-7);
         content: "";
         position: absolute;
         background-color: var(--icon-default);

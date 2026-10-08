@@ -6,13 +6,13 @@ import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 
-devtools_module("cpu_profile") {
+devtools_foundation_module("cpu_profile") {
   sources = [
     "CPUProfileDataModel.ts",
     "ProfileTreeModel.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/platform:bundle",
     "../../generated",
   ]
@@ -21,7 +21,7 @@ devtools_module("cpu_profile") {
 devtools_entrypoint("bundle") {
   entrypoint = "cpu_profile.ts"
 
-  deps = [ ":cpu_profile" ]
+  ts_deps = [ ":cpu_profile" ]
 
   visibility = [
     ":*",
@@ -34,14 +34,13 @@ devtools_entrypoint("bundle") {
   ]
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "CPUProfileDataModel.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../generated",
-    "../../testing",
   ]
 }

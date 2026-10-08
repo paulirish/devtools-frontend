@@ -30,61 +30,50 @@ export default createRule({
       category: 'Possible Errors',
     },
     messages: {
-      missingBugId:
-          'Skipped tests must have a CRBug included in the description: `it.skip(\'[crbug.com/BUGID]: testname\', async() => {})',
+      disallowSkip: 'Do not use .skip. Use test/TestExpectations instead.',
       extraBugId:
-          'Non-skipped tests cannot include a CRBug tag at the beginning of the description: `it.skip(\'testname (crbug.com/BUGID)\', async() => {})',
-      comment: 'A skipped test must have an attached comment with an explanation written before the test',
+          'Non-skipped tests cannot include a CRBug tag at the beginning of the description: `it(\'testname (crbug.com/BUGID)\', async() => {})',
     },
     fixable: 'code',
     schema: [],  // no options
   },
   defaultOptions: [],
   create: function(context) {
-    const sourceCode = context.sourceCode;
     return {
       MemberExpression(node) {
-        if (node.object.type !== 'Identifier' || node.property.type !== 'Identifier') {
+        if (node.property.type !== 'Identifier' || node.property.name !== 'skip') {
           return;
         }
-
-        if ((node.object.name === 'it' || node.object.name === 'describe') &&
-            (node.property.name === 'skip' || node.property.name === 'skipOnPlatforms') &&
-            node.parent?.type === 'CallExpression') {
-          const testNameNode = node.property.name === 'skip' ? node.parent.arguments[0] : node.parent.arguments[1];
-
-          if (!testNameNode) {
-            return;
-          }
-
-          const textValue = getTextValue(testNameNode);
-
-          if (!textValue || !TEST_NAME_REGEX.test(textValue)) {
-            context.report({
-              node,
-              messageId: 'missingBugId',
-            });
-          }
-
-          const attachedComments = sourceCode.getCommentsBefore(node.parent);
-
-          if (attachedComments.length === 0) {
-            context.report({node, messageId: 'comment'});
-          }
+        if (node.object.type !== 'Identifier') {
+          return;
         }
+        if (node.object.name !== 'it' && node.object.name !== 'describe') {
+          return;
+        }
+        if (node.parent?.type !== 'CallExpression') {
+          return;
+        }
+        context.report({
+          node,
+          messageId: 'disallowSkip',
+        });
       },
 
       CallExpression(node: TSESTree.CallExpression) {
-        if (node.callee.type === 'Identifier' && node.callee.name === 'it' && node.arguments[0]) {
-          const textValue = getTextValue(node.arguments[0]);
-
-          if (textValue && TEST_NAME_REGEX.test(textValue)) {
-            context.report({
-              node,
-              messageId: 'extraBugId',
-            });
-          }
+        if (node.callee.type !== 'Identifier' || node.callee.name !== 'it') {
+          return;
         }
+        if (node.arguments.length === 0) {
+          return;
+        }
+        const textValue = getTextValue(node.arguments[0]);
+        if (!textValue || !TEST_NAME_REGEX.test(textValue)) {
+          return;
+        }
+        context.report({
+          node,
+          messageId: 'extraBugId',
+        });
       },
     };
   },

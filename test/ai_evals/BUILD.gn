@@ -1,0 +1,52 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../scripts/build/ninja/copy.gni")
+import("../../scripts/build/typescript/typescript.gni")
+
+group("ai_evals") {
+  testonly = true
+  deps = [
+    ":eval_tests",
+    ":test_inputs",
+    "network",
+  ]
+}
+
+ts_e2e_library("eval_tests") {
+  sources = [ "ai_smoke.test.ts" ]
+  ts_deps = [
+    "../../front_end/core/sdk:bundle",
+    "../../front_end/panels/ai_assistance:bundle",
+    "../e2e/helpers",
+    "helpers",
+  ]
+}
+
+ts_e2e_library("harness_library") {
+  sources = [
+    "ai-eval-state-provider.ts",
+    "mocha-interface.ts",
+    "mocha_hooks.ts",
+    "run-mocha.ts",
+  ]
+  ts_deps = [
+    "../conductor:implementation",
+    "../e2e/conductor:implementation",
+    "../e2e/shared",
+    "../shared",
+  ]
+}
+
+generated_file("test_inputs") {
+  testonly = true
+  outputs = [ "$target_gen_dir/tests.txt" ]
+  data_keys = [ "tests" ]
+  rebase = target_gen_dir
+
+  deps = [
+    ":eval_tests",
+    "network",
+  ]
+}

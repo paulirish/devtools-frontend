@@ -48,6 +48,7 @@ interface ButtonState {
   variant: Variant;
   size?: Size;
   reducedFocusRing?: boolean;
+  buttonTitle?: string;
   disabled: boolean;
   toggled?: boolean;
   toggleOnClick?: boolean;
@@ -62,6 +63,7 @@ interface ButtonState {
   jslogContext?: string;
   longClickable?: boolean;
   inverseColorTheme?: boolean;
+  accessibleExpanded?: boolean;
 }
 
 interface CommonButtonData {
@@ -79,7 +81,14 @@ interface CommonButtonData {
   spinner?: boolean;
   type?: ButtonType;
   value?: string;
+  /**
+   * Sets title on the host and, unless buttonTitle is provided, the internal <button> element.
+   */
   title?: string;
+  /**
+   * Sets title on the internal <button> element, taking precedence over title.
+   */
+  buttonTitle?: string;
   jslogContext?: string;
   longClickable?: boolean;
   inverseColorTheme?: boolean;
@@ -87,6 +96,10 @@ interface CommonButtonData {
    * Sets aria-label on the internal <button> element.
    */
   accessibleLabel?: string;
+  /**
+   * Sets aria-expanded on the internal <button> element.
+   */
+  accessibleExpanded?: boolean;
 }
 
 export type ButtonData = CommonButtonData&(|{
@@ -161,11 +174,13 @@ export class Button extends HTMLElement {
     if (data.title) {
       this.title = data.title;
     }
+    this.#props.buttonTitle = data.buttonTitle;
 
     if (data.accessibleLabel) {
       this.accessibleLabel = data.accessibleLabel;
     }
 
+    this.#props.accessibleExpanded = data.accessibleExpanded;
     this.#props.jslogContext = data.jslogContext;
     this.#props.longClickable = data.longClickable;
     this.#props.inverseColorTheme = data.inverseColorTheme;
@@ -211,6 +226,15 @@ export class Button extends HTMLElement {
     return this.getAttribute('accessibleLabel') || undefined;
   }
 
+  set accessibleExpanded(expanded: boolean|undefined) {
+    this.#props.accessibleExpanded = expanded;
+    this.#render();
+  }
+
+  get accessibleExpanded(): boolean|undefined {
+    return this.#props.accessibleExpanded;
+  }
+
   set reducedFocusRing(reducedFocusRing: boolean) {
     this.#props.reducedFocusRing = reducedFocusRing;
     this.#render();
@@ -227,6 +251,15 @@ export class Button extends HTMLElement {
 
   override set title(title: string) {
     super.title = title;
+    this.#render();
+  }
+
+  get buttonTitle(): string|undefined {
+    return this.#props.buttonTitle;
+  }
+
+  set buttonTitle(buttonTitle: string|undefined) {
+    this.#props.buttonTitle = buttonTitle;
     this.#render();
   }
 
@@ -381,10 +414,11 @@ export class Button extends HTMLElement {
     Lit.render(
       html`
         <style>${buttonStyles}</style>
-        <button title=${ifDefined(this.title || undefined)}
+        <button title=${ifDefined(this.buttonTitle || this.title || undefined)}
                 ?disabled=${this.#props.disabled}
                 class=${classMap(classes)}
                 aria-pressed=${ifDefined(this.#props.toggled)}
+                aria-expanded=${ifDefined(this.#props.accessibleExpanded)}
                 aria-label=${ifDefined(this.accessibleLabel || this.title || undefined)}
                 jslog=${ifDefined(jslog)}>
           ${hasIcon ? html`

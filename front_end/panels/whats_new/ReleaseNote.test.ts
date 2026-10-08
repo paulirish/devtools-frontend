@@ -4,9 +4,7 @@
 
 import {assert} from 'chai';
 
-import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import {
   deinitializeGlobalVars,
   initializeGlobalVars,
@@ -48,20 +46,13 @@ describe('Release Note', () => {
         return new WhatsNew.ReleaseNoteView.ReleaseNoteView();
       },
     });
-
-    // This setting is used to determine if the What's New panel needs to be shown.
-    Common.Settings.registerSettingsForTest([{
-      category: Common.Settings.SettingCategory.APPEARANCE,
-      title: () => 'Show What\'s New after each update' as Platform.UIString.LocalizedString,
-      settingName: 'help.show-release-note',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: true,
-    }]);
-    Root.Runtime.experiments.clearForTest();
-    await initializeGlobalVars({reset: false});
   });
 
   after(async () => await deinitializeGlobalVars());
+
+  beforeEach(() => {
+    WhatsNew.WhatsNew.getReleaseNoteVersionSetting().set(0);
+  });
 
   it('sets and gets the last seen release note version correctly', () => {
     const releaseNoteVersionSetting = WhatsNew.WhatsNew.getReleaseNoteVersionSetting();
@@ -71,6 +62,7 @@ describe('Release Note', () => {
   });
 
   it('updates the last seen version when the release notes are shown', () => {
+    WhatsNew.WhatsNew.getReleaseNoteVersionSetting().set(1);
     assert.strictEqual(WhatsNew.WhatsNew.getReleaseNoteVersionSetting().get(), 1);
     WhatsNew.WhatsNew.showReleaseNoteIfNeeded();
     assert.strictEqual(WhatsNew.WhatsNew.getReleaseNoteVersionSetting().get(), 99);

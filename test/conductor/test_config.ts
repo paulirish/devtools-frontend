@@ -9,31 +9,35 @@ import * as path from 'node:path';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
-import {asArray, commandLineArgs, DiffBehaviors} from './commandline.js';
-import {BUILD_ROOT, defaultChromePath, SOURCE_ROOT} from './paths.js';
+import {
+  asArray,
+  commandLineArgs,
+  DiffBehaviors,
+  expandResponseFiles,
+} from './commandline.js';
+import {
+  BUILD_ROOT,
+  defaultChromePath,
+  SOURCE_ROOT,
+  TEST_ID_REGEX,
+} from './paths.js';
 import {shardFilter} from './sharding.js';
 
-const argv = yargs(hideBin(process.argv)).parseSync()['_'] as string[];
+const argv = yargs(expandResponseFiles(hideBin(process.argv))).help(false).parseSync()['_'] as string[];
 
-const options = commandLineArgs(yargs(argv)).parseSync();
-
-export const enum ServerType {
-  HOSTED_MODE = 'hosted-mode',
-}
-
+const options = commandLineArgs(yargs(argv)).help(false).parseSync();
 interface Config {
   tests: string[];
   verbose: number;
   artifactsDir: string;
   chromeBinary: string;
-  serverType: ServerType;
   debug: boolean;
   headless: boolean;
   coverage: boolean;
   repetitions: number;
   onDiff: {update: boolean|string[], throw: boolean};
   shuffle: boolean;
-  mochaGrep: {invert?: boolean, grep?: string}|{invert?: boolean, fgrep?: string};
+  mochaGrep:|{invert?: boolean, grep?: string}|{invert?: boolean, fgrep?: string};
   copyScreenshotGoldens: boolean;
   retries: number;
   configureChrome: (executablePath: string) => void;
@@ -42,7 +46,12 @@ interface Config {
   shardNumber: number;
   shardBias: number;
   isAiAgent: boolean;
-  allowDuplicateTestIds: boolean;
+  isLuci: boolean;
+  isPerfTest: boolean;
+  expectationsFile?: string;
+  bail: boolean;
+  forceScreenshots: boolean;
+  otaUsername?: string;
 }
 
 function sliceArrayFromElement(array: string[], element: string) {
@@ -54,13 +63,22 @@ const diffBehaviors = asArray(options['on-diff']);
 // --diff=throw is the default, so set the option to true if there is either no --diff=no-throw or if it is overridden
 // by a later --diff=throw
 const onDiffThrow = !diffBehaviors.includes(DiffBehaviors.NO_THROW) ||
-    sliceArrayFromElement(diffBehaviors, DiffBehaviors.NO_THROW).includes(DiffBehaviors.THROW);
+    sliceArrayFromElement(diffBehaviors, DiffBehaviors.NO_THROW)
+        .includes(
+            DiffBehaviors.THROW,
+        );
 // --diff=no-update overrules any previous --diff=update or --diff=update=X.
-const onDiffUpdate =
-    sliceArrayFromElement(diffBehaviors, DiffBehaviors.NO_UPDATE).filter(v => v.startsWith(DiffBehaviors.UPDATE));
+const onDiffUpdate = sliceArrayFromElement(
+                         diffBehaviors,
+                         DiffBehaviors.NO_UPDATE,
+                         )
+                         .filter(v => v.startsWith(DiffBehaviors.UPDATE));
 // --diff=update overrules any previous --diff=update=X. Subsequent --diff=update=X overrule any previous --diff=update.
-const diffUpdateFilters =
-    sliceArrayFromElement(onDiffUpdate, DiffBehaviors.UPDATE).map(v => v.substr(v.indexOf('=') + 1));
+const diffUpdateFilters = sliceArrayFromElement(
+                              onDiffUpdate,
+                              DiffBehaviors.UPDATE,
+                              )
+                              .map(v => v.substr(v.indexOf('=') + 1));
 
 const onDiffUpdateAll = onDiffUpdate.length > 0 && diffUpdateFilters.length === 0;
 const onDiffUpdateSelected = onDiffUpdate.length > 0 ? diffUpdateFilters : false;
@@ -90,7 +108,11 @@ function getTestsFromOptions() {
   return [];
 }
 
-function runProcess(exe: string, args: string[], options: childProcess.SpawnSyncOptionsWithStringEncoding) {
+function runProcess(
+    exe: string,
+    args: string[],
+    options: childProcess.SpawnSyncOptionsWithStringEncoding,
+) {
   return childProcess.spawnSync(exe, args, options);
 }
 
@@ -107,17 +129,29 @@ function configureChrome(executablePath: string) {
         {
           encoding: 'utf-8',
           stdio: 'inherit',
-        });
+        },
+    );
     if (result.error || (result.status ?? 1) !== 0) {
       throw new Error('Setting permissions failed: ' + result.error?.message);
     }
   }
 }
 
+export function isAIAgent(): boolean {
+  return [
+    'GEMINI_CLI',
+    'CLAUDECODE',
+    'CODEX_SANDBOX',
+    'CURSOR_AGENT',
+    'AI_AGENT',
+    'ANTIGRAVITY_AGENT',
+  ].some(agent => agent in process.env);
+}
+
 const getDefaultArtifactDir = () => {
   const artifactsPath = path.join(BUILD_ROOT, 'artifacts');
   if (!fs.existsSync(artifactsPath)) {
-    fs.mkdirSync(artifactsPath);
+    fs.mkdirSync(artifactsPath, {recursive: true});
   }
   return artifactsPath;
 };
@@ -127,7 +161,6 @@ export const TestConfig: Config = {
   verbose: Number(options['verbose'] ?? 0),
   artifactsDir: options['artifacts-dir'] || getDefaultArtifactDir(),
   chromeBinary: options['chrome-binary'] ?? defaultChromePath(),
-  serverType: ServerType.HOSTED_MODE,
   debug: options['debug'],
   headless: options['headless'] === undefined ? !options['debug'] : options['headless'],
   coverage: options['coverage'],
@@ -145,24 +178,16 @@ export const TestConfig: Config = {
   shardCount: options['shard-count'],
   shardNumber: options['shard-number'],
   shardBias: options['shard-bias'],
-  isAiAgent:
-      ['GEMINI_CLI', 'CLAUDECODE', 'CODEX_SANDBOX', 'CURSOR_AGENT', 'AI_AGENT'].some(agent => agent in process.env),
-  allowDuplicateTestIds: options['repeat'] > 1 || options['retries'] > 0,
+  isAiAgent: isAIAgent(),
+  isLuci: process.env['LUCI_CONTEXT'] !== undefined,
+  isPerfTest: false,
+  expectationsFile: options['expectations-file'],
+  bail: options['bail'],
+  forceScreenshots: Boolean(options['force-screenshots']),
+  otaUsername: options['ota-username'],
 };
 
-export function loadTests(testDirectory: string, filename = 'tests.txt') {
-  const tests = fs.readFileSync(path.join(testDirectory, filename))
-                    .toString()
-                    .split('\n')
-                    .map(t => t.trim())
-                    .filter(t => t.length > 0)
-                    .map(t => path.normalize(path.join(testDirectory, t)))
-                    .filter(t => TestConfig.tests.some((spec: string) => t.startsWith(spec)))
-                    // To keep sharding deterministic, use the relative path from the test directory, NOT the
-                    // absolute file path on disk. Also replace backward slashes with forward slashes so sharding stays
-                    // the same across windows, linux and mac.
-                    .filter(t => shardFilter(TestConfig, path.relative(testDirectory, t).replaceAll('\\', '/')));
-
+export function shuffleTests(tests: string[]): string[] {
   if (TestConfig.shuffle) {
     for (let i = tests.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -170,4 +195,31 @@ export function loadTests(testDirectory: string, filename = 'tests.txt') {
     }
   }
   return tests;
+}
+
+export function loadTests(testDirectory: string, filename = 'tests.txt'): string[] {
+  const tests = fs.readFileSync(path.join(testDirectory, filename))
+                    .toString()
+                    .split('\n')
+                    .map(t => t.trim())
+                    .filter(t => t.length > 0)
+                    .map(t => path.normalize(path.join(testDirectory, t)))
+                    .filter(
+                        t => TestConfig.tests.some((spec: string) => {
+                          if (TEST_ID_REGEX.test(spec)) {
+                            spec = spec.match(TEST_ID_REGEX)![1];
+                          }
+                          return t.startsWith(spec);
+                        }),
+                        )
+                    // To keep sharding deterministic, use the relative path from the test directory, NOT the
+                    // absolute file path on disk. Also replace backward slashes with forward slashes so sharding stays
+                    // the same across windows, linux and mac.
+                    .filter(
+                        t => shardFilter(
+                            TestConfig,
+                            path.relative(testDirectory, t).replaceAll('\\', '/'),
+                            ),
+                    );
+  return shuffleTests(tests);
 }

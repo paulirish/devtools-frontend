@@ -15,13 +15,9 @@ import type {
   CookieData,
   DeleteCookiesRequest,
 } from '../common/Cookie.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {EventEmitter, type EventType} from '../common/EventEmitter.js';
-import {
-  debugError,
-  fromEmitterEvent,
-  filterAsync,
-  timeout,
-} from '../common/util.js';
+import {fromEmitterEvent, filterAsync, timeout} from '../common/util.js';
 import {asyncDisposeSymbol, disposeSymbol} from '../util/disposable.js';
 import {Mutex} from '../util/Mutex.js';
 
@@ -111,11 +107,21 @@ export interface BrowserContextEvents extends Record<EventType, unknown> {
  */
 
 export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> {
+  #logger: Logger;
+
   /**
    * @internal
    */
-  constructor() {
-    super();
+  constructor(logger: Logger) {
+    super(undefined, logger);
+    this.#logger = logger;
+  }
+
+  /**
+   * @internal
+   */
+  protected get logger(): Logger {
+    return this.#logger;
   }
 
   /**
@@ -125,7 +131,7 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
   abstract targets(): Target[];
 
   /**
-   * If defined, indicates an ongoing screenshot opereation.
+   * If defined, indicates an ongoing screenshot operation.
    */
   #pageScreenshotMutex?: Mutex;
   #screenshotOperationsCount = 0;
@@ -150,8 +156,7 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
    * @internal
    */
   waitForScreenshotOperations():
-    | Promise<InstanceType<typeof Mutex.Guard>>
-    | undefined {
+    Promise<InstanceType<typeof Mutex.Guard>> | undefined {
     return this.#pageScreenshotMutex?.acquire();
   }
 
@@ -372,12 +377,12 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
     return undefined;
   }
 
-  /** @internal */
   override [disposeSymbol](): void {
-    return void this[asyncDisposeSymbol]().catch(debugError);
+    return void this[asyncDisposeSymbol]().catch(error => {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+    });
   }
 
-  /** @internal */
   override async [asyncDisposeSymbol](): Promise<void> {
     await this.close();
     await super[asyncDisposeSymbol]();

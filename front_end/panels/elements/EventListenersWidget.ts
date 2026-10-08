@@ -36,6 +36,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as EventListeners from '../event_listeners/event_listeners.js';
 
@@ -43,35 +44,35 @@ const {bindToAction, bindToSetting} = UI.UIUtils;
 
 const UIStrings = {
   /**
-   * @description Title of show framework listeners setting in event listeners widget of the elements panel
+   * @description Title of show framework listeners setting in the Event listeners tab of the Elements panel.
    */
   frameworkListeners: 'Resolve `Framework` listeners',
   /**
-   * @description Tooltip text that appears on the setting when hovering over it in Event Listeners Widget of the Elements panel
+   * @description Tooltip text that appears on the setting when hovering over it in the Event listeners tab of the Elements panel.
    */
   showListenersOnTheAncestors: 'Show listeners on the ancestors',
   /**
-   * @description Alternative title text of a setting in Event Listeners Widget of the Elements panel
+   * @description Alternative title text of a setting in the Event listeners tab of the Elements panel.
    */
   ancestors: 'Ancestors',
   /**
-   * @description Title of dispatch filter in event listeners widget of the elements panel
+   * @description Title of dispatch filter in the Event listeners tab of the Elements panel.
    */
   eventListenersCategory: 'Event listeners category',
   /**
-   * @description Text for everything
+   * @description Text for everything.
    */
   all: 'All',
   /**
-   * @description Text in Event Listeners Widget of the Elements panel
+   * @description Text in the Event listeners tab of the Elements panel.
    */
   passive: 'Passive',
   /**
-   * @description Text in Event Listeners Widget of the Elements panel
+   * @description Text in the Event listeners tab of the Elements panel.
    */
   blocking: 'Blocking',
   /**
-   * @description Tooltip text that appears on the setting when hovering over it in Event Listeners Widget of the Elements panel
+   * @description Tooltip text that appears on the setting when hovering over it in the Event listeners tab of the Elements panel.
    */
   resolveEventListenersBoundWith: 'Resolve event listeners bound with framework',
 } as const;
@@ -125,7 +126,6 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
         </devtools-checkbox>
       </devtools-toolbar>
       ${widget(EventListeners.EventListenersView.EventListenersView, {
-        changeCallback: input.onEventListenersViewChange,
         objects: input.eventListenerObjects,
         filter: input.filter,
       })}
@@ -143,17 +143,16 @@ export class EventListenersWidget extends UI.Widget.VBox {
   constructor(view: View = DEFAULT_VIEW) {
     super();
     this.#view = view;
-    this.showForAncestorsSetting =
-        Common.Settings.Settings.instance().moduleSetting('show-event-listeners-for-ancestors');
+    this.showForAncestorsSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.ElementsSettings.showEventListenersForAncestorsSettingDescriptor);
     this.showForAncestorsSetting.addChangeListener(this.requestUpdate.bind(this));
 
     this.dispatchFilterBySetting =
         Common.Settings.Settings.instance().createSetting('event-listener-dispatch-filter-type', DispatchFilterBy.All);
     this.dispatchFilterBySetting.addChangeListener(this.requestUpdate.bind(this));
 
-    this.showFrameworkListenersSetting =
-        Common.Settings.Settings.instance().createSetting('show-frameowkr-listeners', true);
-    this.showFrameworkListenersSetting.setTitle(i18nString(UIStrings.frameworkListeners));
+    this.showFrameworkListenersSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.ElementsSettings.showFrameworkListenersSettingDescriptor);
     this.showFrameworkListenersSetting.addChangeListener(this.requestUpdate.bind(this));
 
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.requestUpdate.bind(this));
@@ -242,17 +241,16 @@ export class EventListenersWidget extends UI.Widget.VBox {
     }
 
     return context
-        .evaluate(
-            {
-              expression: 'self',
-              objectGroup: objectGroupName,
-              includeCommandLineAPI: false,
-              silent: true,
-              returnByValue: false,
-              generatePreview: false,
-            },
-            /* userGesture */ false,
-            /* awaitPromise */ false)
+        .evaluateWithSelectedFrameFallback({
+          expression: 'self',
+          objectGroup: objectGroupName,
+          includeCommandLineAPI: false,
+          silent: true,
+          returnByValue: false,
+          generatePreview: false,
+        },
+                                           /* userGesture */ false,
+                                           /* awaitPromise */ false)
         .then(result => {
           if ('object' in result) {
             return result.object;

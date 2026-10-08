@@ -5,9 +5,8 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
-import type * as TextUtils from '../text_utils/text_utils.js';
-
-let fileManagerInstance: FileManager|null;
+import * as Root from '../../core/root/root.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 
 export interface SaveCallbackParam {
   fileSystemPath?: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString;
@@ -16,23 +15,34 @@ export interface SaveCallbackParam {
 export class FileManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   readonly #saveCallbacks = new Map<
       Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, (arg0: SaveCallbackParam|null) => void>();
-  private constructor() {
+  readonly #eventDescriptors: Common.EventTarget.EventDescriptor[];
+  constructor() {
     super();
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.SavedURL, this.savedURL, this);
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.CanceledSaveURL, this.#canceledSavedURL, this);
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.AppendedToURL, this.appendedToURL, this);
+    this.#eventDescriptors = [
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+          Host.InspectorFrontendHostAPI.Events.SavedURL, this.savedURL, this),
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+          Host.InspectorFrontendHostAPI.Events.CanceledSaveURL, this.#canceledSavedURL, this),
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+          Host.InspectorFrontendHostAPI.Events.AppendedToURL, this.appendedToURL, this),
+    ];
+  }
+
+  dispose(): void {
+    Common.EventTarget.removeEventListeners(this.#eventDescriptors);
   }
 
   static instance(opts: {forceNew: boolean|null} = {forceNew: null}): FileManager {
     const {forceNew} = opts;
-    if (!fileManagerInstance || forceNew) {
-      fileManagerInstance = new FileManager();
+    if (!Root.DevToolsContext.globalInstance().has(FileManager) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(FileManager, new FileManager());
     }
 
-    return fileManagerInstance;
+    return Root.DevToolsContext.globalInstance().get(FileManager);
+  }
+
+  static removeInstance(): void {
+    Root.DevToolsContext.globalInstance().delete(FileManager);
   }
 
   /**

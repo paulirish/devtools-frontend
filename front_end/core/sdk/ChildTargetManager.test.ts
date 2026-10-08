@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
-import {
-  createTarget,
-} from '../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 
 import * as SDK from './sdk.js';
 
@@ -30,14 +29,24 @@ function createTargetInfo(targetId?: string, type?: string, url?: string, title?
   };
 }
 
-let nextSessionId = 0;
-function createSessionId() {
-  return ('SESSION_ID' + ++nextSessionId) as Protocol.Target.SessionID;
-}
+describe('ChildTargetManager', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
 
-describeWithMockConnection('ChildTargetManager', () => {
+  let universe: TestUniverse;
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
+  let createSessionId: () => Protocol.Target.SessionID;
+
+  beforeEach(() => {
+    let nextSessionId = 0;
+    createSessionId = () => ('SESSION_ID' + ++nextSessionId) as Protocol.Target.SessionID;
+  });
+
   it('adds subtargets', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget(
@@ -47,7 +56,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets subtarget type', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     for (const [protocolType, sdkType] of [
@@ -75,7 +84,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets subtarget to frame for devtools scheme if type is other', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -96,7 +105,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets subtarget to frame for chrome://print/ if type is other', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -109,7 +118,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets subtarget to frame for chrome://file-manager/ if type is other', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -122,7 +131,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets subtarget to frame for sidebar URLs if type is other', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -143,7 +152,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets worker target name to the target title', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -155,7 +164,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets non-frame target name to the last path component if present', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -173,7 +182,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('sets non-frame target a numbered name if it cannot use URL path', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     assert.lengthOf(childTargetManager.childTargets(), 0);
     await childTargetManager.attachedToTarget({
@@ -203,12 +212,13 @@ describeWithMockConnection('ChildTargetManager', () => {
       targetInfo: createTargetInfo(undefined, 'worker', 'data:application/javascript;console.log("Worker")'),
       waitingForDebugger: false,
     });
-    assert.strictEqual(childTargetManager.childTargets()[3].name(), '#1');
-    assert.strictEqual(childTargetManager.childTargets()[4].name(), '#2');
+    assert.match(childTargetManager.childTargets()[3].name(), /^#\d+$/);
+    assert.match(childTargetManager.childTargets()[4].name(), /^#\d+$/);
+    assert.notStrictEqual(childTargetManager.childTargets()[3].name(), childTargetManager.childTargets()[4].name());
   });
 
   it('calls attach callback', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(target);
     const attachCallback = sinon.spy();
     SDK.ChildTargetManager.ChildTargetManager.install(attachCallback);
@@ -227,7 +237,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('marks the target as crashed when it crashes', async () => {
-    const parentTarget = createTarget();
+    const parentTarget = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(parentTarget);
     await childTargetManager.attachedToTarget({
       sessionId: createSessionId(),
@@ -244,7 +254,7 @@ describeWithMockConnection('ChildTargetManager', () => {
   });
 
   it('"un-crashes" a target when the target info message is received', async () => {
-    const parentTarget = createTarget();
+    const parentTarget = universe.createTarget();
     const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(parentTarget);
     await childTargetManager.attachedToTarget({
       sessionId: createSessionId(),
@@ -263,7 +273,7 @@ describeWithMockConnection('ChildTargetManager', () => {
 
   describe('Storage initialization', () => {
     it('should initialize storage for a top-level worker with STORAGE capability', async () => {
-      const parentTarget = createTarget({type: SDK.Target.Type.BROWSER});
+      const parentTarget = universe.createTarget({type: SDK.Target.Type.BROWSER});
 
       const getStorageKeyStub = sinon.stub().resolves({
         storageKey: 'https://example.com/' as Protocol.Storage.SerializedStorageKey,
@@ -296,7 +306,7 @@ describeWithMockConnection('ChildTargetManager', () => {
     });
 
     it('should NOT initialize storage for a frame target', async () => {
-      const parentTarget = createTarget();
+      const parentTarget = universe.createTarget();
       const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(parentTarget);
       const initializeStorageSpy =
           sinon.spy(childTargetManager, 'initializeStorage' as keyof typeof childTargetManager);
@@ -311,7 +321,7 @@ describeWithMockConnection('ChildTargetManager', () => {
     });
 
     it('should NOT initialize storage for a worker without STORAGE capability', async () => {
-      const parentTarget = createTarget();
+      const parentTarget = universe.createTarget();
       const childTargetManager = new SDK.ChildTargetManager.ChildTargetManager(parentTarget);
       const initializeStorageSpy =
           sinon.spy(childTargetManager, 'initializeStorage' as keyof typeof childTargetManager);

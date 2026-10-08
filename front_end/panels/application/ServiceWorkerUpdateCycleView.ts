@@ -1,51 +1,144 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import {html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+
+import serviceWorkerUpdateCycleViewStyles from './serviceWorkerUpdateCycleView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in Indexed DBViews of the Application panel
+   * @description Table column header for the version column in the Service Worker update cycle table of the Application panel.
    */
   version: 'Version',
   /**
-   * @description Table heading for Service Workers update information. Update is a noun.
+   * @description Table column header for the update activity column in the Service Worker update cycle table of the Application panel. Update is a noun.
    */
-  updateActivity: 'Update Activity',
+  updateActivity: 'Update activity',
   /**
-   * @description Title for the timeline tab.
+   * @description Table column header for the timeline column in the Service Worker update cycle table of the Application panel.
    */
   timeline: 'Timeline',
   /**
-   * @description Text in Service Workers Update Life Cycle
-   * @example {2} PH1
+   * @description Details row text displaying the start time of a phase in the Service Worker update cycle table of the Application panel.
+   * @example {2026-09-14T15:30:00.000Z} PH1
    */
   startTimeS: 'Start time: {PH1}',
   /**
-   * @description Text for end time of an event
-   * @example {2} PH1
+   * @description Details row text displaying the end time of a phase in the Service Worker update cycle table of the Application panel.
+   * @example {2026-09-14T15:30:00.000Z} PH1
    */
   endTimeS: 'End time: {PH1}',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ServiceWorkerUpdateCycleView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class ServiceWorkerUpdateCycleView {
-  private registration: SDK.ServiceWorkerManager.ServiceWorkerRegistration;
+export interface ViewInput {
+  timeRanges: ServiceWorkerUpdateRange[];
+  expandedRows: Set<string>;
+  onFocus: (event: Event) => void;
+  onKeydown: (event: Event, key: string) => void;
+  onClick: (event: Event, key: string) => void;
+}
+
+export type View = (input: ViewInput, output: unknown, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  let tableRows: LitTemplate|typeof nothing = nothing;
+
+  if (input.timeRanges.length > 0) {
+    const startTimes = input.timeRanges.map(r => r.start);
+    const endTimes = input.timeRanges.map(r => r.end);
+    const startTime = startTimes.reduce((a, b) => Math.min(a, b));
+    const endTime = endTimes.reduce((a, b) => Math.max(a, b));
+    const scale = 100 / (endTime - startTime);
+
+    tableRows = html`${input.timeRanges.map(range => {
+      const phaseName = range.phase;
+      const left = (scale * (range.start - startTime));
+      const right = (scale * (endTime - range.end));
+      const key = `${range.id}-${range.phase}`;
+      const expanded = input.expandedRows.has(key);
+
+      // clang-format off
+      return html`
+        <tr class="service-worker-update-timeline" jslog=${VisualLogging.treeItem('update-timeline').track({
+                      click: true,
+                      resize: true,
+                      keydown: 'ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Enter|Space',
+                    })}>
+          <td class="service-worker-update-timing-bar-clickable" tabindex="0" role="button"
+              aria-expanded=${expanded ? 'true' : 'false'}
+              aria-label=${`#${range.id} ${phaseName}`}
+              @focus=${input.onFocus}
+              @keydown=${(e: Event) => input.onKeydown(e, key)}
+              @click=${(e: Event) => input.onClick(e, key)}
+              jslog=${VisualLogging.expand('timing-info').track({click: true})}>
+            #${range.id}
+          </td>
+          <td>${phaseName}</td>
+          <td>
+            <div class="service-worker-update-timing-row">
+              <span class="service-worker-update-timing-bar ${phaseName.toLowerCase()}"
+                    style="left: ${left}%; right: ${right}%;">\u200B</span>
+            </div>
+          </td>
+        </tr>
+        <tr class="service-worker-update-timing-bar-details ${expanded ? 'service-worker-update-timing-bar-details-expanded' : 'service-worker-update-timing-bar-details-collapsed'}" tabindex="0">
+          <td colspan="3"><span>${i18nString(UIStrings.startTimeS, {PH1: new Date(range.start).toISOString()})}</span></td>
+        </tr>
+        <tr class="service-worker-update-timing-bar-details ${expanded ? 'service-worker-update-timing-bar-details-expanded' : 'service-worker-update-timing-bar-details-collapsed'}" tabindex="0">
+          <td colspan="3"><span>${i18nString(UIStrings.endTimeS, {PH1: new Date(range.end).toISOString()})}</span></td>
+        </tr>
+      `;
+      // clang-format on
+    })}`;
+  }
+
+  // clang-format off
+  render(html`
+    <style>${serviceWorkerUpdateCycleViewStyles}</style>
+    <table class="service-worker-update-timing-table" jslog=${VisualLogging.tree('update-timing-table')}>
+      <tr class="service-worker-update-timing-table-header">
+        <td>${i18nString(UIStrings.version)}</td>
+        <td>${i18nString(UIStrings.updateActivity)}</td>
+        <td>${i18nString(UIStrings.timeline)}</td>
+      </tr>
+      ${tableRows}
+    </table>
+  `, target);
+  // clang-format on
+};
+
+export class ServiceWorkerUpdateCycleView extends UI.Widget.Widget {
+  #registration?: SDK.ServiceWorkerManager.ServiceWorkerRegistration;
   private rows: HTMLTableRowElement[];
   private selectedRowIndex: number;
-  tableElement: HTMLElement;
-  constructor(registration: SDK.ServiceWorkerManager.ServiceWorkerRegistration) {
-    this.registration = registration;
+  private expandedRows = new Set<string>();
+  #view: View;
+
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element);
+    this.#view = view;
     this.rows = [];
     this.selectedRowIndex = -1;
-    this.tableElement = document.createElement('table');
-    this.createTimingTable();
+  }
+
+  set registration(registration: SDK.ServiceWorkerManager.ServiceWorkerRegistration|undefined) {
+    this.#registration = registration;
+    this.requestUpdate();
+  }
+
+  get registration(): SDK.ServiceWorkerManager.ServiceWorkerRegistration|undefined {
+    return this.#registration;
+  }
+
+  set registrationFingerprint(_fingerprint: symbol|undefined) {
+    this.requestUpdate();
   }
 
   calculateServiceWorkerUpdateRanges(): ServiceWorkerUpdateRange[] {
@@ -113,7 +206,10 @@ export class ServiceWorkerUpdateCycleView {
       return ranges;
     }
 
-    const versions = this.registration.versionsByMode();
+    if (!this.#registration) {
+      return [];
+    }
+    const versions = this.#registration.versionsByMode();
     const modes = [
       SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.ACTIVE,
       SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.WAITING,
@@ -132,119 +228,32 @@ export class ServiceWorkerUpdateCycleView {
     return [];
   }
 
-  private createTimingTable(): void {
-    this.tableElement.classList.add('service-worker-update-timing-table');
-    this.tableElement.setAttribute('jslog', `${VisualLogging.tree('update-timing-table')}`);
+  override performUpdate(): void {
     const timeRanges = this.calculateServiceWorkerUpdateRanges();
-    this.updateTimingTable(timeRanges);
-  }
 
-  private createTimingTableHead(): void {
-    const serverHeader = this.tableElement.createChild('tr', 'service-worker-update-timing-table-header');
-    UI.UIUtils.createTextChild(serverHeader.createChild('td'), i18nString(UIStrings.version));
-    UI.UIUtils.createTextChild(serverHeader.createChild('td'), i18nString(UIStrings.updateActivity));
-    UI.UIUtils.createTextChild(serverHeader.createChild('td'), i18nString(UIStrings.timeline));
-  }
+    const input: ViewInput = {
+      timeRanges,
+      expandedRows: this.expandedRows,
+      onFocus: this.onFocus.bind(this),
+      onKeydown: this.onKeydown.bind(this),
+      onClick: this.onClick.bind(this),
+    };
 
-  private removeRows(): void {
-    const rows = this.tableElement.getElementsByTagName('tr');
-    while (rows[0]) {
-      if (rows[0].parentNode) {
-        rows[0].parentNode.removeChild(rows[0]);
-      }
-    }
-    this.rows = [];
-  }
-
-  private updateTimingTable(timeRanges: ServiceWorkerUpdateRange[]): void {
-    this.selectedRowIndex = -1;
-    this.removeRows();
-    this.createTimingTableHead();
-    const timeRangeArray = timeRanges;
-    if (timeRangeArray.length === 0) {
-      return;
-    }
-
-    const startTimes = timeRangeArray.map(r => r.start);
-    const endTimes = timeRangeArray.map(r => r.end);
-    const startTime = startTimes.reduce((a, b) => Math.min(a, b));
-    const endTime = endTimes.reduce((a, b) => Math.max(a, b));
-    const scale = 100 / (endTime - startTime);
-
-    for (const range of timeRangeArray) {
-      const phaseName = range.phase;
-
-      const left = (scale * (range.start - startTime));
-      const right = (scale * (endTime - range.end));
-
-      const tr = this.tableElement.createChild('tr', 'service-worker-update-timeline');
-      tr.setAttribute('jslog', `${VisualLogging.treeItem('update-timeline').track({
-                        click: true,
-                        resize: true,
-                        keydown: 'ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Enter|Space',
-                      })}`);
-      this.rows.push(tr);
-      const timingBarVersionElement = tr.createChild('td');
-      UI.UIUtils.createTextChild(timingBarVersionElement, '#' + range.id);
-      timingBarVersionElement.classList.add('service-worker-update-timing-bar-clickable');
-      timingBarVersionElement.setAttribute('tabindex', '0');
-      timingBarVersionElement.setAttribute('role', 'switch');
-      timingBarVersionElement.addEventListener('focus', (event: Event) => {
-        this.onFocus(event);
-      });
-      timingBarVersionElement.setAttribute('jslog', `${VisualLogging.expand('timing-info').track({click: true})}`);
-      UI.ARIAUtils.setChecked(timingBarVersionElement, false);
-      const timingBarTitleElement = tr.createChild('td');
-      UI.UIUtils.createTextChild(timingBarTitleElement, phaseName);
-      const barContainer = tr.createChild('td').createChild('div', 'service-worker-update-timing-row');
-
-      const bar = barContainer.createChild('span', 'service-worker-update-timing-bar ' + phaseName.toLowerCase());
-
-      bar.style.left = left + '%';
-      bar.style.right = right + '%';
-      bar.textContent = '\u200B';  // Important for 0-time items to have 0 width.
-
-      this.constructUpdateDetails(tr, range);
+    this.#view(input, this, this.contentElement);
+    this.rows =
+        Array.from(this.contentElement.querySelectorAll<HTMLTableRowElement>('.service-worker-update-timeline'));
+    if (this.selectedRowIndex >= this.rows.length) {
+      this.selectedRowIndex = -1;
     }
   }
 
-  /**
-   * Detailed information about an update phase. Currently starting and ending time.
-   */
-  private constructUpdateDetails(tr: HTMLElement, range: ServiceWorkerUpdateRange): void {
-    const startRow = this.tableElement.createChild('tr', 'service-worker-update-timing-bar-details');
-    startRow.classList.add('service-worker-update-timing-bar-details-collapsed');
-    const startTimeItem = startRow.createChild('td');
-    startTimeItem.colSpan = 3;
-    const startTime = (new Date(range.start)).toISOString();
-    UI.UIUtils.createTextChild(startTimeItem.createChild('span'), i18nString(UIStrings.startTimeS, {PH1: startTime}));
-    startRow.tabIndex = 0;
-
-    const endRow = this.tableElement.createChild('tr', 'service-worker-update-timing-bar-details');
-    endRow.classList.add('service-worker-update-timing-bar-details-collapsed');
-    const endTimeItem = endRow.createChild('td');
-    endTimeItem.colSpan = 3;
-    const endTime = (new Date(range.end)).toISOString();
-    UI.UIUtils.createTextChild(endTimeItem.createChild('span'), i18nString(UIStrings.endTimeS, {PH1: endTime}));
-    endRow.tabIndex = 0;
-
-    tr.addEventListener('keydown', (event: Event) => {
-      this.onKeydown(event, startRow, endRow);
-    });
-
-    tr.addEventListener('click', (event: Event) => {
-      this.onClick(event, startRow, endRow);
-    });
-  }
-
-  private toggle(startRow: Element, endRow: Element, target: Element, expanded: boolean): void {
-    if (target.classList.contains('service-worker-update-timing-bar-clickable')) {
-      startRow.classList.toggle('service-worker-update-timing-bar-details-collapsed');
-      startRow.classList.toggle('service-worker-update-timing-bar-details-expanded');
-      endRow.classList.toggle('service-worker-update-timing-bar-details-collapsed');
-      endRow.classList.toggle('service-worker-update-timing-bar-details-expanded');
-      UI.ARIAUtils.setChecked(target, !expanded);
+  private toggle(key: string, expanded: boolean): void {
+    if (expanded) {
+      this.expandedRows.delete(key);
+    } else {
+      this.expandedRows.add(key);
     }
+    this.requestUpdate();
   }
 
   private onFocus(event: Event): void {
@@ -260,21 +269,20 @@ export class ServiceWorkerUpdateCycleView {
     this.selectedRowIndex = this.rows.indexOf(tr);
   }
 
-  private onKeydown(event: Event, startRow: HTMLElement, endRow: HTMLElement): void {
+  private onKeydown(event: Event, key: string): void {
     if (!event.target) {
       return;
     }
-    const target: HTMLElement = event.target as HTMLElement;
     const keyboardEvent = event as KeyboardEvent;
-    const expanded = target.getAttribute('aria-checked') === 'true';
+    const expanded = this.expandedRows.has(key);
 
     if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
-      this.toggle(startRow, endRow, target, expanded);
+      this.toggle(key, expanded);
       event.preventDefault();
       return;
     }
     if ((!expanded && keyboardEvent.key === 'ArrowRight') || (expanded && keyboardEvent.key === 'ArrowLeft')) {
-      this.toggle(startRow, endRow, target, expanded);
+      this.toggle(key, expanded);
       event.preventDefault();
       return;
     }
@@ -346,20 +354,10 @@ export class ServiceWorkerUpdateCycleView {
     this.focusRow(this.rows[this.selectedRowIndex]);
   }
 
-  private onClick(event: Event, startRow: Element, endRow: Element): void {
-    const tr = event.target as Element;
-    if (!tr) {
-      return;
-    }
-
-    const expanded = tr.getAttribute('aria-checked') === 'true';
-    this.toggle(startRow, endRow, tr, expanded);
+  private onClick(event: Event, key: string): void {
+    const expanded = this.expandedRows.has(key);
+    this.toggle(key, expanded);
     event.preventDefault();
-  }
-
-  refresh(): void {
-    const timeRanges = this.calculateServiceWorkerUpdateRanges();
-    this.updateTimingTable(timeRanges);
   }
 }
 

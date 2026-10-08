@@ -18,6 +18,7 @@ import {
   LOGPOINT_SOURCE_URL,
 } from './DebuggerModel.js';
 import {LogModel} from './LogModel.js';
+import {saveVariable} from './PageFunctions.js';
 import {RemoteObject} from './RemoteObject.js';
 import {
   Events as ResourceTreeModelEvents,
@@ -34,8 +35,9 @@ import {
   RuntimeModel,
 } from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
+import {consoleUserActivationEvalSettingDescriptor, preserveConsoleLogSettingDescriptor} from './SDKSettings.js';
 import {Capability, type Target, Type} from './Target.js';
-import {TargetManager} from './TargetManager.js';
+import type {TargetManager} from './TargetManager.js';
 
 export {FrontendMessageType} from './ConsoleModelTypes.js';
 
@@ -55,22 +57,23 @@ const UIStrings = {
    * @description Text shown in the console when a performance profile (with the given name) was started.
    * @example {title} PH1
    */
-  profileSStarted: 'Profile \'\'{PH1}\'\' started.',
+  profileSStarted: 'Profile \'\'{PH1}\'\' started',
   /**
    * @description Text shown in the console when a performance profile (with the given name) was stopped.
    * @example {name} PH1
    */
-  profileSFinished: 'Profile \'\'{PH1}\'\' finished.',
+  profileSFinished: 'Profile \'\'{PH1}\'\' finished',
   /**
    * @description Error message shown in the console after the user tries to save a JavaScript value to a temporary variable.
    */
-  failedToSaveToTempVariable: 'Failed to save to temp variable.',
+  failedToSaveToTempVariable: 'Failed to save to temp variable',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('core/sdk/ConsoleModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ConsoleModel extends SDKModel<EventTypes> {
+  readonly #console: Common.Console.Console;
   #messages: ConsoleMessage[] = [];
   readonly #messagesByTimestamp = new Platform.MapUtilities.Multimap<number, ConsoleMessage>();
   readonly #messageByExceptionId = new Map<RuntimeModel, Map<number, ConsoleMessage>>();
@@ -82,6 +85,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
   constructor(target: Target) {
     super(target);
+    this.#console = target.targetManager().getConsole();
 
     const resourceTreeModel = target.model(ResourceTreeModel);
     if (!resourceTreeModel || resourceTreeModel.cachedResourcesLoaded()) {
@@ -142,7 +146,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
   async evaluateCommandInConsole(
       executionContext: ExecutionContext, originatingMessage: ConsoleMessage, expression: string,
       useCommandLineAPI: boolean): Promise<void> {
-    const result = await executionContext.evaluate(
+    const result = await executionContext.evaluateWithSelectedFrameFallback(
         {
           expression,
           objectGroup: 'console',
@@ -153,13 +157,16 @@ export class ConsoleModel extends SDKModel<EventTypes> {
           replMode: true,
           allowUnsafeEvalBlockedByCSP: false,
         },
-        this.target().targetManager().settings.moduleSetting('console-user-activation-eval').get(),
+        this.target().targetManager().settings.resolve(consoleUserActivationEvalSettingDescriptor).get(),
         /* awaitPromise */ false);
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.ConsoleEvaluated);
     if ('error' in result) {
       return;
     }
-    await Common.Console.Console.instance().showPromise();
+    try {
+      await this.#console.showPromise();
+    } catch {
+    }
     this.dispatchEventToListeners(
         Events.CommandEvaluated,
         {result: result.object, commandMessage: originatingMessage, exceptionDetails: result.exceptionDetails});
@@ -285,7 +292,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
   private clearIfNecessary(): void {
     const settings = this.target().targetManager().settings;
-    if (!settings.moduleSetting('preserve-console-log').get()) {
+    if (!settings.resolve(preserveConsoleLogSettingDescriptor).get()) {
       this.clear();
     }
     ++this.#pageLoadSequenceNumber;
@@ -294,12 +301,12 @@ export class ConsoleModel extends SDKModel<EventTypes> {
   private primaryPageChanged(
       event: Common.EventTarget.EventTargetEvent<{frame: ResourceTreeFrame, type: PrimaryPageChangeType}>): void {
     const settings = this.target().targetManager().settings;
-    if (settings.moduleSetting('preserve-console-log').get()) {
+    if (settings.resolve(preserveConsoleLogSettingDescriptor).get()) {
       const {frame} = event.data;
       if (frame.backForwardCacheDetails.restoredFromCache) {
-        Common.Console.Console.instance().log(i18nString(UIStrings.bfcacheNavigation, {PH1: frame.url}));
+        this.#console.log(i18nString(UIStrings.bfcacheNavigation, {PH1: frame.url}));
       } else {
-        Common.Console.Console.instance().log(i18nString(UIStrings.navigatedToS, {PH1: frame.url}));
+        this.#console.log(i18nString(UIStrings.navigatedToS, {PH1: frame.url}));
       }
     }
   }
@@ -355,7 +362,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
   }
 
   // messages[] are not ordered by timestamp.
-  static allMessagesUnordered(targetManager: TargetManager = TargetManager.instance()): ConsoleMessage[] {
+  static allMessagesUnordered(targetManager: TargetManager): ConsoleMessage[] {
     const messages = [];
     for (const target of targetManager.targets()) {
       const targetMessages = target.model(ConsoleModel)?.messages() || [];
@@ -364,7 +371,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
     return messages;
   }
 
-  static requestClearMessages(targetManager: TargetManager = TargetManager.instance()): void {
+  static requestClearMessages(targetManager: TargetManager): void {
     for (const logModel of targetManager.models(LogModel)) {
       logModel.requestClear();
     }
@@ -392,7 +399,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
     return this.#errors;
   }
 
-  static allErrors(targetManager: TargetManager = TargetManager.instance()): number {
+  static allErrors(targetManager: TargetManager): number {
     let errors = 0;
     for (const target of targetManager.targets()) {
       errors += target.model(ConsoleModel)?.errors() || 0;
@@ -404,7 +411,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
     return this.#warnings;
   }
 
-  static allWarnings(targetManager: TargetManager = TargetManager.instance()): number {
+  static allWarnings(targetManager: TargetManager): number {
     let warnings = 0;
     for (const target of targetManager.targets()) {
       warnings += target.model(ConsoleModel)?.warnings() || 0;
@@ -418,6 +425,14 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
   async saveToTempVariable(currentExecutionContext: ExecutionContext|null, remoteObject: RemoteObject|null):
       Promise<void> {
+    const failedToSave = (result: RemoteObject|null): void => {
+      let message = i18nString(UIStrings.failedToSaveToTempVariable);
+      if (result) {
+        message = (message + ' ' + result.description as Common.UIString.LocalizedString);
+      }
+      this.#console.error(message);
+    };
+
     if (!remoteObject || !currentExecutionContext) {
       failedToSave(null);
       return;
@@ -443,26 +458,6 @@ export class ConsoleModel extends SDKModel<EventTypes> {
     }
     if (callFunctionResult.object) {
       callFunctionResult.object.release();
-    }
-
-    function saveVariable(this: Window, value: Protocol.Runtime.CallArgument): string {
-      const prefix = 'temp';
-      let index = 1;
-      while ((prefix + index) in this) {
-        ++index;
-      }
-      const name = prefix + index;
-      // @ts-expect-error Assignment to global object
-      this[name] = value;
-      return name;
-    }
-
-    function failedToSave(result: RemoteObject|null): void {
-      let message = i18nString(UIStrings.failedToSaveToTempVariable);
-      if (result) {
-        message = (message + ' ' + result.description as Common.UIString.LocalizedString);
-      }
-      Common.Console.Console.instance().error(message);
     }
   }
 }
@@ -547,6 +542,7 @@ export interface ConsoleMessageDetails {
   context?: string;
   affectedResources?: AffectedResources;
   category?: Protocol.Log.LogEntryCategory;
+  exceptionDetails?: Protocol.Runtime.ExceptionDetails;
 }
 
 export class ConsoleMessage {
@@ -570,6 +566,7 @@ export class ConsoleMessage {
   #exceptionId?: number = undefined;
   #affectedResources?: AffectedResources;
   category?: Protocol.Log.LogEntryCategory;
+  readonly exceptionDetails?: Protocol.Runtime.ExceptionDetails;
 
   /**
    * The parent frame of the `console.log` call of logpoints or conditional breakpoints
@@ -600,6 +597,7 @@ export class ConsoleMessage {
     this.workerId = details?.workerId;
     this.#affectedResources = details?.affectedResources;
     this.category = details?.category;
+    this.exceptionDetails = details?.exceptionDetails;
 
     if (!this.#executionContextId && this.#runtimeModel) {
       if (this.scriptId) {
@@ -646,6 +644,7 @@ export class ConsoleMessage {
       executionContextId: exceptionDetails.executionContextId,
       scriptId: exceptionDetails.scriptId,
       affectedResources,
+      exceptionDetails,
     };
     return new ConsoleMessage(
         runtimeModel, Protocol.Log.LogEntrySource.Javascript, Protocol.Log.LogEntryLevel.Error,
@@ -787,7 +786,7 @@ export type MessageSource = Protocol.Log.LogEntrySource|Common.Console.FrontendM
 export type MessageLevel = Protocol.Log.LogEntryLevel;
 export type MessageType = Protocol.Runtime.ConsoleAPICalledEventType|FrontendMessageType;
 
-export const MessageSourceDisplayName = new Map<MessageSource, string>(([
+export const MessageSourceDisplayName: Map<MessageSource, string> = new Map<MessageSource, string>(([
   [Protocol.Log.LogEntrySource.XML, 'xml'],
   [Protocol.Log.LogEntrySource.Javascript, 'javascript'],
   [Protocol.Log.LogEntrySource.Network, 'network'],

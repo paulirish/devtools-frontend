@@ -7,11 +7,10 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Annotations from '../../models/annotations/annotations.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import {type LitTemplate, render} from '../../ui/lit/lit.js';
+import {type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as Geometry from '../geometry/geometry.js';
 import {createIcon, Icon} from '../kit/kit.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -25,44 +24,41 @@ import {Events as ZoomManagerEvents, ZoomManager} from './ZoomManager.js';
 
 const UIStrings = {
   /**
-   * @description The aria label for the button to open more tabs at the right tabbed pane in Elements tools
+   * @description Tooltip and accessible label for the more tabs dropdown button in a tab strip.
    */
   moreTabs: 'More tabs',
   /**
-   * @description Text in Tabbed Pane
-   * @example {tab} PH1
+   * @description Tooltip text and accessible label for the close button on a tab in a tab strip.
+   * @example {Console} PH1
    */
   closeS: 'Close {PH1}',
   /**
-   * @description Text to close something
+   * @description Context menu item to close the selected tab in a tab strip.
    */
   close: 'Close',
   /**
-   * @description Text on a menu option to close other drawers when right click on a drawer title
+   * @description Context menu item to close other tabs in a tab strip.
    */
   closeOthers: 'Close others',
   /**
-   * @description Text on a menu option to close the drawer to the right when right click on a drawer title
+   * @description Context menu item to close all tabs to the right of the selected tab in a tab strip.
    */
   closeTabsToTheRight: 'Close tabs to the right',
   /**
-   * @description Text on a menu option to close all the drawers except Console when right click on a drawer title
+   * @description Context menu item to close all tabs in a tab strip.
    */
   closeAll: 'Close all',
   /**
-   * @description Indicates that a tab contains a preview feature (i.e., a beta / experimental feature).
+   * @description Tooltip text and accessible label indicating that a tab contains a preview feature.
    */
   previewFeature: 'Preview feature',
+
   /**
-   * @description Indicates that a tab contains annotation(s).
-   */
-  panelContainsAnnotation: 'This panel has one or more annotations',
-  /**
-   * @description Text to move a tab forwar.
+   * @description Context menu item to move a tab to the right in a tab strip.
    */
   moveTabRight: 'Move right',
   /**
-   * @description Text to move a tab backward.
+   * @description Context menu item to move a tab to the left in a tab strip.
    */
   moveTabLeft: 'Move left',
 } as const;
@@ -83,7 +79,11 @@ export interface TabInfo {
   selected?: boolean;
 }
 
-export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof VBox>(VBox) {
+const TabbedPaneBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof VBox> = Common.ObjectWrapper.eventMixin(
+    VBox,
+);
+
+export class TabbedPane extends TabbedPaneBase {
   readonly #headerElement: HTMLElement;
   protected readonly headerContentsElement: HTMLElement;
   tabSlider: HTMLDivElement;
@@ -103,7 +103,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private delegate?: TabbedPaneTabDelegate;
   private currentTab?: TabbedPaneTab;
   private sliderEnabled?: boolean;
-  private placeholderElement?: Element;
+  private placeholderElement?: Element|LitTemplate;
   private focusedPlaceholderElement?: Element;
   private placeholderContainerElement?: HTMLElement;
   private lastSelectedOverflowTab?: TabbedPaneTab;
@@ -120,6 +120,8 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.registerRequiredCSS(tabbedPaneStyles);
     this.element.classList.add('tabbed-pane');
     this.contentElement.classList.add('tabbed-pane-shadow');
+    this.element.classList.add('flex-auto', 'vbox');
+    this.contentElement.classList.add('flex-auto', 'vbox');
     this.contentElement.tabIndex = -1;
     this.setDefaultFocusedElement(this.contentElement);
     this.#headerElement = this.contentElement.createChild('div', 'tabbed-pane-header');
@@ -180,15 +182,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.currentDevicePixelRatio = window.devicePixelRatio;
     ZoomManager.instance().addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.zoomChanged, this);
     this.makeTabSlider();
-
-    if (Annotations.AnnotationRepository.annotationsEnabled()) {
-      Annotations.AnnotationRepository.instance().addEventListener(
-          Annotations.Events.ANNOTATION_ADDED, this.#onUpdateAnnotations, this);
-      Annotations.AnnotationRepository.instance().addEventListener(
-          Annotations.Events.ANNOTATION_DELETED, this.#onUpdateAnnotations, this);
-      Annotations.AnnotationRepository.instance().addEventListener(
-          Annotations.Events.ALL_ANNOTATIONS_DELETED, this.#onUpdateAnnotations, this);
-    }
   }
 
   setAccessibleName(name: string): void {
@@ -275,9 +268,8 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.delegate = delegate;
   }
 
-  appendTab(
-      id: string, tabTitle: string, view: AnyWidget, tabTooltip?: string, userGesture?: boolean, isCloseable?: boolean,
-      isPreviewFeature?: boolean, index?: number, jslogContext?: string): void {
+  appendTab(id: string, tabTitle: string, view: AnyWidget, tabTooltip?: string, userGesture?: boolean,
+            isCloseable?: boolean, isPreviewFeature?: boolean, index?: number, jslogContext?: string): void {
     const closeable = typeof isCloseable === 'boolean' ? isCloseable : Boolean(this.closeableTabs);
     const tab =
         new TabbedPaneTab(this, id, tabTitle, closeable, Boolean(isPreviewFeature), view, tabTooltip, jslogContext);
@@ -337,9 +329,13 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     this.tabsHistory.splice(this.tabsHistory.indexOf(tab), 1);
     this.#tabs.splice(this.#tabs.indexOf(tab), 1);
+    if (this.lastSelectedOverflowTab === tab) {
+      delete this.lastSelectedOverflowTab;
+    }
     if (tab.shown) {
       this.hideTabElement(tab);
     }
+    tab.clearSlots();
 
     const eventData: EventData = {tabId: id, view: tab.view, isUserGesture: userGesture};
     this.dispatchEventToListeners(Events.TabClosed, eventData);
@@ -518,6 +514,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   protected clearMeasuredWidths(): void {
+    delete this.measuredDropDownButtonWidth;
     for (let i = 0; i < this.#tabs.length; ++i) {
       delete this.#tabs[i].measuredWidth;
     }
@@ -572,47 +569,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
                           }));
   }
 
-  set tabs(tabs: TabInfo[]) {
-    const newIds = new Set(tabs.map(tab => tab.id));
-    for (const id of this.tabsById.keys()) {
-      if (!newIds.has(id)) {
-        this.#closeTab(id);
-      }
-    }
-    let index = 0;
-    for (const tab of tabs) {
-      const existingTab = this.tabsById.get(tab.id);
-      if (existingTab) {
-        this.changeTabView(tab.id, tab.view);
-        this.changeTabTitle(tab.id, tab.title, tab.tabTooltip);
-        if (tab.jslogContext !== undefined) {
-          existingTab.jslogContext = tab.jslogContext;
-        }
-        if (tab.isCloseable !== undefined) {
-          existingTab.closeable = tab.isCloseable;
-        }
-        if (tab.previewFeature !== undefined) {
-          existingTab.previewFeature = tab.previewFeature;
-        }
-        const currentIndex = this.#tabs.indexOf(existingTab);
-        if (currentIndex !== index) {
-          this.insertBefore(existingTab, index);
-        }
-      } else {
-        this.appendTab(
-            tab.id, tab.title, tab.view, tab.tabTooltip, /* userGesture=*/ false, tab.isCloseable, tab.previewFeature,
-            index, tab.jslogContext);
-      }
-      if (tab.enabled !== undefined) {
-        this.setTabEnabled(tab.id, tab.enabled);
-      }
-      if (tab.selected) {
-        this.selectTab(tab.id);
-      }
-      ++index;
-    }
-  }
-
   override onResize(): void {
     if (this.currentDevicePixelRatio !== window.devicePixelRatio) {
       // Force recalculation of all tab widths on a DPI change
@@ -664,49 +620,24 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return constraints;
   }
 
-  setPlaceholderElement(element: Element, focusedElement?: Element): void {
+  setPlaceholderElement(element: Element|LitTemplate, focusedElement?: Element): void {
     this.placeholderElement = element;
     if (focusedElement) {
       this.focusedPlaceholderElement = focusedElement;
     }
     if (this.placeholderContainerElement) {
-      this.placeholderContainerElement.removeChildren();
-      this.placeholderContainerElement.appendChild(element);
+      if (element instanceof Element) {
+        render(nothing, this.placeholderContainerElement);
+        this.placeholderContainerElement.removeChildren();
+        this.placeholderContainerElement.appendChild(element);
+      } else {
+        render(element, this.placeholderContainerElement);
+      }
     }
   }
 
   async waitForTabElementUpdate(): Promise<void> {
     this.performUpdate();
-  }
-
-  updateTabAnnotationIcons(): void {
-    if (!Annotations.AnnotationRepository.annotationsEnabled()) {
-      return;
-    }
-
-    const annotations = Annotations.AnnotationRepository.instance();
-    if (!annotations) {
-      return;
-    }
-
-    for (const tab of this.tabs) {
-      let primaryType = -1;
-      let secondaryType = -1;
-      switch (tab.id) {
-        case 'elements':
-          primaryType = Annotations.AnnotationType.ELEMENT_NODE;
-          secondaryType = Annotations.AnnotationType.STYLE_RULE;
-          break;
-        case 'network':
-          primaryType = Annotations.AnnotationType.NETWORK_REQUEST;
-          secondaryType = Annotations.AnnotationType.NETWORK_REQUEST_SUBPANEL_HEADERS;
-          break;
-      }
-
-      const showTabAnnotationIcon = annotations.getAnnotationDataByType(primaryType).length > 0 ||
-          annotations.getAnnotationDataByType(secondaryType).length > 0;
-      this.setTabAnnotationIcon(tab.id, showTabAnnotationIcon);
-    }
   }
 
   override performUpdate(): void {
@@ -718,7 +649,11 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.#contentElement.classList.add('has-no-tabs');
       if (this.placeholderElement && !this.placeholderContainerElement) {
         this.placeholderContainerElement = this.#contentElement.createChild('div', 'tabbed-pane-placeholder fill');
-        this.placeholderContainerElement.appendChild(this.placeholderElement);
+        if (this.placeholderElement instanceof Element) {
+          this.placeholderContainerElement.appendChild(this.placeholderElement);
+        } else {
+          render(this.placeholderElement, this.placeholderContainerElement);
+        }
         if (this.focusedPlaceholderElement) {
           this.setDefaultFocusedElement(this.focusedPlaceholderElement);
         }
@@ -737,7 +672,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateWidths();
     this.updateTabsDropDown();
     this.updateTabSlider();
-    this.updateTabAnnotationIcons();
   }
 
   private adjustToolbarWidth(): void {
@@ -750,10 +684,9 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (!this.#rightToolbar.hasCompactLayout() &&
         totalWidth - rightToolbarWidth - leftToolbarWidth < this.measuredDropDownButtonWidth + 10) {
       this.#rightToolbar.setCompactLayout(true);
-    } else if (
-        this.#rightToolbar.hasCompactLayout() &&
-        // Estimate the right toolbar size in non-compact mode as 2 times its compact size.
-        totalWidth - 2 * rightToolbarWidth - leftToolbarWidth > this.measuredDropDownButtonWidth + 10) {
+    } else if (this.#rightToolbar.hasCompactLayout() &&
+               // Estimate the right toolbar size in non-compact mode as 2 times its compact size.
+               totalWidth - 2 * rightToolbarWidth - leftToolbarWidth > this.measuredDropDownButtonWidth + 10) {
       this.#rightToolbar.setCompactLayout(false);
     }
   }
@@ -807,11 +740,11 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
         continue;
       }
       if (this.numberOfTabsShown() === 0 && this.tabsHistory[0] === tab) {
-        menu.defaultSection().appendCheckboxItem(
-            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {checked: true, jslogContext: tab.jslogContext});
+        menu.defaultSection().appendCheckboxItem(tab.title, this.dropDownMenuItemSelected.bind(this, tab),
+                                                 {checked: true, jslogContext: tab.jslogContext});
       } else {
-        menu.defaultSection().appendItem(
-            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {jslogContext: tab.jslogContext});
+        menu.defaultSection().appendItem(tab.title, this.dropDownMenuItemSelected.bind(this, tab),
+                                         {jslogContext: tab.jslogContext});
       }
     }
     void menu.show().then(() => ARIAUtils.setExpanded(this.dropDownButton, menu.isHostedMenuOpen()));
@@ -885,7 +818,8 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private maybeShowDropDown(hasMoreTabs: boolean): void {
     // The legacy chevron is suppressed when a trailing-button slot is
     // populated; the slotted element takes its place.
-    const shouldShow = this.#trailingSlot.assignedElements().length === 0 && hasMoreTabs;
+    const shouldShow = this.#trailingSlot.assignedElements().length === 0 && hasMoreTabs &&
+        this.totalWidth() >= (this.measuredDropDownButtonWidth || 0);
     if (shouldShow && !this.dropDownButton.parentElement) {
       this.headerContentsElement.appendChild(this.dropDownButton);
     } else if (!shouldShow && this.dropDownButton.parentElement) {
@@ -985,7 +919,10 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.dropDownButton.classList.add('measuring');
     this.headerContentsElement.appendChild(this.dropDownButton);
-    this.measuredDropDownButtonWidth = this.dropDownButton.getBoundingClientRect().width;
+    const width = this.dropDownButton.getBoundingClientRect().width;
+    if (width > 0) {
+      this.measuredDropDownButtonWidth = width;
+    }
     this.headerContentsElement.removeChild(this.dropDownButton);
     this.dropDownButton.classList.remove('measuring');
   }
@@ -1067,9 +1004,8 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return totalWidth / measuredWidths.length;
   }
 
-  private tabsToShowIndexes(
-      tabsOrdered: TabbedPaneTab[], tabsHistory: TabbedPaneTab[], totalWidth: number,
-      measuredDropDownButtonWidth: number): number[] {
+  private tabsToShowIndexes(tabsOrdered: TabbedPaneTab[], tabsHistory: TabbedPaneTab[], totalWidth: number,
+                            measuredDropDownButtonWidth: number): number[] {
     const tabsToShowIndexes = [];
 
     let totalTabsWidth = 0;
@@ -1207,17 +1143,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.automaticReorder = automatic;
   }
 
-  setTabAnnotationIcon(id: string, iconVisible: boolean): void {
-    const tab = this.tabsById.get(id);
-    if (tab) {
-      tab.tabAnnotationIcon = iconVisible;
-    }
-  }
-
-  #onUpdateAnnotations(): void {
-    this.updateTabAnnotationIcons();
-  }
-
   private keyDown(event: KeyboardEvent): void {
     if (!this.currentTab) {
       return;
@@ -1288,7 +1213,6 @@ export interface EventTypes {
 export class TabbedPaneTab {
   closeable: boolean;
   previewFeature = false;
-  #tabAnnotationIcon = false;
   private readonly tabbedPane: TabbedPane;
   #id: string;
   #title: string;
@@ -1299,15 +1223,20 @@ export class TabbedPaneTab {
   #tabElement!: HTMLElement|undefined;
   private icon: Icon|null = null;
   private suffixElement: HTMLElement|LitTemplate|null = null;
+  // The containers of the `icon-<id>` and `suffix-<id>` slots of the tab header.
+  readonly #slotContainers: {icon?: HTMLElement, suffix?: HTMLElement} = {};
+  // Whether elements are assigned to these slots.
+  readonly #hasSlottedContent = {icon: false, suffix: false};
+  // Last known width of these containers.
+  readonly #slotContainerWidths = {icon: 0, suffix: 0};
 
   #width?: number;
   private delegate?: TabbedPaneTabDelegate;
   private titleElement?: HTMLElement;
   private dragStartX?: number;
   #jslogContext?: string;
-  constructor(
-      tabbedPane: TabbedPane, id: string, title: string, closeable: boolean, previewFeature: boolean, view: AnyWidget,
-      tooltip?: string, jslogContext?: string) {
+  constructor(tabbedPane: TabbedPane, id: string, title: string, closeable: boolean, previewFeature: boolean,
+              view: AnyWidget, tooltip?: string, jslogContext?: string) {
     this.closeable = closeable;
     this.previewFeature = previewFeature;
     this.tabbedPane = tabbedPane;
@@ -1347,42 +1276,6 @@ export class TabbedPaneTab {
 
   set jslogContext(jslogContext: string|undefined) {
     this.#jslogContext = jslogContext;
-  }
-
-  get tabAnnotationIcon(): boolean {
-    return this.#tabAnnotationIcon;
-  }
-
-  set tabAnnotationIcon(iconVisible: boolean) {
-    if (this.#tabAnnotationIcon === iconVisible) {
-      return;
-    }
-    this.#tabAnnotationIcon = iconVisible;
-    if (!this.#tabElement) {
-      return;
-    }
-    const iconElement = this.#tabElement.querySelector('.spark');
-    if (iconVisible) {
-      if (!iconElement) {
-        const spark = this.createTabAnnotationIcon();
-        this.#tabElement.appendChild(spark);
-
-        const parentRect = this.#tabElement.parentElement?.getBoundingClientRect();
-        if (!parentRect) {
-          return;
-        }
-        const containerRect = this.tabElement.getBoundingClientRect();
-        const iconWidth = spark.getBoundingClientRect().width;
-        // Position the icon so that its right edge is at the container's right edge.
-        const x = containerRect.x - parentRect.x + containerRect.width - iconWidth;
-        (spark as HTMLElement).style.left = `${x}px`;
-      }
-    } else {
-      iconElement?.remove();
-    }
-    this.#tabElement.classList.toggle('ai', iconVisible);
-    delete this.measuredWidth;
-    this.tabbedPane.requestUpdate();
   }
 
   isCloseable(): boolean {
@@ -1496,6 +1389,62 @@ export class TabbedPaneTab {
     tabSuffixElements.set(tabElement, suffixElementContainer);
   }
 
+  /**
+   * Adds a slot for the `slot="icon-<id>"` or `slot="suffix-<id>"` children
+   * of the TabbedPaneElement to the tab header. The container is hidden
+   * while nothing is assigned to the slot.
+   */
+  #createSlotContainer(titleElement: Element, kind: 'icon'|'suffix', measuring: boolean): void {
+    if (measuring && !this.#hasSlottedContent[kind]) {
+      return;
+    }
+    const container = document.createElement('span');
+    container.classList.add(kind === 'icon' ? 'tabbed-pane-header-tab-icon' : 'tabbed-pane-header-tab-suffix-element',
+                            'tabbed-pane-header-tab-slot-container');
+    titleElement.insertAdjacentElement(kind === 'icon' ? 'beforebegin' : 'afterend', container);
+    if (measuring) {
+      // Slotted content can't be cloned, so like `createMeasureClone`, give
+      // the container the size of the real one instead.
+      const width = this.#measureSlotContainer(kind);
+      if (width > 0) {
+        container.style.boxSizing = 'border-box';
+        container.style.width = `${width}px`;
+      }
+      return;
+    }
+    const slot = container.createChild('slot');
+    slot.name = `${kind}-${this.#id}`;
+    this.#slotContainers[kind] = container;
+    container.style.display = 'none';
+    // Listen on the container (slotchange bubbles) rather than the slot itself:
+    // Blink's SlotAssignment caches <slot> elements in its ShadowRoot until the
+    // next slot assignment recalc, so anything retained by the <slot> stays
+    // alive after the tab is closed if no recalc follows.
+    container.addEventListener('slotchange', () => {
+      this.#hasSlottedContent[kind] = slot.assignedElements().length > 0;
+      container.style.display = this.#hasSlottedContent[kind] ? '' : 'none';
+      delete this.measuredWidth;
+      this.tabbedPane.requestUpdate();
+    });
+  }
+
+  clearSlots(): void {
+    // Detach the <slot> elements from the tab header so that Blink's
+    // SlotAssignment cache cannot retain the tab element (and through its
+    // listeners, this TabbedPaneTab and its view) via parent pointers.
+    this.#slotContainers.icon?.removeChildren();
+    this.#slotContainers.suffix?.removeChildren();
+  }
+
+  #measureSlotContainer(kind: 'icon'|'suffix'): number {
+    // The container isn't rendered while the tab header isn't shown.
+    const width = this.#slotContainers[kind]?.getBoundingClientRect().width ?? 0;
+    if (width > 0) {
+      this.#slotContainerWidths[kind] = width;
+    }
+    return this.#slotContainerWidths[kind];
+  }
+
   private createMeasureClone(original: Icon): Element {
     // Cloning doesn't work for the icon component because the shadow
     // root isn't copied, but it is sufficient to create a div styled
@@ -1519,6 +1468,8 @@ export class TabbedPaneTab {
     Tooltip.install(titleElement, this.tooltip || '');
     this.createIconElement(tabElement, titleElement, measuring);
     this.createSuffixElement(tabElement, titleElement, measuring);
+    this.#createSlotContainer(titleElement, 'icon', measuring);
+    this.#createSlotContainer(titleElement, 'suffix', measuring);
     if (!measuring) {
       this.titleElement = titleElement;
     }
@@ -1527,12 +1478,6 @@ export class TabbedPaneTab {
       const previewIcon = this.createPreviewIcon();
       tabElement.appendChild(previewIcon);
       tabElement.classList.add('preview');
-    }
-
-    if (this.tabAnnotationIcon) {
-      const tabAnnotationIcon = this.createTabAnnotationIcon();
-      tabElement.appendChild(tabAnnotationIcon);
-      tabElement.classList.add('ai');
     }
 
     if (this.closeable) {
@@ -1552,23 +1497,12 @@ export class TabbedPaneTab {
 
       tabElement.addEventListener('contextmenu', this.tabContextMenu.bind(this), false);
       if (this.tabbedPane.allowTabReorder) {
-        installDragHandle(
-            tabElement, this.startTabDragging.bind(this), this.tabDragging.bind(this), this.endTabDragging.bind(this),
-            null, null, 200);
+        installDragHandle(tabElement, this.startTabDragging.bind(this), this.tabDragging.bind(this),
+                          this.endTabDragging.bind(this), null, null, 200);
       }
     }
 
     return tabElement as HTMLElement;
-  }
-
-  private createTabAnnotationIcon(): Icon {
-    const tabAnnotationIcon = new Icon();
-    tabAnnotationIcon.name = 'spark';
-    tabAnnotationIcon.classList.add('small');
-    tabAnnotationIcon.classList.add('spark');
-    tabAnnotationIcon.setAttribute('title', i18nString(UIStrings.panelContainsAnnotation));
-    tabAnnotationIcon.setAttribute('aria-label', i18nString(UIStrings.panelContainsAnnotation));
-    return tabAnnotationIcon;
   }
 
   private createCloseIconButton(): Buttons.Button.Button {
@@ -1677,25 +1611,24 @@ export class TabbedPaneTab {
     const contextMenu = new ContextMenu(event);
     if (this.closeable) {
       contextMenu.defaultSection().appendItem(i18nString(UIStrings.close), close.bind(this), {jslogContext: 'close'});
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.closeOthers), closeOthers.bind(this), {jslogContext: 'close-others'});
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.closeTabsToTheRight), closeToTheRight.bind(this),
-          {jslogContext: 'close-tabs-to-the-right'});
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.closeAll), closeAll.bind(this), {jslogContext: 'close-all'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.closeOthers), closeOthers.bind(this),
+                                              {jslogContext: 'close-others'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.closeTabsToTheRight), closeToTheRight.bind(this),
+                                              {jslogContext: 'close-tabs-to-the-right'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.closeAll), closeAll.bind(this),
+                                              {jslogContext: 'close-all'});
     }
     if (this.delegate) {
       this.delegate.onContextMenu(this.id, contextMenu);
     }
     const tabIndex = this.tabbedPane.getTabIndex(this.id);
     if (tabIndex > 0) {
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.moveTabLeft), moveTabBackward.bind(this, tabIndex), {jslogContext: 'move-tab-backward'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.moveTabLeft), moveTabBackward.bind(this, tabIndex),
+                                              {jslogContext: 'move-tab-backward'});
     }
     if (tabIndex < this.tabbedPane.tabsElement.childNodes.length - 1) {
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.moveTabRight), moveTabForward.bind(this, tabIndex), {jslogContext: 'move-tab-forward'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.moveTabRight), moveTabForward.bind(this, tabIndex),
+                                              {jslogContext: 'move-tab-forward'});
     }
     void contextMenu.show();
   }
@@ -1773,34 +1706,115 @@ export interface TabbedPaneTabDelegate {
   onContextMenu(tabId: string, contextMenu: ContextMenu): void;
 }
 
+/**
+ * Declarative version of the TabbedPane. Each child element with an `id` is a
+ * tab, e.g.
+ *
+ * ```html
+ * <devtools-tabbed-pane>
+ *   <div id="tab1" title="Tab 1">Content 1</div>
+ *   <devtools-icon slot="icon-tab1" name="warning"></devtools-icon>
+ *   <span slot="suffix-tab1">*</span>
+ * </devtools-tabbed-pane>
+ * ```
+ *
+ * Children with `slot="icon-<tab id>"` and `slot="suffix-<tab id>"` are shown
+ * before and after the title in the header of that tab.
+ */
 export class TabbedPaneElement extends WidgetElement<TabbedPane> {
+  #closeableTabs = false;
+  #allowTabReorder = false;
+  #automaticReorder = false;
+
+  set closeableTabs(closeable: boolean) {
+    this.#closeableTabs = closeable;
+    this.getWidget()?.setCloseableTabs(closeable);
+  }
+
+  set allowTabReorder(allow: boolean) {
+    this.#allowTabReorder = allow;
+    this.getWidget()?.setAllowTabReorder(this.#allowTabReorder, this.#automaticReorder);
+  }
+
+  set automaticReorder(automatic: boolean) {
+    this.#automaticReorder = automatic;
+    this.getWidget()?.setAllowTabReorder(this.#allowTabReorder, this.#automaticReorder);
+  }
+
+  get tabs(): TabInfo[] {
+    const widget = Widget.getOrCreateWidget(this) as TabbedPane;
+    if (widget) {
+      this.#updateTabs(widget);
+      return widget.tabs;
+    }
+    return [];
+  }
+
+  #delegate?: TabbedPaneTabDelegate;
+  set tabDelegate(delegate: TabbedPaneTabDelegate) {
+    this.#delegate = delegate;
+    this.getWidget()?.setTabDelegate(delegate);
+  }
+
+  #placeholderElement?: Element|LitTemplate;
+  #headerJslog?: string;
+  #managedTabIds = new Set<string>();
+  set placeholder(element: Element|LitTemplate) {
+    this.#placeholderElement = element;
+    this.getWidget()?.setPlaceholderElement(element);
+  }
+
+  set headerJslog(jslog: string) {
+    this.#headerJslog = jslog;
+    this.getWidget()?.headerElement().setAttribute('jslog', jslog);
+  }
+
   readonly #tabObserver = new MutationObserver(() => this.#updateTabs());
 
   constructor() {
     super();
 
-    registerWidgetConfig(this, widgetConfig(element => {
-                           const widget = new TabbedPane(element as TabbedPaneElement);
-                           const slot = widget.contentElement.querySelector('slot:not([name])');
-                           if (slot) {
-                             slot.addEventListener('slotchange', () => this.#syncTabs());
-                           }
-                           widget.addEventListener(Events.TabSelected, () => {
-                             const slot =
-                                 widget.contentElement.querySelector('slot:not([name])') as HTMLSlotElement | null;
-                             const nodes = slot ? slot.assignedElements() : [];
-                             for (const child of nodes) {
-                               if (child.id === widget.selectedTabId) {
-                                 child.setAttribute('selected', '');
-                               } else {
-                                 child.removeAttribute('selected');
-                               }
-                             }
-                             this.dispatchEvent(new CustomEvent('select', {detail: {tabId: widget.selectedTabId}}));
-                           });
-                           this.#syncTabs(widget);
-                           return widget;
-                         }));
+    registerWidgetConfig(
+        this, widgetConfig(element => {
+          const widget = new TabbedPane(element as TabbedPaneElement);
+          widget.setCloseableTabs(this.#closeableTabs);
+          widget.setAllowTabReorder(this.#allowTabReorder, this.#automaticReorder);
+          if (this.#delegate) {
+            widget.setTabDelegate(this.#delegate);
+          }
+          if (this.#headerJslog) {
+            widget.headerElement().setAttribute('jslog', this.#headerJslog);
+          }
+          const slot = widget.contentElement.querySelector('slot:not([name])');
+          if (slot) {
+            slot.addEventListener('slotchange', () => this.#syncTabs());
+          }
+          widget.addEventListener(Events.TabSelected, event => {
+            const nodes = this.#getTabNodes(widget);
+            for (const child of nodes) {
+              if (child.id === widget.selectedTabId) {
+                child.setAttribute('selected', '');
+              } else {
+                child.removeAttribute('selected');
+              }
+            }
+            this.dispatchEvent(new CustomEvent(
+                'select', {detail: {tabId: widget.selectedTabId, isUserGesture: event.data?.isUserGesture}}));
+          });
+          widget.addEventListener(Events.TabClosed, event => {
+            this.dispatchEvent(
+                new CustomEvent('close', {detail: {tabId: event.data.tabId, isUserGesture: event.data.isUserGesture}}));
+          });
+          widget.addEventListener(Events.TabOrderChanged, event => {
+            this.dispatchEvent(
+                new CustomEvent('taborderchanged', {detail: {tabId: event.data.tabId, tabIds: widget.tabIds()}}));
+          });
+          if (this.#placeholderElement) {
+            widget.setPlaceholderElement(this.#placeholderElement);
+          }
+          this.#syncTabs(widget);
+          return widget;
+        }));
   }
 
   override disconnectedCallback(): void {
@@ -1818,12 +1832,19 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
 
   #updateObserver(widget: TabbedPane): void {
     this.#tabObserver.disconnect();
-    const slot = widget.contentElement.querySelector('slot:not([name])') as HTMLSlotElement | null;
-    const nodes = slot ? slot.assignedElements() : [];
+    const nodes = this.#getTabNodes(widget);
     for (const child of nodes) {
-      this.#tabObserver.observe(
-          child, {attributes: true, attributeFilter: ['title', 'jslogcontext', 'selected', 'disabled']});
+      this.#tabObserver.observe(child, {
+        attributes: true,
+        attributeFilter: ['title', 'jslogcontext', 'selected', 'disabled', 'closeable', 'uncloseable'],
+      });
     }
+  }
+
+  #getTabNodes(widget: TabbedPane): Element[] {
+    return Array.from(widget.element.children)
+        .filter(c => c.id !== '' && !c.hasAttribute('slot') && !c.classList.contains('tabbed-pane-header') &&
+                    !c.classList.contains('tabbed-pane-content'));
   }
 
   #updateTabs(widget = this.getWidget()): void {
@@ -1831,21 +1852,19 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
       return;
     }
     const tabs: TabInfo[] = [];
-    const slot = widget.contentElement.querySelector('slot:not([name])') as HTMLSlotElement | null;
-    const nodes = slot ? slot.assignedElements() : [];
+    const nodes = this.#getTabNodes(widget);
     for (const child of nodes) {
       const id = child.id;
       const title = child.getAttribute('title') || '';
       const jslogContext = child.getAttribute('jslogcontext') || undefined;
       const selected = child.hasAttribute('selected');
       const enabled = !child.hasAttribute('disabled');
+      const isCloseable =
+          child.hasAttribute('closeable') ? true : (child.hasAttribute('uncloseable') ? false : undefined);
       const view = Widget.getOrCreateWidget(child as HTMLElement);
       view.setHideOnDetach();
       if (widget.selectedTabId !== id) {
-        view.hideWidget();
         child.classList.add('hidden');
-      } else {
-        view.showWidget();
       }
       tabs.push({
         id,
@@ -1854,10 +1873,48 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
         jslogContext,
         selected,
         enabled,
+        isCloseable,
       });
     }
 
-    widget.tabs = tabs;
+    const newIds = new Set(tabs.map(tab => tab.id));
+    for (const id of this.#managedTabIds) {
+      if (!newIds.has(id)) {
+        widget.closeTab(id);
+      }
+    }
+    this.#managedTabIds = newIds;
+    let index = 0;
+    for (const tab of tabs) {
+      const existingTab = widget.tabsById.get(tab.id);
+      if (existingTab) {
+        widget.changeTabView(tab.id, tab.view);
+        widget.changeTabTitle(tab.id, tab.title, tab.tabTooltip);
+        if (tab.jslogContext !== undefined) {
+          existingTab.jslogContext = tab.jslogContext;
+        }
+        if (tab.isCloseable !== undefined) {
+          existingTab.closeable = tab.isCloseable;
+        }
+        if (tab.previewFeature !== undefined) {
+          existingTab.previewFeature = tab.previewFeature;
+        }
+        const currentIndex = widget.tabIndex(tab.id);
+        if (currentIndex !== index) {
+          widget.insertBefore(existingTab, index);
+        }
+      } else {
+        widget.appendTab(tab.id, tab.title, tab.view, tab.tabTooltip, /* userGesture=*/ false, tab.isCloseable,
+                         tab.previewFeature, index, tab.jslogContext);
+      }
+      if (tab.enabled !== undefined) {
+        widget.setTabEnabled(tab.id, tab.enabled);
+      }
+      if (tab.selected) {
+        widget.selectTab(tab.id);
+      }
+      ++index;
+    }
   }
 }
 

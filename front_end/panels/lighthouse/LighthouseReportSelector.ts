@@ -10,11 +10,11 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description Title of combo box in audits report selector
+   * @description Title of combo box in the Lighthouse report selector.
    */
   reports: 'Reports',
   /**
-   * @description New report item label in Lighthouse Report Selector
+   * @description Label for new report item in the Lighthouse report selector.
    */
   newReport: '(new report)',
 } as const;
@@ -40,7 +40,7 @@ export class ReportSelector {
 
     this.#comboBox.setEnabled(false);
     this.newLighthouseItem = document.createElement('option');
-    this.newLighthouseItem.label = i18nString(UIStrings.newReport);
+    this.newLighthouseItem.textContent = i18nString(UIStrings.newReport);
     this.#comboBox.addOption(this.newLighthouseItem);
     this.#comboBox.select(this.newLighthouseItem);
   }
@@ -127,7 +127,7 @@ export class Item {
     const url = new Common.ParsedURL.ParsedURL(finalDisplayedUrl);
     const timestamp = lighthouseResult.fetchTime;
     this.element = document.createElement('option');
-    this.element.label = `${new Date(timestamp).toLocaleTimeString()} - ${url.domain()}`;
+    this.element.textContent = `${new Date(timestamp).toLocaleTimeString()} - ${url.domain()}`;
   }
 
   select(): void {

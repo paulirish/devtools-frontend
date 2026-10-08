@@ -18,6 +18,7 @@ ts_e2e_library("elements") {
     "computed-pane-properties.test.ts",
     "css-hints.test.ts",
     "dom-breakpoints.test.ts",
+    "edit-as-html-select-all.test.ts",
     "element-breadcrumbs.test.ts",
     "elements-tree.test.ts",
     "filter-matched-styles.test.ts",
@@ -35,12 +36,16 @@ ts_e2e_library("elements") {
     "selection-after-delete.test.ts",
     "shadowroot-styles.test.ts",
     "sidebar-event-listeners.test.ts",
+    "style-flash.test.ts",
     "style-pane-properties.test.ts",
     "styles-disable-inherited.test.ts",
+    "styles-inactive-rules.test.ts",
     "switch-panels-while-editing-as-html.test.ts",
     "violating-element-and-attributes.test.ts",
   ]
-  deps = [
+  ts_deps = [
+    "../../conductor:implementation",
+    "../../shared",
     "../helpers",
     "../shared",
   ]

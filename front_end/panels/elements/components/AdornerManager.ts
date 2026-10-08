@@ -12,9 +12,11 @@ type AdornerSettingsMap = Map<string, boolean>;
 export enum RegisteredAdorners {
   AD = 'ad',
   CONTAINER = 'container',
+  CUSTOM_ELEMENT = 'custom-element',
   FLEX = 'flex',
   GRID = 'grid',
   GRID_LANES = 'grid-lanes',
+  INTEREST = 'interest',
   MEDIA = 'media',
   POPOVER = 'popover',
   REVEAL = 'reveal',

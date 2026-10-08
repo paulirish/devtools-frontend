@@ -1,7 +1,6 @@
 // Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 import '../../../../ui/components/report_view/report_view.js';
 import '../../../../ui/components/request_link_icon/request_link_icon.js';
@@ -14,8 +13,6 @@ import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import * as Logs from '../../../../models/logs/logs.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
-import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
-import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
@@ -29,95 +26,93 @@ const {html} = Lit;
 
 const UIStrings = {
   /**
-   * @description Text in PreloadingDetailsReportView of the Application panel if no element is selected. An element here is an item in a
-   * table of target URLs and additional prefetching states. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state header in the preloading details report of the Application panel when no element is selected.
    */
   noElementSelected: 'No element selected',
   /**
-   * @description Text in PreloadingDetailsReportView of the Application panel to prompt user to select an element in a table. An element here is an item in a
-   * table of target URLs and additional prefetching states. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state description in the preloading details report of the Application panel prompting the user to select an element.
    */
   selectAnElementForMoreDetails: 'Select an element for more details',
   /**
-   * @description Text in details
+   * @description Section header in the preloading details report for detailed information.
    */
   detailsDetailedInformation: 'Detailed information',
   /**
-   * @description Text in details
+   * @description Field label in the preloading details report for the speculation action.
    */
   detailsAction: 'Action',
   /**
-   * @description Text in details
+   * @description Field label in the preloading details report for the preloading status.
    */
   detailsStatus: 'Status',
   /**
-   * @description Text in details
+   * @description Field label in the preloading details report for the target hint.
    */
   detailsTargetHint: 'Target hint',
   /**
-   * @description Text in details
+   * @description Field label in the preloading details report for form submission.
    */
   detailsFormSubmission: 'Form submission',
   /**
-   * @description Text in details
+   * @description Field label in the preloading details report for the failure reason.
    */
   detailsFailureReason: 'Failure reason',
   /**
-   * @description Header of rule set
+   * @description Field label in the preloading details report for the rule set.
    */
   detailsRuleSet: 'Rule set',
   /**
-   * @description Text indicating that the preloading field is true.
+   * @description Field value in the preloading details report indicating true or enabled.
    */
   yes: 'Yes',
   /**
-   * @description Text indicating that the preloading field is false.
+   * @description Field value in the preloading details report indicating false or disabled.
    */
   no: 'No',
   /**
-   * @description Description: status
+   * @description Status note in the preloading details report indicating prerender automatically fell back to prefetch.
    */
   automaticallyFellBackToPrefetch: '(automatically fell back to prefetch)',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load attempt isn't yet triggered.
    */
-  detailedStatusNotTriggered: 'Speculative load attempt is not yet triggered.',
+  detailedStatusNotTriggered: 'Speculative load attempt isn’t yet triggered',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load attempt is eligible but pending.
    */
-  detailedStatusPending: 'Speculative load attempt is eligible but pending.',
+  detailedStatusPending: 'Speculative load attempt is eligible but pending',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load is running.
    */
-  detailedStatusRunning: 'Speculative load is running.',
+  detailedStatusRunning: 'Speculative load is running',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load finished and the result is ready for the next navigation.
    */
-  detailedStatusReady: 'Speculative load finished and the result is ready for the next navigation.',
+  detailedStatusReady: 'Speculative load finished and the result is ready for the next navigation',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load finished and was used for a navigation.
    */
-  detailedStatusSuccess: 'Speculative load finished and used for a navigation.',
+  detailedStatusSuccess: 'Speculative load finished and used for a navigation',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load failed.
    */
-  detailedStatusFailure: 'Speculative load failed.',
+  detailedStatusFailure: 'Speculative load failed',
   /**
-   * @description Description: status
+   * @description Detailed status in the preloading details report indicating the speculative load failed, but fallback to prefetch succeeded.
    */
-  detailedStatusFallbackToPrefetch: 'Speculative load failed, but fallback to prefetch succeeded.',
+  detailedStatusFallbackToPrefetch: 'Speculative load failed, but fallback to prefetch succeeded',
   /**
-   * @description button: Contents of button to inspect prerendered page
+   * @description Button text to inspect the prerendered page.
    */
   buttonInspect: 'Inspect',
   /**
-   * @description button: Title of button to inspect prerendered page
+   * @description Tooltip text for the button to inspect the prerendered page.
    */
-  buttonClickToInspect: 'Click to inspect prerendered page',
+  buttonClickToInspect: 'Inspect prerendered page',
   /**
-   * @description button: Title of button to reveal rule set
+   * @description Tooltip text for the button to reveal the rule set in the speculation rules view.
    */
-  buttonClickToRevealRuleSet: 'Click to reveal rule set',
+  buttonClickToRevealRuleSet: 'Reveal rule set',
 } as const;
 const str_ =
     i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingDetailsReportView.ts', UIStrings);
@@ -168,82 +163,56 @@ interface PreloadingDetailsReportViewDataInternal {
   requestResolver?: Logs.RequestResolver.RequestResolver;
 }
 
-export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
-  readonly #shadow = this.attachShadow({mode: 'open'});
-  #data: PreloadingDetailsReportViewData = null;
+export interface ViewInput {
+  data: PreloadingDetailsReportViewData;
+}
 
-  set data(data: PreloadingDetailsReportViewData) {
-    this.#data = data;
-    void this.#render();
+const DEFAULT_VIEW = (input: ViewInput, _output: undefined, target: HTMLElement): void => {
+  if (input.data === null) {
+    // clang-format off
+    Lit.render(html`
+      <style>${preloadingDetailsReportViewStyles}</style>
+      <style>${UI.inspectorCommonStyles}</style>
+      <div class="empty-state">
+        <span class="empty-state-header">${i18nString(UIStrings.noElementSelected)}</span>
+        <span class="empty-state-description">${i18nString(UIStrings.selectAnElementForMoreDetails)}</span>
+      </div>
+    `, target);
+    // clang-format on
+    return;
   }
 
-  async #render(): Promise<void> {
-    await RenderCoordinator.write('PreloadingDetailsReportView render', () => {
-      if (this.#data === null) {
-        // Disabled until https://crbug.com/1079231 is fixed.
-        // clang-format off
-        Lit.render(html`
-          <style>${preloadingDetailsReportViewStyles}</style>
-          <style>${UI.inspectorCommonStyles}</style>
-          <div class="empty-state">
-            <span class="empty-state-header">${i18nString(UIStrings.noElementSelected)}</span>
-            <span class="empty-state-description">${i18nString(UIStrings.selectAnElementForMoreDetails)}</span>
-          </div>
-        `, this.#shadow, {host: this});
-        // clang-format on
-        return;
-      }
+  const pipeline = input.data.pipeline;
+  const pageURL = input.data.pageURL;
+  const isFallbackToPrefetch = pipeline.getPrerender()?.status === SDK.PreloadingModel.PreloadingStatus.FAILURE &&
+      (pipeline.getPrefetch()?.status === SDK.PreloadingModel.PreloadingStatus.READY ||
+       pipeline.getPrefetch()?.status === SDK.PreloadingModel.PreloadingStatus.SUCCESS);
 
-      const pipeline = this.#data.pipeline;
-      const pageURL = this.#data.pageURL;
-      const isFallbackToPrefetch = pipeline.getPrerender()?.status === SDK.PreloadingModel.PreloadingStatus.FAILURE &&
-          (pipeline.getPrefetch()?.status === SDK.PreloadingModel.PreloadingStatus.READY ||
-           pipeline.getPrefetch()?.status === SDK.PreloadingModel.PreloadingStatus.SUCCESS);
+  const isPrerenderLike = (speculationAction: Protocol.Preload.SpeculationAction): boolean => {
+    return [
+      Protocol.Preload.SpeculationAction.Prerender,
+      Protocol.Preload.SpeculationAction.PrerenderUntilScript,
+    ].includes(speculationAction);
+  };
 
-      // Disabled until https://crbug.com/1079231 is fixed.
-      // clang-format off
-      Lit.render(html`
-        <style>${preloadingDetailsReportViewStyles}</style>
-        <style>${UI.inspectorCommonStyles}</style>
-        <devtools-report
-          .data=${{reportTitle: 'Speculative Loading Attempt'}}
-          jslog=${VisualLogging.section('preloading-details')}>
-          <devtools-report-section-header>${i18nString(UIStrings.detailsDetailedInformation)}</devtools-report-section-header>
+  const url = (): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
 
-          ${this.#url()}
-          ${this.#action(isFallbackToPrefetch)}
-          ${this.#status(isFallbackToPrefetch)}
-          ${this.#targetHint()}
-          ${this.#formSubmission()}
-          ${this.#maybePrefetchFailureReason()}
-          ${this.#maybePrerenderFailureReason()}
-
-          ${this.#data.ruleSets.map(ruleSet => this.#renderRuleSet(ruleSet, pageURL))}
-        </devtools-report>
-      `, this.#shadow, {host: this});
-      // clang-format on
-    });
-  }
-
-  #url(): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
-
-    const prefetchStatus = this.#data.pipeline.getPrefetch()?.status;
+    const prefetchStatus = input.data.pipeline.getPrefetch()?.status;
 
     let value;
     if (attempt.action === Protocol.Preload.SpeculationAction.Prefetch && attempt.requestId !== undefined &&
         prefetchStatus !== SDK.PreloadingModel.PreloadingStatus.NOT_TRIGGERED) {
-      // Disabled until https://crbug.com/1079231 is fixed.
-      // clang-format off
       const {requestId, key: {url}} = attempt;
       const affectedRequest: {requestId?: Protocol.Network.RequestId, url?: string} = {requestId, url};
+      // clang-format off
       value = html`
           <devtools-request-link-icon
             .data=${
               {
                 affectedRequest,
-                requestResolver: this.#data.requestResolver || new Logs.RequestResolver.RequestResolver(),
+                requestResolver: input.data.requestResolver || new Logs.RequestResolver.RequestResolver(Logs.NetworkLog.NetworkLog.instance()),
                 displayURL: true,
                 urlToDisplay: url,
               }
@@ -251,35 +220,24 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           >
           </devtools-request-link-icon>
       `;
+      // clang-format on
     } else {
-      // Disabled until https://crbug.com/1079231 is fixed.
-      // clang-format off
       value = html`
           <div class="text-ellipsis" title=${attempt.key.url}>${attempt.key.url}</div>
       `;
-      // clang-format on
     }
 
-    // Disabled until https://crbug.com/1079231 is fixed.
-    // clang-format off
     return html`
         <devtools-report-key>${i18n.i18n.lockedString('URL')}</devtools-report-key>
         <devtools-report-value>
           ${value}
         </devtools-report-value>
     `;
-    // clang-format on
-  }
+  };
 
-  #isPrerenderLike(speculationAction: Protocol.Preload.SpeculationAction): boolean {
-    return [
-      Protocol.Preload.SpeculationAction.Prerender, Protocol.Preload.SpeculationAction.PrerenderUntilScript
-    ].includes(speculationAction);
-  }
-
-  #action(isFallbackToPrefetch: boolean): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
+  const action = (isFallbackToPrefetch: boolean): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
 
     const action = PreloadingString.capitalizedAction(attempt.action);
 
@@ -290,7 +248,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
 
     let maybeInspectButton: Lit.LitTemplate = Lit.nothing;
     (() => {
-      if (!this.#isPrerenderLike(attempt.action)) {
+      if (!isPrerenderLike(attempt.action)) {
         return;
       }
 
@@ -309,8 +267,6 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
         }
         UI.Context.Context.instance().setFlavor(SDK.Target.Target, prerenderTarget);
       };
-      // Disabled until https://crbug.com/1079231 is fixed.
-      // clang-format off
       maybeInspectButton = html`
           <devtools-button
             @click=${inspect}
@@ -323,11 +279,8 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
             ${i18nString(UIStrings.buttonInspect)}
           </devtools-button>
       `;
-      // clang-format on
     })();
 
-    // Disabled until https://crbug.com/1079231 is fixed.
-    // clang-format off
     return html`
         <devtools-report-key>${i18nString(UIStrings.detailsAction)}</devtools-report-key>
         <devtools-report-value>
@@ -336,12 +289,11 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           </div>
         </devtools-report-value>
     `;
-    // clang-format on
-  }
+  };
 
-  #status(isFallbackToPrefetch: boolean): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
+  const status = (isFallbackToPrefetch: boolean): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
 
     const detailedStatus = isFallbackToPrefetch ? i18nString(UIStrings.detailedStatusFallbackToPrefetch) :
                                                   PreloadingUIUtils.detailedStatus(attempt);
@@ -352,11 +304,11 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${detailedStatus}
         </devtools-report-value>
     `;
-  }
+  };
 
-  #maybePrefetchFailureReason(): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
+  const maybePrefetchFailureReason = (): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
 
     if (attempt.action !== Protocol.Preload.SpeculationAction.Prefetch) {
       return Lit.nothing;
@@ -376,12 +328,12 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${failureDescription}
         </devtools-report-value>
     `;
-  }
+  };
 
-  #targetHint(): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
-    const hasTargetHint = this.#isPrerenderLike(attempt.action) && attempt.key.targetHint !== undefined;
+  const targetHint = (): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
+    const hasTargetHint = isPrerenderLike(attempt.action) && attempt.key.targetHint !== undefined;
     if (!hasTargetHint) {
       return Lit.nothing;
     }
@@ -392,13 +344,13 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${PreloadingUIUtils.detailedTargetHint(attempt.key)}
         </devtools-report-value>
     `;
-  }
+  };
 
-  #formSubmission(): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
+  const formSubmission = (): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
     const hasFormSubmission = attempt.key.formSubmission !== undefined;
-    if (!hasFormSubmission || !this.#isPrerenderLike(attempt.action)) {
+    if (!hasFormSubmission || !isPrerenderLike(attempt.action)) {
       return Lit.nothing;
     }
 
@@ -408,13 +360,13 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${attempt.key.formSubmission ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
         </devtools-report-value>
     `;
-  }
+  };
 
-  #maybePrerenderFailureReason(): Lit.LitTemplate {
-    assertNotNullOrUndefined(this.#data);
-    const attempt = this.#data.pipeline.getOriginallyTriggered();
+  const maybePrerenderFailureReason = (): Lit.LitTemplate => {
+    assertNotNullOrUndefined(input.data);
+    const attempt = input.data.pipeline.getOriginallyTriggered();
 
-    if (!this.#isPrerenderLike(attempt.action)) {
+    if (!isPrerenderLike(attempt.action)) {
       return Lit.nothing;
     }
 
@@ -433,16 +385,15 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${failureReason}
         </devtools-report-value>
     `;
-  }
+  };
 
-  #renderRuleSet(ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): Lit.LitTemplate {
+  const renderRuleSet = (ruleSet: Protocol.Preload.RuleSet,
+                         pageURL: Platform.DevToolsPath.UrlString): Lit.LitTemplate => {
     const revealRuleSetView = (): void => {
       void Common.Revealer.reveal(new PreloadingHelper.PreloadingForward.RuleSetView(ruleSet.id));
     };
     const location = ruleSetLocationShort(ruleSet, pageURL);
 
-    // Disabled until https://crbug.com/1079231 is fixed.
-    // clang-format off
     return html`
       <devtools-report-key>${i18nString(UIStrings.detailsRuleSet)}</devtools-report-key>
       <devtools-report-value>
@@ -461,14 +412,55 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
         </div>
       </devtools-report-value>
     `;
-    // clang-format on
+  };
+
+  // clang-format off
+  Lit.render(html`
+    <style>${preloadingDetailsReportViewStyles}</style>
+    <style>${UI.inspectorCommonStyles}</style>
+    <devtools-report
+      .data=${{reportTitle: 'Speculative Loading Attempt'}}
+      jslog=${VisualLogging.section('preloading-details')}>
+      <devtools-report-section-header>${i18nString(UIStrings.detailsDetailedInformation)}</devtools-report-section-header>
+
+      ${url()}
+      ${action(isFallbackToPrefetch)}
+      ${status(isFallbackToPrefetch)}
+      ${targetHint()}
+      ${formSubmission()}
+      ${maybePrefetchFailureReason()}
+      ${maybePrerenderFailureReason()}
+
+      ${input.data.ruleSets.map(ruleSet => renderRuleSet(ruleSet, pageURL))}
+    </devtools-report>
+  `, target);
+  // clang-format on
+};
+
+export class PreloadingDetailsReportView extends UI.Widget.VBox {
+  #data: PreloadingDetailsReportViewData = null;
+  #view: typeof DEFAULT_VIEW;
+
+  constructor(element?: HTMLElement,
+              view: (input: ViewInput, _output: undefined, target: HTMLElement) => void = DEFAULT_VIEW) {
+    super(element);
+    this.#view = view;
   }
-}
 
-customElements.define('devtools-resources-preloading-details-report-view', PreloadingDetailsReportView);
+  set data(data: PreloadingDetailsReportViewData) {
+    this.#data = data;
+    this.requestUpdate();
+  }
 
-declare global {
-  interface HTMLElementTagNameMap {
-    'devtools-resources-preloading-details-report-view': PreloadingDetailsReportView;
+  override wasShown(): void {
+    super.wasShown();
+    this.requestUpdate();
+  }
+
+  override performUpdate(): void {
+    const viewInput = {
+      data: this.#data,
+    };
+    this.#view(viewInput, undefined, this.contentElement);
   }
 }

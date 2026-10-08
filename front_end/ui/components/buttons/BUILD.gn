@@ -27,20 +27,20 @@ devtools_ui_module("button") {
     "FloatingButton.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../ui/lit:bundle",
     "../../../ui/visual_logging:bundle",
     "../../kit:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "buttons.ts"
 
-  deps = [
-    ":button",
-    ":css_files",
-  ]
+  deps = [ ":css_files" ]
+
+  ts_deps = [ ":button" ]
 
   visibility = [
     "../../../entrypoints/main/*",
@@ -55,7 +55,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "Button.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
   ]
@@ -63,5 +63,5 @@ devtools_ui_module("unittests") {
 
 component_doc("docs") {
   sources = [ "Button.docs.ts" ]
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 }

@@ -8,8 +8,8 @@ import {veImpressionForChangesPanel} from '../helpers/changes-helpers.js';
 import {editCSSProperty} from '../helpers/elements-helpers.js';
 import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {expectVeEvents, veImpressionsUnder} from '../helpers/visual-logging-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('The Changes Panel', () => {
   const PANEL_ROOT_SELECTOR = 'div[aria-label="Changes panel"]';
@@ -55,17 +55,17 @@ describe('The Changes Panel', () => {
     let changes = await getChangesList(devToolsPage);
     assert.lengthOf(changes, 0, 'There should be no changes by default');
 
-    await editCSSProperty('html, body', 'background', 'red', devToolsPage);
+    await editCSSProperty(devToolsPage, 'html, body', 'background', 'red');
     await waitForNewChanges(changes, devToolsPage);
 
     changes = await getChangesList(devToolsPage);
     assert.lengthOf(changes, 1, 'There should now be 1 change in the list');
     assert.strictEqual(changes[0], `${TEST_PAGE}.html`);
 
-    await expectVeEvents(
-        [
-          veImpressionsUnder('Drawer', [veImpressionForChangesPanel()]),
-        ],
-        undefined, devToolsPage);
+    await expectVeEvents(devToolsPage,
+                         [
+                           veImpressionsUnder('Drawer', [veImpressionForChangesPanel()]),
+                         ],
+                         undefined);
   });
 });

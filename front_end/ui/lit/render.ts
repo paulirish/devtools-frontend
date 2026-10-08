@@ -5,15 +5,25 @@
 
 import * as Lit from '../../third_party/lit/lit.js';
 
+import {InterceptBindingDirective} from './Directives.js';
+
 export interface RenderOptions extends Lit.RenderOptions {
   container?: {
     attributes?: Record<string, string|null|boolean|undefined|{toString(): string}>,
     classes?: string[],
     listeners?: Record<string, EventListenerOrEventListenerObject>,
+    interceptedListeners?: Record<string, EventListenerOrEventListenerObject>,
   };
 }
 
 const renderOptions = new WeakMap<HTMLElement|DocumentFragment, RenderOptions|undefined>();
+
+interface ListenerEntry {
+  listener: EventListenerOrEventListenerObject;
+  wrapper: EventListener;
+}
+
+const containerListeners = new WeakMap<HTMLElement|DocumentFragment, Map<string, ListenerEntry>>();
 
 export function render(template: unknown, container: HTMLElement|DocumentFragment, options?: RenderOptions):
     ReturnType<typeof Lit.render> {
@@ -62,22 +72,54 @@ export function render(template: unknown, container: HTMLElement|DocumentFragmen
     }
   }
 
-  const oldListeners = renderOptions.get(container)?.container?.listeners;
-  const newListeners = options?.container?.listeners;
-  if (oldListeners) {
-    for (const [name, listener] of Object.entries(oldListeners)) {
-      if (newListeners?.[name] !== listener) {
-        host.removeEventListener(name, listener);
-      }
-    }
+  let listenersMap = containerListeners.get(container);
+  if (!listenersMap) {
+    listenersMap = new Map();
+    containerListeners.set(container, listenersMap);
   }
+
+  const newListeners = options?.container?.listeners;
   if (newListeners) {
     for (const [name, listener] of Object.entries(newListeners)) {
-      if (oldListeners?.[name] !== listener) {
-        host.addEventListener(name, listener);
+      const entry = listenersMap.get(name);
+      if (entry) {
+        entry.listener = listener;
+      } else {
+        let currentListener = listener;
+        const newEntry: ListenerEntry = {
+          get listener() {
+            return currentListener;
+          },
+          set listener(val: EventListenerOrEventListenerObject) {
+            currentListener = val;
+          },
+          wrapper: (event: Event) => {
+            if (typeof currentListener === 'function') {
+              return currentListener.call(host, event);
+            }
+            if (currentListener && 'handleEvent' in currentListener) {
+              return currentListener.handleEvent(event);
+            }
+          },
+        };
+        listenersMap.set(name, newEntry);
+        host.addEventListener(name, newEntry.wrapper);
       }
     }
   }
+
+  // Remove old listeners that are no longer present
+  for (const [name, entry] of listenersMap.entries()) {
+    if (!newListeners || !(name in newListeners)) {
+      host.removeEventListener(name, entry.wrapper);
+      listenersMap.delete(name);
+    }
+  }
+
+  if (host instanceof Element) {
+    InterceptBindingDirective.registerListeners(host, options?.container?.interceptedListeners);
+  }
+
   renderOptions.set(container, options);
   return Lit.render(template, container, options);
 }

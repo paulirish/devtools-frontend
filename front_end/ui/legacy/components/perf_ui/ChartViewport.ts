@@ -6,6 +6,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as RenderCoordinator from '../../../components/render_coordinator/render_coordinator.js';
+import * as SettingsUI from '../../../settings/settings.js';
 import * as UI from '../../legacy.js';
 
 import chartViewPortStyles from './chartViewport.css.js';
@@ -30,7 +31,7 @@ export interface Config {
 }
 
 export class ChartViewport extends UI.Widget.VBox {
-  private readonly delegate: ChartViewportDelegate;
+  readonly delegate: ChartViewportDelegate;
   viewportElement: HTMLElement;
   #alwaysShowVerticalScroll: boolean;
   private rangeSelectionEnabled: boolean;
@@ -40,7 +41,7 @@ export class ChartViewport extends UI.Widget.VBox {
   private cursorElement: HTMLElement;
   #isDragging!: boolean;
   private totalHeight!: number;
-  private offsetHeight!: number;
+  offsetHeight!: number;
   private scrollTop!: number;
   private rangeSelectionStart: number|null;
   private rangeSelectionEnd: number|null;
@@ -49,7 +50,7 @@ export class ChartViewport extends UI.Widget.VBox {
   private dragStartScrollTop!: number;
   private visibleLeftTime!: number;
   private visibleRightTime!: number;
-  private offsetWidth!: number;
+  offsetWidth!: number;
   private targetLeftTime!: number;
   private targetRightTime!: number;
   private selectionOffsetShiftX!: number;
@@ -156,7 +157,7 @@ export class ChartViewport extends UI.Widget.VBox {
     this.updateContentElementSize();
   }
 
-  private updateContentElementSize(): void {
+  updateContentElementSize(): void {
     let offsetWidth: number = this.vScrollElement.offsetLeft;
     if (!offsetWidth) {
       offsetWidth = this.contentElement.offsetWidth;
@@ -231,7 +232,9 @@ export class ChartViewport extends UI.Widget.VBox {
    * 4. Trackpad: Mouse Wheel AND horizontal scroll (deltaX > deltaY): --> Zoom
    */
   private onMouseWheel(wheelEvent: WheelEvent): void {
-    const navigation = Common.Settings.Settings.instance().moduleSetting('flamechart-selected-navigation').get();
+    const navigation = Common.Settings.Settings.instance()
+                           .resolve(SettingsUI.TimelineSettings.flamechartSelectedNavigationSettingDescriptor)
+                           .get();
     // Delta for navigation left, right, up and down.
     // Calculated from horizontal or vertical scroll delta, depending on which one exists.
     const panDelta = (wheelEvent.deltaY || wheelEvent.deltaX) / 53 * this.offsetHeight / 8;
@@ -504,31 +507,48 @@ export class ChartViewport extends UI.Widget.VBox {
     // that if the view is restored, the time shown is correct.
     if (this.cancelWindowTimesAnimation) {
       this.cancelWindowTimesAnimation();
+      this.cancelWindowTimesAnimation = null;
       this.setWindowTimes(this.targetLeftTime, this.targetRightTime, false);
     }
   }
 
   setWindowTimes(startTime: number, endTime: number, animate?: boolean): void {
-    if (startTime === this.targetLeftTime && endTime === this.targetRightTime) {
+    // If already animating to the requested target, let the active animation continue.
+    if (animate && this.cancelWindowTimesAnimation && this.targetLeftTime === startTime &&
+        this.targetRightTime === endTime) {
       return;
     }
-    if (!animate || this.visibleLeftTime === 0 || this.visibleRightTime === Infinity ||
-        (startTime === 0 && endTime === Infinity) || (startTime === Infinity && endTime === Infinity)) {
-      // Skip animation, move instantly.
-      this.targetLeftTime = startTime;
-      this.targetRightTime = endTime;
+
+    // If already at rest at the target window with no active animation, nothing to do.
+    if (!this.cancelWindowTimesAnimation && this.visibleLeftTime === startTime && this.visibleRightTime === endTime) {
+      return;
+    }
+
+    // Cancel any in-flight animation before starting a new transition or snapping.
+    if (this.cancelWindowTimesAnimation) {
+      this.cancelWindowTimesAnimation();
+      this.cancelWindowTimesAnimation = null;
+    }
+
+    this.targetLeftTime = startTime;
+    this.targetRightTime = endTime;
+
+    // Only animate if requested and both current and target bounds are finite, valid ranges.
+    // Initial loads (where visibleLeftTime/RightTime are 0 or uninitialized) and sentinel
+    // ranges (like Infinity) snap instantly to prevent animation glitches or NaN calculations.
+    const hasInitialWindow = Number.isFinite(this.visibleLeftTime) && Number.isFinite(this.visibleRightTime) &&
+        this.visibleRightTime > this.visibleLeftTime;
+    const isFiniteTarget = Number.isFinite(startTime) && Number.isFinite(endTime) && endTime > startTime;
+    const canAnimate = Boolean(animate) && hasInitialWindow && isFiniteTarget;
+
+    if (!canAnimate) {
+      // Snap instantly.
       this.visibleLeftTime = startTime;
       this.visibleRightTime = endTime;
       this.scheduleUpdate();
       return;
     }
-    if (this.cancelWindowTimesAnimation) {
-      this.cancelWindowTimesAnimation();
-      this.visibleLeftTime = this.targetLeftTime;
-      this.visibleRightTime = this.targetRightTime;
-    }
-    this.targetLeftTime = startTime;
-    this.targetRightTime = endTime;
+
     this.cancelWindowTimesAnimation = UI.UIUtils.animateFunction(
         this.element.window(), animateWindowTimes.bind(this),
         [{from: this.visibleLeftTime, to: startTime}, {from: this.visibleRightTime, to: endTime}], 100, () => {

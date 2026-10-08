@@ -10,20 +10,18 @@ import("../../../../scripts/build/typescript/typescript.gni")
 devtools_ui_module("theme_support") {
   sources = [ "ThemeSupport.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/root:bundle",
+    "../../settings:bundle",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "theme_support.ts"
 
-  deps = [
-    ":theme_support",
-    "../:css_files",
-  ]
+  ts_deps = [ ":theme_support" ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/legacy/*,
@@ -45,7 +43,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "ThemeSupport.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/host:bundle",
     "../../../testing",
@@ -54,5 +52,5 @@ devtools_ui_module("unittests") {
 
 component_doc("docs") {
   sources = [ "ThemeColors.docs.ts" ]
-  deps = [ "../../lit:bundle" ]
+  ts_deps = [ "../../lit:bundle" ]
 }

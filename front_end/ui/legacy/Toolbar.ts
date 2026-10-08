@@ -11,7 +11,8 @@ import * as Root from '../../core/root/root.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import {createIcon} from '../kit/kit.js';
-import type {TemplateResult} from '../lit/lit.js';
+import {type LitTemplate, nothing, render} from '../lit/lit.js';
+import * as SettingUIRegistration from '../settings/settings.js';
 
 import {type Action, Events as ActionEvents} from './ActionRegistration.js';
 import {ActionRegistry} from './ActionRegistry.js';
@@ -27,23 +28,23 @@ import {Widget} from './Widget.js';
 
 const UIStrings = {
   /**
-   * @description Announced screen reader message for ToolbarSettingToggle when the setting is toggled on.
+   * @description Announcement text for screen readers when a toolbar toggle button is pressed.
    */
   pressed: 'pressed',
   /**
-   * @description Announced screen reader message for ToolbarSettingToggle when the setting is toggled off.
+   * @description Announcement text for screen readers when a toolbar toggle button is not pressed.
    */
   notPressed: 'not pressed',
   /**
-   * @description Tooltip shown when the user hovers over the clear icon to empty the text input.
+   * @description Tooltip text and accessible label for the clear input button in a toolbar input.
    */
   clearInput: 'Clear',
   /**
-   * @description Placeholder for filter bars that shows before the user types in a filter keyword.
+   * @description Placeholder text for a filter input in a toolbar.
    */
   filter: 'Filter',
   /**
-   * @description Tooltip shown when the user hovers over the regex icon to toggle regular-expression filtering.
+   * @description Tooltip text and accessible label for the regular expression toggle button in a filter toolbar.
    */
   useRegularExpression: 'Use regular expression',
 } as const;
@@ -412,10 +413,13 @@ export class Toolbar extends HTMLElement {
       const widget = Widget.get(item.element);
       if (widget) {
         widget.detach();
+      } else {
+        item.element.remove();
       }
     }
     this.items = [];
-    this.removeChildren();
+    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+    render(nothing, this);
   }
 
   hideSeparatorDupes(): void {
@@ -740,11 +744,13 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
     this.proxyElement = this.prompt.attach(internalPromptElement);
     this.proxyElement.classList.add('toolbar-prompt-proxy');
     this.proxyElement.addEventListener('keydown', (event: Event) => this.onKeydownCallback(event as KeyboardEvent));
-    this.prompt.initialize(
-        completions || (() => Promise.resolve([])),
-        ' ',
-        dynamicCompletions,
-    );
+    if (completions) {
+      this.prompt.initialize(
+          completions,
+          ' ',
+          dynamicCompletions,
+      );
+    }
     if (tooltip) {
       this.prompt.setTitle(tooltip);
     }
@@ -845,11 +851,12 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
 }
 
 export class ToolbarFilter extends ToolbarInput {
-  constructor(
-      filterBy?: Common.UIString.LocalizedString, growFactor?: number, shrinkFactor?: number, tooltip?: string,
-      completions?: ((arg0: string, arg1: string, arg2?: boolean|undefined) => Promise<Suggestion[]>),
-      dynamicCompletions?: boolean, jslogContext?: string, element?: HTMLElement, showRegexToggle?: boolean,
-      onRegexToggle?: () => void) {
+  #regexButton?: Buttons.Button.Button;
+
+  constructor(filterBy?: Common.UIString.LocalizedString, growFactor?: number, shrinkFactor?: number, tooltip?: string,
+              completions?: ((arg0: string, arg1: string, arg2?: boolean|undefined) => Promise<Suggestion[]>),
+              dynamicCompletions?: boolean, jslogContext?: string, element?: HTMLElement, showRegexToggle?: boolean,
+              onRegexToggle?: (toggled: boolean) => void) {
     const filterPlaceholder = filterBy ? filterBy : i18nString(UIStrings.filter);
     super(
         filterPlaceholder, filterPlaceholder, growFactor, shrinkFactor, tooltip, completions, dynamicCompletions,
@@ -869,25 +876,39 @@ export class ToolbarFilter extends ToolbarInput {
         toggledIconName: regexIconName,
         toggleType: Buttons.Button.ToggleType.PRIMARY,
         toggled: false,
+        checked: false,
         title: i18nString(UIStrings.useRegularExpression),
         jslogContext: regexIconName,
       };
+      regexButton.style.setProperty('--dot-toggle-top', 'calc(100% - var(--sys-size-3) - var(--sys-size-1))');
+      regexButton.style.setProperty('--dot-toggle-left', 'calc(100% - var(--sys-size-3) - var(--sys-size-1))');
       ARIAUtils.setLabel(regexButton, i18nString(UIStrings.useRegularExpression));
       regexButton.addEventListener('click', () => {
-        onRegexToggle?.();
+        regexButton.checked = regexButton.toggled;
+        onRegexToggle?.(regexButton.toggled);
       });
       this.insertTrailingElement(regexButton);
+      this.#regexButton = regexButton;
     }
+  }
+
+  setRegexToggled(toggled: boolean): void {
+    if (!this.#regexButton || this.#regexButton.toggled === toggled) {
+      return;
+    }
+    this.#regexButton.toggled = toggled;
+    this.#regexButton.checked = toggled;
   }
 }
 
 export class ToolbarInputElement extends HTMLElement {
-  static observedAttributes = ['value', 'disabled', 'regex'];
+  static observedAttributes: string[] = ['value', 'disabled', 'regex', 'regex-toggled'];
 
   item?: ToolbarInput;
   datalist: HTMLDataListElement|null = null;
   #value: string|undefined = undefined;
   #disabled = false;
+  #regexToggled = false;
   connectedCallback(): void {
     if (this.item) {
       return;
@@ -919,6 +940,9 @@ export class ToolbarInputElement extends HTMLElement {
     if (this.#disabled) {
       this.item.setEnabled(false);
     }
+    if (this.#regexToggled && this.item instanceof ToolbarFilter) {
+      this.item.setRegexToggled(true);
+    }
     this.item.addEventListener(ToolbarInput.Event.TEXT_CHANGED, event => {
       this.dispatchEvent(new CustomEvent('change', {detail: event.data}));
     });
@@ -931,8 +955,9 @@ export class ToolbarInputElement extends HTMLElement {
     this.item?.focus();
   }
 
-  #onRegexToggle(): void {
-    this.dispatchEvent(new CustomEvent('regextoggle'));
+  #onRegexToggle(toggled: boolean): void {
+    this.#regexToggled = toggled;
+    this.dispatchEvent(new CustomEvent('regextoggle', {detail: toggled}));
   }
 
   async #onAutocomplete(expression: string, prefix: string, force?: boolean): Promise<Suggestion[]> {
@@ -955,6 +980,11 @@ export class ToolbarInputElement extends HTMLElement {
       this.#disabled = typeof newValue === 'string';
       if (this.item) {
         this.item.setEnabled(!this.#disabled);
+      }
+    } else if (name === 'regex-toggled') {
+      this.#regexToggled = typeof newValue === 'string';
+      if (this.item instanceof ToolbarFilter) {
+        this.item.setRegexToggled(this.#regexToggled);
       }
     }
   }
@@ -1205,7 +1235,7 @@ export interface Provider {
 }
 
 export interface ItemsProvider {
-  toolbarItems(): ToolbarItem[]|TemplateResult;
+  toolbarItems(): LitTemplate;
 }
 
 export class ToolbarComboBox extends ToolbarItem<void, HTMLSelectElement> {
@@ -1426,7 +1456,9 @@ export class ToolbarSettingCheckbox extends ToolbarCheckbox {
   constructor(
       setting: Common.Settings.Setting<boolean>, tooltip?: Common.UIString.LocalizedString,
       alternateTitle?: Common.UIString.LocalizedString) {
-    super(alternateTitle || setting.title(), tooltip, undefined, setting.name);
+    const uiDescriptor = SettingUIRegistration.SettingUIRegistration.maybeResolve(setting.descriptor());
+    const title = alternateTitle ?? uiDescriptor?.title ?? ('' as Common.UIString.LocalizedString);
+    super(title, tooltip, undefined, setting.name);
     bindCheckbox(this.element as CheckboxLabel, setting);
   }
 }

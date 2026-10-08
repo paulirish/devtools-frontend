@@ -9,7 +9,6 @@
 
 /* eslint-disable no-console */
 
-import * as path from 'node:path';
 import type * as puppeteer from 'puppeteer-core';
 
 const ALLOWED_ASSERTION_FAILURES = [
@@ -17,6 +16,8 @@ const ALLOWED_ASSERTION_FAILURES = [
   'Session is unregistering, can\'t dispatch pending call to Debugger.setBlackboxPatterns',
   // Failure during shutdown. crbug.com/1199322
   'Session is unregistering, can\'t dispatch pending call to DOM.getDocument',
+  // Failure during shutdown.
+  'Connection is closed, can\'t dispatch pending call to Network.loadNetworkResource',
   // Expected failures in assertion.test.ts
   'expected failure 1',
   'expected failure 2',
@@ -31,6 +32,7 @@ const ALLOWED_ASSERTION_FAILURES = [
   // See: https://crbug.com/1192052
   'Request Runtime.evaluate failed. {"code":-32602,"message":"uniqueContextId not found"}',
   'Session is unregistering, can\'t dispatch pending call to Runtime.evaluate',  // same as above
+  'Session is unregistering, can\'t dispatch pending call to Runtime.compileScript',
   'uniqueContextId not found',
   'Request Storage.getStorageKey failed. {"code":-32602,"message":"Frame tree node for given frame not found"}',
   // Some left-over a11y calls show up in the logs.
@@ -42,6 +44,10 @@ const ALLOWED_ASSERTION_FAILURES = [
   'Fetch API cannot load chrome-error://chromewebdata/neterror.rollup.js.map. URL scheme "chrome-error" is not supported.',
   'Request Storage.getAffectedUrlsForThirdPartyCookieMetadata failed.',
   'Hash of blocked script',
+  // CXX debugging extension dummy icon error.
+  'Failed to load resource: net::ERR_INVALID_URL',
+  // Extension server error that can happen during debugging tests.
+  'Extension server error: Operation failed: Failed',
 ];
 
 const FILTERED_LOGS = ['Autofocus processing was blocked because a document already has a focused element'];
@@ -102,9 +108,6 @@ export function installPageErrorHandlers(page: puppeteer.Page): void {
       throw new Error(`Page error in Frontend: ${error}`);
     }
 
-    if (error.message.includes(path.join('ui', 'components', 'docs'))) {
-      uiComponentDocErrors.push(error);
-    }
     const message = error.stack ?? error.message;
     if (isExpectedError(error)) {
       expectedErrors.push(message);
@@ -169,16 +172,16 @@ export class ErrorExpectation {
     pendingErrorExpectations.add(this);
   }
 
-  drop() {
+  drop(): Error|puppeteer.ConsoleMessage|undefined {
     pendingErrorExpectations.delete(this);
     return this.#caught;
   }
 
-  get caught() {
+  get caught(): Error|puppeteer.ConsoleMessage|undefined {
     return this.#caught;
   }
 
-  check(consoleMessage: puppeteer.ConsoleMessage|Error) {
+  check(consoleMessage: puppeteer.ConsoleMessage|Error): boolean {
     const text = consoleMessage instanceof Error ? consoleMessage.message : consoleMessage.text();
     let match = (this.#msg instanceof RegExp) ? Boolean(text.match(this.#msg)) : text.includes(this.#msg);
     // When console.assert(condition) fails (no second arg), the only message is
@@ -196,7 +199,7 @@ export class ErrorExpectation {
   }
 }
 
-export function expectError(msg: string|RegExp) {
+export function expectError(msg: string|RegExp): ErrorExpectation {
   return new ErrorExpectation(msg);
 }
 
@@ -215,11 +218,6 @@ export function dumpCollectedErrors(): void {
   console.log('Expected errors: ' + expectedErrors.length);
   console.log('   Fatal errors: ' + fatalErrors.length);
 
-  if (uiComponentDocErrors.length) {
-    console.log(
-        '\nErrors from component examples during test run:\n', uiComponentDocErrors.map(e => e.message).join('\n  '));
-  }
-
   const allFatalErrors = fatalErrors.join('\n');
 
   expectedErrors = [];
@@ -231,11 +229,5 @@ export function dumpCollectedErrors(): void {
 }
 
 const pendingErrorExpectations = new Set<ErrorExpectation>();
-export let fatalErrors: string[] = [];
+let fatalErrors: string[] = [];
 export let expectedErrors: string[] = [];
-/**
- * Gathered separately so we can surface them during screenshot tests to help
- * give an idea of failures, rather than having to guess purely based on the
- * screenshot.
- **/
-export const uiComponentDocErrors: Error[] = [];

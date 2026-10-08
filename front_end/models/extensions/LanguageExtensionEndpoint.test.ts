@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as Bindings from '../bindings/bindings.js';
 
 import * as Extensions from './extensions.js';
 
@@ -17,9 +19,10 @@ for (const allowFileAccess of [true, false]) {
     let endpoint: Extensions.LanguageExtensionEndpoint.LanguageExtensionEndpoint;
     beforeEach(() => {
       const channel = new MessageChannel();
+      const pluginManager = sinon.createStubInstance(Bindings.DebuggerLanguagePlugins.DebuggerLanguagePluginManager);
       endpoint = new Extensions.LanguageExtensionEndpoint.LanguageExtensionEndpoint(
           allowFileAccess, '', '', {language: 'lang', symbol_types: [Protocol.Debugger.DebugSymbolsType.SourceMap]},
-          channel.port1);
+          channel.port1, pluginManager);
     });
 
     it('canAccessURL respects allowFileAccess correctly', () => {
@@ -62,6 +65,28 @@ for (const allowFileAccess of [true, false]) {
       assert.lengthOf(endpointProxyStub.getCalls(), allowFileAccess ? 4 : 2);
       await endpoint.addRawModule('', 'wasm.debug.wasm', {url: 'http://example.com'});
       assert.lengthOf(endpointProxyStub.getCalls(), allowFileAccess ? 5 : 3);
+    });
+
+    it('validates all properties in getFunctionInfo results', async () => {
+      const endpointProxyStub = sinon.stub(Extensions.ExtensionEndpoint.ExtensionEndpoint.prototype, 'sendRequest');
+      endpointProxyStub.resolves({frames: []});
+      await endpoint.getFunctionInfo({rawModuleId: '', codeOffset: 0, inlineFrameIndex: 0});
+
+      const validator = endpointProxyStub.firstCall.args[2];
+      // Either result property is sufficient on its own, and both may be present.
+      assert.isTrue(validator({frames: []}));
+      assert.isTrue(validator({missingSymbolFiles: []}));
+      assert.isTrue(validator({frames: [], missingSymbolFiles: []}));
+
+      // Non-empty arrays validate function names and missing-file paths as strings.
+      assert.isTrue(validator({frames: [{name: 'functionName'}]}));
+      assert.isTrue(validator({missingSymbolFiles: ['missing.wasm']}));
+
+      // Reject invalid property containers and invalid array elements.
+      assert.isFalse(validator({frames: [], missingSymbolFiles: 123}));
+      assert.isFalse(validator({frames: [], missingSymbolFiles: [123]}));
+      assert.isFalse(validator({frames: 123, missingSymbolFiles: []}));
+      assert.isFalse(validator({frames: [{name: 123}]}));
     });
   });
 }

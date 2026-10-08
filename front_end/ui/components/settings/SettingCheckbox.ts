@@ -4,24 +4,24 @@
 /* eslint-disable @devtools/no-lit-render-outside-of-view, @devtools/enforce-custom-element-definitions-location */
 
 import '../tooltips/tooltips.js';
-import './SettingDeprecationWarning.js';
 import '../../kit/kit.js';
 
 import type * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Lit from '../../lit/lit.js';
+import * as SettingUIRegistration from '../../settings/settings.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as Buttons from '../buttons/buttons.js';
 import * as Input from '../input/input.js';
 
 import settingCheckboxStyles from './settingCheckbox.css.js';
 
-const {html, Directives: {ifDefined}} = Lit;
+const {html} = Lit;
 
 const UIStrings = {
   /**
-   * @description Text that is usually a hyperlink to more documentation
+   * @description Text that is usually a hyperlink to more documentation.
    */
   learnMore: 'Learn more',
 } as const;
@@ -31,6 +31,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export interface SettingCheckboxData {
   setting: Common.Settings.Setting<boolean>;
   textOverride?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -42,6 +43,7 @@ export class SettingCheckbox extends HTMLElement {
   #setting?: Common.Settings.Setting<boolean>;
   #changeListenerDescriptor?: Common.EventTarget.EventDescriptor;
   #textOverride?: string;
+  #disabled?: boolean;
 
   set data(data: SettingCheckboxData) {
     if (this.#changeListenerDescriptor && this.#setting) {
@@ -50,6 +52,7 @@ export class SettingCheckbox extends HTMLElement {
 
     this.#setting = data.setting;
     this.#textOverride = data.textOverride;
+    this.#disabled = data.disabled;
 
     this.#changeListenerDescriptor = this.#setting.addChangeListener(() => {
       this.#render();
@@ -62,12 +65,8 @@ export class SettingCheckbox extends HTMLElement {
       return undefined;
     }
 
-    if (this.#setting.deprecation) {
-      return html`<devtools-setting-deprecation-warning .data=${
-          this.#setting.deprecation}></devtools-setting-deprecation-warning>`;
-    }
-
-    const learnMore = this.#setting.learnMore();
+    const uiDescriptor = SettingUIRegistration.SettingUIRegistration.maybeResolve(this.#setting.descriptor());
+    const learnMore = uiDescriptor?.learnMore;
     if (learnMore) {
       const jsLogContext = `${this.#setting.name}-documentation`;
       const data: Buttons.Button.ButtonData = {
@@ -124,7 +123,7 @@ export class SettingCheckbox extends HTMLElement {
   }
 
   get checked(): boolean {
-    if (!this.#setting || this.#setting.disabledReasons().length > 0) {
+    if (!this.#setting) {
       return false;
     }
 
@@ -136,18 +135,13 @@ export class SettingCheckbox extends HTMLElement {
       throw new Error('No "Setting" object provided for rendering');
     }
 
+    const uiDescriptor = SettingUIRegistration.SettingUIRegistration.maybeResolve(this.#setting.descriptor());
+    const learnMore = uiDescriptor?.learnMore;
+    const titleText = uiDescriptor?.title ?? '';
+
     const icon = this.icon();
-    const title = `${this.#setting.learnMore() ? this.#setting.learnMore()?.tooltip?.() : ''}`;
-    const disabledReasons = this.#setting.disabledReasons();
-    const reason = disabledReasons.length ?
-        html`
-      <devtools-button class="disabled-reason" .iconName=${'info'} .variant=${Buttons.Button.Variant.ICON} .size=${
-            Buttons.Button.Size.SMALL} title=${ifDefined(disabledReasons.join('\n'))} @click=${
-            onclick}></devtools-button>
-    ` :
-        Lit.nothing;
-    Lit.render(
-        html`
+    const title = learnMore?.tooltip?.() ?? '';
+    Lit.render(html`
       <style>${Input.checkboxStyles}</style>
       <style>${settingCheckboxStyles}</style>
       <p>
@@ -155,16 +149,16 @@ export class SettingCheckbox extends HTMLElement {
           <input
             type="checkbox"
             .checked=${this.checked}
-            ?disabled=${this.#setting.disabled()}
+            ?disabled=${this.#disabled}
             @change=${this.#checkboxChanged}
             jslog=${VisualLogging.toggle().track({change: true}).context(this.#setting.name)}
-            aria-label=${this.#setting.title()}
+            aria-label=${titleText}
           />
-          ${this.#textOverride || this.#setting.title()}${reason}
+          ${this.#textOverride || titleText}
         </label>
         ${icon}
       </p>`,
-        this.#shadow, {host: this});
+               this.#shadow, {host: this});
   }
 
   #checkboxChanged(e: Event): void {

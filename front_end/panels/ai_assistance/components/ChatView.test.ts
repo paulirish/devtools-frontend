@@ -3,33 +3,24 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as SDK from '../../../core/sdk/sdk.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
-import {
-  cleanup,
-  initializePersistenceImplForTests,
-  setupAutomaticFileSystem
-} from '../../../testing/AiAssistanceHelpers.js';
-import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import {raf, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import * as AiAssistancePanel from '../ai_assistance.js';
 
 describeWithEnvironment('ChatView', () => {
-  beforeEach(() => {
-    initializePersistenceImplForTests();
-    setupAutomaticFileSystem();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
   function getProp(options: Partial<AiAssistancePanel.Props>): AiAssistancePanel.Props {
     const noop = () => {};
     const messages = options.messages ?? [];
-    const context = sinon.createStubInstance(AiAssistanceModel.StylingAgent.NodeContext);
+    const context = sinon.createStubInstance(AiAssistanceModel.DOMNodeContext.DOMNodeContext);
     context.getTitle.returns('');
+    const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    node.classNames.returns([]);
+    context.getItem.returns(node);
     return {
       onTextSubmit: noop,
       onInspectElementClick: noop,
@@ -43,7 +34,6 @@ describeWithEnvironment('ChatView', () => {
       conversationMarkdown: 'placeholder conversation markdown',
       onContextRemoved: noop,
       onContextAdd: noop,
-      changeManager: new AiAssistanceModel.ChangeManager.ChangeManager(),
       inspectElementToggled: false,
       conversationType: AiAssistanceModel.AiHistoryStorage.ConversationType.STYLING,
       messages,
@@ -56,6 +46,8 @@ describeWithEnvironment('ChatView', () => {
       isTextInputDisabled: false,
       emptyStateSuggestions: [],
       inputPlaceholder: i18n.i18n.lockedString('input placeholder'),
+      textInputValue: '',
+      onTextChange: noop,
       disclaimerText: i18n.i18n.lockedString('disclaimer text'),
       markdownRenderer: new AiAssistancePanel.MarkdownRendererWithCodeBlock(),
       walkthrough: {
@@ -81,14 +73,16 @@ describeWithEnvironment('ChatView', () => {
               {
                 type: 'step',
                 step: {
-                  isLoading: false,
+                  state: {
+                    type: 'needs_approval',
+                    sideEffectDialog: {
+                      description: null,
+                      onAnswer: () => {},
+                    },
+                  },
                   title: 'Updating element styles',
                   thought: 'Updating element styles',
                   code: '$0.style.background = "blue";',
-                  requestApproval: {
-                    description: null,
-                    onAnswer: () => {},
-                  },
                 },
               },
             ],
@@ -138,80 +132,23 @@ describeWithEnvironment('ChatView', () => {
     });
   });
 
-  describe('getCSSChangeSummaryMessage', () => {
-    it('returns undefined if there are no messages', () => {
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage([], false);
-      assert.isUndefined(result);
-    });
+  describe('Interaction', () => {
+    it('should call onTextChange when the textarea text is changed', async () => {
+      const onTextChangeStub = sinon.stub();
+      const props = getProp({
+        onTextChange: onTextChangeStub,
+      });
+      const chat = new AiAssistancePanel.ChatView(props);
+      renderElementIntoDOM(chat);
 
-    it('returns undefined if there are no model messages', () => {
-      const messages: AiAssistancePanel.ChatMessage.Message[] = [
-        {entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.USER, text: 'Hello', id: '2'},
-      ];
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage(messages, false);
-      assert.isUndefined(result);
-    });
+      await raf();
 
-    it('returns the last model message if not loading', () => {
-      const modelMessage: AiAssistancePanel.ChatMessage.Message = {
-        entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
-        id: '1',
-        parts: [{type: 'answer', text: 'Response'}],
-      };
-      const messages: AiAssistancePanel.ChatMessage.Message[] = [
-        {entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.USER, text: 'Hello', id: '2'},
-        modelMessage,
-      ];
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage(messages, false);
-      assert.strictEqual(result, modelMessage);
-    });
+      const textArea = chat.shadowRoot!.querySelector('.chat-input') as HTMLTextAreaElement;
+      assert.exists(textArea);
+      textArea.value = 'test text';
+      textArea.dispatchEvent(new Event('input'));
 
-    it('returns the last model message if loading but the last message is a user message', () => {
-      const modelMessage: AiAssistancePanel.ChatMessage.Message = {
-        entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
-        id: '1',
-        parts: [{type: 'answer', text: 'Response'}],
-      };
-      const messages: AiAssistancePanel.ChatMessage.Message[] = [
-        modelMessage,
-        {entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.USER, text: 'Follow up', id: '2'},
-      ];
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage(messages, true);
-      assert.strictEqual(result, modelMessage);
-    });
-
-    it('returns the penultimate model message if loading and the last message is a model message', () => {
-      const modelMessage1: AiAssistancePanel.ChatMessage.Message = {
-        entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
-        id: '1',
-        parts: [{type: 'answer', text: 'Response 1'}],
-      };
-      const modelMessage2: AiAssistancePanel.ChatMessage.Message = {
-        entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
-        id: '2',
-        parts: [{type: 'answer', text: 'Response 2'}],
-      };
-      const messages: AiAssistancePanel.ChatMessage.Message[] = [
-        modelMessage1,
-        {entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.USER, text: 'Follow up', id: '3'},
-        modelMessage2,
-      ];
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage(messages, true);
-      assert.strictEqual(result, modelMessage1);
-    });
-
-    it('returns undefined if loading and there is only one model message and it is the last message', () => {
-      const modelMessage: AiAssistancePanel.ChatMessage.Message = {
-        entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.MODEL,
-        id: '1',
-        parts: [{type: 'answer', text: 'Response'}],
-      };
-      const messages: AiAssistancePanel.ChatMessage.Message[] = [
-        {entity: AiAssistancePanel.ChatMessage.ChatMessageEntity.USER, text: 'Hello', id: '2'},
-        modelMessage,
-      ];
-      const result = AiAssistancePanel.getCSSChangeSummaryMessage(messages, true);
-      assert.isUndefined(result);
+      sinon.assert.calledWith(onTextChangeStub, 'test text');
     });
   });
 });

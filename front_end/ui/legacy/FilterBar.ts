@@ -25,26 +25,31 @@ export {filterStyles};
 
 const UIStrings = {
   /**
-   * @description Text to filter result items
+   * @description Tooltip text for the filter toggle button in the filter bar.
    */
   filter: 'Filter',
   /**
-   * @description Text that appears when hover over the filter bar in the Network tool
+   * @description Placeholder text for the search input in the filter bar.
    */
   egSmalldUrlacomb: 'e.g. `/small[\d]+/ url:a.com/b`',
   /**
-   * @description Text that appears when hover over the All button in the Network tool
+   * @description Tooltip text for the filter buttons in the filter bar.
    * @example {Ctrl + } PH1
    */
   sclickToSelectMultipleTypes: '{PH1}Click to select multiple types',
   /**
-   * @description Text for everything
+   * @description Label for the option to show all types in a filter bar.
    */
   allStrings: 'All',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/FilterBar.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class FilterBar extends Common.ObjectWrapper.eventMixin<FilterBarEventTypes, typeof HBox>(HBox) {
+const FilterBarBase: Common.ObjectWrapper.EventMixin<FilterBarEventTypes, typeof HBox> =
+    Common.ObjectWrapper.eventMixin(
+        HBox,
+    );
+
+export class FilterBar extends FilterBarBase {
   private enabled: boolean;
   private readonly stateSetting: Common.Settings.Setting<boolean>;
   readonly #filterButton: ToolbarSettingToggle;

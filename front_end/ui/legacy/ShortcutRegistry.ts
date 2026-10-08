@@ -6,6 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as Settings from '../settings/settings.js';
 
 import {type Action, getRegisteredActionExtensions, KeybindSet} from './ActionRegistration.js';
 import type {ActionRegistry} from './ActionRegistry.js';
@@ -26,7 +27,7 @@ export class ShortcutRegistry {
   private readonly devToolsDefaultShortcutActions: Set<string>;
   private readonly disabledDefaultShortcutsForAction: Platform.MapUtilities.Multimap<string, KeyboardShortcut>;
   private readonly keybindSetSetting: Common.Settings.Setting<string>;
-  private readonly userShortcutsSetting: Common.Settings.Setting<KeyboardShortcut[]>;
+  private readonly userShortcutsSetting: Common.Settings.Setting<Settings.MainSettings.UserShortcut[]>;
 
   constructor(actionRegistry: ActionRegistry) {
     this.actionRegistry = actionRegistry;
@@ -37,12 +38,14 @@ export class ShortcutRegistry {
     this.consumePrefix = null;
     this.devToolsDefaultShortcutActions = new Set();
     this.disabledDefaultShortcutsForAction = new Platform.MapUtilities.Multimap();
-    this.keybindSetSetting = Common.Settings.Settings.instance().moduleSetting('active-keybind-set');
+    this.keybindSetSetting =
+        Common.Settings.Settings.instance().resolve(Settings.MainSettings.activeKeybindSetSettingDescriptor);
     this.keybindSetSetting.addChangeListener(event => {
       Host.userMetrics.keybindSetSettingChanged(event.data);
       this.registerBindings();
     });
-    this.userShortcutsSetting = Common.Settings.Settings.instance().moduleSetting('user-shortcuts');
+    this.userShortcutsSetting =
+        Common.Settings.Settings.instance().resolve(Settings.MainSettings.userShortcutsSettingDescriptor);
     this.userShortcutsSetting.addChangeListener(this.registerBindings, this);
 
     this.registerBindings();
@@ -511,10 +514,10 @@ export class ShortcutTreeNode {
 }
 
 export class ForwardedShortcut {
-  static instance = new ForwardedShortcut();
+  static instance: ForwardedShortcut = new ForwardedShortcut();
 }
 
-export const ForwardedActions = new Set<string>([
+export const ForwardedActions: Set<string> = new Set<string>([
   'main.toggle-dock',
   'debugger.toggle-breakpoints-active',
   'debugger.toggle-pause',

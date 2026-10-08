@@ -8,13 +8,9 @@ import { environment } from '../environment.js';
 import { assert } from '../util/assert.js';
 import { mergeUint8Arrays, stringToTypedArray } from '../util/encoding.js';
 import { packageVersion } from '../util/version.js';
-import { debug } from './Debug.js';
+import { DEBUG_PREFIXES } from './Debug.js';
 import { TimeoutError } from './Errors.js';
 import { paperFormats } from './PDFOptions.js';
-/**
- * @internal
- */
-export const debugError = debug('puppeteer:error');
 /**
  * @internal
  */
@@ -141,11 +137,11 @@ fun, ...args) {
 /**
  * @internal
  */
-export async function getReadableAsTypedArray(readable, path) {
+export async function getReadableAsTypedArray(readable, path, logger) {
     const buffers = [];
     const reader = readable.getReader();
     if (path) {
-        const fileHandle = await environment.value.fs.promises.open(path, 'w+');
+        const fileHandle = await environment.value.openFileForWriting(path);
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -177,7 +173,7 @@ export async function getReadableAsTypedArray(readable, path) {
         return concat;
     }
     catch (error) {
-        debugError(error);
+        logger?.(DEBUG_PREFIXES.error)?.(error);
         return null;
     }
 }

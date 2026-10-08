@@ -9,50 +9,64 @@ import * as path from 'node:path';
 import {hideBin} from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 
-import type {Conversation, EvalFileOutput, ProcessedQuery} from './types.js';
+import type {SessionId, TaskId} from '../types.d.ts';
+
+import type {Trajectory, Turn} from './types.js';
 
 /** Note: non-exhaustive. **/
-export interface RawOutput {
-  metadata: Array<{exampleId: string, explanation: string}>;
-  examples: Array<{
-    exampleId: string,
-    request: {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      current_message: {
-        parts: Array<{
-          text?: string,
-          functionResponse?: {
-            name: string,
-            response: {result: Record<string, string>},
-          },
-        }>,
-      },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      function_declarations: Array<{
+/* eslint-disable @typescript-eslint/naming-convention */
+export interface RawRequest {
+  current_message: {
+    parts: Array<{
+      text?: string,
+      functionResponse?: {
         name: string,
-        description: string,
-        parameters: {
-          properties?: Record<string, unknown>,
-        },
-      }>,
-      metadata: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        client_version: string,
+        response: {result: Record<string, string>},
       },
-    },
-    aidaResponse: {
-      metadata: {
-        rcpGlobalId?: string,
-        inferenceOptionMetadata?: {
-          modelId: string,
-          modelVersion: string,
-        },
-      },
-      explanation?: string,
-      functionCalls?: Array<{name: string, args: Record<string, unknown>}>,
-      completed?: true,
+    }>,
+  };
+  function_declarations: Array<{
+    name: string,
+    description: string,
+    parameters: {
+      properties?: Record<string, unknown>,
     },
   }>;
+  metadata: {
+    client_version: string,
+  };
+}
+
+export interface RawFunctionCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface RawAidaResponse {
+  metadata: {
+    inferenceOptionMetadata?: {
+      modelId: string,
+      modelVersion: string,
+    },
+  };
+  explanation?: string;
+  functionCalls?: RawFunctionCall[];
+  completed?: true;
+}
+/* eslint-enable @typescript-eslint/naming-convention */
+
+export interface RawExample {
+  taskId: TaskId;
+  request: RawRequest;
+  aidaResponse: RawAidaResponse;
+}
+
+export interface RawOutput {
+  metadata: Array<{
+    taskId: TaskId,
+  }>;
+  examples?: RawExample[];
+  trajectories?: RawExample[];
 }
 
 interface RawToEvalOptions {
@@ -60,74 +74,189 @@ interface RawToEvalOptions {
   label: string;
 }
 
-export function convertRawOutputToEval(opts: RawToEvalOptions): EvalFileOutput {
+/**
+ * Converts raw DevTools AIDA interaction logs collected during auto-run
+ * into standard evaluation trajectories used by LLM grading suites.
+ */
+export function convertRawOutputToEval(opts: RawToEvalOptions): Trajectory[] {
   const inputHash = hash(JSON.stringify(opts.inputFromAutoRun));
-  const exampleIds = opts.inputFromAutoRun.metadata.map(m => m.exampleId);
+  const {metadata} = opts.inputFromAutoRun;
+  const rawEntries = opts.inputFromAutoRun.trajectories ?? opts.inputFromAutoRun.examples ?? [];
 
-  const processedExamples: Conversation[] =
-      exampleIds
-          .map((exampleIdFromInput, index) => {
-            const data = opts.inputFromAutoRun.examples.filter(e => e.exampleId === exampleIdFromInput);
-            if (!data.length) {
-              return null;
-            }
-            const exampleMetadata = opts.inputFromAutoRun.metadata[index];
+  return metadata
+      .map((meta, index) => {
+        const sessionExamples = rawEntries.filter(e => e.taskId === meta.taskId);
+        if (!sessionExamples.length) {
+          return null;
+        }
+        const sessionId: SessionId = `${inputHash}-${index}`;
+        return buildTrajectory(sessionId, meta.taskId, sessionExamples);
+      })
+      .filter((trajectory): trajectory is Trajectory => trajectory !== null);
+}
 
-            const id = inputHash + '-' + index;
-            const chromeVersion = data.at(0)?.request.metadata.client_version;
-            assert.ok(chromeVersion, 'No client_version');
-            const modelData = data.at(0)?.aidaResponse.metadata.inferenceOptionMetadata;
-            assert.ok(modelData, 'No inferenceOptionMetadata');
-            const processed: Conversation = {
-              id,
-              autoRunExampleId: exampleIdFromInput,
-              chromeVersion,
-              explanation: exampleMetadata?.explanation ?? '',
-              model: {
-                id: modelData?.modelId,
-                version: modelData?.modelVersion,
-              },
-              queries: [],
-            };
+/**
+ * Constructs a single Trajectory from session metadata and its corresponding raw turns.
+ */
+function buildTrajectory(
+    sessionId: SessionId,
+    taskId: TaskId,
+    examples: RawExample[],
+    ): Trajectory {
+  const firstExample = examples[0];
+  const chromeVersion = firstExample?.request.metadata.client_version;
+  assert.ok(chromeVersion, 'No client_version found in example');
 
-            for (const {request, aidaResponse} of data) {
-              if (!aidaResponse.completed) {
-                continue;
-              }
+  const modelData = firstExample?.aidaResponse.metadata.inferenceOptionMetadata;
+  assert.ok(modelData, 'No inferenceOptionMetadata found in example');
 
-              const responseText = aidaResponse.explanation?.trim();
-
-              const query: ProcessedQuery = {
-                request: {
-                  prompt: request.current_message.parts[0].text,
-                  functionCallResponse: request.current_message.parts[0].functionResponse?.name,
-                  availableFunctionNames:
-                      request.function_declarations ? request.function_declarations.map(dec => dec.name) : [],
-                },
-                response: {
-                  rpcGlobalId: aidaResponse.metadata.rcpGlobalId ?? '',
-                  text: responseText,
-                  functionCallRequests: aidaResponse.functionCalls?.map(call => {
-                    return {
-                      name: call.name,
-                      args: call.args,
-                    };
-                  }),
-                }
-              };
-              processed.queries.push(query);
-            }
-            return processed;
-          })
-          .filter(x => x !== null);
-  const finalOutput: EvalFileOutput = {
+  return {
     metadata: {
-      createdAt: new Date().toISOString(),
-      id: hash(processedExamples.map(x => x.id).join('')),
+      session_id: sessionId,
+      model: modelData.modelId ?? '',
+      chrome_version: chromeVersion,
+      task_id: taskId,
     },
-    conversations: processedExamples,
+    data: buildTurns(examples),
   };
-  return finalOutput;
+}
+
+/**
+ * Iterates through raw request/response pairs and reconstructs the chronological turn history.
+ */
+function buildTurns(examples: RawExample[]): Turn[] {
+  const turns: Turn[] = [];
+  let turnIndex = 1;
+
+  for (const {request, aidaResponse} of examples) {
+    if (!aidaResponse.completed) {
+      continue;
+    }
+
+    const [requestPart] = request.current_message.parts;
+    const userText = requestPart?.text;
+    const functionResponse = requestPart?.functionResponse;
+
+    if (userText) {
+      // User prompt starts a new turn.
+      turns.push(createUserTurn(String(turnIndex++), userText));
+    } else if (functionResponse) {
+      // Tool responses from DevTools are attached back to the preceding Gemini turn that invoked them.
+      attachToolResultToLastTurn(turns, functionResponse.name, functionResponse.response);
+    }
+
+    // AIDA response turn (text explanation and/or tool call invocations).
+    turns.push(createGeminiTurn(String(turnIndex++), aidaResponse));
+  }
+
+  return turns;
+}
+
+function createUserTurn(turnId: string, userText: string): Turn {
+  return {
+    turn_id: turnId,
+    role: 'user',
+    // TODO: Look into capturing the actual execution timestamp instead of current time.
+    timestamp: Math.floor(Date.now() * 1000),
+    // TODO: Temporarily assigning an empty tokens object to match the KAF eval schema. We need to get the actual token usage.
+    tokens: {},
+    content: [userText],
+    thoughts: [],
+    tool_calls: [],
+  };
+}
+
+function createGeminiTurn(turnId: string, aidaResponse: RawAidaResponse): Turn {
+  const responseText = aidaResponse.explanation?.trim();
+  // TODO: Look into capturing the actual execution timestamp instead of current time.
+  const timestamp = Math.floor(Date.now() * 1000);
+  const functionCalls = aidaResponse.functionCalls ?? [];
+  const toolCalls = functionCalls.map(call => ({
+                                        name: call.name,
+                                        args: call.args,
+                                        timestamp,
+                                      }));
+
+  return {
+    turn_id: turnId,
+    role: 'gemini',
+    timestamp,
+    // TODO: Temporarily assigning an empty tokens object to match the KAF eval schema. We need to get the actual token usage.
+    tokens: {},
+    content: responseText ? [responseText] : [],
+    thoughts: buildThoughts(functionCalls, timestamp),
+    tool_calls: toolCalls,
+  };
+}
+
+/**
+ * Extracts model thoughts/explanations from tool function calls into structured thought objects.
+ */
+function buildThoughts(functionCalls: RawFunctionCall[], timestamp: number): Turn['thoughts'] {
+  return functionCalls.flatMap(call => {
+    if (!call.args.explanation) {
+      return [];
+    }
+    // Prefer the explicit title provided by the model (e.g. in executeJavaScript), otherwise fall back to tool name.
+    const subject = (call.args.title as string) || call.name;
+    const description = call.args.explanation as string;
+    return [{subject, description, timestamp}];
+  });
+}
+
+/**
+ * Finds the preceding Gemini turn and associates the tool execution result with the matching tool call.
+ * Note: DevTools executes at most one tool call per turn, so matching by tool name is sufficient.
+ */
+function attachToolResultToLastTurn(turns: Turn[], toolName: string, response: unknown): void {
+  const prevTurn = turns.at(-1);
+  if (prevTurn && prevTurn.role === 'gemini' && prevTurn.tool_calls) {
+    const toolCall = prevTurn.tool_calls.find(tc => tc.name === toolName);
+    if (toolCall) {
+      toolCall.result = response;
+      toolCall.status = (response && typeof response === 'object' && 'error' in response) ? 'error' : 'success';
+    }
+  }
+}
+
+/**
+ * Formats a trajectory into a clean, human-readable plaintext chat log.
+ * Shows user queries, agent explanations, and any tool calls/results.
+ */
+export function formatChatLog(trajectory: Trajectory): string {
+  const parts: string[] = [];
+  for (const turn of trajectory.data) {
+    if (turn.role === 'user') {
+      parts.push('User:');
+      if (turn.content?.length) {
+        parts.push(turn.content.join('\n'));
+      }
+    } else {
+      parts.push('Agent:');
+      if (turn.thoughts?.length) {
+        for (const thought of turn.thoughts) {
+          if (thought.description) {
+            parts.push(`[Thought: ${thought.description}]`);
+          }
+        }
+      }
+      if (turn.content?.length) {
+        parts.push(turn.content.join('\n'));
+      }
+      if (turn.tool_calls?.length) {
+        for (const tc of turn.tool_calls) {
+          const argsStr = tc.args ? JSON.stringify(tc.args) : '';
+          parts.push(`[Tool Call: ${tc.name}(${argsStr})]`);
+          if (tc.result !== undefined) {
+            const resultStr = typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result);
+            parts.push(`[Tool Result: ${resultStr}]`);
+          }
+        }
+      }
+    }
+    parts.push('');
+  }
+  return parts.join('\n').trimEnd() + '\n';
 }
 
 if (import.meta.main) {
@@ -139,27 +268,32 @@ if (import.meta.main) {
             type: 'boolean',
             demandOption: false,
             default: false,
-            description: 'Output formatted JSON rather than minified.'
+            description: 'Output formatted JSON rather than minified.',
           })
           .parseSync();
 
   const inputPath = path.isAbsolute(userArgs.file) ? userArgs.file : path.join(process.cwd(), userArgs.file);
   const contents = fs.readFileSync(inputPath, 'utf8');
-  const finalOutput =
+  const trajectories =
       convertRawOutputToEval({inputFromAutoRun: JSON.parse(contents) as RawOutput, label: userArgs.label});
 
-  const stringified = userArgs.pretty ? JSON.stringify(finalOutput, null, 2) : JSON.stringify(finalOutput);
-  const fileName = `${slug(userArgs.label)}-${finalOutput.metadata.id}.json`;
-  fs.writeFileSync(path.join(process.cwd(), fileName), stringified, 'utf8');
-  console.log(`Wrote ${fileName} to disk.`);
+  for (const trajectory of trajectories) {
+    const stringified = userArgs.pretty ? JSON.stringify(trajectory, null, 2) : JSON.stringify(trajectory);
+    const fileName = `${slug(userArgs.label)}-${trajectory.metadata.session_id}.json`;
+    fs.writeFileSync(path.join(process.cwd(), fileName), stringified, 'utf8');
+    console.log(`Wrote ${fileName} to disk.`);
+  }
 }
 
+/**
+ * Computes a 15-character MD5 hash of the string for generating unique session IDs.
+ */
 function hash(str: string) {
   const hash = crypto.createHash('md5').update(str).digest('hex');
   return hash.substring(0, 15);
 }
 
-function slug(str: string): string {
+export function slug(str: string): string {
   str = str.replace(/^\s+|\s+$/g, '');  // Trim leading/trailing whitespace
   str = str.toLowerCase();
   str = str.replace(/[^a-z0-9 -]/g, '')  // Remove invalid chars

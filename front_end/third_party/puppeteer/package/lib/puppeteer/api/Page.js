@@ -90,10 +90,11 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
 import { concat, distinctUntilChanged, EMPTY, filter, first, firstValueFrom, from, map, merge, mergeMap, mergeScan, of, raceWith, ReplaySubject, startWith, switchMap, take, takeUntil, timer, } from '../../third_party/rxjs/rxjs.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { TargetCloseError } from '../common/Errors.js';
 import { EventEmitter, } from '../common/EventEmitter.js';
 import { TimeoutSettings } from '../common/TimeoutSettings.js';
-import { debugError, fromEmitterEvent, filterAsync, isString, NETWORK_IDLE_TIME, timeout, withSourcePuppeteerURLIfNone, fromAbortSignal, } from '../common/util.js';
+import { fromEmitterEvent, filterAsync, isString, NETWORK_IDLE_TIME, timeout, withSourcePuppeteerURLIfNone, fromAbortSignal, } from '../common/util.js';
 import { environment } from '../environment.js';
 import { guarded } from '../util/decorators.js';
 import { AsyncDisposableStack, asyncDisposeSymbol, DisposableStack, disposeSymbol, } from '../util/disposable.js';
@@ -189,8 +190,13 @@ let Page = (() => {
         /**
          * @internal
          */
-        constructor() {
-            super();
+        logger;
+        /**
+         * @internal
+         */
+        constructor(logger) {
+            super(undefined, logger);
+            this.logger = logger;
             fromEmitterEvent(this, "request" /* PageEvent.Request */)
                 .pipe(mergeMap(originalRequest => {
                 return concat(of(1), merge(fromEmitterEvent(this, "requestfailed" /* PageEvent.RequestFailed */), fromEmitterEvent(this, "requestfinished" /* PageEvent.RequestFinished */), fromEmitterEvent(this, "response" /* PageEvent.Response */).pipe(map(response => {
@@ -758,7 +764,7 @@ let Page = (() => {
          *
          * ```ts
          * import {KnownDevices} from 'puppeteer';
-         * const iPhone = KnownDevices['iPhone 15 Pro'];
+         * const iPhone = KnownDevices['iPhone 17 Pro'];
          *
          * const browser = await puppeteer.launch();
          * const page = await browser.newPage();
@@ -832,10 +838,10 @@ let Page = (() => {
             if (!path) {
                 return;
             }
-            await environment.value.fs.promises.writeFile(path, typedArray);
+            await environment.value.writeFile(path, typedArray);
         }
         /**
-         * Captures a screencast of this {@link Page | page}.
+         * Captures a screencast of this {@link Page | page}. Works in Chrome 153+.
          *
          * @example
          * Recording a {@link Page | page}:
@@ -865,7 +871,7 @@ let Page = (() => {
          *
          * @param options - Configures screencast behavior.
          *
-         * @experimental
+         * @deprecated Use {@link Page.record} instead.
          *
          * @remarks
          *
@@ -907,10 +913,19 @@ let Page = (() => {
             if (options.scale !== undefined && options.scale <= 0) {
                 throw new Error(`\`scale\` must be greater than 0.`);
             }
+            if (options.path && environment.value.path) {
+                await environment.value.mkdir(environment.value.path.dirname(options.path), { recursive: options.overwrite ?? true });
+            }
+            const stream = options.path
+                ? environment.value.createWriteStream(options.path, {
+                    encoding: 'binary',
+                    overwrite: options.overwrite,
+                })
+                : undefined;
             const recorder = new ScreenRecorder(this, width, height, {
                 ...options,
                 crop,
-            });
+            }, this.logger);
             try {
                 await this._startScreencast();
             }
@@ -918,12 +933,82 @@ let Page = (() => {
                 void recorder.stop();
                 throw error;
             }
-            if (options.path) {
-                const { createWriteStream } = environment.value.fs;
-                const stream = createWriteStream(options.path, 'binary');
+            if (stream) {
                 recorder.pipe(stream);
             }
             return recorder;
+        }
+        /**
+         * Records this {@link Page | page} using the Chrome DevTools Protocol
+         * {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-startScreenRecording | Page.startScreenRecording}
+         * API.
+         *
+         * Outputs mp4 video stream.
+         *
+         * @example
+         * Recording a {@link Page | page}:
+         *
+         * ```ts
+         * import puppeteer from 'puppeteer';
+         *
+         * // Launch a browser
+         * const browser = await puppeteer.launch();
+         *
+         * // Create a new page
+         * const page = await browser.newPage();
+         *
+         * // Go to your site.
+         * await page.goto('https://www.example.com');
+         *
+         * // Start recording.
+         * const recorder = await page.record({path: 'recording.mp4'});
+         *
+         * // Do something.
+         *
+         * // Stop recording.
+         * await recorder.stop();
+         *
+         * await browser.close();
+         * ```
+         *
+         * @param options - Configures recording behavior.
+         *
+         * @experimental
+         */
+        async record(options = {}) {
+            if (options.maxWidth !== undefined && options.maxWidth <= 0) {
+                throw new Error('`maxWidth` must be greater than 0.');
+            }
+            if (options.maxHeight !== undefined && options.maxHeight <= 0) {
+                throw new Error('`maxHeight` must be greater than 0.');
+            }
+            if (options.frameRate !== undefined && options.frameRate <= 0) {
+                throw new Error('`frameRate` must be greater than 0.');
+            }
+            if (options.fps !== undefined && options.fps <= 0) {
+                throw new Error('`fps` must be greater than 0.');
+            }
+            if (options.path && environment.value.path) {
+                await environment.value.mkdir(environment.value.path.dirname(options.path), { recursive: options.overwrite ?? true });
+            }
+            const stream = options.path
+                ? environment.value.createWriteStream(options.path, {
+                    encoding: 'binary',
+                    overwrite: options.overwrite,
+                })
+                : undefined;
+            const recording = this.createScreenRecording(options);
+            try {
+                await recording._start();
+            }
+            catch (error) {
+                void recording.stop();
+                throw error;
+            }
+            if (stream) {
+                recording.pipe(stream);
+            }
+            return recording;
         }
         #screencastSessionCount = 0;
         #startScreencastPromise;
@@ -933,15 +1018,16 @@ let Page = (() => {
         async _startScreencast() {
             ++this.#screencastSessionCount;
             if (!this.#startScreencastPromise) {
-                this.#startScreencastPromise = this.mainFrame()
-                    .client.send('Page.startScreencast', { format: 'png' })
-                    .then(() => {
-                    // Wait for the first frame.
-                    return new Promise(resolve => {
-                        return this.mainFrame().client.once('Page.screencastFrame', () => {
-                            return resolve();
-                        });
+                const client = this.mainFrame().client;
+                const firstFrame = new Promise(resolve => {
+                    return client.once('Page.screencastFrame', () => {
+                        return resolve();
                     });
+                });
+                this.#startScreencastPromise = client
+                    .send('Page.startScreencast', { format: 'png' })
+                    .then(() => {
+                    return firstFrame;
                 });
             }
             await this.#startScreencastPromise;
@@ -970,7 +1056,9 @@ let Page = (() => {
                 if (viewport && viewport.deviceScaleFactor !== 0) {
                     await this.setViewport({ ...viewport, deviceScaleFactor: 0 });
                     stack.defer(() => {
-                        void this.setViewport(viewport).catch(debugError);
+                        void this.setViewport(viewport).catch(error => {
+                            this.logger?.(DEBUG_PREFIXES.error)?.(error);
+                        });
                     });
                 }
                 return await this.mainFrame()
@@ -1068,7 +1156,9 @@ let Page = (() => {
                                 ...scrollDimensions,
                             });
                             stack.defer(async () => {
-                                await this.setViewport(viewport).catch(debugError);
+                                await this.setViewport(viewport).catch(error => {
+                                    this.logger?.(DEBUG_PREFIXES.error)?.(error);
+                                });
                             });
                         }
                     }
@@ -1446,13 +1536,13 @@ let Page = (() => {
         waitForFunction(pageFunction, options, ...args) {
             return this.mainFrame().waitForFunction(pageFunction, options, ...args);
         }
-        /** @internal */
         [(_screenshot_decorators = [guarded(function () {
                 return this.browser();
             })], disposeSymbol)]() {
-            return void this[asyncDisposeSymbol]().catch(debugError);
+            return void this[asyncDisposeSymbol]().catch(error => {
+                this.logger?.(DEBUG_PREFIXES.error)?.(error);
+            });
         }
-        /** @internal */
         async [asyncDisposeSymbol]() {
             await this.close();
             await super[asyncDisposeSymbol]();

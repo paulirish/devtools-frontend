@@ -116,6 +116,28 @@ experimental domain Overlay
       aaa
       apca
 
+  # Configuration for Inset-Modified Containing Block (IMCB) and CSS Anchor Positioning highlight.
+  type ImcbHighlightConfig extends object
+    properties
+      # Border color for the Inset-Modified Containing Block (default: transparent).
+      optional DOM.RGBA imcbBorderColor
+      # Background fill color for the Inset-Modified Containing Block (default: transparent).
+      optional DOM.RGBA imcbBackgroundColor
+      # Fill color for the inset modifiers area (difference between CB and IMCB).
+      optional DOM.RGBA insetsBackgroundColor
+      # Hatch color for the inset modifiers area.
+      optional DOM.RGBA insetsHatchColor
+      # Border color for the referenced target anchor element(s) (when element is anchor-positioned).
+      optional DOM.RGBA anchorBorderColor
+      # Background fill color for the referenced target anchor element(s) (when element is anchor-positioned).
+      optional DOM.RGBA anchorBackgroundColor
+      # Whether to render the 3x3 position-area grid lines when position-area is used.
+      optional boolean showPositionAreaGrid
+      # Line color for the 3x3 position-area grid lines.
+      optional DOM.RGBA positionAreaGridLineColor
+      # Fill color for the active region within the position-area grid.
+      optional DOM.RGBA positionAreaActiveRegionColor
+
   # Configuration data for the highlighting of page elements.
   type HighlightConfig extends object
     properties
@@ -157,6 +179,8 @@ experimental domain Overlay
       optional ContrastAlgorithm contrastAlgorithm
       # The container query container highlight configuration (default: all transparent).
       optional ContainerQueryContainerHighlightConfig containerQueryContainerHighlightConfig
+      # The IMCB highlight configuration (default: all transparent).
+      optional ImcbHighlightConfig imcbHighlightConfig
 
   type ColorFormat extends string
     enum
@@ -207,6 +231,36 @@ experimental domain Overlay
       optional DOM.RGBA contentColor
       # The content box highlight outline color (default: transparent).
       optional DOM.RGBA outlineColor
+
+  # Supported display cutout shapes.
+  type DisplayCutoutShape extends string
+    enum
+      pill
+      notch
+      circle
+      rectangle
+
+  # Configuration for a display cutout.
+  type DisplayCutoutConfig extends object
+    properties
+      # A rectangle representing the cutout bounds.
+      DOM.Rect rect
+      # Shape used to draw the cutout.
+      DisplayCutoutShape shape
+      # Border radius for rounded cutout shapes.
+      optional integer borderRadius
+      # Upper shoulder radius for notch cutout shapes.
+      optional integer upperRadius
+      # Lower transition radius for notch cutout shapes.
+      optional integer lowerRadius
+      # Center x coordinate for circle cutout shapes.
+      optional integer cx
+      # Center y coordinate for circle cutout shapes.
+      optional integer cy
+      # Radius for circle cutout shapes.
+      optional integer radius
+      # The cutout fill color (default: black).
+      optional DOM.RGBA contentColor
 
   # Configuration for Window Controls Overlay
   type WindowControlsOverlayConfig extends object
@@ -475,6 +529,12 @@ experimental domain Overlay
     parameters
       # hinge data, null means hideHinge
       optional HingeConfig hingeConfig
+
+  # Add a display cutout overlay.
+  command setShowDisplayCutout
+    parameters
+      # display cutout data, null means hide display cutout
+      optional DisplayCutoutConfig displayCutoutConfig
 
   # Show elements in isolation mode with overlays.
   command setShowIsolatedElements

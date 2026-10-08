@@ -38,7 +38,32 @@ interface ParsedTraceAndModel {
 const traceEngineCache = new Map<string, Map<string, ParsedTraceAndModel>>();
 
 export interface TraceEngineLoaderOptions {
-  initTraceBounds: boolean;
+  /**
+   * The configuration the trace engine runs with.
+   *
+   * TraceLoader caches parsed traces by file name and stringified configuration key.
+   * If a test supplies a custom configuration, TraceLoader parses the trace again
+   * and caches the result under that configuration key.
+   *
+   * Optional. Falls back to default configuration if not provided.
+   */
+  config?: Trace.Types.Configuration.Configuration;
+  /**
+   * Whether to initialize and activate the Timeline ModificationsManager.
+   *
+   * ModificationsManager tracks user modifications in the Timeline panel.
+   * These include breadcrumbs, entry annotations, entry labels, and hidden entries.
+   *
+   * Setting this to `true` dynamically imports the `panels/timeline` entrypoint.
+   * This import pulls in UI widgets and settings that depend on the browser DOM.
+   * Do not enable this in headless or Node unit tests that run without DOM support.
+   *
+   * Enable this only in Timeline panel unit tests that test modifications,
+   * breadcrumbs, or annotation overlays.
+   *
+   * Defaults to `false`.
+   */
+  withModificationsManager?: boolean;
 }
 
 /**
@@ -49,30 +74,12 @@ export interface TraceEngineLoaderOptions {
  **/
 export class TraceLoader {
   /**
-   * Parsing some trace files easily takes up more than our default Mocha timeout
-   * which is 2seconds. So for most tests that include parsing a trace, we have to
-   * increase the timeout. We use this function to ensure we set a consistent
-   * timeout across all trace model tests.
-   **/
-  static setTestTimeout(context: Mocha.Context|Mocha.Suite): void {
-    // Some traces take a long time to process, especially on our CQ machines.
-    // The trace that takes the longest on my Mac M1 Pro is ~3s (yahoo-news.json.gz).
-    // In CQ, that same trace takes ~10s (linux), ~7.5s (mac), ~11.5s (windows).
-    if (context.timeout() > 0) {
-      context.timeout(Math.max(context.timeout(), 45000));
-    }
-  }
-
-  /**
    * Loads a trace file into memory and returns its contents after
    * JSON.parse-ing them
    *
    **/
   static async fixtureContents(context: Mocha.Context|Mocha.Suite|null, name: string):
       Promise<Trace.Types.File.Contents> {
-    if (context) {
-      TraceLoader.setTestTimeout(context);
-    }
     const cached = fileContentsCache.get(name);
     if (cached) {
       return cached;
@@ -128,31 +135,42 @@ export class TraceLoader {
   }
 
   /**
-   * Executes only the new trace engine on the fixture and returns the resulting parsed data.
+   * Executes the trace engine on a fixture file and returns the parsed trace.
    *
-   * @param context The Mocha test context. Processing a trace can easily
-   * takes up longer than the default Mocha timeout, which is 2s. So we have to
-   * increase this test's timeout. It might be null when we only render a
-   * component example. See TraceLoader.setTestTimeout.
-   * @param file The name of the trace file to be loaded.
-   * The trace file should be in ../panels/timeline/fixtures/traces folder.
-   * @param options Additional trace options.
-   * @param options.initTraceBounds (defaults to `true`) after the trace is
-   * loaded, the TraceBounds manager will automatically be initialised using
-   * the bounds from the trace.
-   * @param config The config the new trace engine should run with. Optional,
-   * will fall back to the Default config if not provided.
+   * TraceLoader caches parsed trace results in memory across tests.
+   * When loading a trace, TraceLoader executes the following steps:
+   * 1. Resets TraceBounds.BoundsManager to empty to avoid leaking state between tests.
+   * 2. Checks the cache for an existing parsed trace matching the fixture name and configuration.
+   * 3. If missing from the cache, reads the fixture and parses the events.
+   *    Parsing runs with `yieldToMain: false` to avoid simulated main thread delays in tests.
+   * 4. Initializes TraceBounds.BoundsManager with the trace bounds and activates SyntheticEventsManager.
+   * 5. If `options.withModificationsManager` is `true`, dynamically imports the Timeline panel
+   *    entrypoint, resets ModificationsManager, and activates a new manager instance.
+   *
+   * Usage examples:
+   * ```ts
+   * // Standard trace parse (model, handler, lantern, or AI assistance tests)
+   * const parsedTrace = await TraceLoader.traceEngine(this, 'basic-trace.json.gz');
+   *
+   * // Custom engine configuration
+   * const parsedTrace = await TraceLoader.traceEngine(this, 'basic-trace.json.gz', {config});
+   *
+   * // Timeline panel test that tests modifications, breadcrumbs, or annotations
+   * const parsedTrace = await TraceLoader.traceEngine(this, 'basic-trace.json.gz', {withModificationsManager: true});
+   * ```
+   *
+   * @param context The Mocha test context.
+   * @param name The name of the trace file in `front_end/panels/timeline/fixtures/traces`.
+   * @param options Trace engine loader options.
    */
-  static async traceEngine(
-      context: Mocha.Context|Mocha.Suite|null, name: string,
-      config: Trace.Types.Configuration.Configuration = Trace.Types.Configuration.defaults(), opts = {
-        withTimelinePanel: true,
-      }): Promise<Trace.TraceModel.ParsedTrace> {
-    if (context) {
-      TraceLoader.setTestTimeout(context);
-    }
+  static async traceEngine(context: Mocha.Context|Mocha.Suite|null, name: string,
+                           options: TraceEngineLoaderOptions = {}): Promise<Trace.TraceModel.ParsedTrace> {
+    const {
+      config = Trace.Types.Configuration.defaults(),
+      withModificationsManager = false,
+    } = options;
     let timelineModule: typeof Timeline|undefined;
-    if (opts.withTimelinePanel) {
+    if (withModificationsManager) {
       timelineModule = await import('../panels/timeline/timeline.js');
     }
     // Force the TraceBounds to be reset to empty. This ensures that in
@@ -252,16 +270,19 @@ export class TraceLoader {
           .parse(events, {
             metadata,
             isFreshRecording: emulateFreshRecording,
+            yieldToMain: false,
             async resolveSourceMap(params) {
               const {sourceUrl, sourceMapUrl, cachedRawSourceMap} = params;
 
               if (cachedRawSourceMap) {
-                return new SDK.SourceMap.SourceMap(sourceUrl, sourceMapUrl, cachedRawSourceMap);
+                return new SDK.SourceMap.SourceMap(sourceUrl, sourceMapUrl, cachedRawSourceMap,
+                                                   Common.Console.Console.instance());
               }
 
               if (sourceMapUrl.startsWith('data:')) {
                 const rawSourceMap = await (await fetch(sourceMapUrl)).json();
-                return new SDK.SourceMap.SourceMap(sourceUrl, sourceMapUrl, rawSourceMap);
+                return new SDK.SourceMap.SourceMap(sourceUrl, sourceMapUrl, rawSourceMap,
+                                                   Common.Console.Console.instance());
               }
 
               return null;
@@ -281,7 +302,7 @@ export class TraceLoader {
    * Karma test run in a single context if we load all the traces
    * we risk getting out of memory
    */
-  static resetCache() {
+  static resetCache(): void {
     fileContentsCache.clear();
     traceEngineCache.clear();
   }

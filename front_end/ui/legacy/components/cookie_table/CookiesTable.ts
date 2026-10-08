@@ -34,6 +34,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 import '../data_grid/data_grid.js';
+import '../../../components/buttons/buttons.js';
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -43,138 +44,153 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import * as IssuesManager from '../../../../models/issues_manager/issues_manager.js';
 import * as NetworkForward from '../../../../panels/network/forward/forward.js';
 import {Icon} from '../../../kit/kit.js';
-import {Directives, html, render} from '../../../lit/lit.js';
+import {Directives, html, nothing, render} from '../../../lit/lit.js';
 import * as UI from '../../legacy.js';
+import dataGridAiButtonStyles from '../data_grid/dataGridAiButton.css.js';
 
 import cookiesTableStyles from './cookiesTable.css.js';
 
-interface ViewInput {
+export interface ViewInput {
   data: CookieData[];
   selectedKey?: string;
   editable?: boolean;
+  deletable?: boolean;
   renderInline?: boolean;
   portBindingEnabled?: boolean;
   schemeBindingEnabled?: boolean;
-  onEdit: (data: CookieData, columnId: string, valueBeforeEditing: string, newText: string) => void;
+  onEdit: (data: CookieData, columnId: string, valueBeforeEditing: string|boolean, newText: string|boolean) => void;
   onCreate: (data: CookieData) => void;
   onRefresh: () => void;
   onDelete: (data: CookieData) => void;
   onContextMenu: (data: CookieData, menu: UI.ContextMenu.ContextMenu) => void;
   onSelect: (key: string|undefined) => void;
+  showAiButton?: boolean;
+  aiButtonTitle?: string;
+  onAiButtonClick?: (cookie: CookieData, event: Event) => void;
 }
 type ViewFunction = (input: ViewInput, output: object, target: HTMLElement) => void;
 type AttributeWithIcon = SDK.Cookie.Attribute.NAME|SDK.Cookie.Attribute.VALUE|SDK.Cookie.Attribute.DOMAIN|
                          SDK.Cookie.Attribute.PATH|SDK.Cookie.Attribute.SECURE|SDK.Cookie.Attribute.SAME_SITE;
 
-type CookieData = Partial<Record<SDK.Cookie.Attribute, string>>&{
-  name: string,
-  value: string,
-}&{
-  key?: string,
-  flagged?: boolean,
-  icons?: Partial<Record<AttributeWithIcon, Icon>>,
-  priorityValue?: number,
-  expiresTooltip?: string,
-  dirty?: boolean,
-  inactive?: boolean,
-};
+type BooleanAttributes =
+    SDK.Cookie.Attribute.HTTP_ONLY|SDK.Cookie.Attribute.SECURE|SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR;
+type CookieData = Partial<Record<Exclude<SDK.Cookie.Attribute, BooleanAttributes>, string>>&
+    Partial<Record<BooleanAttributes, string|boolean>>&{
+      name: string,
+      value: string,
+    }&{
+      key?: string,
+      flagged?: boolean,
+      icons?: Partial<Record<AttributeWithIcon, Icon>>,
+      priorityValue?: number,
+      expiresTooltip?: string,
+      dirty?: boolean,
+      inactive?: boolean,
+    };
 
 const {repeat, ifDefined} = Directives;
 
 const UIStrings = {
   /**
-   * @description Cookie table cookies table expires session value in Cookies Table of the Cookies table in the Application panel
+   * @description Table cell text in the expires or max-age column indicating that the cookie expires at the end of the session.
    */
   session: 'Session',
   /**
-   * @description Text for the name of something
+   * @description Header for the cookie name column in the cookies table.
    */
   name: 'Name',
   /**
-   * @description Text for the value of something
+   * @description Header for the cookie value column in the cookies table.
    */
   value: 'Value',
   /**
-   * @description Text for the size of something
+   * @description Header for the cookie size column in the cookies table.
    */
   size: 'Size',
   /**
-   * @description Text for the "Domain" of the cookie
+   * @description Header for the cookie domain column in the cookies table.
    * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#domaindomain-value
    */
   domain: 'Domain',
   /**
-   * @description Text for the "Path" of the cookie
+   * @description Header for the cookie path column in the cookies table.
    * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#pathpath-value
    */
   path: 'Path',
   /**
-   * @description Text for the "Secure" property of the cookie
+   * @description Header for the secure attribute column in the cookies table.
    * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#secure
    */
   secure: 'Secure',
   /**
-   * @description Text for the "Partition Key Site" property of the cookie
+   * @description Header for the partition key site column in the cookies table.
    * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#partitioned
    */
-  partitionKeySite: 'Partition Key Site',
+  partitionKeySite: 'Partition key site',
   /**
-   * @description Text for the "Priority" property of the cookie
-   * Contains Low, Medium (default), or High if using deprecated cookie Priority attribute.
+   * @description Header for the priority attribute column in the cookies table. Contains Low, Medium (default), or High if using deprecated cookie Priority attribute.
    * https://bugs.chromium.org/p/chromium/issues/detail?id=232693
    */
   priority: 'Priority',
   /**
-   * @description Data grid name for Editable Cookies data grid
+   * @description Accessible name for the editable cookies table.
    */
-  editableCookies: 'Editable Cookies',
+  editableCookies: 'Editable cookies',
   /**
-   * @description Text for web cookies
+   * @description Accessible name for the cookies table.
    */
   cookies: 'Cookies',
   /**
-   * @description Text for something not available
+   * @description Table cell text indicating that a cookie property is not available.
    */
   na: 'N/A',
   /**
-   * @description Text for Context Menu entry
+   * @description Context menu item in the cookies table to show network requests associated with the selected cookie.
    */
   showRequestsWithThisCookie: 'Show requests with this cookie',
   /**
-   * @description Text for Context Menu entry
+   * @description Context menu item in the cookies table to show the issue associated with the selected cookie.
    */
   showIssueAssociatedWithThis: 'Show issue associated with this cookie',
   /**
-   * @description Tooltip for the cell that shows the sourcePort property of a cookie in the cookie table. The source port is numberic attribute of a cookie.
+   * @description Tooltip text for the source port column cell in the cookies table. The source port is a numeric attribute indicating the port number (1-65535) on which the cookie was set, or -1 if unknown.
    */
   sourcePortTooltip:
       'Shows the source port (range 1-65535) the cookie was set on. If the port is unknown, this shows -1.',
   /**
-   * @description Tooltip for the cell that shows the sourceScheme property of a cookie in the cookie table. The source scheme is a trinary attribute of a cookie.
+   * @description Tooltip text for the source scheme column cell in the cookies table. The source scheme is a trinary (three-state) attribute indicating whether the cookie was set on a secure scheme (`Secure`), non-secure scheme (`NonSecure`), or unset (`Unset`).
    */
   sourceSchemeTooltip:
       'Shows the source scheme (`Secure`, `NonSecure`) the cookie was set on. If the scheme is unknown, this shows `Unset`.',
   /**
-   * @description Text for the date column displayed if the expiration time of the cookie is extremely far out in the future.
+   * @description Table cell text in the expires column when the expiration time of the cookie is in the far future.
    * @example {+275760-09-13T00:00:00.000Z} date
    */
   timeAfter: 'after {date}',
   /**
-   * @description Tooltip for the date column displayed if the expiration time of the cookie is extremely far out in the future.
+   * @description Tooltip text in the expires column when the expiration time of the cookie is in the far future.
    * @example {+275760-09-13T00:00:00.000Z} date
    * @example {9001628746521180} seconds
    */
   timeAfterTooltip: 'The expiration timestamp is {seconds}, which corresponds to a date after {date}',
   /**
-   * @description Text to be show in the Partition Key column in case it is an opaque origin.
+   * @description Table cell text in the partition key site column when the origin is opaque.
    */
   opaquePartitionKey: '(opaque)',
+  /**
+   * @description Tooltip for the disabled AI button on HttpOnly cookies explaining why they cannot be added as context.
+   */
+  httpOnlyCookiesCannotBeAdded: 'HttpOnly cookies can’t be added as context',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/cookie_table/CookiesTable.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
 const expiresSessionValue = i18nLazyString(UIStrings.session);
+
+function isFlagAttribute(attribute: SDK.Cookie.Attribute): attribute is BooleanAttributes {
+  return attribute === SDK.Cookie.Attribute.HTTP_ONLY || attribute === SDK.Cookie.Attribute.SECURE;
+}
 
 export interface CookiesTableData {
   cookies: SDK.Cookie.Cookie[];
@@ -187,6 +203,10 @@ export class CookiesTable extends UI.Widget.VBox {
   #refreshCallback?: (() => void);
   #selectedCallback?: ((arg0: SDK.Cookie.Cookie|null) => void);
   #deleteCallback?: ((arg0: SDK.Cookie.Cookie, arg1: () => void) => void);
+  #aiButtonIsEnabled = false;
+  #onAiButtonClick?: (cookie: SDK.Cookie.Cookie, event: Event) => void;
+  #onPopulateAiContextMenu?: (cookie: SDK.Cookie.Cookie, contextMenu: UI.ContextMenu.ContextMenu) => void;
+  #aiButtonTitle?: string;
   private lastEditedColumnId: string|null;
   private data: CookieData[] = [];
   private cookies: SDK.Cookie.Cookie[] = [];
@@ -214,11 +234,13 @@ export class CookiesTable extends UI.Widget.VBox {
                id="cookies-table"
                striped
                ?inline=${input.renderInline}
+               ?deletable=${input.deletable}
                @create=${(e: CustomEvent<CookieData>) => input.onCreate(e.detail)}
                @refresh=${input.onRefresh}
                @deselect=${() => input.onSelect(undefined)}
           >
             <table>
+              ${input.showAiButton ? html`<style>${dataGridAiButtonStyles}</style>` : nothing}
                <tr>
                  <th id=${SDK.Cookie.Attribute.NAME} sortable ?disclosure=${input.editable} ?editable=${input.editable} long weight="24">
                    ${i18nString(UIStrings.name)}
@@ -265,23 +287,34 @@ export class CookiesTable extends UI.Widget.VBox {
                    SourcePort
                 </th>` : ''}
               </tr>
-              ${repeat(this.data, cookie => cookie.key, cookie => html`
+              ${repeat(this.data, cookie => cookie.key, cookie => {
+                const isHttpOnly = Boolean(cookie['http-only']);
+                return html`
                 <tr ?selected=${cookie.key === input.selectedKey}
                     ?inactive=${cookie.inactive}
                     ?dirty=${cookie.dirty}
                     ?highlighted=${cookie.flagged}
-                    @edit=${(e: CustomEvent<{columnId: string, valueBeforeEditing: string, newText: string}>) =>
+                    @edit=${(e: CustomEvent<{columnId: string, valueBeforeEditing: string|boolean, newText: string|boolean}>) =>
                        input.onEdit(cookie, e.detail.columnId, e.detail.valueBeforeEditing, e.detail.newText)}
                     @delete=${()=> input.onDelete(cookie)}
                     @contextmenu=${(e: CustomEvent<UI.ContextMenu.ContextMenu>) => input.onContextMenu(cookie, e.detail)}
                     @select=${() => input.onSelect(cookie.key)}>
-                  <td>${cookie.icons?.name}${cookie.name}</td>
+                  <td>${input.showAiButton ? html`
+                      <span class="ai-button-container">
+                        <devtools-floating-button
+                          icon-name=${Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled ? 'spark' : 'smart-assistant'}
+                          title=${ifDefined(isHttpOnly ? i18nString(UIStrings.httpOnlyCookiesCannotBeAdded) : input.aiButtonTitle)}
+                          ?disabled=${isHttpOnly}
+                          @click=${(e: Event) => !isHttpOnly && input.onAiButtonClick?.(cookie, e)}
+                        ></devtools-floating-button>
+                      </span>
+                    ` : nothing}${cookie.icons?.name}${cookie.name}</td>
                   <td>${cookie.value}</td>
                   <td>${cookie.icons?.domain}${cookie.domain}</td>
                   <td>${cookie.icons?.path}${cookie.path}</td>
                   <td title=${ifDefined(cookie.expiresTooltip)}>${cookie.expires}</td>
                   <td>${cookie.size}</td>
-                  <td data-value=${Boolean(cookie['http-only'])}></td>
+                  <td data-value=${isHttpOnly}></td>
                   <td data-value=${Boolean(cookie.secure)}>${cookie.icons?.secure}</td>
                   <td>${cookie.icons?.['same-site']}${cookie['same-site']}</td>
                   <td>${cookie['partition-key-site']}</td>
@@ -291,7 +324,8 @@ export class CookiesTable extends UI.Widget.VBox {
                     <td title=${i18nString(UIStrings.sourceSchemeTooltip)}>${cookie['source-scheme']}</td>` : ''}
                   ${input.portBindingEnabled ? html`
                     <td title=${i18nString(UIStrings.sourcePortTooltip)}>${cookie['source-port']}</td>` : ''}
-                </tr>`)}
+                </tr>`;
+              })}
                 ${input.editable ? html`<tr placeholder><tr>` : ''}
               </table>
             </devtools-data-grid>`, target, {host: target});
@@ -347,6 +381,26 @@ export class CookiesTable extends UI.Widget.VBox {
     this.#selectedCallback = callback;
   }
 
+  set aiButtonIsEnabled(enabled: boolean) {
+    this.#aiButtonIsEnabled = enabled;
+  }
+
+  get aiButtonIsEnabled(): boolean {
+    return this.#aiButtonIsEnabled;
+  }
+
+  set onAiButtonClick(callback: (cookie: SDK.Cookie.Cookie, event: Event) => void) {
+    this.#onAiButtonClick = callback;
+  }
+
+  set onPopulateAiContextMenu(callback: (cookie: SDK.Cookie.Cookie, contextMenu: UI.ContextMenu.ContextMenu) => void) {
+    this.#onPopulateAiContextMenu = callback;
+  }
+
+  set aiButtonTitle(title: string|undefined) {
+    this.#aiButtonTitle = title;
+  }
+
   set deleteCallback(callback: (arg0: SDK.Cookie.Cookie, arg1: () => void) => void) {
     this.#deleteCallback = callback;
   }
@@ -391,10 +445,12 @@ export class CookiesTable extends UI.Widget.VBox {
   }
 
   override performUpdate(): void {
+    const onAiButtonClick = this.#onAiButtonClick;
     const input: ViewInput = {
       data: this.data,
       selectedKey: this.selectedKey,
       editable: this.#editable,
+      deletable: Boolean(this.#deleteCallback),
       renderInline: this.renderInline,
       schemeBindingEnabled: this.schemeBindingEnabled,
       portBindingEnabled: this.portBindingEnabled,
@@ -404,6 +460,17 @@ export class CookiesTable extends UI.Widget.VBox {
       onDelete: this.onDeleteCookie.bind(this),
       onSelect: this.onSelect.bind(this),
       onContextMenu: this.populateContextMenu.bind(this),
+      showAiButton: this.#aiButtonIsEnabled,
+      aiButtonTitle: this.#aiButtonIsEnabled ? this.#aiButtonTitle : undefined,
+      onAiButtonClick: (this.#aiButtonIsEnabled && onAiButtonClick) ?
+          (cookieData: CookieData, event: Event) => {
+            event.stopPropagation();
+            const cookie = this.cookies.find(c => c.key() === cookieData.key);
+            if (cookie) {
+              onAiButtonClick(cookie, event);
+            }
+          } :
+          undefined,
     };
     const output = {};
     this.view(input, output, this.element);
@@ -421,7 +488,8 @@ export class CookiesTable extends UI.Widget.VBox {
     }
   }
 
-  private onUpdateCookie(oldData: CookieData, columnIdentifier: string, _oldText: string, newText: string): void {
+  private onUpdateCookie(oldData: CookieData, columnIdentifier: string, _oldText: string|boolean,
+                         newText: string|boolean): void {
     const oldCookie = this.cookies.find(cookie => cookie.key() === oldData.key);
     if (!oldCookie) {
       return;
@@ -489,7 +557,14 @@ export class CookiesTable extends UI.Widget.VBox {
              of [SDK.Cookie.Attribute.DOMAIN, SDK.Cookie.Attribute.PATH, SDK.Cookie.Attribute.HTTP_ONLY,
                  SDK.Cookie.Attribute.SECURE, SDK.Cookie.Attribute.SAME_SITE, SDK.Cookie.Attribute.SOURCE_SCHEME]) {
       if (attribute in data) {
-        cookie.addAttribute(attribute, data[attribute]);
+        const value = data[attribute];
+        if (isFlagAttribute(attribute)) {
+          if (value === true) {
+            cookie.addAttribute(attribute);
+          }
+        } else {
+          cookie.addAttribute(attribute, value);
+        }
       }
     }
     if (data.expires && data.expires !== expiresSessionValue()) {
@@ -501,11 +576,8 @@ export class CookiesTable extends UI.Widget.VBox {
           Number.parseInt(data[SDK.Cookie.Attribute.SOURCE_PORT] || '', 10) || undefined);
     }
     if (data[SDK.Cookie.Attribute.PARTITION_KEY_SITE]) {
-      cookie.setPartitionKey(
-          data[SDK.Cookie.Attribute.PARTITION_KEY_SITE],
-          Boolean(
-              data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] ? data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] :
-                                                                   false));
+      cookie.setPartitionKey(data[SDK.Cookie.Attribute.PARTITION_KEY_SITE],
+                             data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] === true);
     }
     cookie.setSize(data[SDK.Cookie.Attribute.NAME].length + data[SDK.Cookie.Attribute.VALUE].length);
     return cookie;
@@ -520,7 +592,11 @@ export class CookiesTable extends UI.Widget.VBox {
              of [SDK.Cookie.Attribute.HTTP_ONLY, SDK.Cookie.Attribute.SECURE, SDK.Cookie.Attribute.SAME_SITE,
                  SDK.Cookie.Attribute.SOURCE_SCHEME, SDK.Cookie.Attribute.SOURCE_PORT]) {
       if (cookie.hasAttribute(attribute)) {
-        data[attribute] = String(cookie.getAttribute(attribute) ?? true);
+        if (isFlagAttribute(attribute)) {
+          data[attribute] = true;
+        } else {
+          data[attribute] = String(cookie.getAttribute(attribute) ?? true);
+        }
       }
     }
     data[SDK.Cookie.Attribute.DOMAIN] = cookie.domain() || (isRequest ? i18nString(UIStrings.na) : '');
@@ -538,7 +614,7 @@ export class CookiesTable extends UI.Widget.VBox {
     }
     data[SDK.Cookie.Attribute.PARTITION_KEY_SITE] =
         cookie.partitionKeyOpaque() ? i18nString(UIStrings.opaquePartitionKey).toString() : cookie.topLevelSite();
-    data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] = cookie.hasCrossSiteAncestor() ? 'true' : '';
+    data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] = cookie.hasCrossSiteAncestor();
     data[SDK.Cookie.Attribute.SIZE] = String(cookie.size());
     data[SDK.Cookie.Attribute.PRIORITY] = cookie.priority();
     data.priorityValue = ['Low', 'Medium', 'High'].indexOf(cookie.priority());
@@ -615,6 +691,7 @@ export class CookiesTable extends UI.Widget.VBox {
       return;
     }
     const cookie = maybeCookie;
+    this.#onPopulateAiContextMenu?.(cookie, contextMenu);
 
     contextMenu.revealSection().appendItem(i18nString(UIStrings.showRequestsWithThisCookie), () => {
       const requestFilter = NetworkForward.UIFilter.UIRequestFilter.filters([
@@ -629,10 +706,10 @@ export class CookiesTable extends UI.Widget.VBox {
       ]);
       void Common.Revealer.reveal(requestFilter);
     }, {jslogContext: 'show-requests-with-this-cookie'});
-    if (IssuesManager.RelatedIssue.hasIssues(cookie)) {
+    if (IssuesManager.RelatedIssue.hasIssues(cookie, IssuesManager.IssuesManager.IssuesManager.instance())) {
       contextMenu.revealSection().appendItem(i18nString(UIStrings.showIssueAssociatedWithThis), () => {
         // TODO(chromium:1077719): Just filter for the cookie instead of revealing one of the associated issues.
-        void IssuesManager.RelatedIssue.reveal(cookie);
+        void IssuesManager.RelatedIssue.reveal(cookie, IssuesManager.IssuesManager.IssuesManager.instance());
       }, {jslogContext: 'show-issue-associated-with-this'});
     }
   }

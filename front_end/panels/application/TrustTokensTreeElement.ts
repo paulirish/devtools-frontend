@@ -13,13 +13,12 @@ import type {ResourcesPanel} from './ResourcesPanel.js';
 
 const UIStrings = {
   /**
-   * @description Hover text for an info icon in the Private State Token panel.
-   * Previously known as 'Trust Tokens'.
+   * @description Label for the private state tokens tree element in the Application panel sidebar.
    */
   trustTokens: 'Private state tokens',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/TrustTokensTreeElement.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class TrustTokensTreeElement extends ApplicationPanelTreeElement {
   private view?: ApplicationComponents.TrustTokensView.TrustTokensView;

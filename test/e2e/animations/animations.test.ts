@@ -7,8 +7,8 @@ import {assert} from 'chai';
 import {veImpressionForAnimationsPanel} from '../helpers/animations-helpers.js';
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 import {expectVeEvents, veImpressionsUnder} from '../helpers/visual-logging-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('The Animations Panel', () => {
   async function runAnimationTest(animationFn: string, devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
@@ -20,10 +20,10 @@ describe('The Animations Panel', () => {
 
   async function waitForAnimationsPanelToLoad(devToolsPage: DevToolsPage) {
     // Open panel and wait for content
-    await openPanelViaMoreTools('Animations', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Animations');
     await devToolsPage.waitFor('div[aria-label="Animations panel"]');
     await devToolsPage.waitFor('div.animation-timeline-header');
-    await expectVeEvents([veImpressionsUnder('Drawer', [veImpressionForAnimationsPanel()])], undefined, devToolsPage);
+    await expectVeEvents(devToolsPage, [veImpressionsUnder('Drawer', [veImpressionForAnimationsPanel()])], undefined);
   }
 
   async function navigateToSiteWithAnimation(inspectedPage: InspectedPage) {
@@ -33,8 +33,8 @@ describe('The Animations Panel', () => {
 
   async function waitForAnimationContent(devToolsPage: DevToolsPage) {
     await devToolsPage.waitFor('.animation-timeline-buffer');
-    await devToolsPage.click(
-        '.animation-buffer-preview[aria-label="Animation Preview 1"]', {clickOptions: {offset: {x: 4, y: 4}}});
+    await devToolsPage.click('.animation-buffer-preview[aria-label="Animation preview 1"]',
+                             {clickOptions: {offset: {x: 4, y: 4}}});
     await devToolsPage.waitFor('.animation-node-row');
     await devToolsPage.waitFor('svg.animation-ui');
   }
@@ -79,25 +79,27 @@ describe('The Animations Panel', () => {
       await inspectedPage.goToResource('animations/animation-groups.html');
       const steps = [
         {expression: 'restartAnimation(\'node1\', \'expandWidth\')', numberOfAnimationGroups: 1},
-        {expression: 'restartAnimation(\'node2\', \'expandWidth\')', numberOfAnimationGroups: 1}, {
+        {expression: 'restartAnimation(\'node2\', \'expandWidth\')', numberOfAnimationGroups: 1},
+        {
           expression: 'toggleClass(\'node1\', \'expandWidth\', false); restartAnimation(\'node1\', \'expand\')',
-          numberOfAnimationGroups: 2
+          numberOfAnimationGroups: 2,
         },
         {expression: 'restartAnimation(\'node3\', \'expand\')', numberOfAnimationGroups: 2},
         {expression: 'restartAnimation(\'node3\', \'expand\')', numberOfAnimationGroups: 2},
-        {expression: 'restartAnimation(\'node2\', \'expand\')', numberOfAnimationGroups: 3}, {
+        {expression: 'restartAnimation(\'node2\', \'expand\')', numberOfAnimationGroups: 3},
+        {
           expression: 'toggleClass(\'node1\', \'long\', true); restartAnimation(\'node1\', \'expand\')',
-          numberOfAnimationGroups: 4
+          numberOfAnimationGroups: 4,
         },
         {
           expression: 'toggleClass(\'node3\', \'long\', true); restartAnimation(\'node3\', \'expand\')',
-          numberOfAnimationGroups: 4
+          numberOfAnimationGroups: 4,
         },
         {
           expression:
               'toggleClass(\'node2\', \'expandWidth\', false); toggleClass(\'node2\', \'long\', true); restartAnimation(\'node2\', \'expand\')',
-          numberOfAnimationGroups: 4
-        }
+          numberOfAnimationGroups: 4,
+        },
       ];
 
       for (const step of steps) {
@@ -113,74 +115,74 @@ describe('The Animations Panel', () => {
         {
           // "New group #0" -> Total groups: 1
           expression: 'resetElement(\'node1\'); startTransition(\'node1\')',
-          numberOfAnimationGroups: 1
+          numberOfAnimationGroups: 1,
         },
         {
           // "Group #0 started again!" -> Total groups: 1
           expression: 'resetElement(\'node2\'); startTransition(\'node2\')',
-          numberOfAnimationGroups: 1
+          numberOfAnimationGroups: 1,
         },
         {
           // "Group #0 started again!" -> Total groups: 1
           expression: 'resetElement(\'node3\'); startTransition(\'node3\')',
-          numberOfAnimationGroups: 1
+          numberOfAnimationGroups: 1,
         },
         {
           // "New group #1" -> Total groups: 2
           expression: 'resetElement(\'node1\'); toggleClass(\'node1\', \'duration\'); startTransition(\'node1\')',
-          numberOfAnimationGroups: 2
+          numberOfAnimationGroups: 2,
         },
         {
           // "Group #1 started again!" -> Total groups: 2
           expression: 'resetElement(\'node1\'); toggleClass(\'node1\', \'duration\'); startTransition(\'node1\')',
-          numberOfAnimationGroups: 2
+          numberOfAnimationGroups: 2,
         },
         {
           // "Group #1 started again!" -> Total groups: 2
           expression: 'resetElement(\'node2\'); toggleClass(\'node2\', \'duration\'); startTransition(\'node2\')',
-          numberOfAnimationGroups: 2
+          numberOfAnimationGroups: 2,
         },
         {
           // "New group #2" -> Total groups: 3
           expression: 'resetElement(\'node1\'); toggleClass(\'node1\', \'expand\')',
-          numberOfAnimationGroups: 3
+          numberOfAnimationGroups: 3,
         },
         {
           // "Group #2 started again!" -> Total groups: 3
           expression: 'resetElement(\'node1\'); toggleClass(\'node1\', \'expand\')',
-          numberOfAnimationGroups: 3
+          numberOfAnimationGroups: 3,
         },
         {
           // "Group #2 started again!" -> Total groups: 3
           expression: 'resetElement(\'node3\'); toggleClass(\'node3\', \'expand\')',
-          numberOfAnimationGroups: 3
+          numberOfAnimationGroups: 3,
         },
         {
           // "New group #3" -> Total groups: 4
           expression: 'resetElement(\'node4\'); startTransition(\'node4\')',
-          numberOfAnimationGroups: 4
+          numberOfAnimationGroups: 4,
         },
         {
           // "New group #4" -> Total groups: 5
           expression: 'resetElement(\'node4\'); toggleClass(\'node4\', \'expand\')',
-          numberOfAnimationGroups: 5
+          numberOfAnimationGroups: 5,
         },
         {
           // "Group #4 started again!" -> Total groups: 5
           expression: 'resetElement(\'node4\'); toggleClass(\'node4\', \'expand\')',
-          numberOfAnimationGroups: 5
+          numberOfAnimationGroups: 5,
         },
         {
           // "New group #5" -> Total groups: 6
           expression:
               'resetElement(\'node4\'); toggleClass(\'node4\', \'duration\'); toggleClass(\'node4\', \'expand\')',
-          numberOfAnimationGroups: 6
+          numberOfAnimationGroups: 6,
         },
         {
           // "Group #4 started again!" -> Total groups: 6
           expression: 'resetElement(\'node4\'); toggleClass(\'node4\', \'expand\')',
-          numberOfAnimationGroups: 6
-        }
+          numberOfAnimationGroups: 6,
+        },
       ];
 
       for (const step of steps) {

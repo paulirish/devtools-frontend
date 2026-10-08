@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import {createTarget, describeWithEnvironment, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 
 import * as WebMCP from './web_mcp.js';
 
@@ -19,13 +23,18 @@ function createTool(name: string, frameId: Protocol.Page.FrameId): Protocol.WebM
   };
 }
 
-describeWithEnvironment('WebMCPModel', () => {
+describe('WebMCPModel', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
   let target: SDK.Target.Target;
   let webMCPModel: WebMCP.WebMCPModel.WebMCPModel;
 
   beforeEach(() => {
-    updateHostConfig({devToolsWebMCPSupport: {enabled: true}});
-    target = createTarget();
+    universe = new TestUniverse();
+    target = universe.createTarget();
     const model = target.model(WebMCP.WebMCPModel.WebMCPModel);
     assert.isNotNull(model);
     webMCPModel = model;
@@ -142,5 +151,22 @@ describeWithEnvironment('WebMCPModel', () => {
     const invokeCancelStub = sinon.stub(target.webMCPAgent(), 'invoke_cancelInvocation');
     call.cancel();
     sinon.assert.calledOnceWithExactly(invokeCancelStub, {invocationId: 'cancelable-invocation'});
+  });
+
+  it('extracts and sorts annotation flags correctly', () => {
+    const protocolTool: Protocol.WebMCP.Tool = {
+      name: 'test-tool',
+      description: 'description',
+      inputSchema: {},
+      frameId: 'frame-1' as Protocol.Page.FrameId,
+      annotations: {
+        untrustedContent: true,
+        readOnly: true,
+        autosubmit: false,
+      },
+    };
+    webMCPModel.toolsAdded({tools: [protocolTool]});
+    const tool = [...webMCPModel.tools][0];
+    assert.deepEqual(tool.flags, ['readOnly', 'untrustedContent']);
   });
 });

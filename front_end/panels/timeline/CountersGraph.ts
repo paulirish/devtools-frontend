@@ -13,40 +13,41 @@ import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingUIRegistration from '../../ui/settings/settings.js';
 
 import type {TimelineModeViewDelegate} from './TimelinePanel.js';
 
 const UIStrings = {
   /**
-   * @description Text for a heap profile type
+   * @description Label for the JS heap counter in the counters graph of the Performance panel.
    */
   jsHeap: 'JS heap',
   /**
-   * @description Text for documents, a type of resources
+   * @description Label for the documents counter in the counters graph of the Performance panel.
    */
   documents: 'Documents',
   /**
-   * @description Text in Counters Graph of the Performance panel
+   * @description Label for the DOM nodes counter in the counters graph of the Performance panel.
    */
   nodes: 'Nodes',
   /**
-   * @description Text in Counters Graph of the Performance panel
+   * @description Label for the event listeners counter in the counters graph of the Performance panel.
    */
   listeners: 'Listeners',
   /**
-   * @description Text in Counters Graph of the Performance panel
+   * @description Label for the GPU memory counter in the counters graph of the Performance panel.
    */
   gpuMemory: 'GPU memory',
   /**
-   * @description Range text content in Counters Graph of the Performance panel
+   * @description Range text content in the counters graph of the Performance panel.
    * @example {2} PH1
    * @example {10} PH2
    */
   ss: '[{PH1} – {PH2}]',
   /**
-   * @description text shown when no counter events are found and the graph is empty
+   * @description Message displayed when no memory usage data is found in the counters graph of the Performance panel.
    */
-  noEventsFound: 'No memory usage data found within selected events.',
+  noEventsFound: 'No memory usage data found within selected events',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/CountersGraph.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -123,16 +124,35 @@ export class CountersGraph extends UI.Widget.VBox {
     this.countersByName.set(
         'jsHeapSizeUsed',
         this.createCounter(
-            i18nString(UIStrings.jsHeap), 'js-heap-size-used', 'hsl(220, 90%, 43%)', i18n.ByteUtilities.bytesToString));
+            i18nString(UIStrings.jsHeap),
+            Common.Settings.Settings.instance().resolve(
+                SettingUIRegistration.TimelineSettings.timelineCountersGraphJsHeapSizeUsedSettingDescriptor),
+            'hsl(220, 90%, 43%)', i18n.ByteUtilities.bytesToString));
     this.countersByName.set(
-        'documents', this.createCounter(i18nString(UIStrings.documents), 'documents', 'hsl(0, 90%, 43%)'));
-    this.countersByName.set('nodes', this.createCounter(i18nString(UIStrings.nodes), 'nodes', 'hsl(120, 90%, 43%)'));
+        'documents',
+        this.createCounter(i18nString(UIStrings.documents),
+                           Common.Settings.Settings.instance().resolve(
+                               SettingUIRegistration.TimelineSettings.timelineCountersGraphDocumentsSettingDescriptor),
+                           'hsl(0, 90%, 43%)'));
+    this.countersByName.set(
+        'nodes',
+        this.createCounter(i18nString(UIStrings.nodes),
+                           Common.Settings.Settings.instance().resolve(
+                               SettingUIRegistration.TimelineSettings.timelineCountersGraphNodesSettingDescriptor),
+                           'hsl(120, 90%, 43%)'));
     this.countersByName.set(
         'jsEventListeners',
-        this.createCounter(i18nString(UIStrings.listeners), 'js-event-listeners', 'hsl(38, 90%, 43%)'));
+        this.createCounter(
+            i18nString(UIStrings.listeners),
+            Common.Settings.Settings.instance().resolve(
+                SettingUIRegistration.TimelineSettings.timelineCountersGraphJsEventListenersSettingDescriptor),
+            'hsl(38, 90%, 43%)'));
 
     this.gpuMemoryCounter = this.createCounter(
-        i18nString(UIStrings.gpuMemory), 'gpu-memory-used-kb', 'hsl(300, 90%, 43%)', i18n.ByteUtilities.bytesToString);
+        i18nString(UIStrings.gpuMemory),
+        Common.Settings.Settings.instance().resolve(
+            SettingUIRegistration.TimelineSettings.timelineCountersGraphGpuMemoryUsedKbSettingDescriptor),
+        'hsl(300, 90%, 43%)', i18n.ByteUtilities.bytesToString);
     this.countersByName.set('gpuMemoryUsedKB', this.gpuMemoryCounter);
 
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
@@ -193,13 +213,12 @@ export class CountersGraph extends UI.Widget.VBox {
     this.currentValuesBar.id = 'counter-values-bar';
   }
 
-  private createCounter(
-      uiName: Common.UIString.LocalizedString, settingsKey: string, color: string,
-      formatter?: ((arg0: number) => string)): Counter {
+  private createCounter(uiName: Common.UIString.LocalizedString, setting: Common.Settings.Setting<boolean>,
+                        color: string, formatter?: ((arg0: number) => string)): Counter {
     const counter = new Counter();
     this.counters.push(counter);
     this.counterUI.push(
-        new CounterUI(this, uiName, settingsKey, color, counter, formatter ?? this.#defaultNumberFormatter.format));
+        new CounterUI(this, uiName, setting, color, counter, formatter ?? this.#defaultNumberFormatter.format));
     return counter;
   }
 
@@ -406,15 +425,14 @@ export class CounterUI {
   private readonly counterName: Common.UIString.LocalizedString;
   private readonly marker: HTMLElement;
 
-  constructor(
-      countersPane: CountersGraph, title: Common.UIString.LocalizedString, settingsKey: string, graphColor: string,
-      counter: Counter, formatter: (arg0: number) => string) {
+  constructor(countersPane: CountersGraph, title: Common.UIString.LocalizedString,
+              setting: Common.Settings.Setting<boolean>, graphColor: string, counter: Counter,
+              formatter: (arg0: number) => string) {
     this.countersPane = countersPane;
     this.counter = counter;
     this.formatter = formatter;
 
-    this.setting = Common.Settings.Settings.instance().createSetting('timeline-counters-graph-' + settingsKey, true);
-    this.setting.setTitle(title);
+    this.setting = setting;
     this.filter = new UI.Toolbar.ToolbarSettingCheckbox(this.setting, title);
     const parsedColor = Common.Color.parse(graphColor);
     if (parsedColor) {

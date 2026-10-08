@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
 import {querySelectorErrorOnMissing, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
-import {deinitializeGlobalVars, initializeGlobalVars} from '../../../testing/EnvironmentHelpers.js';
+import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import type * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as AiAssistance from '../ai_assistance.js';
 
-describe('ExportForAgentsDialog', () => {
+describeWithEnvironment('ExportForAgentsDialog', () => {
   const noop = () => {};
   let dialog: UI.Dialog.Dialog;
   let inspectorFrontendHostStub:
@@ -20,17 +21,12 @@ describe('ExportForAgentsDialog', () => {
   let promptText: string;
   let markdownText: string;
 
-  beforeEach(async () => {
-    await initializeGlobalVars();
+  beforeEach(() => {
     AiAssistance.ExportForAgentsDialog.ExportForAgentsDialog.clearPersistedViewState();
     dialog = new UI.Dialog.Dialog();
     inspectorFrontendHostStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance);
     promptText = 'This is prompt text.';
     markdownText = '# This is markdown text.\n\nWith some content.';
-  });
-
-  afterEach(async () => {
-    await deinitializeGlobalVars();
   });
 
   it('renders correctly in initial (prompt) state', async () => {
@@ -80,6 +76,25 @@ describe('ExportForAgentsDialog', () => {
     const promptRadioButton =
         querySelectorErrorOnMissing<HTMLInputElement>(component.contentElement, 'input[value="prompt"]');
     assert.strictEqual((component.contentElement.getRootNode() as Document).activeElement, promptRadioButton);
+  });
+
+  it('shows a focus indicator on the read-only textarea', async () => {
+    const component = new AiAssistance.ExportForAgentsDialog.ExportForAgentsDialog({
+      dialog,
+      promptText,
+      markdownText,
+      onConversationSaveAs: noop,
+    });
+    renderElementIntoDOM(component);
+    await component.updateComplete;
+
+    const textarea = querySelectorErrorOnMissing<HTMLTextAreaElement>(component.contentElement, 'textarea');
+    textarea.focus();
+
+    assert.isTrue(textarea.matches(':focus-visible'));
+    const textareaStyles = getComputedStyle(textarea);
+    assert.strictEqual(textareaStyles.outlineStyle, 'solid');
+    assert.strictEqual(textareaStyles.outlineWidth, '2px');
   });
 
   it('renders loading state when promptText is a Promise and updates when it is loaded', async () => {
@@ -164,6 +179,7 @@ describe('ExportForAgentsDialog', () => {
        // Clean up.
        resolvePrompt('Done');
        await promptTextPromise;
+       await component.updateComplete;
      });
 
   it('enables the "Save as..." button for Markdown when the summary prompt is generating', async () => {

@@ -4,28 +4,65 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {debuglog} from 'node:util';
-
-import {isNode} from '../environment.js';
+import {isNode, environment} from '../environment.js';
 
 declare global {
   const __PUPPETEER_DEBUG: string;
 }
+/**
+ * @public
+ * @experimental
+ */
+export const DEBUG_PREFIXES = {
+  cdpSend: 'puppeteer:protocol:SEND ►',
+  cdpReceive: 'puppeteer:protocol:RECV ◀',
+  bidiSend: 'puppeteer:webDriverBiDi:SEND ►',
+  bidiReceive: 'puppeteer:webDriverBiDi:RECV ◀',
+  error: 'puppeteer:error',
+  ffmpeg: 'puppeteer:ffmpeg',
+} as const;
 
 /**
- * @internal
+ * @public
+ * @experimental
  */
-let debugModule: typeof debuglog | null = null;
-/**
- * @internal
- */
-export async function importDebug(): Promise<typeof debuglog> {
-  if (!debugModule) {
-    debugModule = (await import('node:util')).debuglog;
-  }
-  return debugModule;
-}
+export type DebugPrefix = (typeof DEBUG_PREFIXES)[keyof typeof DEBUG_PREFIXES];
 
+/**
+ * A function called by Puppeteer to output debug messages.
+ *
+ * @param args - Arbitrary values to log for a debug event.
+ *
+ * @public
+ * @experimental
+ */
+export type LoggerFunction = (...args: unknown[]) => void;
+
+/**
+ * A logger factory function that receives a debug channel prefix and returns
+ * a {@link LoggerFunction} to emit logs for that channel, or `undefined` if
+ * logging is disabled for that channel.
+ *
+ * @example
+ *
+ * ```ts
+ * const customLogger: Logger = (prefix: string) => {
+ *   if (prefix.includes('protocol')) {
+ *     return (...args: unknown[]) =>
+ *       console.log(`[DEBUG: ${prefix}]`, ...args);
+ *   }
+ *   return undefined;
+ * };
+ * ```
+ *
+ * @param prefix - A debug channel prefix, one of {@link DebugPrefix}.
+ * @returns A {@link LoggerFunction} to log messages for the channel,
+ * or `undefined` if logging is disabled.
+ *
+ * @public
+ * @experimental
+ */
+export type Logger = (prefix: string) => LoggerFunction | undefined;
 /**
  * A debug function that can be used in any environment.
  *
@@ -53,7 +90,7 @@ export async function importDebug(): Promise<typeof debuglog> {
  * @example
  *
  * ```
- * const log = debug('Page');
+ * const log = debug(DEBUG_PREFIXES.error);
  *
  * log('new page created')
  * // logs "Page: new page created"
@@ -64,63 +101,41 @@ export async function importDebug(): Promise<typeof debuglog> {
  *
  * @internal
  */
-export const debug = (prefix: string): ((...args: unknown[]) => void) => {
+export const debug: Logger = (prefix): LoggerFunction | undefined => {
   if (isNode) {
-    return async (...logArgs: unknown[]) => {
-      if (captureLogs) {
-        capturedLogs.push(prefix + logArgs);
-      }
-      ((await importDebug())(prefix) as (...args: any[]) => void)(...logArgs);
+    const nodeDebug = environment.value.debuglog?.(prefix);
+    if (!nodeDebug || !nodeDebug.enabled) {
+      return;
+    }
+
+    return (...logArgs: unknown[]) => {
+      (nodeDebug as LoggerFunction)(...logArgs);
     };
   }
 
+  const debugLevel = (globalThis as any).__PUPPETEER_DEBUG;
+  if (!debugLevel) {
+    return;
+  }
+
+  const everythingShouldBeLogged = debugLevel === '*';
+
+  const prefixMatchesDebugLevel =
+    everythingShouldBeLogged ||
+    /**
+     * If the debug level is `foo*`, that means we match any prefix that
+     * starts with `foo`. If the level is `foo`, we match only the prefix
+     * `foo`.
+     */
+    (debugLevel.endsWith('*')
+      ? prefix.startsWith(debugLevel.slice(0, -1))
+      : prefix === debugLevel);
+
+  if (!prefixMatchesDebugLevel) {
+    return;
+  }
+
   return (...logArgs: unknown[]): void => {
-    const debugLevel = (globalThis as any).__PUPPETEER_DEBUG;
-    if (!debugLevel) {
-      return;
-    }
-
-    const everythingShouldBeLogged = debugLevel === '*';
-
-    const prefixMatchesDebugLevel =
-      everythingShouldBeLogged ||
-      /**
-       * If the debug level is `foo*`, that means we match any prefix that
-       * starts with `foo`. If the level is `foo`, we match only the prefix
-       * `foo`.
-       */
-      (debugLevel.endsWith('*')
-        ? prefix.startsWith(debugLevel)
-        : prefix === debugLevel);
-
-    if (!prefixMatchesDebugLevel) {
-      return;
-    }
-
     console.log(`${prefix}:`, ...logArgs);
   };
 };
-
-/**
- * @internal
- */
-let capturedLogs: string[] = [];
-/**
- * @internal
- */
-let captureLogs = false;
-
-/**
- * @internal
- */
-export function setLogCapture(value: boolean): void {
-  capturedLogs = [];
-  captureLogs = value;
-}
-
-/**
- * @internal
- */
-export function getCapturedLogs(): string[] {
-  return capturedLogs;
-}

@@ -3,18 +3,18 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget, stubNoopSettings} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 
 import * as PerformanceMonitor from './performance_monitor.js';
 
-describeWithMockConnection('PerformanceMonitor', () => {
+describeWithEnvironment('PerformanceMonitor', () => {
   let target: SDK.Target.Target;
   let performanceMonitor: PerformanceMonitor.PerformanceMonitor.PerformanceMonitorImpl;
 
@@ -93,7 +93,7 @@ describeWithMockConnection('PerformanceMonitor', () => {
   });
 });
 
-describe('ControlPane', () => {
+describeWithEnvironment('ControlPane', () => {
   const chartsInfo: PerformanceMonitor.PerformanceMonitor.ChartInfo[] = [
     {
       title: 'Chart1' as unknown as Common.UIString.LocalizedString,
@@ -104,10 +104,6 @@ describe('ControlPane', () => {
       metrics: [{name: 'Metric2', color: 'blue'}],
     },
   ];
-
-  beforeEach(() => {
-    stubNoopSettings();
-  });
 
   it('renders indicators', async () => {
     const view = createViewFunctionStub(PerformanceMonitor.PerformanceMonitor.ControlPane);
@@ -125,6 +121,7 @@ describe('ControlPane', () => {
 
     const onMetricChanged = sinon.spy();
     controlPane.onMetricChanged = onMetricChanged;
+    onMetricChanged.resetHistory();
 
     controlPane.chartsInfo = chartsInfo;
     const {onCheckboxChange} = await view.nextInput;

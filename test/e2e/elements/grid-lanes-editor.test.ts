@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert} from 'chai';
-
 import {
   clickNthChildOfSelectedElementNode,
   focusElementsTree,
@@ -12,8 +10,8 @@ import {
   waitForCSSPropertyValue,
 } from '../helpers/elements-helpers.js';
 import {clickPropertyButton, clickStylePropertyEditorButton} from '../helpers/style-property-editor-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('Grid Lanes Editor', function() {
   async function setupStyles(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
@@ -25,20 +23,22 @@ describe('Grid Lanes Editor', function() {
       </style>
       <div id="target"></div>
     `);
-    await waitForContentOfSelectedElementsNode('<body>\u200B', devToolsPage);
+    await waitForContentOfSelectedElementsNode(devToolsPage, '<body>\u200B');
     await focusElementsTree(devToolsPage);
-    await clickNthChildOfSelectedElementNode(1, devToolsPage);
-    await waitForCSSPropertyValue('#target', 'display', 'grid-lanes', undefined, devToolsPage);
+    await clickNthChildOfSelectedElementNode(devToolsPage, 1);
+    await waitForCSSPropertyValue(devToolsPage, '#target', 'display', 'grid-lanes', undefined);
   }
 
   it('can be opened and grid-lanes styles can be edited', async ({devToolsPage, inspectedPage}) => {
     await setupStyles(devToolsPage, inspectedPage);
-    await clickStylePropertyEditorButton('Open grid-lanes editor', 'devtools-grid-lanes-editor', devToolsPage);
-    await clickPropertyButton('[title="Add justify-items: start"]', devToolsPage);
-    await waitForCSSPropertyValue('#target', 'justify-items', 'start', undefined, devToolsPage);
-    await clickPropertyButton('[title="Remove justify-items: start"]', devToolsPage);
+    await clickStylePropertyEditorButton(devToolsPage, 'Open grid-lanes editor', 'devtools-grid-lanes-editor');
+    await clickPropertyButton(devToolsPage, '[title="Add justify-items: start"]');
+    await waitForCSSPropertyValue(devToolsPage, '#target', 'justify-items', 'start', undefined);
+    await clickPropertyButton(devToolsPage, '[title="Remove justify-items: start"]');
     await devToolsPage.waitFor('[title="Add justify-items: start"]');
-    const property = await getCSSPropertyInRule('#target', 'justify-items', undefined, devToolsPage);
-    assert.isUndefined(property);
+    await devToolsPage.waitForFunction(async () => {
+      const property = await getCSSPropertyInRule(devToolsPage, '#target', 'justify-items', undefined);
+      return property === undefined;
+    });
   });
 });

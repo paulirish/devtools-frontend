@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Protocol from '../../generated/protocol.js';
-import * as Bindings from '../../models/bindings/bindings.js';
-import * as Workspace from '../../models/workspace/workspace.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
 import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
-import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
-import * as Common from '../common/common.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
@@ -23,7 +20,15 @@ const SCRIPT_ID_TWO = '2' as Protocol.Runtime.ScriptId;
 
 describe('DebuggerModel', () => {
   setupRuntimeHooks();
-  setupSettingsHooks();
+
+  let universe: TestUniverse;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    // Eagerly initialize DebuggerWorkspaceBinding to register its observer on TargetManager.
+    // This sets up the before-paused callback needed for auto-stepping checks.
+    void universe.debuggerWorkspaceBinding;
+  });
 
   describe('breakpoint activation', () => {
     it('deactivates breakpoints on construction with inactive breakpoints', async () => {
@@ -35,8 +40,8 @@ describe('DebuggerModel', () => {
         }
         return {};
       });
-      Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(false);
-      createTarget({connection});
+      universe.settings.resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(false);
+      universe.createTarget({connection});
       assert.isTrue(breakpointsDeactivated);
     });
 
@@ -50,12 +55,12 @@ describe('DebuggerModel', () => {
         return {};
       });
 
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
 
       await target.suspend();
 
       // Deactivate breakpoints while suspended.
-      Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(false);
+      universe.settings.resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(false);
 
       // Verify that the backend received the message.
       assert.isTrue(breakpointsDeactivated);
@@ -80,25 +85,116 @@ describe('DebuggerModel', () => {
         return {};
       });
 
-      // Deactivate breakpoints befroe the target is created.
-      Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(false);
-      const target = createTarget({connection});
+      // Deactivate breakpoints before the target is created.
+      universe.settings.resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(false);
+      const target = universe.createTarget({connection});
       assert.isTrue(breakpointsDeactivated);
 
       await target.suspend();
 
       // Activate breakpoints while suspended.
-      Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(true);
+      universe.settings.resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(true);
 
       // Verify that the backend received the message.
       assert.isTrue(breakpointsActivated);
     });
   });
 
+  describe('skipAllPauses', () => {
+    it('skips all pauses on construction when setting is enabled', async () => {
+      const connection = new MockCDPConnection();
+      let skipAllPausesEnabled = false;
+      connection.setSuccessHandler('Debugger.setSkipAllPauses', request => {
+        if (request.skip === true) {
+          skipAllPausesEnabled = true;
+        }
+        return {};
+      });
+      universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(true);
+      universe.createTarget({connection});
+      assert.isTrue(skipAllPausesEnabled);
+    });
+
+    it('updates skip all pauses when setting changes', async () => {
+      const connection = new MockCDPConnection();
+      const skipRequests: boolean[] = [];
+      connection.setSuccessHandler('Debugger.setSkipAllPauses', request => {
+        skipRequests.push(request.skip);
+        return {};
+      });
+      universe.createTarget({connection});
+      universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(true);
+      universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(false);
+      assert.deepEqual(skipRequests, [true, false]);
+    });
+
+    it('skips all pauses for suspended target when resumed', async () => {
+      const connection = new MockCDPConnection();
+      let skipAllPausesEnabled = false;
+      connection.setSuccessHandler('Debugger.setSkipAllPauses', request => {
+        if (request.skip === true) {
+          skipAllPausesEnabled = true;
+        }
+        return {};
+      });
+
+      universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(true);
+      const target = universe.createTarget({connection});
+      assert.isTrue(skipAllPausesEnabled);
+
+      await target.suspend();
+
+      skipAllPausesEnabled = false;
+      await target.resume();
+      assert.isTrue(skipAllPausesEnabled);
+    });
+
+    it('does not re-enable pauses on pause() when setting is enabled', async () => {
+      const connection = new MockCDPConnection();
+      const skipRequests: boolean[] = [];
+      connection.setSuccessHandler('Debugger.setSkipAllPauses', request => {
+        skipRequests.push(request.skip);
+        return {};
+      });
+      connection.setSuccessHandler('Debugger.pause', () => ({}));
+
+      universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(true);
+      const target = universe.createTarget({connection});
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assert.deepEqual(skipRequests, [true]);
+
+      debuggerModel?.pause();
+      assert.deepEqual(skipRequests, [true]);
+    });
+
+    it('does not re-enable pauses after timeout when setting is enabled', async () => {
+      const clock = sinon.useFakeTimers();
+      try {
+        const connection = new MockCDPConnection();
+        const skipRequests: boolean[] = [];
+        connection.setSuccessHandler('Debugger.setSkipAllPauses', request => {
+          skipRequests.push(request.skip);
+          return {};
+        });
+
+        universe.settings.resolve(SDK.DebuggerModel.skipAllPausesSettingDescriptor).set(true);
+        const target = universe.createTarget({connection});
+        const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+        assert.deepEqual(skipRequests, [true]);
+
+        debuggerModel?.skipAllPausesUntilReloadOrTimeout(500);
+        clock.tick(600);
+        assert.deepEqual(skipRequests, [true]);
+      } finally {
+        clock.restore();
+      }
+    });
+  });
+
   describe('createRawLocationFromURL', () => {
     it('yields correct location in the presence of multiple scripts with the same URL', async () => {
       const connection = new MockCDPConnection();
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       const url = 'http://localhost/index.html';
       connection.dispatchEvent(
@@ -112,7 +208,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             hash: '',
             buildId: '',
-            isLiveEdit: false,
             sourceMapURL: undefined,
             hasSourceURL: false,
             length: 10,
@@ -129,7 +224,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             hash: '',
             buildId: '',
-            isLiveEdit: false,
             sourceMapURL: undefined,
             hasSourceURL: false,
             length: 10,
@@ -160,7 +254,7 @@ describe('DebuggerModel', () => {
         };
       });
 
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
       target.markAsNodeJSForTest();
       const model = new SDK.DebuggerModel.DebuggerModel(target);
       const {breakpointId} = await model.setBreakpointByURL(urlString`fs.js`, 1);
@@ -171,7 +265,7 @@ describe('DebuggerModel', () => {
   describe('scriptsForSourceURL', () => {
     it('returns the latest script at the front of the result for scripts with the same URL', () => {
       const connection = new MockCDPConnection();
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
       const url = 'http://localhost/index.html';
       connection.dispatchEvent(
           'Debugger.scriptParsed', {
@@ -184,7 +278,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             hash: '',
             buildId: '',
-            isLiveEdit: false,
             sourceMapURL: undefined,
             hasSourceURL: false,
             length: 10,
@@ -201,7 +294,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             buildId: '',
             hash: '',
-            isLiveEdit: false,
             sourceMapURL: undefined,
             hasSourceURL: false,
             length: 10,
@@ -220,12 +312,11 @@ describe('DebuggerModel', () => {
     setupLocaleHooks();
 
     it('Scope.typeName covers every enum value', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
       const scriptUrl = urlString`https://script-host/script.js`;
-      const script = new SDK.Script.Script(
-          debuggerModel, SCRIPT_ID_ONE, scriptUrl, 0, 0, 0, 0, 0, '', false, false, undefined, false, 0, null, null,
-          null, null, null, null, null);
+      const script = new SDK.Script.Script(debuggerModel, SCRIPT_ID_ONE, scriptUrl, 0, 0, 0, 0, 0, '', false, undefined,
+                                           false, 0, null, null, null, null, null, null, null);
       const scopeTypes: Protocol.Debugger.ScopeType[] = [
         Protocol.Debugger.ScopeType.Global,
         Protocol.Debugger.ScopeType.Local,
@@ -262,27 +353,93 @@ describe('DebuggerModel', () => {
         assert.notEqual('', scope.typeName());
       }
     });
+
+    it('attaches extra properties to the local scope even if preceded by a block scope', () => {
+      const target = universe.createTarget();
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
+      const scriptUrl = urlString`https://script-host/script.js`;
+      const script = new SDK.Script.Script(debuggerModel, SCRIPT_ID_ONE, scriptUrl, 0, 0, 0, 0, 0, '', false, undefined,
+                                           false, 0, null, null, null, null, null, null, null);
+      const payload: Protocol.Debugger.CallFrame = {
+        callFrameId: '0' as Protocol.Debugger.CallFrameId,
+        functionName: 'test',
+        location: {
+          scriptId: SCRIPT_ID_ONE,
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+        url: 'test-url',
+        scopeChain: [
+          {
+            type: Protocol.Debugger.ScopeType.Block,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+          },
+          {
+            type: Protocol.Debugger.ScopeType.Local,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+          },
+        ],
+        this: {type: 'object'} as Protocol.Runtime.RemoteObject,
+        returnValue: {type: 'number', value: 42} as Protocol.Runtime.RemoteObject,
+        canBeRestarted: false,
+      };
+      const callFrame = new SDK.DebuggerModel.CallFrame(debuggerModel, script, payload, 0);
+      const scopes = callFrame.scopeChain();
+      assert.lengthOf(scopes[0].extraProperties(), 0);
+      assert.lengthOf(scopes[1].extraProperties(), 1);
+      assert.strictEqual(scopes[1].extraProperties()[0].name, 'Return value');
+    });
+
+    it('exposes emptyReason and retains empty scopes in the scope chain', () => {
+      const target = universe.createTarget();
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
+      const scriptUrl = urlString`https://script-host/script.js`;
+      const script = new SDK.Script.Script(debuggerModel, SCRIPT_ID_ONE, scriptUrl, 0, 0, 0, 0, 0, '', false, undefined,
+                                           false, 0, null, null, null, null, null, null, null);
+      const payload: Protocol.Debugger.CallFrame = {
+        callFrameId: '0' as Protocol.Debugger.CallFrameId,
+        functionName: 'test',
+        location: {
+          scriptId: SCRIPT_ID_ONE,
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+        url: 'test-url',
+        scopeChain: [
+          {
+            type: Protocol.Debugger.ScopeType.Block,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+            emptyReason: Protocol.Debugger.ScopeEmptyReason.NoVariables,
+          },
+          {
+            type: Protocol.Debugger.ScopeType.Local,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+          },
+          {
+            type: Protocol.Debugger.ScopeType.Closure,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+            emptyReason: Protocol.Debugger.ScopeEmptyReason.AllUnavailable,
+          },
+        ],
+        this: {type: 'object'} as Protocol.Runtime.RemoteObject,
+        canBeRestarted: false,
+      };
+      const callFrame = new SDK.DebuggerModel.CallFrame(debuggerModel, script, payload, 0);
+      const scopes = callFrame.scopeChain();
+      assert.lengthOf(scopes, 3);
+      assert.strictEqual(scopes[0].emptyReason(), Protocol.Debugger.ScopeEmptyReason.NoVariables);
+      assert.isUndefined(scopes[1].emptyReason());
+      assert.strictEqual(scopes[2].emptyReason(), Protocol.Debugger.ScopeEmptyReason.AllUnavailable);
+      assert.deepEqual(scopes.map(scope => scope.ordinal()), [0, 1, 2]);
+      assert.strictEqual(callFrame.localScope(), scopes[1]);
+    });
   });
 
   describe('pause', () => {
-    beforeEach(() => {
-      const targetManager = SDK.TargetManager.TargetManager.instance();
-      const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-      const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-      const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
-      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
-        forceNew: true,
-        resourceMapping,
-        targetManager,
-        ignoreListManager,
-        workspace,
-      });
-    });
-
     it('with empty call frame list will invoke plain step-into', async () => {
       const connection = new MockCDPConnection();
-      const target =
-          createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.FRAME, connection});
+      const target = universe.createTarget(
+          {id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.FRAME, connection});
       const stepIntoRequestPromise = new Promise<void>(resolve => {
         connection.setSuccessHandler('Debugger.stepInto', () => {
           resolve();
@@ -302,16 +459,9 @@ describe('DebuggerModel', () => {
   });
 
   describe('ignoring sourcemaps', () => {
-    beforeEach(() => {
-      SDK.PageResourceLoader.PageResourceLoader.instance({
-        forceNew: true,
-        loadOverride: null,
-      });
-    });
-
     it('ignores sourcemaps when DWARF symbols are present', () => {
       const connection = new MockCDPConnection();
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       const sourceMapManager = debuggerModel!.sourceMapManager();
       const attachSourceMapSpy = sinon.spy(sourceMapManager, 'attachSourceMap');
@@ -334,7 +484,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             hash: '',
             buildId: '',
-            isLiveEdit: false,
             sourceMapURL: sourceMapUrl,
             hasSourceURL: false,
             length: 10,
@@ -347,7 +496,7 @@ describe('DebuggerModel', () => {
 
     it('attaches sourcemaps when DWARF symbols are not present', () => {
       const connection = new MockCDPConnection();
-      const target = createTarget({connection});
+      const target = universe.createTarget({connection});
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       const sourceMapManager = debuggerModel!.sourceMapManager();
       const attachSourceMapSpy = sinon.spy(sourceMapManager, 'attachSourceMap');
@@ -366,7 +515,6 @@ describe('DebuggerModel', () => {
             executionContextId: 1 as Protocol.Runtime.ExecutionContextId,
             hash: '',
             buildId: '',
-            isLiveEdit: false,
             sourceMapURL: sourceMapUrl,
             hasSourceURL: false,
             length: 10,
@@ -387,18 +535,21 @@ describe('DebuggerModel', () => {
     const sourceMapSymbols:
         Protocol.Debugger.DebugSymbols = {type: Protocol.Debugger.DebugSymbolsType.SourceMap, externalURL: 'abc'};
 
+    let targetManager: SDK.TargetManager.TargetManager;
     beforeEach(() => {
-      Common.Console.Console.instance({forceNew: true});
+      const universe = new TestUniverse();
+      targetManager = universe.targetManager;
     });
 
     function testSelectSymbolSource(
         debugSymbols: Protocol.Debugger.DebugSymbols[]|null, expectedSymbolType: Protocol.Debugger.DebugSymbolsType,
         expectedWarning?: string) {
-      const selectedSymbol = SDK.DebuggerModel.DebuggerModel.selectSymbolSource(debugSymbols);
+      const devToolsConsole = targetManager.getConsole();
+      const selectedSymbol = SDK.DebuggerModel.DebuggerModel.selectSymbolSource(debugSymbols, devToolsConsole);
       assert.isNotNull(selectedSymbol);
       assert.strictEqual(selectedSymbol.type, expectedSymbolType);
 
-      const consoleMessages = Common.Console.Console.instance().messages();
+      const consoleMessages = devToolsConsole.messages();
       if (!expectedWarning) {
         assert.lengthOf(consoleMessages, 0);
         return;
@@ -429,10 +580,11 @@ describe('DebuggerModel', () => {
     });
 
     it('returns null if nothing is available', () => {
-      const selectedSymbol = SDK.DebuggerModel.DebuggerModel.selectSymbolSource([]);
+      const devToolsConsole = targetManager.getConsole();
+      const selectedSymbol = SDK.DebuggerModel.DebuggerModel.selectSymbolSource([], devToolsConsole);
       assert.isNull(selectedSymbol);
 
-      const consoleMessages = Common.Console.Console.instance().messages();
+      const consoleMessages = devToolsConsole.messages();
       assert.lengthOf(consoleMessages, 0);
     });
   });

@@ -4,6 +4,8 @@
 
 import type {Brand} from './Brand.js';
 
+let graphemeSegmenter: Intl.Segmenter|null = null;
+
 export const escapeCharacters = (inputString: string, charsToEscape: string): string => {
   let foundChar = false;
   for (let i = 0; i < charsToEscape.length; ++i) {
@@ -48,23 +50,71 @@ const escapedReplacements = new Map([
   ['</script', '\\x3C/script'],
 ]);
 
+const UNICODE_ESCAPE_SOURCE = '[\\p{Format}\\p{Surrogate}]';
+const UNICODE_ESCAPE_REGEX = new RegExp(UNICODE_ESCAPE_SOURCE, 'u');
+const UNICODE_ESCAPE_GLOBAL_REGEX = new RegExp(UNICODE_ESCAPE_SOURCE, 'gu');
+
+const UNICODE_ESCAPE_EXCEPT_ZWSP_SOURCE = '(?![\\u200B\\u200C\\u200D])[\\p{Format}]|\\p{Surrogate}';
+const UNICODE_ESCAPE_EXCEPT_ZWSP_REGEX = new RegExp(UNICODE_ESCAPE_EXCEPT_ZWSP_SOURCE, 'u');
+const UNICODE_ESCAPE_EXCEPT_ZWSP_GLOBAL_REGEX = new RegExp(UNICODE_ESCAPE_EXCEPT_ZWSP_SOURCE, 'gu');
+
+/**
+ * Escapes formatting and surrogate characters in the string into literal Unicode escape sequences (e.g. \u200B).
+ * Use this when displaying strings to developers for inspection (e.g. in the Console or Object properties)
+ * where you want hidden or invisible characters to be explicitly visible as literal text.
+ */
+export const escapeUnicodeAsText = (content: string): string => {
+  if (!UNICODE_ESCAPE_REGEX.test(content)) {
+    return content;
+  }
+  return content.replaceAll(UNICODE_ESCAPE_GLOBAL_REGEX, match => {
+    return match.split('').map(char => '\\u' + toHexadecimal(char.charCodeAt(0), 4)).join('');
+  });
+};
+
+/**
+ * Escapes dangerous formatting and surrogate characters (like bidi override characters) to prevent
+ * security and layout issues, but leaves safe, layout-critical zero-width formatting characters
+ * (Zero Width Space \u200B, Zero Width Non-Joiner \u200C, and Zero Width Joiner \u200D) untouched.
+ * Use this when rendering user-controlled content inside templates or HTML markup where you want formatting
+ * characters to function normally for word wrapping or rendering layout, rather than showing as literal text.
+ */
+export const safeEscapeUnicode = (content: string): string => {
+  if (!UNICODE_ESCAPE_EXCEPT_ZWSP_REGEX.test(content)) {
+    return content;
+  }
+  return content.replaceAll(UNICODE_ESCAPE_EXCEPT_ZWSP_GLOBAL_REGEX, match => {
+    return match.split('').map(char => '\\u' + toHexadecimal(char.charCodeAt(0), 4)).join('');
+  });
+};
+
 export const formatAsJSLiteral = (content: string): string => {
-  const patternsToEscape = /(\\|<(?:!--|\/?script))|(\p{Control})|(\p{Surrogate})/gu;
-  const patternsToEscapePlusSingleQuote = /(\\|'|<(?:!--|\/?script))|(\p{Control})|(\p{Surrogate})/gu;
+  const patternsToEscape = /(\\|<(?:!--|\/?script))|(\p{Control}|\p{Format})|(\p{Surrogate})/giu;
+  const patternsToEscapePlusSingleQuote = /(\\|'|<(?:!--|\/?script))|(\p{Control}|\p{Format})|(\p{Surrogate})/giu;
   const escapePattern = (match: string, pattern: string, controlChar: string, loneSurrogate: string): string => {
     if (controlChar) {
       if (escapedReplacements.has(controlChar)) {
         // @ts-expect-error https://github.com/microsoft/TypeScript/issues/13086
         return escapedReplacements.get(controlChar);
       }
-      const twoDigitHex = toHexadecimal(controlChar.charCodeAt(0), 2);
-      return '\\x' + twoDigitHex;
+      return controlChar.split('')
+          .map(char => {
+            const charCode = char.charCodeAt(0);
+            if (controlChar.length === 1 && charCode <= 0xFF) {
+              return '\\x' + toHexadecimal(charCode, 2);
+            }
+            return '\\u' + toHexadecimal(charCode, 4);
+          })
+          .join('');
     }
     if (loneSurrogate) {
       const fourDigitHex = toHexadecimal(loneSurrogate.charCodeAt(0), 4);
       return '\\u' + fourDigitHex;
     }
     if (pattern) {
+      if (pattern.startsWith('<')) {
+        return '\\x3C' + pattern.slice(1);
+      }
       return escapedReplacements.get(pattern) || '';
     }
     return match;
@@ -158,8 +208,8 @@ export const toBase64 = (inputString: string): string => {
     shift = i % 3;
     v |= data[i] << (16 >>> shift & 24);
     if (shift === 2) {
-      encoded += String.fromCharCode(
-          encodeBits(v >>> 18 & 63), encodeBits(v >>> 12 & 63), encodeBits(v >>> 6 & 63), encodeBits(v & 63));
+      encoded += String.fromCharCode(encodeBits(v >>> 18 & 63), encodeBits(v >>> 12 & 63), encodeBits(v >>> 6 & 63),
+                                     encodeBits(v & 63));
       v = 0;
     }
   }
@@ -294,8 +344,8 @@ export const filterRegex = function(query: string): RegExp {
   return new RegExp(regexString, 'i');
 };
 
-export const createSearchRegex = function(
-    query: string, caseSensitive: boolean, isRegex: boolean, matchWholeWord = false): RegExp {
+export const createSearchRegex = function(query: string, caseSensitive: boolean, isRegex: boolean,
+                                          matchWholeWord = false): RegExp {
   const regexFlags = caseSensitive ? 'g' : 'gi';
   let regexObject;
 
@@ -445,6 +495,39 @@ export const trimEndWithMaxLength = (str: string, maxLength: number): string => 
   }
 
   return str.slice(0, lastSegmentIndex) + ellipsis;
+};
+
+/**
+ * Truncates a string to not exceed a maximum number of UTF-16 code units (as measured by JS `string.length`).
+ *
+ * Unlike simple character limiters, this helper is grapheme-aware and uses `Intl.Segmenter` to prevent
+ * slicing inside surrogate pairs (e.g. Plane 1+ characters or emojis like '𠜎' / '🥳') or combining characters
+ * (e.g. 'é' represented in NFD as 'e' + combining acute accent). If the limit falls in the middle of a
+ * grapheme cluster, the function backs off to drop the entire cluster, ensuring the result is always a valid
+ * Unicode string.
+ *
+ * @param str The string to truncate.
+ * @param maxCodeUnits The maximum allowed code unit length (must be >= 0).
+ * @returns The truncated string, guaranteed to be <= maxCodeUnits in length and grapheme-safe.
+ */
+export const truncateToCodeUnitLength = (str: string, maxCodeUnits: number): string => {
+  if (isNaN(maxCodeUnits) || maxCodeUnits <= 0) {
+    return '';
+  }
+  if (str.length <= maxCodeUnits) {
+    return str;
+  }
+  if (!graphemeSegmenter) {
+    graphemeSegmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  }
+  let lastSafeIndex = 0;
+  for (const {index, segment} of graphemeSegmenter.segment(str)) {
+    if (index + segment.length > maxCodeUnits) {
+      break;
+    }
+    lastSafeIndex = index + segment.length;
+  }
+  return str.slice(0, lastSafeIndex);
 };
 
 export const escapeForRegExp = (str: string): string => {
@@ -656,4 +739,69 @@ export const concatBase64 = function(lhs: string, rhs: string): string {
   const lhsLeaveAsIs = lhs.substring(0, lhs.length - 4);
   const lhsToDecode = lhs.substring(lhs.length - 4);
   return lhsLeaveAsIs + globalThis.btoa(globalThis.atob(lhsToDecode) + globalThis.atob(rhs));
+};
+
+/**
+ * Characters that cause spreadsheet viewers (Excel, Google Sheets, LibreOffice
+ * Calc) to evaluate a cell as a formula rather than rendering it as plain text
+ * when they appear at the start of a cell.
+ */
+const CSV_FORMULA_TRIGGERS = new Set(['=', '+', '-', '@', '\t', '\r']);
+
+/**
+ * Matches plain numeric literals (e.g. `-42`, `+3.14`, `-1e-3`).
+ * Even though negative/signed numbers start with `-` or `+`, spreadsheets parse
+ * them as numbers rather than formulas, so we exempt them from `'` prefixing to
+ * keep numeric columns usable.
+ */
+const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/**
+ * Returns true if a spreadsheet viewer could interpret `value` as a formula
+ * (for example `=SUM(A1:A2)`, `"- Loading..."`, or `"@alice"`).
+ */
+function isCsvFormula(value: string): boolean {
+  // Check both the raw string and the leading-whitespace-trimmed string, since
+  // some spreadsheet parsers ignore leading spaces before `=`, `+`, `-`, or `@`.
+  const trimmed = value.trimStart();
+  if (!CSV_FORMULA_TRIGGERS.has(value[0]) && !CSV_FORMULA_TRIGGERS.has(trimmed[0])) {
+    return false;
+  }
+  return !CSV_PLAIN_NUMBER.test(trimmed.trimEnd());
+}
+
+/**
+ * Formats and escapes `value` so it can be safely written as a single CSV cell.
+ *
+ * This handles two separate layers of escaping:
+ * 1. Spreadsheet formula escaping (CWE-1236 & viewer fidelity):
+ *    RFC 4180 double-quoting (`"=1+1"` or `"- Loading..."`) only groups text
+ *    into a single CSV column; spreadsheet apps strip the outer `"` and still
+ *    evaluate cells starting with `=`, `+`, `-`, or `@` as formulas (often
+ *    resulting in `#NAME?` errors or unintended formula execution). Prefixing
+ *    the value with a single quote (`'`) tells spreadsheet apps to treat the
+ *    cell as literal text (and they hide the leading `'` when displaying it).
+ *    - Example without commas: `=SUM(A1:A2)` -> `'=SUM(A1:A2)`
+ * 2. RFC 4180 structural CSV quoting:
+ *    If the cell also contains commas (`,`), double quotes (`"`), or newlines,
+ *    it is wrapped in `"..."` (with inner `"` doubled to `""`) so CSV parsers
+ *    do not split the cell across columns or rows.
+ *    - Example with commas: `=SUM(1,2)` -> `"'=SUM(1,2)"`
+ *    - Example starting with a literal quote: `"=SUM(1,2)"` -> `"""=SUM(1,2)"""`
+ *      (not treated as a formula since the first character is `"`, not `=`).
+ */
+export const escapeCsvCell = function(value: string): string {
+  // Step 1: Prefix formula-like text with `'` so spreadsheets render it as literal text.
+  let escaped = isCsvFormula(value) ? `'${value}` : value;
+
+  // Step 2: Apply standard RFC 4180 double-quoting if the cell contains quotes,
+  // commas, or line breaks so the CSV structure stays intact.
+  if (escaped.includes('"')) {
+    escaped = escaped.replace(/"/g, '""');
+    return `"${escaped}"`;
+  }
+  if (escaped.includes(',') || escaped.includes('\n') || escaped.includes('\r')) {
+    return `"${escaped}"`;
+  }
+  return escaped;
 };

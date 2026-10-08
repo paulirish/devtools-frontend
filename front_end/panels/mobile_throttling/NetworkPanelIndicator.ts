@@ -9,22 +9,17 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description Icon title in Network Panel Indicator of the Network panel
+   * @description Icon title for warning indicator in the Network panel title.
    */
   networkThrottlingIsEnabled: 'Network throttling is enabled',
   /**
-   * @description Icon title in Network Panel Indicator of the Network panel
+   * @description Icon title for warning indicator in the Network panel title.
    */
-  requestsMayBeOverridden: 'Requests may be overridden locally, see the Sources panel',
+  requestsMayBeOverridden: 'Requests may be overridden locally. See the Sources panel.',
   /**
-   * @description Icon title in Network Panel Indicator of the Network panel
+   * @description Icon title for warning indicator in the Network panel title.
    */
-  requestsMayBeBlocked: 'Requests may be blocked, see the Network request blocking panel',
-  /**
-   * @description Title of an icon in the Network panel that indicates that accepted content encodings have been overridden.
-   */
-  acceptedEncodingOverrideSet:
-      'The set of accepted `Content-Encoding` headers has been modified by DevTools, see the Network conditions panel',
+  requestsMayBeBlocked: 'Requests may be blocked. See the Request conditions panel.',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/NetworkPanelIndicator.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -41,9 +36,9 @@ export class NetworkPanelIndicator {
         SDK.NetworkManager.MultitargetNetworkManager.Events.BLOCKED_PATTERNS_CHANGED, updateVisibility);
     manager.addEventListener(
         SDK.NetworkManager.MultitargetNetworkManager.Events.INTERCEPTORS_CHANGED, updateVisibility);
-    manager.addEventListener(
-        SDK.NetworkManager.MultitargetNetworkManager.Events.ACCEPTED_ENCODINGS_CHANGED, updateVisibility);
-    Common.Settings.Settings.instance().moduleSetting('cache-disabled').addChangeListener(updateVisibility, this);
+    Common.Settings.Settings.instance()
+        .resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor)
+        .addChangeListener(updateVisibility, this);
 
     updateVisibility();
 
@@ -57,9 +52,6 @@ export class NetworkPanelIndicator {
       }
       if (manager.isBlocking()) {
         warnings.push(i18nString(UIStrings.requestsMayBeBlocked));
-      }
-      if (manager.isAcceptedEncodingOverrideSet()) {
-        warnings.push(i18nString(UIStrings.acceptedEncodingOverrideSet));
       }
       UI.InspectorView.InspectorView.instance().setPanelWarnings('network', warnings);
     }

@@ -1,0 +1,137 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import * as Host from '../../../core/host/host.js';
+import * as i18n from '../../../core/i18n/i18n.js';
+import type * as SDK from '../../../core/sdk/sdk.js';
+import * as Logs from '../../logs/logs.js';
+import {formatBytesToKb, seconds} from '../data_formatters/UnitFormatters.js';
+
+import {
+  type BaseToolCapability,
+  type DataHandlerResult,
+  type DataTool,
+  isOriginAllowedByLock,
+  type OriginLockCapability,
+  PermissionPrompt,
+  resolveOriginFromLock,
+  ToolName,
+} from './Tool.js';
+
+const UIStringsNotTranslate = {
+  listingNetworkRequests: 'Listing network requests',
+} as const;
+
+const lockedString = i18n.i18n.lockedString;
+
+interface NetworkRequestSummary {
+  id: string;
+  url: string;
+  statusCode: number;
+  duration: string;
+  transferSize: string;
+}
+
+/**
+ * A tool that lists all network requests recorded by DevTools.
+ * Filters the list by the conversation's established origin to prevent cross-origin data exposure.
+ */
+export class ListNetworkRequestsTool implements
+    DataTool<Record<string, never>, unknown, BaseToolCapability&OriginLockCapability> {
+  readonly name: ToolName = ToolName.LIST_NETWORK_REQUESTS;
+  readonly permissionPrompt: PermissionPrompt = PermissionPrompt.NEVER;
+  readonly description: string =
+      'Lists recorded network requests for the active origin, including request ID, URL, HTTP status code, duration, and transfer size.';
+
+  readonly #networkLog?: Logs.NetworkLog.NetworkLog;
+
+  constructor(networkLog?: Logs.NetworkLog.NetworkLog) {
+    this.#networkLog = networkLog;
+  }
+
+  readonly parameters: Host.AidaClient.FunctionObjectParam<never> = {
+    type: Host.AidaClient.ParametersTypes.OBJECT,
+    description: '',
+    nullable: true,
+    required: [],
+    properties: {},
+  };
+
+  displayInfoFromArgs(): {
+    title: string,
+    action: string,
+  } {
+    return {
+      title: lockedString(UIStringsNotTranslate.listingNetworkRequests),
+      action: 'listNetworkRequests()',
+    };
+  }
+
+  /**
+   * Handles the request to list network requests.
+   * Returns requests matching the conversation's established origin, if set.
+   */
+  async handler(
+      _params: Record<string, never>,
+      context: BaseToolCapability&OriginLockCapability,
+      ): Promise<DataHandlerResult<unknown>> {
+    const requests: NetworkRequestSummary[] = [];
+    // A conversation is locked to an origin once the first query is made.
+    // We only allow inspecting requests matching the conversation's established origin.
+    const originLock = context.getOriginLock();
+    const originResult = resolveOriginFromLock(originLock);
+    if ('error' in originResult) {
+      return originResult;
+    }
+    const establishedOrigin = originResult.origin;
+
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    const networkLog = this.#networkLog ?? Logs.NetworkLog.NetworkLog.instance();
+    let hasCrossOriginRequest = false;
+    const requestsToShow: SDK.NetworkRequest.NetworkRequest[] = [];
+    for (const request of networkLog.requests()) {
+      // If the request's initiator origin does not match the locked origin, skip it.
+      if (!isOriginAllowedByLock(originLock, request.initiatorSecurityOrigin())) {
+        hasCrossOriginRequest = true;
+        continue;
+      }
+
+      requests.push({
+        id: request.requestId(),
+        url: request.url(),
+        statusCode: request.statusCode,
+        duration: seconds(request.duration),
+        transferSize: formatBytesToKb(request.transferSize),
+      });
+      requestsToShow.push(request);
+    }
+
+    if (requests.length === 0) {
+      if (hasCrossOriginRequest) {
+        return {
+          error: `No requests showing with origin ${establishedOrigin.siteId()}. Tell the user to start a new chat`,
+        };
+      }
+      return {
+        result: JSON.stringify([]),
+        widgets: [{
+          name: 'NETWORK_REQUESTS_LIST',
+          data: {
+            requests: [],
+          },
+        }],
+      };
+    }
+
+    return {
+      result: JSON.stringify(requests),
+      widgets: [{
+        name: 'NETWORK_REQUESTS_LIST',
+        data: {
+          requests: requestsToShow,
+        },
+      }],
+    };
+  }
+}

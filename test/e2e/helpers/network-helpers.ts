@@ -5,8 +5,8 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 import {veImpression} from './visual-logging-helpers.js';
 
@@ -25,7 +25,8 @@ export async function openNetworkTab(devToolsPage: DevToolsPage): Promise<void> 
 /**
  * Select the Network tab in DevTools
  */
-export async function navigateToNetworkTab(testName: string, devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
+export async function navigateToNetworkTab(devToolsPage: DevToolsPage, inspectedPage: InspectedPage,
+                                           testName: string): Promise<void> {
   await inspectedPage.goToResource(`network/${testName}`);
   await openNetworkTab(devToolsPage);
 }
@@ -35,25 +36,25 @@ export async function navigateToNetworkTab(testName: string, devToolsPage: DevTo
  * @param numberOfRequests The expected number of requests to wait for.
  * @param selector Optional. The selector to use to get the list of requests.
  */
-export async function waitForSomeRequestsToAppear(numberOfRequests: number, devToolsPage: DevToolsPage) {
+export async function waitForSomeRequestsToAppear(devToolsPage: DevToolsPage, numberOfRequests: number): Promise<void> {
   await devToolsPage.waitForFunction(async () => {
     const requests = await getAllRequestNames(devToolsPage);
     return requests.length >= numberOfRequests && Boolean(requests.map(name => name ? name.trim() : '').join(''));
   });
 }
 
-export async function getAllRequestNames(devToolsPage: DevToolsPage) {
+export async function getAllRequestNames(devToolsPage: DevToolsPage): Promise<string[]> {
   const requests = await devToolsPage.$$(REQUEST_LIST_SELECTOR + ' .name-column');
   return await Promise.all(requests.map(
       request => request.evaluate(
           r => [...r.childNodes].find(({nodeType}) => nodeType === Node.TEXT_NODE)?.textContent ?? '')));
 }
 
-export async function getNumberOfRequests(devToolsPage: DevToolsPage) {
+export async function getNumberOfRequests(devToolsPage: DevToolsPage): Promise<number> {
   return (await getAllRequestNames(devToolsPage)).length;
 }
 
-export async function getSelectedRequestName(devToolsPage: DevToolsPage) {
+export async function getSelectedRequestName(devToolsPage: DevToolsPage): Promise<string|null> {
   const request = await devToolsPage.$(REQUEST_LIST_SELECTOR + ' tr.selected .name-column');
   if (!request) {
     return null;
@@ -63,8 +64,8 @@ export async function getSelectedRequestName(devToolsPage: DevToolsPage) {
   });
 }
 
-export async function selectRequestByName(
-    name: string, clickOptions: puppeteer.ClickOptions = {}, devToolsPage: DevToolsPage) {
+export async function selectRequestByName(devToolsPage: DevToolsPage, name: string,
+                                          clickOptions: puppeteer.ClickOptions = {}): Promise<void> {
   await devToolsPage.waitForFunction(async () => {
     const requests = await getAllRequestNames(devToolsPage);
     return requests.some(request => request.trim() === name);
@@ -101,22 +102,23 @@ export async function selectRequestByName(
   await devToolsPage.page.mouse.click(x, y, clickOptions);
 }
 
-export async function waitForSelectedRequestChange(initialRequestName: string|null, devToolsPage: DevToolsPage) {
-  await devToolsPage.waitForFunction(async () => {
-    const name = await getSelectedRequestName(devToolsPage);
-    return name !== initialRequestName;
+export async function waitForSelectedRequestChange(devToolsPage: DevToolsPage,
+                                                   initialSelected: string|null): Promise<string> {
+  return await devToolsPage.waitForFunction(async () => {
+    const selected = await getSelectedRequestName(devToolsPage);
+    return selected !== initialSelected ? selected : undefined;
   });
 }
 
-export async function setPersistLog(persist: boolean, devToolsPage: DevToolsPage) {
-  await devToolsPage.setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
+export async function setKeepLog(devToolsPage: DevToolsPage, enable: boolean): Promise<void> {
+  await devToolsPage.setCheckBox('[title*="clear log"]', enable);
 }
 
-export async function setCacheDisabled(disabled: boolean, devToolsPage: DevToolsPage): Promise<void> {
-  await devToolsPage.setCheckBox('[title^="Disable cache"]', disabled);
+export async function setCacheDisabled(devToolsPage: DevToolsPage, enable: boolean): Promise<void> {
+  await devToolsPage.setCheckBox('[title^="Disable cache"]', enable);
 }
 
-export async function setInvert(invert: boolean, devToolsPage: DevToolsPage) {
+export async function setInvert(devToolsPage: DevToolsPage, invert: boolean): Promise<void> {
   await devToolsPage.setCheckBox('[title="Invert"]', invert);
 }
 
@@ -130,7 +132,7 @@ export async function clearTimeWindow(devToolsPage: DevToolsPage): Promise<void>
   await overviewGridCursorArea.click({count: 2});
 }
 
-export async function setTextFilter(text: string, devToolsPage: DevToolsPage): Promise<void> {
+export async function setTextFilter(devToolsPage: DevToolsPage, text: string): Promise<void> {
   const toolbarHandle = await devToolsPage.waitFor('.text-filter');
   const input = await devToolsPage.waitForAria('Filter', toolbarHandle);
   await input.focus();
@@ -153,7 +155,8 @@ export async function clearTextFilter(devToolsPage: DevToolsPage): Promise<void>
   }
 }
 
-export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>, devToolsPage: DevToolsPage) {
+export async function getTextFromHeadersRow(devToolsPage: DevToolsPage,
+                                            row: puppeteer.ElementHandle<Element>): Promise<string[]> {
   const headerNameElement = await row.waitForSelector('.header-name');
   assert.isOk(headerNameElement);
   const headerNameText = await headerNameElement.evaluate(el => el.textContent || '');
@@ -180,7 +183,9 @@ export async function elementContainsTextWithSelector(
   return selectedElements.includes(textContent);
 }
 
-export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) {
+export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}): {
+  impressions: string[],
+} {
   const filterBar = options?.newFilterBar ?
       [
         veImpression('DropDown', 'request-types'),
@@ -242,7 +247,7 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
   ]);
 }
 
-export async function clickInfobarButton(devToolsPage: DevToolsPage) {
+export async function clickInfobarButton(devToolsPage: DevToolsPage): Promise<void> {
   const infoBar = await devToolsPage.waitForAria('Select a folder to store override files in');
   // Allow time for infobar to animate in before clicking the button
   await devToolsPage.timeout(550);

@@ -19,16 +19,16 @@ describe('The Console Tab', function() {
     // eslint-disable-next-line no-console
     await inspectedPage.evaluate(() => console.log('target'));
 
-    await typeIntoConsoleAndWaitForResult('1;', 1, undefined, devToolsPage);
-    await typeIntoConsoleAndWaitForResult('2;', 1, undefined, devToolsPage);
-    await typeIntoConsoleAndWaitForResult('3;', 1, undefined, devToolsPage);
+    await typeIntoConsoleAndWaitForResult(devToolsPage, '1;', 1, undefined);
+    await typeIntoConsoleAndWaitForResult(devToolsPage, '2;', 1, undefined);
+    await typeIntoConsoleAndWaitForResult(devToolsPage, '3;', 1, undefined);
 
     const evaluateResults = await devToolsPage.evaluate(() => {
       return Array.from(document.querySelectorAll('.console-user-command-result')).map(node => node.textContent);
     });
     assert.deepEqual(evaluateResults, ['1', '2', '3'], 'did not find expected output in the console');
 
-    await typeIntoConsole('console.clear();', devToolsPage);
+    await typeIntoConsole(devToolsPage, 'console.clear();');
 
     await devToolsPage.waitForFunction(async () => {
       return await devToolsPage.evaluate(() => document.querySelectorAll('.console-user-command-result').length === 1);
@@ -44,11 +44,26 @@ describe('The Console Tab', function() {
     assert.strictEqual(clearResult, 'undefined', 'the result of clear was not undefined');
 
     // Check that the sidebar is also cleared.
-    await devToolsPage.click('[aria-label="Show console sidebar"]');
-    const sideBar = await devToolsPage.waitFor('div[slot="sidebar"]');
-    const treeOutline = await devToolsPage.waitFor('.tree-outline', sideBar);
-    const entries = await devToolsPage.$$('li', treeOutline);
-    const entriesText = await Promise.all(entries.map(e => e.evaluate(e => e.innerText)));
+    await devToolsPage.click('[aria-label="Show Console sidebar"]');
+    await devToolsPage.waitFor('div[slot="sidebar"]');
+    const entriesText = await devToolsPage.waitForFunction(async () => {
+      // Find the sidebar element explicitly inside the polling loop, in case lit removes and recreates elements
+      const sideBarHandle = await devToolsPage.$('div[slot="sidebar"]');
+      if (!sideBarHandle) {
+        return false;
+      }
+      const treeOutlineHandle = await devToolsPage.waitFor('.tree-outline', sideBarHandle);
+      const entries = await devToolsPage.$$('li', treeOutlineHandle);
+      if (entries.length === 0) {
+        return false;
+      }
+      const text = await Promise.all(entries.map(e => e.evaluate(e => e.innerText as string)));
+      if (text.length > 0 && text[0] === '1 message') {
+        return text;
+      }
+      return false;
+    });
+
     assert.deepEqual(entriesText, [
       '1 message',
       '<other> 1',

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import cssnano from 'cssnano';
 import cssnanoPresetLite from 'cssnano-preset-lite';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import postcss from 'postcss';
 
@@ -40,14 +40,13 @@ export default \`${stylesheetContents}
 }
 
 async function runMain() {
-  const [, , buildTimestamp, isDebugString, targetName, srcDir, targetGenDir, files, ] = process.argv;
+  const [, , buildTimestamp, isDebugString, srcDir, targetGenDir, files] = process.argv;
 
   const filenames = files.split(',');
-  const configFiles = [];
   const isDebug = isDebugString === 'true';
 
-  for (const fileName of filenames) {
-    const contents = fs.readFileSync(path.join(srcDir, fileName), {
+  await Promise.all(filenames.map(async fileName => {
+    const contents = await fs.readFile(path.join(srcDir, fileName), {
       encoding: 'utf8',
       flag: 'r',
     });
@@ -60,26 +59,10 @@ async function runMain() {
     const generatedFileName = `${fileName}.js`;
     const generatedFileLocation = path.join(targetGenDir, generatedFileName);
 
-    writeIfChanged(generatedFileLocation, newContents);
-
-    configFiles.push(`\"${generatedFileName}\"`);
-  }
-
-  writeIfChanged(
-      path.join(targetGenDir, `${targetName}-tsconfig.json`),
-      `{
-    "compilerOptions": {
-        "composite": true,
-        "outDir": "."
-    },
-    "files": [
-        ${configFiles.join(',\n        ')}
-    ]
-}
-`,
-  );
+    await writeIfChanged(generatedFileLocation, newContents);
+  }));
 }
 
 if (import.meta.main) {
-  runMain();
+  await runMain();
 }

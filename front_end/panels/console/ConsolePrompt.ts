@@ -9,6 +9,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Badges from '../../models/badges/badges.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as Formatter from '../../models/formatter/formatter.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
@@ -16,6 +17,7 @@ import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import {Icon} from '../../ui/kit/kit.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Settings from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ConsolePanel} from './ConsolePanel.js';
@@ -25,25 +27,29 @@ const {Direction} = TextEditor.TextEditorHistory;
 
 const UIStrings = {
   /**
-   * @description Text in Console Prompt of the Console panel
+   * @description Text in Console prompt of the Console panel.
    */
   consolePrompt: 'Console prompt',
   /**
-   * @description Warning shown to users when pasting text into the DevTools console. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
+   * @description Warning shown to users when pasting text into the DevTools Console. IMPORTANT: keep double quotes around PH1 and do not use single quotes.
    * @example {allow pasting} PH1
    */
   selfXssWarning:
-      'Warning: Don’t paste code into the DevTools Console that you don’t understand or haven’t reviewed yourself. This could allow attackers to steal your identity or take control of your computer. Please type “{PH1}” below and press Enter to allow pasting.',
+      'Warning: Don’t paste code into the DevTools Console that you don’t understand or haven’t reviewed yourself. This could allow attackers to steal your identity or take control of your computer. Type "{PH1}" below and press Enter to allow pasting.',
   /**
-   * @description Text a user needs to type in order to confirm that they are aware of the danger of pasting code into the DevTools console.
+   * @description Text a user needs to type in order to confirm that they are aware of the danger of pasting code into the DevTools Console.
    */
   allowPasting: 'allow pasting',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsolePrompt.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.Widget>(
-    UI.Widget.Widget) {
+const ConsolePromptBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.Widget> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.Widget,
+    );
+
+export class ConsolePrompt extends ConsolePromptBase {
   private addCompletionsFromHistory: boolean;
   #history: TextEditor.AutocompleteHistory.AutocompleteHistory;
   private initialText: string;
@@ -123,7 +129,8 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.element.appendChild(this.promptIcon);
     this.iconThrottler = new Common.Throttler.Throttler(0);
 
-    this.eagerEvalSetting = Common.Settings.Settings.instance().moduleSetting('console-eager-eval');
+    this.eagerEvalSetting =
+        Common.Settings.Settings.instance().resolve(Settings.ConsoleSettings.consoleEagerEvalSettingDescriptor);
     this.eagerEvalSetting.addChangeListener(this.eagerSettingChanged.bind(this));
     this.eagerPreviewElement.classList.toggle('hidden', !this.eagerEvalSetting.get());
 
@@ -133,8 +140,9 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     const argumentHints = TextEditor.JavaScript.argumentHints();
     this.#argumentHintsState = argumentHints[0];
 
-    const autocompleteOnEnter = TextEditor.Config.DynamicSetting.bool(
-        'console-autocomplete-on-enter', [], TextEditor.Config.conservativeCompletion);
+    const autocompleteOnEnter =
+        TextEditor.Config.DynamicSetting.bool(Settings.ConsoleSettings.consoleAutocompleteOnEnterSettingDescriptor, [],
+                                              TextEditor.Config.conservativeCompletion);
 
     const extensions = [
       CodeMirror.keymap.of(this.editorKeymap()),
@@ -170,7 +178,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
       this.aiCodeCompletionProvider.editorInitialized(this.editor);
       this.editor.editor.dispatch({
         effects: TextEditor.AiCodeCompletionProvider.setAiCodeCompletionTeaserMode.of(
-            TextEditor.AiCodeCompletionProvider.AiCodeCompletionTeaserMode.ONLY_SHOW_ON_EMPTY)
+            TextEditor.AiCodeCompletionProvider.AiCodeCompletionTeaserMode.ONLY_SHOW_ON_EMPTY),
       });
     }
 
@@ -236,7 +244,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
       SDK.OverlayModel.OverlayModel.highlightObjectAsDOMNode(result.object);
     } else if (this.highlightingNode) {
       this.highlightingNode = false;
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
     if (result && executionContext) {
       executionContext.runtimeModel.releaseEvaluationResult(result);
@@ -247,7 +255,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     super.willHide();
     if (this.highlightingNode) {
       this.highlightingNode = false;
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
   }
 
@@ -272,6 +280,18 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
   clear(): void {
     this.editor.dispatch({
       changes: {from: 0, to: this.editor.state.doc.length},
+    });
+  }
+
+  /**
+   * Replaces the full prompt content with the given text, places the caret
+   * at the end, and scrolls the editor into view.
+   */
+  insertText(text: string): void {
+    this.editor.dispatch({
+      changes: {from: 0, to: this.editor.state.doc.length, insert: text},
+      selection: {anchor: text.length},
+      scrollIntoView: true,
     });
   }
 
@@ -390,7 +410,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
         if (teaserMode !== TextEditor.AiCodeCompletionProvider.AiCodeCompletionTeaserMode.OFF) {
           this.editor.editor.dispatch({
             effects: TextEditor.AiCodeCompletionProvider.setAiCodeCompletionTeaserMode.of(
-                TextEditor.AiCodeCompletionProvider.AiCodeCompletionTeaserMode.OFF)
+                TextEditor.AiCodeCompletionProvider.AiCodeCompletionTeaserMode.OFF),
           });
         }
       }
@@ -429,7 +449,8 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
       useCommandLineAPI: boolean): Promise<void> {
     const callFrame = executionContext.debuggerModel.selectedCallFrame();
     if (callFrame?.script.isJavaScript()) {
-      const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);
+      const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(
+          callFrame, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance());
       expression = await this.substituteNames(expression, nameMap);
     }
 
@@ -438,7 +459,8 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
         ?.evaluateCommandInConsole(executionContext, message, expression, useCommandLineAPI);
   }
 
-  private async substituteNames(expression: string, mapping: Map<string, string|null>): Promise<string> {
+  private async substituteNames(expression: string,
+                                mapping: Formatter.FormatterWorkerPool.ScopeVariableMapping[]): Promise<string> {
     try {
       return await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(expression, mapping);
     } catch {

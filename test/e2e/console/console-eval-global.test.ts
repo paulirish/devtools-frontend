@@ -5,7 +5,12 @@
 import {assert} from 'chai';
 
 import {step} from '../../shared/helper.js';
-import {CONSOLE_TAB_SELECTOR, focusConsolePrompt, getCurrentConsoleMessages} from '../helpers/console-helpers.js';
+import {
+  CONSOLE_TAB_SELECTOR,
+  focusConsolePrompt,
+  getCurrentConsoleMessages,
+  waitForLastConsoleMessageToHaveContent,
+} from '../helpers/console-helpers.js';
 
 describe('The Console Tab', () => {
   it('interacts with the global scope correctly', async ({devToolsPage}) => {
@@ -22,35 +27,21 @@ describe('The Console Tab', () => {
         };
       `);
       await devToolsPage.pressKey('Enter');
-      // Wait for the console to be usable again.
-      await devToolsPage.waitForFunction(async () => {
-        return (await devToolsPage.$$('.console-user-command-result')).length === 1;
-      });
+      await waitForLastConsoleMessageToHaveContent(devToolsPage, 'undefined');
     });
 
     await step('enter code that references the created bindings', async () => {
-      // TODO: it should actually wait for rendering to finish.
-      await devToolsPage.drainTaskQueue();
-
       await devToolsPage.pasteText('foo;');
       await devToolsPage.pressKey('Enter');
-
-      // Wait for the console to be usable again.
-      await devToolsPage.waitForFunction(async () => {
-        return (await devToolsPage.$$('.console-user-command-result')).length === 2;
-      });
-
-      // TODO: it should actually wait for rendering to finish.
-      await devToolsPage.drainTaskQueue();
+      await waitForLastConsoleMessageToHaveContent(devToolsPage, '\'fooValue\'');
 
       await devToolsPage.pasteText('bar;');
       await devToolsPage.pressKey('Enter');
+      await waitForLastConsoleMessageToHaveContent(devToolsPage, '{a: \'b\'}');
     });
 
     await step('check that the expected output is logged', async () => {
-      // TODO: it should actually wait for rendering to finish.
-      await devToolsPage.drainTaskQueue();
-      const messages = await getCurrentConsoleMessages(false, undefined, undefined, devToolsPage);
+      const messages = await getCurrentConsoleMessages(devToolsPage, false, undefined, undefined);
       assert.deepEqual(messages, [
         'undefined',
         '\'fooValue\'',

@@ -20,6 +20,8 @@ declare namespace ProtocolProxyApi {
   export interface ProtocolApi {
     Accessibility: AccessibilityApi;
 
+    Ads: AdsApi;
+
     Animation: AnimationApi;
 
     Audits: AuditsApi;
@@ -52,6 +54,8 @@ declare namespace ProtocolProxyApi {
 
     DeviceOrientation: DeviceOrientationApi;
 
+    DigitalCredentials: DigitalCredentialsApi;
+
     Emulation: EmulationApi;
 
     EventBreakpoints: EventBreakpointsApi;
@@ -63,6 +67,8 @@ declare namespace ProtocolProxyApi {
     Fetch: FetchApi;
 
     FileSystem: FileSystemApi;
+
+    FindInPage: FindInPageApi;
 
     HeadlessExperimental: HeadlessExperimentalApi;
 
@@ -133,6 +139,8 @@ declare namespace ProtocolProxyApi {
   export interface ProtocolDispatchers {
     Accessibility: AccessibilityDispatcher;
 
+    Ads: AdsDispatcher;
+
     Animation: AnimationDispatcher;
 
     Audits: AuditsDispatcher;
@@ -165,6 +173,8 @@ declare namespace ProtocolProxyApi {
 
     DeviceOrientation: DeviceOrientationDispatcher;
 
+    DigitalCredentials: DigitalCredentialsDispatcher;
+
     Emulation: EmulationDispatcher;
 
     EventBreakpoints: EventBreakpointsDispatcher;
@@ -176,6 +186,8 @@ declare namespace ProtocolProxyApi {
     Fetch: FetchDispatcher;
 
     FileSystem: FileSystemDispatcher;
+
+    FindInPage: FindInPageDispatcher;
 
     HeadlessExperimental: HeadlessExperimentalDispatcher;
 
@@ -306,6 +318,23 @@ declare namespace ProtocolProxyApi {
      */
     nodesUpdated(params: Protocol.Accessibility.NodesUpdatedEvent): void;
 
+  }
+
+  export interface AdsApi {
+    /**
+     * Retrieves ad metrics for the current page.
+     */
+    invoke_getAdMetrics(): Promise<Protocol.Ads.GetAdMetricsResponse>;
+
+    /**
+     * Retrieves ad scripts for the current page. To minimize payload size, this
+     * only returns the newly tracked ad scripts since the last call to
+     * getAdScripts (i.e., the delta).
+     */
+    invoke_getAdScripts(): Promise<Protocol.Ads.GetAdScriptsResponse>;
+
+  }
+  export interface AdsDispatcher {
   }
 
   export interface AnimationApi {
@@ -650,6 +679,13 @@ declare namespace ProtocolProxyApi {
     invoke_getBrowserCommandLine(): Promise<Protocol.Browser.GetBrowserCommandLineResponse>;
 
     /**
+     * Adds or updates a mock camera in the shared video capture device list for
+     * test automation. The mock camera is not scoped to a particular page or
+     * frame and is removed when the DevTools session that created it disconnects.
+     */
+    invoke_addMockCamera(params: Protocol.Browser.AddMockCameraRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Get Chrome histograms.
      */
     invoke_getHistograms(params: Protocol.Browser.GetHistogramsRequest): Promise<Protocol.Browser.GetHistogramsResponse>;
@@ -696,12 +732,16 @@ declare namespace ProtocolProxyApi {
     invoke_addPrivacySandboxEnrollmentOverride(params: Protocol.Browser.AddPrivacySandboxEnrollmentOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
-     * Configures encryption keys used with a given privacy sandbox API to talk
-     * to a trusted coordinator.  Since this is intended for test automation only,
-     * coordinatorOrigin must be a .test domain. No existing coordinator
-     * configuration for the origin may exist.
+     * Gets the current globally-applied privacy control status
+     * See https://www.w3.org/TR/gpc/#get-global-privacy-control
      */
-    invoke_addPrivacySandboxCoordinatorKeyConfig(params: Protocol.Browser.AddPrivacySandboxCoordinatorKeyConfigRequest): Promise<Protocol.ProtocolResponseWithError>;
+    invoke_getGlobalPrivacyControl(): Promise<Protocol.Browser.GetGlobalPrivacyControlResponse>;
+
+    /**
+     * Sets and then gets the current globally-applied privacy control status
+     * See https://www.w3.org/TR/gpc/#set-global-privacy-control
+     */
+    invoke_setGlobalPrivacyControl(params: Protocol.Browser.SetGlobalPrivacyControlRequest): Promise<Protocol.Browser.SetGlobalPrivacyControlResponse>;
 
   }
   export interface BrowserDispatcher {
@@ -755,6 +795,11 @@ declare namespace ProtocolProxyApi {
      * Ensures that the given node is in its starting-style state.
      */
     invoke_forceStartingStyle(params: Protocol.CSS.ForceStartingStyleRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Forces a position-try option for the given node.
+     */
+    invoke_forcePositionTryOption(params: Protocol.CSS.ForcePositionTryOptionRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_getBackgroundColors(params: Protocol.CSS.GetBackgroundColorsRequest): Promise<Protocol.CSS.GetBackgroundColorsResponse>;
 
@@ -1359,6 +1404,32 @@ declare namespace ProtocolProxyApi {
      */
     invoke_forceShowPopover(params: Protocol.DOM.ForceShowPopoverRequest): Promise<Protocol.DOM.ForceShowPopoverResponse>;
 
+    /**
+     * Returns candidate nodes that are configured as triggers for the given popover.
+     */
+    invoke_getImplicitAnchorCandidates(params: Protocol.DOM.GetImplicitAnchorCandidatesRequest): Promise<Protocol.DOM.GetImplicitAnchorCandidatesResponse>;
+
+    /**
+     * When enabling, this API forces an element to gain interest in its target,
+     * keeping interest active until disabled.
+     */
+    invoke_forceShowInterest(params: Protocol.DOM.ForceShowInterestRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Sets a spelling or grammar error marker on the given range of text.
+     * See https://github.com/Igalia/explainers/blob/main/force-spelling-grammar-markers/README.md
+     * Note: exactly one between nodeId, backendNodeId and objectId should be passed
+     * to identify the node.
+     */
+    invoke_setTextMarker(params: Protocol.DOM.SetTextMarkerRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Clears the spelling and grammar error text markers overlapping the ranges
+     * set by setTextMarker in this session. These markers are also removed when
+     * the DOM domain is disabled or the session ends.
+     */
+    invoke_clearTextMarkers(): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface DOMDispatcher {
     /**
@@ -1625,6 +1696,17 @@ declare namespace ProtocolProxyApi {
   export interface DeviceOrientationDispatcher {
   }
 
+  export interface DigitalCredentialsApi {
+    /**
+     * Sets the behavior of the virtual wallet for digital credential requests
+     * issued from this frame.
+     */
+    invoke_setVirtualWalletBehavior(params: Protocol.DigitalCredentials.SetVirtualWalletBehaviorRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface DigitalCredentialsDispatcher {
+  }
+
   export interface EmulationApi {
     /**
      * Tells whether emulation is supported.
@@ -1673,6 +1755,16 @@ declare namespace ProtocolProxyApi {
      * respective variables to be undefined, even if previously overridden.
      */
     invoke_setSafeAreaInsetsOverride(params: Protocol.Emulation.SetSafeAreaInsetsOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Overrides virtual keyboard geometry in CSS pixels, relative to the top-level viewport. The
+     * provided rect is used for navigator.virtualKeyboard.boundingRect, geometrychange events, and
+     * env(keyboard-inset-*) values on the inspected frame. The override applies independently of
+     * navigator.virtualKeyboard.overlaysContent so clients can preview overlay geometry without
+     * mutating page state. Values are rounded to the nearest CSS pixel. Omitting the rect clears the
+     * override.
+     */
+    invoke_setVirtualKeyboardGeometryOverride(params: Protocol.Emulation.SetVirtualKeyboardGeometryOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
@@ -1831,6 +1923,11 @@ declare namespace ProtocolProxyApi {
     invoke_setDataSaverOverride(params: Protocol.Emulation.SetDataSaverOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_setHardwareConcurrencyOverride(params: Protocol.Emulation.SetHardwareConcurrencyOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Overrides the value of navigator.cpuPerformance
+     */
+    invoke_setCPUPerformanceOverride(params: Protocol.Emulation.SetCPUPerformanceOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Allows overriding user agent with the given string.
@@ -2091,6 +2188,34 @@ declare namespace ProtocolProxyApi {
 
   }
   export interface FileSystemDispatcher {
+  }
+
+  export interface FindInPageApi {
+    /**
+     * Forwards `query` to the find-in-page facility, starting a new find session.
+     * Where exactly the search starts from is implementation-specific.
+     */
+    invoke_findFirst(params: Protocol.FindInPage.FindFirstRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Moves to the next match for the query passed to the most recent
+     * findFirst() call.
+     */
+    invoke_findNext(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Moves to the previous match for the query passed to the most recent
+     * findFirst() call.
+     */
+    invoke_findPrev(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Ends the current find session, if any, and clears its highlighting.
+     */
+    invoke_stop(): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface FindInPageDispatcher {
   }
 
   export interface HeadlessExperimentalApi {
@@ -2508,16 +2633,6 @@ declare namespace ProtocolProxyApi {
 
   export interface NetworkApi {
     /**
-     * Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
-     */
-    invoke_setAcceptedEncodings(params: Protocol.Network.SetAcceptedEncodingsRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Clears accepted encodings set by setAcceptedEncodings
-     */
-    invoke_clearAcceptedEncodingsOverride(): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
      * Tells whether clearing browser cache is supported.
      * @deprecated
      */
@@ -2544,16 +2659,6 @@ declare namespace ProtocolProxyApi {
      * Clears browser cookies.
      */
     invoke_clearBrowserCookies(): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Response to Network.requestIntercepted which either modifies the request to continue with any
-     * modifications, or blocks it, or completes it with the provided response bytes. If a network
-     * fetch occurs as a result which encounters a redirect an additional Network.requestIntercepted
-     * event will be sent with the same InterceptionId.
-     * Deprecated, use Fetch.continueRequest, Fetch.fulfillRequest and Fetch.failRequest instead.
-     * @deprecated
-     */
-    invoke_continueInterceptedRequest(params: Protocol.Network.ContinueInterceptedRequestRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Deletes browser cookies with matching name and url or domain/path/partitionKey pair.
@@ -2626,19 +2731,6 @@ declare namespace ProtocolProxyApi {
     invoke_getRequestPostData(params: Protocol.Network.GetRequestPostDataRequest): Promise<Protocol.Network.GetRequestPostDataResponse>;
 
     /**
-     * Returns content served for the given currently intercepted request.
-     */
-    invoke_getResponseBodyForInterception(params: Protocol.Network.GetResponseBodyForInterceptionRequest): Promise<Protocol.Network.GetResponseBodyForInterceptionResponse>;
-
-    /**
-     * Returns a handle to the stream representing the response body. Note that after this command,
-     * the intercepted request can't be continued as is -- you either need to cancel it or to provide
-     * the response body. The stream only supports sequential read, IO.read will fail if the position
-     * is specified.
-     */
-    invoke_takeResponseBodyForInterceptionAsStream(params: Protocol.Network.TakeResponseBodyForInterceptionAsStreamRequest): Promise<Protocol.Network.TakeResponseBodyForInterceptionAsStreamResponse>;
-
-    /**
      * This method sends a new XMLHttpRequest which is identical to the original one. The following
      * parameters should be identical: method, url, async, request body, extra headers, withCredentials
      * attribute, user, password.
@@ -2684,13 +2776,6 @@ declare namespace ProtocolProxyApi {
      * Specifies whether to attach a page script stack id in requests
      */
     invoke_setAttachDebugStack(params: Protocol.Network.SetAttachDebugStackRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Sets the requests to intercept that match the provided patterns and optionally resource types.
-     * Deprecated, please use Fetch.enable instead.
-     * @deprecated
-     */
-    invoke_setRequestInterception(params: Protocol.Network.SetRequestInterceptionRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Allows overriding user agent with the given string.
@@ -2761,14 +2846,6 @@ declare namespace ProtocolProxyApi {
      * Fired when HTTP request has finished loading.
      */
     loadingFinished(params: Protocol.Network.LoadingFinishedEvent): void;
-
-    /**
-     * Details of an intercepted HTTP request, which must be either allowed, blocked, modified or
-     * mocked.
-     * Deprecated, use Fetch.requestPaused instead.
-     * @deprecated
-     */
-    requestIntercepted(params: Protocol.Network.RequestInterceptedEvent): void;
 
     /**
      * Fired if request ended up loading from cache.
@@ -3105,6 +3182,11 @@ declare namespace ProtocolProxyApi {
     invoke_setShowHinge(params: Protocol.Overlay.SetShowHingeRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Add a display cutout overlay.
+     */
+    invoke_setShowDisplayCutout(params: Protocol.Overlay.SetShowDisplayCutoutRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Show elements in isolation mode with overlays.
      */
     invoke_setShowIsolatedElements(params: Protocol.Overlay.SetShowIsolatedElementsRequest): Promise<Protocol.ProtocolResponseWithError>;
@@ -3323,10 +3405,20 @@ declare namespace ProtocolProxyApi {
     invoke_getManifestIcons(): Promise<Protocol.Page.GetManifestIconsResponse>;
 
     /**
-     * Returns the unique (PWA) app id.
+     * Returns the unique (PWA) app id, along with IWA bundle ID and parent app info.
      * Only returns values if the feature flag 'WebAppEnableManifestId' is enabled
      */
     invoke_getAppId(): Promise<Protocol.Page.GetAppIdResponse>;
+
+    /**
+     * Returns the list of installed child Sub-Apps for the inspected parent app.
+     */
+    invoke_getSubApps(): Promise<Protocol.Page.GetSubAppsResponse>;
+
+    /**
+     * Returns the list of sibling Sub-Apps sharing the same parent app if the inspected context is a Sub-App.
+     */
+    invoke_getSiblingSubApps(): Promise<Protocol.Page.GetSiblingSubAppsResponse>;
 
     invoke_getAdScriptAncestry(params: Protocol.Page.GetAdScriptAncestryRequest): Promise<Protocol.Page.GetAdScriptAncestryResponse>;
 
@@ -3483,6 +3575,16 @@ declare namespace ProtocolProxyApi {
      * Starts sending each frame using the `screencastFrame` event.
      */
     invoke_startScreencast(params: Protocol.Page.StartScreencastRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Starts screencast video recording.
+     */
+    invoke_startScreenRecording(params: Protocol.Page.StartScreenRecordingRequest): Promise<Protocol.Page.StartScreenRecordingResponse>;
+
+    /**
+     * Stops screencast video recording.
+     */
+    invoke_stopScreenRecording(): Promise<Protocol.Page.StopScreenRecordingResponse>;
 
     /**
      * Force the page stop all navigations and pending resource fetches.
@@ -4261,55 +4363,31 @@ declare namespace ProtocolProxyApi {
     invoke_clearTrustTokens(params: Protocol.Storage.ClearTrustTokensRequest): Promise<Protocol.Storage.ClearTrustTokensResponse>;
 
     /**
-     * Gets details for a named interest group.
+     * Returns all stored Private Verification Tokens for the current browsing
+     * context.
      */
-    invoke_getInterestGroupDetails(params: Protocol.Storage.GetInterestGroupDetailsRequest): Promise<Protocol.Storage.GetInterestGroupDetailsResponse>;
+    invoke_getPrivateVerificationTokens(): Promise<Protocol.Storage.GetPrivateVerificationTokensResponse>;
 
     /**
-     * Enables/Disables issuing of interestGroupAccessed events.
+     * Returns the configured Private Verification Tokens issuers and their redeemer
+     * origins.
      */
-    invoke_setInterestGroupTracking(params: Protocol.Storage.SetInterestGroupTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+    invoke_getPrivateVerificationTokensIssuerConfigs(): Promise<Protocol.Storage.GetPrivateVerificationTokensIssuerConfigsResponse>;
 
     /**
-     * Enables/Disables issuing of interestGroupAuctionEventOccurred and
-     * interestGroupAuctionNetworkRequestCreated.
+     * Removes all Private Verification Tokens issued by the provided issuerOrigin.
      */
-    invoke_setInterestGroupAuctionTracking(params: Protocol.Storage.SetInterestGroupAuctionTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+    invoke_clearPrivateVerificationTokens(params: Protocol.Storage.ClearPrivateVerificationTokensRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
-     * Gets metadata for an origin's shared storage.
+     * Removes a specific Private Verification Token by its ID.
      */
-    invoke_getSharedStorageMetadata(params: Protocol.Storage.GetSharedStorageMetadataRequest): Promise<Protocol.Storage.GetSharedStorageMetadataResponse>;
+    invoke_deletePrivateVerificationToken(params: Protocol.Storage.DeletePrivateVerificationTokenRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
-     * Gets the entries in an given origin's shared storage.
+     * Set tracking for Private Verification Tokens.
      */
-    invoke_getSharedStorageEntries(params: Protocol.Storage.GetSharedStorageEntriesRequest): Promise<Protocol.Storage.GetSharedStorageEntriesResponse>;
-
-    /**
-     * Sets entry with `key` and `value` for a given origin's shared storage.
-     */
-    invoke_setSharedStorageEntry(params: Protocol.Storage.SetSharedStorageEntryRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Deletes entry for `key` (if it exists) for a given origin's shared storage.
-     */
-    invoke_deleteSharedStorageEntry(params: Protocol.Storage.DeleteSharedStorageEntryRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Clears all entries for a given origin's shared storage.
-     */
-    invoke_clearSharedStorageEntries(params: Protocol.Storage.ClearSharedStorageEntriesRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Resets the budget for `ownerOrigin` by clearing all budget withdrawals.
-     */
-    invoke_resetSharedStorageBudget(params: Protocol.Storage.ResetSharedStorageBudgetRequest): Promise<Protocol.ProtocolResponseWithError>;
-
-    /**
-     * Enables/disables issuing of sharedStorageAccessed events.
-     */
-    invoke_setSharedStorageTracking(params: Protocol.Storage.SetSharedStorageTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+    invoke_setPrivateVerificationTokensTracking(params: Protocol.Storage.SetPrivateVerificationTokensTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Set tracking for a storage key's buckets.
@@ -4325,14 +4403,6 @@ declare namespace ProtocolProxyApi {
      * Deletes state for sites identified as potential bounce trackers, immediately.
      */
     invoke_runBounceTrackingMitigations(): Promise<Protocol.Storage.RunBounceTrackingMitigationsResponse>;
-
-    /**
-     * Returns the effective Related Website Sets in use by this profile for the browser
-     * session. The effective Related Website Sets will not change during a browser session.
-     */
-    invoke_getRelatedWebsiteSets(): Promise<Protocol.Storage.GetRelatedWebsiteSetsResponse>;
-
-    invoke_setProtectedAudienceKAnonymity(params: Protocol.Storage.SetProtectedAudienceKAnonymityRequest): Promise<Protocol.ProtocolResponseWithError>;
 
   }
   export interface StorageDispatcher {
@@ -4356,41 +4426,14 @@ declare namespace ProtocolProxyApi {
      */
     indexedDBListUpdated(params: Protocol.Storage.IndexedDBListUpdatedEvent): void;
 
-    /**
-     * One of the interest groups was accessed. Note that these events are global
-     * to all targets sharing an interest group store.
-     */
-    interestGroupAccessed(params: Protocol.Storage.InterestGroupAccessedEvent): void;
-
-    /**
-     * An auction involving interest groups is taking place. These events are
-     * target-specific.
-     */
-    interestGroupAuctionEventOccurred(params: Protocol.Storage.InterestGroupAuctionEventOccurredEvent): void;
-
-    /**
-     * Specifies which auctions a particular network fetch may be related to, and
-     * in what role. Note that it is not ordered with respect to
-     * Network.requestWillBeSent (but will happen before loadingFinished
-     * loadingFailed).
-     */
-    interestGroupAuctionNetworkRequestCreated(params: Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent): void;
-
-    /**
-     * Shared storage was accessed by the associated page.
-     * The following parameters are included in all events.
-     */
-    sharedStorageAccessed(params: Protocol.Storage.SharedStorageAccessedEvent): void;
-
-    /**
-     * A shared storage run or selectURL operation finished its execution.
-     * The following parameters are included in all events.
-     */
-    sharedStorageWorkletOperationExecutionFinished(params: Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent): void;
-
     storageBucketCreatedOrUpdated(params: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void;
 
     storageBucketDeleted(params: Protocol.Storage.StorageBucketDeletedEvent): void;
+
+    /**
+     * Private Verification Tokens have been stored or deleted.
+     */
+    privateVerificationTokensUpdated(): void;
 
   }
 
@@ -5040,13 +5083,8 @@ declare namespace ProtocolProxyApi {
     invoke_setReturnValue(params: Protocol.Debugger.SetReturnValueRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
-     * Edits JavaScript source live.
-     *
-     * In general, functions that are currently on the stack can not be edited with
-     * a single exception: If the edited function is the top-most stack frame and
-     * that is the only activation of that function on the stack. In this case
-     * the live edit will be successful and a `Debugger.restartFrame` for the
-     * top-most function is automatically triggered.
+     * Live edit is no longer supported and this command always fails with a "no longer available" error.
+     * @deprecated
      */
     invoke_setScriptSource(params: Protocol.Debugger.SetScriptSourceRequest): Promise<Protocol.Debugger.SetScriptSourceResponse>;
 

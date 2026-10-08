@@ -1,0 +1,990 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import {assert} from 'chai';
+import sinon from 'sinon';
+
+import * as CommentManager from '../../models/comment_manager/comment_manager.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import * as TextEditor from '../components/text_editor/text_editor.js';
+
+import * as Comments from './comments.js';
+
+function createTextEditor(doc: string, filePath?: string): TextEditor.TextEditor.TextEditor {
+  const state = CodeMirror.EditorState.create({
+    doc,
+    extensions: [
+      CodeMirror.lineNumbers(),
+      TextEditor.Config.baseConfiguration(doc),
+    ],
+  });
+  const textEditor = new TextEditor.TextEditor.TextEditor(state);
+  textEditor.setAttribute('jslog', 'TextField; context: editor');
+  textEditor.editor.dom.setAttribute('jslog', 'TextField; context: editor');
+  if (filePath) {
+    textEditor.editor.dom.setAttribute('data-file-path', filePath);
+  }
+  return textEditor;
+}
+
+describeWithEnvironment('CommentOverlayManager', () => {
+  let container: HTMLElement;
+  let manager: Comments.CommentOverlayManager.CommentOverlayManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    renderElementIntoDOM(container);
+    const commentManager = new CommentManager.CommentManager.CommentManager();
+    commentManager.setAgentAttached(true);
+    manager = new Comments.CommentOverlayManager.CommentOverlayManager(commentManager);
+  });
+
+  afterEach(() => {
+    manager.clear();
+    container.remove();
+  });
+
+  it('creates and retrieves comment threads and computes pin positions', () => {
+    const item = document.createElement('div');
+    item.setAttribute('jslog', 'TreeItem; context: test');
+    item.textContent = 'font-size: 14px;';
+    container.appendChild(item);
+
+    const thread = manager.createComment(item, 'Needs adjustment');
+    assert.isNotNull(thread);
+    assert.lengthOf(manager.getCommentThreads(), 1);
+    assert.strictEqual(manager.getCommentThread(thread!.id), thread);
+    assert.strictEqual(thread?.comments[0].text, 'Needs adjustment');
+    assert.strictEqual(thread?.comments[0].author, 'DEVELOPER');
+    assert.strictEqual(thread?.status, 'DRAFT');
+
+    const pins = manager.getPinPositions();
+    assert.lengthOf(pins, 1);
+    assert.isTrue(pins[0].visible);
+  });
+
+  it('returns null when creating comment on non-anchorable element', () => {
+    const item = document.createElement('div');
+    container.appendChild(item);
+
+    const thread = manager.createComment(item, 'Invalid anchor');
+    assert.isNull(thread);
+    assert.lengthOf(manager.getCommentThreads(), 0);
+  });
+
+  it('supports AGENT author and isGeneratedComment metadata in created comment threads and skips pins', () => {
+    const item = document.createElement('div');
+    item.setAttribute('jslog', 'TreeItem; context: agent-item');
+    item.textContent = 'color: #333;';
+    container.appendChild(item);
+
+    const thread = manager.createComment(item, 'Auto-fixed color', {author: 'AGENT', isGeneratedComment: true});
+
+    assert.isNotNull(thread);
+    assert.strictEqual(thread?.comments[0].author, 'AGENT');
+    assert.strictEqual(thread?.comments[0].text, 'Auto-fixed color');
+    assert.isTrue(thread?.isGeneratedComment);
+    assert.isEmpty(manager.getPinPositions());
+    assert.isEmpty(manager.getHighlightRects());
+  });
+
+  it('removes comment threads and cleans up DOM observer and pin positions', () => {
+    const unobserveSpy = sinon.spy(IntersectionObserver.prototype, 'unobserve');
+    try {
+      const item = document.createElement('div');
+      item.setAttribute('jslog', 'TreeItem; context: delete-test');
+      item.textContent = 'delete me';
+      container.appendChild(item);
+
+      const thread = manager.createComment(item, 'To delete');
+      assert.isNotNull(thread);
+      assert.lengthOf(manager.getCommentThreads(), 1);
+      assert.lengthOf(manager.getPinPositions(), 1);
+
+      let eventCount = 0;
+      manager.addEventListener(Comments.CommentOverlayManager.Events.POSITIONS_UPDATED, () => {
+        eventCount++;
+      });
+
+      manager.removeCommentThread(thread!.id);
+      assert.lengthOf(manager.getCommentThreads(), 0);
+      assert.lengthOf(manager.getPinPositions(), 0);
+      assert.strictEqual(eventCount, 1);
+      sinon.assert.calledWith(unobserveSpy, item);
+    } finally {
+      unobserveSpy.restore();
+    }
+  });
+
+  it('clears all comment threads and pin positions when clear() is called', () => {
+    manager.setCommentMode(true);
+    const item = document.createElement('div');
+    item.setAttribute('jslog', 'TreeItem; context: clear-test');
+    item.textContent = 'clear me';
+    container.appendChild(item);
+
+    manager.createComment(item, 'To clear');
+    assert.lengthOf(manager.getCommentThreads(), 1);
+    assert.lengthOf(manager.getPinPositions(), 1);
+    assert.isTrue(manager.isCommentMode());
+
+    manager.clear();
+    assert.lengthOf(manager.getCommentThreads(), 0);
+    assert.lengthOf(manager.getPinPositions(), 0);
+    assert.isFalse(manager.isCommentMode());
+  });
+
+  it('toggles comment mode', () => {
+    manager.setCommentMode(true);
+    assert.isTrue(manager.isCommentMode());
+
+    manager.setCommentMode(false);
+    assert.isFalse(manager.isCommentMode());
+  });
+
+  it('updates cursor when hovering over commentable elements in comment mode', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const commentableEl = document.createElement('div');
+    commentableEl.setAttribute('jslog', 'TreeItem; context: commentable-hover');
+    commentableEl.textContent = 'hover me';
+    container.appendChild(commentableEl);
+
+    commentableEl.dispatchEvent(new MouseEvent('mouseover', {bubbles: true, cancelable: true}));
+    assert.strictEqual(commentableEl.style.cursor, Comments.CommentOverlayManager.COMMENT_MODE_CURSOR);
+
+    commentableEl.dispatchEvent(new MouseEvent('mouseleave', {bubbles: true, cancelable: true}));
+    assert.strictEqual(commentableEl.style.cursor, '');
+
+    commentableEl.dispatchEvent(new MouseEvent('mouseover', {bubbles: true, cancelable: true}));
+    manager.setCommentMode(false);
+    assert.strictEqual(commentableEl.style.cursor, '');
+  });
+
+  it('handles element clicks in comment mode', () => {
+    const item = document.createElement('div');
+    item.setAttribute('jslog', 'TreeItem; context: click-item');
+    item.textContent = 'display: block;';
+    container.appendChild(item);
+
+    const handledInactive = manager.handleElementClick(item);
+    assert.isFalse(handledInactive);
+    assert.isEmpty(manager.getCommentThreads());
+
+    manager.setCommentMode(true);
+    const handledActive = manager.handleElementClick(item);
+    assert.isTrue(handledActive);
+    const threads = manager.getCommentThreads();
+    assert.lengthOf(threads, 1);
+    assert.strictEqual(threads[0].status, 'DRAFT');
+    assert.strictEqual(manager.getAnchorElement(threads[0]), item);
+    assert.lengthOf(manager.getPinPositions(), 1);
+  });
+
+  it('creates draft thread when clicking elements inside Shadow DOM using composed target', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({mode: 'open'});
+    const innerEl = document.createElement('div');
+    innerEl.setAttribute('jslog', 'TreeItem; context: shadow-item');
+    innerEl.textContent = 'shadow content';
+    shadow.appendChild(innerEl);
+    container.appendChild(host);
+
+    innerEl.click();
+
+    const threads = manager.getCommentThreads();
+    assert.lengthOf(threads, 1);
+    assert.strictEqual(threads[0].status, 'DRAFT');
+    assert.strictEqual(manager.getAnchorElement(threads[0]), innerEl);
+    assert.lengthOf(manager.getPinPositions(), 1);
+  });
+
+  it('creates draft thread and updates positions when clicking in Comment Mode', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: draft-clickable');
+    el.textContent = 'font-size: 14px;';
+    container.appendChild(el);
+
+    const positionsListener = sinon.spy();
+    manager.addEventListener(Comments.CommentOverlayManager.Events.POSITIONS_UPDATED, positionsListener);
+
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX: 150,
+      clientY: 250,
+    });
+    el.dispatchEvent(clickEvent);
+    const threads = manager.getCommentThreads();
+
+    assert.isTrue(clickEvent.defaultPrevented);
+    assert.lengthOf(threads, 1);
+    assert.strictEqual(threads[0].status, 'DRAFT');
+    assert.strictEqual(manager.getAnchorElement(threads[0]), el);
+    assert.isTrue(manager.getPinPositions()[0]?.visible ?? false);
+    assert.isTrue(manager.getHighlightRects()[0]?.visible ?? false);
+    sinon.assert.calledOnce(positionsListener);
+  });
+
+  it('clears draft thread when clicking an unanchorable element', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: draft-clear-target');
+    el.textContent = 'draft clear item';
+    container.appendChild(el);
+    manager.handleElementClick(el);
+    assert.lengthOf(manager.getCommentThreads(), 1);
+
+    const emptyDiv = document.createElement('div');
+    container.appendChild(emptyDiv);
+    emptyDiv.click();
+
+    assert.isEmpty(manager.getCommentThreads());
+  });
+
+  it('clears draft thread when toggling Comment Mode off', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: mode-toggle-target');
+    el.textContent = 'mode toggle item';
+    container.appendChild(el);
+    manager.handleElementClick(el);
+    assert.lengthOf(manager.getCommentThreads(), 1);
+
+    manager.setCommentMode(false);
+    assert.isEmpty(manager.getCommentThreads());
+  });
+
+  it('suppresses pointer and mouse events on anchorable elements in Comment Mode', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: suppress-item');
+    el.textContent = 'target content';
+    container.appendChild(el);
+
+    for (const eventType of ['mousedown', 'pointerdown', 'mouseup', 'pointerup', 'dblclick']) {
+      const ev = new MouseEvent(eventType, {bubbles: true, cancelable: true});
+      el.dispatchEvent(ev);
+      assert.isTrue(ev.defaultPrevented, `Expected ${eventType} to be defaultPrevented`);
+    }
+  });
+
+  it('sets hover highlight data on mouseover in Comment Mode and clears it on mouseleave', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: highlighted');
+    el.textContent = 'padding: 8px;';
+    container.appendChild(el);
+
+    const mouseoverEvent = new MouseEvent('mouseover', {bubbles: true, cancelable: true});
+    el.dispatchEvent(mouseoverEvent);
+    assert.isTrue(mouseoverEvent.defaultPrevented);
+
+    const hoverData = manager.getHoverHighlight();
+    assert.isNotNull(hoverData);
+    assert.isTrue(hoverData?.visible);
+
+    const mouseleaveEvent = new MouseEvent('mouseleave', {bubbles: true, cancelable: true});
+    el.dispatchEvent(mouseleaveEvent);
+    assert.isTrue(mouseleaveEvent.defaultPrevented);
+    assert.isNull(manager.getHoverHighlight());
+  });
+
+  it('does not consume mouseleave event on non-anchorable elements in Comment Mode', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const nonAnchorEl = document.createElement('div');
+    container.appendChild(nonAnchorEl);
+
+    const mouseleaveEvent = new MouseEvent('mouseleave', {bubbles: true, cancelable: true});
+    nonAnchorEl.dispatchEvent(mouseleaveEvent);
+    assert.isFalse(mouseleaveEvent.defaultPrevented);
+    assert.isNull(manager.getHoverHighlight());
+  });
+
+  it('does not clear hover highlight when moving pointer between children of the same anchor element', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const anchorEl = document.createElement('div');
+    anchorEl.setAttribute('jslog', 'TreeItem; context: parent-anchor');
+    const child1 = document.createElement('span');
+    child1.textContent = 'child 1';
+    const child2 = document.createElement('span');
+    child2.textContent = 'child 2';
+    anchorEl.appendChild(child1);
+    anchorEl.appendChild(child2);
+    container.appendChild(anchorEl);
+
+    const mouseoverEvent = new MouseEvent('mouseover', {bubbles: true, cancelable: true});
+    child1.dispatchEvent(mouseoverEvent);
+    assert.isNotNull(manager.getHoverHighlight());
+
+    const mouseleaveEvent = new MouseEvent('mouseleave', {bubbles: true, cancelable: true, relatedTarget: child2});
+    child1.dispatchEvent(mouseleaveEvent);
+
+    assert.isNotNull(manager.getHoverHighlight());
+  });
+
+  it('deduplicates HOVER_HIGHLIGHT_CHANGED events when hover data has not changed', () => {
+    manager.start(container);
+    manager.setCommentMode(true);
+
+    const anchorEl = document.createElement('div');
+    anchorEl.setAttribute('jslog', 'TreeItem; context: dedup-anchor');
+    anchorEl.textContent = 'dedup content';
+    container.appendChild(anchorEl);
+
+    let eventCount = 0;
+    manager.addEventListener(Comments.CommentOverlayManager.Events.HOVER_HIGHLIGHT_CHANGED, () => {
+      eventCount++;
+    });
+
+    const mouseoverEvent1 = new MouseEvent('mouseover', {bubbles: true, cancelable: true});
+    anchorEl.dispatchEvent(mouseoverEvent1);
+    assert.strictEqual(eventCount, 1);
+
+    // Repeated mousemove or mouseover on the same element with identical bounds should not dispatch new events
+    const mousemoveEvent = new MouseEvent('mousemove', {bubbles: true, cancelable: true});
+    anchorEl.dispatchEvent(mousemoveEvent);
+    assert.strictEqual(eventCount, 1);
+
+    // Leaving should fire event once
+    const mouseleaveEvent = new MouseEvent('mouseleave', {bubbles: true, cancelable: true});
+    anchorEl.dispatchEvent(mouseleaveEvent);
+    assert.strictEqual(eventCount, 2);
+
+    // Repeated leave or clear when already null should not dispatch new events
+    anchorEl.dispatchEvent(mouseleaveEvent);
+    assert.strictEqual(eventCount, 2);
+  });
+
+  it('starts and stops listeners and observers cleanly', () => {
+    manager.start({root: container});
+    manager.stop();
+  });
+
+  it('staggers pin vertical offsets when multiple comments are on the same element', () => {
+    const item = document.createElement('div');
+    item.setAttribute('jslog', 'TreeItem; context: multi-pin');
+    item.textContent = 'display: grid;';
+    item.getBoundingClientRect = () => new DOMRect(50, 100, 200, 30);
+    container.appendChild(item);
+
+    manager.setCommentMode(true);
+    const thread1 = manager.createComment(item, 'First comment');
+    const thread2 = manager.createComment(item, 'Second comment');
+
+    assert.isNotNull(thread1);
+    assert.isNotNull(thread2);
+
+    const pins = manager.getPinPositions();
+    assert.lengthOf(pins, 2);
+    assert.isTrue(pins[0].visible);
+    assert.isTrue(pins[1].visible);
+
+    // Second pin should have a 26px vertical offset compared to first pin
+    assert.strictEqual(pins[1].top - pins[0].top, 26);
+  });
+
+  it('observes connected elements with IntersectionObserver even when hidden', () => {
+    const observeSpy = sinon.spy(IntersectionObserver.prototype, 'observe');
+    try {
+      const hiddenEl = document.createElement('div');
+      hiddenEl.setAttribute('jslog', 'TreeItem; context: hidden-item');
+      hiddenEl.textContent = 'hidden item';
+      hiddenEl.style.display = 'none';
+      container.appendChild(hiddenEl);
+
+      manager.setCommentMode(true);
+      const thread = manager.createComment(hiddenEl, 'Hidden comment');
+      assert.isNotNull(thread);
+      sinon.assert.calledWith(observeSpy, hiddenEl);
+
+      // Pins should be empty because element is hidden
+      assert.lengthOf(manager.getPinPositions(), 0);
+    } finally {
+      observeSpy.restore();
+    }
+  });
+
+  it('keeps observing element when other comment threads remain on it', () => {
+    const unobserveSpy = sinon.spy(IntersectionObserver.prototype, 'unobserve');
+    try {
+      const el = document.createElement('div');
+      el.setAttribute('jslog', 'TreeItem; context: shared-element');
+      el.textContent = 'shared comment target';
+      container.appendChild(el);
+
+      manager.setCommentMode(true);
+      const thread1 = manager.createComment(el, 'Comment 1');
+      const thread2 = manager.createComment(el, 'Comment 2');
+      assert.isNotNull(thread1);
+      assert.isNotNull(thread2);
+      assert.lengthOf(manager.getCommentThreads(), 2);
+
+      manager.removeCommentThread(thread1!.id);
+      assert.lengthOf(manager.getCommentThreads(), 1);
+      assert.isFalse(unobserveSpy.calledWith(el));
+
+      manager.removeCommentThread(thread2!.id);
+      assert.lengthOf(manager.getCommentThreads(), 0);
+      sinon.assert.calledWith(unobserveSpy, el);
+    } finally {
+      unobserveSpy.restore();
+    }
+  });
+
+  it('rematches comments across DOM re-renders and updates pin visibility for orphaned comments', async () => {
+    const clock = sinon.useFakeTimers();
+    try {
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const oldItem = document.createElement('div');
+      oldItem.setAttribute('jslog', 'TreeItem; context: dynamic');
+      oldItem.textContent = 'display: flex;';
+      container.appendChild(oldItem);
+
+      const thread = manager.createComment(oldItem, 'Flex bug');
+      assert.isNotNull(thread);
+      assert.lengthOf(manager.getPinPositions(), 1);
+      assert.isTrue(manager.getPinPositions()[0].visible);
+
+      // Simulate DOM re-render by replacing oldItem with a newly recreated DOM node
+      oldItem.remove();
+      const newItem = document.createElement('div');
+      newItem.setAttribute('jslog', 'TreeItem; context: dynamic');
+      newItem.textContent = 'display: flex;';
+      container.appendChild(newItem);
+
+      await Promise.resolve();
+      clock.tick(250);
+
+      assert.lengthOf(manager.getPinPositions(), 1);
+      assert.isTrue(manager.getPinPositions()[0].visible);
+
+      // Simulate item scrolling out of view / folder collapsing (node removed)
+      newItem.remove();
+
+      await Promise.resolve();
+      clock.tick(250);
+
+      assert.lengthOf(manager.getPinPositions(), 0);
+      assert.lengthOf(manager.getHighlightRects(), 0);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('unobserves old elements when rematching to a new element for recycled nodes', async () => {
+    const clock = sinon.useFakeTimers();
+    const unobserveSpy = sinon.spy(IntersectionObserver.prototype, 'unobserve');
+    try {
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const oldItem = document.createElement('div');
+      oldItem.setAttribute('jslog', 'TreeItem; context: recycled');
+      oldItem.textContent = 'item 1';
+      container.appendChild(oldItem);
+
+      const thread = manager.createComment(oldItem, 'Recycled test');
+      assert.isNotNull(thread);
+
+      oldItem.setAttribute('jslog', 'TreeItem; context: recycled-different');
+      const newItem = document.createElement('div');
+      newItem.setAttribute('jslog', 'TreeItem; context: recycled');
+      newItem.textContent = 'item 1 recycled';
+      container.appendChild(newItem);
+
+      await Promise.resolve();
+      clock.tick(250);
+
+      sinon.assert.calledWith(unobserveSpy, oldItem);
+    } finally {
+      unobserveSpy.restore();
+      clock.restore();
+    }
+  });
+  describe('CodeMirror editor comments and clipping', () => {
+    it('creates comment attached to CodeMirror editor when line is clicked', () => {
+      const textEditor = createTextEditor('const a = 1;\nconst b = 2;\nconst c = 3;', 'src/code.ts');
+      container.appendChild(textEditor);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const lines = textEditor.editor.dom.querySelectorAll('.cm-content > .cm-line');
+      const line2 = lines[1];
+      assert.isDefined(line2);
+
+      line2.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}));
+
+      const threads = manager.getCommentThreads();
+      assert.lengthOf(threads, 1);
+      const thread = threads[0];
+      assert.strictEqual(thread.status, 'DRAFT');
+      assert.strictEqual(thread.anchor.editor?.lineNumber, 2);
+      assert.strictEqual(thread.anchor.editor?.filePath, 'src/code.ts');
+
+      thread.save('Editor comment');
+      assert.strictEqual(thread.status, 'ACTIVE');
+      assert.strictEqual(thread.comments[0].text, 'Editor comment');
+
+      const highlights = manager.getHighlightRects();
+      assert.lengthOf(highlights, 1);
+      const editorRect = textEditor.editor.dom.getBoundingClientRect();
+      assert.strictEqual(highlights[0].top, editorRect.top);
+      assert.strictEqual(highlights[0].height, editorRect.height);
+
+      const pins = manager.getPinPositions();
+      assert.lengthOf(pins, 1);
+      assert.strictEqual(pins[0].top, editorRect.top - 12);
+      assert.strictEqual(pins[0].left, editorRect.right - 12);
+    });
+
+    it('clips hover highlight to visible editor area when hovering over wide line in CodeMirror', () => {
+      const longText = 'const longHover = "' +
+          'B'.repeat(2000) + '";';
+      const textEditor = createTextEditor(longText, 'src/hover.ts');
+      textEditor.style.width = '300px';
+      container.appendChild(textEditor);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const line1 = textEditor.editor.dom.querySelector('.cm-content > .cm-line');
+      assert.isNotNull(line1);
+
+      line1!.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, composed: true}));
+
+      const scroller = textEditor.editor.dom.querySelector('.cm-scroller');
+      assert.isNotNull(scroller);
+      const scrollerRect = scroller!.getBoundingClientRect();
+
+      const hover = manager.getHoverHighlight();
+      assert.isNotNull(hover);
+      assert.isTrue(hover!.left >= scrollerRect.left - 1);
+      assert.isTrue(hover!.left + hover!.width <= scrollerRect.right + 1);
+    });
+
+    it('rematches CodeMirror comments across dynamic updates when jslog is on host element', async () => {
+      const clock = sinon.useFakeTimers();
+      try {
+        const textEditor = createTextEditor('const val = 42;\nconst next = 43;', 'src/rematch.ts');
+        container.appendChild(textEditor);
+
+        manager.start(container);
+        manager.setCommentMode(true);
+
+        const lines = textEditor.editor.dom.querySelectorAll('.cm-content > .cm-line');
+        const line2 = lines[1];
+        assert.isDefined(line2);
+
+        manager.createComment(line2, 'Rematch comment');
+        assert.lengthOf(manager.getPinPositions(), 1);
+
+        // Trigger rematch observer debounced timer
+        await Promise.resolve();
+        clock.tick(250);
+
+        assert.lengthOf(manager.getPinPositions(), 1);
+        assert.isTrue(manager.getPinPositions()[0].visible);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('staggers pins vertically when multiple comments are on the CodeMirror editor', () => {
+      const textEditor = createTextEditor('const item1 = 1;\nconst item2 = 2;', 'src/stagger.ts');
+      container.appendChild(textEditor);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const lines = textEditor.editor.dom.querySelectorAll('.cm-content > .cm-line');
+      const line1 = lines[0];
+      const line2 = lines[1];
+      assert.isDefined(line1);
+      assert.isDefined(line2);
+
+      manager.createComment(line1, 'First comment on editor');
+      manager.createComment(line2, 'Second comment on editor');
+
+      const pins = manager.getPinPositions();
+      assert.lengthOf(pins, 2);
+      assert.strictEqual(pins[1].top, pins[0].top + 26);
+    });
+  });
+
+  describe('Container and scroll clipping', () => {
+    it('clips highlight box and pin to ancestor scroll container when element is partially visible', () => {
+      const scrollParent = document.createElement('div');
+      scrollParent.style.overflow = 'hidden';
+      scrollParent.getBoundingClientRect = () => new DOMRect(0, 50, 400, 100);
+      container.appendChild(scrollParent);
+
+      const item = document.createElement('div');
+      item.setAttribute('jslog', 'TreeItem; context: clipped-item');
+      item.textContent = 'display: flex;';
+      // Element starts at top: 100 and extends to bottom: 200 (past parent bottom: 150)
+      item.getBoundingClientRect = () => new DOMRect(10, 100, 200, 100);
+      scrollParent.appendChild(item);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+      const thread = manager.createComment(item, 'Clipped comment');
+      assert.isNotNull(thread);
+
+      const highlights = manager.getHighlightRects();
+      assert.lengthOf(highlights, 1);
+      assert.strictEqual(highlights[0].top, 100);
+      assert.strictEqual(highlights[0].height, 50);  // Clipped to 150 - 100 = 50
+      assert.strictEqual(highlights[0].left, 10);
+      assert.strictEqual(highlights[0].width, 200);
+
+      const pins = manager.getPinPositions();
+      assert.lengthOf(pins, 1);
+      assert.strictEqual(pins[0].top, 100 - 12);
+      assert.strictEqual(pins[0].left, 10 + 200 - 12);
+    });
+
+    it('hides highlight box and pin when element is completely scrolled out of scroll container', () => {
+      const scrollParent = document.createElement('div');
+      scrollParent.style.overflow = 'hidden';
+      scrollParent.getBoundingClientRect = () => new DOMRect(0, 50, 400, 100);
+      container.appendChild(scrollParent);
+
+      const item = document.createElement('div');
+      item.setAttribute('jslog', 'TreeItem; context: out-of-view-item');
+      item.textContent = 'display: none;';
+      // Element is completely below scrollParent (top: 200, bottom: 250)
+      item.getBoundingClientRect = () => new DOMRect(10, 200, 200, 50);
+      scrollParent.appendChild(item);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+      const thread = manager.createComment(item, 'Out of view comment');
+      assert.isNotNull(thread);
+
+      const highlights = manager.getHighlightRects();
+      assert.lengthOf(highlights, 0);
+
+      const pins = manager.getPinPositions();
+      assert.lengthOf(pins, 0);
+    });
+
+    it('clips hover highlight to ancestor scroll container boundaries', () => {
+      const scrollParent = document.createElement('div');
+      scrollParent.style.overflow = 'hidden';
+      scrollParent.getBoundingClientRect = () => new DOMRect(0, 0, 300, 100);
+      container.appendChild(scrollParent);
+
+      const item = document.createElement('div');
+      item.setAttribute('jslog', 'TreeItem; context: hover-clipped');
+      item.textContent = 'hover clipped';
+      // Element extends beyond parent bottom (top: 50, bottom: 150)
+      item.getBoundingClientRect = () => new DOMRect(0, 50, 300, 100);
+      scrollParent.appendChild(item);
+
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const mouseoverEvent = new MouseEvent('mouseover', {bubbles: true, cancelable: true});
+      item.dispatchEvent(mouseoverEvent);
+
+      const hover = manager.getHoverHighlight();
+      assert.isNotNull(hover);
+      assert.strictEqual(hover?.top, 50);
+      assert.strictEqual(hover?.height, 50);  // Clipped to 100 - 50 = 50
+      assert.strictEqual(hover?.width, 300);
+    });
+  });
+
+  it('creates comment with custom signature using CustomAnchorResolver', () => {
+    const customTarget = document.createElement('div');
+    customTarget.classList.add('custom-resolver-target');
+    container.appendChild(customTarget);
+
+    const customResolver: Comments.CommentAnchorResolver.CustomAnchorResolver = {
+      matches(el: Element): boolean {
+        return el === customTarget;
+      },
+      resolve(_el: Element, options?: {clientX: number, clientY: number}) {
+        return {
+          anchor: {
+            vePath: 'Panel: custom > View: main',
+            textSignature: 'Custom Text',
+            timeline: {
+              traceId: 'trace-test-1',
+              traceEventKey: 'key-123',
+              entryName: 'Custom Entry',
+              startTimeMicro: (options?.clientX ?? 0) * 1000,
+              chartLocation: 'main',
+            },
+          },
+          anchorElement: customTarget,
+          highlightRect: {
+            top: options?.clientY ?? 10,
+            left: options?.clientX ?? 20,
+            width: 80,
+            height: 30,
+            visible: true,
+          },
+        };
+      },
+    };
+
+    Comments.CommentAnchorResolver.registerCustomAnchorResolver(customResolver);
+    try {
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const thread =
+          manager.createComment(customTarget, 'Investigate custom target', {coordinates: {clientX: 40, clientY: 60}});
+      assert.isNotNull(thread);
+      assert.isNotNull(thread?.anchor.timeline);
+      assert.strictEqual(thread?.anchor.timeline?.traceId, 'trace-test-1');
+      assert.strictEqual(thread?.anchor.timeline?.startTimeMicro, 40000);
+      assert.strictEqual(thread?.comments[0].text, 'Investigate custom target');
+      assert.lengthOf(manager.getPinPositions(), 0);
+      assert.lengthOf(manager.getHighlightRects(), 0);
+    } finally {
+      Comments.CommentAnchorResolver.unregisterCustomAnchorResolver(customResolver);
+    }
+  });
+
+  it('updates cursor and highlight when hovering over custom resolver elements and clears on unanchored coordinates or leave',
+     () => {
+       const customTarget = document.createElement('div');
+       customTarget.classList.add('custom-resolver-target');
+       container.appendChild(customTarget);
+
+       const customResolver: Comments.CommentAnchorResolver.CustomAnchorResolver = {
+         matches(el: Element): boolean {
+           return el === customTarget;
+         },
+         resolve(_el: Element, options?: {clientX: number, clientY: number, forHover?: boolean}) {
+           if (options && options.clientX > 100) {
+             return null;
+           }
+           return {
+             anchor: {
+               vePath: 'Panel: custom > View: main',
+               textSignature: 'Custom Text',
+             },
+             anchorElement: customTarget,
+             highlightRect: {
+               top: 10,
+               left: 20,
+               width: 80,
+               height: 30,
+               visible: true,
+             },
+           };
+         },
+       };
+
+       Comments.CommentAnchorResolver.registerCustomAnchorResolver(customResolver);
+       try {
+         manager.start(container);
+         manager.setCommentMode(true);
+
+         customTarget.dispatchEvent(
+             new MouseEvent('mousemove', {bubbles: true, cancelable: true, clientX: 50, clientY: 50}));
+         assert.strictEqual(customTarget.style.cursor, Comments.CommentOverlayManager.COMMENT_MODE_CURSOR);
+         const hoverData = manager.getHoverHighlight();
+         assert.isNotNull(hoverData);
+         assert.strictEqual(hoverData?.left, 20);
+
+         customTarget.dispatchEvent(
+             new MouseEvent('mousemove', {bubbles: true, cancelable: true, clientX: 150, clientY: 50}));
+         assert.strictEqual(customTarget.style.cursor, '');
+         assert.isNull(manager.getHoverHighlight());
+
+         customTarget.dispatchEvent(
+             new MouseEvent('mousemove', {bubbles: true, cancelable: true, clientX: 50, clientY: 50}));
+         assert.strictEqual(customTarget.style.cursor, Comments.CommentOverlayManager.COMMENT_MODE_CURSOR);
+
+         customTarget.dispatchEvent(new MouseEvent('mouseleave', {bubbles: true, cancelable: true}));
+         assert.strictEqual(customTarget.style.cursor, '');
+         assert.isNull(manager.getHoverHighlight());
+       } finally {
+         Comments.CommentAnchorResolver.unregisterCustomAnchorResolver(customResolver);
+       }
+     });
+
+  it('updates cursor and consumes event when custom resolver omits highlightRect', () => {
+    const customTarget = document.createElement('div');
+    customTarget.classList.add('custom-resolver-target');
+    container.appendChild(customTarget);
+
+    const customResolver: Comments.CommentAnchorResolver.CustomAnchorResolver = {
+      matches(el: Element): boolean {
+        return el === customTarget;
+      },
+      resolve(_el: Element, _options?: {clientX: number, clientY: number, forHover?: boolean}) {
+        return {
+          anchor: {
+            vePath: 'Panel: custom > View: main',
+            textSignature: 'Custom Text Without Highlight Rect',
+          },
+          anchorElement: customTarget,
+        };
+      },
+    };
+
+    Comments.CommentAnchorResolver.registerCustomAnchorResolver(customResolver);
+    try {
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const event = new MouseEvent('mousemove', {bubbles: true, cancelable: true, clientX: 50, clientY: 50});
+      customTarget.dispatchEvent(event);
+
+      assert.strictEqual(customTarget.style.cursor, Comments.CommentOverlayManager.COMMENT_MODE_CURSOR);
+      assert.isNull(manager.getHoverHighlight());
+      assert.isTrue(event.defaultPrevented);
+    } finally {
+      Comments.CommentAnchorResolver.unregisterCustomAnchorResolver(customResolver);
+    }
+  });
+
+  it('updates positions synchronously when a scroll container inside a ShadowRoot fires a non-composed scroll event',
+     () => {
+       manager.start(container);
+       manager.setCommentMode(true);
+
+       const host = document.createElement('div');
+       const shadow = host.attachShadow({mode: 'open'});
+       const shadowScrollContainer = document.createElement('div');
+       shadowScrollContainer.style.overflow = 'auto';
+       shadowScrollContainer.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
+
+       let itemTop = 80;
+       const innerEl = document.createElement('div');
+       innerEl.setAttribute('jslog', 'TreeItem; context: shadow-scroll-item');
+       innerEl.textContent = 'shadow scrollable item';
+       innerEl.getBoundingClientRect = () => new DOMRect(10, itemTop, 100, 24);
+
+       shadowScrollContainer.appendChild(innerEl);
+       shadow.appendChild(shadowScrollContainer);
+       container.appendChild(host);
+
+       const thread = manager.createComment(innerEl, 'Shadow scroll comment');
+       assert.isNotNull(thread);
+       assert.strictEqual(manager.getHighlightRects()[0]?.top, 80);
+
+       // Simulate scrolling inside the ShadowRoot: native scroll events have bubbles: false, composed: false.
+       itemTop = 40;
+       shadowScrollContainer.dispatchEvent(new Event('scroll', {bubbles: false, composed: false}));
+
+       // Position should be updated synchronously on the leading edge of the scroll event without waiting for a timer.
+       assert.strictEqual(manager.getHighlightRects()[0]?.top, 40);
+     });
+
+  it('does not leak ShadowRoots in observedScrollRoots when comment is deleted', () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({mode: 'open'});
+    const anchor = document.createElement('div');
+    anchor.setAttribute('jslog', 'TreeItem; context: shadow-test');
+    anchor.textContent = 'shadow test anchor';
+    shadowRoot.appendChild(anchor);
+    container.appendChild(host);
+
+    manager.start(container);
+
+    const addEventListenerSpy = sinon.spy(shadowRoot, 'addEventListener');
+    const removeEventListenerSpy = sinon.spy(shadowRoot, 'removeEventListener');
+
+    const thread = manager.createComment(anchor, 'Test comment');
+    assert.isNotNull(thread);
+    assert.isTrue(addEventListenerSpy.calledWith('scroll'), 'Scroll listener was not added to ShadowRoot');
+
+    // Remove the comment thread and its anchor from the DOM
+    if (thread) {
+      manager.removeCommentThread(thread.id);
+    }
+    anchor.remove();
+
+    assert.isTrue(
+        removeEventListenerSpy.calledWith('scroll'),
+        'ShadowRoot was not removed from observedScrollRoots (removeEventListener was not called), causing a leak');
+  });
+
+  it('tracks scroll events on new ancestors when a comment anchor is reparented', async () => {
+    const clock = sinon.useFakeTimers();
+    try {
+      manager.start(container);
+      manager.setCommentMode(true);
+
+      const host1 = document.createElement('div');
+      const shadow1 = host1.attachShadow({mode: 'open'});
+      const scrollContainer1 = document.createElement('div');
+      scrollContainer1.style.overflow = 'auto';
+      scrollContainer1.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
+
+      let itemTop = 80;
+      const innerEl = document.createElement('div');
+      innerEl.setAttribute('jslog', 'TreeItem; context: shadow-scroll-item');
+      innerEl.textContent = 'shadow scrollable item';
+      innerEl.getBoundingClientRect = () => new DOMRect(10, itemTop, 100, 24);
+
+      scrollContainer1.appendChild(innerEl);
+      shadow1.appendChild(scrollContainer1);
+      container.appendChild(host1);
+
+      const thread = manager.createComment(innerEl, 'Reparented shadow scroll comment');
+      assert.isNotNull(thread);
+      assert.strictEqual(manager.getHighlightRects()[0]?.top, 80);
+
+      const host2 = document.createElement('div');
+      const shadow2 = host2.attachShadow({mode: 'open'});
+      const scrollContainer2 = document.createElement('div');
+      scrollContainer2.style.overflow = 'auto';
+      scrollContainer2.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
+
+      container.appendChild(host2);
+
+      // Reparent the element
+      scrollContainer2.appendChild(innerEl);
+      shadow2.appendChild(scrollContainer2);
+
+      // Give MutationObserver a chance to trigger scheduleRematch
+      await Promise.resolve();
+      clock.tick(250);
+
+      assert.strictEqual(manager.getHighlightRects()[0]?.top, 80);
+
+      // Simulate scrolling the new container
+      itemTop = 40;
+      scrollContainer2.dispatchEvent(new Event('scroll', {bubbles: false, composed: false}));
+
+      // Position should be updated synchronously on the leading edge of the scroll event without waiting for a timer.
+      assert.strictEqual(manager.getHighlightRects()[0]?.top, 40);
+    } finally {
+      clock.restore();
+    }
+  });
+});

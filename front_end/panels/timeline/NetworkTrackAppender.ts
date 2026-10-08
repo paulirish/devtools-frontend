@@ -23,7 +23,7 @@ import {InstantEventVisibleDurationMs} from './TimelineFlameChartDataProvider.js
 
 const UIStrings = {
   /**
-   * @description Text in Timeline Flame Chart Data Provider of the Performance panel
+   * @description Header for the network track in the timeline flame chart of the Performance panel.
    */
   network: 'Network',
 } as const;
@@ -37,7 +37,7 @@ export class NetworkTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'Network';
 
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
-  webSocketIdToLevel = new Map<number, number>();
+  webSocketIdToLevel: Map<number, number> = new Map();
   #events: NetworkTrackEvent[] = [];
 
   #font: string;

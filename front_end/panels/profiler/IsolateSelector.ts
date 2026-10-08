@@ -10,48 +10,48 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description aria label for javascript VM instances target list in heap profiler
+   * @description Aria label for JavaScript VM instances target list in heap profiler.
    */
   javascriptVmInstances: 'JavaScript VM instances',
   /**
-   * @description Text in Isolate Selector of a profiler tool
+   * @description Label for total JavaScript heap size in the isolate selector.
    */
   totalJsHeapSize: 'Total JS heap size',
   /**
-   * @description Total trend div title in Isolate Selector of a profiler tool
+   * @description Tooltip for the overall page JavaScript heap size change trend over the specified time window.
    * @example {3} PH1
    */
-  totalPageJsHeapSizeChangeTrend: 'Total page JS heap size change trend over the last {PH1} minutes.',
+  totalPageJsHeapSizeChangeTrend: 'Total page JS heap size change trend over the last {PH1} minutes',
   /**
-   * @description Total value div title in Isolate Selector of a profiler tool
+   * @description Tooltip for total page JavaScript heap size across all VM instances.
    */
-  totalPageJsHeapSizeAcrossAllVm: 'Total page JS heap size across all VM instances.',
+  totalPageJsHeapSizeAcrossAllVm: 'Total page JS heap size across all VM instances',
   /**
-   * @description Heap size change trend measured in kB/s
+   * @description Heap size change trend measured in kB/s.
    * @example {2 kB} PH1
    */
   changeRate: '{PH1}/s',
   /**
-   * @description Text for isolate selector list items with positive change rate
+   * @description Text for isolate selector list items with positive change rate.
    * @example {1.0 kB} PH1
    */
   increasingBySPerSecond: 'increasing by {PH1} per second',
   /**
-   * @description Text for isolate selector list items with negative change rate
+   * @description Text for isolate selector list items with negative change rate.
    * @example {1.0 kB} PH1
    */
   decreasingBySPerSecond: 'decreasing by {PH1} per second',
   /**
-   * @description Heap div title in Isolate Selector of a profiler tool
+   * @description Tooltip for individual VM instance heap size in use by live JavaScript objects.
    */
-  heapSizeInUseByLiveJsObjects: 'Heap size in use by live JS objects.',
+  heapSizeInUseByLiveJsObjects: 'Heap size in use by live JS objects',
   /**
-   * @description Trend div title in Isolate Selector of a profiler tool
+   * @description Tooltip for the heap size growth rate trend over the specified time window.
    * @example {3} PH1
    */
-  heapSizeChangeTrendOverTheLastS: 'Heap size change trend over the last {PH1} minutes.',
+  heapSizeChangeTrendOverTheLastS: 'Heap size change trend over the last {PH1} minutes',
   /**
-   * @description Text to show an item is empty
+   * @description Text to show an item is empty.
    */
   empty: '(empty)',
 } as const;
@@ -66,8 +66,10 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
   totalValueDiv: HTMLElement;
   readonly totalTrendDiv: HTMLElement;
 
-  constructor() {
-    super();
+  // `devtools-widget` passes its host element into widget constructors.
+  // Accept and forward it so this widget attaches to that host element.
+  constructor(element?: HTMLElement) {
+    super(element);
 
     this.items = new UI.ListModel.ListModel();
     this.list = new UI.ListControl.ListControl(this.items, this, UI.ListControl.ListMode.NonViewport);

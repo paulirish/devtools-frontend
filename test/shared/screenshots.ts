@@ -13,7 +13,6 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {SOURCE_ROOT} from '../conductor/paths.js';
 import {platform} from '../conductor/platform.js';
-import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
 import {ScreenshotError} from '../conductor/screenshot-error.js';
 import {TestConfig} from '../conductor/test_config.js';
 
@@ -24,7 +23,7 @@ import {TestConfig} from '../conductor/test_config.js';
  * goldens from there.
  */
 const testRunnerCWD = SOURCE_ROOT;
-const GOLDENS_FOLDER = path.join(testRunnerCWD, 'test', 'goldens', platform);
+const GOLDENS_FOLDER = path.join(testRunnerCWD, 'test', 'goldens', 'linux');
 
 /**
  * It's assumed that the image_diff binaries are in CWD/third_party/image_diff/{platform}/image_diff
@@ -44,7 +43,7 @@ if (!fs.existsSync(IMAGE_DIFF_BINARY)) {
  * previous runs interfere.
  */
 const generatedScreenshotFolderParts = ['..', '.generated', platform];
-const generatedScreenshotFolder = path.join(__dirname, ...generatedScreenshotFolderParts);
+const generatedScreenshotFolder = path.join(import.meta.dirname, ...generatedScreenshotFolderParts);
 if (fs.existsSync(generatedScreenshotFolder)) {
   fs.rmSync(generatedScreenshotFolder, {recursive: true});
 }
@@ -63,15 +62,18 @@ const DEFAULT_MS_BETWEEN_RETRIES = 150;
 // acceptable and will not fail the test.
 const DEFAULT_SCREENSHOT_THRESHOLD_PERCENT = 0;
 
-export const assertElementScreenshotUnchanged = async (
+export const assertElementScreenshotUnchanged = async(
     element: puppeteer.ElementHandle|null,
     fileName: NonNullable<puppeteer.ScreenshotOptions['path']>,
     options: Partial<puppeteer.ScreenshotOptions> = {},
-    ) => {
+    ): Promise<void> => {
   assert.isOk(element, `Given element for test ${fileName} was not found.`);
-  // Only assert screenshots on Linux. We don't observe platform-specific differences enough to justify
-  // the costs of asserting 3 platforms per screenshot.
-  if (platform !== 'linux') {
+  // Only assert screenshots on Linux, unless forceScreenshots is enabled.
+  if (platform !== 'linux' && !TestConfig.forceScreenshots) {
+    if (TestConfig.onDiff.update) {
+      throw new Error(
+          'Cannot update screenshots on non-Linux platforms. You must use a Linux machine or use the hosted screenshot bot to update screenshots.');
+    }
     // Extra new line to work with the progress-diff karma reporter that
     // replaces the previous line.
     console.warn('Screenshot assertions are only supported on Linux\n');
@@ -81,52 +83,42 @@ export const assertElementScreenshotUnchanged = async (
       element, fileName, DEFAULT_SCREENSHOT_THRESHOLD_PERCENT, DEFAULT_RETRIES_COUNT, options);
 };
 
-function getFrontend() {
-  // Outside e2e or interaction tests the frontend can be undefined.
-  try {
-    const {frontend} = getBrowserAndPages();
-    return frontend;
-  } catch {
-    return;
-  }
-}
-
 const assertScreenshotUnchangedWithRetries = async (
-    elementOrPage: puppeteer.ElementHandle|puppeteer.Page, fileName: NonNullable<puppeteer.ScreenshotOptions['path']>,
-    maximumDiffThreshold: number, maximumRetries: number, options: Partial<puppeteer.ScreenshotOptions> = {}) => {
-  const frontend = getFrontend();
-  try {
-    await frontend?.evaluate(() => window.dispatchEvent(new Event('hidecomponentdocsui')));
-    /**
-     * You can call the helper with a path for the golden - e.g.
-     * accordion/basic.png. So we split on `/` and then join on path.sep to
-     * ensure we calculate the right path regardless of platform.
-     */
-    const fileNameForPlatform = fileName.split('/').join(path.sep);
-    const goldenScreenshotPath = path.join(GOLDENS_FOLDER, fileNameForPlatform);
-    const generatedScreenshotPath =
-        path.join(generatedScreenshotFolder, fileNameForPlatform) as NonNullable<puppeteer.ScreenshotOptions['path']>;
+    elementOrPage: puppeteer.ElementHandle|puppeteer.Page,
+    fileName: NonNullable<puppeteer.ScreenshotOptions['path']>,
+    maximumDiffThreshold: number,
+    maximumRetries: number,
+    options: Partial<puppeteer.ScreenshotOptions> = {},
+    ) => {
+  /**
+   * You can call the helper with a path for the golden - e.g.
+   * accordion/basic.png. So we split on `/` and then join on path.sep to
+   * ensure we calculate the right path regardless of platform.
+   */
+  const fileNameForPlatform = fileName.split('/').join(path.sep);
+  const goldenScreenshotPath = path.join(GOLDENS_FOLDER, fileNameForPlatform);
+  const generatedScreenshotPath = path.join(
+                                      generatedScreenshotFolder,
+                                      fileNameForPlatform,
+                                      ) as NonNullable<puppeteer.ScreenshotOptions['path']>;
 
-    /**
-     * Ensure that the directories for the golden/generated file exist. We need
-     * this because if the user calls this function with `accordion/basic.png`,
-     * we need to make sure that the `accordion` folder exists.
-     */
-    fs.mkdirSync(path.dirname(generatedScreenshotPath), {recursive: true});
-    fs.mkdirSync(path.dirname(goldenScreenshotPath), {recursive: true});
+  /**
+   * Ensure that the directories for the golden/generated file exist. We need
+   * this because if the user calls this function with `accordion/basic.png`,
+   * we need to make sure that the `accordion` folder exists.
+   */
+  fs.mkdirSync(path.dirname(generatedScreenshotPath), {recursive: true});
+  fs.mkdirSync(path.dirname(goldenScreenshotPath), {recursive: true});
 
-    await assertScreenshotUnchanged({
-      elementOrPage,
-      generatedScreenshotPath,
-      goldenScreenshotPath,
-      screenshotOptions: options,
-      fileName,
-      maximumDiffThreshold,
-      maximumRetries,
-    });
-  } finally {
-    await frontend?.evaluate(() => window.dispatchEvent(new Event('showcomponentdocsui')));
-  }
+  await assertScreenshotUnchanged({
+    elementOrPage,
+    generatedScreenshotPath,
+    goldenScreenshotPath,
+    screenshotOptions: options,
+    fileName,
+    maximumDiffThreshold,
+    maximumRetries,
+  });
 };
 
 interface ScreenshotAssertionOptions {
@@ -167,19 +159,13 @@ const assertScreenshotUnchanged = async (options: ScreenshotAssertionOptions) =>
   // In the event that a golden does not exist, assume the generated screenshot is the new golden.
   if (!fs.existsSync(goldenScreenshotPath)) {
     // LUCI_CONTEXT is an environment variable present on the bots.
-    if (process.env.LUCI_CONTEXT !== undefined && !shouldUpdate) {
+    if (TestConfig.isLuci && !shouldUpdate) {
       // If the image is missing, there's no point retrying the test N more times.
       onBotAndImageNotFound = true;
       throw ScreenshotError.fromGeneratedScreenshot(
-          `Failing test: in an environment with LUCI_CONTEXT and did not find a golden screenshot.
-
-        Here's the image that this test generated as a base64:
-
-        data:image/png;base64,${fs.readFileSync(generatedScreenshotPath, {
-            encoding: 'base64',
-          })}
-        `,
-          generatedScreenshotPath);
+          'Failing test: in an environment with LUCI_CONTEXT and did not find a golden screenshot.',
+          generatedScreenshotPath,
+      );
     }
 
     console.log('Golden does not exist, using generated screenshot.');
@@ -193,8 +179,10 @@ const assertScreenshotUnchanged = async (options: ScreenshotAssertionOptions) =>
   try {
     await compare(goldenScreenshotPath, generatedScreenshotPath, maximumDiffThreshold, shouldUpdate);
   } catch (compareError) {
-    if (!onBotAndImageNotFound) {
-      console.log(`=> Test failed. Retrying (retry ${retryCount} of ${maximumRetries} maximum).`);
+    if (!onBotAndImageNotFound && maximumRetries > 1) {
+      console.log(
+          `=> Test failed. Retrying (retry ${retryCount} of ${maximumRetries} maximum).`,
+      );
     }
 
     if (retryCount === maximumRetries || onBotAndImageNotFound) {
@@ -278,54 +266,34 @@ async function execImageDiffCommand(cmd: string) {
 }
 
 async function compare(golden: string, generated: string, maximumDiffThreshold: number, isInDiffUpdateMode: boolean) {
-  const isOnBot = process.env.LUCI_CONTEXT !== undefined;
-  if (!isOnBot && process.env.SKIP_SCREENSHOT_COMPARISONS_FOR_FAST_COVERAGE) {
-    // When checking test coverage locally the tests get sped up significantly
-    // if we do not do the actual image comparison. Obviously this makes the
-    // tests all pass, but it is useful to quickly get coverage stats.
-    // Therefore you can pass this flag to skip all screenshot comparisions. We
-    // make sure this is only possible if not on a CQ bot and 99.9% of the time
-    // this should not be used!
-    return;
-  }
-
   const {rawMisMatchPercentage, diffPath} = await imageDiff(golden, generated);
 
-  const base64TestGeneratedImageLog = `Here's the image the test generated as a base64:
-    data:image/png;base64,${fs.readFileSync(generated, {
-    encoding: 'base64',
-  })}`;
-
-  const base64DiffImageLog = `And here's the diff image as base64:\n
-    data:image/png;base64,${
-      diffPath ? fs.readFileSync(diffPath, {
-        encoding: 'base64',
-      }) :
-                 ''}`;
-
   let debugInfo = '';
-  if (isOnBot) {
-    debugInfo = `${base64TestGeneratedImageLog}\n${base64DiffImageLog}\n`;
+  if (TestConfig.isLuci) {
+    debugInfo = '\nPlease check LUCI artifacts for the images.';
   } else if (!isInDiffUpdateMode) {
-    debugInfo = `Run the tests again with --on-diff=update to update all tests that fail.
-  Only do this if you expected this screenshot to have changed!
-
-  Diff image generated at:
-  => ${path.relative(testRunnerCWD, diffPath)}\n`;
+    const newImage = path.relative(testRunnerCWD, generated);
+    const diffImage = path.relative(testRunnerCWD, diffPath);
+    debugInfo = `
+  => New image at ${newImage}
+  => Diff image at ${diffImage}`;
   }
 
-  try {
-    assert.isAtMost(
-        rawMisMatchPercentage, maximumDiffThreshold,
-        `There is a ${rawMisMatchPercentage}% difference between the golden and generated image.
+  const error = `Image assertion failed with ${rawMisMatchPercentage}% difference.${debugInfo}`;
+  assert.isAtMost;
+  if (rawMisMatchPercentage > maximumDiffThreshold) {
+    throw ScreenshotError.fromScreenshotAssertionError(
+        new Error(error),
+        golden,
+        generated,
+        diffPath,
+    );
+  }
 
-    ${debugInfo}`);
-    if (rawMisMatchPercentage > 0) {
-      console.log(`test passed with difference of ${rawMisMatchPercentage}%`);
-    }
-
-  } catch (assertionError) {
-    throw ScreenshotError.fromScreenshotAssertionError(assertionError, golden, generated, diffPath);
+  if (rawMisMatchPercentage > 0) {
+    console.log(
+        `Image assertion passed with ${rawMisMatchPercentage}% difference`,
+    );
   }
 }
 

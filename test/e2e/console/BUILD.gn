@@ -10,6 +10,7 @@ ts_e2e_library("console") {
     "command-line-api.test.ts",
     "console-accessors.test.ts",
     "console-autocomplete.test.ts",
+    "console-bind-fake.test.ts",
     "console-clear.test.ts",
     "console-context-menu.test.ts",
     "console-context-selector.test.ts",
@@ -37,8 +38,11 @@ ts_e2e_library("console") {
     "search.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
+    "../../../front_end/core/root:bundle",
     "../../../front_end/panels/console:bundle",
+    "../../conductor:implementation",
+    "../../shared",
     "../helpers",
     "../shared",
   ]

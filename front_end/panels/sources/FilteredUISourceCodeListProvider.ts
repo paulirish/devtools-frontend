@@ -9,26 +9,33 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
-import {Directives, html, type TemplateResult} from '../../ui/lit/lit.js';
+import {Directives, html, nothing, type TemplateResult} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import {FilePathScoreFunction} from './FilePathScoreFunction.js';
 import filteredUISourceCodeListProviderStyles from './filteredUISourceCodeListProvider.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in Filtered UISource Code List Provider of the Sources panel
+   * @description Text in Filtered UISourceCode list provider of the Sources panel.
    */
   noFilesFound: 'No files found',
   /**
-   * @description Name of an item that is on the ignore list
+   * @description Name of an item that is on the ignore list.
    * @example {compile.html} PH1
    */
   sIgnoreListed: '{PH1} (ignore listed)',
+  /**
+   * @description Tag indicating a file is from the local workspace
+   */
+  workspace: 'Workspace',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/sources/FilteredUISourceCodeListProvider.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {classMap} = Directives;
+
+const FILE_SYSTEM_SCORE_BONUS = 1_000_000;
 
 export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidget.Provider {
   private queryLineNumberAndColumnNumber: string;
@@ -46,6 +53,18 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
 
     this.uiSourceCodes = [];
     this.uiSourceCodeIds = new Set();
+  }
+
+  /**
+   * Checks if the given UISourceCode belongs to a file system project.
+   * This includes:
+   * - Workspace.Workspace.projectTypes.FileSystem: Standard workspace folders added by the user.
+   * - Workspace.Workspace.projectTypes.ConnectableFileSystem: Workspace folders connected via custom protocols.
+   */
+  private isFileSystemFile(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    const projectType = uiSourceCode.project().type();
+    return projectType === Workspace.Workspace.projectTypes.FileSystem ||
+        projectType === Workspace.Workspace.projectTypes.ConnectableFileSystem;
   }
 
   private projectRemoved(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
@@ -73,7 +92,9 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
     if (this.uiSourceCodeIds.has(uiSourceCode.canonicalScriptId())) {
       return false;
     }
-    if (Common.Settings.Settings.instance().moduleSetting('navigator-just-my-code').get() &&
+    if (Common.Settings.Settings.instance()
+            .resolve(SettingsUI.SourcesSettings.navigatorJustMyCodeSettingDescriptor)
+            .get() &&
         Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
             uiSourceCode)) {
       return false;
@@ -116,8 +137,10 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
   override itemScoreAt(itemIndex: number, query: string): number {
     const uiSourceCode = this.uiSourceCodes[itemIndex];
     const score = this.defaultScores ? (this.defaultScores.get(uiSourceCode) || 0) : 0;
+    const fileSystemBonus = this.isFileSystemFile(uiSourceCode) ? FILE_SYSTEM_SCORE_BONUS : 0;
+
     if (!query || query.length < 2) {
-      return score;
+      return score + fileSystemBonus;
     }
 
     if (this.query !== query) {
@@ -148,7 +171,8 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
     }
 
     const fullDisplayName = uiSourceCode.fullDisplayName();
-    return score + multiplier * (contentTypeBonus + this.scorer.calculateScore(fullDisplayName, null));
+    return score + multiplier * (contentTypeBonus + this.scorer.calculateScore(fullDisplayName, null)) +
+        fileSystemBonus;
   }
 
   override renderItem(itemIndex: number, query: string): TemplateResult {
@@ -179,6 +203,8 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
         subtitleRanges.push({offset: indexes[i], length: 1});
       }
     }
+    const isFileSystem = this.isFileSystemFile(uiSourceCode);
+
     // clang-format off
     return html`
       <style>${filteredUISourceCodeListProviderStyles}</style>
@@ -196,6 +222,7 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
             class="filtered-ui-source-code-subtitle" title=${tooltipText}>
           ${this.renderSubtitleElement(fullDisplayName.substring(0, fileNameIndex + 1))}
         </devtools-highlight>
+        ${isFileSystem ? html`<span class="tag">${i18nString(UIStrings.workspace)}</span>` : nothing}
       </div>`;
     // clang-format on
   }

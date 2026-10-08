@@ -7,13 +7,12 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("project_settings") {
+devtools_foundation_module("project_settings") {
   sources = [ "ProjectSettingsModel.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
-    "../../core/root:bundle",
     "../../core/sdk:bundle",
   ]
 }
@@ -21,11 +20,12 @@ devtools_module("project_settings") {
 devtools_entrypoint("bundle") {
   entrypoint = "project_settings.ts"
 
-  deps = [ ":project_settings" ]
+  ts_deps = [ ":project_settings" ]
 
   visibility = [
     ":*",
     "../../entrypoints/main",
+    "../../foundation/*",
     "../../panels/settings",
     "../../testing/*",
     "../persistence/*",
@@ -34,11 +34,11 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
   sources = [ "ProjectSettingsModel.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",

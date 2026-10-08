@@ -10,6 +10,7 @@ import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
+import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
@@ -28,9 +29,9 @@ const UIStrings = {
    */
   consoleMessage: 'Console message',
   /**
-   * @description The title of the insight source "Stacktrace".
+   * @description Title of the insight source 'Stack trace'.
    */
-  stackTrace: 'Stacktrace',
+  stackTrace: 'Stack trace',
   /**
    * @description The title of the insight source "Network request".
    */
@@ -49,7 +50,7 @@ const UIStrings = {
    */
   insight: 'Explanation',
   /**
-   * @description The title of the a button that closes the insight pane.
+   * @description Title of a button that closes the explanation.
    */
   closeInsight: 'Close explanation',
   /**
@@ -72,9 +73,9 @@ const UIStrings = {
    */
   report: 'Report legal issue',
   /**
-   * @description The text of the header inside the console insight pane when there was an error generating an insight.
+   * @description Header text shown when there was an error generating an insight.
    */
-  error: 'DevTools has encountered an error',
+  error: 'DevTools encountered an error',
   /**
    * @description The message shown when an error has been encountered.
    */
@@ -90,11 +91,11 @@ const UIStrings = {
    */
   learnMore: 'Learn more',
   /**
-   * @description The error message when the user is not logged in into Chrome.
+   * @description The error message when the user is not logged in to Chrome.
    */
-  notLoggedIn: 'This feature is only available when you sign into Chrome with your Google account.',
+  notLoggedIn: 'This feature is only available when you sign in to Chrome with your Google account',
   /**
-   * @description The title of a button which opens the Chrome SignIn page.
+   * @description Title of a button which opens the Chrome sign-in page.
    */
   signIn: 'Sign in',
   /**
@@ -105,7 +106,7 @@ const UIStrings = {
   /**
    * @description Message shown when the user is offline.
    */
-  offline: 'Check your internet connection and try again.',
+  offline: 'Check your internet connection and try again',
   /**
    * @description The message shown if the user is not logged in.
    */
@@ -120,13 +121,12 @@ const UIStrings = {
    * available and a page reload might populate it.
    */
   reloadRecommendation:
-      'Reload the page to capture related network request data for this message in order to create a better insight.',
+      'Reload the page to capture related network request data for this message to get a better insight',
   /**
    * @description Shown to the user when they need to enable the console insights feature in settings in order to use it.
    * @example {Console insights in Settings} PH1
    */
-  turnOnInSettings:
-      'Turn on {PH1} to receive AI assistance for understanding and addressing console warnings and errors.',
+  turnOnInSettings: 'Turn on {PH1} to use AI assistance for understanding and addressing console warnings and errors',
   /**
    * @description Text for a link to Chrome DevTools Settings.
    */
@@ -146,7 +146,7 @@ const UIStrings = {
   /**
    * @description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
    */
-  notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
+  notAvailableInIncognitoMode: 'AI assistance isn’t available in Incognito mode or Guest mode',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/explain/components/ConsoleInsight.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -754,7 +754,8 @@ export type ViewFunction = typeof DEFAULT_VIEW;
 
 export class ConsoleInsight extends UI.Widget.Widget {
   static async create(promptBuilder: PublicPromptBuilder, aidaClient: PublicAidaClient): Promise<Lit.LitTemplate> {
-    const aidaPreconditions = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+    const aidaPreconditions = Host.AidaClient.HostConfigTracker.instance().aidaAvailability ??
+        await Host.AidaClient.AidaClient.checkAccessPreconditions();
     return html`<devtools-widget class="devtools-console-insight" ${
         widget(element => new ConsoleInsight(promptBuilder, aidaClient, aidaPreconditions, element))}>
     </devtools-widget>`;
@@ -779,9 +780,10 @@ export class ConsoleInsight extends UI.Widget.Widget {
   // Rating sub-form state.
   #selectedRating?: boolean;
 
-  #consoleInsightsEnabledSetting: Common.Settings.Setting<boolean>|undefined;
+  #consoleInsightsEnabledSetting: AiAssistanceModel.AiSetting.AiSetting<boolean>;
   #aidaPreconditions: Host.AidaClient.AidaAccessPreconditions;
-  #boundOnAidaAvailabilityChange: () => Promise<void>;
+  #boundOnAidaAvailabilityChange:
+      (ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>) => void;
   #marked: Marked.Marked.Marked;
 
   constructor(
@@ -859,12 +861,12 @@ export class ConsoleInsight extends UI.Widget.Widget {
 
   // off -> entrypoints are shown, and point to the AI setting panel where the setting can be turned on
   // on -> entrypoints are shown, and console insights can be generated
-  #getConsoleInsightsEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
-    try {
-      return Common.Settings.moduleSetting('console-insights-enabled') as Common.Settings.Setting<boolean>;
-    } catch {
-      return;
-    }
+  #getConsoleInsightsEnabledSetting(): AiAssistanceModel.AiSetting.AiSetting<boolean> {
+    return new AiAssistanceModel.AiSetting.AiSetting(
+        AiAssistanceModel.AiUtils.consoleInsightsEnabledSettingDescriptor,
+        Host.AidaClient.HostConfigTracker.instance(),
+        Common.Settings.Settings.instance(),
+    );
   }
 
   // off -> consent reminder is shown, unless the 'console-insights-enabled'-setting has been enabled in the current DevTools session
@@ -876,7 +878,8 @@ export class ConsoleInsight extends UI.Widget.Widget {
   override wasShown(): void {
     super.wasShown();
     this.focus();
-    this.#consoleInsightsEnabledSetting?.addChangeListener(this.#onConsoleInsightsSettingChanged, this);
+    this.#consoleInsightsEnabledSetting.addEventListener(AiAssistanceModel.AiSetting.Events.CHANGED,
+                                                         this.#onConsoleInsightsSettingChanged, this);
     const blockedByAge = Root.Runtime.hostConfig.aidaAvailability?.blockedByAge === true;
     if (this.#state.type === State.LOADING && this.#consoleInsightsEnabledSetting?.getIfNotDisabled() === true &&
         !blockedByAge && this.#state.consentOnboardingCompleted) {
@@ -885,7 +888,10 @@ export class ConsoleInsight extends UI.Widget.Widget {
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
     // If AIDA availability has changed while the component was disconnected, we need to update.
-    void this.#onAidaAvailabilityChange();
+    const initialAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (initialAvailability !== undefined) {
+      this.#updateAidaAvailability(initialAvailability);
+    }
     // The setting might have been turned on/off while the component was disconnected.
     // Update the state, unless the current state is already terminal (`INSIGHT` or `ERROR`).
     if (this.#state.type !== State.INSIGHT && this.#state.type !== State.ERROR) {
@@ -896,18 +902,22 @@ export class ConsoleInsight extends UI.Widget.Widget {
 
   override willHide(): void {
     super.willHide();
-    this.#consoleInsightsEnabledSetting?.removeChangeListener(this.#onConsoleInsightsSettingChanged, this);
+    this.#consoleInsightsEnabledSetting.removeEventListener(AiAssistanceModel.AiSetting.Events.CHANGED,
+                                                            this.#onConsoleInsightsSettingChanged, this);
     Host.AidaClient.HostConfigTracker.instance().removeEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
   }
 
-  async #onAidaAvailabilityChange(): Promise<void> {
-    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
-    if (currentAidaAvailability !== this.#aidaPreconditions) {
-      this.#aidaPreconditions = currentAidaAvailability;
+  #updateAidaAvailability(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): void {
+    if (aidaAvailability !== this.#aidaPreconditions) {
+      this.#aidaPreconditions = aidaAvailability;
       this.#state = this.#getStateFromAidaAvailability();
       void this.#generateInsightIfNeeded();
     }
+  }
+
+  #onAidaAvailabilityChange(ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>): void {
+    this.#updateAidaAvailability(ev.data);
   }
 
   #onConsoleInsightsSettingChanged(): void {

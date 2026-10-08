@@ -23,19 +23,20 @@ devtools_ui_module("icon_button") {
   ]
 
   deps = [
+    ":css_files",
     "../../../Images:optimize_images",
-    "../../../ui/kit:bundle",
-    "../../../ui/lit:bundle",
+  ]
+
+  ts_deps = [
+    "../../kit:bundle",
+    "../../lit:bundle",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "icon_button.ts"
 
-  deps = [
-    ":css_files",
-    ":icon_button",
-  ]
+  ts_deps = [ ":icon_button" ]
 
   visibility = [
     "../../../entrypoints/inspector_main/*",
@@ -57,7 +58,7 @@ devtools_ui_module("unittests") {
     "IconButton.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../kit:bundle",

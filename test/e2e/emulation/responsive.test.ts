@@ -8,7 +8,7 @@ import {
   getZoom,
   openDeviceToolbar,
   selectZoomLevel,
-  toggleAutoAdjustZoom,
+  toggleFitToWindow,
   waitForZoom,
 } from '../helpers/emulation-helpers.js';
 
@@ -16,8 +16,8 @@ describe('Custom devices', () => {
   it('can preserve zoom', async ({devToolsPage, inspectedPage}) => {
     await openDeviceToolbar(devToolsPage, inspectedPage);
 
-    await selectZoomLevel(devToolsPage, '50%');
-    assert.strictEqual(await getZoom(devToolsPage), '50%');
+    await selectZoomLevel(devToolsPage, '100%');
+    assert.strictEqual(await getZoom(devToolsPage), '100%');
 
     await clickWidthInput(devToolsPage);
     await devToolsPage.page.keyboard.press('ArrowDown');
@@ -26,10 +26,14 @@ describe('Custom devices', () => {
     await selectZoomLevel(devToolsPage, '50%');
     assert.strictEqual(await getZoom(devToolsPage), '50%');
 
-    await toggleAutoAdjustZoom(devToolsPage);
-
     await clickWidthInput(devToolsPage);
     await devToolsPage.page.keyboard.press('ArrowDown');
     await waitForZoom(devToolsPage, '50%');
+
+    await toggleFitToWindow(devToolsPage);
+
+    await clickWidthInput(devToolsPage);
+    await devToolsPage.page.keyboard.press('ArrowDown');
+    await waitForZoom(devToolsPage, 'Fit to window');
   });
 });

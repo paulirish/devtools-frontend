@@ -5,17 +5,17 @@
 import type * as puppeteer from 'puppeteer-core';
 import type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalThis: any = global;
 
 let loadExtensionPromise: Promise<unknown> = Promise.resolve();
 
-export async function loadExtension(
-    name: string, startPage: string|undefined = undefined, allowFileAccess: boolean|undefined = undefined,
-    devToolsPage: DevToolsPage, inspectedPage: InspectedPage): Promise<puppeteer.Frame> {
+export async function loadExtension(devToolsPage: DevToolsPage, inspectedPage: InspectedPage, name: string,
+                                    startPage: string|undefined = undefined,
+                                    allowFileAccess: boolean|undefined = undefined): Promise<puppeteer.Frame> {
   startPage = startPage || `${inspectedPage.getResourcesPath()}/extensions/empty_extension.html`;
   const extensionInfo = {startPage, name, allowFileAccess};
 

@@ -6,8 +6,8 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Geometry from '../../models/geometry/geometry.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
+import * as Geometry from '../geometry/geometry.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -19,14 +19,14 @@ import {createShadowRootWithCoreStyles, measuredScrollbarWidth, measurePreferred
 
 const UIStrings = {
   /**
-   * @description Aria alert to read the suggestion for the suggestion box when typing in text editor
+   * @description Announcement text for screen readers when navigating suggestions in a suggestion box.
    * @example {name} PH1
    * @example {2} PH2
    * @example {5} PH3
    */
   sSuggestionSOfS: '{PH1}, suggestion {PH2} of {PH3}',
   /**
-   * @description Aria alert to confirm the suggestion when it is selected from the suggestion box
+   * @description Announcement text for screen readers when a suggestion is selected in a suggestion box.
    * @example {name} PH1
    */
   sSuggestionSSelected: '{PH1}, suggestion selected',

@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../core/platform/platform.js';
-import type {TemplateResult} from '../lit/lit.js';
+import {type LitTemplate, nothing} from '../lit/lit.js';
 
 import type {TabbedPane} from './TabbedPane.js';
-import type {ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
+import type {ToolbarMenuButton} from './Toolbar.js';
 import {ViewManager} from './ViewManager.js';
 import {type AnyWidget, VBox, type WidgetOptions} from './Widget.js';
 
@@ -23,7 +23,7 @@ export interface View {
 
   isTransient(): boolean;
 
-  toolbarItems(): Promise<ToolbarItem[]|TemplateResult>;
+  toolbarItems(): Promise<LitTemplate>;
 
   widget(): Promise<AnyWidget>;
 
@@ -61,10 +61,16 @@ export class SimpleView<ContentTypeT extends HTMLElement|DocumentFragment = HTML
    * @param options the settings for the resulting view.
    * @throws TypeError - if `options.viewId` is not in extended kebab case.
    */
-  constructor(options: SimpleViewOptions<ContentTypeT>) {
-    super(options);
-    this.#title = options.title;
-    this.#viewId = options.viewId;
+  constructor(options: SimpleViewOptions<ContentTypeT>);
+  constructor(element: HTMLElement, options: SimpleViewOptions<ContentTypeT>);
+  constructor(elementOrOptions: HTMLElement|SimpleViewOptions<ContentTypeT>,
+              options?: SimpleViewOptions<ContentTypeT>) {
+    // @ts-expect-error
+    super(elementOrOptions, options);
+    const optionsObj =
+        (elementOrOptions instanceof HTMLElement ? options : elementOrOptions) as SimpleViewOptions<ContentTypeT>;
+    this.#title = optionsObj.title;
+    this.#viewId = optionsObj.viewId;
     if (!Platform.StringUtilities.isExtendedKebabCase(this.#viewId)) {
       throw new TypeError(`Invalid view ID '${this.#viewId}'`);
     }
@@ -86,8 +92,8 @@ export class SimpleView<ContentTypeT extends HTMLElement|DocumentFragment = HTML
     return false;
   }
 
-  toolbarItems(): Promise<ToolbarItem[]> {
-    return Promise.resolve([]);
+  toolbarItems(): Promise<LitTemplate> {
+    return Promise.resolve(nothing);
   }
 
   widget(): Promise<AnyWidget> {

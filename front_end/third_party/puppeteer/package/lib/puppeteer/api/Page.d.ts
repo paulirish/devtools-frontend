@@ -14,6 +14,7 @@ import type { Tracing } from '../cdp/Tracing.js';
 import type { WebMCP } from '../cdp/WebMCP.js';
 import type { ConsoleMessage } from '../common/ConsoleMessage.js';
 import type { Cookie, CookieParam, DeleteCookiesRequest } from '../common/Cookie.js';
+import type { Logger } from '../common/Debug.js';
 import type { Device } from '../common/Device.js';
 import { EventEmitter, type EventsWithWildcard, type EventType } from '../common/EventEmitter.js';
 import type { FileChooser } from '../common/FileChooser.js';
@@ -37,24 +38,65 @@ import type { Issue } from './Issue.js';
 import type { JSHandle } from './JSHandle.js';
 import { Locator, type AwaitedLocator } from './locators/locators.js';
 import type { Realm } from './Realm.js';
+import type { ScreenRecording } from './ScreenRecording.js';
 import type { Target } from './Target.js';
 import type { WebWorker } from './WebWorker.js';
 /**
  * @public
  */
 export interface Metrics {
+    /**
+     * The timestamp when the metrics sample was taken, in monotonic time
+     * (seconds since an arbitrary point in the past).
+     */
     Timestamp?: number;
+    /**
+     * Number of documents in the page.
+     */
     Documents?: number;
+    /**
+     * Number of frames in the page.
+     */
     Frames?: number;
+    /**
+     * Number of events in the page.
+     */
     JSEventListeners?: number;
+    /**
+     * Number of DOM nodes in the page.
+     */
     Nodes?: number;
+    /**
+     * Total number of full or partial page layouts.
+     */
     LayoutCount?: number;
+    /**
+     * Total number of page style recalculations.
+     */
     RecalcStyleCount?: number;
+    /**
+     * Combined duration of all page layouts, in seconds.
+     */
     LayoutDuration?: number;
+    /**
+     * Combined duration of all page style recalculations, in seconds.
+     */
     RecalcStyleDuration?: number;
+    /**
+     * Combined duration of JavaScript execution, in seconds.
+     */
     ScriptDuration?: number;
+    /**
+     * Combined duration of all tasks performed by the browser, in seconds.
+     */
     TaskDuration?: number;
+    /**
+     * Used JavaScript heap size, in bytes.
+     */
     JSHeapUsedSize?: number;
+    /**
+     * Total JavaScript heap size, in bytes.
+     */
     JSHeapTotalSize?: number;
 }
 /**
@@ -327,6 +369,45 @@ export interface ScreencastOptions {
      * @defaultValue `'ffmpeg'`
      */
     ffmpegPath?: string;
+}
+/**
+ * @public
+ * @experimental
+ */
+export interface RecordOptions {
+    /**
+     * File path to save the recording to.
+     */
+    path?: string;
+    /**
+     * Specifies whether to overwrite output file,
+     * or exit immediately if it already exists.
+     *
+     * @defaultValue `true`
+     */
+    overwrite?: boolean;
+    /**
+     * Whether to record audio.
+     *
+     * @defaultValue `false`
+     */
+    audio?: boolean;
+    /**
+     * Maximum frame width in pixels.
+     */
+    maxWidth?: number;
+    /**
+     * Maximum frame height in pixels.
+     */
+    maxHeight?: number;
+    /**
+     * Maximum frame rate in frames per second.
+     */
+    frameRate?: number;
+    /**
+     * Frame rate in frames per second (alias for frameRate).
+     */
+    fps?: number;
 }
 /**
  * @public
@@ -632,7 +713,11 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * @internal
      */
-    constructor();
+    logger: Logger;
+    /**
+     * @internal
+     */
+    constructor(logger: Logger);
     /**
      * `true` if the service worker are being bypassed, `false` otherwise.
      */
@@ -717,7 +802,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * A target this page was created from.
      *
-     * @deprecated Use {@link Page.createCDPSession} directly.
+     * @deprecated To create CDP session use {@link Page.createCDPSession} directly. To
+     * identify pages spawned by this one, use {@link PageEvent.Popup} event instead.
      */
     abstract target(): Target;
     /**
@@ -753,9 +839,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     abstract get tracing(): Tracing;
     /**
-     * Experimental API for {@link https://github.com/webmachinelearning/webmcp
-     * | WebMCP}. Requires Chrome 149+ with the
-     * `--enable-features=WebMCPTesting,DevToolsWebMCPSupport` flags enabled.
+     * Experimental API for {@link https://github.com/webmachinelearning/webmcp| WebMCP}.
+     * Requires Chrome 151+ with the `--enable-features=WebMCP` flag enabled.
      *
      * @experimental
      */
@@ -1398,7 +1483,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @returns
      *
-     * - `Timestamp` : The timestamp when the metrics sample was taken.
+     * - `Timestamp` : The timestamp when the metrics sample was taken, in
+     *   monotonic time (seconds).
      *
      * - `Documents` : Number of documents in the page.
      *
@@ -1412,18 +1498,20 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * - `RecalcStyleCount` : Total number of page style recalculations.
      *
-     * - `LayoutDuration` : Combined durations of all page layouts.
+     * - `LayoutDuration` : Combined durations of all page layouts, in seconds.
      *
      * - `RecalcStyleDuration` : Combined duration of all page style
-     *   recalculations.
+     *   recalculations, in seconds.
      *
-     * - `ScriptDuration` : Combined duration of JavaScript execution.
+     * - `ScriptDuration` : Combined duration of JavaScript execution, in
+     *   seconds.
      *
-     * - `TaskDuration` : Combined duration of all tasks performed by the browser.
+     * - `TaskDuration` : Combined duration of all tasks performed by the
+     *   browser, in seconds.
      *
-     * - `JSHeapUsedSize` : Used JavaScript heap size.
+     * - `JSHeapUsedSize` : Used JavaScript heap size, in bytes.
      *
-     * - `JSHeapTotalSize` : Total JavaScript heap size.
+     * - `JSHeapTotalSize` : Total JavaScript heap size, in bytes.
      *
      * @remarks
      * All timestamps are in monotonic time: monotonically increasing time
@@ -1623,7 +1711,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * import {KnownDevices} from 'puppeteer';
-     * const iPhone = KnownDevices['iPhone 15 Pro'];
+     * const iPhone = KnownDevices['iPhone 17 Pro'];
      *
      * const browser = await puppeteer.launch();
      * const page = await browser.newPage();
@@ -1743,6 +1831,11 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * ```
      */
     abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
+    /**
+     * @param locale - Locale to emulate on the page. Passing no locale disables
+     * locale emulation.
+     */
+    abstract emulateLocale(locale?: string): Promise<void>;
     /**
      * @param timezoneId - Changes the timezone of the page. See
      * {@link https://source.chromium.org/chromium/chromium/deps/icu.git/+/faee8bc70570192d82d2978a71e2a615788597d1:source/data/misc/metaZones.txt | ICU’s metaZones.txt}
@@ -1939,7 +2032,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     _maybeWriteTypedArrayToFile(path: string | undefined, typedArray: Uint8Array): Promise<void>;
     /**
-     * Captures a screencast of this {@link Page | page}.
+     * Captures a screencast of this {@link Page | page}. Works in Chrome 153+.
      *
      * @example
      * Recording a {@link Page | page}:
@@ -1969,7 +2062,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param options - Configures screencast behavior.
      *
-     * @experimental
+     * @deprecated Use {@link Page.record} instead.
      *
      * @remarks
      *
@@ -1979,6 +2072,48 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
      */
     screencast(options?: Readonly<ScreencastOptions>): Promise<ScreenRecorder>;
+    /**
+     * @internal
+     */
+    protected abstract createScreenRecording(options: Readonly<RecordOptions>): ScreenRecording;
+    /**
+     * Records this {@link Page | page} using the Chrome DevTools Protocol
+     * {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-startScreenRecording | Page.startScreenRecording}
+     * API.
+     *
+     * Outputs mp4 video stream.
+     *
+     * @example
+     * Recording a {@link Page | page}:
+     *
+     * ```ts
+     * import puppeteer from 'puppeteer';
+     *
+     * // Launch a browser
+     * const browser = await puppeteer.launch();
+     *
+     * // Create a new page
+     * const page = await browser.newPage();
+     *
+     * // Go to your site.
+     * await page.goto('https://www.example.com');
+     *
+     * // Start recording.
+     * const recorder = await page.record({path: 'recording.mp4'});
+     *
+     * // Do something.
+     *
+     * // Stop recording.
+     * await recorder.stop();
+     *
+     * await browser.close();
+     * ```
+     *
+     * @param options - Configures recording behavior.
+     *
+     * @experimental
+     */
+    record(options?: Readonly<RecordOptions>): Promise<ScreenRecording>;
     /**
      * @internal
      */
@@ -2425,9 +2560,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @experimental
      */
     abstract windowId(): Promise<WindowId>;
-    /** @internal */
     [disposeSymbol](): void;
-    /** @internal */
     [asyncDisposeSymbol](): Promise<void>;
     /**
      * Opens DevTools for the this page if not already open and returns the DevTools page.

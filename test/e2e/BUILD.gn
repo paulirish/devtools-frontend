@@ -6,6 +6,7 @@ import("../../scripts/build/ninja/copy.gni")
 import("../../scripts/build/typescript/typescript.gni")
 
 group("e2e") {
+  testonly = true
   deps = [
     ":test_inputs",
     ":tests",
@@ -14,8 +15,15 @@ group("e2e") {
 }
 
 node_ts_library("tests") {
-  deps = [
+  sources = [ "run-mocha.ts" ]
+
+  ts_deps = [
     "../conductor:implementation",
+    "../shared",
+    "conductor:implementation",
+  ]
+
+  deps = [
     "ai_assistance",
     "animations",
     "application",
@@ -53,10 +61,10 @@ node_ts_library("tests") {
     "throttling",
     "webaudio",
   ]
-  sources = [ "mocharc.ts" ]
 }
 
 generated_file("test_inputs") {
+  testonly = true
   outputs = [ "$target_gen_dir/tests.txt" ]
   data_keys = [ "tests" ]
   rebase = target_gen_dir

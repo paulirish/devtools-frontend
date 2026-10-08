@@ -8,8 +8,10 @@ import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as SourceMapsResolver from '../../models/trace_source_maps_resolver/trace_source_maps_resolver.js';
+import * as Workspace from '../../models/workspace/workspace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getDurationString, getEventLevel, type LastTimestampByLevel} from './AppenderUtils.js';
@@ -167,7 +169,6 @@ export const enum VisualLoggingTrackName {
   THREAD_MAIN = 'thread.main',
   THREAD_FRAME = 'thread.frame',
   THREAD_WORKER = 'thread.worker',
-  THREAD_AUCTION_WORKLET = 'thread.auction-worklet',
   THREAD_RASTERIZER = 'thread.rasterizer',
   THREAD_POOL = 'thread.pool',
   THREAD_OTHER = 'thread.other',
@@ -300,8 +301,6 @@ export class CompatibilityTracksAppender {
         }
         case Trace.Handlers.Threads.ThreadType.WORKER:
           return 3;
-        case Trace.Handlers.Threads.ThreadType.AUCTION_WORKLET:
-          return 3;
         case Trace.Handlers.Threads.ThreadType.RASTERIZER:
           return 4;
         case Trace.Handlers.Threads.ThreadType.THREAD_POOL:
@@ -313,7 +312,9 @@ export class CompatibilityTracksAppender {
       }
     };
     const threads = Trace.Handlers.Threads.threadsInTrace(this.#parsedTrace.data);
-    const showAllEvents = Common.Settings.Settings.instance().moduleSetting('timeline-show-all-events').get();
+    const showAllEvents = Common.Settings.Settings.instance()
+                              .resolve(SettingsUI.TimelineSettings.timelineShowAllEventsSettingDescriptor)
+                              .get();
 
     for (const {pid, tid, name, type, entries, tree} of threads) {
       if (this.#parsedTrace.data.Meta.traceIsGeneric) {
@@ -324,20 +325,6 @@ export class CompatibilityTracksAppender {
         continue;
       }
       if ((name && HIDDEN_THREAD_NAMES.has(name)) && !showAllEvents) {
-        continue;
-      }
-
-      const matchingWorklet = this.#parsedTrace.data.AuctionWorklets.worklets.get(pid);
-      if (matchingWorklet) {
-        // Each AuctionWorklet has two key threads:
-        // 1. the Utility Thread
-        // 2. the V8 Helper Thread - either a bidder or seller. see buildNameForAuctionWorklet()
-        // There are other threads in a worklet process, but we don't render them.
-        const tids = [matchingWorklet.args.data.utilityThread.tid, matchingWorklet.args.data.v8HelperThread.tid];
-        if (tids.includes(tid)) {
-          this.#threadAppenders.push(new ThreadAppender(
-              this, this.#parsedTrace, pid, tid, '', Trace.Handlers.Threads.ThreadType.AUCTION_WORKLET, entries, tree));
-        }
         continue;
       }
 
@@ -642,8 +629,10 @@ export class CompatibilityTracksAppender {
     }
 
     // If there's a url associated, add into additionalElements
-    const url = URL.parse(
-        info.url ?? SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(this.#parsedTrace, event) ?? '');
+    const url = URL.parse(info.url ??
+                          SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(
+                              this.#parsedTrace, event, Workspace.Workspace.WorkspaceImpl.instance()) ??
+                          '');
     if (url) {
       const MAX_PATH_LENGTH = 45;
       const path = Platform.StringUtilities.trimMiddle(url.href.replace(url.origin, ''), MAX_PATH_LENGTH);

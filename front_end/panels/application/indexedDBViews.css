@@ -7,48 +7,35 @@
 .indexed-db-data-view .data-view-toolbar {
   position: relative;
   background-color: var(--sys-color-cdt-base-container);
-  border-bottom: 1px solid var(--sys-color-divider);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 }
 
-.indexed-db-data-view .data-grid {
+.indexed-db-data-view devtools-data-grid {
+  border: 0;
   flex: auto;
 }
 
-.indexed-db-data-view .data-grid .data-container tr:nth-last-child(1) {
+:host-context(.indexed-db-data-view) .data-grid .data-container tr:nth-last-child(1) {
   background-color: var(--sys-color-cdt-base-container);
 }
 
-.indexed-db-data-view .data-grid .data-container tr:nth-last-child(1) td {
+:host-context(.indexed-db-data-view) .data-grid .data-container tr:nth-last-child(1) td {
   border: 0;
 }
 
-.indexed-db-data-view .data-grid .data-container tr:nth-last-child(2) td {
-  border-bottom: 1px solid var(--sys-color-divider);
+:host-context(.indexed-db-data-view) .data-grid .data-container tr:nth-last-child(2) td {
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
 }
 
-.indexed-db-data-view .data-grid:focus .data-container tr.selected {
+:host-context(.indexed-db-data-view) .data-grid:focus .data-container tr.selected {
   background-color: var(--sys-color-tonal-container);
   color: inherit;
-}
-
-.indexed-db-data-view .section,
-.indexed-db-data-view .section > .header,
-.indexed-db-data-view .section > .header .title {
-  margin: 0;
-  min-height: inherit;
-  line-height: inherit;
-}
-
-.indexed-db-data-view .data-grid .data-container td .section .header .title {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
 }
 
 .indexed-db-key-path {
   color: var(--sys-color-error);
   white-space: pre-wrap;
-  unicode-bidi: -webkit-isolate;
+  unicode-bidi: isolate;
 }
 
 .indexed-db-container {
@@ -74,8 +61,36 @@
   line-height: 27px;
   padding-left: 5px;
   background-color: var(--sys-color-cdt-base-container);
-  border-top: 1px solid var(--sys-color-divider);
+  border-top: var(--sys-size-1) solid var(--sys-color-divider);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+
+.object-store-summary-bar .separator {
+  padding: 0 0.5em;
+}
+
+.key-filter-input {
+  flex-grow: 0.5;
+}
+
+.stale-data-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--sys-size-3);
+  padding: 0 var(--sys-size-3);
+}
+
+.stale-data-warning .warning-icon {
+  --icon-color: var(--icon-warning);
+
+  width: var(--sys-size-9);
+  height: var(--sys-size-9);
+}
+
+.data-grid-container {
+  flex: auto;
+  display: flex;
+  flex-direction: column;
 }

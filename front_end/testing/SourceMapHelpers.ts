@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import sinon from 'sinon';
+
 import type * as Host from '../core/host/host.js';
 import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as Workspace from '../models/workspace/workspace.js';
 
-import {dispatchEvent, setMockConnectionResponseHandler} from './MockConnection.js';
+import {MockCDPConnection} from './MockCDPConnection.js';
+import {dispatchEvent} from './MockConnection.js';
 
 export interface LoadResult {
   success: boolean;
@@ -16,7 +19,7 @@ export interface LoadResult {
   errorDescription: Host.ResourceLoader.LoadErrorDescription;
 }
 
-export function setupPageResourceLoaderForSourceMap(sourceMapContent: string) {
+export function setupPageResourceLoaderForSourceMap(sourceMapContent: string): void {
   const loadSourceMap = async (_url: string) => {
     return {
       success: true,
@@ -61,7 +64,7 @@ export async function loadBasicSourceMapExample(target: SDK.Target.Target):
     workspace,
     ignoreListManager,
   });
-  SDK.PageResourceLoader.PageResourceLoader.instance({
+  const pageResourceLoader = SDK.PageResourceLoader.PageResourceLoader.instance({
     forceNew: true,
     loadOverride: async (_: string) => ({
       success: true,
@@ -70,6 +73,10 @@ export async function loadBasicSourceMapExample(target: SDK.Target.Target):
     }),
     maxConcurrentLoads: 1,
   });
+  sinon.stub(target.targetManager().context, 'get')
+      .callThrough()
+      .withArgs(SDK.PageResourceLoader.PageResourceLoader)
+      .returns(pageResourceLoader);
 
   const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
   let sourceMapAttachedCallback = () => {};
@@ -81,7 +88,11 @@ export async function loadBasicSourceMapExample(target: SDK.Target.Target):
   }
   debuggerModel.sourceMapManager().addEventListener(
       SDK.SourceMapManager.Events.SourceMapAttached, sourceMapAttachedCallback);
-  setMockConnectionResponseHandler('Debugger.getScriptSource', getScriptSourceHandler);
+  const connection = target.router()?.connection;
+  if (!connection || !(connection instanceof MockCDPConnection)) {
+    throw new Error('Target must use MockCDPConnection');
+  }
+  connection.setSuccessHandler('Debugger.getScriptSource', getScriptSourceHandler);
   // Load the script and source map into the frontend.
   dispatchEvent(target, 'Debugger.scriptParsed', {
     scriptId: SCRIPT_ID,
@@ -111,6 +122,7 @@ export async function loadBasicSourceMapExample(target: SDK.Target.Target):
   if (!sourceMap) {
     throw new Error('Source map could not be registered');
   }
+  await debuggerModel.sourceMapManager().waitForSourceMapsProcessedForTest();
 
   return {sourceMap, script};
 }

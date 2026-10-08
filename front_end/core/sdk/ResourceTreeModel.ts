@@ -9,23 +9,25 @@ import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
 import {type DeferredDOMNode, DOMModel, type DOMNode} from './DOMModel.js';
-import {FrameManager} from './FrameManager.js';
+import type {FrameManager} from './FrameManager.js';
 import {Events as NetworkManagerEvents, NetworkManager, type RequestUpdateDroppedEventData} from './NetworkManager.js';
 import type {NetworkRequest} from './NetworkRequest.js';
 import {Resource} from './Resource.js';
 import {ExecutionContext, RuntimeModel} from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
+import {SecurityOrigin} from './SecurityOrigin.js';
 import {SecurityOriginManager} from './SecurityOriginManager.js';
 import {StorageKeyManager} from './StorageKeyManager.js';
 import {Capability, type Target, Type} from './Target.js';
-import {TargetManager} from './TargetManager.js';
+import type {TargetManager} from './TargetManager.js';
 
 export class ResourceTreeModel extends SDKModel<EventTypes> {
   readonly agent: ProtocolProxyApi.PageApi;
   readonly storageAgent: ProtocolProxyApi.StorageApi;
   readonly #securityOriginManager: SecurityOriginManager;
   readonly #storageKeyManager: StorageKeyManager;
-  readonly framesInternal = new Map<string, ResourceTreeFrame>();
+  readonly #frameManager: FrameManager;
+  readonly framesInternal: Map<string, ResourceTreeFrame> = new Map<string, ResourceTreeFrame>();
   #cachedResourcesProcessed = false;
   #pendingReloadOptions: {
     ignoreCache: (boolean|undefined),
@@ -38,6 +40,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
 
   constructor(target: Target) {
     super(target);
+    this.#frameManager = target.targetManager().getFrameManager();
 
     const networkManager = target.model(NetworkManager);
     if (networkManager) {
@@ -72,16 +75,47 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     return request.frameId ? resourceTreeModel.frameForId(request.frameId) : null;
   }
 
-  static frames(): ResourceTreeFrame[] {
+  static frames(targetManager: TargetManager): ResourceTreeFrame[] {
     const result = [];
-    for (const resourceTreeModel of TargetManager.instance().models(ResourceTreeModel)) {
+    for (const resourceTreeModel of targetManager.models(ResourceTreeModel)) {
       result.push(...resourceTreeModel.frames());
     }
     return result;
   }
 
-  static resourceForURL(url: Platform.DevToolsPath.UrlString): Resource|null {
-    for (const resourceTreeModel of TargetManager.instance().models(ResourceTreeModel)) {
+  /**
+   * Finds the first active frame that matches the specified security origin under
+   * the given primary page target.
+   *
+   * Returns `null` if the target has no outermost target or if no matching frame
+   * exists.
+   *
+   * @param primaryPageTarget The primary page target that contains the candidate frames.
+   * @param origin The security origin to match.
+   * @returns The first matching frame, or `null` if no frame matches.
+   */
+  static frameForOrigin(
+      primaryPageTarget: Target,
+      origin: SecurityOrigin,
+      ): ResourceTreeFrame|null {
+    const outermostTarget = primaryPageTarget.outermostTarget();
+    if (!outermostTarget) {
+      return null;
+    }
+    for (const frame of ResourceTreeModel.frames(primaryPageTarget.targetManager())) {
+      if (frame.resourceTreeModel().target().outermostTarget() !== outermostTarget) {
+        continue;
+      }
+      if (frame.securityOrigin().isSameOriginWith(origin)) {
+        return frame;
+      }
+    }
+
+    return null;
+  }
+
+  static resourceForURL(targetManager: TargetManager, url: Platform.DevToolsPath.UrlString): Resource|null {
+    for (const resourceTreeModel of targetManager.models(ResourceTreeModel)) {
       const mainFrame = resourceTreeModel.mainFrame;
       // Workers call into this with no #frames available.
       const result = mainFrame ? mainFrame.resourceForURL(url) : null;
@@ -92,8 +126,8 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     return null;
   }
 
-  static reloadAllPages(bypassCache?: boolean, scriptToEvaluateOnLoad?: string): void {
-    for (const resourceTreeModel of TargetManager.instance().models(ResourceTreeModel)) {
+  static reloadAllPages(targetManager: TargetManager, bypassCache?: boolean, scriptToEvaluateOnLoad?: string): void {
+    for (const resourceTreeModel of targetManager.models(ResourceTreeModel)) {
       if (resourceTreeModel.target().parentTarget()?.type() !== Type.FRAME) {
         resourceTreeModel.reloadPage(bypassCache, scriptToEvaluateOnLoad);
       }
@@ -215,8 +249,8 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     void this.updateStorageKeys();
 
     if (frame.backForwardCacheDetails.restoredFromCache) {
-      FrameManager.instance().modelRemoved(this);
-      FrameManager.instance().modelAdded(this);
+      this.#frameManager.modelRemoved(this);
+      this.#frameManager.modelAdded(this);
       void this.#buildResourceTree();
     }
   }
@@ -243,6 +277,33 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
         frame.addResource(frameResource);
       }
     }
+  }
+
+  navigatedWithinDocument(frameId: Protocol.Page.FrameId, url: string): void {
+    const frame = this.framesInternal.get(frameId);
+    if (!frame) {
+      return;
+    }
+    frame.navigatedWithinDocument(url as Platform.DevToolsPath.UrlString);
+    if (frame.isMainFrame()) {
+      this.target().setInspectedURL(frame.url);
+    }
+    this.dispatchEventToListeners(Events.FrameNavigatedWithinDocument, frame);
+  }
+
+  frameStoppedLoading(frameId: Protocol.Page.FrameId): void {
+    const frame = this.framesInternal.get(frameId);
+    if (!frame) {
+      return;
+    }
+    // The renderer sends `Page.frameNavigated` before it tells the browser
+    // process about the commit, so the `Storage.getStorageKey` request issued
+    // from `ResourceTreeFrame.navigate()` may be answered for the previous
+    // document (and fails outright if that document had an opaque origin, e.g.
+    // the initial about:blank). `Page.frameStoppedLoading` comes from the
+    // browser process after the commit, so re-fetch the storage key here.
+    void frame.getStorageKey(/* forceFetch */ true);
+    void this.updateStorageKeys();
   }
 
   frameDetached(frameId: Protocol.Page.FrameId, isSwap: boolean): void {
@@ -486,23 +547,25 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
   }
 
   private getSecurityOriginData(): SecurityOriginData {
-    const securityOrigins = new Set<string>();
+    const securityOrigins: SecurityOrigin[] = [];
 
-    let mainSecurityOrigin: string|null = null;
-    let unreachableMainSecurityOrigin: string|null = null;
+    let mainSecurityOrigin: SecurityOrigin|null = null;
+    let unreachableMainSecurityOrigin: SecurityOrigin|null = null;
     for (const frame of this.framesInternal.values()) {
-      const origin = frame.securityOrigin;
-      if (!origin) {
+      const origin = frame.securityOrigin();
+      if (frame.isMainFrame()) {
+        mainSecurityOrigin = origin.isOpaque() ? null : origin;
+        if (frame.unreachableUrl()) {
+          const unreachable = SecurityOrigin.create(frame.unreachableUrl());
+          unreachableMainSecurityOrigin = unreachable.isOpaque() ? null : unreachable;
+        }
+      }
+      if (origin.isOpaque()) {
         continue;
       }
 
-      securityOrigins.add(origin);
-      if (frame.isMainFrame()) {
-        mainSecurityOrigin = origin;
-        if (frame.unreachableUrl()) {
-          const unreachableParsed = new Common.ParsedURL.ParsedURL(frame.unreachableUrl());
-          unreachableMainSecurityOrigin = unreachableParsed.securityOrigin();
-        }
+      if (!securityOrigins.some(existing => existing.isSameOriginWith(origin))) {
+        securityOrigins.push(origin);
       }
     }
     return {
@@ -534,9 +597,12 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
 
   private updateSecurityOrigins(): void {
     const data = this.getSecurityOriginData();
-    this.#securityOriginManager.setMainSecurityOrigin(
-        data.mainSecurityOrigin || '', data.unreachableMainSecurityOrigin || '');
-    this.#securityOriginManager.updateSecurityOrigins(data.securityOrigins);
+    // TODO(crbug.com/559122726): SecurityOriginManager currently expects string identifiers.
+    // Update SecurityOriginManager to store and emit SecurityOrigin objects directly so
+    // that the siteId() conversions below can be removed.
+    this.#securityOriginManager.setMainSecurityOrigin(data.mainSecurityOrigin?.siteId() || '',
+                                                      data.unreachableMainSecurityOrigin?.siteId() || '');
+    this.#securityOriginManager.updateSecurityOrigins(new Set(data.securityOrigins.map(o => o.siteId())));
   }
 
   private async updateStorageKeys(): Promise<void> {
@@ -549,9 +615,10 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     return this.mainFrame ? await this.mainFrame.getStorageKey(/* forceFetch */ false) : null;
   }
 
+  // TODO(crbug.com/559122726): Remove siteId() usage and evaluate removing this method in favor of direct SecurityOrigin handling.
   getMainSecurityOrigin(): string|null {
     const data = this.getSecurityOriginData();
-    return data.mainSecurityOrigin || data.unreachableMainSecurityOrigin;
+    return data.mainSecurityOrigin?.siteId() || data.unreachableMainSecurityOrigin?.siteId() || null;
   }
 
   onBackForwardCacheNotUsed(event: Protocol.Page.BackForwardCacheNotUsedEvent): void {
@@ -582,6 +649,7 @@ export enum Events {
   /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   FrameAdded = 'FrameAdded',
   FrameNavigated = 'FrameNavigated',
+  FrameNavigatedWithinDocument = 'FrameNavigatedWithinDocument',
   FrameDetached = 'FrameDetached',
   FrameResized = 'FrameResized',
   FrameWillNavigate = 'FrameWillNavigate',
@@ -605,6 +673,7 @@ export enum Events {
 export interface EventTypes {
   [Events.FrameAdded]: ResourceTreeFrame;
   [Events.FrameNavigated]: ResourceTreeFrame;
+  [Events.FrameNavigatedWithinDocument]: ResourceTreeFrame;
   [Events.FrameDetached]: {frame: ResourceTreeFrame, isSwap: boolean};
   [Events.FrameResized]: void;
   [Events.FrameWillNavigate]: ResourceTreeFrame;
@@ -633,7 +702,7 @@ export class ResourceTreeFrame {
   #name: string|null|undefined;
   #url: Platform.DevToolsPath.UrlString;
   #domainAndRegistry: string;
-  #securityOrigin: string|null;
+  #securityOrigin: SecurityOrigin;
   #securityOriginDetails?: Protocol.Page.SecurityOriginDetails;
   #storageKey?: Promise<string|null>;
   #unreachableUrl: Platform.DevToolsPath.UrlString;
@@ -644,7 +713,7 @@ export class ResourceTreeFrame {
   #creationStackTrace: Protocol.Runtime.StackTrace|null;
   #creationStackTraceTarget: Target|null = null;
   #childFrames = new Set<ResourceTreeFrame>();
-  resourcesMap = new Map<Platform.DevToolsPath.UrlString, Resource>();
+  resourcesMap: Map<Platform.DevToolsPath.UrlString, Resource> = new Map<Platform.DevToolsPath.UrlString, Resource>();
   backForwardCacheDetails: {
     explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
     restoredFromCache?: boolean,
@@ -664,7 +733,7 @@ export class ResourceTreeFrame {
     this.#name = payload?.name;
     this.#url = payload && payload.url as Platform.DevToolsPath.UrlString || Platform.DevToolsPath.EmptyUrlString;
     this.#domainAndRegistry = (payload?.domainAndRegistry) || '';
-    this.#securityOrigin = payload?.securityOrigin ?? null;
+    this.#securityOrigin = SecurityOrigin.create(payload?.securityOrigin ?? '');
     this.#securityOriginDetails = payload?.securityOriginDetails;
     this.#unreachableUrl =
         (payload && payload.unreachableUrl as Platform.DevToolsPath.UrlString) || Platform.DevToolsPath.EmptyUrlString;
@@ -713,7 +782,7 @@ export class ResourceTreeFrame {
     this.#name = framePayload.name;
     this.#url = framePayload.url as Platform.DevToolsPath.UrlString;
     this.#domainAndRegistry = framePayload.domainAndRegistry;
-    this.#securityOrigin = framePayload.securityOrigin;
+    this.#securityOrigin = SecurityOrigin.create(framePayload.securityOrigin);
     this.#securityOriginDetails = framePayload.securityOriginDetails;
     void this.getStorageKey(/* forceFetch */ true);
     this.#unreachableUrl =
@@ -732,6 +801,10 @@ export class ResourceTreeFrame {
     if (mainResource && mainResource.loaderId === this.#loaderId) {
       this.addResource(mainResource);
     }
+  }
+
+  navigatedWithinDocument(url: Platform.DevToolsPath.UrlString): void {
+    this.#url = url;
   }
 
   resourceTreeModel(): ResourceTreeModel {
@@ -759,7 +832,15 @@ export class ResourceTreeFrame {
     return res.adScriptAncestry || null;
   }
 
-  get securityOrigin(): string|null {
+  /**
+   * Returns the security origin of this frame.
+   *
+   * If the frame does not have a valid origin (such as `about:blank`), this
+   * method returns a unique opaque origin.
+   *
+   * @returns The security origin of the frame.
+   */
+  securityOrigin(): SecurityOrigin {
     return this.#securityOrigin;
   }
 
@@ -1079,7 +1160,8 @@ export class PageDispatcher implements ProtocolProxyApi.PageDispatcher {
   frameStartedLoading({}: Protocol.Page.FrameStartedLoadingEvent): void {
   }
 
-  frameStoppedLoading({}: Protocol.Page.FrameStoppedLoadingEvent): void {
+  frameStoppedLoading({frameId}: Protocol.Page.FrameStoppedLoadingEvent): void {
+    this.#resourceTreeModel.frameStoppedLoading(frameId);
   }
 
   frameRequestedNavigation({}: Protocol.Page.FrameRequestedNavigationEvent): void {
@@ -1094,7 +1176,8 @@ export class PageDispatcher implements ProtocolProxyApi.PageDispatcher {
   frameStartedNavigating({}: Protocol.Page.FrameStartedNavigatingEvent): void {
   }
 
-  navigatedWithinDocument({}: Protocol.Page.NavigatedWithinDocumentEvent): void {
+  navigatedWithinDocument({frameId, url}: Protocol.Page.NavigatedWithinDocumentEvent): void {
+    this.#resourceTreeModel.navigatedWithinDocument(frameId, url);
   }
 
   frameResized(): void {
@@ -1144,10 +1227,13 @@ export class PageDispatcher implements ProtocolProxyApi.PageDispatcher {
 }
 
 SDKModel.register(ResourceTreeModel, {capabilities: Capability.DOM, autostart: true, early: true});
+/**
+ * Aggregated security origin data for frames belonging to a resource tree model.
+ */
 export interface SecurityOriginData {
-  securityOrigins: Set<string>;
-  mainSecurityOrigin: string|null;
-  unreachableMainSecurityOrigin: string|null;
+  securityOrigins: SecurityOrigin[];
+  mainSecurityOrigin: SecurityOrigin|null;
+  unreachableMainSecurityOrigin: SecurityOrigin|null;
 }
 
 export interface StorageKeyData {

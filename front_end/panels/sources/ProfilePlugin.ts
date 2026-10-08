@@ -17,7 +17,7 @@ import {Plugin} from './Plugin.js';
 
 const UIStrings = {
   /**
-   * @description The milisecond unit
+   * @description The millisecond unit.
    */
   ms: 'ms',
 } as const;
@@ -66,7 +66,8 @@ function markersFromProfileData(map: Workspace.UISourceCode.LineColumnProfileMap
 }
 
 export class PerformanceProfilePlugin extends Plugin {
-  updateEffect = CodeMirror.StateEffect.define<Workspace.UISourceCode.LineColumnProfileMap>();
+  updateEffect: CodeMirror.StateEffectType<Workspace.UISourceCode.LineColumnProfileMap> =
+      CodeMirror.StateEffect.define<Workspace.UISourceCode.LineColumnProfileMap>();
   field: CodeMirror.StateField<CodeMirror.RangeSet<CodeMirror.GutterMarker>>;
   gutter: CodeMirror.Extension;
   compartment: CodeMirror.Compartment = new CodeMirror.Compartment();

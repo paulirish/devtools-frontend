@@ -16,9 +16,11 @@ import {
   PAUSE_INDICATOR_SELECTOR,
   RESUME_BUTTON,
   retrieveTopCallFrameWithoutResuming,
+  SourceFileEvents,
+  waitForSourceFiles,
 } from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 async function assertScriptLocation(expectedLocation: string, devToolsPage: DevToolsPage) {
   const scriptLocation = await retrieveTopCallFrameWithoutResuming(devToolsPage);
@@ -53,8 +55,8 @@ describe('The Sources Tab', function() {
   const CLICK_BREAKPOINT_HTML = 'click-breakpoint.html';
 
   it('sets and hits breakpoints in JavaScript', async ({inspectedPage, devToolsPage}) => {
-    await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
-    await addBreakpointForLine(4, devToolsPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
+    await addBreakpointForLine(devToolsPage, 4);
 
     const scriptEvaluation = inspectedPage.evaluate('f2();');
 
@@ -69,10 +71,10 @@ describe('The Sources Tab', function() {
   });
 
   it('can disable and re-enable breakpoints in JavaScript', async ({inspectedPage, devToolsPage}) => {
-    await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
 
     // After adding a breakpoint, we expect the script to pause. Resume afterwards.
-    await addBreakpointForLine(4, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 4);
     await testScriptPauseAndResume(CLICK_BREAKPOINT_SCRIPT, inspectedPage, devToolsPage);
 
     // Disable breakpoint. This time, we should not pause but be able to
@@ -86,8 +88,8 @@ describe('The Sources Tab', function() {
   });
 
   it('can set and remove breakpoints in JavaScript', async ({inspectedPage, devToolsPage}) => {
-    await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
-    await addBreakpointForLine(4, devToolsPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
+    await addBreakpointForLine(devToolsPage, 4);
 
     // Hover over breakpoint.
     await devToolsPage.hover(`[aria-label="${CLICK_BREAKPOINT_SCRIPT}"] [aria-label="checked"]`);
@@ -102,22 +104,22 @@ describe('The Sources Tab', function() {
   it('doesn\'t synchronize breakpoints between scripts and source-mapped scripts',
      async ({devToolsPage, inspectedPage}) => {
        // Navigate to page with sourceURL annotation and set breakpoint in line 2.
-       await openSourceCodeEditorForFile(
-           'breakpoint-conflict.js', 'breakpoint-conflict-source-url.html', devToolsPage, inspectedPage);
-       await addBreakpointForLine(2, devToolsPage);
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'breakpoint-conflict.js',
+                                         'breakpoint-conflict-source-url.html');
+       await addBreakpointForLine(devToolsPage, 2);
 
        // Navigate to page with sourceMappingURL annotation and check that breakpoint did not sync.
-       await openSourceCodeEditorForFile(
-           'breakpoint-conflict.js', 'breakpoint-conflict-source-map.html', devToolsPage, inspectedPage);
-       assert.isFalse(await isBreakpointSet(2, devToolsPage), 'Breakpoint found on line 2 which shouldn\'t be there');
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'breakpoint-conflict.js',
+                                         'breakpoint-conflict-source-map.html');
+       assert.isFalse(await isBreakpointSet(devToolsPage, 2), 'Breakpoint found on line 2 which shouldn\'t be there');
      });
 
   it('stops at each breakpoint on resume (using F8) on target', async ({inspectedPage, devToolsPage}) => {
-    await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
 
-    await addBreakpointForLine(3, devToolsPage);
-    await addBreakpointForLine(4, devToolsPage);
-    await addBreakpointForLine(9, devToolsPage);
+    await addBreakpointForLine(devToolsPage, 3);
+    await addBreakpointForLine(devToolsPage, 4);
+    await addBreakpointForLine(devToolsPage, 9);
 
     const scriptEvaluation = inspectedPage.evaluate('f2();');
 
@@ -136,20 +138,20 @@ describe('The Sources Tab', function() {
   });
 
   it('shows a tooltip for logpoints', async ({inspectedPage, devToolsPage}) => {
-    await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
-    await addLogpointForLine(4, '14', devToolsPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
+    await addLogpointForLine(devToolsPage, 4, '14');
 
     const tooltip = await devToolsPage.waitFor('.cm-breakpoint-logpoint devtools-tooltip');
     assert.strictEqual(await tooltip.evaluate(e => e.textContent), '14');
   });
 
   describe('with instrumenation breackpoints', () => {
-    setup({enabledDevToolsExperiments: ['instrumentation-breakpoints']});
+    setup({enabledFeatures: ['DevToolsInstrumentationBreakpoints']});
     it('can hit a breakpoint on the main thread on a fresh DevTools', async ({devToolsPage, inspectedPage}) => {
-      await openSourceCodeEditorForFile(
-          'breakpoint-hit-on-first-load.js', 'breakpoint-hit-on-first-load.html', devToolsPage, inspectedPage);
+      await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'breakpoint-hit-on-first-load.js',
+                                        'breakpoint-hit-on-first-load.html');
 
-      await addBreakpointForLine(1, devToolsPage);
+      await addBreakpointForLine(devToolsPage, 1);
 
       await inspectedPage.goTo('about:blank');
       await devToolsPage.reloadWithParams({panel: 'sources'});
@@ -164,10 +166,10 @@ describe('The Sources Tab', function() {
 
     it('can hit a breakpoint in an inline script on the main thread on a fresh DevTools',
        async ({devToolsPage, inspectedPage}) => {
-         await openSourceCodeEditorForFile(
-             'breakpoint-hit-on-first-load.html', 'breakpoint-hit-on-first-load.html', devToolsPage, inspectedPage);
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'breakpoint-hit-on-first-load.html',
+                                           'breakpoint-hit-on-first-load.html');
 
-         await addBreakpointForLine(9, devToolsPage);
+         await addBreakpointForLine(devToolsPage, 9);
 
          await inspectedPage.goTo('about:blank');
          await devToolsPage.reloadWithParams({panel: 'sources'});
@@ -182,20 +184,23 @@ describe('The Sources Tab', function() {
 
     it('can hit a breakpoint in an inline script with sourceURL comment on the main thread on a fresh DevTools',
        async ({devToolsPage, inspectedPage}) => {
-         await openSourceCodeEditorForFile(
-             'breakpoint-hit-on-first-load.html', 'breakpoint-hit-on-first-load.html', devToolsPage, inspectedPage);
+         await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'breakpoint-hit-on-first-load.html',
+                                           'breakpoint-hit-on-first-load.html');
 
          await openFileQuickOpen(devToolsPage);
          await devToolsPage.page.keyboard.type('hello.js');
          // TODO: it should actually wait for rendering to finish.
          await devToolsPage.drainTaskQueue();
 
-         const firstItemTitle = await getMenuItemTitleAtPosition(0, devToolsPage);
-         const firstItem = await getMenuItemAtPosition(0, devToolsPage);
+         const firstItemTitle = await getMenuItemTitleAtPosition(devToolsPage, 0);
+         const firstItem = await getMenuItemAtPosition(devToolsPage, 0);
          assert.strictEqual(firstItemTitle, 'hello.js');
-         await devToolsPage.clickElement(firstItem);
+         // Calling clickElement triggers an asynchronous panel switch and CodeMirror request in Quick Open.
+         await waitForSourceFiles(devToolsPage, SourceFileEvents.SOURCE_FILE_LOADED,
+                                  files => files.some(f => f.endsWith('hello.js')),
+                                  () => devToolsPage.clickElement(firstItem));
 
-         await addBreakpointForLine(2, devToolsPage);
+         await addBreakpointForLine(devToolsPage, 2);
 
          await inspectedPage.goTo('about:blank');
          await devToolsPage.reloadWithParams({panel: 'sources'});
@@ -211,22 +216,22 @@ describe('The Sources Tab', function() {
 
   describe('The breakpoint edit dialog', () => {
     it('shows up on Ctrl/Meta + click if no breakpoint was set', async ({devToolsPage, inspectedPage}) => {
-      await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
+      await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
       const lineNumberColumn = await devToolsPage.waitFor(CODE_LINE_COLUMN_SELECTOR);
 
       await devToolsPage.click('text/4', {
         root: lineNumberColumn,
         modifiers: {
           control: true,
-        }
+        },
       });
 
       await devToolsPage.waitFor('.sources-edit-breakpoint-dialog');
     });
 
     it('shows up on Ctrl/Meta + click if breakpoint was already set', async ({devToolsPage, inspectedPage}) => {
-      await openSourceCodeEditorForFile(CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML, devToolsPage, inspectedPage);
-      await addBreakpointForLine(4, devToolsPage);
+      await openSourceCodeEditorForFile(devToolsPage, inspectedPage, CLICK_BREAKPOINT_SCRIPT, CLICK_BREAKPOINT_HTML);
+      await addBreakpointForLine(devToolsPage, 4);
 
       const lineNumberColumn = await devToolsPage.waitFor(CODE_LINE_COLUMN_SELECTOR);
 
@@ -234,7 +239,7 @@ describe('The Sources Tab', function() {
         root: lineNumberColumn,
         modifiers: {
           control: true,
-        }
+        },
       });
       await devToolsPage.waitFor('.sources-edit-breakpoint-dialog');
     });

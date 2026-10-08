@@ -134,7 +134,7 @@ export class AiCodeGeneration {
               seconds,
               nanos,
             },
-          }
+          },
         },
       },
     });
@@ -150,7 +150,7 @@ export class AiCodeGeneration {
         user_acceptance: {
           sample: {
             sample_id: sampleId,
-          }
+          },
         },
       },
     });
@@ -158,9 +158,8 @@ export class AiCodeGeneration {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeGenerationSuggestionAccepted);
   }
 
-  async generateCode(
-      prompt: string, preamble: string, inferenceLanguage?: Host.AidaClient.AidaInferenceLanguage,
-      options?: {signal?: AbortSignal}): Promise<Host.AidaClient.GenerateCodeResponse|null> {
+  async generateCode(prompt: string, preamble: string, inferenceLanguage?: Host.AidaClient.AidaInferenceLanguage,
+                     options?: {signal?: AbortSignal}): Promise<Host.AidaClient.GenerateCodeResponse> {
     const request = this.#buildRequest(prompt, preamble, inferenceLanguage);
     const response = await this.#aidaClient.generateCode(request, options);
 

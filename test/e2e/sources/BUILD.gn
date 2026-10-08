@@ -32,7 +32,7 @@ ts_e2e_library("sources") {
     "inline-scripts.test.ts",
     "inline-variable.test.ts",
     "link-to-correct-source-line.test.ts",
-    "live-edit-moving-breakpoint.test.ts",
+    "memory-leak.test.ts",
     "navigator-view.test.ts",
     "overrides.test.ts",
     "pause-button.test.ts",
@@ -52,8 +52,10 @@ ts_e2e_library("sources") {
     "worker-relative-sourcemap.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../front_end/ui/components/text_editor:bundle",
+    "../../conductor:implementation",
+    "../../shared",
     "../helpers",
     "../shared",
   ]

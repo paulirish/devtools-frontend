@@ -1,4 +1,5 @@
-import { debugError, isString } from '../common/util.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
+import { isString } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { typedArrayToBase64 } from '../util/encoding.js';
 /**
@@ -341,13 +342,17 @@ export var InterceptResolutionAction;
  */
 export function headersArray(headers) {
     const result = [];
-    for (const name in headers) {
+    for (const name of Object.keys(headers)) {
         const value = headers[name];
-        if (!Object.is(value, undefined)) {
-            const values = Array.isArray(value) ? value : [value];
-            result.push(...values.map(value => {
-                return { name, value: value + '' };
-            }));
+        if (value !== undefined) {
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    result.push({ name, value: v + '' });
+                }
+            }
+            else {
+                result.push({ name, value: value + '' });
+            }
         }
     }
     return result;
@@ -443,7 +448,7 @@ const errorReasons = {
 /**
  * @internal
  */
-export function handleError(error) {
+export function handleError(error, logger) {
     // Firefox throws an invalid argument error with a message starting with
     // 'Expected "header" [...]'.
     if (error.originalMessage.includes('Invalid header') ||
@@ -456,6 +461,6 @@ export function handleError(error) {
     // In certain cases, protocol will return error if the request was
     // already canceled or the page was closed. We should tolerate these
     // errors.
-    debugError(error);
+    logger?.(DEBUG_PREFIXES.error)?.(error);
 }
 //# sourceMappingURL=HTTPRequest.js.map

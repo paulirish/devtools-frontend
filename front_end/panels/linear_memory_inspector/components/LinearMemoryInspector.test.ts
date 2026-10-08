@@ -6,6 +6,7 @@ import {assert} from 'chai';
 
 import {
   assertScreenshot,
+  doubleRaf,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
@@ -24,7 +25,7 @@ describe('LinearMemoryInspector', () => {
     const target = document.createElement('div');
     target.style.width = 'var(--sys-size-40)';
     target.style.height = 'var(--sys-size-30)';
-    renderElementIntoDOM(target);
+    renderElementIntoDOM(target, {includeCommonStyles: true});
     const array = [];
     const string = 'Hello this is a string from the memory buffer!';
 
@@ -40,7 +41,7 @@ describe('LinearMemoryInspector', () => {
     const valueTypes = new Set([
       LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT32,
       LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER32
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER32,
     ]);
     const valueTypeModes = new Map();
 
@@ -76,6 +77,13 @@ describe('LinearMemoryInspector', () => {
         {},
         target,
     );
+    const viewer = target.querySelector('devtools-linear-memory-inspector-viewer');
+    assert.exists(viewer);
+    let prevHeight = -1;
+    while (viewer.clientHeight !== prevHeight) {
+      prevHeight = viewer.clientHeight;
+      await doubleRaf();
+    }
     await assertScreenshot('linear_memory_inspector/lmi.png');
   });
 });
@@ -124,8 +132,7 @@ describe('LinearMemoryInspector', () => {
 
     for (const index of expectedHistory) {
       assert.strictEqual(view.input.address, index);
-      view.input.onNavigateHistory(new LinearMemoryInspectorComponents.LinearMemoryNavigator.HistoryNavigationEvent(
-          LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD));
+      view.input.onNavigateHistory(LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD);
       await view.nextInput;
     }
   });
@@ -142,16 +149,14 @@ describe('LinearMemoryInspector', () => {
 
     for (let i = historyLength - 1; i > 0; --i) {
       assert.strictEqual(view.input.address, visitedByteValue[i]);
-      view.input.onNavigateHistory(new LinearMemoryInspectorComponents.LinearMemoryNavigator.HistoryNavigationEvent(
-          LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD));
+      view.input.onNavigateHistory(LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD);
       await view.nextInput;
     }
     assert.strictEqual(view.input.address, visitedByteValue[0]);
 
     for (let i = 0; i < historyLength - 1; ++i) {
       assert.strictEqual(view.input.address, visitedByteValue[i]);
-      view.input.onNavigateHistory(new LinearMemoryInspectorComponents.LinearMemoryNavigator.HistoryNavigationEvent(
-          LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.FORWARD));
+      view.input.onNavigateHistory(LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.FORWARD);
       await view.nextInput;
     }
     assert.strictEqual(view.input.address, visitedByteValue[historyLength - 1]);
@@ -161,14 +166,12 @@ describe('LinearMemoryInspector', () => {
     const addressBefore = view.input.address;
     const numBytesPerPage = view.input.memorySlice.length;
 
-    view.input.onNavigatePage(new LinearMemoryInspectorComponents.LinearMemoryNavigator.PageNavigationEvent(
-        LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.FORWARD));
+    view.input.onNavigatePage(LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.FORWARD);
     let addressAfter = (await view.nextInput).address;
     let expectedAddressAfter = addressBefore + numBytesPerPage;
     assert.strictEqual(addressAfter, expectedAddressAfter);
 
-    view.input.onNavigatePage(new LinearMemoryInspectorComponents.LinearMemoryNavigator.PageNavigationEvent(
-        LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD));
+    view.input.onNavigatePage(LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD);
     addressAfter = (await view.nextInput).address;
     expectedAddressAfter -= numBytesPerPage;
     assert.strictEqual(addressAfter, Math.max(0, expectedAddressAfter));
@@ -207,9 +210,7 @@ describe('LinearMemoryInspector', () => {
   });
 
   it('leaves the navigator address as inputted by user on edit event', async () => {
-    const event = new LinearMemoryInspectorComponents.LinearMemoryNavigator.AddressInputChangedEvent(
-        '2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.EDIT);
-    view.input.onAddressChange(event);
+    view.input.onAddressChange('2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.EDIT);
     const newViewInput = await view.nextInput;
     assert.strictEqual(newViewInput.currentNavigatorAddressLine, '2');
     assert.strictEqual(
@@ -217,9 +218,7 @@ describe('LinearMemoryInspector', () => {
   });
 
   it('leaves the navigator address as inputted by user on invalid edit event', async () => {
-    const event = new LinearMemoryInspectorComponents.LinearMemoryNavigator.AddressInputChangedEvent(
-        '-2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.EDIT);
-    view.input.onAddressChange(event);
+    view.input.onAddressChange('-2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.EDIT);
     const newViewInput = await view.nextInput;
     assert.strictEqual(newViewInput.currentNavigatorAddressLine, '-2');
     assert.strictEqual(
@@ -227,9 +226,7 @@ describe('LinearMemoryInspector', () => {
   });
 
   it('leaves the navigator address as inputted by user on invalid submit event', async () => {
-    const event = new LinearMemoryInspectorComponents.LinearMemoryNavigator.AddressInputChangedEvent(
-        '-2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.SUBMITTED);
-    view.input.onAddressChange(event);
+    view.input.onAddressChange('-2', LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.SUBMITTED);
     const newViewInput = await view.nextInput;
     assert.strictEqual(newViewInput.currentNavigatorAddressLine, '-2');
     assert.strictEqual(

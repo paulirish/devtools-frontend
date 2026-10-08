@@ -42,21 +42,21 @@ describe('IssueView cache', () => {
       await devToolsPage.waitForFunction(async () => {
         await expandIssue(devToolsPage);
         const issueElement =
-            await getIssueByTitle('Ensure CORS requests include credentials only when allowed', devToolsPage);
+            await getIssueByTitle(devToolsPage, 'Ensure CORS requests include credentials only when allowed');
         assert.isOk(issueElement);
         const section =
-            await getResourcesElement('requests', issueElement, '.cors-issue-affected-resource-label', devToolsPage);
+            await getResourcesElement(devToolsPage, 'requests', issueElement, '.cors-issue-affected-resource-label');
         const text = await section.label.evaluate(el => el.textContent);
         const expected = numberOfAggregatedIssues === 1 ? '1 request' : `${numberOfAggregatedIssues} requests`;
         return text === expected;
       });
       const issueElement =
-          await getIssueByTitle('Ensure CORS requests include credentials only when allowed', devToolsPage);
+          await getIssueByTitle(devToolsPage, 'Ensure CORS requests include credentials only when allowed');
       assert.isOk(issueElement);
       const section =
-          await getResourcesElement('requests', issueElement, '.cors-issue-affected-resource-label', devToolsPage);
-      await ensureResourceSectionIsExpanded(section, devToolsPage);
-      await waitForTableFromResourceSectionContents(section.content, expectedTableRows, devToolsPage);
+          await getResourcesElement(devToolsPage, 'requests', issueElement, '.cors-issue-affected-resource-label');
+      await ensureResourceSectionIsExpanded(devToolsPage, section);
+      await waitForTableFromResourceSectionContents(devToolsPage, section.content, expectedTableRows);
       const adorner = await devToolsPage.waitFor('.aggregated-issues-count');
       const count = await adorner.evaluate(el => el.textContent);
       assert.strictEqual(count, `${numberOfAggregatedIssues}`);
@@ -64,23 +64,23 @@ describe('IssueView cache', () => {
     const header = [
       'Request',
       'Status',
-      'Preflight Request (if problematic)',
-      'Access-Control-Allow-Credentials Header Value',
+      'Preflight request (if problematic)',
+      'Access-Control-Allow-Credentials header value',
     ];
     const expectedRow1 = [
       'acac-invalid.rawresponse',
-      'blocked',
+      'Blocked',
       'acac-invalid.rawresponse',
       'false',
     ];
     const expectedRow2 = [
       'acac-invalid.rawresponse',
-      'blocked',
+      'Blocked',
       '',
       'false',
     ];
     await waitForResources(2, [header, expectedRow1, expectedRow2]);
-    await devToolsPage.setCheckBox('[title="Include cookie Issues caused by third-party sites"]', true);
+    await devToolsPage.setCheckBox('[title="Include cookie issues caused by third-party sites"]', true);
 
     // Trigger issue again to see if resources are updated.
     await triggerIssue();

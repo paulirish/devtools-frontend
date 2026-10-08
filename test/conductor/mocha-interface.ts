@@ -3,125 +3,245 @@
 // found in the LICENSE file.
 
 import * as Mocha from 'mocha';
+import type {CommonFunctions, CreateOptions, SuiteFunctions, TestFunctions} from 'mocha/lib/interfaces/common';
 // @ts-expect-error
 import * as commonInterface from 'mocha/lib/interfaces/common.js';
-import * as Path from 'node:path';
 
-import {makeInstrumentedTestFunction} from './mocha-interface-helpers.js';
-import {platform, type Platform} from './platform.js';
-import {TestConfig} from './test_config.js';
+import {
+  DefaultPuppeteerStateProvider,
+  InstrumentedTestFunction,
+  type TestCallback,
+  type TestStateProvider,
+} from './mocha-interface-helpers.js';
 
 type SuiteFunction = ((this: Mocha.Suite) => void)|undefined;
-type ExclusiveSuiteFunction = (this: Mocha.Suite) => void;
 
-function devtoolsTestInterface(suite: Mocha.Suite) {
-  const suites: [Mocha.Suite] = [suite];
-  suite.on(
-      Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE,
-      function(context, file, mocha) {
-        const common =
-            // Different module outputs between tsc and esbuild.
-            ('default' in commonInterface ? commonInterface.default : commonInterface)(suites, context, mocha);
-        // @ts-expect-error Custom interface.
-        context['before'] = function before(fn: Mocha.AsyncFunc) {
-          return common.before(makeInstrumentedTestFunction(fn, 'before'));
-        };
-        // @ts-expect-error Custom interface.
-        context['after'] = function after(fn: Mocha.AsyncFunc) {
-          return common.after(makeInstrumentedTestFunction(fn, 'after'));
-        };
-        // @ts-expect-error Custom interface.
-        context['beforeEach'] = function beforeEach(fn: Mocha.AsyncFunc) {
-          return common.beforeEach(makeInstrumentedTestFunction(fn, 'beforeEach'));
-        };
-        // @ts-expect-error Custom interface.
-        context['afterEach'] = function afterEach(fn: Mocha.AsyncFunc) {
-          return common.afterEach(makeInstrumentedTestFunction(fn, 'afterEach'));
-        };
-        if (mocha.options.delay) {
-          context['run'] = common.runWithSuite(suite);
-        }
-        function describeTitle(title: string) {
-          const parsedPath = Path.parse(file);
-          const directories = parsedPath.dir.split(Path.sep);
-          const index = directories.lastIndexOf('e2e');
-          let prefix = parsedPath.name;
-          if (index >= 0) {
-            prefix = [...directories.slice(index + 1), `${parsedPath.name}.ts`].join('/');
-          }
-          if (title.includes(prefix)) {
-            return title;
-          }
-          return `${prefix}: ${title}`;
-        }
-        function describe(title: string, fn: SuiteFunction) {
-          return common.suite.create({
-            title: describeTitle(title),
-            file,
-            fn,
-          });
-        }
-        describe.only = function(title: string, fn: ExclusiveSuiteFunction) {
-          return common.suite.only({
-            title: describeTitle(title),
-            file,
-            fn,
-          });
-        };
-        describe.skip = function(title: string, fn: SuiteFunction) {
-          return common.suite.skip({
-            title: describeTitle(title),
-            file,
-            fn,
-          });
-        };
-        // @ts-expect-error Custom interface.
-        context['describe'] = describe;
-        function iterationSuffix(iteration: number): string {
-          if (iteration === 0) {
-            return '';
-          }
-          return ` (#${iteration})`;
-        }
-        function createTest(title: string, fn?: Mocha.AsyncFunc) {
-          const suite = suites[0];
-          const test =
-              new Mocha.Test(title, suite.isPending() || !fn ? undefined : makeInstrumentedTestFunction(fn, 'test'));
-          test.file = file;
-          suite.addTest(test);
-          return test;
-        }
-        // Regular mocha it returns the test instance.
-        // It is not possible with TestConfig.repetitions.
-        const it = function(title: string, fn?: Mocha.AsyncFunc) {
-          for (let i = 0; i < TestConfig.repetitions; i++) {
-            const iterationTitle = title + iterationSuffix(i);
-            createTest(iterationTitle, fn);
-          }
-        };
-        // @ts-expect-error Custom interface.
-        context.it = it;
-        it.skip = function(title: string, _fn: Mocha.AsyncFunc) {
-          // no fn to skip.
-          return createTest(title);
-        };
-        it.only = function(title: string, fn: Mocha.AsyncFunc) {
-          for (let i = 0; i < TestConfig.repetitions; i++) {
-            const iterationTitle = title + iterationSuffix(i);
-            common.test.only(mocha, createTest(iterationTitle, fn));
-          }
-        };
-        it.skipOnPlatforms = function(platforms: Platform[], title: string, fn: Mocha.AsyncFunc) {
-          const shouldSkip = platforms.includes(platform);
-          if (shouldSkip) {
-            return context.it.skip(title);
-          }
-          return context.it(title, fn);
-        };
-      },
-  );
+export interface MochaInterfaceOptions<TState = unknown, TSuiteSettings = unknown> {
+  description: string;
+  stateProvider?: TestStateProvider<TState, TSuiteSettings>;
 }
 
-devtoolsTestInterface.description = 'DevTools test interface';
+export interface CustomItFunction<TState> {
+  (title: string, fn?: TestCallback<TState>|Mocha.AsyncFunc): Mocha.Test;
+  skip: (
+      title: string,
+      _fn?: TestCallback<TState>|Mocha.AsyncFunc,
+      ) => Mocha.Test;
+  only: (
+      title: string,
+      fn?: TestCallback<TState>|Mocha.AsyncFunc,
+      ) => Mocha.Test;
+}
 
-module.exports = devtoolsTestInterface;
+export interface CustomDescribeFunction {
+  (title: string, fn?: (this: Mocha.Suite) => void): Mocha.Suite;
+  only: (title: string, fn?: (this: Mocha.Suite) => void) => Mocha.Suite;
+  skip: (title: string, fn?: (this: Mocha.Suite) => void) => Mocha.Suite;
+}
+
+export interface CustomMochaGlobals<TState, TSuiteSettings> {
+  describe: CustomDescribeFunction;
+  setup?: (settings: TSuiteSettings) => void;
+  it: CustomItFunction<TState>;
+  before?: Mocha.HookFunction;
+  after?: Mocha.HookFunction;
+  beforeEach?: Mocha.HookFunction;
+  afterEach?: Mocha.HookFunction;
+  run?: () => void;
+}
+
+export function createMochaInterface<
+  TState = unknown,
+  TSuiteSettings = unknown,
+>(
+  options: MochaInterfaceOptions<TState, TSuiteSettings>,
+): {
+  (rootSuite: Mocha.Suite): void,
+  description: string,
+} {
+  const devtoolsTestInterface = function(rootSuite: Mocha.Suite): void {
+    let defaultImplementation: CommonFunctions;
+    let mochaGlobals: CustomMochaGlobals<TState, TSuiteSettings>;
+    let mochaRoot: Mocha;
+
+    rootSuite.on(
+        Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE,
+        (context: Mocha.MochaGlobals, file: string, mocha: Mocha) => {
+          mochaGlobals = context as unknown as CustomMochaGlobals<TState, TSuiteSettings>;
+          mochaRoot = mocha;
+          const defaultFactory = (
+          'createCommon' in commonInterface
+            ? commonInterface.createCommon
+            : 'default' in commonInterface
+              ? commonInterface.default
+              : commonInterface
+        ) as (
+          suites: Mocha.Suite[],
+          context: Mocha.MochaGlobals,
+          mocha: Mocha,
+        ) => CommonFunctions;
+          defaultImplementation = defaultFactory([rootSuite], context, mocha);
+
+          if (mocha.options.delay) {
+            context.run = defaultImplementation.runWithSuite(rootSuite);
+          }
+          mochaGlobals.describe = customDescribe(
+              defaultImplementation.suite,
+              file,
+          );
+        },
+    );
+
+    function customDescribe(
+        suiteImplementation: SuiteFunctions,
+        file: string,
+        ): CustomDescribeFunction {
+      function withAugmentedTitle(
+          suiteFn: (opts: CreateOptions) => Mocha.Suite,
+      ) {
+        return function(
+                   title: string,
+                   describeBodyFn: SuiteFunction,
+                   ): Mocha.Suite {
+          const suite = suiteFn({
+            title,
+            file,
+            fn: function(this: Mocha.Suite) {
+              const thisSuite = this;
+              const parentDefinitions = {
+                describe: mochaGlobals.describe,
+                setup: mochaGlobals.setup,
+                it: mochaGlobals.it,
+              };
+              mochaGlobals.describe = customDescribe(
+                  defaultImplementation.suite,
+                  file,
+              );
+              if (options.stateProvider?.registerSuiteSettings) {
+                mochaGlobals.setup = function(suiteSettings: TSuiteSettings) {
+                  options.stateProvider!.registerSuiteSettings!(
+                      thisSuite,
+                      suiteSettings,
+                  );
+                };
+              }
+              mochaGlobals.it = customIt(
+                  defaultImplementation.test,
+                  thisSuite,
+                  thisSuite.file || '',
+                  mochaRoot,
+                  options.stateProvider,
+              );
+              if (describeBodyFn) {
+                describeBodyFn.call(thisSuite);
+              }
+              // Restore definitions so when we come back from a nested describe
+              // we have the same definitions available as for the current block,
+              // therefore correctly handling the next describe block that is at
+              // the same level with this one.
+              mochaGlobals.describe = parentDefinitions.describe;
+              mochaGlobals.setup = parentDefinitions.setup;
+              mochaGlobals.it = parentDefinitions.it;
+            },
+          });
+
+          if (!suite.isPending() && options.stateProvider?.prepareSuite) {
+            suite.beforeEach(async function(this: Mocha.Context) {
+              this.timeout(0);
+              await options.stateProvider!.prepareSuite!(suite);
+            });
+          }
+          return suite;
+        };
+      }
+
+      const describe = withAugmentedTitle(
+                           suiteImplementation.create.bind(suiteImplementation),
+                           ) as CustomDescribeFunction;
+      describe.only = withAugmentedTitle(
+          suiteImplementation.only.bind(suiteImplementation),
+      );
+      describe.skip = withAugmentedTitle(
+          suiteImplementation.skip.bind(suiteImplementation),
+      );
+      return describe;
+    }
+  };
+
+  devtoolsTestInterface.description = options.description;
+  return devtoolsTestInterface;
+}
+
+function customIt<TState>(
+    testImplementation: TestFunctions,
+    suite: Mocha.Suite,
+    file: string,
+    mocha: Mocha,
+    stateProvider?: TestStateProvider<TState, never>,
+    ): CustomItFunction<TState> {
+  function createTest(
+      title: string,
+      itBodyFn?: TestCallback<TState>|Mocha.AsyncFunc,
+      ): Mocha.Test {
+    const test = new Mocha.Test(
+        title,
+        suite.isPending() || !itBodyFn ? undefined :
+                                         InstrumentedTestFunction.instrument<TState>(
+                                             itBodyFn,
+                                             'test',
+                                             suite,
+                                             stateProvider,
+                                             ),
+    );
+    test.file = file;
+
+    // Creates a proxy that changes the duration to return
+    // our own timing.
+    const proxyTest = new Proxy(test, {
+      get(target, property, receiver) {
+        if (property === 'duration' && target.realDuration) {
+          return (Reflect.get(target, 'realDuration', receiver) ?? Reflect.get(target, property, receiver));
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    suite.addTest(proxyTest);
+    return proxyTest;
+  }
+
+  // Regular mocha it returns the test instance.
+  const localIt: CustomItFunction<TState> = Object.assign(
+      function(
+          title: string,
+          fn?: TestCallback<TState>|Mocha.AsyncFunc,
+          ):
+          Mocha.Test {
+            return createTest(title, fn);
+          },
+      {
+        skip: function(
+                  title: string,
+                  _fn?: TestCallback<TState>|Mocha.AsyncFunc,
+                  ): Mocha.Test {
+          return createTest(title);
+        },
+        only: function(
+                  title: string,
+                  fn?: TestCallback<TState>|Mocha.AsyncFunc,
+                  ): Mocha.Test {
+          return testImplementation.only(mocha, createTest(title, fn));
+        },
+      },
+  );
+
+  return localIt;
+}
+
+export const devtoolsTestInterface: {
+  (rootSuite: Mocha.Suite): void,
+  description: string,
+} = createMochaInterface({
+  description: 'DevTools test interface',
+  stateProvider: DefaultPuppeteerStateProvider.instance,
+});

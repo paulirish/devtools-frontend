@@ -16,7 +16,7 @@ devtools_module("main") {
     "SimpleApp.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
@@ -26,16 +26,10 @@ devtools_module("main") {
     "../../core/sdk:bundle",
     "../../foundation:bundle",
     "../../models/ai_assistance:bundle",
-    "../../models/autofill_manager:bundle",
     "../../models/badges:bundle",
-    "../../models/bindings:bundle",
-    "../../models/breakpoints:bundle",
+    "../../models/comment_manager:bundle",
     "../../models/crux-manager:bundle",
-    "../../models/issues_manager:bundle",
-    "../../models/live-metrics:bundle",
-    "../../models/logs:bundle",
     "../../models/persistence:bundle",
-    "../../models/project_settings:bundle",
     "../../models/workspace:bundle",
     "../../panels/common:bundle",
     "../../panels/snippets:bundle",
@@ -46,8 +40,10 @@ devtools_module("main") {
     "../../ui/legacy/components/utils:bundle",
     "../../ui/legacy/theme_support:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 generate_css("css_files") {
@@ -57,19 +53,16 @@ generate_css("css_files") {
 devtools_entrypoint("bundle") {
   entrypoint = "main.ts"
 
-  deps = [
-    ":css_files",
-    ":main",
-  ]
+  ts_deps = [ ":main" ]
 
   visibility = [
     ":*",
     "../../testing/*",
     "../devtools_app:*",
-    "../greendev_floaty:*",
     "../js_app:*",
     "../ndb_app:*",
     "../node_app:*",
+    "../shell/*",
     "../trace_app:*",
     "../worker_app:*",
   ]
@@ -80,21 +73,24 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "main-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
+    "../../core/host:bundle",
     "../../core/i18n:bundle",
+    "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../entrypoints/inspector_main:bundle",
+    "../../models/badges:bundle",
+    "../../models/persistence:bundle",
     "../../models/workspace:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/utils:bundle",
+    "../../ui/settings:bundle",
   ]
 
   visibility = [
-    "../../panels/greendev/*",
-    "../greendev_floaty/*",
     "../shell/*",
     "../trace_app:*",
   ]
@@ -109,10 +105,11 @@ ts_library("unittests") {
     "MainImpl.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/sdk:bundle",
+    "../../generated",
     "../../testing",
     "../../ui/legacy:bundle",
   ]

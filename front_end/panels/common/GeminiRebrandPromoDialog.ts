@@ -14,8 +14,8 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -24,11 +24,10 @@ import styles from './geminiRebrandPromoDialog.css.js';
 
 const UIStrings = {
   /**
-   * @description Aria label for the dialog
+   * @description ARIA label for the dialog.
    */
-  dialogAriaLabel: 'Gemini 3 Flash in DevTools',
+  dialogAriaLabel: '`Gemini 3 Flash` in `DevTools`',
   /**
-   *
    * @description Button text for dismissing the dialog.
    */
   dismiss: 'Dismiss',
@@ -37,19 +36,19 @@ const UIStrings = {
    */
   getStarted: 'Get started',
   /**
-   * @description Detail message shown in the dialog.
+   * @description Feature item describing Gemini as an AI companion for web development.
    */
   detailAiCompanion: 'Meet your AI-powered companion for web dev',
   /**
-   * @description Detail message shown in the dialog.
+   * @description Feature item describing instant answers for console errors.
    */
   detailConsoleErrors: 'Get instant, accurate answers for console errors',
   /**
-   * @description Detail message shown in the dialog.
+   * @description Feature item describing CSS and JS snippet generation.
    */
   detailGenerateCode: 'Generate CSS and JS snippets on the fly',
   /**
-   * @description Detail message shown in the dialog.
+   * @description Feature item describing automatic issue detection in performance traces.
    */
   detailPerformance: 'Automatically find issues in performance traces',
 } as const;
@@ -121,7 +120,7 @@ export const DEFAULT_VIEW: View = (input, _output, target): void => {
           @click=${input.onGetStartedClick}>${i18nString(UIStrings.getStarted)}</devtools-button>
       </div>
     `,
-    target
+    target,
   );
   // clang-format on
 };
@@ -177,7 +176,7 @@ export class GeminiRebrandPromoDialog extends UI.Widget.VBox {
       return;
     }
 
-    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+    const currentAidaAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
     if (currentAidaAvailability !== Host.AidaClient.AidaAccessPreconditions.AVAILABLE) {
       return;
     }

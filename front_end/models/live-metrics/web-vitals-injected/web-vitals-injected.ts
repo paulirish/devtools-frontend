@@ -15,6 +15,7 @@ declare const window: Window&{
   getNodeForIndex: (index: number) => Node | undefined,
   [Spec.INTERNAL_KILL_SWITCH]: () => void,
   [Spec.EVENT_BINDING_NAME]: (payload: string) => void,
+  devToolsReportSoftNavs?: boolean,
 };
 
 const eventListenerCleanupController = new AbortController();
@@ -121,29 +122,6 @@ window.getNodeForIndex = (index: number): Node|undefined => {
   return nodeList[index].deref();
 };
 
-function limitScripts(loafs: Spec.PerformanceLongAnimationFrameTimingJSON[]):
-    Spec.PerformanceLongAnimationFrameTimingJSON[] {
-  return loafs.map(loaf => {
-    const longestScripts: Spec.PerformanceScriptTimingJSON[] = [];
-    for (const script of loaf.scripts) {
-      if (longestScripts.length < Spec.SCRIPTS_PER_LOAF_LIMIT) {
-        longestScripts.push(script);
-        continue;
-      }
-
-      const shorterIndex = longestScripts.findIndex(s => s.duration < script.duration);
-      if (shorterIndex === -1) {
-        continue;
-      }
-
-      longestScripts[shorterIndex] = script;
-    }
-    longestScripts.sort((a, b) => a.startTime - b.startTime);
-    loaf.scripts = longestScripts;
-    return loaf;
-  });
-}
-
 function isPrerendered(): boolean {
   if (document.prerendering) {
     return true;
@@ -174,15 +152,20 @@ function initialize(): void {
   // callback before any others.
   WebVitals.onBFCacheRestore(() => {
     startedHidden = false;
-    sendEventToDevTools({name: 'reset'});
+    sendEventToDevTools({name: 'reset', navigationType: 'back-forward-cache'});
   });
 
+  let lastLcpNavigationId: number|undefined;
   onLCP(metric => {
+    if (lastLcpNavigationId && metric.navigationId && metric.navigationId !== lastLcpNavigationId) {
+      sendEventToDevTools({name: 'reset', url: window.location.href, navigationType: metric.navigationType});
+    }
+    lastLcpNavigationId = metric.navigationId;
     const event: Spec.LcpChangeEvent = {
       name: 'LCP',
       value: metric.value as Trace.Types.Timing.Milli,
       startedHidden: Boolean(startedHidden),
-      phases: {
+      subparts: {
         timeToFirstByte: metric.attribution.timeToFirstByte as Trace.Types.Timing.Milli,
         resourceLoadDelay: metric.attribution.resourceLoadDelay as Trace.Types.Timing.Milli,
         resourceLoadTime: metric.attribution.resourceLoadDuration as Trace.Types.Timing.Milli,
@@ -195,7 +178,7 @@ function initialize(): void {
       event.nodeIndex = establishNodeIndex(element);
     }
     sendEventToDevTools(event);
-  }, {reportAllChanges: true});
+  }, {reportAllChanges: true, reportSoftNavs: window.devToolsReportSoftNavs});
 
   onCLS(metric => {
     const event: Spec.ClsChangeEvent = {
@@ -204,54 +187,19 @@ function initialize(): void {
       clusterShiftIds: metric.entries.map(Spec.getUniqueLayoutShiftId),
     };
     sendEventToDevTools(event);
-  }, {reportAllChanges: true});
+  }, {reportAllChanges: true, reportSoftNavs: window.devToolsReportSoftNavs});
 
   function onEachInteraction(interaction: WebVitals.INPMetricWithAttribution): void {
-    // Multiple `InteractionEntry` events can be emitted for the same `uniqueInteractionId`
-    // However, it is easier to combine these entries in the DevTools client rather than in
-    // this injected code.
-    const event: Spec.InteractionEntryEvent = {
-      name: 'InteractionEntry',
-      duration: interaction.value as Trace.Types.Timing.Milli,
-      phases: {
-        inputDelay: interaction.attribution.inputDelay as Trace.Types.Timing.Milli,
-        processingDuration: interaction.attribution.processingDuration as Trace.Types.Timing.Milli,
-        presentationDelay: interaction.attribution.presentationDelay as Trace.Types.Timing.Milli,
-      },
-      startTime: interaction.entries[0].startTime,
-      entryGroupId: interaction.entries[0].interactionId as Spec.InteractionEntryGroupId,
-      nextPaintTime: interaction.attribution.nextPaintTime,
-      interactionType: interaction.attribution.interactionType,
-      eventName: interaction.entries[0].name,
-      // To limit the amount of events, just get the last 5 LoAFs
-      longAnimationFrameEntries: limitScripts(
-          interaction.attribution.longAnimationFrameEntries.slice(-Spec.LOAF_LIMIT).map(loaf => loaf.toJSON())),
-    };
-    const target = interaction.attribution.interactionTarget;
-    if (target) {
-      event.nodeIndex = Number(target);
-    }
-    sendEventToDevTools(event);
+    sendEventToDevTools(Spec.createInteractionEntryEvent(interaction));
   }
 
   onINP(metric => {
-    const event: Spec.InpChangeEvent = {
-      name: 'INP',
-      value: metric.value as Trace.Types.Timing.Milli,
-      phases: {
-        inputDelay: metric.attribution.inputDelay as Trace.Types.Timing.Milli,
-        processingDuration: metric.attribution.processingDuration as Trace.Types.Timing.Milli,
-        presentationDelay: metric.attribution.presentationDelay as Trace.Types.Timing.Milli,
-      },
-      startTime: metric.entries[0].startTime,
-      entryGroupId: metric.entries[0].interactionId as Spec.InteractionEntryGroupId,
-      interactionType: metric.attribution.interactionType,
-    };
-    sendEventToDevTools(event);
+    sendEventToDevTools(Spec.createInpChangeEvent(metric));
   }, {
     reportAllChanges: true,
     durationThreshold: 0,
     includeProcessedEventEntries: false,
+    reportSoftNavs: window.devToolsReportSoftNavs,
     onEachInteraction,
     generateTarget(el) {
       if (el) {

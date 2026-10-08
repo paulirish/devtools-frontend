@@ -5,23 +5,26 @@
 
 import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import type * as Foundation from '../../foundation/foundation.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
-import {DeviceModeWrapper} from './DeviceModeWrapper.js';
+import {DeviceModeView} from './DeviceModeView.js';
 import {type Bounds, Events, InspectedPagePlaceholder} from './InspectedPagePlaceholder.js';
 
-let appInstance: AdvancedApp;
+let appInstance: AdvancedApp|null = null;
 
 export class AdvancedApp implements UI.App.App {
   private rootSplitWidget!: UI.SplitWidget.SplitWidget;
-  private deviceModeView!: DeviceModeWrapper;
+  private deviceModeView!: DeviceModeView;
   private inspectedPagePlaceholder!: InspectedPagePlaceholder;
   private toolboxWindow?: Window|null;
   private toolboxRootView?: UI.RootView.RootView;
   private changingDockSide?: boolean;
+  readonly #universe: Foundation.Universe.Universe;
 
-  constructor() {
+  constructor(universe: Foundation.Universe.Universe) {
+    this.#universe = universe;
     UI.DockController.DockController.instance().addEventListener(
         UI.DockController.Events.BEFORE_DOCK_SIDE_CHANGED, this.openToolboxWindow, this);
   }
@@ -29,15 +32,22 @@ export class AdvancedApp implements UI.App.App {
   /**
    * Note: it's used by toolbox.ts without real type checks.
    */
-  static instance(): AdvancedApp {
+  static instance(universe?: Foundation.Universe.Universe): AdvancedApp {
     if (!appInstance) {
-      appInstance = new AdvancedApp();
+      if (!universe) {
+        throw new Error('AdvancedApp.instance() requires a Universe on initial instantiation');
+      }
+      appInstance = new AdvancedApp(universe);
     }
     return appInstance;
   }
 
+  static removeInstance(): void {
+    appInstance = null;
+  }
+
   presentUI(document: Document): void {
-    const rootView = new UI.RootView.RootView();
+    const rootView = new UI.RootView.RootView(this.#universe);
 
     this.rootSplitWidget =
         new UI.SplitWidget.SplitWidget(false, true, 'inspector-view.split-view-state', 555, 300, true);
@@ -48,8 +58,7 @@ export class AdvancedApp implements UI.App.App {
 
     this.inspectedPagePlaceholder = InspectedPagePlaceholder.instance();
     this.inspectedPagePlaceholder.addEventListener(Events.UPDATE, this.onSetInspectedPageBounds.bind(this), this);
-    this.deviceModeView =
-        DeviceModeWrapper.instance({inspectedPagePlaceholder: this.inspectedPagePlaceholder, forceNew: false});
+    this.deviceModeView = new DeviceModeView();
 
     UI.DockController.DockController.instance().addEventListener(
         UI.DockController.Events.BEFORE_DOCK_SIDE_CHANGED, this.onBeforeDockSideChange, this);
@@ -85,7 +94,7 @@ export class AdvancedApp implements UI.App.App {
     UI.UIUtils.installComponentRootStyles(toolboxDocument.body);
     UI.ContextMenu.ContextMenu.installHandler(toolboxDocument);
 
-    this.toolboxRootView = new UI.RootView.RootView();
+    this.toolboxRootView = new UI.RootView.RootView(this.#universe);
     this.toolboxRootView.attachToDocument(toolboxDocument);
 
     this.updateDeviceModeView();
@@ -200,7 +209,7 @@ export class AdvancedAppProvider implements UI.AppProvider.AppProvider {
     return advancedAppProviderInstance;
   }
 
-  createApp(): UI.App.App {
-    return AdvancedApp.instance();
+  createApp(universe: Foundation.Universe.Universe): UI.App.App {
+    return AdvancedApp.instance(universe);
   }
 }

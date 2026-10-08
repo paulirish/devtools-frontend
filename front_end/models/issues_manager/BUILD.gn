@@ -8,11 +8,9 @@ import("../../../scripts/build/ninja/devtools_pre_built.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("issues_manager") {
+devtools_foundation_module("issues_manager") {
   sources = [
-    "AttributionReportingIssue.ts",
     "BounceTrackingIssue.ts",
-    "CheckFormsIssuesTrigger.ts",
     "ClientHintIssue.ts",
     "ConnectionAllowlistIssue.ts",
     "ContentSecurityPolicyIssue.ts",
@@ -20,6 +18,7 @@ devtools_module("issues_manager") {
     "CookieIssue.ts",
     "CorsIssue.ts",
     "CrossOriginEmbedderPolicyIssue.ts",
+    "DOMIssuesManager.ts",
     "DeprecationIssue.ts",
     "ElementAccessibilityIssue.ts",
     "EmailVerificationRequestIssue.ts",
@@ -32,6 +31,7 @@ devtools_module("issues_manager") {
     "IssueResolver.ts",
     "IssuesManager.ts",
     "IssuesManagerEvents.ts",
+    "LazyLoadImageIssue.ts",
     "MarkdownIssueDescription.ts",
     "MixedContentIssue.ts",
     "PartitioningBlobURLIssue.ts",
@@ -46,46 +46,27 @@ devtools_module("issues_manager") {
     "SourceFrameIssuesManager.ts",
     "StylesheetLoadingIssue.ts",
     "UnencodedDigestIssue.ts",
+    "WebInstallIssue.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/bindings:bundle",
     "../../models/workspace:bundle",
     "../../third_party/marked:bundle",
-    "../../third_party/third-party-web:bundle",
   ]
 
   public_deps = [ ":descriptions" ]
 }
 
 devtools_issue_description_files = [
-  "arInsecureContext.md",
-  "arInvalidInfoHeader.md",
-  "arInvalidRegisterOsSourceHeader.md",
-  "arInvalidRegisterOsTriggerHeader.md",
-  "arInvalidRegisterSourceHeader.md",
-  "arInvalidRegisterTriggerHeader.md",
-  "arNavigationRegistrationWithoutTransientUserActivation.md",
-  "arNavigationRegistrationUniqueScopeAlreadySet.md",
-  "arNoRegisterOsSourceHeader.md",
-  "arNoRegisterOsTriggerHeader.md",
-  "arNoRegisterSourceHeader.md",
-  "arNoRegisterTriggerHeader.md",
-  "arNoWebOrOsSupport.md",
-  "arOsSourceIgnored.md",
-  "arOsTriggerIgnored.md",
-  "arPermissionPolicyDisabled.md",
-  "arSourceAndTriggerHeaders.md",
-  "arSourceIgnored.md",
-  "arTriggerIgnored.md",
-  "arUntrustworthyReportingOrigin.md",
-  "arWebAndOsHeaders.md",
   "bounceTrackingMitigations.md",
   "clientHintMetaTagAllowListInvalidOrigin.md",
   "clientHintMetaTagModifiedHTML.md",
@@ -94,6 +75,9 @@ devtools_issue_description_files = [
   "CoepCorpNotSameOriginAfterDefaultedToSameOriginByCoep.md",
   "CoepCorpNotSameSite.md",
   "CoepFrameResourceNeedsCoepHeader.md",
+  "connectionAllowlistEmbeddingRequirementNotSatisfied.md",
+  "connectionAllowlistIFrameAttributeLoosensEmbeddingRequirement.md",
+  "connectionAllowlistInvalidAllowConnectionAllowlistFrom.md",
   "connectionAllowlistInvalidAllowlistItemType.md",
   "connectionAllowlistInvalidHeader.md",
   "connectionAllowlistInvalidUrlPattern.md",
@@ -102,7 +86,6 @@ devtools_issue_description_files = [
   "connectionAllowlistReportingEndpointNotToken.md",
   "CompatibilityModeQuirks.md",
   "CookieAttributeValueExceedsMaxSize.md",
-  "cookieExcludeBlockedWithinRelatedWebsiteSet.md",
   "cookieExcludeDomainNonAscii.md",
   "cookieWarnDomainNonAscii.md",
   "corsAllowCredentialsRequired.md",
@@ -143,16 +126,20 @@ devtools_issue_description_files = [
   "genericFormModelContextParameterMissingName.md",
   "federatedAuthRequestApprovalDeclined.md",
   "federatedAuthRequestTooManyRequests.md",
+  "federatedAuthRequestWellKnownBlockedByConnectionAllowlist.md",
   "federatedAuthRequestManifestHttpNotFound.md",
   "federatedAuthRequestManifestNoResponse.md",
+  "federatedAuthRequestConfigBlockedByConnectionAllowlist.md",
   "federatedAuthRequestManifestInvalidResponse.md",
   "federatedAuthRequestErrorFetchingSignin.md",
   "federatedAuthRequestInvalidSigninResponse.md",
   "federatedAuthRequestAccountsHttpNotFound.md",
   "federatedAuthRequestAccountsNoResponse.md",
+  "federatedAuthRequestAccountsBlockedByConnectionAllowlist.md",
   "federatedAuthRequestAccountsInvalidResponse.md",
   "federatedAuthRequestIdTokenHttpNotFound.md",
   "federatedAuthRequestIdTokenNoResponse.md",
+  "federatedAuthRequestIdTokenBlockedByConnectionAllowlist.md",
   "federatedAuthRequestIdTokenInvalidResponse.md",
   "federatedAuthRequestIdTokenInvalidRequest.md",
   "federatedAuthRequestErrorIdToken.md",
@@ -188,7 +175,42 @@ devtools_issue_description_files = [
   "emailVerificationRequestWellKnownMissingAccountsEndpoint.md",
   "emailVerificationRequestUserLoggedOut.md",
   "emailVerificationRequestWellKnownAccountsEndpointCrossOrigin.md",
+  "emailVerificationRequestAccountsHttpNotFound.md",
+  "emailVerificationRequestAccountsNoResponse.md",
+  "emailVerificationRequestAccountsInvalidResponse.md",
+  "emailVerificationRequestAccountsInvalidContentType.md",
+  "emailVerificationRequestAccountsEmptyList.md",
+  "emailVerificationRequestEmailVerificationWellKnownHttpNotFound.md",
+  "emailVerificationRequestEmailVerificationWellKnownNoResponse.md",
+  "emailVerificationRequestEmailVerificationWellKnownInvalidResponse.md",
+  "emailVerificationRequestEmailVerificationWellKnownInvalidContentType.md",
+  "emailVerificationRequestJwksHttpNotFound.md",
+  "emailVerificationRequestJwksInvalidResponse.md",
+  "emailVerificationRequestTokenVerificationSdJwtUnsupportedHeaderAlg.md",
+  "emailVerificationRequestTokenVerificationSdJwtMissingIss.md",
+  "emailVerificationRequestTokenVerificationSdJwtMissingIat.md",
+  "emailVerificationRequestTokenVerificationSdJwtMissingCnf.md",
+  "emailVerificationRequestTokenVerificationSdJwtMissingEmail.md",
+  "emailVerificationRequestTokenVerificationSdJwtInvalidIssuedAt.md",
+  "emailVerificationRequestTokenVerificationSdJwtInvalidIssuer.md",
+  "emailVerificationRequestTokenVerificationSdJwtJwksMissingKeys.md",
+  "emailVerificationRequestTokenVerificationSdJwtSignatureFailed.md",
+  "emailVerificationRequestTokenVerificationSdJwtInvalidEmailVerified.md",
+  "emailVerificationRequestTokenVerificationSdJwtInvalidEmail.md",
+  "emailVerificationRequestTokenVerificationSdJwtInvalidHolderKey.md",
+  "emailVerificationRequestTokenVerificationKbInvalidTyp.md",
+  "emailVerificationRequestTokenVerificationKbMissingAud.md",
+  "emailVerificationRequestTokenVerificationKbMissingNonce.md",
+  "emailVerificationRequestTokenVerificationKbMissingIat.md",
+  "emailVerificationRequestTokenVerificationKbMissingSdHash.md",
+  "emailVerificationRequestTokenVerificationKbInvalidIssuedAt.md",
+  "emailVerificationRequestTokenVerificationKbInvalidAudience.md",
+  "emailVerificationRequestTokenVerificationKbInvalidNonce.md",
+  "emailVerificationRequestTokenVerificationKbInvalidSdHash.md",
+  "emailVerificationRequestTokenVerificationKbMissingCnf.md",
+  "emailVerificationRequestTokenVerificationKbSignatureFailed.md",
   "heavyAd.md",
+  "lazyLoadImageZeroSize.md",
   "LowTextContrast.md",
   "mixedContent.md",
   "permissionElementActivationDisabled.md",
@@ -214,17 +236,12 @@ devtools_issue_description_files = [
   "permissionElementSecurityChecksFailed.md",
   "permissionElementTypeNotSupported.md",
   "permissionElementUntrustedEvent.md",
-  "SameSiteExcludeContextDowngradeRead.md",
-  "SameSiteExcludeContextDowngradeSet.md",
-  "SameSiteExcludeNavigationContextDowngrade.md",
   "SameSiteNoneInsecureErrorRead.md",
   "SameSiteNoneInsecureErrorSet.md",
   "SameSiteNoneInsecureWarnRead.md",
   "SameSiteNoneInsecureWarnSet.md",
   "SameSiteUnspecifiedLaxAllowUnsafeRead.md",
   "SameSiteUnspecifiedLaxAllowUnsafeSet.md",
-  "SameSiteWarnCrossDowngradeRead.md",
-  "SameSiteWarnCrossDowngradeSet.md",
   "cookieCrossSiteRedirectDowngrade.md",
   "cookieWarnThirdPartyPhaseoutSet.md",
   "cookieWarnThirdPartyPhaseoutRead.md",
@@ -233,10 +250,11 @@ devtools_issue_description_files = [
   "cookieExcludePortMismatch.md",
   "cookieExcludeSchemeMismatch.md",
   "cookieWarnMetadataGrantRead.md",
+  "cookieWarnMetadataGrantReadOptOut.md",
   "cookieWarnMetadataGrantSet.md",
+  "cookieWarnMetadataGrantSetOptOut.md",
   "propertyRuleIssue.md",
   "propertyRuleInvalidNameIssue.md",
-  "SameSiteWarnStrictLaxDowngradeStrict.md",
   "selectElementAccessibilityDisallowedOptGroupChild.md",
   "selectElementAccessibilityDisallowedSelectChild.md",
   "selectElementAccessibilityInteractiveContentAttributesSelectDescendant.md",
@@ -301,7 +319,18 @@ devtools_issue_description_files = [
   "unencodedDigestIncorrectDigestType.md",
   "unencodedDigestMalformedDictionary.md",
   "unencodedDigestUnknownAlgorithm.md",
+  "webInstallManifestMissingId.md",
+  "webInstallManifestMissingNameOrShortName.md",
+  "webInstallManifestParsingOrNetworkError.md",
+  "webInstallNoManifest.md",
+  "webInstallStartUrlInvalid.md",
 ]
+
+generated_file("description_list") {
+  outputs = [ "$target_gen_dir/description_list.json" ]
+  contents = devtools_issue_description_files
+  output_conversion = "json"
+}
 
 devtools_pre_built("descriptions") {
   sources = []
@@ -311,26 +340,26 @@ devtools_pre_built("descriptions") {
     data += [ "$target_gen_dir/descriptions/$file" ]
   }
 
-  write_file("$target_gen_dir/description_list.json",
-             devtools_issue_description_files,
-             "json")
+  public_deps = [ ":description_list" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "issues_manager.ts"
 
-  deps = [ ":issues_manager" ]
+  ts_deps = [ ":issues_manager" ]
 
   visibility = [
     ":*",
     "../../../mcp/*",
     "../../entrypoints/main/*",
+    "../../foundation/*",
     "../../panels/application/*",
     "../../panels/console/*",
     "../../panels/console_counters/*",
     "../../panels/elements/*",
     "../../panels/issues/*",
     "../../panels/network/*",
+    "../../panels/profiler/*",
     "../../panels/security/*",
     "../../panels/sources/*",
     "../../testing/*",
@@ -343,48 +372,36 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
-  testonly = true
-
-  sources = [
-    "CheckFormsIssuesTrigger.test.ts",
-    "IssuesManager.test.ts",
-    "SelectivePermissionsInterventionIssue.test.ts",
-  ]
-
-  deps = [
-    ":bundle",
-    "../../core/sdk:bundle",
-    "../../generated",
-    "../../testing",
-  ]
-}
-
 devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
     "ConnectionAllowlistIssue.test.ts",
+    "DOMIssuesManager.test.ts",
     "DeprecationIssue.test.ts",
     "ElementAccessibilityIssue.test.ts",
+    "FederatedAuthRequestIssue.test.ts",
     "FederatedAuthUserInfoRequestIssue.test.ts",
     "GenericIssue.test.ts",
     "Issue.test.ts",
     "IssueAggregator.test.ts",
     "IssueResolver.test.ts",
+    "IssuesManager.test.ts",
+    "LazyLoadImageIssue.test.ts",
     "MarkdownIssueDescription.test.ts",
     "PermissionElementIssue.test.ts",
     "PropertyRuleIssue.test.ts",
     "RelatedIssue.test.ts",
     "SRIMessageSignatureIssue.test.ts",
+    "SelectivePermissionsInterventionIssue.test.ts",
     "SharedDictionaryIssue.test.ts",
     "StylesheetLoadingIssue.test.ts",
     "UnencodedDigestIssue.test.ts",
+    "WebInstallIssue.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
     "../../testing",

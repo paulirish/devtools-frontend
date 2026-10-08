@@ -7,6 +7,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as _ProtocolClient from '../../core/protocol_client/protocol_client.js';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Extensions from '../../models/extensions/extensions.js';
+import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type {ExtensionServer} from './ExtensionServer.js';
@@ -199,14 +200,19 @@ export class ExtensionSidebarPane extends UI.View.SimpleView {
       callback('operation cancelled');
       return;
     }
-    objectPropertiesView.element.removeChildren();
-    void UI.UIUtils.Renderer.render(object, {title, editable: false, expand: true}).then(result => {
-      if (!result) {
-        callback();
-        return;
-      }
-      objectPropertiesView.element.appendChild(result.element);
-      callback();
+    objectPropertiesView.detachChildWidgets();
+    const section = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionWidget();
+    section.objectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(object, {
+      readOnly: true,
+      propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
     });
+    section.objectTree.expanded = true;
+    if (title) {
+      const span = document.createElement('span');
+      span.textContent = title;
+      section.title = span;
+    }
+    section.show(objectPropertiesView.element);
+    callback();
   }
 }

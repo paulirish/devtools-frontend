@@ -6,9 +6,9 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as ProtocolClient from '../protocol_client/protocol_client.js';
-import * as Root from '../root/root.js';
 
 import {SDKModel, type SDKModelConstructor} from './SDKModel.js';
+import {SecurityOrigin} from './SecurityOrigin.js';
 import type {TargetManager} from './TargetManager.js';
 
 export class Target extends ProtocolClient.InspectorBackend.TargetBase {
@@ -16,6 +16,8 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
   #name: string;
   #inspectedURL: Platform.DevToolsPath.UrlString = Platform.DevToolsPath.EmptyUrlString;
   #inspectedURLName = '';
+  /** Caches the parsed security origin for `#inspectedURL`. */
+  #inspectedSecurityOrigin: SecurityOrigin|null = null;
   readonly #capabilitiesMask: number;
   #type: Type;
   readonly #parentTarget: Target|null;
@@ -50,10 +52,7 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         this.#capabilitiesMask = Capability.BROWSER | Capability.STORAGE | Capability.DOM | Capability.JS |
             Capability.LOG | Capability.NETWORK | Capability.TARGET | Capability.TRACING | Capability.EMULATION |
             Capability.INPUT | Capability.INSPECTOR | Capability.AUDITS | Capability.WEB_AUTHN | Capability.IO |
-            Capability.MEDIA | Capability.EVENT_BREAKPOINTS | Capability.DOM_STORAGE;
-        if (Root.Runtime.hostConfig.devToolsWebMCPSupport?.enabled) {
-          this.#capabilitiesMask |= Capability.WEB_MCP;
-        }
+            Capability.MEDIA | Capability.EVENT_BREAKPOINTS | Capability.DOM_STORAGE | Capability.WEB_MCP;
         if (parentTarget?.type() !== Type.FRAME) {
           // This matches backend exposing certain capabilities only for the main frame.
           this.#capabilitiesMask |=
@@ -79,9 +78,6 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         if (parentTarget?.type() !== Type.FRAME) {
           this.#capabilitiesMask |= Capability.STORAGE;
         }
-        break;
-      case Type.SHARED_STORAGE_WORKLET:
-        this.#capabilitiesMask = Capability.JS | Capability.LOG | Capability.INSPECTOR | Capability.EVENT_BREAKPOINTS;
         break;
       case Type.Worker:
         this.#capabilitiesMask = Capability.JS | Capability.LOG | Capability.NETWORK | Capability.TARGET |
@@ -213,8 +209,23 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
     return this.#inspectedURL;
   }
 
+  /**
+   * Returns the security origin for this target's inspected URL.
+   *
+   * The target caches the origin until `setInspectedURL()` changes the URL.
+   * If the URL is empty or invalid, this method returns a unique opaque origin.
+   * An opaque origin does not match any other origin.
+   */
+  inspectedSecurityOrigin(): SecurityOrigin {
+    if (!this.#inspectedSecurityOrigin) {
+      this.#inspectedSecurityOrigin = SecurityOrigin.create(this.#inspectedURL);
+    }
+    return this.#inspectedSecurityOrigin;
+  }
+
   setInspectedURL(inspectedURL: Platform.DevToolsPath.UrlString): void {
     this.#inspectedURL = inspectedURL;
+    this.#inspectedSecurityOrigin = null;
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(inspectedURL);
     this.#inspectedURLName = parsedURL ? parsedURL.lastPathComponentWithFragment() : '#' + this.#id;
     this.#targetManager.onInspectedURLChange(this);
@@ -291,7 +302,6 @@ export enum Type {
   // eslint-disable-next-line @typescript-eslint/naming-convention -- Used by web_tests.
   Worker = 'worker',
   SHARED_WORKER = 'shared-worker',
-  SHARED_STORAGE_WORKLET = 'shared-storage-worklet',
   NODE = 'node',
   BROWSER = 'browser',
   AUCTION_WORKLET = 'auction-worklet',

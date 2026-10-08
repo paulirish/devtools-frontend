@@ -15,11 +15,11 @@ import {
 
 const UIStrings = {
   /**
-   * @description Title for HTTP Message Signatures specification url
+   * @description Title for HTTP Message Signatures specification URL.
    */
   httpMessageSignatures: 'HTTP Message Signatures (RFC9421)',
   /**
-   * @description Title for Signature-based Integrity specification url
+   * @description Title for Signature-based Integrity specification URL.
    */
   signatureBasedIntegrity: 'Signature-based Integrity',
 } as const;
@@ -69,18 +69,16 @@ export class SRIMessageSignatureIssue extends Issue<Protocol.Audits.SRIMessageSi
         {
           link: 'https://wicg.github.io/signature-based-sri/',
           linkTitle: i18nLazyString(UIStrings.signatureBasedIntegrity),
-        }
+        },
       ],
-      substitutions: new Map()
+      substitutions: new Map(),
     };
     if (details.error === Protocol.Audits.SRIMessageSignatureError.ValidationFailedSignatureMismatch) {
       description.substitutions?.set('PLACEHOLDER_signatureBase', () => details.signatureBase);
     }
     if (details.error === Protocol.Audits.SRIMessageSignatureError.ValidationFailedIntegrityMismatch) {
-      description.substitutions?.set('PLACEHOLDER_integrityAssertions', () => {
-        const prefix = '\n* ';
-        return prefix + this.details().integrityAssertions.join(prefix);
-      });
+      description.substitutions?.set('PLACEHOLDER_integrityAssertions',
+                                     () => this.details().integrityAssertions.join('\n'));
     }
     return resolveLazyDescription(description);
   }

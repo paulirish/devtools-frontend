@@ -5,11 +5,12 @@
 import {assert} from 'chai';
 import type {ElementHandle} from 'puppeteer-core';
 
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DataGridElement} from '../../../front_end/ui/legacy/components/data_grid/DataGridElement.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 export async function getDataGridRows(
-    expectedNumberOfRows: number, root: ElementHandle<Node>|undefined, matchExactNumberOfRows = true,
-    devToolsPage: DevToolsPage): Promise<Array<Array<ElementHandle<HTMLTableCellElement>>>> {
+    devToolsPage: DevToolsPage, expectedNumberOfRows: number, root: ElementHandle<Node>|undefined,
+    matchExactNumberOfRows = true): Promise<Array<Array<ElementHandle<HTMLTableCellElement>>>> {
   const dataGrid = !root ? await devToolsPage.waitFor('devtools-data-grid') : root;
   const handlers = await (async () => {
     if (matchExactNumberOfRows) {
@@ -27,8 +28,8 @@ export async function getDataGridRows(
   return await Promise.all(handlers.map(handler => devToolsPage.$$('td[jslog]:not(.hidden)', handler)));
 }
 
-export async function getDataGridColumnNames(
-    root: ElementHandle<Node>|undefined, devToolsPage: DevToolsPage): Promise<String[]> {
+export async function getDataGridColumnNames(devToolsPage: DevToolsPage,
+                                             root: ElementHandle<Node>|undefined): Promise<String[]> {
   const columnNames: String[] = [];
   const dataGrid = !root ? await devToolsPage.waitFor('devtools-data-grid') : root;
 
@@ -43,7 +44,8 @@ export async function getDataGridColumnNames(
   return columnNames;
 }
 
-export async function getDataGrid(root: ElementHandle|undefined, devToolsPage: DevToolsPage) {
+export async function getDataGrid(devToolsPage: DevToolsPage,
+                                  root: ElementHandle|undefined): Promise<ElementHandle<DataGridElement>> {
   const dataGrid = await devToolsPage.waitFor('devtools-data-grid', root);
   assert.isOk(dataGrid, 'Could not find data-grid');
   await devToolsPage.waitForFunction(async () => {
@@ -54,10 +56,10 @@ export async function getDataGrid(root: ElementHandle|undefined, devToolsPage: D
   return dataGrid;
 }
 
-export async function getInnerTextOfDataGridCells(
-    dataGridElement: ElementHandle<Element>, expectedNumberOfRows: number, matchExactNumberOfRows = true,
-    devToolsPage: DevToolsPage): Promise<string[][]> {
-  const gridRows = await getDataGridRows(expectedNumberOfRows, dataGridElement, matchExactNumberOfRows, devToolsPage);
+export async function getInnerTextOfDataGridCells(devToolsPage: DevToolsPage, dataGridElement: ElementHandle<Element>,
+                                                  expectedNumberOfRows: number,
+                                                  matchExactNumberOfRows = true): Promise<string[][]> {
+  const gridRows = await getDataGridRows(devToolsPage, expectedNumberOfRows, dataGridElement, matchExactNumberOfRows);
   const table: string[][] = [];
   for (const row of gridRows) {
     const textRow = [];

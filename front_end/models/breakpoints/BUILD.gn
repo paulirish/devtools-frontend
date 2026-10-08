@@ -7,19 +7,19 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("breakpoints") {
+devtools_foundation_module("breakpoints") {
   sources = [ "BreakpointManager.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../bindings:bundle",
     "../formatter:bundle",
     "../source_map_scopes:bundle",
-    "../text_utils:bundle",
     "../workspace:bundle",
   ]
 }
@@ -27,11 +27,12 @@ devtools_module("breakpoints") {
 devtools_entrypoint("bundle") {
   entrypoint = "breakpoints.ts"
 
-  deps = [ ":breakpoints" ]
+  ts_deps = [ ":breakpoints" ]
 
   visibility = [
     ":*",
     "../../entrypoints/main",
+    "../../foundation/*",
     "../../models/ai_assistance/*",
     "../../panels/changes/*",
     "../../panels/console/*",
@@ -47,23 +48,24 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "BreakpointManager.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../extension-api",
     "../../core/common:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../testing",
     "../bindings:bundle",
+    "../formatter:bundle",
     "../persistence:bundle",
-    "../text_utils:bundle",
     "../workspace:bundle",
   ]
 }

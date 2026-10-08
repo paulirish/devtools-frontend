@@ -9,11 +9,11 @@ import type * as Autofill from './autofill.js';
 
 const UIStrings = {
   /**
-   * @description Label for the autofill pane
+   * @description Label for the Autofill panel.
    */
   autofill: 'Autofill',
   /**
-   * @description Command for showing the 'Autofill' pane
+   * @description Command for showing the Autofill panel.
    */
   showAutofill: 'Show Autofill',
 } as const;
@@ -36,8 +36,9 @@ UI.ViewManager.registerViewExtension({
   commandPrompt: i18nLazyString(UIStrings.showAutofill),
   order: 100,
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
-  async loadView() {
+  async loadView(universe) {
     const Autofill = await loadAutofillModule();
-    return new Autofill.AutofillView.AutofillView();
+    const {autofillManager} = universe;
+    return new Autofill.AutofillView.AutofillView(autofillManager);
   },
 });

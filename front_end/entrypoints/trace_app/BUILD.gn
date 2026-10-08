@@ -7,14 +7,11 @@ import("../visibility.gni")
 devtools_entrypoint("entrypoint") {
   entrypoint = "trace_app.ts"
 
-  deps = [
-    "../../Images:optimize_images",
-    "../../core/sdk:meta",
+  deps = [ "../../Images:optimize_images" ]
+
+  ts_deps = [
     "../../entrypoints/inspector_main:meta",
     "../../entrypoints/main:meta",
-    "../../models/logs:meta",
-    "../../models/persistence:meta",
-    "../../models/workspace:meta",
     "../../panels/ai_assistance:meta",
     "../../panels/browser_debugger:meta",
     "../../panels/developer_resources:meta",

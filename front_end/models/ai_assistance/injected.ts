@@ -12,6 +12,7 @@
 
 export const AI_ASSISTANCE_CSS_CLASS_NAME = 'ai-style-change';
 export const FREESTYLER_WORLD_NAME = 'DevTools AI Assistance';
+export const FREESTYLER_WORLD_CSP = 'connect-src \'none\'';
 export const FREESTYLER_BINDING_NAME = '__freestyler';
 
 export interface FreestyleCallbackArgs {
@@ -89,9 +90,9 @@ function freestylerBindingFunc(bindingName: string): void {
   }
 }
 
-export const freestylerBinding = `(${String(freestylerBindingFunc)})('${FREESTYLER_BINDING_NAME}')`;
+export const freestylerBinding: string = `(${String(freestylerBindingFunc)})('${FREESTYLER_BINDING_NAME}')`;
 
-export const PAGE_EXPOSED_FUNCTIONS = ['setElementStyles'];
+export const PAGE_EXPOSED_FUNCTIONS: string[] = ['setElementStyles'];
 
 /**
  * Please see fileoverview
@@ -170,4 +171,4 @@ const setupSetElementStyles = `function setupSetElementStyles(prefix) {
   global.setElementStyles = setElementStyles;
 }`;
 
-export const injectedFunctions = `(${setupSetElementStyles})('${AI_ASSISTANCE_CSS_CLASS_NAME}')`;
+export const injectedFunctions: string = `(${setupSetElementStyles})('${AI_ASSISTANCE_CSS_CLASS_NAME}')`;

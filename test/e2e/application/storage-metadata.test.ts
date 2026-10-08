@@ -5,12 +5,12 @@
 import {
   navigateToApplicationTab,
 } from '../helpers/application-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
-export async function navigateToBucketViaDbMetadata(
-    devToolsPage: DevToolsPage, inspectedPage: InspectedPage, subPanel: string, dbSelector: string) {
-  await navigateToApplicationTab('storage-buckets-link', devToolsPage, inspectedPage);
+export async function navigateToBucketViaDbMetadata(devToolsPage: DevToolsPage, inspectedPage: InspectedPage,
+                                                    subPanel: string, dbSelector: string): Promise<void> {
+  await navigateToApplicationTab(devToolsPage, inspectedPage, 'storage-buckets-link');
 
   await devToolsPage.bringToFront();
   await devToolsPage.reload();

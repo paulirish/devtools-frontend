@@ -20,7 +20,7 @@ const UIStrings = {
    */
   openCubicBezierEditor: 'Open cubic bezier editor',
   /**
-   * @description Tooltip text for an icon that opens shadow editor. The shadow editor is a tool
+   * @description Tooltip text for an icon that opens the shadow editor. The shadow editor is a tool
    * which allows the user to edit CSS shadow properties.
    */
   openShadowEditor: 'Open shadow editor',
@@ -260,10 +260,10 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
         return new Common.Color.Oklab(color.l, color.a, color.b, color.alpha, customProperty);
       }
       if (color.is(Common.Color.Format.SRGB) || color.is(Common.Color.Format.SRGB_LINEAR) ||
-          color.is(Common.Color.Format.DISPLAY_P3) || color.is(Common.Color.Format.A98_RGB) ||
-          color.is(Common.Color.Format.PROPHOTO_RGB) || color.is(Common.Color.Format.REC_2020) ||
-          color.is(Common.Color.Format.XYZ) || color.is(Common.Color.Format.XYZ_D50) ||
-          color.is(Common.Color.Format.XYZ_D65)) {
+          color.is(Common.Color.Format.DISPLAY_P3) || color.is(Common.Color.Format.DISPLAY_P3_LINEAR) ||
+          color.is(Common.Color.Format.A98_RGB) || color.is(Common.Color.Format.PROPHOTO_RGB) ||
+          color.is(Common.Color.Format.REC_2020) || color.is(Common.Color.Format.XYZ) ||
+          color.is(Common.Color.Format.XYZ_D50) || color.is(Common.Color.Format.XYZ_D65)) {
         return new Common.Color.ColorFunction(
             color.colorSpace, color.p0, color.p1, color.p2, color.alpha, customProperty);
       }

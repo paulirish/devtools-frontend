@@ -13,14 +13,14 @@ import tableStyles from './table.css.js';
 
 const UIStrings = {
   /**
-   * @description Table row value representing the remaining items not shown in the table due to size constraints. This row will always represent at least 2 items.
+   * @description Table row label representing the remaining items not shown in the table in the Performance panel sidebar.
    * @example {5} PH1
    */
   others: '{PH1} others',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Table.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const {html} = Lit;
 

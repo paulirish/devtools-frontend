@@ -8,172 +8,220 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Badges from '../../models/badges/badges.js';
+import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import type * as InspectorMain from '../inspector_main/inspector_main.js';
 
 import type * as Main from './main.js';
 
 const UIStrings = {
   /**
-   * @description Text in Main
+   * @description Title of a setting under the Persistence category in Settings.
+   */
+  localOverrides: 'Local overrides',
+  /**
+   * @description A tag of enable local overrides setting that can be searched in the command menu.
+   */
+  interception: 'interception',
+  /**
+   * @description A tag of enable local overrides setting that can be searched in the command menu.
+   */
+  override: 'override',
+  /**
+   * @description A tag of group network by frame setting that can be searched in the command menu.
+   */
+  network: 'network',
+  /**
+   * @description A tag of enable local overrides setting that can be searched in the command menu.
+   */
+  rewrite: 'rewrite',
+  /**
+   * @description A tag of enable local overrides setting that can be searched in the command menu.
+   * Noun for network request.
+   */
+  request: 'request',
+  /**
+   * @description Title of an option under the Persistence category that can be invoked through the command menu.
+   */
+  enableOverrideNetworkRequests: 'Enable override network requests',
+  /**
+   * @description Title of an option under the Persistence category that can be invoked through the command menu.
+   */
+  disableOverrideNetworkRequests: 'Disable override network requests',
+  /**
+   * @description Label for a checkbox in the settings UI. Allows developers to opt-in/opt-out
+   * of receiving Google Developer Program (GDP) badges based on their activity in Chrome DevTools.
+   */
+  earnBadges: 'Earn badges',
+  /**
+   * @description Title of a setting under the Appearance category in Settings. When the webpage is
+   * paused by devtools, an overlay is shown on top of the page to indicate that it is paused. The
+   * overlay is a pause/unpause button and some text, which appears on top of the paused page. This
+   * setting turns off this overlay.
+   */
+  disablePaused: 'Disable paused state overlay',
+  /**
+   * @description Action title to focus the page being debugged.
    */
   focusDebuggee: 'Focus page',
   /**
-   * @description Text in the Shortcuts page in settings to explain a keyboard shortcut
+   * @description Action title and shortcut description to toggle the Console drawer.
    */
   toggleDrawer: 'Toggle drawer',
   /**
-   * @description Title of an action that navigates to the next panel
+   * @description Title of an action that navigates to the next panel.
    */
   nextPanel: 'Next panel',
   /**
-   * @description Title of an action that navigates to the previous panel
+   * @description Title of an action that navigates to the previous panel.
    */
   previousPanel: 'Previous panel',
   /**
-   * @description Title of an action that reloads the DevTools
+   * @description Title of an action that reloads DevTools.
    */
   reloadDevtools: 'Reload DevTools',
   /**
-   * @description Title of an action in the main tool to toggle dock
+   * @description Title of an action in the main toolbar to restore the last dock position.
    */
   restoreLastDockPosition: 'Restore last dock position',
   /**
-   * @description Text in the Shortcuts page to explain a keyboard shortcut (zoom in)
+   * @description Shortcut description and action title to zoom in.
    */
   zoomIn: 'Zoom in',
   /**
-   * @description Text in the Shortcuts page to explain a keyboard shortcut (zoom out)
+   * @description Shortcut description and action title to zoom out.
    */
   zoomOut: 'Zoom out',
   /**
-   * @description Title of an action that reset the zoom level to its default
+   * @description Title of an action that resets the zoom level to default.
    */
   resetZoomLevel: 'Reset zoom level',
   /**
-   * @description Title of an action to search in panel
+   * @description Title of an action to search within the current panel.
    */
   searchInPanel: 'Search in panel',
   /**
-   * @description Title of an action that cancels the current search
+   * @description Title of an action that cancels the current search.
    */
   cancelSearch: 'Cancel search',
   /**
-   * @description Title of an action that finds the next search result
+   * @description Title of an action that finds the next search result.
    */
   findNextResult: 'Find next result',
   /**
-   * @description Title of an action to find the previous search result
+   * @description Title of an action to find the previous search result.
    */
   findPreviousResult: 'Find previous result',
   /**
-   * @description Title of a setting under the Appearance category in Settings
+   * @description Title of the theme setting under the Appearance category in Settings.
    */
   theme: 'Theme:',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to switch to the browser's preferred color theme.
    */
-  switchToBrowserPreferredTheme: 'Switch to browser\'s preferred theme',
+  switchToBrowserPreferredTheme: 'Switch to browser’s preferred theme',
   /**
-   * @description A drop-down menu option to switch to the same (light or dark) theme as the browser
+   * @description Drop-down menu option to match the browser's color theme.
    */
   autoTheme: 'Auto',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to switch to the light color theme.
    */
   switchToLightTheme: 'Switch to light theme',
   /**
-   * @description A drop-down menu option to switch to light theme
+   * @description Drop-down menu option to select the light color theme.
    */
   lightCapital: 'Light',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to switch to the dark color theme.
    */
   switchToDarkTheme: 'Switch to dark theme',
   /**
-   * @description A drop-down menu option to switch to dark theme
+   * @description Drop-down menu option to select the dark color theme.
    */
   darkCapital: 'Dark',
   /**
-   * @description A tag of theme preference settings that can be searched in the command menu
+   * @description Tag for theme preference settings when searched in the command menu.
    */
   darkLower: 'dark',
   /**
-   * @description A tag of theme preference settings that can be searched in the command menu
+   * @description Tag for theme preference settings when searched in the command menu.
    */
   lightLower: 'light',
   /**
-   * @description Title of a setting under the Appearance category in Settings
+   * @description Title of the panel layout setting under the Appearance category in Settings.
    */
   panelLayout: 'Panel layout:',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to use a horizontal panel layout.
    */
   useHorizontalPanelLayout: 'Use horizontal panel layout',
   /**
-   * @description A drop-down menu option to use horizontal panel layout
+   * @description Drop-down menu option for horizontal panel layout.
    */
   horizontal: 'horizontal',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to use a vertical panel layout.
    */
   useVerticalPanelLayout: 'Use vertical panel layout',
   /**
-   * @description A drop-down menu option to use vertical panel layout
+   * @description Drop-down menu option for vertical panel layout.
    */
   vertical: 'vertical',
   /**
-   * @description Title of a setting under the Appearance category that can be invoked through the Command Menu
+   * @description Command menu option to use automatic panel layout.
    */
   useAutomaticPanelLayout: 'Use automatic panel layout',
   /**
-   * @description Text short for automatic
+   * @description Drop-down menu option for automatic panel layout.
    */
   auto: 'auto',
   /**
-   * @description Title of a setting under the Appearance category in Settings
+   * @description Checkbox label for the setting to use Ctrl plus number keys to switch panels.
    */
   enableCtrlShortcutToSwitchPanels: 'Use Ctrl + 1-9 to switch panels',
   /**
-   * @description (Mac only) Title of a setting under the Appearance category in Settings
+   * @description Checkbox label for the setting to use Command plus number keys to switch panels on Mac.
    */
   enableShortcutToSwitchPanels: 'Use ⌘ + 1-9 to switch panels',
   /**
-   * @description A drop-down menu option to dock to right
+   * @description Drop-down menu option to dock DevTools to the right.
    */
   right: 'Right',
   /**
-   * @description Text to dock the DevTools to the right of the browser tab
+   * @description Title of the action and setting option to dock DevTools to the right of the browser window.
    */
   dockToRight: 'Dock to right',
   /**
-   * @description A drop-down menu option to dock to bottom
+   * @description Drop-down menu option to dock DevTools to the bottom.
    */
   bottom: 'Bottom',
   /**
-   * @description Text to dock the DevTools to the bottom of the browser tab
+   * @description Title of the action and setting option to dock DevTools to the bottom of the browser window.
    */
   dockToBottom: 'Dock to bottom',
   /**
-   * @description A drop-down menu option to dock to left
+   * @description Drop-down menu option to dock DevTools to the left.
    */
   left: 'Left',
   /**
-   * @description Text to dock the DevTools to the left of the browser tab
+   * @description Title of the action and setting option to dock DevTools to the left of the browser window.
    */
   dockToLeft: 'Dock to left',
   /**
-   * @description A drop-down menu option to undock into separate window
+   * @description Drop-down menu option for undocked DevTools in a separate window.
    */
   undocked: 'Undocked',
   /**
-   * @description Text to undock the DevTools
+   * @description Title of the action and setting option to undock DevTools into a separate window.
    */
   undockIntoSeparateWindow: 'Undock into separate window',
   /**
-   * @description Name of the default set of DevTools keyboard shortcuts
+   * @description Option label for the default set of DevTools keyboard shortcuts.
    */
   devtoolsDefault: 'DevTools (Default)',
   /**
@@ -192,11 +240,6 @@ const UIStrings = {
    * of saving settings to their Google account.
    */
   saveSettings: 'Save `DevTools` settings to your `Google` account',
-  /**
-   * @description Label for a checkbox in the settings UI. Allows developers to opt-in/opt-out
-   * of receiving Google Developer Program (GDP) badges based on their activity in Chrome DevTools.
-   */
-  earnBadges: 'Earn badges',
   /**
    * @description A command available in the command menu to perform searches, for example in the
    * elements panel, as user types, rather than only when they press Enter.
@@ -228,7 +271,7 @@ const UIStrings = {
   /**
    * @description Command to turn the browser color scheme matching off through the command menu.
    */
-  dontMatchChromeColorSchemeCommand: 'Don\'t match Chrome color scheme',
+  dontMatchChromeColorSchemeCommand: 'Don’t match Chrome color scheme',
   /**
    * @description Command to toggle the drawer orientation.
    */
@@ -296,7 +339,7 @@ UI.ActionRegistration.registerActionExtension({
       shortcut: 'Shift+Esc',
     },
   ],
-  condition: config => Boolean(config?.devToolsFlexibleLayout?.verticalDrawerEnabled)
+  condition: config => Boolean(config?.devToolsFlexibleLayout?.verticalDrawerEnabled),
 });
 
 UI.ActionRegistration.registerActionExtension({
@@ -615,13 +658,9 @@ UI.ActionRegistration.registerActionExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.uiThemeSettingDescriptor, {
   category: Common.Settings.SettingCategory.APPEARANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.theme),
-  settingName: 'ui-theme',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'systemPreferred',
   reloadRequired: false,
   options: [
     {
@@ -646,13 +685,9 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.chromeThemeColorsSettingDescriptor, {
   category: Common.Settings.SettingCategory.APPEARANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.matchChromeColorScheme),
-  settingName: 'chrome-theme-colors',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
   options: [
     {
       value: true,
@@ -670,13 +705,9 @@ Common.Settings.registerSettingExtension({
   },
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.sidebarPositionSettingDescriptor, {
   category: Common.Settings.SettingCategory.APPEARANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.panelLayout),
-  settingName: 'sidebar-position',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'auto',
   options: [
     {
       title: i18nLazyString(UIStrings.useHorizontalPanelLayout),
@@ -696,13 +727,9 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.languageSettingDescriptor, {
   category: Common.Settings.SettingCategory.APPEARANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'language',
-  settingType: Common.Settings.SettingType.ENUM,
   title: i18nLazyString(UIStrings.language),
-  defaultValue: 'en-US',
   options: [
     {
       value: 'browserLanguage',
@@ -714,21 +741,19 @@ Common.Settings.registerSettingExtension({
   reloadRequired: true,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.shortcutPanelSwitchSettingDescriptor, {
   category: Common.Settings.SettingCategory.APPEARANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: Host.Platform.platform() === 'mac' ? i18nLazyString(UIStrings.enableShortcutToSwitchPanels) :
                                               i18nLazyString(UIStrings.enableCtrlShortcutToSwitchPanels),
-  settingName: 'shortcut-panel-switch',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.disablePausedStateOverlaySettingDescriptor, {
+  category: Common.Settings.SettingCategory.APPEARANCE,
+  title: i18nLazyString(UIStrings.disablePaused),
+});
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.currentDockStateSettingDescriptor, {
   category: Common.Settings.SettingCategory.GLOBAL,
-  settingName: 'currentDockState',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'right',
   options: [
     {
       value: 'right',
@@ -753,11 +778,7 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'active-keybind-set',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'devToolsDefault',
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.activeKeybindSetSettingDescriptor, {
   options: [
     {
       value: 'devToolsDefault',
@@ -785,41 +806,45 @@ function createOptionForLocale(localeString: string): Common.Settings.SettingExt
   };
 }
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.syncPreferencesSettingDescriptor, {
   category: Common.Settings.SettingCategory.ACCOUNT,
-  // This name must be kept in sync with DevToolsSettings::kSyncDevToolsPreferencesFrontendName.
-  settingName: 'sync-preferences',
-  settingType: Common.Settings.SettingType.BOOLEAN,
   title: i18nLazyString(UIStrings.saveSettings),
-  defaultValue: false,
   reloadRequired: true,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(Badges.receiveGdpBadgesSettingDescriptor, {
   category: Common.Settings.SettingCategory.ACCOUNT,
-  settingName: 'receive-gdp-badges',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.earnBadges),
-  defaultValue: false,
   reloadRequired: true,
 });
 
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'user-shortcuts',
-  settingType: Common.Settings.SettingType.ARRAY,
-  defaultValue: [],
-});
+SettingsUI.SettingUIRegistration.register(
+    Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor, {
+      category: Common.Settings.SettingCategory.PERSISTENCE,
+      title: i18nLazyString(UIStrings.localOverrides),
+      tags: [
+        i18nLazyString(UIStrings.interception),
+        i18nLazyString(UIStrings.override),
+        i18nLazyString(UIStrings.network),
+        i18nLazyString(UIStrings.rewrite),
+        i18nLazyString(UIStrings.request),
+      ],
+      options: [
+        {
+          value: true,
+          title: i18nLazyString(UIStrings.enableOverrideNetworkRequests),
+        },
+        {
+          value: false,
+          title: i18nLazyString(UIStrings.disableOverrideNetworkRequests),
+        },
+      ],
+    });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.MainSettings.searchAsYouTypeSettingDescriptor, {
   category: Common.Settings.SettingCategory.GLOBAL,
-  storageType: Common.Settings.SettingStorageType.LOCAL,
   title: i18nLazyString(UIStrings.searchAsYouTypeSetting),
-  settingName: 'search-as-you-type',
-  settingType: Common.Settings.SettingType.BOOLEAN,
   order: 3,
-  defaultValue: true,
   options: [
     {
       value: true,
@@ -911,29 +936,29 @@ UI.Toolbar.registerToolbarItem({
     const isPolicyRestricted = config?.aidaAvailability?.blockedByEnterprisePolicy === true;
     return Boolean(isFlagEnabled && !isGeoRestricted && !isPolicyRestricted);
   },
-  async loadItem() {
+  loadItem: Common.Lazy.lazy(async () => {
     const Main = await loadMainModule();
-    return Main.GlobalAiButton.GlobalAiButtonToolbarProvider.instance();
-  },
+    return new Main.GlobalAiButton.GlobalAiButtonToolbarProvider();
+  }) as () => Promise<UI.Toolbar.Provider>,
   order: 98,
   location: UI.Toolbar.ToolbarItemLocation.MAIN_TOOLBAR_RIGHT,
 });
 
 UI.Toolbar.registerToolbarItem({
-  async loadItem() {
+  loadItem: Common.Lazy.lazy(async () => {
     const Main = await loadMainModule();
-    return Main.MainImpl.SettingsButtonProvider.instance();
-  },
+    return new Main.MainImpl.SettingsButtonProvider();
+  }) as () => Promise<UI.Toolbar.Provider>,
   order: 99,
   location: UI.Toolbar.ToolbarItemLocation.MAIN_TOOLBAR_RIGHT,
 });
 
 UI.Toolbar.registerToolbarItem({
   condition: () => !Root.Runtime.Runtime.isTraceApp(),
-  async loadItem() {
+  loadItem: Common.Lazy.lazy(async () => {
     const Main = await loadMainModule();
-    return Main.MainImpl.MainMenuItem.instance();
-  },
+    return new Main.MainImpl.MainMenuItem();
+  }) as () => Promise<UI.Toolbar.Provider>,
   order: 100,
   location: UI.Toolbar.ToolbarItemLocation.MAIN_TOOLBAR_RIGHT,
 });
@@ -949,7 +974,7 @@ UI.Toolbar.registerToolbarItem({
 UI.AppProvider.registerAppProvider({
   async loadAppProvider() {
     const Main = await loadMainModule();
-    return Main.SimpleApp.SimpleAppProvider.instance();
+    return new Main.SimpleApp.SimpleAppProvider();
   },
   order: 10,
 });

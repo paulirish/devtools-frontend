@@ -5,7 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TextUtils from '../text_utils/text_utils.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
@@ -176,6 +176,9 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
     this.uiSourceCode = this.#project.createUISourceCode(url, header.contentType());
     uiSourceCodeToStyleMap.set(this.uiSourceCode, this);
     NetworkProject.setInitialFrameAttribution(this.uiSourceCode, header.frameId);
+    if (header.hasSourceURL) {
+      NetworkProject.setSourceURLSynthesized(this.uiSourceCode);
+    }
     this.#project.addUISourceCodeWithProvider(this.uiSourceCode, this, metadata, 'text/css');
 
     this.#eventListeners = [
@@ -188,6 +191,9 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
 
   addHeader(header: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader): void {
     this.headers.add(header);
+    if (header.hasSourceURL) {
+      NetworkProject.setSourceURLSynthesized(this.uiSourceCode);
+    }
     NetworkProject.addFrameAttribution(this.uiSourceCode, header.frameId);
   }
 
@@ -310,7 +316,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
     const sourceMapManager = this.#cssModel.sourceMapManager();
     this.headers.forEach(header => {
       sourceMapManager.detachSourceMap(header);
-      sourceMapManager.attachSourceMap(header, sourceUrl, sourceMapUrl);
+      sourceMapManager.attachSourceMap(header, sourceUrl, sourceMapUrl, SDK.SourceMap.SourceMapProvenance.USER);
     });
   }
 }

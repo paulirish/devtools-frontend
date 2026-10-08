@@ -1,0 +1,62 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/ninja/devtools_entrypoint.gni")
+import("../../../scripts/build/ninja/devtools_module.gni")
+import("../../../scripts/build/typescript/typescript.gni")
+import("../visibility.gni")
+
+devtools_foundation_module("comment_manager") {
+  sources = [
+    "CD4ABridge.ts",
+    "CommentManager.ts",
+    "CommentThread.ts",
+  ]
+
+  ts_deps = [
+    "../../core/common:bundle",
+    "../../core/host:bundle",
+    "../../core/sdk:bundle",
+    "../../generated",
+    "../logs:bundle",
+  ]
+}
+
+devtools_entrypoint("bundle") {
+  entrypoint = "comment_manager.ts"
+
+  ts_deps = [ ":comment_manager" ]
+
+  visibility = [
+    ":*",
+    "../../entrypoints/main/*",
+    "../../foundation/*",
+    "../../models/change_tracker/*",
+    "../../models/elements/*",
+    "../../panels/comments/*",
+    "../../panels/common/*",
+    "../../testing/*",
+    "../../ui/comments/*",
+  ]
+
+  visibility += devtools_models_visibility
+}
+
+devtools_foundation_module("foundation_unittests") {
+  testonly = true
+
+  sources = [
+    "CD4ABridge.test.ts",
+    "CommentManager.test.ts",
+    "CommentThread.test.ts",
+  ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../core/host:bundle",
+    "../../core/sdk:bundle",
+    "../logs:bundle",
+  ]
+}

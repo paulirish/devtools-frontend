@@ -1,7 +1,6 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Nokia Inc.  All rights reserved.
@@ -33,8 +32,8 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -43,18 +42,25 @@ import {KeyValueStorageItemsView} from './KeyValueStorageItemsView.js';
 
 const UIStrings = {
   /**
-   * @description Name for the "DOM Storage Items" table that shows the content of the DOM Storage.
+   * @description Accessible name for the DOM storage items datagrid in the Application panel.
    */
-  domStorageItems: 'DOM Storage Items',
+  domStorageItems: 'DOM storage items',
   /**
-   * @description Text for announcing that the "DOM Storage Items" table was cleared, that is, all
-   * entries were deleted.
+   * @description Screen reader announcement when the DOM storage items table is cleared.
    */
-  domStorageItemsCleared: 'DOM Storage Items cleared',
+  domStorageItemsCleared: 'DOM storage items cleared',
   /**
-   * @description Text for announcing a DOM Storage key/value item has been deleted
+   * @description Screen reader announcement when a DOM storage key-value item is deleted.
    */
-  domStorageItemDeleted: 'The storage item was deleted.',
+  domStorageItemDeleted: 'The storage item was deleted',
+  /**
+   * @description Context menu item in the Application panel to start a chat with AI assistance.
+   */
+  startAChat: 'Start a chat',
+  /**
+   * @description Context menu item in the Application panel to explain a DOM storage item with AI assistance.
+   */
+  explainItem: 'Explain this item',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/DOMStorageItemsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -96,7 +102,7 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
     Common.EventTarget.removeEventListeners(this.eventListeners);
     this.domStorage = domStorage;
     const storageKind = domStorage.isLocalStorage ? 'local-storage-data' : 'session-storage-data';
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context(storageKind)}`);
+    this.jslog = `${VisualLogging.pane().context(storageKind)}`;
     if (domStorage.storageKey) {
       this.toolbar?.setStorageKey(domStorage.storageKey);
     }
@@ -111,7 +117,6 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
           SDK.DOMStorageModel.DOMStorage.Events.DOM_STORAGE_ITEM_UPDATED, this.domStorageItemUpdated, this),
     ];
     this.refreshItems();
-    this.selectedItemChanged(null);
   }
 
   private domStorageItemsCleared(): void {
@@ -174,13 +179,7 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
     this.showItems(filteredItems);
   }
 
-  override deleteAllItems(): void {
-    this.domStorage.clear();
-    // explicitly clear the view because the event won't be fired when it has no items
-    this.domStorageItemsCleared();
-  }
-
-  protected override selectedItemChanged(item: {key: string, value: string}|null): void {
+  #setAiStorageContext(item: {key: string, value: string}|null): void {
     const storageKey = this.domStorage.storageKey;
     if (!storageKey) {
       return;
@@ -203,6 +202,44 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
     const storageItem = new AiAssistanceModel.StorageItem.DOMStorageItem(
         mainPageOrigin, origin, storageKey, storageType, item ? item.key : undefined);
     UI.Context.Context.instance().setFlavor(AiAssistanceModel.StorageItem.StorageItem, storageItem);
+  }
+
+  override deleteAllItems(): void {
+    this.domStorage.clear();
+    // explicitly clear the view because the event won't be fired when it has no items
+    this.domStorageItemsCleared();
+  }
+
+  protected override selectedItemChanged(item: {key: string, value: string}|null): void {
+    this.#setAiStorageContext(item);
+  }
+
+  protected override isAiButtonEnabled(): boolean {
+    return UI.ActionRegistry.ActionRegistry.instance().hasAction('ai-assistance.storage-floating-button');
+  }
+
+  protected override populateContextMenu(item: {key: string, value: string},
+                                         contextMenu: UI.ContextMenu.ContextMenu): void {
+    const openAiAssistanceId = 'ai-assistance.application-panel-context';
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
+    if (actionRegistry.hasAction(openAiAssistanceId)) {
+      this.#setAiStorageContext(item);
+      const action = actionRegistry.getAction(openAiAssistanceId);
+      const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
+      submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
+      submenu.defaultSection().appendItem(i18nString(UIStrings.explainItem),
+                                          () => action.execute({prompt: 'Explain this storage item.'}),
+                                          {disabled: !action.enabled(), jslogContext: openAiAssistanceId + '.storage'});
+    }
+  }
+
+  protected override onAiButtonClick(item: {key: string, value: string}, _event: Event): void {
+    this.#setAiStorageContext(item);
+    const aiFloatingActionId = 'ai-assistance.storage-floating-button';
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
+    if (actionRegistry.hasAction(aiFloatingActionId)) {
+      void actionRegistry.getAction(aiFloatingActionId).execute();
+    }
   }
 
   protected removeItem(key: string): void {

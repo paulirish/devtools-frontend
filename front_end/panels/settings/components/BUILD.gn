@@ -14,7 +14,7 @@ generate_css("css_files") {
 devtools_ui_module("components") {
   sources = [ "SyncSection.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/i18n:bundle",
@@ -31,15 +31,13 @@ devtools_ui_module("components") {
     "../../../ui/lit:bundle",
     "../../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "components.ts"
 
-  deps = [
-    ":components",
-    ":css_files",
-  ]
+  ts_deps = [ ":components" ]
 
   visibility = [
     ":*",
@@ -52,7 +50,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "SyncSection.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/host:bundle",
     "../../../core/root:bundle",

@@ -14,32 +14,44 @@ devtools_foundation_module("protocol_client") {
     "InspectorBackend.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../generated",
-    "../../generated:protocol",
     "../platform:bundle",
+  ]
+}
+
+# TODO: We keep PuppeteerDevToolsConnection in a separate target because node
+# types will leak into the rest of DevTools compilation otherwise!
+devtools_foundation_module("puppeteer_devtools_connection") {
+  sources = [ "PuppeteerDevToolsConnection.ts" ]
+
+  ts_deps = [
+    ":protocol_client",
+    "../../third_party/puppeteer:bundle",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "protocol_client.ts"
 
-  deps = [
-    ":protocol_client",
-    "../../generated",
-  ]
+  ts_deps = [ ":protocol_client" ]
 
   visibility = [ "*" ]
 }
 
-devtools_foundation_module("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
-  sources = [ "InspectorBackend.test.ts" ]
+  sources = [
+    "InspectorBackend.test.ts",
+    "PuppeteerDevToolsConnection.test.ts",
+  ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../generated:protocol",
+    ":puppeteer_devtools_connection",
+    "../../generated",
     "../../testing",
+    "../../third_party/puppeteer:bundle",
   ]
 }

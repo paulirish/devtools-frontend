@@ -2,26 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import sinon from 'sinon';
+
 import type {Chrome} from '../../extension-api/ExtensionAPI.js';
 import * as Host from '../core/host/host.js';
+import * as SDK from '../core/sdk/sdk.js';
+import * as Bindings from '../models/bindings/bindings.js';
 import type * as Extensions from '../models/extensions/extensions.js';
+import * as Logs from '../models/logs/logs.js';
+import * as Workspace from '../models/workspace/workspace.js';
 import * as PanelCommon from '../panels/common/common.js';
 
-import {describeWithEnvironment, setupActionRegistry} from './EnvironmentHelpers.js';
-import {describeWithMockConnection} from './MockConnection.js';
+import {
+  deinitializeGlobalVars,
+  initializeGlobalVars,
+  setupActionRegistry,
+} from './EnvironmentHelpers.js';
+import {MockDebuggerBackend} from './MockScopeChain.js';
 
-interface ExtensionContext {
+export interface ExtensionContext {
   chrome: Partial<Chrome.DevTools.Chrome>;
   extensionDescriptor: Extensions.ExtensionAPI.ExtensionDescriptor;
+  backend?: Partial<MockDebuggerBackend>;
 }
 
-export function getExtensionOrigin() {
+export function getExtensionOrigin(): string {
   return window.location.origin;
 }
 
-export function describeWithDevtoolsExtension(
-    title: string, extension: Partial<Host.InspectorFrontendHostAPI.ExtensionDescriptor>,
-    fn: (this: Mocha.Suite, context: ExtensionContext) => void) {
+export function setupDevtoolsExtensionHooks(extension: Partial<Host.InspectorFrontendHostAPI.ExtensionDescriptor> = {},
+                                            keysToForward: number[] = []): ExtensionContext {
   const extensionDescriptor = {
     startPage: `${getExtensionOrigin()}/blank.html`,
     name: 'TestExtension',
@@ -34,7 +44,7 @@ export function describeWithDevtoolsExtension(
     chrome: {},
   };
 
-  function setup() {
+  function setupExtensionHelper() {
     const server = PanelCommon.ExtensionServer.ExtensionServer.instance({forceNew: true});
     sinon.stub(server, 'addExtensionFrame');
 
@@ -43,36 +53,47 @@ export function describeWithDevtoolsExtension(
           if (origin === getExtensionOrigin()) {
             const chrome: Partial<Chrome.DevTools.Chrome> = {};
             (window as {chrome?: Partial<Chrome.DevTools.Chrome>}).chrome = chrome;
-            self.injectedExtensionAPI(extensionDescriptor, 'main', 'dark', [], () => {}, 1, window);
+            self.injectedExtensionAPI(extensionDescriptor, 'main', 'dark', keysToForward, () => {}, 1, window);
             context.chrome = chrome;
           }
         });
     server.addExtension(extensionDescriptor);
   }
 
-  function cleanup() {
+  function cleanupExtensionHelper() {
     const chrome: Partial<Chrome.DevTools.Chrome> = {};
     (window as {chrome?: Partial<Chrome.DevTools.Chrome>}).chrome = chrome;
     context.chrome = chrome;
+    sinon.restore();
   }
 
-  return describeWithMockConnection(`with-extension-${title}`, function() {
-    beforeEach(cleanup);
-    beforeEach(setup);
-    afterEach(cleanup);
+  beforeEach(async () => {
+    await initializeGlobalVars();
+  });
 
-    describeWithEnvironment(title, function() {
-      setupActionRegistry();
-      fn.call(this, context);
+  setupActionRegistry();
+
+  beforeEach(() => {
+    cleanupExtensionHelper();
+    const backend = new MockDebuggerBackend();
+    context.backend = backend;
+    sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(backend.universe.workspace);
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(backend.universe.targetManager);
+    const cssWorkspaceBinding = sinon.createStubInstance(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, {
+      sourceMapURLsForUISourceCode: [],
     });
-  });
-}
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(cssWorkspaceBinding);
 
-describeWithDevtoolsExtension.only = function(
-    title: string, extension: Partial<Host.InspectorFrontendHostAPI.ExtensionDescriptor>,
-    fn: (this: Mocha.Suite, context: ExtensionContext) => void) {
-  // eslint-disable-next-line mocha/no-exclusive-tests
-  return describe.only('.only', function() {
-    return describeWithDevtoolsExtension(title, extension, fn);
+    const networkLog = new Logs.NetworkLog.NetworkLog(backend.universe.targetManager, backend.universe.settings);
+    sinon.stub(Logs.NetworkLog.NetworkLog, 'instance').returns(networkLog);
+
+    setupExtensionHelper();
   });
-};
+
+  afterEach(async () => {
+    cleanupExtensionHelper();
+    await deinitializeGlobalVars();
+  });
+
+  return context;
+}

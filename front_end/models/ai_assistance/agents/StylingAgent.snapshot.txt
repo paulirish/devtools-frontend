@@ -1,29 +1,3 @@
-Title: StylingAgent describeElement should describe an element with no children, siblings, or parent
-Content:
-* Element's uid is 99.
-* Its selector is `div#myElement`
-=== end content
-
-Title: StylingAgent describeElement should describe an element with child element and text nodes
-Content:
-* Element's uid is 99.
-* Its selector is `div#parentElement`
-* It has 2 child element nodes: `span.child1` (uid=undefined), `span.child2` (uid=undefined)
-* It only has 1 child text node
-=== end content
-
-Title: StylingAgent describeElement should describe an element with siblings and a parent
-Content:
-* Element's uid is 99.
-* Its selector is `div#parentElement`
-* It has a next sibling and it is an element (uid=undefined) node
-* It has a previous sibling and it is a non element node
-* Its parent's selector is `div#grandparentElement` (uid=undefined)
-* Its parent is a non element node
-* Its parent has only 1 child element node
-* Its parent has only 1 child text node
-=== end content
-
 Title: StylingAgent buildRequest structure matches the snapshot
 Content:
 {
@@ -57,7 +31,7 @@ Content:
   "function_declarations": [
     {
       "name": "getStyles",
-      "description": "Get computed and source styles for one or multiple elements on the inspected page for multiple elements at once by uid.\n\n**CRITICAL** An element uid is a number, not a selector.\n**CRITICAL** Use selectors to refer to elements in the text output. Do not use uids.\n**CRITICAL** Always provide the explanation argument to explain what and why you query.\n**CRITICAL** You MUST provide a specific list of CSS property names. Do not use generic values like \"all\" or \"*\".",
+      "description": "Retrieves computed and authored CSS styles for one or more elements by their backend node IDs (uids).\n\n**CRITICAL** An element uid is a number, not a selector.\n**CRITICAL** Use selectors to refer to elements in the text output. Do not use uids.\n**CRITICAL** Always provide the explanation argument to explain what and why you query.\n**CRITICAL** You MUST provide a specific list of CSS property names. Do not use generic values like \"all\" or \"*\".",
       "parameters": {
         "type": 6,
         "description": "",
@@ -96,7 +70,7 @@ Content:
     },
     {
       "name": "executeJavaScript",
-      "description": "This function allows you to run JavaScript code on the inspected page to access the element styles and page content.\nCall this function to gather additional information or modify the page state. Call this function enough times to investigate the user request.",
+      "description": "This function allows you to run JavaScript code on the inspected page to access the element styles and page content.\nCall this function to gather additional information or modify the page state. Call this function enough times to investigate the user request. Note: You cannot make network requests using this function.",
       "parameters": {
         "type": 6,
         "description": "",
@@ -104,7 +78,7 @@ Content:
         "properties": {
           "code": {
             "type": 1,
-            "description": "JavaScript code snippet to run on the inspected page. Make sure the code is formatted for readability.\n\n# Instructions\n\n* To return data, define a top-level `data` variable and populate it with data you want to get. Only JSON-serializable objects can be assigned to `data`.\n* If you modify styles on an element, ALWAYS call the pre-defined global `async setElementStyles(el: Element, styles: object)` function. This function is an internal mechanism for you and should never be presented as a command/advice to the user.\n* **CRITICAL** Only get styles that might be relevant to the user request.\n* **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.\n* **CRITICAL** Consider that `data` variable from the previous function calls are not available in a new function call.\n\nFor example, the code to change element styles:\n\n```\nawait setElementStyles($0, {\n  color: 'blue',\n});\n```\n\nFor example, the code to get overlapping elements:\n\n```\nconst data = {\n  overlappingElements: Array.from(document.querySelectorAll('*'))\n    .filter(el => {\n      const rect = el.getBoundingClientRect();\n      const popupRect = $0.getBoundingClientRect();\n      return (\n        el !== $0 &&\n        rect.left < popupRect.right &&\n        rect.right > popupRect.left &&\n        rect.top < popupRect.bottom &&\n        rect.bottom > popupRect.top\n      );\n    })\n    .map(el => ({\n      tagName: el.tagName,\n      id: el.id,\n      className: el.className,\n      zIndex: window.getComputedStyle(el)['z-index']\n    }))\n};\n```\n"
+            "description": "JavaScript code snippet to run on the inspected page. Make sure the code is formatted for readability.\n\n# Instructions\n\n* To return data, define a top-level `data` variable and populate it with data you want to get. Only JSON-serializable objects can be assigned to `data`.\n* $0 refers to the currently selected DOM node (or document body if none selected).\n* **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.\n* **CRITICAL** Variables from previous function calls are not available in subsequent calls.\n* **CRITICAL** Keep code concise (max 40 lines and 2,500 characters). Split complex logic into multiple steps.\n* **CRITICAL** Network requests (e.g., fetch, XMLHttpRequest) are disabled and cannot be made.\n\nFor example, to query DOM elements:\n\n```\nconst data = {\n  title: document.title,\n  elementText: $0?.textContent?.trim(),\n  childCount: $0?.children.length,\n};\n```\n"
           },
           "explanation": {
             "type": 1,
@@ -119,30 +93,6 @@ Content:
           "code",
           "explanation",
           "title"
-        ]
-      }
-    },
-    {
-      "name": "activateDeviceEmulation",
-      "description": "Sets emulation viewing mode for a specific device and optionally enables vision deficiency emulation.",
-      "parameters": {
-        "type": 6,
-        "description": "",
-        "nullable": false,
-        "properties": {
-          "deviceName": {
-            "type": 1,
-            "description": "The name of the device to emulate. Allowed values: Pixel 3 XL, Pixel 7, Samsung Galaxy S8+, Samsung Galaxy S20 Ultra, Surface Pro 7, Surface Duo, Galaxy Z Fold 5, Asus Zenbook Fold, Samsung Galaxy A51/71, Nest Hub Max, Nest Hub, iPhone 4, iPhone 5/SE, iPhone 6/7/8, iPhone SE, iPhone XR, iPhone 12 Pro, iPhone 14 Pro Max, iPad Mini, iPad Air, iPad Pro.",
-            "nullable": false
-          },
-          "visionDeficiency": {
-            "type": 1,
-            "description": "Optional vision deficiency to emulate. Allowed values: blurredVision, reducedContrast, achromatopsia, deuteranopia, protanopia, tritanopia.",
-            "nullable": true
-          }
-        },
-        "required": [
-          "deviceName"
         ]
       }
     }
@@ -415,7 +365,8 @@ Content:
     "type": "action",
     "code": "console.log('hello');",
     "output": "hello",
-    "canceled": false
+    "canceled": false,
+    "toolName": "executeJavaScript"
   },
   {
     "type": "querying"

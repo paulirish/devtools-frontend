@@ -4,11 +4,34 @@
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
+import type * as Common from '../common/common.js';
 
 import {CSSModel} from './CSSModel.js';
-import {MultitargetNetworkManager} from './NetworkManager.js';
+import type {MultitargetNetworkManager} from './NetworkManager.js';
 import {Events, OverlayModel} from './OverlayModel.js';
 import {SDKModel} from './SDKModel.js';
+import {
+  avifFormatDisabledSettingDescriptor,
+  cpuPressureSettingDescriptor,
+  dataSaverSettingDescriptor,
+  emulateAutoDarkModeSettingDescriptor,
+  emulatedCSSMediaFeatureColorGamutSettingDescriptor,
+  emulatedCSSMediaFeatureForcedColorsSettingDescriptor,
+  emulatedCSSMediaFeaturePrefersColorSchemeSettingDescriptor,
+  emulatedCSSMediaFeaturePrefersContrastSettingDescriptor,
+  emulatedCSSMediaFeaturePrefersReducedDataSettingDescriptor,
+  emulatedCSSMediaFeaturePrefersReducedMotionSettingDescriptor,
+  emulatedCSSMediaFeaturePrefersReducedTransparencySettingDescriptor,
+  emulatedCSSMediaSettingDescriptor,
+  emulatedOSTextScaleSettingDescriptor,
+  emulatedVisionDeficiencySettingDescriptor,
+  idleDetectionSettingDescriptor,
+  javaScriptDisabledSettingDescriptor,
+  jpegXlFormatDisabledSettingDescriptor,
+  localFontsDisabledSettingDescriptor,
+  touchSettingDescriptor,
+  webpFormatDisabledSettingDescriptor,
+} from './SDKSettings.js';
 import {Capability, type Target} from './Target.js';
 
 export const enum DataSaverOverride {
@@ -18,6 +41,7 @@ export const enum DataSaverOverride {
 }
 
 export class EmulationModel extends SDKModel<EmulationModelEventTypes> implements ProtocolProxyApi.EmulationDispatcher {
+  readonly #multitargetNetworkManager: MultitargetNetworkManager;
   readonly #emulationAgent: ProtocolProxyApi.EmulationApi;
   readonly #deviceOrientationAgent: ProtocolProxyApi.DeviceOrientationApi;
   #cssModel: CSSModel|null;
@@ -34,9 +58,12 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
   };
   #screenOrientationLocked: boolean;
   #lockedOrientation: Protocol.Emulation.ScreenOrientation|null;
+  readonly #dataSaverSetting: Common.Settings.Setting<DataSaverOverride>;
+  readonly #dataSaverChangeListener: () => void;
 
   constructor(target: Target) {
     super(target);
+    this.#multitargetNetworkManager = target.targetManager().getNetworkManager();
     this.#emulationAgent = target.emulationAgent();
     this.#deviceOrientationAgent = target.deviceOrientationAgent();
     this.#screenOrientationLocked = false;
@@ -50,7 +77,7 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
     }
 
     const settings = this.target().targetManager().settings;
-    const disableJavascriptSetting = settings.moduleSetting('java-script-disabled');
+    const disableJavascriptSetting = settings.resolve(javaScriptDisabledSettingDescriptor);
     disableJavascriptSetting.addChangeListener(
         async () =>
             await this.#emulationAgent.invoke_setScriptExecutionDisabled({value: disableJavascriptSetting.get()}));
@@ -58,14 +85,14 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       void this.#emulationAgent.invoke_setScriptExecutionDisabled({value: true});
     }
 
-    const touchSetting = settings.moduleSetting('emulation.touch');
+    const touchSetting = settings.resolve(touchSettingDescriptor);
     touchSetting.addChangeListener(() => {
       const settingValue = touchSetting.get();
 
       void this.overrideEmulateTouch(settingValue === 'force');
     });
 
-    const idleDetectionSetting = settings.moduleSetting('emulation.idle-detection');
+    const idleDetectionSetting = settings.resolve(idleDetectionSettingDescriptor);
     idleDetectionSetting.addChangeListener(async () => {
       const settingValue = idleDetectionSetting.get();
       if (settingValue === 'none') {
@@ -80,7 +107,7 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       await this.setIdleOverride(emulationParams);
     });
 
-    const cpuPressureDetectionSetting = settings.moduleSetting('emulation.cpu-pressure');
+    const cpuPressureDetectionSetting = settings.resolve(cpuPressureSettingDescriptor);
     cpuPressureDetectionSetting.addChangeListener(async () => {
       const settingValue = cpuPressureDetectionSetting.get();
 
@@ -98,19 +125,19 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       await this.setPressureStateOverride(settingValue);
     });
 
-    const mediaTypeSetting = settings.moduleSetting<string>('emulated-css-media');
-    const mediaFeatureColorGamutSetting = settings.moduleSetting<string>('emulated-css-media-feature-color-gamut');
+    const mediaTypeSetting = settings.resolve(emulatedCSSMediaSettingDescriptor);
+    const mediaFeatureColorGamutSetting = settings.resolve(emulatedCSSMediaFeatureColorGamutSettingDescriptor);
     const mediaFeaturePrefersColorSchemeSetting =
-        settings.moduleSetting<string>('emulated-css-media-feature-prefers-color-scheme');
-    const mediaFeatureForcedColorsSetting = settings.moduleSetting('emulated-css-media-feature-forced-colors');
+        settings.resolve(emulatedCSSMediaFeaturePrefersColorSchemeSettingDescriptor);
+    const mediaFeatureForcedColorsSetting = settings.resolve(emulatedCSSMediaFeatureForcedColorsSettingDescriptor);
     const mediaFeaturePrefersContrastSetting =
-        settings.moduleSetting<string>('emulated-css-media-feature-prefers-contrast');
+        settings.resolve(emulatedCSSMediaFeaturePrefersContrastSettingDescriptor);
     const mediaFeaturePrefersReducedDataSetting =
-        settings.moduleSetting<string>('emulated-css-media-feature-prefers-reduced-data');
+        settings.resolve(emulatedCSSMediaFeaturePrefersReducedDataSettingDescriptor);
     const mediaFeaturePrefersReducedTransparencySetting =
-        settings.moduleSetting<string>('emulated-css-media-feature-prefers-reduced-transparency');
+        settings.resolve(emulatedCSSMediaFeaturePrefersReducedTransparencySettingDescriptor);
     const mediaFeaturePrefersReducedMotionSetting =
-        settings.moduleSetting<string>('emulated-css-media-feature-prefers-reduced-motion');
+        settings.resolve(emulatedCSSMediaFeaturePrefersReducedMotionSettingDescriptor);
     // Note: this uses a different format than what the CDP API expects,
     // because we want to update these values per media type/feature
     // without having to search the `features` array (inefficient) or
@@ -159,26 +186,24 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
     });
     void this.updateCssMedia();
 
-    const autoDarkModeSetting = settings.moduleSetting('emulate-auto-dark-mode');
+    const autoDarkModeSetting = settings.resolve(emulateAutoDarkModeSettingDescriptor);
     autoDarkModeSetting.addChangeListener(() => {
       const enabled = autoDarkModeSetting.get();
-      mediaFeaturePrefersColorSchemeSetting.setDisabled(enabled);
       mediaFeaturePrefersColorSchemeSetting.set(enabled ? 'dark' : '');
       void this.emulateAutoDarkMode(enabled);
     });
     if (autoDarkModeSetting.get()) {
-      mediaFeaturePrefersColorSchemeSetting.setDisabled(true);
       mediaFeaturePrefersColorSchemeSetting.set('dark');
       void this.emulateAutoDarkMode(true);
     }
 
-    const visionDeficiencySetting = settings.moduleSetting('emulated-vision-deficiency');
+    const visionDeficiencySetting = settings.resolve(emulatedVisionDeficiencySettingDescriptor);
     visionDeficiencySetting.addChangeListener(() => this.emulateVisionDeficiency(visionDeficiencySetting.get()));
     if (visionDeficiencySetting.get()) {
       void this.emulateVisionDeficiency(visionDeficiencySetting.get());
     }
 
-    const osTextScaleSetting = settings.moduleSetting('emulated-os-text-scale');
+    const osTextScaleSetting = settings.resolve(emulatedOSTextScaleSettingDescriptor);
     osTextScaleSetting.addChangeListener(() => {
       void this.emulateOSTextScale(parseFloat(osTextScaleSetting.get()) || undefined);
     });
@@ -186,15 +211,15 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       void this.emulateOSTextScale(parseFloat(osTextScaleSetting.get()) || undefined);
     }
 
-    const localFontsDisabledSetting = settings.moduleSetting('local-fonts-disabled');
+    const localFontsDisabledSetting = settings.resolve(localFontsDisabledSettingDescriptor);
     localFontsDisabledSetting.addChangeListener(() => this.setLocalFontsDisabled(localFontsDisabledSetting.get()));
     if (localFontsDisabledSetting.get()) {
       this.setLocalFontsDisabled(localFontsDisabledSetting.get());
     }
 
-    const avifFormatDisabledSetting = settings.moduleSetting('avif-format-disabled');
-    const jpegXlFormatDisabledSetting = settings.moduleSetting('jpeg-xl-format-disabled');
-    const webpFormatDisabledSetting = settings.moduleSetting('webp-format-disabled');
+    const avifFormatDisabledSetting = settings.resolve(avifFormatDisabledSettingDescriptor);
+    const jpegXlFormatDisabledSetting = settings.resolve(jpegXlFormatDisabledSettingDescriptor);
+    const webpFormatDisabledSetting = settings.resolve(webpFormatDisabledSettingDescriptor);
 
     const updateDisabledImageFormats = (): void => {
       const types = [];
@@ -218,6 +243,15 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       updateDisabledImageFormats();
     }
 
+    this.#dataSaverSetting = settings.resolve(dataSaverSettingDescriptor);
+    this.#dataSaverChangeListener = () => {
+      void this.setDataSaverOverride(this.#dataSaverSetting.get());
+    };
+    this.#dataSaverSetting.addChangeListener(this.#dataSaverChangeListener, this);
+    if (this.#dataSaverSetting.get() !== DataSaverOverride.UNSET) {
+      void this.setDataSaverOverride(this.#dataSaverSetting.get());
+    }
+
     this.#cpuPressureEnabled = false;
     this.#touchEmulationAllowed = true;
     this.#touchEnabled = false;
@@ -228,6 +262,11 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       configuration: Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile,
     };
     target.registerEmulationDispatcher(this);
+  }
+
+  override dispose(): void {
+    super.dispose();
+    this.#dataSaverSetting.removeChangeListener(this.#dataSaverChangeListener, this);
   }
 
   setTouchEmulationAllowed(touchEmulationAllowed: boolean): void {
@@ -248,6 +287,10 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
     } else {
       await this.#emulationAgent.invoke_clearDeviceMetricsOverride();
     }
+  }
+
+  async setSafeAreaInsets(insets: Protocol.Emulation.SafeAreaInsets): Promise<void> {
+    await this.#emulationAgent.invoke_setSafeAreaInsetsOverride({insets});
   }
 
   overlayModel(): OverlayModel|null {
@@ -273,7 +316,7 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
         this.#emulationAgent.invoke_setTimezoneOverride({timezoneId: ''}),
         this.#emulationAgent.invoke_setLocaleOverride({locale: ''}),
         this.#emulationAgent.invoke_setUserAgentOverride(
-            {userAgent: MultitargetNetworkManager.instance().currentUserAgent()}),
+            {userAgent: this.#multitargetNetworkManager.currentUserAgent()}),
       ]);
     } else if (location.unavailable) {
       await Promise.all([
@@ -281,7 +324,7 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
         this.#emulationAgent.invoke_setTimezoneOverride({timezoneId: ''}),
         this.#emulationAgent.invoke_setLocaleOverride({locale: ''}),
         this.#emulationAgent.invoke_setUserAgentOverride(
-            {userAgent: MultitargetNetworkManager.instance().currentUserAgent()}),
+            {userAgent: this.#multitargetNetworkManager.currentUserAgent()}),
       ]);
     } else {
       function processEmulationResult(errorType: string, result: Protocol.ProtocolResponseWithError): Promise<void> {
@@ -315,7 +358,7 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
             .then(result => processEmulationResult('emulation-set-locale', result)),
         this.#emulationAgent
             .invoke_setUserAgentOverride({
-              userAgent: MultitargetNetworkManager.instance().currentUserAgent(),
+              userAgent: this.#multitargetNetworkManager.currentUserAgent(),
               acceptLanguage: location.locale,
             })
             .then(result => processEmulationResult('emulation-set-user-agent', result)),
@@ -399,6 +442,11 @@ export class EmulationModel extends SDKModel<EmulationModelEventTypes> implement
       throw new Error('hardwareConcurrency must be a positive value');
     }
     await this.#emulationAgent.invoke_setHardwareConcurrencyOverride({hardwareConcurrency});
+  }
+
+  async setCPUPerformanceOverride(performanceTier?: Protocol.Emulation.SetCPUPerformanceOverrideRequestPerformanceTier):
+      Promise<void> {
+    await this.#emulationAgent.invoke_setCPUPerformanceOverride({performanceTier});
   }
 
   async emulateTouch(enabled: boolean, mobile: boolean): Promise<void> {

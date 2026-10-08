@@ -8,46 +8,9 @@ import type { CDPSession } from '../api/CDPSession.js';
 import type { ElementHandle } from '../api/ElementHandle.js';
 import type { Frame } from '../api/Frame.js';
 import type { ConsoleMessageLocation } from '../common/ConsoleMessage.js';
+import { type Logger } from '../common/Debug.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import type { FrameManager } from './FrameManager.js';
-/**
- * Tool annotations
- *
- * @public
- */
-export interface WebMCPAnnotation {
-    /**
-     * A hint indicating that the tool does not modify any state.
-     */
-    readOnly?: boolean;
-    /**
-     * A hint indicating that the tool output may contain untrusted content, ex: UGC, 3rd
-     * party data.
-     */
-    untrustedContent?: boolean;
-    /**
-     * If the declarative tool was declared with the autosubmit attribute.
-     */
-    autosubmit?: boolean;
-}
-/**
- * Represents the status of a tool invocation.
- *
- * @public
- */
-export type WebMCPInvocationStatus = 'Completed' | 'Canceled' | 'Error';
-/**
- * @internal
- */
-export interface ProtocolWebMCPTool {
-    name: string;
-    description: string;
-    inputSchema?: object;
-    annotations?: WebMCPAnnotation;
-    frameId: string;
-    backendNodeId?: number;
-    stackTrace?: Protocol.Runtime.StackTrace;
-}
 /**
  * Represents a registered WebMCP tool available on the page.
  *
@@ -73,7 +36,7 @@ export declare class WebMCPTool extends EventEmitter<{
     /**
      * Optional annotations for the tool.
      */
-    annotations?: WebMCPAnnotation;
+    annotations?: Protocol.WebMCP.Annotation;
     /**
      * Frame the tool was defined for.
      */
@@ -89,7 +52,7 @@ export declare class WebMCPTool extends EventEmitter<{
     /**
      * @internal
      */
-    constructor(webmcp: WebMCP, tool: ProtocolWebMCPTool, frame: Frame);
+    constructor(webmcp: WebMCP, tool: Protocol.WebMCP.Tool, frame: Frame);
     /**
      * The corresponding ElementHandle when tool was registered via a form.
      */
@@ -97,7 +60,16 @@ export declare class WebMCPTool extends EventEmitter<{
     /**
      * Executes tool with input parameters, matching tool's `inputSchema`.
      */
-    execute(input?: object): Promise<WebMCPToolCallResult>;
+    execute(input?: object, options?: WebMCPToolExecuteOptions): Promise<WebMCPToolCallResult>;
+}
+/**
+ * @public
+ */
+export interface WebMCPToolExecuteOptions {
+    /**
+     * A signal object that allows you to cancel the tool execution.
+     */
+    signal?: AbortSignal;
 }
 /**
  * @public
@@ -121,6 +93,7 @@ export interface WebMCPToolsRemovedEvent {
  * @public
  */
 export declare class WebMCPToolCall {
+    #private;
     /**
      * Tool invocation identifier.
      */
@@ -136,7 +109,7 @@ export declare class WebMCPToolCall {
     /**
      * @internal
      */
-    constructor(invocationId: string, tool: WebMCPTool, input: string);
+    constructor(invocationId: string, tool: WebMCPTool, input: string, logger?: Logger);
 }
 /**
  * @public
@@ -153,7 +126,7 @@ export interface WebMCPToolCallResult {
     /**
      * Status of the invocation.
      */
-    status: WebMCPInvocationStatus;
+    status: Protocol.WebMCP.InvocationStatus;
     /**
      * Output or error delivered as delivered to the agent. Missing if `status` is anything
      * other than Completed.
@@ -202,7 +175,7 @@ export declare class WebMCP extends EventEmitter<{
     /**
      * @internal
      */
-    constructor(client: CDPSession, frameManager: FrameManager);
+    constructor(client: CDPSession, frameManager: FrameManager, logger?: Logger);
     /**
      * @internal
      */
@@ -213,6 +186,10 @@ export declare class WebMCP extends EventEmitter<{
     invokeTool(tool: WebMCPTool, input: object): Promise<{
         invocationId: string;
     }>;
+    /**
+     * @internal
+     */
+    cancelInvocation(invocationId: string): Promise<void>;
     /**
      * Gets all WebMCP tools defined by the page.
      */

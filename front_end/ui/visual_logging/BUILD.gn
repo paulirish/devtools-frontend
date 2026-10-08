@@ -18,7 +18,7 @@ devtools_ui_module("visual_logging") {
     "LoggingState.ts",
     "NonDomState.ts",
   ]
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/platform:bundle",
@@ -30,7 +30,7 @@ devtools_ui_module("visual_logging") {
 devtools_entrypoint("bundle") {
   entrypoint = "visual_logging.ts"
 
-  deps = [ ":visual_logging" ]
+  ts_deps = [ ":visual_logging" ]
 
   visibility = [
     ":*",
@@ -38,6 +38,7 @@ devtools_entrypoint("bundle") {
     "../../entrypoints/inspector_main/*",
     "../../entrypoints/main/*",
     "../../panels/*",
+    "../comments/*",
     "../components/*",
     "../kit/*",
     "../legacy/*",
@@ -47,10 +48,10 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("testing") {
   entrypoint = "visual_logging-testing.ts"
 
-  deps = [ ":visual_logging" ]
+  ts_deps = [ ":visual_logging" ]
 
   visibility = [
-    ":unittests",
+    ":*",
     "../../testing/*",
   ]
 }
@@ -68,7 +69,7 @@ devtools_ui_module("unittests") {
     "NonDomState.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":testing",
     "../../core/common:bundle",
     "../../core/host:bundle",

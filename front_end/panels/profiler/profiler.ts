@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 import * as BottomUpProfileDataGrid from './BottomUpProfileDataGrid.js';
+import * as HeapDetachedElementsDataGrid from './HeapDetachedElementsDataGrid.js';
+import * as HeapDetachedElementsView from './HeapDetachedElementsView.js';
 import * as HeapProfilerPanel from './HeapProfilerPanel.js';
 import * as HeapProfileView from './HeapProfileView.js';
 import * as HeapSnapshotDataGrids from './HeapSnapshotDataGrids.js';
@@ -17,11 +19,13 @@ import * as ProfileLauncherView from './ProfileLauncherView.js';
 import * as ProfileSidebarTreeElement from './ProfileSidebarTreeElement.js';
 import * as ProfilesPanel from './ProfilesPanel.js';
 import * as ProfileTypeRegistry from './ProfileTypeRegistry.js';
-import * as ProfileView from './ProfileView.js';
 import * as TopDownProfileDataGrid from './TopDownProfileDataGrid.js';
+import * as WritableProfileHeader from './WritableProfileHeader.js';
 
 export {
   BottomUpProfileDataGrid,
+  HeapDetachedElementsDataGrid,
+  HeapDetachedElementsView,
   HeapProfilerPanel,
   HeapProfileView,
   HeapSnapshotDataGrids,
@@ -36,6 +40,6 @@ export {
   ProfileSidebarTreeElement,
   ProfilesPanel,
   ProfileTypeRegistry,
-  ProfileView,
   TopDownProfileDataGrid,
+  WritableProfileHeader,
 };

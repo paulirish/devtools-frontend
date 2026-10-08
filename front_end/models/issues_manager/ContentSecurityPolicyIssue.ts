@@ -15,23 +15,23 @@ import {
 
 const UIStrings = {
   /**
-   * @description Title for CSP url link
+   * @description Title for CSP URL link.
    */
-  contentSecurityPolicySource: 'Content Security Policy - Source Allowlists',
+  contentSecurityPolicySource: 'Content Security Policy - Source allowlists',
   /**
-   * @description Title for CSP inline issue link
+   * @description Title for CSP inline issue link.
    */
-  contentSecurityPolicyInlineCode: 'Content Security Policy - Inline Code',
+  contentSecurityPolicyInlineCode: 'Content Security Policy - Inline code',
   /**
-   * @description Title for the CSP eval link
+   * @description Title for the CSP eval link.
    */
   contentSecurityPolicyEval: 'Content Security Policy - Eval',
   /**
-   * @description Title for Trusted Types policy violation issue link. https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API
+   * @description Title for Trusted Types policy violation issue link (https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API).
    */
   trustedTypesFixViolations: 'Trusted Types - Fix violations',
   /**
-   * @description Title for Trusted Types policy violation issue link. https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API
+   * @description Title for Trusted Types policy violation issue link (https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API).
    */
   trustedTypesPolicyViolation: 'Trusted Types - Policy violation',
 } as const;
@@ -131,27 +131,27 @@ const cspTrustedTypesPolicyViolation = {
   links: [{link: 'https://web.dev/trusted-types/', linkTitle: i18nLazyString(UIStrings.trustedTypesPolicyViolation)}],
 };
 
-export const urlViolationCode = [
+export const urlViolationCode: string = [
   Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
   Protocol.Audits.ContentSecurityPolicyViolationType.KURLViolation,
 ].join('::');
 
-export const inlineViolationCode = [
+export const inlineViolationCode: string = [
   Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
   Protocol.Audits.ContentSecurityPolicyViolationType.KInlineViolation,
 ].join('::');
 
-export const evalViolationCode = [
+export const evalViolationCode: string = [
   Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
   Protocol.Audits.ContentSecurityPolicyViolationType.KEvalViolation,
 ].join('::');
 
-export const trustedTypesSinkViolationCode = [
+export const trustedTypesSinkViolationCode: string = [
   Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
   Protocol.Audits.ContentSecurityPolicyViolationType.KTrustedTypesSinkViolation,
 ].join('::');
 
-export const trustedTypesPolicyViolationCode = [
+export const trustedTypesPolicyViolationCode: string = [
   Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
   Protocol.Audits.ContentSecurityPolicyViolationType.KTrustedTypesPolicyViolation,
 ].join('::');

@@ -13,11 +13,11 @@ const {html, render} = Lit;
 
 const UIStrings = {
   /**
-   * @description prefix shown next to related insight chips
+   * @description Prefix shown next to related insight chips in the Performance panel.
    */
   insightKeyword: 'Insight',
   /**
-   * @description Prefix shown next to related insight chips and containing the insight name.
+   * @description Prefix shown next to related insight chips containing the insight name in the Performance panel.
    * @example {Improve image delivery} PH1
    */
   insightWithName: 'Insight: {PH1}',
@@ -37,6 +37,7 @@ export interface ViewInput {
   eventToInsightsMap: EventToRelatedInsightsMap;
   onInsightClick: (insight: RelatedInsight) => void;
 }
+export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
 
 export interface Data {
   eventToRelatedInsightsMap: EventToRelatedInsightsMap|null;
@@ -44,12 +45,12 @@ export interface Data {
 }
 
 export class RelatedInsightChips extends UI.Widget.Widget {
-  #view: typeof DEFAULT_VIEW;
+  #view: View;
 
   #activeEvent: Trace.Types.Events.Event|null = null;
   #eventToInsightsMap: EventToRelatedInsightsMap = new Map();
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
   }
@@ -81,7 +82,7 @@ export class RelatedInsightChips extends UI.Widget.Widget {
   }
 }
 
-export const DEFAULT_VIEW: (input: ViewInput, output: object, target: HTMLElement) => void =
+export const DEFAULT_VIEW: View =
     (input, _output, target) => {
       const {activeEvent, eventToInsightsMap} = input;
       const relatedInsights = activeEvent ? eventToInsightsMap.get(activeEvent) ?? [] : [];

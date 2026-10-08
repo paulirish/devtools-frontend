@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 import stylisticPlugin from '@stylistic/eslint-plugin';
-import { defineConfig, globalIgnores } from 'eslint/config';
+import {defineConfig, globalIgnores} from 'eslint/config';
 import eslintPlugin from 'eslint-plugin-eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
 import litPlugin from 'eslint-plugin-lit';
 import mochaPlugin from 'eslint-plugin-mocha';
 import globals from 'globals';
-import { join } from 'node:path';
+import {join} from 'node:path';
 import typescriptEslint from 'typescript-eslint';
 
 import devToolsPlugin from './scripts/eslint_rules/plugin.mjs';
@@ -27,9 +27,9 @@ export default defineConfig([
     'third_party/',
 
     'front_end/diff/diff_match_patch.js',
-    'front_end/models/javascript_metadata/NativeFunctions.js',
+    'front_end/models/javascript_metadata/NativeFunctions.ts',
     // All of these scripts are auto-generated so don't lint them.
-    'front_end/generated/ARIAProperties.js',
+    'front_end/generated/ARIAProperties.ts',
     'front_end/generated/Deprecation.ts',
     'front_end/generated/InspectorBackendCommands.ts',
     'front_end/generated/protocol-mapping.d.ts',
@@ -59,9 +59,11 @@ export default defineConfig([
     'scripts/migration/**/*.js',
     'scripts/protocol_typescript/*.js',
     'scripts/deps/tests/fixtures',
+    'scripts/gn_deps_verifier/tests/fixtures',
     'test/**/fixtures/',
     'test/e2e/**/*.js',
     'test/shared/**/*.js',
+    'extensions/cxx_debugging/tests/inputs/',
   ]),
   {
     name: 'JavaScript files',
@@ -103,6 +105,7 @@ export default defineConfig([
       '@stylistic/semi': 'error',
       '@stylistic/no-extra-semi': 'error',
       '@stylistic/comma-style': ['error', 'last'],
+      '@stylistic/comma-dangle': ['error', 'always-multiline'],
       '@stylistic/wrap-iife': ['error', 'inside'],
 
       '@stylistic/spaced-comment': [
@@ -196,7 +199,7 @@ export default defineConfig([
       radix: 'error',
       'valid-typeof': 'error',
       'no-return-assign': ['error', 'always'],
-      'no-implicit-coercion': ['error', { allow: ['!!'] }],
+      'no-implicit-coercion': ['error', {allow: ['!!']}],
 
       'no-array-constructor': 'error',
 
@@ -259,7 +262,14 @@ export default defineConfig([
       // Sort imports first
       'import/first': 'error',
       // Closure does not properly typecheck default exports
-      'import/no-default-export': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are not allowed. Use named exports instead.',
+        },
+      ],
       /**
        * Catch duplicate import paths. For example this would catch the following example:
        * import {Foo} from './foo.js'
@@ -365,6 +375,7 @@ export default defineConfig([
         'error',
         {
           argsIgnorePattern: '^_',
+          ignoreUsingDeclarations: true,
         },
       ],
 
@@ -528,12 +539,7 @@ export default defineConfig([
       // certain TypeScript compilation errors after fixes
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
 
-      '@typescript-eslint/no-inferrable-types': 'error',
-
-      '@typescript-eslint/consistent-generic-constructors': [
-        'error',
-        'constructor',
-      ],
+      '@typescript-eslint/consistent-generic-constructors': 'off',
 
       // This is more performant
       // And should provide better stack trace when debugging
@@ -605,7 +611,7 @@ export default defineConfig([
     rules: {
       'no-console': 'off',
       '@devtools/es-modules-import': 'off',
-      'import/no-default-export': 'off',
+      'no-restricted-syntax': 'off',
     },
   },
   {
@@ -621,9 +627,10 @@ export default defineConfig([
       ],
       '@devtools/l10n-i18nString-call-only-with-uistrings': 'error',
       '@devtools/l10n-no-i18nString-calls-module-instantiation': 'error',
-      '@devtools/l10n-no-locked-or-placeholder-only-phrase': 'error',
       '@devtools/l10n-no-uistrings-export': 'error',
       '@devtools/l10n-no-unused-message': 'error',
+      '@devtools/l10n-uistrings-sentence-punctuation': 'error',
+      '@devtools/l10n-uistrings-text-style': 'error',
     },
   },
   {
@@ -692,6 +699,13 @@ export default defineConfig([
     },
   },
   {
+    name: 'Front-end core and models files',
+    files: ['front_end/core/**/*.ts', 'front_end/models/**/*.ts'],
+    rules: {
+      '@devtools/no-instance-of-migrated-singletons': 'error',
+    },
+  },
+  {
     name: 'Front-end meta files',
     files: ['front_end/**/*-meta.ts'],
     rules: {
@@ -713,15 +727,26 @@ export default defineConfig([
     },
   },
   {
+    name: 'API test files',
+    files: ['**/*.test.api.ts'],
+    rules: {
+      '@devtools/no-api-test-unit-helpers': 'error',
+    },
+  },
+  {
     name: 'TypeScript test files',
     files: [
       '*.test.ts',
+      '*.docs.ts',
       // This makes the specificity greater than the front-end ts files
       'front_end/**/*.test.ts',
+      'front_end/**/*.docs.ts',
       'test/**/*.ts',
       '**/testing/*.ts',
-      'scripts/eslint_rules/test/**/*',
-      'extensions/cxx_debugging/e2e/**',
+      'scripts/eslint_rules/tests/**/*',
+      'scripts/gn_deps_verifier/tests/**/*',
+      'extensions/cxx_debugging/e2e/**/*.ts',
+      'extensions/cxx_debugging/tests/**/*.ts',
     ],
 
     rules: {
@@ -750,6 +775,7 @@ export default defineConfig([
       ],
 
       '@devtools/check-test-definitions': 'error',
+      '@devtools/prefer-chai-assert': 'error',
       '@devtools/no-assert-strict-equal-for-arrays-and-objects': 'error',
       '@devtools/no-assert-deep-strict-equal': 'error',
       '@devtools/no-assert-equal': 'error',
@@ -773,11 +799,6 @@ export default defineConfig([
 
     settings: {
       'mocha/additionalCustomNames': [
-        {
-          name: 'describeWithDevtoolsExtension',
-          type: 'suite',
-          interfaces: ['BDD', 'TDD'],
-        },
         {
           name: 'describeWithEnvironment',
           type: 'suite',
@@ -821,7 +842,7 @@ export default defineConfig([
   },
   {
     name: 'Supported CSS properties rules',
-    files: ['front_end/generated/SupportedCSSProperties.js'],
+    files: ['front_end/generated/SupportedCSSProperties.ts'],
     rules: {
       '@devtools/jslog-context-list': 'error',
     },
@@ -838,6 +859,14 @@ export default defineConfig([
     files: ['front_end/legacy_test_runner/**/*'],
     rules: {
       '@devtools/es-modules-import': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/naming-convention': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@devtools/no-imperative-dom-api': 'off',
+      'jsdoc/require-returns-description': 'off',
     },
   },
   {
@@ -858,7 +887,10 @@ export default defineConfig([
   {
     name: 'Keep models/trace isolated',
     files: ['front_end/models/trace/**/*.ts'],
-    ignores: ['front_end/models/trace/**/*.test.ts'],
+    ignores: [
+      'front_end/models/trace/**/*.test.ts',
+      'front_end/models/trace/**/*.docs.ts',
+    ],
     rules: {
       '@devtools/no-imports-in-directory': [
         'error',
@@ -912,16 +944,22 @@ export default defineConfig([
     rules: {
       // Not a useful rule for .d.ts files where we are
       // representing an existing module.
-      'import/no-default-export': 'off',
+      'no-restricted-syntax': 'off',
     },
   },
   {
     name: 'Config files',
-    files: ['eslint.config.mjs', '**/*/rollup.config.mjs'],
+    files: [
+      'eslint.config.mjs',
+      '**/*/rollup.config.mjs',
+      '**/*.rollup.js',
+      '**/*/karma.conf.ts',
+      '**/*/karma.conf.in.js',
+    ],
     rules: {
       // The config operate on the default export
       // So allow it for them
-      'import/no-default-export': 'off',
+      'no-restricted-syntax': 'off',
     },
   },
 ]);

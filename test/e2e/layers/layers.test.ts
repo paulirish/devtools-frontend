@@ -5,7 +5,7 @@
 import {assert} from 'chai';
 
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 describe('The Layers Panel', function() {
   async function getCurrentUrl(devToolsPage: DevToolsPage) {
@@ -20,7 +20,7 @@ describe('The Layers Panel', function() {
     await inspectedPage.goToResource(targetUrl);
 
     await devToolsPage.bringToFront();
-    await openPanelViaMoreTools('Layers', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Layers');
     await inspectedPage.bringToFront();
     await inspectedPage.raf();
     await devToolsPage.bringToFront();
@@ -33,7 +33,7 @@ describe('The Layers Panel', function() {
   });
 
   it('should update the layers view when going offline', async ({devToolsPage, inspectedPage}) => {
-    await openPanelViaMoreTools('Layers', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Layers');
 
     const targetUrl = 'layers/default.html';
     await inspectedPage.goToResource(targetUrl, {waitUntil: 'networkidle0'});

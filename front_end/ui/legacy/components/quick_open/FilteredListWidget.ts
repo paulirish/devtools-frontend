@@ -6,10 +6,10 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Geometry from '../../../../models/geometry/geometry.js';
-import * as TextUtils from '../../../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../../../core/text_utils/text_utils.js';
 import * as Diff from '../../../../third_party/diff/diff.js';
 import * as TextPrompt from '../../../../ui/components/text_prompt/text_prompt.js';
+import * as Geometry from '../../../geometry/geometry.js';
 import {type LitTemplate, nothing, render} from '../../../lit/lit.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
@@ -18,34 +18,38 @@ import filteredListWidgetStyles from './filteredListWidget.css.js';
 
 const UIStrings = {
   /**
-   * @description Aria label for quick open dialog prompt
+   * @description Accessible name for the input prompt in the quick open dialog.
    */
   quickOpenPrompt: 'Quick open prompt',
   /**
-   * @description Title of quick open dialog
+   * @description Title for the quick open dialog.
    */
   quickOpen: 'Quick open',
   /**
-   * @description Text to show no results have been found
+   * @description Message displayed when a search returns no matching items.
    */
   noResultsFound: 'No results found',
   /**
-   * @description Aria alert to read the item in list when navigating with screen readers
-   * @example {name} PH1
+   * @description Announcement for screen readers when navigating items in a list.
+   * @example {Show Console} PH1
    * @example {2} PH2
    * @example {5} PH3
    */
   sItemSOfS: '{PH1}, item {PH2} of {PH3}',
   /**
-   * @description Text that should be read out by screen readers when a new badge is available
+   * @description Text announced by screen readers when an item has a new feature badge.
    */
-  newFeature: 'This is a new feature',
+  newFeature: 'New feature',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/quick_open/FilteredListWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements UI.ListControl.ListDelegate<number> {
+const FilteredListWidgetBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class FilteredListWidget extends FilteredListWidgetBase implements UI.ListControl.ListDelegate<number> {
   private promptHistory: string[];
   private scoringTimer: number;
   private filterTimer: number;
@@ -154,8 +158,9 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     this.inputBoxElement.setSuggestion(suggestion);
   }
 
-  setHintElement(hint: string): void {
+  setHintElement(hint: string, accessibleName: string): void {
     this.hintElement.textContent = hint;
+    UI.ARIAUtils.setLabel(this.hintElement, accessibleName);
   }
 
   showAsDialog(dialogTitle?: string): void {
@@ -318,18 +323,26 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     }
   }
 
+  private textForSelectedItem(): string {
+    const selectedElement = this.list.elementAtIndex(this.list.selectedIndex());
+    if (!selectedElement) {
+      return '';
+    }
+    const children = selectedElement.querySelectorAll('*');
+    return Array.from(children)
+        .filter(e => !e.children.length && e.localName !== 'style')
+        .map(e => e.classList.contains('new-badge') ? i18nString(UIStrings.newFeature) : e.textContent)
+        .filter(text => text?.trim())
+        .join(', ');
+  }
+
   private onMouseMove(event: Event): void {
     const item = this.list.itemForNode((event.target as Node | null));
     if (item === null) {
       return;
     }
     this.list.selectItem(item);
-    const selectedElement = this.list.elementAtIndex(this.list.selectedIndex());
-    const children = selectedElement.querySelectorAll('*');
-    const text = Array.from(children)
-                     .filter(e => !e.children.length)
-                     .map(e => e.classList.contains('new-badge') ? i18nString(UIStrings.newFeature) : e.textContent)
-                     .join();
+    const text = this.textForSelectedItem();
     if (text) {
       UI.ARIAUtils.LiveAnnouncer.alert(
           i18nString(UIStrings.sItemSOfS, {PH1: text, PH2: this.list.selectedIndex() + 1, PH3: this.items.length}));
@@ -554,7 +567,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     }
     if (handled) {
       keyboardEvent.consume(true);
-      const text = this.list.elementAtIndex(this.list.selectedIndex())?.textContent;
+      const text = this.textForSelectedItem();
       if (text) {
         UI.ARIAUtils.LiveAnnouncer.alert(
             i18nString(UIStrings.sItemSOfS, {PH1: text, PH2: this.list.selectedIndex() + 1, PH3: this.items.length}));

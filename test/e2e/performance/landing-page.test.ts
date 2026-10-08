@@ -15,8 +15,8 @@ import {
   waitForNonEmptyHeapSnapshotData,
 } from '../helpers/memory-helpers.js';
 import {increaseTimeoutForPerfPanel, navigateToPerformanceTab} from '../helpers/performance-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 const READY_LOCAL_METRIC_SELECTOR = '#local-value .metric-value:not(.waiting)';
 const READY_FIELD_METRIC_SELECTOR = '#field-value .metric-value:not(.waiting)';
@@ -124,7 +124,7 @@ describe('The Performance panel landing page', function() {
 
       // Reload DevTools to inject new listeners after content is loaded
       await devToolsPage.reload();
-      await navigateToPerformanceTab(undefined, devToolsPage, inspectedPage);
+      await navigateToPerformanceTab(devToolsPage, inspectedPage, undefined);
 
       // An execution context will be created once the web vitals library has been injected
       await executionContextPromise;
@@ -202,7 +202,7 @@ describe('The Performance panel landing page', function() {
       await devToolsPage.waitForMany(READY_LOCAL_METRIC_SELECTOR, 2);
 
       // INP and interactions should be reset
-      const inpCard = await devToolsPage.waitFor('#inp devtools-metric-card');
+      const inpCard = await devToolsPage.waitFor('#inp devtools-widget');
       await devToolsPage.waitFor(WAITING_LOCAL_METRIC_SELECTOR, inpCard);
 
       const interactions3 = await devToolsPage.$$<HTMLElement>(INTERACTION_SELECTOR);
@@ -424,12 +424,15 @@ describe('The Performance panel landing page', function() {
 
       await devToolsPage.click('.log-extra-details-button', {root: interaction});
 
-      await tabExistsInDrawer('#tab-console-view', devToolsPage);
-      const messages = await getCurrentConsoleMessages(undefined, undefined, undefined, devToolsPage);
+      await tabExistsInDrawer(devToolsPage, '#tab-console-view');
+      const messages = await getCurrentConsoleMessages(devToolsPage, undefined, undefined, undefined);
       assert.lengthOf(messages, 4);
       assert.match(messages[0], /^\[DevTools\] Long animation frames for \d+ms pointer interaction$/);
       assert.strictEqual(messages[1], 'Scripts:');
-      assert.strictEqual(messages[2], 'Array(3)');
+      assert.include(messages[2], 'Array(3)');
+      assert.include(messages[2], 'BUTTON#long-click.onpointerdown');
+      assert.include(messages[2], 'BUTTON#long-click.onpointerup');
+      assert.include(messages[2], 'BUTTON#long-click.onclick');
       assert.strictEqual(messages[3], 'Intersecting long animation frame events: [{…}]');
     } finally {
       await inspectedPageSession.detach();
@@ -475,10 +478,10 @@ describe('The Performance panel landing page', function() {
 
       // For redundancy, ensure the button node is removed from the memory heap
       await navigateToMemoryTab(devToolsPage);
-      await takeHeapSnapshot(undefined, devToolsPage);
+      await takeHeapSnapshot(devToolsPage, undefined);
       await waitForNonEmptyHeapSnapshotData(devToolsPage);
-      await setClassFilter('Detached <button>', devToolsPage);
-      const row = await getCategoryRow('Detached <button>', false, devToolsPage);
+      await setClassFilter(devToolsPage, 'Detached <button>');
+      const row = await getCategoryRow(devToolsPage, 'Detached <button>', false);
       assert.isNull(row);
     } finally {
       await inspectedPageSession.detach();

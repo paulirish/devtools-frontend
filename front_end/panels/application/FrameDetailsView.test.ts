@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
@@ -13,11 +15,8 @@ import {
   raf,
   renderElementIntoDOM,
 } from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-  dispatchEvent,
-} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {dispatchEvent} from '../../testing/MockConnection.js';
 import type * as ReportView from '../../ui/components/report_view/report_view.js';
 
 import * as Application from './application.js';
@@ -25,7 +24,7 @@ import * as Application from './application.js';
 const makeFrame = (target: SDK.Target.Target) => {
   const newFrame: SDK.ResourceTreeModel.ResourceTreeFrame = {
     url: 'https://www.example.com/path/page.html',
-    securityOrigin: 'https://www.example.com',
+    securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create('https://www.example.com'),
     displayName: () => 'TestTitle',
     unreachableUrl: () => '',
     adFrameType: () => Protocol.Page.AdFrameType.None,
@@ -36,9 +35,8 @@ const makeFrame = (target: SDK.Target.Target) => {
     isCrossOriginIsolated: () => true,
     getCrossOriginIsolatedContextType: () => Protocol.Page.CrossOriginIsolatedContextType.NotIsolatedFeatureDisabled,
     getSecureContextType: () => Protocol.Page.SecureContextType.SecureLocalhost,
-    getGatedAPIFeatures: () =>
-        [Protocol.Page.GatedAPIFeatures.SharedArrayBuffers,
-         Protocol.Page.GatedAPIFeatures.SharedArrayBuffersTransferAllowed],
+    getGatedAPIFeatures: () => [Protocol.Page.GatedAPIFeatures.SharedArrayBuffers,
+                                Protocol.Page.GatedAPIFeatures.SharedArrayBuffersTransferAllowed],
     getOwnerDOMNodeOrDocument: () => Promise.resolve({
       nodeName: () => 'iframe',
       nodeType: () => Node.ELEMENT_NODE,
@@ -84,8 +82,15 @@ const makeFrame = (target: SDK.Target.Target) => {
   return newFrame;
 };
 
-describeWithMockConnection('FrameDetailsView', () => {
+describeWithEnvironment('FrameDetailsView', () => {
   beforeEach(() => {
+    Root.Runtime.experiments.register({
+      name: Root.ExperimentNames.ExperimentName.PROTOCOL_MONITOR,
+      title: 'Protocol Monitor',
+      aboutFlag: 'devtools-protocol-monitor',
+      isEnabled: false,
+      requiresChromeRestart: false,
+    });
     const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
     const targetManager = SDK.TargetManager.TargetManager.instance();
     const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
@@ -154,7 +159,7 @@ describeWithMockConnection('FrameDetailsView', () => {
           {
             scriptId: '456' as Protocol.Runtime.ScriptId,
             debuggerId: '' as Protocol.Runtime.UniqueDebuggerId,
-          }
+          },
         ],
         rootScriptFilterlistRule: '/ad-script2.$script',
       }),
@@ -190,18 +195,18 @@ describeWithMockConnection('FrameDetailsView', () => {
     assert.deepEqual(keys, [
       'URL',
       'Origin',
-      'Owner Element',
-      'Frame Creation Stack Trace',
-      'Ad Status',
-      'Creator Ad Script Ancestry',
-      'Root Script Filterlist Rule',
-      'Secure Context',
-      'Cross-Origin Isolated',
+      'Owner element',
+      'Frame creation stack trace',
+      'Ad status',
+      'Creator ad script ancestry',
+      'Root script filterlist rule',
+      'Secure context',
+      'Cross-origin isolated',
       'Cross-Origin Embedder Policy (COEP)',
       'Cross-Origin Opener Policy (COOP)',
       'Content-Security-Policy',
       'SharedArrayBuffers',
-      'Measure Memory',
+      'Measure memory',
     ]);
 
     const values = [...component.contentElement.querySelectorAll('devtools-report-value')].map(v => v.deepInnerText());

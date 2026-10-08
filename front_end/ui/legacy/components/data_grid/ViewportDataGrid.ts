@@ -4,15 +4,19 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import type * as TextUtils from '../../../../models/text_utils/text_utils.js';
+import type * as TextUtils from '../../../../core/text_utils/text_utils.js';
 import * as RenderCoordinator from '../../../components/render_coordinator/render_coordinator.js';
 
 import {type DataGridData, DataGridImpl, DataGridNode, Events as DataGridEvents, type Parameters} from './DataGrid.js';
 
 let nextId = 0;
 
-export class ViewportDataGrid<T> extends Common.ObjectWrapper.eventMixin<EventTypes, typeof DataGridImpl>(
-    DataGridImpl)<ViewportDataGridNode<T>> {
+const ViewportDataGridBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof DataGridImpl> =
+    Common.ObjectWrapper.eventMixin(
+        DataGridImpl,
+    );
+
+export class ViewportDataGrid<T> extends ViewportDataGridBase<ViewportDataGridNode<T>> {
   private readonly onScrollBound: (event: Event|null) => void;
   private visibleNodes: Array<ViewportDataGridNode<T>>;
   /**

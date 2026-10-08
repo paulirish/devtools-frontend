@@ -7,15 +7,15 @@ import("../../../../../scripts/build/ninja/devtools_entrypoint.gni")
 devtools_entrypoint("bundle") {
   entrypoint = "spec.ts"
 
-  deps = [
+  ts_deps = [
     "../../../../third_party/web-vitals:bundle",
     "../../../trace:bundle",
   ]
 
   visibility = [
     ":*",
-    "../:web-vitals-injected",
+    "../:*",
     "../../:*",
-    "../../:live-metrics",
+    "../../../../panels/timeline/components/*",
   ]
 }

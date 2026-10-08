@@ -6,22 +6,27 @@ import type * as Platform from '../../core/platform/platform.js';
 
 import {PrivateAPI} from './ExtensionAPI.js';
 import {ExtensionEndpoint} from './ExtensionEndpoint.js';
-import {RecorderPluginManager} from './RecorderPluginManager.js';
+import type {RecorderPluginManager} from './RecorderPluginManager.js';
+
+const isString = (value: unknown): value is string => typeof value === 'string';
 
 export class RecorderExtensionEndpoint extends ExtensionEndpoint {
   private readonly name: string;
   private readonly mediaType?: string;
   private readonly capabilities: PrivateAPI.RecordingExtensionPluginCapability[];
   readonly #extensionOrigin: Platform.DevToolsPath.UrlString;
+  readonly #recorderPluginManager: RecorderPluginManager;
 
-  constructor(
-      name: string, port: MessagePort, capabilities: PrivateAPI.RecordingExtensionPluginCapability[],
-      extensionOrigin: Platform.DevToolsPath.UrlString, mediaType?: string) {
+  constructor(name: string, port: Platform.HostRuntime.WorkerMessagePort,
+              capabilities: PrivateAPI.RecordingExtensionPluginCapability[],
+              extensionOrigin: Platform.DevToolsPath.UrlString, recorderPluginManager: RecorderPluginManager,
+              mediaType?: string) {
     super(port);
     this.name = name;
     this.mediaType = mediaType;
     this.capabilities = capabilities;
     this.#extensionOrigin = extensionOrigin;
+    this.#recorderPluginManager = recorderPluginManager;
   }
 
   getName(): string {
@@ -44,7 +49,7 @@ export class RecorderExtensionEndpoint extends ExtensionEndpoint {
     switch (event) {
       case PrivateAPI.RecorderExtensionPluginEvents.UnregisteredRecorderExtensionPlugin: {
         this.disconnect();
-        RecorderPluginManager.instance().removePlugin(this);
+        this.#recorderPluginManager.removePlugin(this);
         break;
       }
       default:
@@ -60,7 +65,7 @@ export class RecorderExtensionEndpoint extends ExtensionEndpoint {
    * [1]: https://github.com/puppeteer/replay/blob/main/src/Schema.ts#L245
    */
   stringify(recording: Object): Promise<string> {
-    return this.sendRequest(PrivateAPI.RecorderExtensionPluginCommands.Stringify, {recording});
+    return this.sendRequest(PrivateAPI.RecorderExtensionPluginCommands.Stringify, {recording}, isString);
   }
 
   /**
@@ -71,7 +76,7 @@ export class RecorderExtensionEndpoint extends ExtensionEndpoint {
    * [1]: https://github.com/puppeteer/replay/blob/main/src/Schema.ts#L243
    */
   stringifyStep(step: Object): Promise<string> {
-    return this.sendRequest(PrivateAPI.RecorderExtensionPluginCommands.StringifyStep, {step});
+    return this.sendRequest(PrivateAPI.RecorderExtensionPluginCommands.StringifyStep, {step}, isString);
   }
 
   /**

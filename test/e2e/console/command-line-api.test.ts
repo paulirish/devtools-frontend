@@ -6,8 +6,8 @@ import {
   checkCommandResultFunction,
   navigateToConsoleTab,
 } from '../helpers/console-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 async function openConsoleOnTestPage(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
   await inspectedPage.goToResource('../resources/console/command-line-api.html');
@@ -21,74 +21,52 @@ describe('The Console Tab', () => {
 
       it('which yields inner listeners correctly', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand(
-            'innerListeners();',
-            '{keydown: Array(2), wheel: Array(1)}',
-            undefined,
-            devToolsPage,
-        );
+        await checkCommand(devToolsPage, 'innerListeners();', '{keydown: Array(2), wheel: Array(1)}', undefined);
       });
 
       it('which yields inner listeners correctly after removal', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand(
-            'removeInnerListeners(); getEventListeners(innerElement());',
-            '{keydown: Array(1)}',
-            undefined,
-            devToolsPage,
-        );
+        await checkCommand(devToolsPage, 'removeInnerListeners(); getEventListeners(innerElement());',
+                           '{keydown: Array(1)}', undefined);
       });
 
       it('which yields the correct event listeners for an element', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand(
-            'getEventListeners(document.getElementById("outer"));',
-            '{mousemove: Array(1), mousedown: Array(1), keydown: Array(1), keyup: Array(1)}',
-            undefined,
-            devToolsPage,
-        );
+        await checkCommand(devToolsPage, 'getEventListeners(document.getElementById("outer"));',
+                           '{mousemove: Array(1), mousedown: Array(1), keydown: Array(1), keyup: Array(1)}', undefined);
       });
 
       it('which yields the correct event listeners for a button', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand(
-            'getEventListeners(document.getElementById("button"));',
-            '{click: Array(1), mouseover: Array(1)}',
-            undefined,
-            devToolsPage,
-        );
+        await checkCommand(devToolsPage, 'getEventListeners(document.getElementById("button"));',
+                           '{click: Array(1), mouseover: Array(1)}', undefined);
       });
 
       it('which yields the correct event listeners for the window object', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand(
-            'getEventListeners(window);',
-            '{popstate: Array(1)}',
-            undefined,
-            devToolsPage,
-        );
+        await checkCommand(devToolsPage, 'getEventListeners(window);', '{popstate: Array(1)}', undefined);
       });
 
       it('which yields the correct event listeners for an empty element', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand('getEventListeners(document.getElementById("empty"));', '{}', undefined, devToolsPage);
+        await checkCommand(devToolsPage, 'getEventListeners(document.getElementById("empty"));', '{}', undefined);
       });
 
       it('which yields the correct event listeners for an invalid element', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand('getEventListeners(document.getElementById("invalid"));', '{}', undefined, devToolsPage);
+        await checkCommand(devToolsPage, 'getEventListeners(document.getElementById("invalid"));', '{}', undefined);
       });
 
       it('which yields the correct event listeners for an empty object', async ({devToolsPage, inspectedPage}) => {
         await openConsoleOnTestPage(devToolsPage, inspectedPage);
-        await checkCommand('getEventListeners({});', '{}', undefined, devToolsPage);
+        await checkCommand(devToolsPage, 'getEventListeners({});', '{}', undefined);
       });
 
       it('which yields the correct event listeners are for a null and undefined values',
          async ({devToolsPage, inspectedPage}) => {
            await openConsoleOnTestPage(devToolsPage, inspectedPage);
-           await checkCommand('getEventListeners(null);', '{}', undefined, devToolsPage);
-           await checkCommand('getEventListeners(undefined);', '{}', undefined, devToolsPage);
+           await checkCommand(devToolsPage, 'getEventListeners(null);', '{}', undefined);
+           await checkCommand(devToolsPage, 'getEventListeners(undefined);', '{}', undefined);
          });
     });
   });

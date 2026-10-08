@@ -4,13 +4,14 @@
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import {CSSFontFace} from './CSSFontFace.js';
+import {CSSLocation} from './CSSLocation.js';
 import {CSSMatchedStyles} from './CSSMatchedStyles.js';
 import {CSSMedia} from './CSSMedia.js';
 import {cssMetadata} from './CSSMetadata.js';
@@ -25,6 +26,8 @@ import {
   ResourceTreeModel,
 } from './ResourceTreeModel.js';
 import {SDKModel} from './SDKModel.js';
+import {cssSourceMapsEnabledSettingDescriptor} from './SDKSettings.js';
+import {SourceMapProvenance} from './SourceMap.js';
 import {SourceMapManager} from './SourceMapManager.js';
 import {Capability, type Target} from './Target.js';
 
@@ -38,8 +41,63 @@ export interface LayoutProperties {
   isGrid: boolean;
   isSubgrid: boolean;
   isGridLanes: boolean;
+  isContents?: boolean;
   containerType?: string;
   hasScroll: boolean;
+  isAnchorPositioned?: boolean;
+}
+
+function isAnchorPositioned(computedStyle: Map<string, string>, matchedStyles?: CSSMatchedStyles|null): boolean {
+  const position = computedStyle.get('position');
+  if (position !== 'absolute' && position !== 'fixed') {
+    return false;
+  }
+  const positionAnchor = computedStyle.get('position-anchor');
+  if (positionAnchor && positionAnchor !== 'none') {
+    return true;
+  }
+  const positionArea = computedStyle.get('position-area');
+  if (positionArea && positionArea !== 'none') {
+    return true;
+  }
+  const anchorProperties = [
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'inset',
+    'inset-block',
+    'inset-inline',
+    'inset-block-start',
+    'inset-block-end',
+    'inset-inline-start',
+    'inset-inline-end',
+    'width',
+    'height',
+    'min-width',
+    'min-height',
+    'max-width',
+    'max-height',
+  ];
+  if (anchorProperties.some(prop => {
+        const val = computedStyle.get(prop);
+        return Boolean(val && (val.includes('anchor(') || val.includes('anchor-size(')));
+      })) {
+    return true;
+  }
+  if (matchedStyles) {
+    for (const style of matchedStyles.nodeStyles()) {
+      for (const property of style.allProperties()) {
+        if (!property.activeInStyle() || !matchedStyles.propertyState(property)) {
+          continue;
+        }
+        if (property.value.includes('anchor(') || property.value.includes('anchor-size(')) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 export class CSSModel extends SDKModel<EventTypes> {
@@ -80,8 +138,8 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
 
     const settings = this.target().targetManager().settings;
-    this.#sourceMapManager.setEnabled(settings.moduleSetting<boolean>('css-source-maps-enabled').get());
-    settings.moduleSetting<boolean>('css-source-maps-enabled')
+    this.#sourceMapManager.setEnabled(settings.resolve(cssSourceMapsEnabledSettingDescriptor).get());
+    settings.resolve(cssSourceMapsEnabledSettingDescriptor)
         .addChangeListener(event => this.#sourceMapManager.setEnabled(event.data));
   }
 
@@ -392,6 +450,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
 
     const display = styles.get('display');
+    const isContents = display === 'contents';
     const isFlex = display === 'flex' || display === 'inline-flex';
     const isGrid = display === 'grid' || display === 'inline-grid';
     const isSubgrid = (isGrid &&
@@ -403,13 +462,17 @@ export class CSSModel extends SDKModel<EventTypes> {
     const isContainer = Boolean(containerType) && containerType !== '' && containerType !== 'normal';
     const hasScroll = Boolean(styles.get('scroll-snap-type')) && styles.get('scroll-snap-type') !== 'none';
 
+    const isAnchored = isAnchorPositioned(styles);
+
     return {
       isFlex,
       isGrid,
       isSubgrid,
       isGridLanes,
+      isContents,
       containerType: isContainer ? containerType : undefined,
       hasScroll,
+      isAnchorPositioned: isAnchored,
     };
   }
 
@@ -779,7 +842,8 @@ export class CSSModel extends SDKModel<EventTypes> {
       }
       styleSheetIds.add(styleSheetHeader.id);
     }
-    this.#sourceMapManager.attachSourceMap(styleSheetHeader, styleSheetHeader.sourceURL, styleSheetHeader.sourceMapURL);
+    this.#sourceMapManager.attachSourceMap(styleSheetHeader, styleSheetHeader.sourceURL, styleSheetHeader.sourceMapURL,
+                                           SourceMapProvenance.CDP);
     this.dispatchEventToListeners(Events.StyleSheetAdded, styleSheetHeader);
   }
 
@@ -841,7 +905,7 @@ export class CSSModel extends SDKModel<EventTypes> {
 
     this.#sourceMapManager.detachSourceMap(header);
     header.setSourceMapURL(sourceMapURL);
-    this.#sourceMapManager.attachSourceMap(header, header.sourceURL, header.sourceMapURL);
+    this.#sourceMapManager.attachSourceMap(header, header.sourceURL, header.sourceMapURL, SourceMapProvenance.CDP);
     if (sourceMapURL === null) {
       return 'Error in CSS.setStyleSheetText';
     }
@@ -1048,28 +1112,7 @@ export class Edit {
   }
 }
 
-export class CSSLocation {
-  readonly #cssModel: CSSModel;
-  styleSheetId: Protocol.DOM.StyleSheetId;
-  url: Platform.DevToolsPath.UrlString;
-  lineNumber: number;
-  columnNumber: number;
-  constructor(header: CSSStyleSheetHeader, lineNumber: number, columnNumber?: number) {
-    this.#cssModel = header.cssModel();
-    this.styleSheetId = header.id;
-    this.url = header.resourceURL();
-    this.lineNumber = lineNumber;
-    this.columnNumber = columnNumber || 0;
-  }
-
-  cssModel(): CSSModel {
-    return this.#cssModel;
-  }
-
-  header(): CSSStyleSheetHeader|null {
-    return this.#cssModel.styleSheetHeaderForId(this.styleSheetId);
-  }
-}
+export {CSSLocation};
 
 class CSSDispatcher implements ProtocolProxyApi.CSSDispatcher {
   readonly #cssModel: CSSModel;

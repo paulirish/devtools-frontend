@@ -40,9 +40,9 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import type * as StackTrace from '../../models/stack_trace/stack_trace.js';
 import * as Buttons from '../components/buttons/buttons.js';
+import * as Geometry from '../geometry/geometry.js';
 import {Icon, type IconData} from '../kit/kit.js';
 import * as Lit from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
@@ -60,6 +60,7 @@ import {InspectorView} from './InspectorView.js';
 import {KeyboardShortcut, Keys} from './KeyboardShortcut.js';
 import smallBubbleStyles from './smallBubble.css.js';
 import {Tooltip} from './Tooltip.js';
+import * as WidgetUtils from './Widget.js';
 import {Widget} from './Widget.js';
 
 declare global {
@@ -70,55 +71,56 @@ declare global {
     'dt-small-bubble': DevToolsSmallBubble;
   }
 }
-const {Directives, render} = Lit;
+const Directives: typeof Lit.Directives = Lit.Directives;
+const render: typeof Lit.render = Lit.render;
 
 const UIStrings = {
   /**
-   * @description label to open link externally
+   * @description Context menu item to open a link in a new tab.
    */
   openInNewTab: 'Open in new tab',
   /**
-   * @description label to copy link address
+   * @description Context menu item to copy a link address.
    */
   copyLinkAddress: 'Copy link address',
   /**
-   * @description label to copy file name
+   * @description Context menu item to copy a file name.
    */
   copyFileName: 'Copy file name',
   /**
-   * @description label for the profiler control button
+   * @description Warning message shown when attempting to start a profiler while another is already active.
    */
   anotherProfilerIsAlreadyActive: 'Another profiler is already active',
   /**
-   * @description Text in UIUtils
+   * @description Label for a resolved promise in asynchronous call stacks.
    */
   promiseResolvedAsync: 'Promise resolved (async)',
   /**
-   * @description Text in UIUtils
+   * @description Label for a rejected promise in asynchronous call stacks.
    */
   promiseRejectedAsync: 'Promise rejected (async)',
   /**
-   * @description Text for the title of asynchronous function calls group in Call Stack
+   * @description Title for a group of asynchronous function calls in the call stack.
    */
-  asyncCall: 'Async Call',
+  asyncCall: 'Async call',
   /**
-   * @description Text for the name of anonymous functions
+   * @description Fallback name for anonymous functions in the call stack.
    */
   anonymous: '(anonymous)',
   /**
-   * @description Text to close something
+   * @description Tooltip text and accessible label for a close button.
    */
   close: 'Close',
   /**
-   * @description Text on a button for message dialog
+   * @description Button text for confirming an action in a dialog.
    */
   ok: 'OK',
   /**
-   * @description Text to cancel something
+   * @description Button text for canceling an action in a dialog.
    */
   cancel: 'Cancel',
   /**
-   * @description Text for the new badge appearing next to some menu items
+   * @description Text for a badge highlighting a new feature next to menu items.
    */
   new: 'NEW',
 } as const;
@@ -752,7 +754,8 @@ class AnimateOnDirective extends Lit.Directive.Directive {
   }
 }
 
-export const animateOn = Lit.Directive.directive(AnimateOnDirective);
+export const animateOn: (_condition: boolean, _className: string) => Lit.DirectiveResult<typeof AnimateOnDirective> =
+    Lit.Directive.directive(AnimateOnDirective);
 
 export function measurePreferredSize(element: Element, containerElement?: Element|null): Geometry.Size {
   const oldParent = element.parentElement;
@@ -1045,14 +1048,18 @@ export function createHistoryInput(type = 'search', className?: string): HTMLInp
 
   function onKeydown(event: KeyboardEvent): void {
     if (event.keyCode === Keys.Up.code) {
-      historyPosition = Math.max(historyPosition - 1, 0);
-      historyInput.value = history[historyPosition];
-      historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
+      if (historyPosition > 0) {
+        historyPosition--;
+        historyInput.value = history[historyPosition];
+        historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
+      }
       event.consume(true);
     } else if (event.keyCode === Keys.Down.code) {
-      historyPosition = Math.min(historyPosition + 1, history.length - 1);
-      historyInput.value = history[historyPosition];
-      historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
+      if (historyPosition < history.length - 1) {
+        historyPosition++;
+        historyInput.value = history[historyPosition];
+        historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
+      }
       event.consume(true);
     } else if (event.keyCode === Keys.Enter.code) {
       if (history.length > 1 && history[history.length - 2] === historyInput.value) {
@@ -1190,7 +1197,8 @@ export function setTitle(element: HTMLElement, title: string): void {
 }
 
 export class CheckboxLabel extends HTMLElement {
-  static readonly observedAttributes = ['checked', 'disabled', 'indeterminate', 'name', 'title', 'aria-label'];
+  static readonly observedAttributes: string[] =
+      ['checked', 'disabled', 'indeterminate', 'name', 'title', 'aria-label', 'small'];
 
   readonly #shadowRoot!: DocumentFragment;
   #checkboxElement!: HTMLInputElement;
@@ -1255,6 +1263,8 @@ export class CheckboxLabel extends HTMLElement {
       this.#textElement.title = newValue ?? '';
     } else if (name === 'aria-label') {
       this.#checkboxElement.ariaLabel = newValue;
+    } else if (name === 'small') {
+      this.#checkboxElement.classList.toggle('small', newValue !== null);
     }
   }
 
@@ -1280,6 +1290,14 @@ export class CheckboxLabel extends HTMLElement {
 
   set checked(checked: boolean) {
     this.toggleAttribute('checked', checked);
+  }
+
+  get small(): boolean {
+    return this.hasAttribute('small');
+  }
+
+  set small(small: boolean) {
+    this.toggleAttribute('small', small);
   }
 
   set disabled(disabled: boolean) {
@@ -1633,27 +1651,6 @@ export class ConfirmDialog {
   }
 }
 
-export interface RenderedObject {
-  element: HTMLElement;
-  forceSelect(): void;
-}
-
-export abstract class Renderer {
-  abstract render(object: Object, options?: Options): Promise<RenderedObject|null>;
-
-  static async render(object: Object, options?: Options): Promise<RenderedObject|null> {
-    if (!object) {
-      throw new Error('Can\'t render ' + object);
-    }
-    const extension = getApplicableRegisteredRenderers(object)[0];
-    if (!extension) {
-      return null;
-    }
-    const renderer = await extension.loadRenderer();
-    return await renderer.render(object, options);
-  }
-}
-
 export function formatTimestamp(timestamp: number, full: boolean): string {
   const date = new Date(timestamp);
   const yymmdd = date.getFullYear() + '-' + leadZero(date.getMonth() + 1, 2) + '-' + leadZero(date.getDate(), 2);
@@ -1665,15 +1662,6 @@ export function formatTimestamp(timestamp: number, full: boolean): string {
     const valueString = String(value);
     return valueString.padStart(length, '0');
   }
-}
-
-export interface Options {
-  title?: string|Element;
-  editable?: boolean;
-  /**
-   * Should the resulting object be expanded.
-   */
-  expand?: boolean;
 }
 
 export const isScrolledToBottom = (element: Element): boolean => {
@@ -1738,32 +1726,6 @@ export const deepElementFromEvent = (ev: Event): Node|null => {
   const root = event.target && (event.target as Element).getComponentRoot();
   return root ? deepElementFromPoint((root as Document | ShadowRoot), event.pageX, event.pageY) : null;
 };
-
-const registeredRenderers: RendererRegistration[] = [];
-
-export function registerRenderer(registration: RendererRegistration): void {
-  registeredRenderers.push(registration);
-}
-export function getApplicableRegisteredRenderers(object: Object): RendererRegistration[] {
-  return registeredRenderers.filter(isRendererApplicableToContextTypes);
-
-  function isRendererApplicableToContextTypes(rendererRegistration: RendererRegistration): boolean {
-    if (!rendererRegistration.contextTypes) {
-      return true;
-    }
-    for (const contextType of rendererRegistration.contextTypes()) {
-      if (object instanceof contextType) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-export interface RendererRegistration {
-  loadRenderer: () => Promise<Renderer>;
-  contextTypes: () => Array<Platform.Constructor.ConstructorOrAbstract<unknown>>;
-}
 
 export interface ConfirmDialogOptions {
   okButtonLabel?: string;
@@ -2016,51 +1978,6 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
   });
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type BindingEventListener = (arg: any) => any;
-export class InterceptBindingDirective extends Lit.Directive.Directive {
-  static readonly #interceptedBindings = new WeakMap<Element, Map<string, BindingEventListener>>();
-  static readonly #attachedBindings = new WeakMap<Element, Map<string, BindingEventListener>>();
-
-  override update(part: Lit.Directive.Part, [listener]: [BindingEventListener]): unknown {
-    if (part.type !== Lit.Directive.PartType.EVENT) {
-      return listener;
-    }
-    let eventListeners = InterceptBindingDirective.#interceptedBindings.get(part.element);
-    if (!eventListeners) {
-      eventListeners = new Map();
-      InterceptBindingDirective.#interceptedBindings.set(part.element, eventListeners);
-    }
-    eventListeners.set(part.name, listener);
-
-    return this.render(listener);
-  }
-
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-function-type */
-  render(listener: Function): Function {
-    return listener;
-  }
-
-  static setEventListeners(templateElement: Element, renderedElement: Element): void {
-    const attachedListeners = InterceptBindingDirective.#attachedBindings.get(renderedElement);
-    if (attachedListeners) {
-      for (const [name, listener] of attachedListeners) {
-        renderedElement.removeEventListener(name, listener);
-      }
-    }
-
-    const newListeners = InterceptBindingDirective.#interceptedBindings.get(templateElement);
-    if (newListeners?.size) {
-      for (const [name, listener] of newListeners) {
-        renderedElement.addEventListener(name, listener);
-      }
-      InterceptBindingDirective.#attachedBindings.set(renderedElement, new Map(newListeners));
-    } else {
-      InterceptBindingDirective.#attachedBindings.delete(renderedElement);
-    }
-  }
-}
-
 export const cloneCustomElement = <T extends HTMLElement>(element: T, deep?: boolean): T => {
   const clone = document.createElement(element.localName) as T;
   for (const attribute of element.attributes) {
@@ -2074,6 +1991,80 @@ export const cloneCustomElement = <T extends HTMLElement>(element: T, deep?: boo
   return clone;
 };
 
+class UIUtilsWidgetDirective extends WidgetUtils.WidgetDirective {
+  #renderedElement?: HTMLElement;
+  #lastWidgetClass?: unknown;
+  #lastKey?: unknown;
+
+  override update(part: Lit.Directive.Part, args: Parameters<this['render']>): unknown {
+    const [widgetClass, widgetParams] = args;
+
+    if (part.type === Lit.Directive.PartType.ELEMENT) {
+      const element = (part as Lit.Directive.ElementPart).element as HTMLElement;
+      this.#updateElementAndClones(element, widgetClass, widgetParams);
+      return Lit.nothing;
+    }
+
+    if (part.type === Lit.Directive.PartType.CHILD) {
+      let classChanged = false;
+      if (this.#lastWidgetClass !== widgetClass) {
+        this.#lastWidgetClass = widgetClass;
+        const newKey =
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            WidgetUtils.Widget.isPrototypeOf(widgetClass as any) ? widgetClass : (widgetClass as any).toString();
+        if (this.#lastKey !== newKey) {
+          this.#lastKey = newKey;
+          classChanged = true;
+        }
+      }
+
+      if (!this.#renderedElement || classChanged) {
+        // Initial render or class changed: cache the element
+        this.#renderedElement = document.createElement('devtools-widget');
+        this.#updateElementAndClones(this.#renderedElement, widgetClass, widgetParams);
+        return this.#renderedElement;
+      }
+      // Subsequent updates: mutate cached element and its clones
+      this.#updateElementAndClones(this.#renderedElement, widgetClass, widgetParams);
+      return Lit.noChange;  // Prevent Lit from recreating the DOM node
+    }
+
+    return super.update(part, args);
+  }
+
+  #updateElementAndClones<F extends WidgetUtils.WidgetFactory<WidgetUtils.AnyWidget>,
+                                    ParamKeys extends keyof WidgetUtils.InferWidgetTFromFactory<F>>(
+      element: HTMLElement, widgetClass: F,
+      widgetParams?: Pick<WidgetUtils.InferWidgetTFromFactory<F>, ParamKeys>&
+      Partial<WidgetUtils.InferWidgetTFromFactory<F>>): void {
+    const update = (el: HTMLElement): void => {
+      const config = WidgetUtils.widgetConfig<F, ParamKeys>(widgetClass, widgetParams);
+      const oldConfig = WidgetUtils.widgetConfigs.get(el);
+      const widget = WidgetUtils.Widget.get(el);
+      if (widget && config.widgetParams) {
+        let needsUpdate = false;
+        for (const key in config.widgetParams) {
+          if (Object.prototype.hasOwnProperty.call(config.widgetParams, key) &&
+              config.widgetParams[key] !== oldConfig?.widgetParams?.[key]) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (widget as any)[key] = config.widgetParams[key];
+            needsUpdate = true;
+          }
+        }
+        if (needsUpdate) {
+          widget.requestUpdate();
+        }
+      }
+      WidgetUtils.registerWidgetConfig(el, config);
+    };
+
+    update(element);
+    for (const clone of HTMLElementWithLightDOMTemplate.getClones(element)) {
+      update(clone as HTMLElement);
+    }
+  }
+}
+
 export class HTMLElementWithLightDOMTemplate extends HTMLElement {
   readonly #mutationObserver = new MutationObserver(this.#onChange.bind(this));
   #contentTemplate: HTMLTemplateElement|null = null;
@@ -2083,19 +2074,50 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
     this.#mutationObserver.observe(this, {childList: true, attributes: true, subtree: true, characterData: true});
   }
 
+  static readonly #originalToClones = new WeakMap<Node, Set<WeakRef<Node>>>();
+  static getClones(node: Node): Node[] {
+    const cloneSet = this.#originalToClones.get(node);
+    if (!cloneSet) {
+      return [];
+    }
+    const clones: Node[] = [];
+    for (const cloneRef of cloneSet) {
+      const clone = cloneRef.deref();
+      const root = clone?.getRootNode();
+      if (clone && (root instanceof Document || root instanceof DocumentFragment)) {
+        clones.push(clone);
+      } else {
+        cloneSet.delete(cloneRef);
+      }
+    }
+    return clones;
+  }
+
   static cloneNode(node: Node): Node {
     const clone = node.cloneNode(false);
+
+    let cloneSet = HTMLElementWithLightDOMTemplate.#originalToClones.get(node);
+    if (!cloneSet) {
+      cloneSet = new Set();
+      HTMLElementWithLightDOMTemplate.#originalToClones.set(node, cloneSet);
+    }
+    cloneSet.add(new WeakRef(clone));
+
     for (const child of node.childNodes) {
       clone.appendChild(HTMLElementWithLightDOMTemplate.cloneNode(child));
     }
     if (node instanceof Element && clone instanceof Element) {
-      InterceptBindingDirective.setEventListeners(node, clone);
+      Lit.CustomDirectives.InterceptBindingDirective.setEventListeners(node, clone);
+      const currentConfig = WidgetUtils.widgetConfigs.get(node as HTMLElement);
+      if (currentConfig) {
+        WidgetUtils.registerWidgetConfig(clone as HTMLElement, currentConfig);
+      }
     }
     return clone;
   }
 
-  private static patchLitTemplate(template: Lit.LitTemplate): void {
-    const interceptingWrapper = Lit.Directive.directive(InterceptBindingDirective);
+  static patchLitTemplate(template: Lit.LitTemplate): void {
+    const interceptingWrapper = Lit.Directive.directive(Lit.CustomDirectives.InterceptBindingDirective);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patchingWrapper = <Args extends any[], R>(fn: (...args: Args) => R): ((...args: Args) => R) => {
       return function(this: unknown, ...args: Args): R {
@@ -2112,10 +2134,6 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
       return Boolean(
           typeof value === 'object' && value && '_$litType$' in value && 'strings' in value && 'values' in value &&
           value['_$litType$'] === 1);
-    }
-
-    function isLitDirective(value: unknown): value is {values: unknown[]} {
-      return Boolean(typeof value === 'object' && value && '_$litDirective$' in value && 'values' in value);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2138,7 +2156,11 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
         HTMLElementWithLightDOMTemplate.patchLitTemplate(value);
         return value;
       }
-      if (isLitDirective(value)) {
+      if (Lit.isLitDirective(value)) {
+        const directiveValue = value as unknown as {_$litDirective$?: unknown};
+        if (directiveValue['_$litDirective$'] === WidgetUtils.WidgetDirective) {
+          directiveValue['_$litDirective$'] = UIUtilsWidgetDirective;
+        }
         for (let i = 0; i < value.values.length; i++) {
           const subvalue = value.values[i];
           if (isCallable(subvalue)) {
@@ -2174,11 +2196,37 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
     render(template, this.#contentTemplate.content);
   }
 
+  flushPendingMutationsForTesting(): void {
+    const records = this.#mutationObserver.takeRecords();
+    if (records.length > 0) {
+      this.#onChange(records);
+    }
+  }
+
   #onChange(mutationList: MutationRecord[]): void {
     this.onChange(mutationList);
-    for (const mutation of mutationList) {
-      this.removeNodes(mutation.removedNodes);
-      this.addNodes(mutation.addedNodes, mutation.nextSibling);
+    const addedNodes = new Set<Node>();
+    const removedNodes = new Set<Node>();
+    for (let i = 0; i < mutationList.length; i++) {
+      const mutation = mutationList[i];
+      for (const node of mutation.addedNodes) {
+        addedNodes.add(node);
+      }
+      for (const node of mutation.removedNodes) {
+        removedNodes.add(node);
+      }
+    }
+    if (removedNodes.size > 0) {
+      this.removeNodes([...removedNodes]);
+    }
+
+    const finalAddedNodes = [...addedNodes].filter(n => this.templateRoot.contains(n));
+    if (finalAddedNodes.length > 0) {
+      this.addNodes(finalAddedNodes);
+    }
+
+    for (let i = 0; i < mutationList.length; i++) {
+      const mutation = mutationList[i];
       this.updateNode(mutation.target, mutation.attributeName);
     }
   }
@@ -2189,10 +2237,10 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
   protected updateNode(_node: Node, _attributeName: string|null): void {
   }
 
-  protected addNodes(_nodes: NodeList|Node[], _nextSibling?: Node|null): void {
+  protected addNodes(_nodes: NodeList|Node[]): void {
   }
 
-  protected removeNodes(_nodes: NodeList): void {
+  protected removeNodes(_nodes: NodeList|Node[]): void {
   }
 
   static findCorrespondingElement(

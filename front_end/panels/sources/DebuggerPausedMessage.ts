@@ -20,95 +20,95 @@ const {html, render, nothing, Directives: {ifDefined}} = Lit;
 
 const UIStrings = {
   /**
-   * @description Text in the JavaScript Debugging pane of the Sources pane when a DOM breakpoint is hit
+   * @description Text in the JavaScript Debugger sidebar of the Sources panel when a DOM breakpoint is hit.
    * @example {conditional breakpoint} PH1
    */
   pausedOnS: 'Paused on {PH1}',
   /**
-   * @description Text in the JavaScript Debugging pane of the Sources pane when a DOM breakpoint is hit because a child is added to the subtree
+   * @description Text in the JavaScript Debugger sidebar of the Sources panel when a DOM breakpoint is hit because a child is added to the subtree.
    * @example {node} PH1
    */
   childSAdded: 'Child {PH1} added',
   /**
-   * @description Text in the JavaScript Debugging pane of the Sources pane when a DOM breakpoint is hit because a descendant is added
+   * @description Text in the JavaScript Debugger sidebar of the Sources panel when a DOM breakpoint is hit because a descendant is added.
    * @example {node} PH1
    */
   descendantSAdded: 'Descendant {PH1} added',
   /**
-   * @description Text in the JavaScript Debugging pane of the Sources pane when a DOM breakpoint is hit because a descendant is removed
+   * @description Text in the JavaScript Debugger sidebar of the Sources panel when a DOM breakpoint is hit because a descendant is removed.
    * @example {node} PH1
    */
   descendantSRemoved: 'Descendant {PH1} removed',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnEventListener: 'Paused on event listener',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnXhrOrFetch: 'Paused on XHR or fetch',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnException: 'Paused on exception',
   /**
    * @description We pause exactly when the promise rejection is happening, so that the user can see where in the code it comes from.
    * A Promise is a Web API object (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise),
    * that will either be 'fulfilled' or 'rejected' at some unknown time in the future.
-   * The subject of the term is omited but it is "Execution", that is, "Execution was paused on <event>".
+   * The subject of the term is omitted but it is "Execution", that is, "Execution was paused on <event>".
    */
   pausedOnPromiseRejection: 'Paused on `promise` rejection',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnAssertion: 'Paused on assertion',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnDebuggedFunction: 'Paused on debugged function',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedBeforePotentialOutofmemory: 'Paused before potential out-of-memory crash',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnCspViolation: 'Paused on CSP violation',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel specifying cause of break
+   * @description Text in Debugger paused message of the Sources panel specifying cause of break.
    */
-  trustedTypeSinkViolation: '`Trusted Type` Sink Violation',
+  trustedTypeSinkViolation: '`Trusted Type` sink violation',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel specifying cause of break
+   * @description Text in Debugger paused message of the Sources panel specifying cause of break.
    */
-  trustedTypePolicyViolation: '`Trusted Type` Policy Violation',
+  trustedTypePolicyViolation: '`Trusted Type` policy violation',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   pausedOnBreakpoint: 'Paused on breakpoint',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   debuggerPaused: 'Debugger paused',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   subtreeModifications: 'subtree modifications',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   attributeModifications: 'attribute modifications',
   /**
-   * @description Text in Debugger Paused Message of the Sources panel
+   * @description Text in Debugger paused message of the Sources panel.
    */
   nodeRemoval: 'node removal',
   /**
-   * @description Error message text
+   * @description Error message text.
    * @example {Snag Error} PH1
    */
   webglErrorFiredS: 'WebGL Error Fired ({PH1})',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Text in DOMDebugger model.
    * @example {"script-src 'self'"} PH1
    */
   scriptBlockedDueToContent: 'Script blocked due to Content Security Policy directive: {PH1}',
@@ -173,8 +173,8 @@ const DEFAULT_VIEW = (input: ViewInput|null, _output: undefined, target: Documen
     </div>`, target, {
         container: {
           attributes: {jslog: `${VisualLogging.dialog('debugger-paused')}`},
-          classes: ['paused-message', 'flex-none']
-        }
+          classes: ['paused-message', 'flex-none'],
+        },
       });
   // clang-format on
 };
@@ -182,11 +182,18 @@ const DEFAULT_VIEW = (input: ViewInput|null, _output: undefined, target: Documen
 type View = typeof DEFAULT_VIEW;
 
 export class DebuggerPausedMessage extends UI.Widget.Widget<ShadowRoot> {
+  static override readonly INJECT: readonly[typeof SDK.EventBreakpointsModel.EventBreakpointsManager] =
+      [SDK.EventBreakpointsModel.EventBreakpointsManager] as const;
+
   #viewInput: ViewInput|null = null;
-  constructor(element?: HTMLElement, private readonly view: View = DEFAULT_VIEW) {
+  readonly #eventBreakpointsManager: SDK.EventBreakpointsModel.EventBreakpointsManager;
+  constructor(element: HTMLElement|undefined,
+              [eventBreakpointsManager]: UI.Widget.WidgetDependencies<typeof DebuggerPausedMessage>,
+              private readonly view: View = DEFAULT_VIEW) {
     super(element, {
       useShadowDom: 'pure',
     });
+    this.#eventBreakpointsManager = eventBreakpointsManager;
   }
 
   private static descriptionWithoutStack(description: string): string {
@@ -221,7 +228,7 @@ export class DebuggerPausedMessage extends UI.Widget.Widget<ShadowRoot> {
     };
   }
 
-  static #findEventNameForUi(detailsAuxData?: SDK.DebuggerModel.EventListenerPausedDetailsAuxData): string {
+  #findEventNameForUi(detailsAuxData?: SDK.DebuggerModel.EventListenerPausedDetailsAuxData): string {
     if (!detailsAuxData) {
       return '';
     }
@@ -237,7 +244,7 @@ export class DebuggerPausedMessage extends UI.Widget.Widget<ShadowRoot> {
     }
 
     let breakpoint: SDK.CategorizedBreakpoint.CategorizedBreakpoint|null =
-        SDK.EventBreakpointsModel.EventBreakpointsManager.instance().resolveEventListenerBreakpoint(detailsAuxData);
+        this.#eventBreakpointsManager.resolveEventListenerBreakpoint(detailsAuxData);
     if (breakpoint) {
       // EventBreakpointsManager breakpoints are the only ones with localized names.
       return getLocalizedBreakpointName(breakpoint.name);
@@ -269,8 +276,8 @@ export class DebuggerPausedMessage extends UI.Widget.Widget<ShadowRoot> {
     if (details.reason === Protocol.Debugger.PausedEventReason.DOM) {
       this.#viewInput = await DebuggerPausedMessage.createDOMBreakpointHitMessageDetails(details);
     } else if (details.reason === Protocol.Debugger.PausedEventReason.EventListener) {
-      const eventNameForUI = DebuggerPausedMessage.#findEventNameForUi(
-          details.auxData as SDK.DebuggerModel.EventListenerPausedDetailsAuxData);
+      const eventNameForUI =
+          this.#findEventNameForUi(details.auxData as SDK.DebuggerModel.EventListenerPausedDetailsAuxData);
       this.#viewInput = {mainText: i18nString(UIStrings.pausedOnEventListener), subText: eventNameForUI, errorLike};
     } else if (details.reason === Protocol.Debugger.PausedEventReason.XHR) {
       const auxData = (details.auxData as PausedDetailsAuxData);
@@ -336,11 +343,12 @@ export class DebuggerPausedMessage extends UI.Widget.Widget<ShadowRoot> {
   }
 }
 
-export const BreakpointTypeNouns = new Map([
-  [Protocol.DOMDebugger.DOMBreakpointType.SubtreeModified, i18nLazyString(UIStrings.subtreeModifications)],
-  [Protocol.DOMDebugger.DOMBreakpointType.AttributeModified, i18nLazyString(UIStrings.attributeModifications)],
-  [Protocol.DOMDebugger.DOMBreakpointType.NodeRemoved, i18nLazyString(UIStrings.nodeRemoval)],
-]);
+export const BreakpointTypeNouns: Map<Protocol.DOMDebugger.DOMBreakpointType, () => Platform.UIString.LocalizedString> =
+    new Map([
+      [Protocol.DOMDebugger.DOMBreakpointType.SubtreeModified, i18nLazyString(UIStrings.subtreeModifications)],
+      [Protocol.DOMDebugger.DOMBreakpointType.AttributeModified, i18nLazyString(UIStrings.attributeModifications)],
+      [Protocol.DOMDebugger.DOMBreakpointType.NodeRemoved, i18nLazyString(UIStrings.nodeRemoval)],
+    ]);
 
 interface PausedDetailsAuxData {
   description?: string;

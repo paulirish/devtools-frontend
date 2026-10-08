@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import {Printer} from '../../testing/PropertyParser.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
@@ -136,8 +137,7 @@ describe('CSSPropertyParser', () => {
 
   describe('PropertyParser', () => {
     it('correctly identifies spacing', () => {
-      const requiresSpace = (a: string, b: string) =>
-          SDK.CSSPropertyParser.requiresSpace([document.createTextNode(a)], [document.createTextNode(b)]);
+      const requiresSpace = (a: string, b: string) => SDK.CSSPropertyParser.requiresSpace(a, b);
 
       assert.isTrue(requiresSpace('a', 'b'));
       assert.isFalse(requiresSpace('', 'text'));
@@ -169,21 +169,6 @@ describe('CSSPropertyParser', () => {
       assert.isFalse(requiresSpace('text', '* text'));
       assert.isFalse(requiresSpace('text', '{ text'));
       assert.isFalse(requiresSpace('text', '; text'));
-
-      assert.isTrue(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text'), document.createElement('div')], [document.createTextNode('text')]));
-      assert.isTrue(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text')], [document.createElement('div'), document.createTextNode('text')]));
-      assert.isTrue(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text'), document.createElement('div')],
-          [document.createElement('div'), document.createTextNode('text')]));
-      assert.isFalse(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text'), document.createElement('div')], [document.createTextNode(' text')]));
-      assert.isFalse(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text')], [document.createElement('div'), document.createTextNode(' text')]));
-      assert.isFalse(SDK.CSSPropertyParser.requiresSpace(
-          [document.createTextNode('text'), document.createElement('div')],
-          [document.createElement('div'), document.createTextNode(' text')]));
     });
 
     it('parses comments', () => {
@@ -232,7 +217,7 @@ describe('CSSPropertyParser', () => {
       assert.strictEqual(tokenizeDeclaration('color /*comment*/', 'red')?.propertyName, 'color');
       assert.strictEqual(tokenizeDeclaration('/*comment*/color/*comment*/', 'red')?.propertyName, 'color');
       assert.strictEqual(tokenizeDeclaration(' /*comment*/color', 'red')?.propertyName, 'color');
-      assert.strictEqual(tokenizeDeclaration('co/*comment*/lor', 'red')?.propertyName, 'lor');
+      assert.isUndefined(SDK.CSSPropertyParser.tokenizeDeclaration('co/*comment*/lor', 'red')?.propertyName);
       assert.isNull(SDK.CSSPropertyParser.tokenizeDeclaration('co:lor', 'red'));
     });
 
@@ -501,22 +486,21 @@ describe('CSSPropertyParser', () => {
     });
 
     it('parses vars correctly', () => {
-      for (const succeed
-               of ['var(--a)', 'var(--a, 123)', 'var(--a, calc(1+1))', 'var(--a, var(--b))', 'var(--a, var(--b, 123))',
-                   'var(--a, a b c)', 'var(--a,)']) {
+      for (const succeed of ['var(--a)', 'var(---a)', 'var(----a)', 'var(---)', 'var(--a, 123)', 'var(--a, calc(1+1))',
+                             'var(--a, var(--b))', 'var(--a, var(---b))', 'var(--a, var(--b, 123))', 'var(--a, a b c)',
+                             'var(--a,)']) {
         const {ast, match, text} =
             matchSingleValue('width', succeed, new SDK.CSSPropertyParserMatchers.BaseVariableMatcher(() => ''));
 
         assert.exists(ast, succeed);
         assert.exists(match, text);
         assert.strictEqual(match.text, succeed);
-        assert.strictEqual(match.name, '--a');
         const [name, ...fallback] = succeed.substring(4, succeed.length - 1).split(/, */);
         assert.strictEqual(match.name, name);
         assert.strictEqual(
             match.fallback?.map(n => ast.text(n)).join(' '), fallback.length > 0 ? fallback.join(', ') : undefined);
       }
-      for (const fail of ['var', 'var(a)', 'var(--a']) {
+      for (const fail of ['var', 'var(a)', 'var(--)', 'var(--a']) {
         const {match, text} =
             matchSingleValue('width', fail, new SDK.CSSPropertyParserMatchers.BaseVariableMatcher(() => ''));
 
@@ -572,6 +556,27 @@ describe('CSSPropertyParser', () => {
         assert.strictEqual(match.type, 'px');
         assert.deepEqual(match.fallback, []);
       }
+    });
+
+    it('parses declarations containing inline comments around property names and values', () => {
+      const ast = tokenizeDeclaration('/* before-name */ background-color /* after-name */',
+                                      '/* before-val */ rgb(255, /* mid-val */ 0, 0) /* after-val */');
+      assert.strictEqual(ast.propertyName, 'background-color');
+
+      const matching = SDK.CSSPropertyParser.BottomUpTreeMatching.walk(ast, []);
+      assert.strictEqual(matching.getComputedPropertyValueText().trim(), 'rgb(255,  0, 0)');
+    });
+
+    it('gracefully handles declarations with an unterminated comment', () => {
+      assert.isNull(SDK.CSSPropertyParser.tokenizeDeclaration('color', 'red /* foo: bar;'));
+      assert.isNull(SDK.CSSPropertyParser.tokenizeDeclaration('/* color', 'red'));
+      assert.isNull(SDK.CSSPropertyParser.matchDeclaration('color', 'red /* foo: bar;', []));
+    });
+
+    it('gracefully handles declarations with an unclosed quote', () => {
+      assert.isNotNull(SDK.CSSPropertyParser.tokenizeDeclaration('color', 'red \' foo'));
+      assert.isNotNull(SDK.CSSPropertyParser.tokenizeDeclaration('color', 'red " foo'));
+      assert.isNotNull(SDK.CSSPropertyParser.matchDeclaration('color', 'red \' foo', []));
     });
   });
 });

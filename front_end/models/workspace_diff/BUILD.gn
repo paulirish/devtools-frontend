@@ -7,15 +7,16 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("workspace_diff") {
+devtools_foundation_module("workspace_diff") {
   sources = [ "WorkspaceDiff.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
+    "../../core/root:bundle",
+    "../../core/text_utils:bundle",
     "../../models/formatter:bundle",
     "../../models/persistence:bundle",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../third_party/diff:bundle",
   ]
@@ -24,10 +25,11 @@ devtools_module("workspace_diff") {
 devtools_entrypoint("bundle") {
   entrypoint = "workspace_diff.ts"
 
-  deps = [ ":workspace_diff" ]
+  ts_deps = [ ":workspace_diff" ]
 
   visibility = [
     ":*",
+    "../../foundation/*",
     "../../panels/ai_assistance/*",
     "../../panels/changes/*",
     "../../panels/common/*",
@@ -39,20 +41,16 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "WorkspaceDiff.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../core/common:bundle",
     "../../core/platform:bundle",
-    "../../core/sdk:bundle",
     "../../testing",
-    "../bindings:bundle",
-    "../breakpoints:bundle",
+    "../formatter:bundle",
     "../persistence:bundle",
-    "../workspace:bundle",
   ]
 }

@@ -10,10 +10,11 @@ import {URLPattern} from '../../third_party/urlpattern-polyfill/urlpattern-polyf
 import type {TargetFilterCallback} from '../api/Browser.js';
 import type {CDPSession} from '../api/CDPSession.js';
 import {CDPSessionEvent} from '../api/CDPSession.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {EventEmitter} from '../common/EventEmitter.js';
-import {debugError} from '../common/util.js';
 import {assert} from '../util/assert.js';
 import {Deferred} from '../util/Deferred.js';
+import {DisposableStack} from '../util/disposable.js';
 
 import {CdpCDPSession} from './CdpSession.js';
 import type {Connection} from './Connection.js';
@@ -83,13 +84,10 @@ export class TargetManager
   #targetFilterCallback: TargetFilterCallback | undefined;
   #targetFactory: TargetFactory;
 
-  #attachedToTargetListenersBySession = new WeakMap<
+  #subscriptions = new DisposableStack();
+  #attachmentSubscriptions = new WeakMap<
     CDPSession | Connection,
-    (event: Protocol.Target.AttachedToTargetEvent) => void
-  >();
-  #detachedFromTargetListenersBySession = new WeakMap<
-    CDPSession | Connection,
-    (event: Protocol.Target.DetachedFromTargetEvent) => void
+    DisposableStack
   >();
 
   #initializeDeferred = Deferred.create<void>();
@@ -109,6 +107,7 @@ export class TargetManager
   #initialAttachDone = false;
   #blocklist: Array<{pattern: URLPattern; rule: string}> = [];
   #allowlist: Array<{pattern: URLPattern; rule: string}> = [];
+  #logger?: Logger;
 
   constructor(
     connection: Connection,
@@ -117,8 +116,9 @@ export class TargetManager
     waitForInitiallyDiscoveredTargets = true,
     blocklist?: string[],
     allowlist?: string[],
+    logger?: Logger,
   ) {
-    super();
+    super(undefined, logger);
     if (blocklist && allowlist) {
       throw new Error('Cannot specify both blockList and allowList');
     }
@@ -127,14 +127,18 @@ export class TargetManager
     this.#targetFilterCallback = targetFilterCallback;
     this.#targetFactory = targetFactory;
     this.#waitForInitiallyDiscoveredTargets = waitForInitiallyDiscoveredTargets;
+    this.#logger = logger;
 
     this.#blocklist = this.#mapPatterns(blocklist);
     this.#allowlist = this.#mapPatterns(allowlist);
 
-    this.#connection.on('Target.targetCreated', this.#onTargetCreated);
-    this.#connection.on('Target.targetDestroyed', this.#onTargetDestroyed);
-    this.#connection.on('Target.targetInfoChanged', this.#onTargetInfoChanged);
-    this.#connection.on(
+    const connectionEmitter = this.#subscriptions.use(
+      new EventEmitter(this.#connection),
+    );
+    connectionEmitter.on('Target.targetCreated', this.#onTargetCreated);
+    connectionEmitter.on('Target.targetDestroyed', this.#onTargetDestroyed);
+    connectionEmitter.on('Target.targetInfoChanged', this.#onTargetInfoChanged);
+    connectionEmitter.on(
       CDPSessionEvent.SessionDetached,
       this.#onSessionDetached,
     );
@@ -173,14 +177,7 @@ export class TargetManager
   }
 
   dispose(): void {
-    this.#connection.off('Target.targetCreated', this.#onTargetCreated);
-    this.#connection.off('Target.targetDestroyed', this.#onTargetDestroyed);
-    this.#connection.off('Target.targetInfoChanged', this.#onTargetInfoChanged);
-    this.#connection.off(
-      CDPSessionEvent.SessionDetached,
-      this.#onSessionDetached,
-    );
-
+    this.#subscriptions.dispose();
     this.#removeAttachmentListeners(this.#connection);
   }
 
@@ -193,35 +190,26 @@ export class TargetManager
   }
 
   #setupAttachmentListeners(session: CDPSession | Connection): void {
-    const listener = (event: Protocol.Target.AttachedToTargetEvent) => {
-      void this.#onAttachedToTarget(session, event);
-    };
-    assert(!this.#attachedToTargetListenersBySession.has(session));
-    this.#attachedToTargetListenersBySession.set(session, listener);
-    session.on('Target.attachedToTarget', listener);
+    assert(!this.#attachmentSubscriptions.has(session));
+    const subscriptions = new DisposableStack();
+    const sessionEmitter = subscriptions.use(new EventEmitter(session));
 
-    const detachedListener = (
-      event: Protocol.Target.DetachedFromTargetEvent,
-    ) => {
+    sessionEmitter.on('Target.attachedToTarget', event => {
+      void this.#onAttachedToTarget(session, event);
+    });
+
+    sessionEmitter.on('Target.detachedFromTarget', event => {
       return this.#onDetachedFromTarget(session, event);
-    };
-    assert(!this.#detachedFromTargetListenersBySession.has(session));
-    this.#detachedFromTargetListenersBySession.set(session, detachedListener);
-    session.on('Target.detachedFromTarget', detachedListener);
+    });
+
+    this.#attachmentSubscriptions.set(session, subscriptions);
   }
 
   #removeAttachmentListeners(session: CDPSession | Connection): void {
-    const listener = this.#attachedToTargetListenersBySession.get(session);
-    if (listener) {
-      session.off('Target.attachedToTarget', listener);
-      this.#attachedToTargetListenersBySession.delete(session);
-    }
-
-    const detachedListener =
-      this.#detachedFromTargetListenersBySession.get(session);
-    if (detachedListener) {
-      session.off('Target.detachedFromTarget', detachedListener);
-      this.#detachedFromTargetListenersBySession.delete(session);
+    const subscriptions = this.#attachmentSubscriptions.get(session);
+    if (subscriptions) {
+      subscriptions.dispose();
+      this.#attachmentSubscriptions.delete(session);
     }
   }
 
@@ -229,14 +217,18 @@ export class TargetManager
     session: CdpCDPSession,
     parentSession: Connection | CDPSession,
   ): Promise<void> => {
-    await session.send('Runtime.runIfWaitingForDebugger').catch(debugError);
+    await session.send('Runtime.runIfWaitingForDebugger').catch(error => {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+    });
     // We don't use `session.detach()` because that dispatches all commands on
     // the connection instead of the parent session.
     await parentSession
       .send('Target.detachFromTarget', {
         sessionId: session.id(),
       })
-      .catch(debugError);
+      .catch(error => {
+        this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+      });
   };
 
   #getParentTarget = (
@@ -342,6 +334,7 @@ export class TargetManager
     }
 
     if (!this.#connection.isAutoAttached(targetInfo.targetId)) {
+      await this.#maybeSetupNetworkConditions(session, targetInfo);
       return;
     }
 
@@ -360,6 +353,15 @@ export class TargetManager
     // should determine if a target is auto-attached or not with the help of
     // CDP.
     if (targetInfo.type === 'service_worker') {
+      if (!this.isUrlAllowed(targetInfo.url)) {
+        await Promise.all([
+          this.#maybeSetupNetworkConditions(session, targetInfo),
+          session.send('Runtime.runIfWaitingForDebugger'),
+        ]).catch(error => {
+          this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+        });
+        return;
+      }
       await this.#silentDetach(session, parentSession);
       if (
         this.#attachedTargetsByTargetId.has(targetInfo.targetId) ||
@@ -427,8 +429,8 @@ export class TargetManager
       this.#finishInitializationIfReady(parentTarget._targetId);
     }
 
-    // TODO: the browser might be shutting down here. What do we do with the
-    // error?
+    // The browser might be shutting down here, so we
+    // ignore potential errors.
     await Promise.all([
       session.send('Target.setAutoAttach', {
         waitForDebuggerOnStart: true,
@@ -436,9 +438,11 @@ export class TargetManager
         autoAttach: true,
         filter: this.#discoveryFilter,
       }),
-      this.#maybeSetupNetworkConditions(session),
+      this.#maybeSetupNetworkConditions(session, targetInfo),
       session.send('Runtime.runIfWaitingForDebugger'),
-    ]).catch(debugError);
+    ]).catch(error => {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+    });
   };
 
   #finishInitializationIfReady(targetId?: string): void {
@@ -512,7 +516,10 @@ export class TargetManager
     return result;
   }
 
-  #maybeSetupNetworkConditions = async (session: CDPSession): Promise<void> => {
+  #maybeSetupNetworkConditions = async (
+    session: CDPSession,
+    targetInfo: Protocol.Target.TargetInfo,
+  ): Promise<void> => {
     if (this.#blocklist.length === 0 && this.#allowlist.length === 0) {
       return;
     }
@@ -547,9 +554,23 @@ export class TargetManager
       });
     }
 
-    await session.send('Network.emulateNetworkConditionsByRule', {
-      offline: this.#blocklist.length > 0 ? true : undefined,
-      matchedNetworkConditions,
+    const needsNetwork =
+      targetInfo.type === 'worker' ||
+      targetInfo.type === 'service_worker' ||
+      targetInfo.type === 'shared_worker';
+
+    const promises = [];
+    if (needsNetwork) {
+      promises.push(session.send('Network.enable'));
+    }
+    promises.push(
+      session.send('Network.emulateNetworkConditionsByRule', {
+        offline: this.#blocklist.length > 0 ? true : undefined,
+        matchedNetworkConditions,
+      }),
+    );
+    await Promise.all(promises).catch(error => {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(error);
     });
   };
 }

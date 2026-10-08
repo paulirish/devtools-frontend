@@ -3,6 +3,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# /// script
+# requires-python = '>=3.11,<3.12'
+# dependencies = [
+#   'pyyaml==5.4.1+chromium.1'
+# ]
+# ///
+
 import argparse
 from collections import Counter
 import http.server
@@ -61,6 +68,8 @@ def get_artifact_dir(project, *paths):
     return os.path.join(base, *paths)
 
 
+NINJA_BIN = repo_path('//third_party/ninja/ninja')
+
 def ninja(build_root, artifact, verbose):
     ninja_dir = repo_path(build_root, get_artifact_dir(artifact))
     if not os.path.exists(repo_path(ninja_dir, 'build.ninja')):
@@ -69,7 +78,7 @@ def ninja(build_root, artifact, verbose):
         )
         raise FileNotFoundError(repo_path(ninja_dir, 'build.ninja'))
 
-    run_process('ninja', cwd=ninja_dir, verbose=verbose)
+    run_process(NINJA_BIN, cwd=ninja_dir, verbose=verbose)
 
 
 def run_process(*args, verbose=False, cwd=None, env=None):
@@ -131,6 +140,7 @@ class Test(object):
             f'-fdebug-prefix-map={os.path.dirname(self.source_file)}/='
         ]
         self.flags = [f + extra_flag for f in test_data['flags']]
+        self.test_flags = test_data['flags']
 
         input_basename, _ = os.path.splitext(self.source_file)
         output_file_name = input_basename + '__' + Test.__replace_special_characters(
@@ -278,10 +288,8 @@ class Compile(RunnerCommand):
         ninja(build_root, 'test_suite', verbose)
 
     def build_driver(self, build_root, verbose):
-        tsc = repo_path('//node_modules/typescript/bin/tsc')
+        tsc = repo_path('//third_party/typescript/typescript.py')
         run_process(sys.executable,
-                    NODE,
-                    '--output',
                     tsc,
                     '-p',
                     repo_path('//extensions/cxx_debugging/e2e'),
@@ -329,19 +337,23 @@ class Init(RunnerCommand):
 
     @classmethod
     def generate_tests(cls, test, test_suite_dir):
-        return [{
-            "name":
-            test.name,
-            "test":
-            os.path.relpath(os.path.join(test.output_directory, output_file),
-                            test_suite_dir),
-            "script":
-            test.test_script,
-            "extension_parameters":
-            test.extension_parameters,
-            "file":
-            test.test_file
-        } for output_file in test.output_files]
+        tests = []
+        for idx, output_file in enumerate(test.output_files):
+            tests.append({
+                "name":
+                f"{test.name} ({' '.join(test.test_flags[idx])})",
+                "test":
+                os.path.relpath(
+                    os.path.join(test.output_directory, output_file),
+                    test_suite_dir),
+                "script":
+                test.test_script,
+                "extension_parameters":
+                test.extension_parameters,
+                "file":
+                test.test_file
+            })
+        return tests
 
     def _register_options(self, parser):
         parser.add_argument('--debug', '-d', action='store_true')
@@ -370,13 +382,14 @@ class Init(RunnerCommand):
         mocha_spec = {
             'require': [
                 repo_path(options.build_root,
-                          'extensions/cxx_debugging/e2e/MochaRootHooks.js'),
+                          get_artifact_dir('devtools-frontend'),
+                          'gen/test/e2e/conductor/mocha_hooks.js'),
                 'source-map-support/register'
             ],
             'ui':
             repo_path(options.build_root,
                       get_artifact_dir('devtools-frontend'),
-                      'gen/test/conductor/mocha-interface.js'),
+                      'gen/test/e2e/conductor/mocha-interface.js'),
             'spec': [
                 repo_path(
                     options.build_root,
@@ -389,10 +402,12 @@ class Init(RunnerCommand):
             'slow':
             15000,
             'timeout':
-            0 if options.debug else 120000
+            0 if options.debug else 120000,
+            'retries':
+            4
         }
         with open(repo_path(test_suite_dir, '.mocharc.js'), 'w') as mocharc:
-            mocharc.write('module.exports = {};'.format(
+            mocharc.write('export default {};'.format(
                 json.dumps(mocha_spec, indent=2)))
 
         with open(repo_path(test_suite_dir, 'tests.json'), 'w') as tests_file:
@@ -413,7 +428,13 @@ class Init(RunnerCommand):
             repo_path(options.build_root,
                       get_artifact_dir('devtools-frontend'), 'gen',
                       'cxx_debugging'))
-
+        create_symlink(repo_path('//node_modules'),
+                       repo_path(options.build_root, 'node_modules'))
+        create_symlink(
+            repo_path(options.build_root,
+                      get_artifact_dir('devtools-frontend'), 'gen', 'test'),
+            repo_path(options.build_root,
+                      'extensions/cxx_debugging/e2e/node_modules/test'))
 
 class Inspect(Init):
     Command = 'inspect'

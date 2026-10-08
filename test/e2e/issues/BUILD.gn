@@ -31,7 +31,8 @@ ts_e2e_library("issues") {
     "sab-issues.test.ts",
     "select-element-accessibility-issues.test.ts",
   ]
-  deps = [
+  ts_deps = [
+    "../../shared",
     "../helpers",
     "../shared",
   ]

@@ -23,7 +23,7 @@ devtools_ui_module("changes") {
     "CombinedDiffView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
@@ -40,15 +40,13 @@ devtools_ui_module("changes") {
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "changes.ts"
 
-  deps = [
-    ":changes",
-    ":css_files",
-  ]
+  ts_deps = [ ":changes" ]
 
   visibility = [
     ":*",
@@ -62,7 +60,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "changes-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/i18n:bundle",
     "../../ui/legacy:bundle",
@@ -80,7 +78,7 @@ devtools_ui_module("unittests") {
     "changes.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/platform:bundle",

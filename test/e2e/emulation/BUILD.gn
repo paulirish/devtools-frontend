@@ -13,7 +13,7 @@ ts_e2e_library("emulation") {
     "media-query-inspector.test.ts",
     "responsive.test.ts",
   ]
-  deps = [
+  ts_deps = [
     "../helpers",
     "../shared",
   ]

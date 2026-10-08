@@ -3,7 +3,7 @@
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import {existsSync} from 'node:fs';
+import {accessSync, constants, existsSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
@@ -27,9 +27,11 @@ import type {Browser, BrowserCloseCallback} from '../api/Browser.js';
 import {CdpBrowser} from '../cdp/Browser.js';
 import {Connection} from '../cdp/Connection.js';
 import {assertSupportedUrlRestrictions} from '../common/BrowserConnector.js';
+import type {WsOptions} from '../common/ConnectOptions.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {TimeoutError} from '../common/Errors.js';
 import type {SupportedBrowser} from '../common/SupportedBrowser.js';
-import {debugError, DEFAULT_VIEWPORT} from '../common/util.js';
+import {DEFAULT_VIEWPORT} from '../common/util.js';
 import type {Viewport} from '../common/Viewport.js';
 import {
   createIncrementalIdGenerator,
@@ -52,13 +54,47 @@ export interface ResolvedLaunchArgs {
 }
 
 /**
+ * Whether the profile directory exists and the current process can write to it.
+ * A missing directory counts as writable: the browser creates it on launch.
+ *
+ * @internal
+ */
+function isWritableDirectory(directory: string): boolean {
+  try {
+    accessSync(directory, constants.W_OK);
+    return true;
+  } catch {
+    return !existsSync(directory);
+  }
+}
+
+/**
+ * @internal
+ */
+export function getBrowserTypeDisplayName(
+  browserType: InstalledBrowser,
+): string {
+  switch (browserType) {
+    case InstalledBrowser.FIREFOX:
+    case InstalledBrowser.CHROME:
+      return browserType.charAt(0).toUpperCase() + browserType.slice(1);
+    default:
+      return browserType;
+  }
+}
+
+/**
  * Describes a launcher - a class that is able to create and launch a browser instance.
  *
  * @public
  */
 export abstract class BrowserLauncher {
   #browser: SupportedBrowser;
+  #logger: Logger;
 
+  /**
+   * @internal
+   */
   /**
    * @internal
    */
@@ -67,9 +103,21 @@ export abstract class BrowserLauncher {
   /**
    * @internal
    */
-  constructor(puppeteer: PuppeteerNode, browser: SupportedBrowser) {
+  constructor(
+    puppeteer: PuppeteerNode,
+    browser: SupportedBrowser,
+    logger: Logger,
+  ) {
     this.puppeteer = puppeteer;
     this.#browser = browser;
+    this.#logger = logger;
+  }
+
+  /**
+   * @internal
+   */
+  protected get logger(): Logger {
+    return this.#logger;
   }
 
   get browser(): SupportedBrowser {
@@ -77,9 +125,11 @@ export abstract class BrowserLauncher {
   }
 
   async launch(options: LaunchOptions = {}): Promise<Browser> {
+    options.logger ??= this.#logger;
     const {
       dumpio = false,
       enableExtensions = false,
+      extensionsEnabledInIncognito = [],
       env = process.env,
       handleSIGINT = true,
       handleSIGTERM = true,
@@ -122,6 +172,11 @@ export abstract class BrowserLauncher {
     });
 
     if (!existsSync(launchArgs.executablePath)) {
+      if (launchArgs.isTempUserDataDir) {
+        await this.cleanUserDataDir(launchArgs.userDataDir, {
+          isTemp: true,
+        });
+      }
       throw new Error(
         `Browser was not found at the configured executablePath (${launchArgs.executablePath})`,
       );
@@ -130,9 +185,13 @@ export abstract class BrowserLauncher {
     const usePipe = launchArgs.args.includes('--remote-debugging-pipe');
 
     const onProcessExit = async () => {
-      await this.cleanUserDataDir(launchArgs.userDataDir, {
-        isTemp: launchArgs.isTempUserDataDir,
-      });
+      try {
+        await this.cleanUserDataDir(launchArgs.userDataDir, {
+          isTemp: launchArgs.isTempUserDataDir,
+        });
+      } finally {
+        removeTempUserDataDirOnExit?.();
+      }
     };
 
     if (
@@ -145,18 +204,36 @@ export abstract class BrowserLauncher {
       );
     }
 
-    const browserProcess = launch({
-      executablePath: launchArgs.executablePath,
-      args: launchArgs.args,
-      handleSIGHUP,
-      handleSIGTERM,
-      handleSIGINT,
-      dumpio,
-      env,
-      pipe: usePipe,
-      onExit: onProcessExit,
-      signal: options.signal,
-    });
+    let removeTempUserDataDirOnExit: (() => void) | undefined;
+
+    let browserProcess: ReturnType<typeof launch>;
+    try {
+      browserProcess = launch({
+        executablePath: launchArgs.executablePath,
+        args: launchArgs.args,
+        handleSIGHUP,
+        handleSIGTERM,
+        handleSIGINT,
+        dumpio,
+        env,
+        pipe: usePipe,
+        onExit: onProcessExit,
+        signal: options.signal,
+        logger: options.logger,
+      });
+      // Register after @puppeteer/browsers has installed its process-exit
+      // dispatcher. That dispatcher kills the browser before this synchronous
+      // fallback removes the profile directory.
+      removeTempUserDataDirOnExit = launchArgs.isTempUserDataDir
+        ? registerProcessExitCleanup(launchArgs.userDataDir, this.#logger)
+        : undefined;
+    } catch (error) {
+      removeTempUserDataDirOnExit?.();
+      await this.cleanUserDataDir(launchArgs.userDataDir, {
+        isTemp: launchArgs.isTempUserDataDir,
+      });
+      throw error;
+    }
 
     let browser: Browser;
     let cdpConnection: Connection;
@@ -183,6 +260,7 @@ export abstract class BrowserLauncher {
             acceptInsecureCerts,
             networkEnabled,
             idGenerator,
+            logger: options.logger,
           },
         );
       } else {
@@ -192,6 +270,7 @@ export abstract class BrowserLauncher {
             protocolTimeout,
             slowMo,
             idGenerator,
+            logger: options.logger,
           });
         } else {
           cdpConnection = await this.createCdpSocketConnection(browserProcess, {
@@ -199,6 +278,7 @@ export abstract class BrowserLauncher {
             protocolTimeout,
             slowMo,
             idGenerator,
+            logger: options.logger,
           });
         }
 
@@ -212,6 +292,7 @@ export abstract class BrowserLauncher {
               acceptInsecureCerts,
               networkEnabled,
               issuesEnabled,
+              logger: options.logger,
             },
           );
         } else {
@@ -231,6 +312,7 @@ export abstract class BrowserLauncher {
             handleDevToolsAsPage,
             blocklist,
             allowlist,
+            options.logger,
           );
         }
       }
@@ -246,6 +328,14 @@ export abstract class BrowserLauncher {
         (process.platform === 'win32' &&
           existsSync(join(launchArgs.userDataDir, 'lockfile')))
       ) {
+        // The browser reports the same ProcessSingleton failure whether another
+        // instance holds the lock or it simply cannot write to the profile
+        // directory, so check for the latter before blaming a running browser.
+        if (!isWritableDirectory(launchArgs.userDataDir)) {
+          throw new Error(
+            `The browser cannot write to ${launchArgs.userDataDir}. Make the \`userDataDir\` writable or use a different one.`,
+          );
+        }
         throw new Error(
           `The browser is already running for ${launchArgs.userDataDir}. Use a different \`userDataDir\` or stop the running browser first.`,
         );
@@ -262,15 +352,11 @@ export abstract class BrowserLauncher {
     }
 
     if (Array.isArray(enableExtensions)) {
-      if (this.#browser === 'chrome' && !usePipe) {
-        throw new Error(
-          'To use `enableExtensions` with a list of paths in Chrome, you must be connected with `--remote-debugging-pipe` (`pipe: true`).',
-        );
-      }
-
       await Promise.all([
         enableExtensions.map(path => {
-          return browser.installExtension(path);
+          return browser.installExtension(path, {
+            enabledInIncognito: extensionsEnabledInIncognito.includes(path),
+          });
         }),
       ]);
     }
@@ -317,7 +403,7 @@ export abstract class BrowserLauncher {
         await cdpConnection.closeBrowser();
         await browserProcess.hasClosed();
       } catch (error) {
-        debugError(error);
+        this.#logger?.(DEBUG_PREFIXES.error)?.(error);
         await browserProcess.close();
       }
     } else {
@@ -365,13 +451,20 @@ export abstract class BrowserLauncher {
       protocolTimeout: number | undefined;
       slowMo: number;
       idGenerator: GetIdFn;
+      logger: Logger;
+      wsOptions?: WsOptions;
     },
   ): Promise<Connection> {
     const browserWSEndpoint = await browserProcess.waitForLineOutput(
       CDP_WEBSOCKET_ENDPOINT_REGEX,
       opts.timeout,
     );
-    const transport = await WebSocketTransport.create(browserWSEndpoint);
+    const transport = await WebSocketTransport.create(
+      browserWSEndpoint,
+      undefined,
+      opts.logger,
+      opts.wsOptions,
+    );
     return new Connection(
       browserWSEndpoint,
       transport,
@@ -379,6 +472,7 @@ export abstract class BrowserLauncher {
       opts.protocolTimeout,
       /* rawErrors */ false,
       opts.idGenerator,
+      opts.logger,
     );
   }
 
@@ -392,6 +486,8 @@ export abstract class BrowserLauncher {
       protocolTimeout: number | undefined;
       slowMo: number;
       idGenerator: GetIdFn;
+      logger: Logger;
+      wsOptions?: WsOptions;
     },
   ): Promise<Connection> {
     // stdio was assigned during start(), and the 'pipe' option there adds the
@@ -400,6 +496,7 @@ export abstract class BrowserLauncher {
     const transport = new PipeTransport(
       pipeWrite as NodeJS.WritableStream,
       pipeRead as NodeJS.ReadableStream,
+      opts.logger,
     );
     return new Connection(
       '',
@@ -408,6 +505,7 @@ export abstract class BrowserLauncher {
       opts.protocolTimeout,
       /* rawErrors */ false,
       opts.idGenerator,
+      opts.logger,
     );
   }
 
@@ -423,11 +521,15 @@ export abstract class BrowserLauncher {
       acceptInsecureCerts?: boolean;
       networkEnabled: boolean;
       issuesEnabled: boolean;
+      logger: Logger;
     },
   ): Promise<Browser> {
     const bidiOnly = process.env['PUPPETEER_WEBDRIVER_BIDI_ONLY'] === 'true';
     const BiDi = await import(/* webpackIgnore: true */ '../bidi/bidi.js');
-    const bidiConnection = await BiDi.connectBidiOverCdp(cdpConnection);
+    const bidiConnection = await BiDi.connectBidiOverCdp(
+      cdpConnection,
+      opts.logger,
+    );
     return await BiDi.BidiBrowser.create({
       connection: bidiConnection,
       // Do not provide CDP connection to Browser, if BiDi-only mode is enabled. This
@@ -439,6 +541,7 @@ export abstract class BrowserLauncher {
       acceptInsecureCerts: opts.acceptInsecureCerts,
       networkEnabled: opts.networkEnabled,
       issuesEnabled: opts.issuesEnabled,
+      logger: opts.logger,
     });
   }
 
@@ -457,6 +560,8 @@ export abstract class BrowserLauncher {
       acceptInsecureCerts?: boolean;
       networkEnabled?: boolean;
       issuesEnabled?: boolean;
+      logger: Logger;
+      wsOptions?: WsOptions;
     },
   ): Promise<Browser> {
     const browserWSEndpoint =
@@ -464,7 +569,12 @@ export abstract class BrowserLauncher {
         WEBDRIVER_BIDI_WEBSOCKET_ENDPOINT_REGEX,
         opts.timeout,
       )) + '/session';
-    const transport = await WebSocketTransport.create(browserWSEndpoint);
+    const transport = await WebSocketTransport.create(
+      browserWSEndpoint,
+      undefined,
+      opts.logger,
+      opts.wsOptions,
+    );
     const BiDi = await import(/* webpackIgnore: true */ '../bidi/bidi.js');
     const bidiConnection = new BiDi.BidiConnection(
       browserWSEndpoint,
@@ -472,6 +582,7 @@ export abstract class BrowserLauncher {
       opts.idGenerator,
       opts.slowMo,
       opts.protocolTimeout,
+      opts.logger,
     );
     return await BiDi.BidiBrowser.create({
       connection: bidiConnection,
@@ -481,6 +592,7 @@ export abstract class BrowserLauncher {
       acceptInsecureCerts: opts.acceptInsecureCerts,
       networkEnabled: opts.networkEnabled ?? true,
       issuesEnabled: opts.issuesEnabled ?? true,
+      logger: opts.logger,
     });
   }
 
@@ -550,23 +662,72 @@ export abstract class BrowserLauncher {
           `Tried to find the browser at the configured path (${executablePath}) for version ${configVersion}, but no executable was found.`,
         );
       }
-      switch (this.browser) {
-        case 'chrome':
-          throw new Error(
-            `Could not find Chrome (ver. ${browserVersion}). This can occur if either\n` +
-              ` 1. you did not perform an installation before running the script (e.g. \`npx puppeteer browsers install ${browserType}\`) or\n` +
-              ` 2. your cache path is incorrectly configured (which is: ${config.cacheDirectory}).\n` +
-              'For (2), check out our guide on configuring puppeteer at https://pptr.dev/guides/configuration.',
-          );
-        case 'firefox':
-          throw new Error(
-            `Could not find Firefox (rev. ${browserVersion}). This can occur if either\n` +
-              ' 1. you did not perform an installation for Firefox before running the script (e.g. `npx puppeteer browsers install firefox`) or\n' +
-              ` 2. your cache path is incorrectly configured (which is: ${config.cacheDirectory}).\n` +
-              'For (2), check out our guide on configuring puppeteer at https://pptr.dev/guides/configuration.',
-          );
-      }
+
+      throw new Error(
+        `Could not find ${getBrowserTypeDisplayName(browserType)} (ver. ${browserVersion}). This can occur if either\n` +
+          ` 1. you did not perform an installation before running the script (e.g. \`npx puppeteer browsers install ${browserType}\`) or\n` +
+          ` 2. your cache path is incorrectly configured (which is: ${config.cacheDirectory}).\n` +
+          'For (2), check out our guide on configuring puppeteer at https://pptr.dev/guides/configuration.',
+      );
     }
     return executablePath;
   }
+}
+
+interface ProcessExitEmitter {
+  once(event: 'exit', listener: () => void): void;
+  off(event: 'exit', listener: () => void): void;
+}
+
+interface ProcessExitCleanupEntry {
+  userDataDir: string;
+  logger: Logger;
+}
+
+const processExitCleanupEntries = new WeakMap<
+  ProcessExitEmitter,
+  {entries: Set<ProcessExitCleanupEntry>; onExit: () => void}
+>();
+
+/**
+ * Registers a synchronous fallback for removing a temporary profile when the
+ * host process exits before the browser process can run its async cleanup.
+ *
+ * @internal
+ */
+export function registerProcessExitCleanup(
+  userDataDir: string,
+  logger: Logger,
+  processEmitter: ProcessExitEmitter = process,
+): () => void {
+  let cleanup = processExitCleanupEntries.get(processEmitter);
+  if (!cleanup) {
+    const entries = new Set<ProcessExitCleanupEntry>();
+    const onExit = (): void => {
+      for (const entry of entries) {
+        try {
+          rmSync(entry.userDataDir, {
+            recursive: true,
+            force: true,
+            maxRetries: 3,
+            retryDelay: 100,
+          });
+        } catch (error) {
+          entry.logger(DEBUG_PREFIXES.error)?.(error);
+        }
+      }
+    };
+    cleanup = {entries, onExit};
+    processExitCleanupEntries.set(processEmitter, cleanup);
+    processEmitter.once('exit', onExit);
+  }
+  const entry = {userDataDir, logger};
+  cleanup.entries.add(entry);
+  return () => {
+    if (!cleanup?.entries.delete(entry) || cleanup.entries.size > 0) {
+      return;
+    }
+    processEmitter.off('exit', cleanup.onExit);
+    processExitCleanupEntries.delete(processEmitter);
+  };
 }

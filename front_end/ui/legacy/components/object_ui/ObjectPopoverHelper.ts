@@ -7,7 +7,7 @@
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
-import * as Geometry from '../../../../models/geometry/geometry.js';
+import * as Geometry from '../../../geometry/geometry.js';
 import {Link} from '../../../kit/kit.js';
 import {render} from '../../../lit/lit.js';
 import * as UI from '../../legacy.js';
@@ -15,12 +15,12 @@ import * as Components from '../utils/utils.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
 import objectPopoverStyles from './objectPopover.css.js';
-import {ObjectPropertiesSection} from './ObjectPropertiesSection.js';
+import {ObjectPropertiesSectionWidget, valueElementForFunctionDescription} from './ObjectPropertiesSection.js';
 import objectValueStyles from './objectValue.css.js';
 
 const UIStrings = {
   /**
-   * @description Text that is usually a hyperlink to more documentation
+   * @description Link text for opening documentation in an object popover.
    */
   learnMore: 'Learn more',
 } as const;
@@ -37,7 +37,7 @@ export class ObjectPopoverHelper {
 
   dispose(): void {
     if (this.resultHighlightedAsDOM) {
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
     if (this.linkifier) {
       this.linkifier.dispose();
@@ -56,10 +56,15 @@ export class ObjectPopoverHelper {
         resultHighlightedAsDOM = true;
       }
 
+      popover.setMaxContentSize(new Geometry.Size(300, 250));
+      popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
+
       if (result.customPreview()) {
-        const customPreviewComponent = new CustomPreviewComponent(result);
-        customPreviewComponent.expandIfPossible();
-        popoverContentElement = customPreviewComponent.element;
+        const customPreviewComponent = new CustomPreviewComponent();
+        customPreviewComponent.object = result;
+        customPreviewComponent.expanded = true;
+        customPreviewComponent.element.dataset.stableNameForTest = 'object-popover-content';
+        customPreviewComponent.show(popover.contentElement);
       } else {
         popoverContentElement = document.createElement('div');
         popoverContentElement.classList.add('object-popover-content');
@@ -68,21 +73,24 @@ export class ObjectPopoverHelper {
         if (result.type === 'function') {
           titleElement.classList.add('source-code');
           // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-          render(ObjectPropertiesSection.valueElementForFunctionDescription(result.description), titleElement);
+          render(valueElementForFunctionDescription(result.description), titleElement);
         } else {
           titleElement.classList.add('monospace');
           titleElement.createChild('span').textContent = description;
         }
         linkifier = new Components.Linkifier.Linkifier();
-        const section = new ObjectPropertiesSection(result, '', linkifier, true /* showOverflow */);
+        const section = new ObjectPropertiesSectionWidget();
         section.element.classList.add('object-popover-tree');
-        section.titleLessMode();
-        popoverContentElement.appendChild(section.element);
+        section.root = result;
+        if (section.objectTree) {
+          section.objectTree.expanded = true;
+        }
+        section.linkifier = linkifier;
+        section.showOverflow = true;
+        section.show(popoverContentElement, null, true);
+        popoverContentElement.dataset.stableNameForTest = 'object-popover-content';
+        popover.contentElement.appendChild(popoverContentElement);
       }
-      popoverContentElement.dataset.stableNameForTest = 'object-popover-content';
-      popover.setMaxContentSize(new Geometry.Size(300, 250));
-      popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
-      popover.contentElement.appendChild(popoverContentElement);
       return new ObjectPopoverHelper(linkifier, resultHighlightedAsDOM);
     }
 

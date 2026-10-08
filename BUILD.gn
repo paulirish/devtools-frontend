@@ -4,7 +4,6 @@
 
 import("./config/gni/devtools_grd_files.gni")
 import("./config/gni/devtools_image_files.gni")
-import("./front_end/emulated_devices/optimized/optimized_images.gni")
 import("./scripts/build/ninja/copy.gni")
 import("./scripts/build/ninja/node.gni")
 import("./scripts/build/ninja/vars.gni")
@@ -27,6 +26,7 @@ group("devtools_all_files") {
 
   data_deps = devtools_frontend_resources_deps + [
                 "front_end:web_test_resources",
+                "scripts/build:tests",
                 "scripts/hosted_mode",
                 "test",
               ]
@@ -91,7 +91,7 @@ action("assert_third_party_readmes") {
 
 _expected_grd_files = []
 _expected_grd_files += grd_files_bundled_sources
-if (is_debug) {
+if (!devtools_bundle) {
   _expected_grd_files += grd_files_unbundled_sources
 }
 
@@ -99,6 +99,27 @@ generated_file("expected_grd_files") {
   outputs = [ "$target_gen_dir/expected_grd_files.json" ]
 
   contents = _expected_grd_files
+
+  output_conversion = "json"
+}
+
+_grd_entrypoint_files = filter_include(grd_files_bundled_sources,
+                                       [
+                                         "*.js",
+                                         "*.mjs",
+                                       ])
+
+generated_file("bundled_entrypoints") {
+  outputs = [ "$target_gen_dir/bundled_entrypoints.json" ]
+
+  contents = _grd_entrypoint_files + [
+               "front_end/core/legacy_producer/legacy_producer.js",
+               "front_end/core/split_producer/split_producer.js",
+               "front_end/panels/legacy_consumer/legacy_consumer.js",
+               "front_end/panels/legacy_mixed/legacy_mixed.js",
+               "front_end/panels/split_consumer/split_consumer.js",
+               "front_end/panels/split_mixed/split_mixed.js",
+             ]
 
   output_conversion = "json"
 }
@@ -128,13 +149,14 @@ if (!is_debug) {
   node_action("compress") {
     script = "scripts/build/compress_files.js"
     public_deps = [ ":devtools_frontend_resources" ]
+    depfile = "$target_gen_dir/$target_name.d"
 
-    sources = []
+    _compressable_inputs = []
     foreach(_grd_file, _compressable_grd_files) {
-      sources += [ "$target_gen_dir/$_grd_file" ]
+      _compressable_inputs += [ "$target_gen_dir/$_grd_file" ]
     }
 
-    response_file_contents = rebase_path(sources, root_build_dir)
+    response_file_contents = rebase_path(_compressable_inputs, root_build_dir)
 
     outputs = []
     foreach(_grd_file, _compressable_grd_files) {
@@ -147,6 +169,8 @@ if (!is_debug) {
     args = [
       "--file_list",
       "{{response_file_name}}",
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
   }
 } else {
@@ -155,6 +179,7 @@ if (!is_debug) {
 
 action("generate_devtools_grd") {
   script = "scripts/build/generate_devtools_grd.py"
+  depfile = "$target_gen_dir/$target_name.d"
 
   response_file_contents = rebase_path(_expected_grd_files, "front_end")
   outfile = "$target_gen_dir/front_end/devtools_resources.grd"
@@ -165,23 +190,13 @@ action("generate_devtools_grd") {
     "{{response_file_name}}",
     "--output",
     rebase_path(outfile, root_build_dir),
+    "--depfile",
+    rebase_path(depfile, root_build_dir),
   ]
 
-  inputs = []
-
-  if (is_debug) {
-    deps = [ ":devtools_frontend_resources" ]
-    foreach(_grd_file, _expected_grd_files) {
-      inputs += [ "$target_gen_dir/$_grd_file" ]
-    }
-  } else {
-    deps = [ ":compress" ]
-    foreach(_grd_file, _expected_grd_files) {
-      inputs += [ "$target_gen_dir/$_grd_file" ]
-    }
-    foreach(_grd_file, _compressable_grd_files) {
-      inputs += [ "$target_gen_dir/$_grd_file.compressed" ]
-    }
+  deps = [ ":devtools_frontend_resources" ]
+  if (!is_debug) {
+    deps += [ ":compress" ]
 
     # Compression is slow, particularly in debug builds, so only compress in
     # non-debug builds.
@@ -190,6 +205,7 @@ action("generate_devtools_grd") {
 }
 
 generated_file("indexer_ts_files") {
+  testonly = true
   outputs = [ "$root_build_dir/indexer_ts_files.txt" ]
   data_keys = [ "typescript_files" ]
 
@@ -199,10 +215,37 @@ generated_file("indexer_ts_files") {
   ]
 }
 
-ts_library("frontend_indexer_tsconfig") {
-  tsconfigonly = true
-  sourceslist = "$root_build_dir/indexer_ts_files.txt"
+action("frontend_indexer_tsconfig") {
+  testonly = true
+  script = devtools_location_prepend +
+           "scripts/build/typescript/generate_indexer_tsconfig.py"
+  _sourceslist = "$root_build_dir/indexer_ts_files.txt"
+  _tsconfig_base =
+      devtools_location_prepend + "config/typescript/tsconfig.base.json"
+  _global_defs = [
+    devtools_location_prepend + "front_end/global_typings/global_defs.d.ts",
+    devtools_location_prepend + "front_end/legacy/legacy-defs.d.ts",
+    devtools_location_prepend + "node_modules/@types/filesystem/index.d.ts",
+    devtools_location_prepend + "node_modules/@types/filewriter/index.d.ts",
+  ]
   public_deps = [ ":indexer_ts_files" ]
+  inputs = [
+             _sourceslist,
+             _tsconfig_base,
+           ] + _global_defs
+  _output_location = "$target_gen_dir/frontend_indexer_tsconfig-tsconfig.json"
+  outputs = [ _output_location ]
+  args = [
+           "--tsconfig-base",
+           rebase_path(_tsconfig_base, root_build_dir),
+           "--tsconfig_output_location",
+           rebase_path(_output_location, root_build_dir),
+           "--front-end-directory",
+           rebase_path(".", root_build_dir),
+           "--sources-list",
+           rebase_path(_sourceslist, root_build_dir),
+           "--additional-type-definitions",
+         ] + rebase_path(_global_defs, root_build_dir)
 }
 
 copy_to_gen("favicon") {
@@ -213,5 +256,19 @@ group("mcp") {
   deps = [ "./mcp" ]
 }
 
-# TODO(@nvitkov): When http://b/469573569 is fixed
-write_file("$target_gen_dir/package.json", "{}")
+group("harness_tests") {
+  testonly = true
+  deps = [ "./test/harness" ]
+}
+
+group("api_tests") {
+  testonly = true
+  public_deps = [ "test:api_tests" ]
+}
+
+group("unittests") {
+  testonly = true
+  public_deps = [ "test:unittests" ]
+}
+
+write_file("$target_gen_dir/package.json", "{\"type\": \"module\"}")

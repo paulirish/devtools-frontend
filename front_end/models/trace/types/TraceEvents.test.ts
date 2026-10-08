@@ -4,12 +4,11 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import {allThreadEntriesInTrace} from '../../../testing/TraceHelpers.js';
+import {allThreadEntriesInTrace} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
-describeWithEnvironment('TraceEvent types', function() {
+describe('TraceEvent types', function() {
   const {Phase, isNestableAsyncPhase, isPhaseAsync, isFlowPhase} = Trace.Types.Events;
   it('is able to determine if a phase is a nestable async phase', function() {
     assert.isTrue(isNestableAsyncPhase(Phase.ASYNC_NESTABLE_START));
@@ -49,6 +48,19 @@ describeWithEnvironment('TraceEvent types', function() {
     assert.isFalse(isFlowPhase(Phase.ASYNC_STEP_INTO));
     assert.isFalse(isFlowPhase(Phase.ASYNC_NESTABLE_START));
     assert.isFalse(isFlowPhase(Phase.BEGIN));
+  });
+
+  it('recognizes instant display item list snapshots from current traces', async function() {
+    const events = await TraceLoader.rawEvents(this, 'display-item-list-instant-snapshot.json.gz');
+    assert.lengthOf(events, 1);
+
+    const snapshotEvent = events[0];
+    if (!Trace.Types.Events.isDisplayListItemListSnapshot(snapshotEvent)) {
+      throw new Error('Could not recognize the instant display item list snapshot');
+    }
+    assert.strictEqual(snapshotEvent.name, Trace.Types.Events.Name.DISPLAY_ITEM_LIST_SNAPSHOT);
+    assert.strictEqual(snapshotEvent.ph, Trace.Types.Events.Phase.INSTANT);
+    assert.isNotEmpty(snapshotEvent.args.snapshot.skp64);
   });
 
   it('is able to determine that an event is a synthetic user timing event', async function() {

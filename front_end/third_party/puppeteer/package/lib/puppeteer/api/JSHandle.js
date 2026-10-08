@@ -89,7 +89,8 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
-import { debugError, withSourcePuppeteerURLIfNone } from '../common/util.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
+import { withSourcePuppeteerURLIfNone } from '../common/util.js';
 import { moveable, throwIfDisposed } from '../util/decorators.js';
 import { disposeSymbol, asyncDisposeSymbol } from '../util/disposable.js';
 /**
@@ -132,11 +133,18 @@ let JSHandle = (() => {
             if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
             __runInitializers(_classThis, _classExtraInitializers);
         }
+        #logger = __runInitializers(this, _instanceExtraInitializers);
         /**
          * @internal
          */
-        constructor() {
-            __runInitializers(this, _instanceExtraInitializers);
+        constructor(logger) {
+            this.#logger = logger;
+        }
+        /**
+         * @internal
+         */
+        get logger() {
+            return this.#logger;
         }
         /**
          * Evaluates the given function with the current handle as its first argument.
@@ -181,14 +189,7 @@ let JSHandle = (() => {
          */
         async getProperties() {
             const propertyNames = await this.evaluate(object => {
-                const enumerableProperties = [];
-                const descriptors = Object.getOwnPropertyDescriptors(object);
-                for (const propertyName in descriptors) {
-                    if (descriptors[propertyName]?.enumerable) {
-                        enumerableProperties.push(propertyName);
-                    }
-                }
-                return enumerableProperties;
+                return Object.keys(object ?? {});
             });
             const map = new Map();
             const results = await Promise.all(propertyNames.map(key => {
@@ -212,11 +213,11 @@ let JSHandle = (() => {
             }
             return map;
         }
-        /** @internal */
         [(_getProperty_decorators = [throwIfDisposed()], _getProperties_decorators = [throwIfDisposed()], disposeSymbol)]() {
-            return void this[asyncDisposeSymbol]().catch(debugError);
+            return void this[asyncDisposeSymbol]().catch(error => {
+                this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+            });
         }
-        /** @internal */
         [asyncDisposeSymbol]() {
             return this.dispose();
         }

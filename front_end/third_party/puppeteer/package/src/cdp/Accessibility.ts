@@ -9,7 +9,7 @@ import type {Protocol} from 'devtools-protocol';
 import type {ElementHandle} from '../api/ElementHandle.js';
 import type {Realm} from '../api/Realm.js';
 import type {CdpFrame} from '../cdp/Frame.js';
-import {debugError} from '../common/util.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 
 /**
  * Represents a Node and the properties of it that are relevant to Accessibility.
@@ -188,13 +188,15 @@ export interface SnapshotOptions {
 export class Accessibility {
   #realm: Realm;
   #frameId: string;
+  #logger?: Logger;
 
   /**
    * @internal
    */
-  constructor(realm: Realm, frameId = '') {
+  constructor(realm: Realm, frameId = '', logger?: Logger) {
     this.#realm = realm;
     this.#frameId = frameId;
+    this.#logger = logger;
   }
 
   /**
@@ -281,12 +283,14 @@ export class Accessibility {
           root.iframeSnapshot = iframeSnapshot ?? undefined;
         } catch (error) {
           // Frames can get detached at any time resulting in errors.
-          debugError(error);
+          this.#logger?.(DEBUG_PREFIXES.error)?.(error);
         }
       }
-      for (const child of root.children) {
-        await populateIframes(child);
-      }
+      await Promise.all(
+        root.children.map(child => {
+          return populateIframes(child);
+        }),
+      );
     };
 
     let needle: AXNode | null = defaultRoot;
@@ -623,7 +627,16 @@ class AXNode {
         // Since Text nodes are not elements, we want to
         // return a handle to the parent element for them.
         return (await handle.evaluateHandle(node => {
-          return node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          if (node.nodeType !== Node.TEXT_NODE) {
+            return node;
+          }
+          // A text node placed directly in a shadow root has no parent
+          // element, so fall back to the shadow host.
+          return (
+            node.parentElement ??
+            (node.parentNode as ShadowRoot | null)?.host ??
+            null
+          );
         })) as ElementHandle<Element>;
       },
       backendNodeId: this.payload.backendDOMNodeId,

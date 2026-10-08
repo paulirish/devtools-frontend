@@ -11,14 +11,16 @@ import {
 
 describe('The Console Tab', () => {
   it('recursively expands objects', async ({devToolsPage}) => {
+    await devToolsPage.useSoftMenu();
     await devToolsPage.click(CONSOLE_TAB_SELECTOR);
     await focusConsolePrompt(devToolsPage);
 
-    await typeIntoConsole('({a: {x: 21}, b: {y: 42}})', devToolsPage);
+    await typeIntoConsole(devToolsPage, '({a: {x: 21}, b: {y: 42}})');
+
+    const root = await devToolsPage.waitFor('.console-view-object-properties-section');
 
     // Expand the object node recursively
-    await clickOnContextMenu('.console-view-object-properties-section', 'expand-recursively', devToolsPage);
-    const root = await devToolsPage.waitFor('.console-view-object-properties-section.expanded');
+    await clickOnContextMenu(devToolsPage, '.console-view-object-properties-section', 'expand-recursively');
 
     // Ensure that both a and b are expanded.
     const [aChildren, bChildren] = await Promise.all([

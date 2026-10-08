@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
-import {describeWithMockConnection} from '../../../testing/MockConnection.js';
+import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 
@@ -94,7 +95,7 @@ function createOriginMap(): Components.OriginMap.OriginMap {
   return view;
 }
 
-describeWithMockConnection('OriginMap', () => {
+describeWithEnvironment('OriginMap', () => {
   let cruxManager: CrUXManager.CrUXManager;
   let targetManager: SDK.TargetManager.TargetManager;
   let mockFieldData: CrUXManager.PageResult;
@@ -164,7 +165,7 @@ describeWithMockConnection('OriginMap', () => {
       [
         'http://localhost:8080',
         'https://no-data.com',
-        'The Chrome UX Report does not have sufficient real user data for this page.',
+        'The Chrome UX Report doesn’t have enough real user data for this page',
       ],
     ]);
   });
@@ -309,7 +310,7 @@ describeWithMockConnection('OriginMap', () => {
     await RenderCoordinator.done();
 
     const errors = getValidationErrors(originMap);
-    assert.deepEqual(errors, '"bad-origin" is not a valid origin or URL.\n"jj**Sdafsdf" is not a valid origin or URL.');
+    assert.deepEqual(errors, '"bad-origin" isn’t a valid origin or URL\n"jj**Sdafsdf" isn’t a valid origin or URL');
   });
 
   it('should show warning for duplicate dev origin', async () => {
@@ -334,6 +335,6 @@ describeWithMockConnection('OriginMap', () => {
     await RenderCoordinator.done();
 
     const errors = getValidationErrors(originMap);
-    assert.deepEqual(errors, '"http://localhost:8080" is already mapped to a production origin.');
+    assert.deepEqual(errors, '"http://localhost:8080" is already mapped to a production origin');
   });
 });

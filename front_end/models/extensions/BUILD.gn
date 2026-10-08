@@ -7,9 +7,8 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("extensions") {
+devtools_foundation_module("extensions") {
   sources = [
-    "ExtensionAPI.ts",
     "ExtensionEndpoint.ts",
     "HostUrlPattern.ts",
     "LanguageExtensionEndpoint.ts",
@@ -17,12 +16,28 @@ devtools_module("extensions") {
     "RecorderPluginManager.ts",
   ]
 
-  deps = [
+  ts_deps = [
+    ":extension_api",
     "../../../extension-api",
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../models/bindings:bundle",
+  ]
+}
+
+# ExtensionAPI.ts contains the extension API implementation that is
+# serialized via .toString() and injected into the extension's iframe/window. It
+# runs in a browser DOM environment and requires DOM/window types, isolated in a
+# separate ts_library so DOM types do not leak into the rest of
+# models/extensions.
+ts_library("extension_api") {
+  sources = [ "ExtensionAPI.ts" ]
+
+  ts_deps = [
+    "../../../extension-api",
+    "../../core/platform:bundle",
     "../../models/har:bundle",
   ]
 }
@@ -30,7 +45,10 @@ devtools_module("extensions") {
 devtools_entrypoint("bundle") {
   entrypoint = "extensions.ts"
 
-  deps = [ ":extensions" ]
+  ts_deps = [
+    ":extension_api",
+    ":extensions",
+  ]
 
   visibility = [
     ":*",
@@ -40,25 +58,28 @@ devtools_entrypoint("bundle") {
     "../../panels/recorder/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",
-    "../../testing",
+    "../../testing/*",
   ]
 
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
+    "ExtensionEndpoint.test.ts",
     "HostUrlPattern.test.ts",
     "LanguageExtensionEndpoint.test.ts",
     "RecorderPluginManager.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../../extension-api",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
+    "../bindings:bundle",
   ]
 }

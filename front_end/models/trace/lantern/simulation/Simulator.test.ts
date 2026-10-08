@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
+import {assert} from 'chai';
 
 import type * as Protocol from '../../../../generated/protocol.js';
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
 import * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
-import {runTrace, toLanternTrace} from '../testing/testing.js';
+import {toLanternTrace} from '../testing/testing.js';
 
 const {NetworkNode, CPUNode} = Lantern.Graph;
 const {Simulator, DNSCache} = Lantern.Simulation;
 
 let nextRequestId = 1;
 let nextTid = 1;
-
-async function createGraph(context: Mocha.Suite|Mocha.Context, trace: Lantern.Types.Trace) {
-  const parsedTrace = await runTrace(context, trace);
-  const requests = Trace.LanternComputationData.createNetworkRequests(trace, parsedTrace);
-  return Trace.LanternComputationData.createGraph(requests, trace, parsedTrace);
-}
 
 interface FakeRequestOpts {
   startTime?: number;
@@ -79,10 +73,13 @@ function cpuTask({tid, ts, duration}: {
 describe('DependencyGraph/Simulator', () => {
   // Insulate the simulator tests from DNS multiplier changes
   let originalDNSMultiplier = 1;
-  let trace: Lantern.Types.Trace;
+  let realTraceGraph: Lantern.Graph.Node<Trace.Types.Events.SyntheticNetworkRequest>;
 
   before(async function() {
-    trace = toLanternTrace(await TraceLoader.rawEvents(this, 'lantern/progressive-app/trace.json.gz'));
+    const parsedTrace = await TraceLoader.traceEngine(this, 'lantern/progressive-app/trace.json.gz');
+    const trace = toLanternTrace(parsedTrace.traceEvents);
+    const requests = Trace.LanternComputationData.createNetworkRequests(trace, parsedTrace.data);
+    realTraceGraph = Trace.LanternComputationData.createGraph(requests, trace, parsedTrace.data);
     originalDNSMultiplier = DNSCache.rttMultiplier;
     DNSCache.rttMultiplier = 1;
   });
@@ -376,27 +373,29 @@ describe('DependencyGraph/Simulator', () => {
       assert.strictEqual(resultB.timeInMs, 950 + 800);
     });
 
-    it('should maximize throughput with H2', () => {
+    it('should maximize throughput with H2 and H3', () => {
       const simulator = new Simulator({serverResponseTimeByOrigin, observedThroughput});
-      const connectionDefaults = {protocol: 'h2', connectionId: 1};
-      const nodeA = new NetworkNode(request({startTime: 0, endTime: 1, ...connectionDefaults}));
-      const nodeB = new NetworkNode(request({startTime: 1, endTime: 2, ...connectionDefaults}));
-      const nodeC = new NetworkNode(request({startTime: 2, endTime: 3, ...connectionDefaults}));
-      const nodeD = new NetworkNode(request({startTime: 3, endTime: 4, ...connectionDefaults}));
+      for (const protocol of ['h2', 'h3']) {
+        const connectionDefaults = {protocol, connectionId: 1};
+        const nodeA = new NetworkNode(request({startTime: 0, endTime: 1, ...connectionDefaults}));
+        const nodeB = new NetworkNode(request({startTime: 1, endTime: 2, ...connectionDefaults}));
+        const nodeC = new NetworkNode(request({startTime: 2, endTime: 3, ...connectionDefaults}));
+        const nodeD = new NetworkNode(request({startTime: 3, endTime: 4, ...connectionDefaults}));
 
-      nodeA.addDependent(nodeB);
-      nodeB.addDependent(nodeC);
-      nodeB.addDependent(nodeD);
+        nodeA.addDependent(nodeB);
+        nodeB.addDependent(nodeC);
+        nodeB.addDependent(nodeD);
 
-      // Run two simulations:
-      //  - The first with C & D in parallel.
-      //  - The second with C & D in series.
-      // Under HTTP/2 simulation these should be equivalent, but definitely parallel
-      // shouldn't be slower.
-      const resultA = simulator.simulate(nodeA);
-      nodeC.addDependent(nodeD);
-      const resultB = simulator.simulate(nodeA);
-      expect(resultA.timeInMs).to.be.lessThanOrEqual(resultB.timeInMs);
+        // Run two simulations:
+        //  - The first with C & D in parallel.
+        //  - The second with C & D in series.
+        // Under HTTP/2 and HTTP/3 simulation these should be equivalent, but definitely parallel
+        // shouldn't be slower.
+        const resultA = simulator.simulate(nodeA);
+        nodeC.addDependent(nodeD);
+        const resultB = simulator.simulate(nodeA);
+        assert.isAtMost(resultA.timeInMs, resultB.timeInMs, `expected parallel <= series for ${protocol}`);
+      }
     });
 
     it('should throw (not hang) on graphs with cycles', () => {
@@ -409,28 +408,41 @@ describe('DependencyGraph/Simulator', () => {
       assert.throws(() => simulator.simulate(rootNode), /cycle/);
     });
 
-    describe('on a real trace', function() {
-      TraceLoader.setTestTimeout(this);
-
-      it('should compute a timeInMs', async function() {
-        const graph = await createGraph(this, trace);
+    describe('on a real trace', () => {
+      it('should compute a timeInMs', () => {
         const simulator = new Simulator({serverResponseTimeByOrigin, observedThroughput});
-        const result = simulator.simulate(graph);
-        expect(result.timeInMs).to.be.greaterThan(100);
+        const result = simulator.simulate(realTraceGraph);
+        assert.isAbove(result.timeInMs, 100);
       });
 
-      it('should sort the task event times', async () => {
-        const graph = await createGraph(this, trace);
+      it('should sort the task event times', () => {
         const simulator = new Simulator({serverResponseTimeByOrigin, observedThroughput});
-        const result = simulator.simulate(graph);
+        const result = simulator.simulate(realTraceGraph);
         const nodeTimings = Array.from(result.nodeTimings.entries());
 
         for (let i = 1; i < nodeTimings.length; i++) {
           const startTime = nodeTimings[i][1].startTime;
           const previousStartTime = nodeTimings[i - 1][1].startTime;
-          expect(startTime).to.be.greaterThanOrEqual(previousStartTime);
+          assert.isAtLeast(startTime, previousStartTime);
         }
       });
+    });
+
+    it('should not count connectionless (fromDiskCache) requests toward active network requests', () => {
+      const rootNode = new NetworkNode(request({startTime: 0, endTime: 1, fromDiskCache: true}));
+      const nodeCached = new NetworkNode(request({startTime: 1, endTime: 2, fromDiskCache: true}));
+      const nodeReal = new NetworkNode(request({startTime: 2, endTime: 3, fromDiskCache: false}));
+
+      rootNode.addDependent(nodeCached);
+      rootNode.addDependent(nodeReal);
+
+      const simulator =
+          new Simulator({serverResponseTimeByOrigin, maximumConcurrentRequests: 1, observedThroughput: 1});
+      const result = simulator.simulate(rootNode);
+
+      // Both nodeCached and nodeReal should start immediately after rootNode finishes at 8ms.
+      assertNodeTiming(result, nodeCached, {startTime: 8, endTime: 16});
+      assertNodeTiming(result, nodeReal, {startTime: 8, endTime: 958});
     });
   });
 
@@ -438,19 +450,19 @@ describe('DependencyGraph/Simulator', () => {
     it('calculates savings using throughput', () => {
       const simulator = new Simulator({throughput: 1000, observedThroughput: 2000});
       const wastedMs = simulator.computeWastedMsFromWastedBytes(500);
-      expect(wastedMs).to.be.closeTo(4000, 0.1);
+      assert.closeTo(wastedMs, 4000, 0.1);
     });
 
     it('falls back to observed throughput if throughput is 0', () => {
       const simulator = new Simulator({throughput: 0, observedThroughput: 2000});
       const wastedMs = simulator.computeWastedMsFromWastedBytes(500);
-      expect(wastedMs).to.be.closeTo(2000, 0.1);
+      assert.closeTo(wastedMs, 2000, 0.1);
     });
 
     it('returns 0 if throughput and observed throughput are 0', () => {
       const simulator = new Simulator({throughput: 0, observedThroughput: 0});
       const wastedMs = simulator.computeWastedMsFromWastedBytes(500);
-      expect(wastedMs).to.equal(0);
+      assert.strictEqual(wastedMs, 0);
     });
   });
 });

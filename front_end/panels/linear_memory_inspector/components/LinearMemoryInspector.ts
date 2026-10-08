@@ -13,11 +13,9 @@ import {LinearMemoryHighlightChipList} from './LinearMemoryHighlightChipList.js'
 import linearMemoryInspectorStyles from './linearMemoryInspector.css.js';
 import {formatAddress, parseAddress} from './LinearMemoryInspectorUtils.js';
 import {
-  type AddressInputChangedEvent,
-  type HistoryNavigationEvent,
+  LinearMemoryNavigator,
   Mode,
   Navigation,
-  type PageNavigationEvent,
 } from './LinearMemoryNavigator.js';
 import {LinearMemoryValueInterpreter} from './LinearMemoryValueInterpreter.js';
 import type {ByteSelectedEvent, ResizeEvent} from './LinearMemoryViewer.js';
@@ -32,11 +30,11 @@ import {
 
 const UIStrings = {
   /**
-   * @description Tooltip text that appears when hovering over an invalid address in the address line in the Linear memory inspector
+   * @description Tooltip text that appears when hovering over an invalid address in the address line in the Memory inspector panel.
    * @example {0x00000000} PH1
    * @example {0x00400000} PH2
    */
-  addressHasToBeANumberBetweenSAnd: 'Address has to be a number between {PH1} and {PH2}',
+  addressHasToBeANumberBetweenSAnd: 'Address must be a number between {PH1} and {PH2}',
 } as const;
 const str_ =
     i18n.i18n.registerUIStrings('panels/linear_memory_inspector/components/LinearMemoryInspector.ts', UIStrings);
@@ -117,9 +115,9 @@ export interface ViewInput {
   canGoBackInHistory: boolean;
   canGoForwardInHistory: boolean;
   onRefreshRequest: () => void;
-  onAddressChange: (e: AddressInputChangedEvent) => void;
-  onNavigatePage: (e: PageNavigationEvent) => void;
-  onNavigateHistory: (e: HistoryNavigationEvent) => boolean;
+  onAddressChange: (address: string, mode: Mode) => void;
+  onNavigatePage: (navigation: Navigation) => void;
+  onNavigateHistory: (navigation: Navigation) => boolean;
   onJumpToAddress: (address: number) => void;
   onDeleteMemoryHighlight: (info: HighlightInfo) => void;
   onByteSelected: (e: ByteSelectedEvent) => void;
@@ -148,20 +146,19 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: Record<string, unknown>,
   render(html`
     <style>${linearMemoryInspectorStyles}</style>
     <div class="view">
-      <devtools-linear-memory-inspector-navigator
-        .data=${
-      {
+      <devtools-widget class="navigator-widget"
+        ${widget(LinearMemoryNavigator, {
         address: navigatorAddressToShow,
         valid: navigatorAddressIsValid,
         mode: input.currentNavigatorMode,
         error: errorMsg,
         canGoBackInHistory: input.canGoBackInHistory,
         canGoForwardInHistory: input.canGoForwardInHistory,
-      }}
-        @refreshrequested=${input.onRefreshRequest}
-        @addressinputchanged=${input.onAddressChange}
-        @pagenavigation=${input.onNavigatePage}
-        @historynavigation=${input.onNavigateHistory}></devtools-linear-memory-inspector-navigator>
+        onRefreshRequest: input.onRefreshRequest,
+        onAddressChange: input.onAddressChange,
+        onNavigatePage: input.onNavigatePage,
+        onNavigateHistory: input.onNavigateHistory,
+      })}></devtools-widget>
       ${widget(LinearMemoryHighlightChipList, {
         highlightInfos: highlightedMemoryAreas,
         focusedMemoryHighlight,
@@ -245,8 +242,12 @@ function getSmallestEnclosingMemoryHighlight(highlightedMemoryAreas: HighlightIn
 
 export type View = typeof DEFAULT_VIEW;
 
-export class LinearMemoryInspector extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.Widget>(
-    UI.Widget.Widget) {
+const LinearMemoryInspectorBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.Widget> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.Widget,
+    );
+
+export class LinearMemoryInspector extends LinearMemoryInspectorBase {
   readonly #history = new Common.SimpleHistoryManager.SimpleHistoryManager(10);
 
   #memory = new Uint8Array();
@@ -403,8 +404,7 @@ export class LinearMemoryInspector extends Common.ObjectWrapper.eventMixin<Event
     void this.requestUpdate();
   }
 
-  #onAddressChange(e: AddressInputChangedEvent): void {
-    const {address, mode} = e.data;
+  #onAddressChange(address: string, mode: Mode): void {
     const isValid = isValidAddress(address, this.#outerMemoryLength);
     const newAddress = parseAddress(address);
     this.#currentNavigatorAddressLine = address;
@@ -444,13 +444,13 @@ export class LinearMemoryInspector extends Common.ObjectWrapper.eventMixin<Event
     void this.requestUpdate();
   }
 
-  #navigateHistory(e: HistoryNavigationEvent): boolean {
-    return e.data === Navigation.FORWARD ? this.#history.rollover() : this.#history.rollback();
+  #navigateHistory(navigation: Navigation): boolean {
+    return navigation === Navigation.FORWARD ? this.#history.rollover() : this.#history.rollback();
   }
 
-  #navigatePage(e: PageNavigationEvent): void {
-    const newAddress =
-        e.data === Navigation.FORWARD ? this.#address + this.#numBytesPerPage : this.#address - this.#numBytesPerPage;
+  #navigatePage(navigation: Navigation): void {
+    const newAddress = navigation === Navigation.FORWARD ? this.#address + this.#numBytesPerPage :
+                                                           this.#address - this.#numBytesPerPage;
     const addressInRange = Math.max(0, Math.min(newAddress, this.#outerMemoryLength - 1));
     this.#jumpToAddress(addressInRange);
   }

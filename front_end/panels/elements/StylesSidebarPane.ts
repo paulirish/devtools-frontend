@@ -42,11 +42,11 @@ import * as Platform from '../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as ComputedStyle from '../../models/computed_style/computed_style.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import {createIcon, Icon} from '../../ui/kit/kit.js';
@@ -54,6 +54,7 @@ import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_e
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as PanelsCommon from '../common/common.js';
 
@@ -83,65 +84,64 @@ import {WebCustomData} from './WebCustomData.js';
 
 const UIStrings = {
   /**
-   * @description No matches element text content in Styles Sidebar Pane of the Elements panel
+   * @description No matches element text content in the Styles tab of the Elements panel.
    */
   noMatchingSelectorOrStyle: 'No matching selector or style',
   /**
-   * /**
-   * @description Text to announce the result of the filter input in the Styles Sidebar Pane of the Elements panel
+   * @description Text to announce the result of the filter input in the Styles tab of the Elements panel.
    */
   visibleSelectors: '{n, plural, =1 {# visible selector listed below} other {# visible selectors listed below}}',
   /**
-   * @description Separator element text content in Styles Sidebar Pane of the Elements panel
+   * @description Separator element text content in the Styles tab of the Elements panel.
    * @example {scrollbar-corner} PH1
    */
   pseudoSElement: 'Pseudo ::{PH1} element',
   /**
-   * @description Text of a DOM element in Styles Sidebar Pane of the Elements panel
+   * @description Text of a DOM element in the Styles tab of the Elements panel.
    */
   inheritedFroms: 'Inherited from ',
   /**
-   * @description Text of an inherited pseudo element in Styles Sidebar Pane of the Elements panel
+   * @description Text of an inherited pseudo element in the Styles tab of the Elements panel.
    * @example {highlight} PH1
    */
   inheritedFromSPseudoOf: 'Inherited from ::{PH1} pseudo of ',
   /**
-   * @description Title of  in styles sidebar pane of the elements panel
+   * @description Tooltip for color values in the Styles tab of the Elements panel.
    * @example {Ctrl} PH1
    * @example {Alt} PH2
    */
   incrementdecrementWithMousewheelOne:
-      'Increment/decrement with mousewheel or up/down keys. {PH1}: R ±1, Shift: G ±1, {PH2}: B ±1',
+      'Increment/decrement with mousewheel or up/down keys. {PH1}: R ±1, Shift: G ±1, {PH2}: B ±1.',
   /**
-   * @description Title of  in styles sidebar pane of the elements panel
+   * @description Tooltip for color values in the Styles tab of the Elements panel.
    * @example {Ctrl} PH1
    * @example {Alt} PH2
    */
   incrementdecrementWithMousewheelHundred:
-      'Increment/decrement with mousewheel or up/down keys. {PH1}: ±100, Shift: ±10, {PH2}: ±0.1',
+      'Increment/decrement with mousewheel or up/down keys. {PH1}: ±100, Shift: ±10, {PH2}: ±0.1.',
   /**
-   * @description Tooltip text that appears when hovering over the rendering button in the Styles Sidebar Pane of the Elements panel
+   * @description Tooltip text that appears when hovering over the rendering button in the Styles tab of the Elements panel.
    */
   toggleRenderingEmulations: 'Toggle common rendering emulations',
   /**
-   * @description Rendering emulation option for toggling the automatic dark mode
+   * @description Rendering emulation option for toggling the automatic dark mode.
    */
   automaticDarkMode: 'Automatic dark mode',
   /**
-   * @description Text displayed on layer separators in the styles sidebar pane.
+   * @description Text displayed on layer separators in the Styles tab of the Elements panel.
    */
   layer: 'Layer',
   /**
-   * @description Tooltip text for the link in the sidebar pane layer separators that reveals the layer in the layer tree view.
+   * @description Tooltip text for the link in the layer separators that reveals the layer in the layer tree view.
    */
   clickToRevealLayer: 'Click to reveal layer in layer tree',
   /**
    * @description Text to announce that the AI suggestion was accepted.
    * @example {color: blue;} PH1
    */
-  aiSuggestionAccepted: '{PH1} Suggestion accepted.',
+  aiSuggestionAccepted: '{PH1} Suggestion accepted',
   /**
-   * @description Title of the general at-rule section
+   * @description Title of the general at-rule section.
    */
   atRuleSection: 'Other @rules',
 } as const;
@@ -154,6 +154,8 @@ const lockedString = i18n.i18n.lockedString;
 const FILTER_IDLE_PERIOD = 500;
 // Minimum number of @property rules for the @property section block to be folded initially
 const MIN_FOLDED_SECTIONS_COUNT = 5;
+// The number of properties required in a matched styles cascade to trigger IntersectionObserver lazy rendering.
+const LAZY_RENDER_THRESHOLD = 200;
 /** Title of the registered properties section **/
 export const REGISTERED_PROPERTY_SECTION_NAME = '@property';
 /** Title of the function section **/
@@ -175,14 +177,46 @@ const HIGHLIGHTABLE_PROPERTIES = [
   {mode: 'align-content', properties: ['align-content']},
   {mode: 'align-items', properties: ['align-items']},
   {mode: 'flexibility', properties: ['flex', 'flex-basis', 'flex-grow', 'flex-shrink']},
+  {mode: 'position-area', properties: ['position-area']},
+  {
+    mode: 'anchor-positioning',
+    properties: [
+      'position',
+      'position-anchor',
+      'position-try',
+      'position-try-fallbacks',
+      'position-try-order',
+      'position-visibility',
+    ],
+  },
+  {
+    mode: 'insets',
+    properties: [
+      'inset',
+      'inset-block',
+      'inset-block-start',
+      'inset-block-end',
+      'inset-inline',
+      'inset-inline-start',
+      'inset-inline-end',
+      'top',
+      'right',
+      'bottom',
+      'left',
+    ],
+  },
 ];
 
 const DISCLAIMER_TOOLTIP_ID = 'styles-ai-code-completion-disclaimer-tooltip';
 const SPINNER_TOOLTIP_ID = 'styles-ai-code-completion-spinner-tooltip';
 const CITATIONS_TOOLTIP_ID = 'styles-ai-code-completion-citations-tooltip';
 
-export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof ElementsSidebarPane>(
-    ElementsSidebarPane) implements StylesContainer {
+const StylesSidebarPaneBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof ElementsSidebarPane> =
+    Common.ObjectWrapper.eventMixin(
+        ElementsSidebarPane,
+    );
+
+export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesContainer {
   private matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles|null = null;
   private currentToolbarPane: UI.Widget.Widget|null = null;
   private animatedToolbarPane: UI.Widget.Widget|null = null;
@@ -194,9 +228,10 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   private visibleSections: number|null = null;
   private noMatchesElement: HTMLElement;
   private sectionsContainer: UI.Widget.Widget;
-  sectionByElement = new WeakMap<Node, StylePropertiesSection>();
+  sectionByElement: WeakMap<Node, StylePropertiesSection> = new WeakMap<Node, StylePropertiesSection>();
   readonly #swatchPopoverHelper = new InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper();
-  readonly linkifier = new Components.Linkifier.Linkifier(MAX_LINK_LENGTH, /* useLinkDecorator */ true);
+  readonly linkifier: Components.Linkifier.Linkifier =
+      new Components.Linkifier.Linkifier(MAX_LINK_LENGTH, /* useLinkDecorator */ true);
 
   private readonly decorator: StylePropertyHighlighter;
 
@@ -204,14 +239,18 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   private userOperation = false;
   isEditingStyle = false;
   #filterRegex: RegExp|null = null;
+  #filterUpdateScheduled = false;
   #isRegex = false;
   #filterText = '';
   private isActivePropertyHighlighted = false;
   private initialUpdateCompleted = false;
   hasMatchedStyles = false;
-  private sectionBlocks: SectionBlock[] = [];
+  sectionBlocks: SectionBlock[] = [];
+  #allKnownBlocks = new Map<string, SectionBlock>();
+  #lastNode: SDK.DOMModel.DOMNode|null = null;
   private idleCallbackManager: IdleCallbackManager|null = null;
   private needsForceUpdate = false;
+  private isSuppressingResets = false;
   private readonly resizeThrottler = new Common.Throttler.Throttler(100);
   private readonly resetUpdateThrottler = new Common.Throttler.Throttler(500);
   private readonly computedStyleUpdateThrottler = new Common.Throttler.Throttler(500);
@@ -230,6 +269,12 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   aiCodeCompletionProvider?: StylesAiCodeCompletionProvider.StylesAiCodeCompletionProvider;
   #aiCodeCompletionSummaryToolbarContainer?: HTMLElement;
   #aiCodeCompletionSummaryToolbar?: PanelsCommon.AiCodeCompletionSummaryToolbar.AiCodeCompletionSummaryToolbar;
+  #aiCodeCompletionEnabled = false;
+  #shouldRenderLazily = false;
+  #lazyRenderObserver?: IntersectionObserver;
+  #lazyRenderCallbacks = new WeakMap<Element, () => void>();
+  #elementsForSyncViewportCheck: Element[] = [];
+  #updateId = 0;
 
   constructor(computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel) {
     super(computedStyleModel, {delegatesFocus: true, useShadowDom: true, classes: ['flex-none']});
@@ -237,8 +282,11 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.registerRequiredCSS(stylesSidebarPaneStyles);
     Common.Settings.Settings.instance().moduleSetting('text-editor-indent').addChangeListener(this.requestUpdate, this);
     Common.Settings.Settings.instance()
-        .moduleSetting('collapse-non-contributing-css-rules')
+        .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
         .addChangeListener(this.updateCollapsedSectionsSetting, this);
+    Common.Settings.Settings.instance()
+        .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
+        .addChangeListener(this.requestUpdate, this);
     this.toolbarPaneElement = this.createStylesSidebarToolbar();
     this.noMatchesElement = this.contentElement.createChild('div', 'gray-info-message hidden');
     this.noMatchesElement.textContent = i18nString(UIStrings.noMatchingSelectorOrStyle);
@@ -246,13 +294,28 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.sectionsContainer.show(this.contentElement);
     UI.ARIAUtils.markAsList(this.sectionsContainer.contentElement);
     this.sectionsContainer.contentElement.addEventListener('keydown', this.sectionsContainerKeyDown.bind(this), false);
-    this.sectionsContainer.contentElement.addEventListener(
-        'focusin', this.sectionsContainerFocusChanged.bind(this), false);
-    this.sectionsContainer.contentElement.addEventListener(
-        'focusout', this.sectionsContainerFocusChanged.bind(this), false);
+    this.sectionsContainer.contentElement.addEventListener('focusin', this.sectionsContainerFocusChanged.bind(this),
+                                                           false);
+    this.sectionsContainer.contentElement.addEventListener('focusout', this.sectionsContainerFocusChanged.bind(this),
+                                                           false);
 
-    this.#swatchPopoverHelper.addEventListener(
-        InlineEditor.SwatchPopoverHelper.Events.WILL_SHOW_POPOVER, this.hideAllPopovers, this);
+    this.#swatchPopoverHelper.addEventListener(InlineEditor.SwatchPopoverHelper.Events.WILL_SHOW_POPOVER,
+                                               this.hideAllPopovers, this);
+    this.linkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, () => {
+      if (!this.filterRegex() || this.#filterUpdateScheduled) {
+        return;
+      }
+      this.#filterUpdateScheduled = true;
+      queueMicrotask(() => {
+        if (!this.#filterUpdateScheduled) {
+          return;
+        }
+        this.#filterUpdateScheduled = false;
+        if (this.filterRegex()) {
+          this.updateFilter();
+        }
+      });
+    });
     this.decorator = new StylePropertyHighlighter(this);
     this.contentElement.classList.add('styles-pane');
 
@@ -260,19 +323,19 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.contentElement.addEventListener('copy', this.clipboardCopy.bind(this));
 
     this.boundOnScroll = this.onScroll.bind(this);
-    this.imagePreviewPopover = new ImagePreviewPopover(
-        this.contentElement,
-        event => {
-          const link = event.composedPath()[0];
-          if (link instanceof Element) {
-            return link;
-          }
-          return null;
-        },
-        async () => {
-          const features = await Components.ImagePreview.loadPrecomputedFeatures(this.node());
-          return features;
-        });
+    this.imagePreviewPopover =
+        new ImagePreviewPopover(this.contentElement,
+                                event => {
+                                  const link = event.composedPath()[0];
+                                  if (link instanceof Element) {
+                                    return link;
+                                  }
+                                  return null;
+                                },
+                                async () => {
+                                  const features = await Components.ImagePreview.loadPrecomputedFeatures(this.node());
+                                  return features;
+                                });
 
     UI.ViewManager.ViewManager.instance().addEventListener(UI.ViewManager.Events.VIEW_VISIBILITY_CHANGED, event => {
       if (event.data.revealedViewId === 'animations' || event.data.hiddenViewId === 'animations') {
@@ -285,15 +348,18 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         completionContext: {},
         generationContext: {},
         onFeatureEnabled: () => {
+          this.#aiCodeCompletionEnabled = true;
           this.#createAiCodeCompletionSummaryToolbar();
         },
         onFeatureDisabled: () => {
+          this.#aiCodeCompletionEnabled = false;
           this.#cleanupAiCodeCompletion();
         },
         onSuggestionAccepted: this.#onAiCodeCompletionSuggestionAccepted.bind(this),
         onRequestTriggered: this.#onAiCodeCompletionRequestTriggered.bind(this),
         onResponseReceived: this.#onAiCodeCompletionResponseReceived.bind(this),
-        panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor.STYLES,
+        disclaimerTooltipId: DISCLAIMER_TOOLTIP_ID,
+        disclaimerTextVariant: 'styles',
       };
       this.aiCodeCompletionProvider =
           StylesAiCodeCompletionProvider.StylesAiCodeCompletionProvider.createInstance(this.aiCodeCompletionConfig);
@@ -302,7 +368,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
   get webCustomData(): WebCustomData|undefined {
     if (!this.#webCustomData &&
-        Common.Settings.Settings.instance().moduleSetting('show-css-property-documentation-on-hover').get()) {
+        Common.Settings.Settings.instance()
+            .resolve(SettingsUI.ElementsSettings.showCSSPropertyDocumentationOnHoverSettingDescriptor)
+            .get()) {
       // WebCustomData.create() fetches the property docs, so this must happen lazily.
       this.#webCustomData = WebCustomData.create();
     }
@@ -318,6 +386,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   setUserOperation(userOperation: boolean): void {
+    if (userOperation) {
+      this.isSuppressingResets = false;
+    }
     this.userOperation = userOperation;
   }
 
@@ -339,16 +410,16 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
   }
 
-  jumpToSection(sectionName: string, blockName: string): void {
-    this.decorator.findAndHighlightSection(sectionName, blockName);
+  jumpToSection(sectionName: string, blockName: string, treeScopeDistance?: number): void {
+    this.decorator.findAndHighlightSection(sectionName, blockName, treeScopeDistance);
   }
 
   jumpToSectionBlock(section: string): void {
     this.decorator.findAndHighlightSectionBlock(section);
   }
 
-  jumpToFunctionDefinition(functionName: string): void {
-    this.jumpToSection(functionName, FUNCTION_SECTION_NAME);
+  jumpToFunctionDefinition(functionName: string, treeScopeDistance: number): void {
+    this.jumpToSection(functionName, FUNCTION_SECTION_NAME, treeScopeDistance);
   }
 
   jumpToFontPaletteDefinition(paletteName: string): void {
@@ -458,23 +529,22 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     for (let i = 0; i < contextMenuDescriptors.length; ++i) {
       const descriptor = contextMenuDescriptors[i];
-      contextMenu.defaultSection().appendItem(
-          descriptor.text, descriptor.handler, {jslogContext: 'style-sheet-header'});
+      contextMenu.defaultSection().appendItem(descriptor.text, descriptor.handler,
+                                              {jslogContext: 'style-sheet-header'});
     }
-    contextMenu.footerSection().appendItem(
-        'inspector-stylesheet', this.createNewRuleInViaInspectorStyleSheet.bind(this),
-        {jslogContext: 'inspector-stylesheet'});
+    contextMenu.footerSection().appendItem('inspector-stylesheet',
+                                           this.createNewRuleInViaInspectorStyleSheet.bind(this),
+                                           {jslogContext: 'inspector-stylesheet'});
     void contextMenu.show();
 
-    function compareDescriptors(
-        descriptor1: {
-          text: string,
-          handler: () => Promise<void>,
-        },
-        descriptor2: {
-          text: string,
-          handler: () => Promise<void>,
-        }): number {
+    function compareDescriptors(descriptor1: {
+      text: string,
+      handler: () => Promise<void>,
+    },
+                                descriptor2: {
+                                  text: string,
+                                  handler: () => Promise<void>,
+                                }): number {
       return Platform.StringUtilities.naturalOrderComparator(descriptor1.text, descriptor2.text);
     }
 
@@ -516,15 +586,16 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       if (this.lastFilterChange) {
         const stillTyping = Date.now() - this.lastFilterChange < FILTER_IDLE_PERIOD;
         if (!stillTyping) {
-          UI.ARIAUtils.LiveAnnouncer.alert(
-              this.visibleSections ? i18nString(UIStrings.visibleSelectors, {n: this.visibleSections}) :
-                                     i18nString(UIStrings.noMatchingSelectorOrStyle));
+          UI.ARIAUtils.LiveAnnouncer.alert(this.visibleSections ?
+                                               i18nString(UIStrings.visibleSelectors, {n: this.visibleSections}) :
+                                               i18nString(UIStrings.noMatchingSelectorOrStyle));
         }
       }
     }, FILTER_IDLE_PERIOD);
   }
 
-  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement): void {
+  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement,
+                force = false): void {
     if (editedTreeElement) {
       for (const section of this.allSections()) {
         if (section instanceof BlankStylePropertiesSection && section.isBlank) {
@@ -534,7 +605,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       }
     }
 
-    if (this.isEditingStyle) {
+    if (this.isEditingStyle && !force) {
       return;
     }
     const node = this.node();
@@ -549,6 +620,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       section.update(section === editedSection);
     }
 
+    this.#performSyncViewportCheck();
+
     if (this.#filterRegex) {
       this.updateFilter();
     }
@@ -562,10 +635,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     // Hide all popovers when scrolling.
     // Styles and Computed panels both have popover (e.g. imagePreviewPopover),
     // so we need to bind both scroll events.
-    const scrollerElementLists =
-        this?.contentElement?.enclosingNodeOrSelfWithClass('style-panes-wrapper')
-            ?.parentElement?.querySelectorAll('.style-panes-wrapper') as unknown as NodeListOf<Element>;
-    if (scrollerElementLists.length > 0) {
+    const scrollerElementLists = this?.contentElement?.enclosingNodeOrSelfWithClass('style-panes-wrapper')
+                                     ?.parentElement?.querySelectorAll('.style-panes-wrapper');
+    if (scrollerElementLists && scrollerElementLists.length > 0) {
       for (const element of scrollerElementLists) {
         this.scrollerElement = element;
         this.scrollerElement.addEventListener('scroll', this.boundOnScroll, false);
@@ -595,14 +667,15 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const parentNodeId = this.matchedStyles?.getParentLayoutNodeId();
 
     const [computedStyles, parentsComputedStyles, computedStyleExtraFields] = await Promise.all([
-      this.fetchComputedStylesFor(nodeId), this.fetchComputedStylesFor(parentNodeId),
-      this.fetchComputedStyleExtraFieldsFor(nodeId)
+      this.fetchComputedStylesFor(nodeId),
+      this.fetchComputedStylesFor(parentNodeId),
+      this.fetchComputedStyleExtraFieldsFor(nodeId),
     ]);
 
     signal?.throwIfAborted();
 
-    await this.innerRebuildUpdate(
-        signal, this.matchedStyles, computedStyles, parentsComputedStyles, computedStyleExtraFields);
+    await this.innerRebuildUpdate(signal, this.matchedStyles, computedStyles, parentsComputedStyles,
+                                  computedStyleExtraFields);
 
     signal?.throwIfAborted();
 
@@ -612,9 +685,15 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       this.dispatchEventToListeners(Events.INITIAL_UPDATE_COMPLETED);
     }
 
-    this.nodeStylesUpdatedForTest((this.node() as SDK.DOMModel.DOMNode), true);
+    this.#updateId += 1;
+    const currentUpdateId = this.#updateId;
 
-    this.dispatchEventToListeners(Events.STYLES_UPDATE_COMPLETED, {hasMatchedStyles: this.hasMatchedStyles});
+    void UI.Widget.Widget.allUpdatesComplete.then(() => {
+      if (this.#updateId === currentUpdateId) {
+        this.nodeStylesUpdatedForTest((this.node() as SDK.DOMModel.DOMNode), true);
+        this.dispatchEventToListeners(Events.STYLES_UPDATE_COMPLETED, {hasMatchedStyles: this.hasMatchedStyles});
+      }
+    });
   }
 
   #getRegisteredPropertyDetails(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
@@ -624,17 +703,16 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     return registration ? {registration, goToDefinition} : undefined;
   }
 
-  getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
-      ElementsComponents.CSSVariableValueView.CSSVariableParserError|null {
+  getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+                         variableName: string): ElementsComponents.CSSVariableValueView.CSSVariableParserError|null {
     const registrationDetails = this.#getRegisteredPropertyDetails(matchedStyles, variableName);
     return registrationDetails ?
         new ElementsComponents.CSSVariableValueView.CSSVariableParserError(registrationDetails) :
         null;
   }
 
-  getVariablePopoverContents(
-      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string,
-      computedValue: string|null): ElementsComponents.CSSVariableValueView.CSSVariableValueView {
+  getVariablePopoverContents(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string,
+                             computedValue: string|null): ElementsComponents.CSSVariableValueView.CSSVariableValueView {
     return new ElementsComponents.CSSVariableValueView.CSSVariableValueView({
       variableName,
       value: computedValue ?? undefined,
@@ -650,8 +728,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     return await node.domModel().cssModel().getComputedStyle(nodeId);
   }
 
-  private async fetchComputedStyleExtraFieldsFor(nodeId: Protocol.DOM.NodeId|undefined):
-      Promise<Protocol.CSS.ComputedStyleExtraFields|null> {
+  private async fetchComputedStyleExtraFieldsFor(nodeId: Protocol.DOM.NodeId|
+                                                 undefined): Promise<Protocol.CSS.ComputedStyleExtraFields|null> {
     const node = this.node();
     if (node === null || nodeId === undefined) {
       return null;
@@ -673,6 +751,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   private resetCache(): void {
+    this.isSuppressingResets = false;
     const cssModel = this.cssModel();
     if (cssModel) {
       cssModel.discardCachedMatchedCascade();
@@ -703,16 +782,22 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
     this.contentElement.classList.toggle('is-editing-style', editing);
     this.isEditingStyle = editing;
-    this.setActiveProperty(null);
+    if (!editing) {
+      this.setActiveProperty(null);
+    }
   }
 
   setActiveProperty(treeElement: StylePropertyTreeElement|null): void {
+    if (this.isEditingStyle) {
+      return;
+    }
     if (this.isActivePropertyHighlighted) {
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
     this.isActivePropertyHighlighted = false;
 
-    if (!this.node()) {
+    const node = this.node();
+    if (!node) {
       return;
     }
 
@@ -726,14 +811,14 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       if (!properties.includes(treeElement.name)) {
         continue;
       }
-      const node = this.node();
-      if (!node) {
-        continue;
-      }
-      node.domModel().overlayModel().highlightInOverlay(
-          {node: (this.node() as SDK.DOMModel.DOMNode), selectorList}, mode);
+      node.domModel().overlayModel().highlightInOverlay({node, selectorList}, mode);
       this.isActivePropertyHighlighted = true;
-      break;
+      return;
+    }
+
+    if (treeElement.value.includes('anchor(') || treeElement.value.includes('anchor-size(')) {
+      node.domModel().overlayModel().highlightInOverlay({node, selectorList}, 'anchor-positioning');
+      this.isActivePropertyHighlighted = true;
     }
   }
 
@@ -775,11 +860,20 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.requestUpdate();
   }
 
+  suppressResets(): void {
+    this.isSuppressingResets = true;
+  }
+
   #scheduleResetUpdateIfNotEditing(): void {
     this.scheduleResetUpdateIfNotEditingCalledForTest();
 
     // Don't schedule if editing; the edit completion will handle the update.
     if (this.userOperation || this.isEditingStyle) {
+      return;
+    }
+
+    if (this.isSuppressingResets) {
+      this.isSuppressingResets = false;
       return;
     }
 
@@ -792,10 +886,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   #hasAnimatedStyles(animatedStyles: Protocol.CSS.GetAnimatedStylesForNodeResponse): boolean {
-    return Boolean(
-        animatedStyles.animationStyles?.length || animatedStyles.transitionsStyle?.cssProperties.length ||
-        animatedStyles.inherited?.some(
-            inherited => inherited.animationStyles?.length || inherited.transitionsStyle?.cssProperties.length));
+    return Boolean(animatedStyles.animationStyles?.length || animatedStyles.transitionsStyle?.cssProperties.length ||
+                   animatedStyles.inherited?.some(inherited => inherited.animationStyles?.length ||
+                                                      inherited.transitionsStyle?.cssProperties.length));
   }
 
   async #updateAnimatedStyles(): Promise<void> {
@@ -815,8 +908,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
     if (!this.#hasAnimatedStyles(animatedStyles)) {
       // A computed style change that doesn't correspond to any animation is
-      // likely to be a change in the matched styles. In this case, we should
-      // update the matched styles.
+      // likely to be a change in the matched styles, which is already handled
+      // by CSSModelChanged events. We still schedule a reset update here for
+      // DevTools garbage collection purposes.
       this.#scheduleResetUpdateIfNotEditing();
       return;
     }
@@ -825,40 +919,39 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       return;
     }
 
-    const updateStyleSection =
-        (currentStyle: SDK.CSSStyleDeclaration.CSSStyleDeclaration|null, newStyle: Protocol.CSS.CSSStyle|null):
-            void => {
-              // The newly fetched matched styles contain a new style.
-              if (newStyle) {
-                // If the number of CSS properties in the new style
-                // differs from the current style, it indicates a potential change
-                // in property overrides. In this case, re-fetch the entire style
-                // cascade to ensure accurate updates.
-                if (currentStyle?.allProperties().length !== newStyle.cssProperties.length) {
-                  this.#scheduleResetUpdateIfNotEditing();
-                  return;
-                }
+    const updateStyleSection = (currentStyle: SDK.CSSStyleDeclaration.CSSStyleDeclaration|null,
+                                newStyle: Protocol.CSS.CSSStyle|null): void => {
+      // The newly fetched matched styles contain a new style.
+      if (newStyle) {
+        // If the number of CSS properties in the new style
+        // differs from the current style, it indicates a potential change
+        // in property overrides. In this case, re-fetch the entire style
+        // cascade to ensure accurate updates.
+        if (currentStyle?.allProperties().length !== newStyle.cssProperties.length) {
+          this.#scheduleResetUpdateIfNotEditing();
+          return;
+        }
 
-                // If the number of properties remains the same, update the
-                // existing style properties with the new values from the
-                // fetched style.
-                currentStyle.allProperties().forEach((property, index) => {
-                  const newProperty = newStyle.cssProperties[index];
-                  if (!newProperty) {
-                    return;
-                  }
+        // If the number of properties remains the same, update the
+        // existing style properties with the new values from the
+        // fetched style.
+        currentStyle.allProperties().forEach((property, index) => {
+          const newProperty = newStyle.cssProperties[index];
+          if (!newProperty) {
+            return;
+          }
 
-                  property.setLocalValue(newProperty.value);
-                });
-              } else if (currentStyle) {
-                // If no new style is fetched while a current style exists,
-                // it implies the style has been removed (e.g., animation or
-                // transition ended). Trigger a reset and update the UI to
-                // reflect this change.
-                this.#scheduleResetUpdateIfNotEditing();
-                return;
-              }
-            };
+          property.setLocalValue(newProperty.value);
+        });
+      } else if (currentStyle) {
+        // If no new style is fetched while a current style exists,
+        // it implies the style has been removed (e.g., animation or
+        // transition ended). Trigger a reset and update the UI to
+        // reflect this change.
+        this.#scheduleResetUpdateIfNotEditing();
+        return;
+      }
+    };
 
     updateStyleSection(this.matchedStyles.transitionsStyle() ?? null, animatedStyles.transitionsStyle ?? null);
 
@@ -881,9 +974,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         inheritedStyles.filter(style => style.type === SDK.CSSStyleDeclaration.Type.Transition);
     const newInheritedTransitionsStyles =
         animatedStyles.inherited?.map(inherited => inherited.transitionsStyle)
-            .filter(
-                style => style?.cssProperties.some(
-                    cssProperty => SDK.CSSMetadata.cssMetadata().isPropertyInherited(cssProperty.name))) ??
+            .filter(style => style?.cssProperties.some(
+                        cssProperty => SDK.CSSMetadata.cssMetadata().isPropertyInherited(cssProperty.name))) ??
         [];
     if (currentInheritedTransitionsStyles.length !== newInheritedTransitionsStyles.length) {
       this.#scheduleResetUpdateIfNotEditing();
@@ -900,9 +992,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         inheritedStyles.filter(style => style.type === SDK.CSSStyleDeclaration.Type.Animation);
     const newInheritedAnimationsStyles =
         animatedStyles.inherited?.flatMap(inherited => inherited.animationStyles)
-            .filter(
-                animationStyle => animationStyle?.style.cssProperties.some(
-                    cssProperty => SDK.CSSMetadata.cssMetadata().isPropertyInherited(cssProperty.name))) ??
+            .filter(animationStyle => animationStyle?.style.cssProperties.some(
+                        cssProperty => SDK.CSSMetadata.cssMetadata().isPropertyInherited(cssProperty.name))) ??
         [];
     if (currentInheritedAnimationsStyles.length !== newInheritedAnimationsStyles.length) {
       this.#scheduleResetUpdateIfNotEditing();
@@ -963,10 +1054,12 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
   }
 
-  private async innerRebuildUpdate(
-      signal: AbortSignal|undefined, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles|null,
-      computedStyles: Map<string, string>|null, parentsComputedStyles: Map<string, string>|null,
-      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null): Promise<void> {
+  private async innerRebuildUpdate(signal: AbortSignal|undefined,
+                                   matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles|null,
+                                   computedStyles: Map<string, string>|null,
+                                   parentsComputedStyles: Map<string, string>|null,
+                                   computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|
+                                   null): Promise<void> {
     // ElementsSidebarPane's throttler schedules this method. Usually,
     // rebuild is suppressed while editing (see onCSSModelChanged()), but we need a
     // 'force' flag since the currently running throttler process cannot be canceled.
@@ -978,10 +1071,17 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
     const focusedIndex = this.focusedSectionIndex();
 
+    this.#elementsForSyncViewportCheck = [];
     this.linkifier.reset();
+    const node = this.node();
+    if (this.#lastNode !== node) {
+      // Clear inactive styles when a different node is selected.
+      this.#allKnownBlocks.clear();
+      this.#lastNode = node;
+    }
+
     const prevSections = this.sectionBlocks.map(block => block.sections).flat();
 
-    const node = this.node();
     this.hasMatchedStyles = matchedStyles !== null && node !== null;
     if (!this.hasMatchedStyles) {
       this.sectionBlocks = [];
@@ -991,9 +1091,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       return;
     }
 
-    const blocks = await this.rebuildSectionsForMatchedStyleRules(
-        signal, (matchedStyles as SDK.CSSMatchedStyles.CSSMatchedStyles), computedStyles, parentsComputedStyles,
-        computedStyleExtraFields);
+    const blocks =
+        await this.rebuildSectionsForMatchedStyleRules(signal, (matchedStyles as SDK.CSSMatchedStyles.CSSMatchedStyles),
+                                                       computedStyles, parentsComputedStyles, computedStyleExtraFields);
 
     signal?.throwIfAborted();
 
@@ -1035,6 +1135,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
 
     this.sectionsContainer.contentElement.appendChild(fragment);
+    this.#performSyncViewportCheck();
 
     if (elementToFocus) {
       elementToFocus.focus();
@@ -1072,29 +1173,74 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.matchedStyles = matchedStyles;
   }
 
-  rebuildSectionsForMatchedStyleRulesForTest(
-      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, computedStyles: Map<string, string>|null,
-      parentsComputedStyles: Map<string, string>|null,
-      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null): Promise<SectionBlock[]> {
-    return this.rebuildSectionsForMatchedStyleRules(
-        undefined, matchedStyles, computedStyles, parentsComputedStyles, computedStyleExtraFields);
+  setNodeForTest(node: SDK.DOMModel.DOMNode): void {
+    if (this.#lastNode !== node) {
+      this.#allKnownBlocks.clear();
+      this.#lastNode = node;
+    }
   }
 
-  private async rebuildSectionsForMatchedStyleRules(
-      signal: AbortSignal|undefined, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      computedStyles: Map<string, string>|null, parentsComputedStyles: Map<string, string>|null,
-      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null): Promise<SectionBlock[]> {
+  private getStyleId(section: StylePropertiesSection): string {
+    const style = section.styleInternal;
+    const node = section.matchedStyles.isInherited(style) ? section.matchedStyles.nodeForStyle(style) :
+                                                            section.matchedStyles.node();
+    const nodeId = node?.id ?? '';
+    if (style.range) {
+      return `${nodeId}:${style.styleSheetId || ''}:${style.range.toString()}`;
+    }
+    if (style.type === SDK.CSSStyleDeclaration.Type.Inline || style.type === SDK.CSSStyleDeclaration.Type.Attributes) {
+      return `${nodeId}:${style.type}`;
+    }
+    if (style.type === SDK.CSSStyleDeclaration.Type.Animation) {
+      return `${nodeId}:${style.type}:${style.animationName() || ''}:${style.cssText}`;
+    }
+    const parentRule = style.parentRule;
+    if (parentRule instanceof SDK.CSSRule.CSSStyleRule) {
+      const ruleTypes = parentRule.ruleTypes.join(',');
+      const nesting = parentRule.nestingSelectors?.join(',') ?? '';
+      const media = parentRule.media.map(m => m.text).join(',');
+      const containers = parentRule.containerQueries.map(c => c.text).join(',');
+      const supports = parentRule.supports.map(s => s.text).join(',');
+      const scopes = parentRule.scopes.map(s => s.text).join(',');
+      const layers = parentRule.layers.map(l => l.text).join(',');
+      return `${nodeId}:${style.type}:${parentRule.selectorText()}:${ruleTypes}:${nesting}:${media}:${containers}:${
+          supports}:${scopes}:${layers}`;
+    }
+    if (parentRule instanceof SDK.CSSRule.CSSKeyframeRule) {
+      return `${nodeId}:${style.type}:${parentRule.parentRuleName()}:${parentRule.key().text}`;
+    }
+    if (parentRule instanceof SDK.CSSRule.CSSPropertyRule) {
+      return `${nodeId}:${style.type}:${parentRule.propertyName().text}`;
+    }
+    return `${nodeId}:${style.type}:${style.cssText}`;
+  }
+
+  rebuildSectionsForMatchedStyleRulesForTest(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+                                             computedStyles: Map<string, string>|null,
+                                             parentsComputedStyles: Map<string, string>|null,
+                                             computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|
+                                             null): Promise<SectionBlock[]> {
+    return this.rebuildSectionsForMatchedStyleRules(undefined, matchedStyles, computedStyles, parentsComputedStyles,
+                                                    computedStyleExtraFields);
+  }
+
+  private async rebuildSectionsForMatchedStyleRules(signal: AbortSignal|undefined,
+                                                    matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+                                                    computedStyles: Map<string, string>|null,
+                                                    parentsComputedStyles: Map<string, string>|null,
+                                                    computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|
+                                                    null): Promise<SectionBlock[]> {
     if (this.idleCallbackManager) {
       this.idleCallbackManager.discard();
     }
 
     this.idleCallbackManager = new IdleCallbackManager();
 
-    const blocks = [new SectionBlock(null)];
+    const blocks = [new SectionBlock(null, undefined, undefined, 'main')];
     let sectionIdx = 0;
     let lastParentNode: SDK.DOMModel.DOMNode|null = null;
 
-    let lastLayerParent: SectionBlock|undefined;
+    let lastLayerParent: SectionBlock|undefined = blocks[0];
     let lastLayers: SDK.CSSLayer.CSSLayer[]|null = null;
     let sawLayers = false;
 
@@ -1103,7 +1249,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       if (parentRule instanceof SDK.CSSRule.CSSStyleRule) {
         const layers = parentRule.layers;
         if ((layers.length || lastLayers) && lastLayers !== layers) {
-          const block = SectionBlock.createLayerBlock(parentRule);
+          const block = SectionBlock.createLayerBlock(parentRule, lastLayerParent?.id);
           blocks.push(block);
           lastLayerParent?.childBlocks.push(block);
           sawLayers = true;
@@ -1117,13 +1263,26 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     LayersWidget.ButtonProvider.instance().item().setVisible(false);
     const animationsPanelVisible = UI.ViewManager.ViewManager.instance().isViewVisible('animations');
     const cssAnimationsOnlyWhenAnimationsTabOpen =
-        Common.Settings.Settings.instance().moduleSetting('css-animations-only-when-animations-tab-open').get();
+        Common.Settings.Settings.instance()
+            .resolve(SettingsUI.ElementsSettings.cssAnimationsOnlyWhenAnimationsTabOpenSettingDescriptor)
+            .get();
+
+    let totalProperties = 0;
     for (const style of matchedStyles.nodeStyles()) {
+      totalProperties += style.leadingProperties().length;
+    }
+    // Always render eagerly for layout tests.
+    this.#shouldRenderLazily = !Host.InspectorFrontendHost.isUnderTest() && totalProperties > LAZY_RENDER_THRESHOLD;
+
+    const activeStyles = matchedStyles.nodeStyles().filter(style => {
       const isTransitionOrAnimationStyle = style.type === SDK.CSSStyleDeclaration.Type.Transition ||
           style.type === SDK.CSSStyleDeclaration.Type.Animation;
-      if (isTransitionOrAnimationStyle && cssAnimationsOnlyWhenAnimationsTabOpen && !animationsPanelVisible) {
-        continue;
-      }
+      return !isTransitionOrAnimationStyle || animationsPanelVisible || !cssAnimationsOnlyWhenAnimationsTabOpen;
+    });
+
+    for (const style of activeStyles) {
+      const isTransitionOrAnimationStyle = style.type === SDK.CSSStyleDeclaration.Type.Transition ||
+          style.type === SDK.CSSStyleDeclaration.Type.Animation;
 
       const parentNode = matchedStyles.isInherited(style) ? matchedStyles.nodeForStyle(style) : null;
       if (parentNode && parentNode !== lastParentNode) {
@@ -1141,8 +1300,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
           if (signal?.aborted) {
             return;
           }
-          const section = new StylePropertiesSection(
-              this, matchedStyles, style, sectionIdx, computedStyles, parentsComputedStyles, computedStyleExtraFields);
+          const section = new StylePropertiesSection(this, matchedStyles, style, sectionIdx, computedStyles,
+                                                     parentsComputedStyles, computedStyleExtraFields);
           sectionIdx++;
           lastBlock.sections.push(section);
         });
@@ -1261,8 +1420,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         if (signal?.aborted) {
           return;
         }
-        block.sections.push(new PositionTryRuleSection(
-            this, matchedStyles, positionTryRule.style, sectionIdx, positionTryRule.active()));
+        block.sections.push(new PositionTryRuleSection(this, matchedStyles, positionTryRule.style, sectionIdx,
+                                                       positionTryRule.active()));
         sectionIdx++;
       });
       blocks.push(block);
@@ -1276,8 +1435,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
           if (signal?.aborted) {
             return;
           }
-          block.sections.push(new RegisteredPropertiesSection(
-              this, matchedStyles, propertyRule.style(), sectionIdx, propertyRule.propertyName(), expandedByDefault));
+          block.sections.push(new RegisteredPropertiesSection(this, matchedStyles, propertyRule.style(), sectionIdx,
+                                                              propertyRule.propertyName(), expandedByDefault));
           sectionIdx++;
         });
       }
@@ -1292,9 +1451,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
           if (signal?.aborted) {
             return;
           }
-          block.sections.push(new FunctionRuleSection(
-              this, matchedStyles, functionRule.style, functionRule.children(), sectionIdx,
-              functionRule.nameWithParameters(), expandedByDefault));
+          block.sections.push(new FunctionRuleSection(this, matchedStyles, functionRule.style, functionRule.children(),
+                                                      sectionIdx, functionRule.nameWithParameters(),
+                                                      expandedByDefault));
           sectionIdx++;
         });
       }
@@ -1313,7 +1472,77 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
     await this.idleCallbackManager.awaitDone();
 
-    return blocks;
+    const showInactiveCSSRules = Common.Settings.Settings.instance()
+                                     .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
+                                     .get();
+    if (!showInactiveCSSRules) {
+      return blocks;
+    }
+
+    return this.mergeInactiveStyles(blocks, matchedStyles, computedStyles, parentsComputedStyles,
+                                    computedStyleExtraFields);
+  }
+
+  private mergeInactiveStyles(
+      blocks: SectionBlock[],
+      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      computedStyles: Map<string, string>|null,
+      parentsComputedStyles: Map<string, string>|null,
+      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null,
+      ): SectionBlock[] {
+    const getBlockId = (block: SectionBlock): string => block.id;
+
+    for (const block of blocks) {
+      const bid = getBlockId(block);
+      const knownBlock = this.#allKnownBlocks.get(bid);
+      if (knownBlock) {
+        knownBlock.sections = mergeOrderedItems(
+            knownBlock.sections,
+            block.sections,
+            section => this.getStyleId(section),
+            (section, active, newSection) => {
+              if (active && newSection) {
+                section.rebuildWithPayload(matchedStyles, newSection.style(), computedStyles, parentsComputedStyles,
+                                           computedStyleExtraFields);
+              }
+              section.setInactive(!active);
+            },
+        );
+        block.sections = knownBlock.sections;
+      }
+    }
+
+    const oldBlocks = Array.from(this.#allKnownBlocks.values());
+    const finalBlocks = mergeOrderedItems(
+        oldBlocks,
+        blocks,
+        getBlockId,
+        (block, active) => {
+          if (!active) {
+            block.sections.forEach(section => section.setInactive(true));
+          }
+        },
+    );
+
+    this.#allKnownBlocks.clear();
+    for (const block of finalBlocks) {
+      this.#allKnownBlocks.set(getBlockId(block), block);
+    }
+
+    // Restore child relationships using the new tree structure,
+    // but pointing to the final instances.
+    for (const newBlock of blocks) {
+      const finalBlock = this.#allKnownBlocks.get(getBlockId(newBlock));
+      if (finalBlock) {
+        const newChildBlocks =
+            newBlock.childBlocks.map(child => this.#allKnownBlocks.get(getBlockId(child))).filter(b => b !== undefined);
+        finalBlock.childBlocks = finalBlock === newBlock ?
+            newChildBlocks :
+            mergeOrderedItems(finalBlock.childBlocks, newChildBlocks, getBlockId, () => {});
+      }
+    }
+
+    return finalBlocks;
   }
 
   async createNewRuleInViaInspectorStyleSheet(): Promise<void> {
@@ -1330,8 +1559,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     await this.createNewRuleInStyleSheet(styleSheetHeader);
   }
 
-  private async createNewRuleInStyleSheet(styleSheetHeader: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader|null):
-      Promise<void> {
+  private async createNewRuleInStyleSheet(styleSheetHeader: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader|
+                                          null): Promise<void> {
     if (!styleSheetHeader) {
       return;
     }
@@ -1345,13 +1574,13 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
   }
 
-  addBlankSection(
-      insertAfterSection: StylePropertiesSection, styleSheetHeader: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader,
-      ruleLocation: TextUtils.TextRange.TextRange): void {
+  addBlankSection(insertAfterSection: StylePropertiesSection,
+                  styleSheetHeader: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader,
+                  ruleLocation: TextUtils.TextRange.TextRange): void {
     const node = this.node();
-    const blankSection = new BlankStylePropertiesSection(
-        this, insertAfterSection.matchedStyles, node ? node.simpleSelector() : '', styleSheetHeader, ruleLocation,
-        insertAfterSection.style(), 0);
+    const blankSection =
+        new BlankStylePropertiesSection(this, insertAfterSection.matchedStyles, node ? node.simpleSelector() : '',
+                                        styleSheetHeader, ruleLocation, insertAfterSection.style(), 0);
 
     this.sectionsContainer.contentElement.insertBefore(blankSection.element, insertAfterSection.element.nextSibling);
 
@@ -1388,6 +1617,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   private updateFilter(): void {
+    this.#filterUpdateScheduled = false;
     let hasAnyVisibleBlock = false;
     let visibleSections = 0;
     for (const block of this.sectionBlocks) {
@@ -1402,6 +1632,9 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   override wasShown(): void {
     UI.Context.Context.instance().setFlavor(StylesSidebarPane, this);
     super.wasShown();
+    if (this.#aiCodeCompletionEnabled && !this.#aiCodeCompletionSummaryToolbar) {
+      this.#createAiCodeCompletionSummaryToolbar();
+    }
   }
 
   override willHide(): void {
@@ -1441,9 +1674,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = hbox.createChild('devtools-toolbar', 'styles-pane-toolbar');
     toolbar.role = 'presentation';
-    const filterInput = new UI.Toolbar.ToolbarFilter(
-        undefined, 1, 1, undefined, undefined, false, undefined, undefined, /* showRegexToggle=*/ true,
-        this.onRegexToggled.bind(this));
+    const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false, undefined, undefined,
+                                                     /* showRegexToggle=*/ true, this.onRegexToggled.bind(this));
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     void toolbar.appendItemsAtLocation('styles-sidebarpane-toolbar');
@@ -1536,13 +1768,14 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   private createRenderingShortcuts(): UI.Toolbar.ToolbarButton {
-    const prefersColorSchemeSetting =
-        Common.Settings.Settings.instance().moduleSetting<string>('emulated-css-media-feature-prefers-color-scheme');
-    const autoDarkModeSetting = Common.Settings.Settings.instance().moduleSetting('emulate-auto-dark-mode');
+    const prefersColorSchemeSetting = Common.Settings.Settings.instance().resolve(
+        SDK.SDKSettings.emulatedCSSMediaFeaturePrefersColorSchemeSettingDescriptor);
+    const autoDarkModeSetting =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.emulateAutoDarkModeSettingDescriptor);
     const decorateStatus = (condition: boolean, title: string): string => `${condition ? '✓ ' : ''}${title}`;
 
-    const button = new UI.Toolbar.ToolbarToggle(
-        i18nString(UIStrings.toggleRenderingEmulations), 'brush', 'brush-filled', undefined, false);
+    const button = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.toggleRenderingEmulations), 'brush',
+                                                'brush-filled', undefined, false);
     button.element.setAttribute('jslog', `${VisualLogging.dropDown('rendering-emulations').track({click: true})}`);
     button.element.addEventListener('click', event => {
       const boundingRect = button.element.getBoundingClientRect();
@@ -1587,7 +1820,12 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   }
 
   #createAiCodeCompletionSummaryToolbar(): void {
-    if (this.#aiCodeCompletionSummaryToolbar) {
+    if (!this.#aiCodeCompletionEnabled || this.#aiCodeCompletionSummaryToolbar) {
+      return;
+    }
+    const containingPane =
+        this.contentElement.enclosingNodeOrSelfWithClass('style-panes-wrapper') as HTMLElement | null;
+    if (!containingPane) {
       return;
     }
     this.#aiCodeCompletionSummaryToolbar =
@@ -1595,9 +1833,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
           citationsTooltipId: CITATIONS_TOOLTIP_ID,
           disclaimerTooltipId: DISCLAIMER_TOOLTIP_ID,
           spinnerTooltipId: SPINNER_TOOLTIP_ID,
-          panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor.STYLES,
+          disclaimerTextVariant: 'styles',
         });
-    const containingPane = this.contentElement.enclosingNodeOrSelfWithClass('style-panes-wrapper') as HTMLElement;
     this.#aiCodeCompletionSummaryToolbarContainer =
         containingPane.createChild('div', 'ai-code-completion-summary-toolbar-container');
     this.#aiCodeCompletionSummaryToolbarContainer.role = 'toolbar';
@@ -1618,6 +1855,80 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
   #onAiCodeCompletionResponseReceived(): void {
     this.#aiCodeCompletionSummaryToolbar?.setLoading(false);
+  }
+
+  trackForLazyRendering(element: Element, callback: () => void): void {
+    if (!this.#lazyRenderObserver) {
+      this.#lazyRenderObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const cb = this.#lazyRenderCallbacks.get(entry.target);
+            if (cb) {
+              cb();
+              this.untrackForLazyRendering(entry.target);
+            }
+          }
+        }
+      }, {rootMargin: '100px'});
+    }
+    this.#lazyRenderCallbacks.set(element, callback);
+    this.#elementsForSyncViewportCheck.push(element);
+    this.#lazyRenderObserver.observe(element);
+  }
+
+  #performSyncViewportCheck(): void {
+    if (!this.#shouldRenderLazily || this.#elementsForSyncViewportCheck.length === 0) {
+      this.#elementsForSyncViewportCheck = [];
+      return;
+    }
+    const scrollContainer = this.element.parentElement;
+    if (!scrollContainer) {
+      this.#elementsForSyncViewportCheck = [];
+      return;
+    }
+    const {top, bottom} = scrollContainer.getBoundingClientRect();
+    if (bottom === top) {
+      this.#elementsForSyncViewportCheck = [];
+      return;
+    }
+    // Expand the bounding calculation by ±100px to accurately match the {rootMargin: '100px'}
+    // option configured on the IntersectionObserver in trackForLazyRendering.
+    const viewportTop = top - 100;
+    const viewportBottom = bottom + 100;
+
+    const visibleElements: Element[] = [];
+    for (const element of this.#elementsForSyncViewportCheck) {
+      if (!element.isConnected || !this.#lazyRenderCallbacks.has(element)) {
+        continue;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.top > viewportBottom) {
+        break;
+      }
+      if (rect.bottom >= viewportTop) {
+        visibleElements.push(element);
+      }
+    }
+    this.#elementsForSyncViewportCheck = [];
+
+    for (const element of visibleElements) {
+      const callback = this.#lazyRenderCallbacks.get(element);
+      if (callback) {
+        callback();
+        this.untrackForLazyRendering(element);
+      }
+    }
+  }
+
+  shouldRenderLazily(): boolean {
+    return this.#shouldRenderLazily;
+  }
+
+  untrackForLazyRendering(element: Element): void {
+    if (this.#lazyRenderObserver) {
+      this.#lazyRenderObserver.unobserve(element);
+    }
+    this.#lazyRenderCallbacks.delete(element);
   }
 }
 
@@ -1647,7 +1958,7 @@ export class SectionBlock {
   childBlocks: SectionBlock[] = [];
   #expanded = false;
   #icon: Icon|undefined;
-  constructor(titleElement: Element|null, expandable?: boolean, expandedByDefault?: boolean) {
+  constructor(titleElement: Element|null, expandable?: boolean, expandedByDefault?: boolean, readonly id = 'main') {
     this.#titleElement = titleElement;
     this.sections = [];
     this.#expanded = expandedByDefault ?? false;
@@ -1681,12 +1992,11 @@ export class SectionBlock {
     const pseudoArgumentString = pseudoArgument ? `(${pseudoArgument})` : '';
     const pseudoTypeString = `${pseudoType}${pseudoArgumentString}`;
     separatorElement.textContent = i18nString(UIStrings.pseudoSElement, {PH1: pseudoTypeString});
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false, `pseudo:${pseudoType}:${pseudoArgument ?? ''}`);
   }
 
-  static async createInheritedPseudoTypeBlock(
-      pseudoType: Protocol.DOM.PseudoType, pseudoArgument: string|null,
-      node: SDK.DOMModel.DOMNode): Promise<SectionBlock> {
+  static async createInheritedPseudoTypeBlock(pseudoType: Protocol.DOM.PseudoType, pseudoArgument: string|null,
+                                              node: SDK.DOMModel.DOMNode): Promise<SectionBlock> {
     const separatorElement = document.createElement('div');
     separatorElement.className = 'sidebar-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('inherited-pseudotype')}`);
@@ -1695,12 +2005,13 @@ export class SectionBlock {
     UI.UIUtils.createTextChild(separatorElement, i18nString(UIStrings.inheritedFromSPseudoOf, {PH1: pseudoTypeString}));
     const link = PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(node, {preventKeyboardFocus: true});
     render(link, separatorElement);
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false,
+                            `inherited-pseudo:${pseudoType}:${pseudoArgument ?? ''}:${node.id}`);
   }
 
   static createRegisteredPropertiesBlock(expandedByDefault: boolean): SectionBlock {
     const separatorElement = document.createElement('div');
-    const block = new SectionBlock(separatorElement, true, expandedByDefault);
+    const block = new SectionBlock(separatorElement, true, expandedByDefault, 'registered-properties');
     separatorElement.className = 'sidebar-separator';
     separatorElement.appendChild(document.createTextNode(REGISTERED_PROPERTY_SECTION_NAME));
     return block;
@@ -1708,7 +2019,7 @@ export class SectionBlock {
 
   static createFunctionBlock(expandedByDefault: boolean): SectionBlock {
     const separatorElement = document.createElement('div');
-    const block = new SectionBlock(separatorElement, true, expandedByDefault);
+    const block = new SectionBlock(separatorElement, true, expandedByDefault, 'functions');
     separatorElement.className = 'sidebar-separator';
     separatorElement.appendChild(document.createTextNode(FUNCTION_SECTION_NAME));
     return block;
@@ -1719,12 +2030,12 @@ export class SectionBlock {
     separatorElement.className = 'sidebar-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('keyframes')}`);
     separatorElement.textContent = `@keyframes ${keyframesName}`;
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false, `keyframes:${keyframesName}`);
   }
 
   static createAtRuleBlock(expandedByDefault: boolean): SectionBlock {
     const separatorElement = document.createElement('div');
-    const block = new SectionBlock(separatorElement, true, expandedByDefault);
+    const block = new SectionBlock(separatorElement, true, expandedByDefault, 'at-rules');
     separatorElement.className = 'sidebar-separator';
     separatorElement.appendChild(document.createTextNode(i18nString(UIStrings.atRuleSection)));
     return block;
@@ -1735,7 +2046,7 @@ export class SectionBlock {
     separatorElement.className = 'sidebar-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('position-try')}`);
     separatorElement.textContent = `@position-try ${positionTryName}`;
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false, `position-try:${positionTryName}`);
   }
 
   static async createInheritedNodeBlock(node: SDK.DOMModel.DOMNode): Promise<SectionBlock> {
@@ -1747,10 +2058,10 @@ export class SectionBlock {
       preventKeyboardFocus: true,
     });
     render(link, separatorElement);
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false, `inherited-node:${node.id}`);
   }
 
-  static createLayerBlock(rule: SDK.CSSRule.CSSStyleRule): SectionBlock {
+  static createLayerBlock(rule: SDK.CSSRule.CSSStyleRule, parentBlockId = 'main'): SectionBlock {
     const separatorElement = document.createElement('div');
     separatorElement.className = 'sidebar-separator layer-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('layer')}`);
@@ -1760,7 +2071,7 @@ export class SectionBlock {
       const name = rule.origin === Protocol.CSS.StyleSheetOrigin.UserAgent ? '\xa0user\xa0agent\xa0stylesheet' :
                                                                              '\xa0implicit\xa0outer\xa0layer';
       UI.UIUtils.createTextChild(separatorElement.createChild('div'), name);
-      return new SectionBlock(separatorElement);
+      return new SectionBlock(separatorElement, false, false, `layer:${parentBlockId}:${name}`);
     }
     const layerLink = separatorElement.createChild('button');
     layerLink.className = 'link';
@@ -1768,7 +2079,7 @@ export class SectionBlock {
     const name = layers.map(layer => SDK.CSSModel.CSSModel.readableLayerName(layer.text)).join('.');
     layerLink.textContent = name;
     layerLink.onclick = () => LayersWidget.LayersWidget.instance().revealLayer(name);
-    return new SectionBlock(separatorElement);
+    return new SectionBlock(separatorElement, false, false, `layer:${parentBlockId}:${name}`);
   }
 
   updateFilter(): number {
@@ -1990,9 +2301,21 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
   override onInput(event: Event): void {
     super.onInput(event);
     if (this.aiCodeCompletionProvider) {
-      this.#updateAiCodeSuggestion();
-      this.#debouncedTriggerAiCodeCompletion();
+      const inputEvent = event as InputEvent;
+      const isDeletion = inputEvent.inputType?.startsWith('delete');
+      if (isDeletion) {
+        this.#debouncedTriggerAiCodeCompletion.cancel();
+        this.setAiAutoCompletion(null);
+      } else {
+        this.#updateAiCodeSuggestion();
+        this.#debouncedTriggerAiCodeCompletion();
+      }
     }
+  }
+
+  override detach(): void {
+    this.#debouncedTriggerAiCodeCompletion.cancel();
+    super.detach();
   }
 
   #handleEscape(keyboardEvent: KeyboardEvent): boolean {
@@ -2002,12 +2325,13 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     keyboardEvent.preventDefault();
     if (this.isSuggestBoxVisible()) {
       this.suggestBox?.hide();
-      // Required for ensuring the suggestion is not cleared.
-      keyboardEvent.consume(true);
-      return true;
+    } else {
+      this.setAiAutoCompletion(null);
     }
-    this.setAiAutoCompletion(null);
-    return false;
+    // Consume the event to prevent it from bubbling up to cancel the editing session,
+    // and return true to prevent TextPrompt from processing it.
+    keyboardEvent.consume(true);
+    return true;
   }
 
   private handleNameOrValueUpDown(event: Event): boolean {
@@ -2030,9 +2354,8 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
 
     // Handle numeric value increment/decrement only at this point.
     if (!this.isEditingName && this.treeElement.valueElement &&
-        UI.UIUtils.handleElementValueModifications(
-            event, this.treeElement.valueElement, finishHandler.bind(this), this.isValueSuggestion.bind(this),
-            customNumberHandler.bind(this))) {
+        UI.UIUtils.handleElementValueModifications(event, this.treeElement.valueElement, finishHandler.bind(this),
+                                                   this.isValueSuggestion.bind(this), customNumberHandler.bind(this))) {
       return true;
     }
 
@@ -2047,8 +2370,8 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     return this.cssCompletions.indexOf(word) !== -1 || word.startsWith('--');
   }
 
-  private async buildPropertyCompletions(expression: string, query: string, force?: boolean):
-      Promise<UI.SuggestBox.Suggestions> {
+  private async buildPropertyCompletions(expression: string, query: string,
+                                         force?: boolean): Promise<UI.SuggestBox.Suggestions> {
     const lowerQuery = query.toLowerCase();
     const editingVariable = !this.isEditingName && expression.trim().endsWith('var(');
     if (this.isEditingName && expression) {
@@ -2093,8 +2416,8 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     const node = this.treeElement.node();
     if (this.isEditingName && node) {
       const nameValuePresets = SDK.CSSMetadata.cssMetadata().nameValuePresets(node.isSVGNode());
-      nameValuePresets.forEach(
-          preset => filterCompletions.call(this, preset, false /* variable */, true /* nameValue */));
+      nameValuePresets.forEach(preset =>
+                                   filterCompletions.call(this, preset, false /* variable */, true /* nameValue */));
     }
     if (this.isEditingName || editingVariable) {
       this.cssVariables.forEach(variable => filterCompletions.call(this, variable, true /* variable */));
@@ -2174,8 +2497,8 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     }
     return await Promise.resolve(results);
 
-    function filterCompletions(
-        this: CSSPropertyPrompt, completion: string, variable: boolean, nameValue?: boolean): void {
+    function filterCompletions(this: CSSPropertyPrompt, completion: string, variable: boolean,
+                               nameValue?: boolean): void {
       const index = completion.toLowerCase().indexOf(lowerQuery);
       const result: CompletionResult = {
         text: completion,
@@ -2266,8 +2589,8 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     if (!cssModel) {
       return;
     }
-    await this.aiCodeCompletionProvider.triggerAiCodeCompletion(
-        userInput, range.endOffset, this.isEditingName, this.treeElement.property, cssModel);
+    await this.aiCodeCompletionProvider.triggerAiCodeCompletion(userInput, range.endOffset, this.isEditingName,
+                                                                this.treeElement.property, cssModel);
   }
 
   private setAiAutoCompletion(args: {
@@ -2283,6 +2606,7 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     if (!args) {
       this.treeElement.section().activeAiSuggestion = undefined;
       this.activeAiSuggestionInfo = undefined;
+      this.applySuggestion(null);
       return;
     }
 
@@ -2340,7 +2664,7 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
             });
           }
         }
-      }
+      },
     });
     return properties;
   }
@@ -2369,7 +2693,7 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
   }
 
   private acceptCodeComplete(): boolean {
-    if (this.isSuggestBoxVisible()) {
+    if (this.isSuggestBoxVisible() || this.currentSuggestion()) {
       // accept the suggestion from the traditional autocomplete menu
       this.acceptAutoComplete();
 
@@ -2409,9 +2733,9 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
     const suggestionText = this.treeElement.section().activeAiSuggestion?.text;
     await this.treeElement.section().commitActiveAiSuggestion();
     if (this.activeAiSuggestionInfo) {
-      this.aiCodeCompletionProvider?.onSuggestionAccepted(
-          this.activeAiSuggestionInfo.citations, this.activeAiSuggestionInfo.rpcGlobalId,
-          this.activeAiSuggestionInfo.sampleId);
+      this.aiCodeCompletionProvider?.onSuggestionAccepted(this.activeAiSuggestionInfo.citations,
+                                                          this.activeAiSuggestionInfo.rpcGlobalId,
+                                                          this.activeAiSuggestionInfo.sampleId);
     }
     if (suggestionText) {
       UI.ARIAUtils.LiveAnnouncer.status(i18nString(UIStrings.aiSuggestionAccepted, {PH1: suggestionText}));
@@ -2455,6 +2779,66 @@ export function escapeUrlAsCssComment(urlText: string): string {
     return `${url.origin}${url.pathname}${url.search.replaceAll('*/', '*%2F')}${url.hash}`;
   }
   return url.toString();
+}
+
+/**
+ * Merges a newly active list of items with an existing (previously known) list of items,
+ * preserving the relative order of inactive items while updating and inserting active items.
+ */
+export function mergeOrderedItems<T>(
+    oldItems: T[],
+    newItems: T[],
+    getId: (item: T) => string,
+    toggleActive: (item: T, active: boolean, newItem?: T) => void,
+    ): T[] {
+  const newIds = new Set(newItems.map(getId));
+  const oldItemById = new Map(oldItems.map(item => [getId(item), item]));
+  const handledIds = new Set<string>();
+  const merged: T[] = [];
+  let newIdx = 0;
+
+  for (const oldItem of oldItems) {
+    const oldId = getId(oldItem);
+    if (handledIds.has(oldId)) {
+      continue;
+    }
+    if (newIds.has(oldId)) {
+      while (newIdx < newItems.length) {
+        const newItem = newItems[newIdx++];
+        const newId = getId(newItem);
+        const existingItem = oldItemById.get(newId);
+        if (existingItem) {
+          toggleActive(existingItem, true, newItem);
+          merged.push(existingItem);
+          handledIds.add(newId);
+        } else {
+          merged.push(newItem);
+        }
+        if (newId === oldId) {
+          break;
+        }
+      }
+    } else {
+      toggleActive(oldItem, false);
+      merged.push(oldItem);
+      handledIds.add(oldId);
+    }
+  }
+
+  while (newIdx < newItems.length) {
+    const newItem = newItems[newIdx++];
+    const newId = getId(newItem);
+    const existingItem = oldItemById.get(newId);
+    if (existingItem && !handledIds.has(newId)) {
+      toggleActive(existingItem, true, newItem);
+      merged.push(existingItem);
+      handledIds.add(newId);
+    } else if (!handledIds.has(newId)) {
+      merged.push(newItem);
+    }
+  }
+
+  return merged;
 }
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {

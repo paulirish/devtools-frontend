@@ -15,17 +15,17 @@ import {type LazyUint8Array, LinearMemoryInspectorController} from './LinearMemo
 
 const UIStrings = {
   /**
-   * @description Label in the Linear Memory inspector tool that serves as a placeholder if no inspections are open (i.e. nothing to see here).
-   *             Inspection hereby refers to viewing, navigating and understanding the memory through this tool.
+   * @description Label in the Memory inspector panel that serves as a placeholder if no inspections are open (i.e., nothing to see here).
+   *             Inspection here refers to viewing, navigating, and understanding the memory through this panel.
    */
   noOpenInspections: 'No open inspections',
   /**
-   * @description Label in the Linear Memory inspector tool that serves as a placeholder if no inspections are open (i.e. nothing to see here).
-   *             Inspection hereby refers to viewing, navigating and understanding the memory through this tool.
+   * @description Label in the Memory inspector panel that serves as a placeholder if no inspections are open (i.e., nothing to see here).
+   *             Inspection here refers to viewing, navigating, and understanding the memory through this panel.
    */
-  memoryInspectorExplanation: 'On this page you can inspect binary data.',
+  memoryInspectorExplanation: 'On this page you can inspect binary data',
   /**
-   * @description Label in the Linear Memory inspector tool for a link.
+   * @description Label in the Memory inspector panel for a link.
    */
   learnMore: 'Learn more',
 } as const;
@@ -36,8 +36,12 @@ let inspectorInstance: LinearMemoryInspectorPane;
 const MEMORY_INSPECTOR_EXPLANATION_URL =
     'https://developer.chrome.com/docs/devtools/memory-inspector' as Platform.DevToolsPath.UrlString;
 
-export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) {
+const LinearMemoryInspectorPaneBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class LinearMemoryInspectorPane extends LinearMemoryInspectorPaneBase {
   readonly #tabbedPane: UI.TabbedPane.TabbedPane;
 
   constructor() {

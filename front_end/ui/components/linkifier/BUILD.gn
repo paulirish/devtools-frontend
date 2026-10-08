@@ -17,21 +17,19 @@ devtools_ui_module("linkifier") {
     "LinkifierImpl.ts",
     "LinkifierUtils.ts",
   ]
-  deps = [
+  ts_deps = [
     "../../../core/platform:bundle",
     "../../../models/bindings:bundle",
-    "../../../ui/components/render_coordinator:bundle",
-    "../../../ui/lit:bundle",
+    "../../lit:bundle",
+    "../render_coordinator:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "linkifier.ts"
 
-  deps = [
-    ":css_files",
-    ":linkifier",
-  ]
+  ts_deps = [ ":linkifier" ]
 
   visibility = default_components_visibility
 }
@@ -41,7 +39,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "LinkifierImpl.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/platform:bundle",
     "../../../testing",

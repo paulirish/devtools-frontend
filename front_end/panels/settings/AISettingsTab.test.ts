@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
-import type {LocalizedString} from '../../core/platform/UIString.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
@@ -15,6 +15,8 @@ import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewF
 import * as Switch from '../../ui/components/switch/switch.js';
 
 import * as Settings from './settings.js';
+
+type LocalizedString = Platform.UIString.LocalizedString;
 
 describeWithEnvironment('AISettingsTab', () => {
   let deleteAiAssistanceHistoryStub:
@@ -26,12 +28,21 @@ describeWithEnvironment('AISettingsTab', () => {
         sinon.stub(AiAssistanceModel.AiHistoryStorage.AiHistoryStorage.prototype, 'deleteAll');
     AiAssistanceModel.AiHistoryStorage.AiHistoryStorage.instance({forceNew: true});
     updateHostConfig({
+      aidaAvailability: {
+        enabled: true,
+      },
+      devToolsConsoleInsights: {
+        enabled: true,
+      },
+      devToolsFreestyler: {
+        enabled: true,
+      },
       devToolsAiGeneratedTimelineLabels: {
         enabled: true,
       },
       devToolsAiCodeCompletion: {
         enabled: true,
-      }
+      },
     });
     aidaAccessStub = sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions');
     aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.AVAILABLE));
@@ -65,10 +76,10 @@ describeWithEnvironment('AISettingsTab', () => {
   }
 
   it('renders disclaimers and settings', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').set(true);
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
-    Common.Settings.moduleSetting('ai-annotations-enabled').set(true);
-    Common.Settings.moduleSetting('ai-code-completion-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-annotations-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-code-completion-enabled').set(true);
 
     const {view} = await setupWidget();
 
@@ -85,17 +96,17 @@ describeWithEnvironment('AISettingsTab', () => {
     const settingNames = settingParams.map(setting => setting.settingName);
     assert.deepEqual(settingNames, ['Console Insights', 'AI assistance', 'Auto annotations', 'Code suggestions']);
     assert.strictEqual(settingParams[0].settingDescription, 'Helps you understand and fix console warnings and errors');
-    assert.strictEqual(settingParams[1].settingDescription, 'Get help with understanding CSS styles');
+    assert.strictEqual(settingParams[1].settingDescription, 'Get context-aware help on the inspected page');
     assert.strictEqual(
         settingParams[2].settingDescription, 'Automatically generate titles for performance trace annotations');
     assert.strictEqual(settingParams[3].settingDescription, 'Write code faster with AI-powered suggestions');
   });
 
   it('has different dislaimers for managed users which have logging disabled', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').set(true);
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
-    Common.Settings.moduleSetting('ai-annotations-enabled').set(true);
-    Common.Settings.moduleSetting('ai-code-completion-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-annotations-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-code-completion-enabled').set(true);
     updateHostConfig({
       aidaAvailability: {
         enabled: true,
@@ -113,7 +124,7 @@ describeWithEnvironment('AISettingsTab', () => {
     const sendDataNoLogging = disclaimers[1].text as LocalizedString;
     assert.strictEqual(
         sendDataNoLogging,
-        'Your content will not be used by human reviewers to improve AI. Your organization may change these settings at any time.');
+        'Your content won’t be used by human reviewers to improve AI. Your organization may change these settings at any time.');
     const dataCollectionNoLogging = disclaimers[2].text as LocalizedString;
     assert.strictEqual(
         dataCollectionNoLogging,
@@ -121,8 +132,8 @@ describeWithEnvironment('AISettingsTab', () => {
   });
 
   it('has explain this resource enabled', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').set(true);
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
     mockHostConfigWithExplainThisResourceEnabled();
 
     const {view} = await setupWidget();
@@ -131,46 +142,45 @@ describeWithEnvironment('AISettingsTab', () => {
     settingToParams.next();
     const explainThisResource = settingToParams.next();
     assert.exists(explainThisResource.value);
-    assert.isFalse(explainThisResource.value[0].disabled());
-    assert.strictEqual(
-        explainThisResource.value[1].settingDescription,
-        'Get help with understanding CSS styles, and network requests');
+    assert.isFalse(explainThisResource.value[1].setting instanceof AiAssistanceModel.AiSetting.AiSetting &&
+                   explainThisResource.value[1].setting.disabled);
+    assert.strictEqual(explainThisResource.value[1].settingDescription, 'Get context-aware help on the inspected page');
   });
 
   it('can turn feature on, which automatically expands it', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').set(false);
+    Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').set(false);
     const {view} = await setupWidget();
 
-    assert.isFalse(Common.Settings.moduleSetting('console-insights-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').get());
     const setting = view.input.settingToParams.entries().next();
     assert.exists(setting.value);
     assert.isFalse(setting.value[1].settingExpandState.isSettingExpanded);
 
     view.input.toggleSetting(setting.value[0], new Switch.Switch.SwitchChangeEvent(true));
-    assert.isTrue(Common.Settings.moduleSetting('console-insights-enabled').get());
+    assert.isTrue(Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').get());
     assert.isTrue(setting.value[1].settingExpandState.isSettingExpanded);
   });
 
   it('can expand and collapse details via click', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').set(false);
+    Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').set(false);
     const {view} = await setupWidget();
 
     const setting = view.input.settingToParams.entries().next();
     assert.exists(setting.value);
     assert.isFalse(setting.value[1].settingExpandState.isSettingExpanded);
-    assert.isFalse(Common.Settings.moduleSetting('console-insights-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').get());
 
     view.input.expandSetting(setting.value[0]);
-    assert.isFalse(Common.Settings.moduleSetting('console-insights-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').get());
     assert.isTrue(setting.value[1].settingExpandState.isSettingExpanded);
 
     view.input.expandSetting(setting.value[0]);
-    assert.isFalse(Common.Settings.moduleSetting('console-insights-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('console-insights-enabled').get());
     assert.isFalse(setting.value[1].settingExpandState.isSettingExpanded);
   });
 
   it('can turn feature off without collapsing it', async () => {
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
     const {view} = await setupWidget();
 
     const settingToParams = view.input.settingToParams.entries();
@@ -179,16 +189,16 @@ describeWithEnvironment('AISettingsTab', () => {
     assert.exists(setting.value);
 
     view.input.expandSetting(setting.value[0]);
-    assert.isTrue(Common.Settings.moduleSetting('ai-assistance-enabled').get());
+    assert.isTrue(Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').get());
     assert.isTrue(setting.value[1].settingExpandState.isSettingExpanded);
 
     view.input.toggleSetting(setting.value[0], new MouseEvent('click'));
-    assert.isFalse(Common.Settings.moduleSetting('ai-assistance-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').get());
     assert.isTrue(setting.value[1].settingExpandState.isSettingExpanded);
   });
 
   it('disables switches if blocked by age', async () => {
-    const underAgeExplainer = 'This feature is only available to users who are 18 years of age or older.';
+    const underAgeExplainer = 'This feature is only available to users 18 years or older';
     updateHostConfig({
       aidaAvailability: {
         blockedByAge: true,
@@ -207,47 +217,68 @@ describeWithEnvironment('AISettingsTab', () => {
   });
 
   it('updates when the user logs in', async () => {
-    const notLoggedInExplainer = 'This feature is only available when you sign into Chrome with your Google account.';
+    const notLoggedInExplainer = 'This feature is only available when you sign in to Chrome with your Google account';
     aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL));
 
     const {view} = await setupWidget();
 
     assert.deepEqual(view.input.disabledReasons, [notLoggedInExplainer]);
 
-    aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.AVAILABLE));
     Host.AidaClient.HostConfigTracker.instance().dispatchEventToListeners(
-        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED);
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
     await view.nextInput;
 
     assert.deepEqual(view.input.disabledReasons, []);
   });
 
-  it('updates disabled reason', async () => {
-    Common.Settings.moduleSetting('console-insights-enabled').setRegistration({
-      settingName: 'console-insights-enabled',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      disabledCondition: () => {
-        return {disabled: true, reasons: ['some reason' as Platform.UIString.LocalizedString]};
-      },
-    });
-    Common.Settings.moduleSetting('ai-assistance-enabled').setRegistration({
-      settingName: 'ai-assistance-enabled',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: true,
-      disabledCondition: () => {
-        return {disabled: true, reasons: ['some reason' as Platform.UIString.LocalizedString]};
-      },
+  it('disables switches if off the record (incognito)', async () => {
+    const incognitoExplainer = 'AI assistance isn’t available in Incognito mode or Guest mode';
+    updateHostConfig({
+      isOffTheRecord: true,
     });
 
     const {view} = await setupWidget();
 
-    assert.deepEqual(view.input.disabledReasons, ['some reason']);
+    assert.deepEqual(view.input.disabledReasons, [incognitoExplainer]);
+  });
+
+  it('disables switches if offline', async () => {
+    const offlineExplainer = 'This feature is only available with an active internet connection';
+    aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.NO_INTERNET));
+
+    const {view} = await setupWidget();
+
+    assert.deepEqual(view.input.disabledReasons, [offlineExplainer]);
+  });
+
+  it('disables switches if sync is paused', async () => {
+    const notLoggedInExplainer = 'This feature is only available when you sign in to Chrome with your Google account';
+    aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED));
+
+    const {view} = await setupWidget();
+
+    assert.deepEqual(view.input.disabledReasons, [notLoggedInExplainer]);
+  });
+
+  it('updates disabled reason', async () => {
+    const isAvailableStub =
+        sinon.stub(AiAssistanceModel.AiUtils.aiAssistanceEnabledSettingDescriptor, 'isAvailable').returns({
+          status: Common.Settings.SettingAvailability.DISABLED,
+          reason: [AiAssistanceModel.AiUtils.DisabledReason.WRONG_LOCALE],
+        });
+
+    const {view} = await setupWidget();
+
+    assert.deepEqual(view.input.disabledReasons, [
+      'To use this feature, set your language preference to English in DevTools settings' as
+          Platform.UIString.LocalizedString,
+    ]);
+    isAvailableStub.restore();
   });
 
   it('can turn feature off and clear history', async () => {
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
-    Common.Settings.moduleSetting('ai-assistance-history-entries').set([{}, {}]);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-history-entries').set([{}, {}]);
     const {view} = await setupWidget();
 
     const settingToParams = view.input.settingToParams.entries();
@@ -256,18 +287,13 @@ describeWithEnvironment('AISettingsTab', () => {
     assert.exists(setting.value);
 
     view.input.toggleSetting(setting.value[0], new MouseEvent('click'));
-    assert.isFalse(Common.Settings.moduleSetting('ai-assistance-enabled').get());
+    assert.isFalse(Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').get());
     assert.isTrue(
         deleteAiAssistanceHistoryStub.called, 'Expected AiHistoryStorage deleteAll to be called but it is not called');
   });
 
-  it('shows simplified strings when V2 is enabled', async () => {
-    updateHostConfig({
-      devToolsAiAssistanceV2: {
-        enabled: true,
-      },
-    });
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+  it('shows AI assistance setting strings', async () => {
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
 
     const {view} = await setupWidget();
 
@@ -278,24 +304,21 @@ describeWithEnvironment('AISettingsTab', () => {
     assert.strictEqual(
         aiAssistanceParams.settingItems[0].text,
         'Debug styling, network, performance, source code, accessibility and storage issues with DevTools AI assistance');
-    assert.strictEqual(
-        aiAssistanceParams.settingItems[1].text,
-        'Follow the agent\'s reasoning step-by-step and quickly jump to the relevant source data');
+    assert.strictEqual(aiAssistanceParams.settingItems[1].text,
+                       'Follow the agent’s reasoning step-by-step and quickly jump to the relevant source data');
     assert.strictEqual(
         aiAssistanceParams.toConsiderSettingItems[0].text,
         'To generate explanations, chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google and may be seen by human reviewers to improve this feature. This is an experimental AI feature and won’t always get it right.');
   });
 
-  it('shows simplified strings when V2 is enabled and logging is disabled', async () => {
+  it('shows AI assistance setting strings when logging is disabled', async () => {
     updateHostConfig({
-      devToolsAiAssistanceV2: {
-        enabled: true,
-      },
       aidaAvailability: {
+        enabled: true,
         enterprisePolicyValue: 1,  // ALLOW_WITHOUT_LOGGING
       },
     });
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled').set(true);
 
     const {view} = await setupWidget();
 
@@ -304,34 +327,14 @@ describeWithEnvironment('AISettingsTab', () => {
     assert.exists(aiAssistanceParams);
     assert.strictEqual(
         aiAssistanceParams.toConsiderSettingItems[0].text,
-        'To generate explanations, chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google. The content you submit and that is generated by this feature will not be used to improve Google’s AI models. This is an experimental AI feature and won’t always get it right.');
+        'To generate explanations, chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google. The content you submit and that is generated by this feature won’t be used to improve Google’s AI models. This is an experimental AI feature and won’t always get it right.');
   });
 
-  it('shows original strings when V2 is disabled', async () => {
-    updateHostConfig({
-      devToolsAiAssistanceV2: {
-        enabled: false,
-      },
-    });
-    Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
-
-    const {view} = await setupWidget();
-
-    const settingToParams = Array.from(view.input.settingToParams.values());
-    const aiAssistanceParams = settingToParams.find(p => p.settingName === 'AI assistance');
-    assert.exists(aiAssistanceParams);
-    assert.strictEqual(aiAssistanceParams.settingDescription, 'Get help with understanding CSS styles');
-  });
-
-  it('marks the V2 opt-in dialog as seen when turning on AI assistance in V2', async () => {
-    updateHostConfig({
-      devToolsAiAssistanceV2: {
-        enabled: true,
-      },
-    });
-    const aiAssistanceEnabledSetting = Common.Settings.moduleSetting('ai-assistance-enabled');
+  it('marks the V2 opt-in dialog as seen when turning on AI assistance', async () => {
+    const aiAssistanceEnabledSetting = Common.Settings.Settings.instance().moduleSetting('ai-assistance-enabled');
     aiAssistanceEnabledSetting.set(false);
-    const v2OptInSeenSetting = Common.Settings.moduleSetting('ai-assistance-v2-opt-in-change-dialog-seen');
+    const v2OptInSeenSetting = Common.Settings.Settings.instance().resolve(
+        AiAssistanceModel.AiUtils.aiAssistanceV2OptInChangeDialogSeenSettingDescriptor);
     v2OptInSeenSetting.set(false);
 
     const {view} = await setupWidget();
@@ -346,26 +349,11 @@ describeWithEnvironment('AISettingsTab', () => {
     assert.isTrue(v2OptInSeenSetting.get());
   });
 
-  it('does not mark the V2 opt-in dialog as seen when turning on AI assistance in V1', async () => {
-    updateHostConfig({
-      devToolsAiAssistanceV2: {
-        enabled: false,
-      },
-    });
-    const aiAssistanceEnabledSetting = Common.Settings.moduleSetting('ai-assistance-enabled');
-    aiAssistanceEnabledSetting.set(false);
-    const v2OptInSeenSetting = Common.Settings.moduleSetting('ai-assistance-v2-opt-in-change-dialog-seen');
-    v2OptInSeenSetting.set(false);
-
+  it('registers setting entries with string settingName keys', async () => {
     const {view} = await setupWidget();
 
-    const settingToParams = Array.from(view.input.settingToParams.entries());
-    const aiAssistanceEntry = settingToParams.find(entry => entry[1].settingName === 'AI assistance');
-    assert.exists(aiAssistanceEntry);
-
-    view.input.toggleSetting(aiAssistanceEntry[0], new Switch.Switch.SwitchChangeEvent(true));
-
-    assert.isTrue(aiAssistanceEnabledSetting.get());
-    assert.isFalse(v2OptInSeenSetting.get());
+    const settingNames = Array.from(view.input.settingToParams.keys());
+    assert.include(settingNames, 'console-insights-enabled');
+    assert.include(settingNames, 'ai-assistance-enabled');
   });
 });

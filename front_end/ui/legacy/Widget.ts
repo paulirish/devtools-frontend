@@ -32,13 +32,35 @@
 import '../dom_extension/dom_extension.js';
 
 import * as Platform from '../../core/platform/platform.js';
-import * as Geometry from '../../models/geometry/geometry.js';
+import type * as Root from '../../core/root/root.js';
+import type * as Foundation from '../../foundation/foundation.js';
 import * as Lit from '../../ui/lit/lit.js';
+import * as Geometry from '../geometry/geometry.js';
 
 import {appendStyle, deepActiveElement} from './DOMUtilities.js';
 import {cloneCustomElement, createShadowRootWithCoreStyles} from './UIUtils.js';
+import {UniverseRequestEvent} from './UniverseRequestEvent.js';
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+type InjectReturn<T> = T extends {INJECT: infer I} ? I :
+                                                     // eslint-disable-next-line @typescript-eslint/naming-convention
+                                                     T extends {constructor: {INJECT: infer I}} ? I : [];
+
+type MapConstructors<T> = {
+  [K in keyof T]: T[K] extends Root.DevToolsContext.ConstructorT<infer Instance>?
+      Instance :
+      T[K] extends new (...args: any[]) => infer Instance ? Instance : never;
+};
+
+export type WidgetDependencies<T> = MapConstructors<InjectReturn<T>>;
 
 const {html} = Lit;
+
+export function lookupUniverseForElement(element: HTMLElement): Foundation.Universe.Universe|undefined {
+  const event = new UniverseRequestEvent();
+  element.dispatchEvent(event);
+  return event.universe;
+}
 
 // Remember the original DOM mutation methods here, since we
 // will override them below to sanity check the Widget system.
@@ -55,10 +77,11 @@ function assert(condition: unknown, message: string): void {
 
 export type AnyWidget = Widget<HTMLElement|DocumentFragment>;
 
-type WidgetConstructor<WidgetT extends AnyWidget> = new (element: HTMLElement) => WidgetT;
-type WidgetProducer<WidgetT extends AnyWidget> = (element: HTMLElement) => WidgetT;
-type WidgetFactory<WidgetT extends AnyWidget> = WidgetConstructor<WidgetT>|WidgetProducer<WidgetT>;
-type InferWidgetTFromFactory<F> = F extends WidgetFactory<infer WidgetT>? WidgetT : never;
+export type WidgetConstructor<WidgetT extends AnyWidget> = new (element: HTMLElement, ...args: any[]) => WidgetT;
+export type WidgetProducer<WidgetT extends AnyWidget> =
+    (element: HTMLElement, universe?: Foundation.Universe.Universe) => WidgetT;
+export type WidgetFactory<WidgetT extends AnyWidget> = WidgetConstructor<WidgetT>|WidgetProducer<WidgetT>;
+export type InferWidgetTFromFactory<F> = F extends WidgetFactory<infer WidgetT>? WidgetT : never;
 
 export class WidgetConfig<WidgetT extends AnyWidget> {
   constructor(readonly widgetClass: WidgetFactory<WidgetT>, readonly widgetParams?: Partial<WidgetT>) {
@@ -76,15 +99,20 @@ export function widgetConfig<F extends WidgetFactory<AnyWidget>, ParamKeys exten
 let currentUpdateQueue: Map<AnyWidget, PromiseWithResolvers<void>>|null = null;
 const currentlyProcessed = new Set<AnyWidget>();
 let nextUpdateQueue = new Map<AnyWidget, PromiseWithResolvers<void>>();
-let pendingAnimationFrame: number|null = null;
+const pendingAnimationFrames = new WeakMap<Window, number>();
 let overallUpdatePromise: PromiseWithResolvers<void>|null = null;
 
 function enqueueIntoNextUpdateQueue(widget: AnyWidget): Promise<void> {
   const scheduledUpdate = nextUpdateQueue.get(widget) ?? Promise.withResolvers<void>();
   nextUpdateQueue.delete(widget);
   nextUpdateQueue.set(widget, scheduledUpdate);
-  if (pendingAnimationFrame === null) {
-    pendingAnimationFrame = requestAnimationFrame(runNextUpdate);
+  const widgetWindow = widget.contentElement.window() || window;
+  if (!pendingAnimationFrames.has(widgetWindow)) {
+    const frameId = widgetWindow.requestAnimationFrame(() => {
+      pendingAnimationFrames.delete(widgetWindow);
+      runNextUpdate();
+    });
+    pendingAnimationFrames.set(widgetWindow, frameId);
   }
   return scheduledUpdate.promise;
 }
@@ -118,13 +146,30 @@ function cancelUpdate(widget: AnyWidget): void {
   }
 }
 
+function resolveOverallUpdatePromise(): void {
+  if (currentlyProcessed.size === 0 && (!currentUpdateQueue || currentUpdateQueue.size === 0) &&
+      nextUpdateQueue.size === 0 && overallUpdatePromise) {
+    overallUpdatePromise.resolve();
+    overallUpdatePromise = null;
+  }
+}
+
 function runNextUpdate(): void {
-  pendingAnimationFrame = null;
   if (!currentUpdateQueue) {
     currentUpdateQueue = nextUpdateQueue;
     nextUpdateQueue = new Map();
   }
-  for (const [widget, {resolve}] of currentUpdateQueue) {
+  for (const [widget, update] of currentUpdateQueue) {
+    if (currentlyProcessed.has(widget)) {
+      const scheduledUpdate = nextUpdateQueue.get(widget);
+      if (!scheduledUpdate) {
+        nextUpdateQueue.set(widget, update);
+      } else {
+        void scheduledUpdate.promise.then(update.resolve);
+      }
+      continue;
+    }
+    const {resolve} = update;
     currentlyProcessed.add(widget);
     void (async () => {
       try {
@@ -132,7 +177,22 @@ function runNextUpdate(): void {
         widget.addUpdateController(controller);
         await widget.performUpdate(controller.signal);
       } finally {
-        resolve();
+        currentlyProcessed.delete(widget);
+        const nextUpdate = nextUpdateQueue.get(widget);
+        if (nextUpdate) {
+          void nextUpdate.promise.then(resolve);
+          const widgetWindow = widget.contentElement.window() || window;
+          if (!pendingAnimationFrames.has(widgetWindow)) {
+            const frameId = widgetWindow.requestAnimationFrame(() => {
+              pendingAnimationFrames.delete(widgetWindow);
+              runNextUpdate();
+            });
+            pendingAnimationFrames.set(widgetWindow, frameId);
+          }
+        } else {
+          resolve();
+        }
+        resolveOverallUpdatePromise();
       }
     })().catch(e => {
       if (e.name !== 'AbortError') {
@@ -146,28 +206,24 @@ function runNextUpdate(): void {
       runNextUpdate();
     } else {
       currentUpdateQueue = null;
-      currentlyProcessed.clear();
-      if (!pendingAnimationFrame && overallUpdatePromise) {
-        overallUpdatePromise.resolve();
-        overallUpdatePromise = null;
-      }
+      resolveOverallUpdatePromise();
     }
   });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const widgetConfigs = new WeakMap<HTMLElement, WidgetConfig<any>>();
+export const widgetConfigs: WeakMap<HTMLElement, WidgetConfig<any>> = new WeakMap<HTMLElement, WidgetConfig<any>>();
 
-export function registerWidgetConfig<WidgetT extends AnyWidget>(
-    element: HTMLElement, config: WidgetConfig<WidgetT>): void {
+export function registerWidgetConfig<WidgetT extends AnyWidget>(element: HTMLElement,
+                                                                config: WidgetConfig<WidgetT>): void {
   if (!widgetConfigs.has(element)) {
     setUpLifecycleTracking(element);
   }
   widgetConfigs.set(element, config);
 }
 
-function instantiateWidget<WidgetT extends AnyWidget>(
-    element: HTMLElement, widgetConfig: WidgetConfig<WidgetT>): WidgetT {
+export function instantiateWidget<WidgetT extends AnyWidget>(element: HTMLElement,
+                                                             widgetConfig: WidgetConfig<WidgetT>): WidgetT {
   if (!widgetConfig.widgetClass) {
     throw new Error('No widgetClass defined');
   }
@@ -175,10 +231,21 @@ function instantiateWidget<WidgetT extends AnyWidget>(
   let newWidget: WidgetT;
   if (Widget.isPrototypeOf(widgetConfig.widgetClass)) {
     const ctor = widgetConfig.widgetClass as WidgetConstructor<WidgetT>;
-    newWidget = new ctor(element);
+    const depsCtors = (ctor as unknown as typeof Widget).INJECT;
+    if (depsCtors && depsCtors.length > 0) {
+      const universe = lookupUniverseForElement(element);
+      if (!universe) {
+        throw new Error(`No Universe found for widget ${ctor.name} requesting dependencies via INJECT.`);
+      }
+      const deps = depsCtors.map(depCtor => universe.get(depCtor));
+      newWidget = new ctor(element, deps);
+    } else {
+      newWidget = new ctor(element);
+    }
   } else {
     const factory = widgetConfig.widgetClass as WidgetProducer<WidgetT>;
-    newWidget = factory(element);
+    const universe = lookupUniverseForElement(element);
+    newWidget = factory(element, universe);
   }
 
   if (widgetConfig.widgetParams) {
@@ -311,6 +378,8 @@ customElements.define('devtools-widget', WidgetElement);
 
 export class WidgetDirective extends Lit.Directive.Directive {
   #partType: Lit.Directive.PartType;
+  #lastWidgetClass?: unknown;
+  #lastKey?: unknown;
 
   constructor(partInfo: Lit.Directive.PartInfo) {
     super(partInfo);
@@ -353,13 +422,20 @@ export class WidgetDirective extends Lit.Directive.Directive {
     if (this.#partType === Lit.Directive.PartType.ELEMENT) {
       return Lit.nothing;
     }
+    if (this.#lastWidgetClass !== widgetClass) {
+      this.#lastWidgetClass = widgetClass;
+      this.#lastKey = Widget.isPrototypeOf(widgetClass) ? widgetClass : widgetClass.toString();
+    }
     // We use `repeat` to force Lit to recreate the `<devtools-widget>` DOM node when the `widgetClass` changes.
     // If we didn't use `repeat` and used `html` directly, Lit would reuse the same `<devtools-widget>` instance
     // even if `widgetClass` changed (for example, in a ternary operator `condition ? widget(A) : widget(B)`).
     // This is because the template string is the same, so Lit reuses the DOM node and only updates `.widgetConfig`,
     // which does not properly recreate the widget instance.
+    // We use `#lastKey` (and stringify factory functions) instead of just using `widgetClass` as the key
+    // so that we intentionally ignore reference changes for identical inline factories. This prevents accidental
+    // recreation of the DOM node on every render when an anonymous inline arrow function is passed.
     return Lit.Directives.repeat(
-        [widgetClass], () => widgetClass,
+        [widgetClass], () => this.#lastKey,
         () => html`<devtools-widget ${widget<F, ParamKeys>(widgetClass, widgetParams)}></devtools-widget>`);
   }
 }
@@ -459,6 +535,12 @@ export type WidgetOptions<ContentTypeT extends HTMLElement|DocumentFragment = HT
                                         classes?: never,
                                       });
 
+const enum UpdateState {
+  NORMAL = 'NORMAL',            // Standard state: update can be aborted for efficiency.
+  INTERRUPTED = 'INTERRUPTED',  // An update was physically running and got aborted; replacement must be shielded.
+  SHIELDED = 'SHIELDED',        // Current update is a replacement for an interrupted one and cannot be aborted.
+}
+
 export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElement> {
   readonly element: HTMLElement;
   #contentElement: ContentTypeT;
@@ -477,6 +559,7 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   #externallyManaged?: boolean;
   #updateComplete = UPDATE_COMPLETE;
   #updateController?: AbortController;
+  #updateState = UpdateState.NORMAL;
 
   /**
    * Constructs a new `Widget` with the given `options`.
@@ -534,6 +617,15 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   }
 
   /**
+   * An array of dependency constructors that this widget class expects to receive as an array
+   * in the second positional argument to its constructor during `instantiateWidget`:
+   * `constructor(element: HTMLElement, deps: WidgetDependencies<typeof MyWidget>)`
+   *
+   * Override this static field in sub-classes to specify dependency constructors to be retrieved from `Universe`.
+   */
+  static readonly INJECT: ReadonlyArray<Root.DevToolsContext.ConstructorT<unknown>> = [];
+
+  /**
    * Returns the {@link Widget} whose element is the given `node`, or `undefined`
    * if the `node` is not an element for a widget.
    *
@@ -545,7 +637,7 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   }
 
   static get allUpdatesComplete(): Promise<void> {
-    if (!pendingAnimationFrame && !currentUpdateQueue) {
+    if (nextUpdateQueue.size === 0 && !currentUpdateQueue && currentlyProcessed.size === 0) {
       return Promise.resolve();
     }
     if (!overallUpdatePromise) {
@@ -763,9 +855,8 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
     if (this.#isRoot) {
       assert(!currentParent, 'Attempt to show root widget under another widget');
     } else {
-      assert(
-          currentParent && widgetMap.get(currentParent) === this.#parentWidget,
-          'Attempt to show under node belonging to alien widget');
+      assert(currentParent && widgetMap.get(currentParent) === this.#parentWidget,
+             'Attempt to show under node belonging to alien widget');
     }
 
     const wasVisible = this.#visible;
@@ -1000,9 +1091,8 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   getDefaultFocusedElement(): HTMLElement|null {
     const elements = this.getDefaultFocusedElements();
     if (elements.length > 1) {
-      console.error(
-          'Multiple autofocus elements found', this.constructor.name,
-          ...elements.map(e => Platform.StringUtilities.trimMiddle(e.outerHTML, 250)));
+      console.error('Multiple autofocus elements found', this.constructor.name,
+                    ...elements.map(e => Platform.StringUtilities.trimMiddle(e.outerHTML, 250)));
     }
     return elements[0] || null;
   }
@@ -1063,8 +1153,12 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   }
 
   setMinimumAndPreferredSizes(width: number, height: number, preferredWidth: number, preferredHeight: number): void {
-    this.#constraints =
+    const newConstraints =
         new Geometry.Constraints(new Geometry.Size(width, height), new Geometry.Size(preferredWidth, preferredHeight));
+    if (this.#constraints?.isEqual(newConstraints)) {
+      return;
+    }
+    this.#constraints = newConstraints;
     this.invalidateConstraints();
   }
 
@@ -1073,15 +1167,18 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   }
 
   set minimumSize(size: Geometry.Size) {
-    this.#constraints = new Geometry.Constraints(size);
+    const newConstraints = new Geometry.Constraints(size);
+    if (this.#constraints?.isEqual(newConstraints)) {
+      return;
+    }
+    this.#constraints = newConstraints;
     this.invalidateConstraints();
   }
 
   private hasNonZeroConstraints(): boolean {
     const constraints = this.constraints();
-    return Boolean(
-        constraints.minimum.width || constraints.minimum.height || constraints.preferred.width ||
-        constraints.preferred.height);
+    return Boolean(constraints.minimum.width || constraints.minimum.height || constraints.preferred.width ||
+                   constraints.preferred.height);
   }
 
   suspendInvalidations(): void {
@@ -1141,12 +1238,17 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
   }
 
   addUpdateController(controller: AbortController): void {
+    const wasInterrupted = this.#updateState === UpdateState.INTERRUPTED;
     this.#updateController?.abort();
     this.#updateController = controller;
+    // Transition to SHIELDED if we are replacing a starved update, otherwise reset to NORMAL.
+    this.#updateState = wasInterrupted ? UpdateState.SHIELDED : UpdateState.NORMAL;
   }
 
   cancelUpdateController(): void {
     this.#updateController?.abort();
+    this.#updateController = undefined;
+    this.#updateState = UpdateState.NORMAL;
   }
 
   /**
@@ -1156,7 +1258,13 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
    * frame.
    */
   requestUpdate(): void {
-    this.#updateController?.abort();
+    // If the state is SHIELDED, we skip the abort call entirely to break the starvation loop.
+    if (this.#updateState !== UpdateState.SHIELDED) {
+      if (currentlyProcessed.has(this)) {
+        this.#updateState = UpdateState.INTERRUPTED;
+      }
+      this.#updateController?.abort();
+    }
     this.#updateComplete = enqueueWidgetUpdate(this);
   }
 
@@ -1346,3 +1454,36 @@ Node.prototype.removeChildren = function(): void {
   }
   return originalRemoveChildren.call(this);
 };
+
+export interface WrapperWidgetParams {
+  widget: AnyWidget;
+}
+
+export class WrapperWidget extends Widget {
+  #widget: AnyWidget|null = null;
+  constructor(element: HTMLElement, _deps: never[], params?: WrapperWidgetParams) {
+    super(element);
+    this.element.style.setProperty('display', 'contents');
+    if (params?.widget) {
+      this.widget = params.widget;
+    }
+  }
+
+  set widget(widget: AnyWidget|null) {
+    if (this.#widget === widget) {
+      return;
+    }
+    if (this.#widget) {
+      this.#widget.detach();
+    }
+    this.#widget = widget;
+    if (this.#widget) {
+      this.#widget.show(this.element, undefined, /* suppressOrphanWidgetError */ true);
+    }
+  }
+  override focus(): void {
+    if (this.#widget) {
+      this.#widget.focus();
+    }
+  }
+}

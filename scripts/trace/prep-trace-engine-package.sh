@@ -17,7 +17,7 @@ rm -rf "$out_dir/gen"
 perl -pi -e 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/**/*.ts
 
 # build devtools first!
-gn --args="is_debug=true" gen -C $out_dir
+gn --args="is_debug=true devtools_bundle=false" gen -C $out_dir
 autoninja -C $out_dir front_end
 
 rm -rf "$dist"
@@ -103,6 +103,8 @@ for p in Path('$dist').rglob('*.d.ts'):
         content = content.replace(needle, 'any')
 
     comment_out = [
+        'import * as i18n',
+        'import type * as i18n',
         'import type * as Common',
         'import type * as CrUXManager',
         'import type * as Lit',
@@ -110,6 +112,9 @@ for p in Path('$dist').rglob('*.d.ts'):
     ]
     for needle in comment_out:
         content = content.replace(needle, f'// {needle}')
+
+    content = content.replace('i18n.LocalizeString', '(id: string, values?: Record<string, string>) => Platform.UIString.LocalizedString')
+    content = content.replace('i18n.LazyLocalizeString', '() => Platform.UIString.LocalizedString')
 
     for needle in ['Common.UIString.LocalizedString', 'Platform.UIString.LocalizedString']:
         content = content.replace(needle, '{i18nId: string, values: Record<string, string|number>, formattedDefault: string}')

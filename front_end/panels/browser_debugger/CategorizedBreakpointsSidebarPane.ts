@@ -14,23 +14,23 @@ import categorizedBreakpointsSidebarPaneStyles from './categorizedBreakpointsSid
 
 const UIStrings = {
   /**
-   * @description Category of breakpoints
+   * @description Category of event listener breakpoints for Ad Auction Worklet events.
    */
-  auctionWorklet: 'Ad Auction Worklet',
+  auctionWorklet: 'Ad auction worklet',
   /**
-   * @description Text that refers to the animation of the web page
+   * @description Category of event listener breakpoints for animation events.
    */
   animation: 'Animation',
   /**
-   * @description Screen reader description of a hit breakpoint in the Sources panel
+   * @description Screen reader description of a hit breakpoint in the Sources panel.
    */
   breakpointHit: 'breakpoint hit',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for canvas events.
    */
   canvas: 'Canvas',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for clipboard events.
    */
   clipboard: 'Clipboard',
   /**
@@ -38,87 +38,83 @@ const UIStrings = {
    */
   control: 'Control',
   /**
-   * @description Text that refers to device such as a phone
+   * @description Category of event listener breakpoints for device events.
    */
   device: 'Device',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for DOM mutation events.
    */
-  domMutation: 'DOM Mutation',
+  domMutation: 'DOM mutation',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for drag and drop events.
    */
   dragDrop: 'Drag / drop',
   /**
-   * @description Title for a group of cities
+   * @description Category of event listener breakpoints for geolocation events.
    */
   geolocation: 'Geolocation',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for keyboard events.
    */
   keyboard: 'Keyboard',
   /**
-   * @description Text to load something
+   * @description Category of event listener breakpoints for load events.
    */
   load: 'Load',
   /**
-   * @description Text that appears on a button for the media resource type filter.
+   * @description Category of event listener breakpoints for media events.
    */
   media: 'Media',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for mouse events.
    */
   mouse: 'Mouse',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for notification events.
    */
   notification: 'Notification',
   /**
-   * @description Text to parse something
+   * @description Category of event listener breakpoints for parse events.
    */
   parse: 'Parse',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for picture-in-picture events.
    */
-  pictureinpicture: 'Picture-in-Picture',
+  pictureinpicture: 'Picture-in-picture',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for pointer events.
    */
   pointer: 'Pointer',
   /**
-   * @description Label for a group of JavaScript files
+   * @description Category of event listener breakpoints for script events.
    */
   script: 'Script',
   /**
-   * @description Category of breakpoints
-   */
-  sharedStorageWorklet: 'Shared Storage Worklet',
-  /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for timer events.
    */
   timer: 'Timer',
   /**
-   * @description Text for the touch type to simulate on a device
+   * @description Category of event listener breakpoints for touch events.
    */
   touch: 'Touch',
   /**
-   * @description Title for a category of breakpoints on Trusted Type violations
+   * @description Category of event listener breakpoints for Trusted Type violations.
    */
-  trustedTypeViolations: 'Trusted Type Violations',
+  trustedTypeViolations: '`Trusted Type` violations',
   /**
-   * @description Title of the WebAudio tool
+   * @description Category of event listener breakpoints for WebAudio events.
    */
   webaudio: 'WebAudio',
   /**
-   * @description Text in DOMDebugger Model
+   * @description Category of event listener breakpoints for window events.
    */
   window: 'Window',
   /**
-   * @description Text for the service worker type.
+   * @description Category of event listener breakpoints for worker events.
    */
   worker: 'Worker',
   /**
-   * @description Text that appears on a button for the xhr resource type filter.
+   * @description Category of event listener breakpoints for XHR events.
    */
   xhr: 'XHR',
 } as const;
@@ -266,9 +262,8 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox<S
   #filterText: string|null = null;
   #view: View;
   #selectedItem: SDK.CategorizedBreakpoint.Category|SDK.CategorizedBreakpoint.CategorizedBreakpoint|null = null;
-  constructor(
-      breakpoints: SDK.CategorizedBreakpoint.CategorizedBreakpoint[], jslog: string, viewId: string,
-      view = DEFAULT_VIEW) {
+  constructor(breakpoints: SDK.CategorizedBreakpoint.CategorizedBreakpoint[], jslog: string, viewId: string,
+              view: View = DEFAULT_VIEW) {
     super({useShadowDom: 'pure'});
     this.#view = view;
     this.#jslog = jslog;
@@ -386,7 +381,6 @@ const LOCALIZED_CATEGORIES: Record<SDK.CategorizedBreakpoint.Category, () => Pla
   [SDK.CategorizedBreakpoint.Category.PICTURE_IN_PICTURE]: i18nLazyString(UIStrings.pictureinpicture),
   [SDK.CategorizedBreakpoint.Category.POINTER]: i18nLazyString(UIStrings.pointer),
   [SDK.CategorizedBreakpoint.Category.SCRIPT]: i18nLazyString(UIStrings.script),
-  [SDK.CategorizedBreakpoint.Category.SHARED_STORAGE_WORKLET]: i18nLazyString(UIStrings.sharedStorageWorklet),
   [SDK.CategorizedBreakpoint.Category.TIMER]: i18nLazyString(UIStrings.timer),
   [SDK.CategorizedBreakpoint.Category.TOUCH]: i18nLazyString(UIStrings.touch),
   [SDK.CategorizedBreakpoint.Category.TRUSTED_TYPE_VIOLATION]: i18nLazyString(UIStrings.trustedTypeViolations),

@@ -9,7 +9,7 @@ import("../../visibility.gni")
 
 devtools_entrypoint("bundle") {
   entrypoint = "lantern.ts"
-  deps = [
+  ts_deps = [
     "core:bundle",
     "graph:bundle",
     "metrics:bundle",

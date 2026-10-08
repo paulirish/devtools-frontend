@@ -22,7 +22,7 @@ function getInsightComponents(insightSetComponent: Components.SidebarSingleInsig
     BaseInsightComponent[] {
   assert.isOk(insightSetComponent.element.shadowRoot);
   return [
-    ...insightSetComponent.element.shadowRoot.querySelectorAll<BaseInsightWidget>('.insight-component-widget')
+    ...insightSetComponent.element.shadowRoot.querySelectorAll<BaseInsightWidget>('.insight-component-widget'),
   ].map(widgetElement => {
     const widget = widgetElement.getWidget();
     assert.isOk(widget);
@@ -87,7 +87,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'Duplicated JavaScript',
-      'CSS Selector costs',
+      'CSS selector costs',
       'Forced reflow',
       'Use efficient cache lifetimes',
       'Modern HTTP',
@@ -131,7 +131,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'Duplicated JavaScript',
-      'CSS Selector costs',
+      'CSS selector costs',
       'Forced reflow',
       'Modern HTTP',
       'Legacy JavaScript',

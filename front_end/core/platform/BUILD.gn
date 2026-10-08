@@ -20,6 +20,7 @@ devtools_foundation_module("platform") {
     "MapUtilities.ts",
     "MimeType.ts",
     "NumberUtilities.ts",
+    "Size.ts",
     "StringUtilities.ts",
     "Timing.ts",
     "TypedArrayUtilities.ts",
@@ -28,8 +29,8 @@ devtools_foundation_module("platform") {
     "UserVisibleError.ts",
   ]
 
-  deps = [
-    "./api:bundle",
+  ts_deps = [
+    "./api",
     "./browser:bundle",
     "./node:bundle",
   ]
@@ -38,12 +39,12 @@ devtools_foundation_module("platform") {
 devtools_entrypoint("bundle") {
   entrypoint = "platform.ts"
 
-  deps = [ ":platform" ]
+  ts_deps = [ ":platform" ]
 
   visibility = [ "*" ]
 }
 
-devtools_foundation_module("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
@@ -54,11 +55,13 @@ devtools_foundation_module("unittests") {
     "MapUtilities.test.ts",
     "MimeType.test.ts",
     "NumberUtilities.test.ts",
+    "Size.test.ts",
     "StringUtilities.test.ts",
     "TypedArrayUtilities.test.ts",
+    "TypescriptUtilities.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../testing",
   ]

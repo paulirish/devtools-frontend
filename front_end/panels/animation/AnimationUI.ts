@@ -6,7 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
-import * as Geometry from '../../models/geometry/geometry.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -15,15 +15,15 @@ import {type AnimationTimeline, StepTimingFunction} from './AnimationTimeline.js
 
 const UIStrings = {
   /**
-   * @description Title of the first and last points of an animation
+   * @description Title of the first and last points of an animation.
    */
-  animationEndpointSlider: 'Animation Endpoint slider',
+  animationEndpointSlider: 'Animation endpoint slider',
   /**
-   * @description Title of an Animation Keyframe point
+   * @description Title of an animation keyframe point.
    */
-  animationKeyframeSlider: 'Animation Keyframe slider',
+  animationKeyframeSlider: 'Animation keyframe slider',
   /**
-   * @description Title of an animation keyframe group
+   * @description Title of an animation keyframe group.
    * @example {anilogo} PH1
    */
   sSlider: '{PH1} slider',
@@ -501,7 +501,7 @@ export const Options = {
   GridCanvasHeight: 40,
 };
 
-export const Colors = new Map<string, Common.Color.Color|null>([
+export const Colors: Map<string, Common.Color.Color|null> = new Map<string, Common.Color.Color|null>([
   ['Purple', Common.Color.parse('#9C27B0')],
   ['Light Blue', Common.Color.parse('#03A9F4')],
   ['Deep Orange', Common.Color.parse('#FF5722')],

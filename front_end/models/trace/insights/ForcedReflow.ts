@@ -29,15 +29,15 @@ export const UIStrings = {
   description:
       'A forced reflow occurs when JavaScript queries geometric properties (such as `offsetWidth`) after styles have been invalidated by a change to the DOM state. This can result in poor performance. Learn more about [forced reflows](https://developer.chrome.com/docs/performance/insights/forced-reflow) and possible mitigations.',
   /**
-   * @description Title of a list to provide related stack trace data
+   * @description Title of a list to provide related stack trace data.
    */
   reflowCallFrames: 'Call frames that trigger reflow',
   /**
-   * @description Text to describe the top time-consuming function call
+   * @description Text to describe the top time-consuming function call.
    */
   topTimeConsumingFunctionCall: 'Top function call',
   /**
-   * @description Text to describe the total reflow time
+   * @description Text to describe the total reflow time.
    */
   totalReflowTime: 'Total reflow time',
   /**
@@ -45,13 +45,13 @@ export const UIStrings = {
    */
   unattributed: '[unattributed]',
   /**
-   * @description Text for the name of anonymous functions
+   * @description Text for the name of anonymous functions.
    */
   anonymous: '(anonymous)',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/ForcedReflow.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type ForcedReflowInsightModel = InsightModel<typeof UIStrings, {
   topLevelFunctionCallData: ForcedReflowAggregatedData | undefined,

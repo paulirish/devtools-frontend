@@ -7,7 +7,7 @@ import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { computeSystemExecutablePath, Browser as SupportedBrowsers, } from '@puppeteer/browsers';
-import { debugError } from '../common/util.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { assert } from '../util/assert.js';
 import { BrowserLauncher } from './BrowserLauncher.js';
 import { convertPuppeteerChannelToBrowsersChannel, } from './LaunchOptions.js';
@@ -16,8 +16,8 @@ import { rm } from './util/fs.js';
  * @internal
  */
 export class ChromeLauncher extends BrowserLauncher {
-    constructor(puppeteer) {
-        super(puppeteer, 'chrome');
+    constructor(puppeteer, logger) {
+        super(puppeteer, 'chrome', logger);
     }
     async launch(options = {}) {
         const config = await this.puppeteer.configuration();
@@ -69,16 +69,21 @@ export class ChromeLauncher extends BrowserLauncher {
         let isTempUserDataDir = false;
         // Check for the user data dir argument, which will always be set even
         // with a custom directory specified via the userDataDir option.
-        let userDataDirIndex = chromeArguments.findIndex(arg => {
+        const userDataDirIndex = chromeArguments.findIndex(arg => {
             return arg.startsWith('--user-data-dir');
         });
+        let userDataDir;
         if (userDataDirIndex < 0) {
             isTempUserDataDir = true;
-            chromeArguments.push(`--user-data-dir=${await mkdtemp(await this.getProfilePath())}`);
-            userDataDirIndex = chromeArguments.length - 1;
+            const profilePath = await this.getProfilePath();
+            userDataDir = await mkdtemp(profilePath);
+            chromeArguments.push(`--user-data-dir=${userDataDir}`);
         }
-        const userDataDir = chromeArguments[userDataDirIndex].split('=', 2)[1];
-        assert(typeof userDataDir === 'string', '`--user-data-dir` is malformed');
+        else {
+            const parsedUserDataDir = chromeArguments[userDataDirIndex].split('=', 2)[1];
+            assert(typeof parsedUserDataDir === 'string', '`--user-data-dir` is malformed');
+            userDataDir = parsedUserDataDir;
+        }
         let chromeExecutable = executablePath;
         if (!chromeExecutable) {
             assert(channel || !this.puppeteer._isPuppeteerCore, `An \`executablePath\` or \`channel\` must be specified for \`puppeteer-core\``);
@@ -102,8 +107,7 @@ export class ChromeLauncher extends BrowserLauncher {
                 await rm(path);
             }
             catch (error) {
-                debugError(error);
-                throw error;
+                this.logger(DEBUG_PREFIXES.error)?.(error);
             }
         }
     }
@@ -134,6 +138,8 @@ export class ChromeLauncher extends BrowserLauncher {
             'MediaRouter',
             'OptimizationHints',
             'WebUIReloadButton',
+            'WebUIOmniboxPopup',
+            'WebUIOmniboxAimPopup',
             ...(turnOnExperimentalFeaturesForTesting
                 ? []
                 : [
@@ -197,9 +203,9 @@ export class ChromeLauncher extends BrowserLauncher {
         if (headless) {
             chromeArguments.push(headless === 'shell' ? '--headless' : '--headless=new', '--hide-scrollbars', '--mute-audio');
         }
-        chromeArguments.push(enableExtensions
-            ? '--enable-unsafe-extension-debugging'
-            : '--disable-extensions');
+        if (!enableExtensions) {
+            chromeArguments.push('--disable-extensions');
+        }
         if (args.every(arg => {
             return arg.startsWith('-');
         })) {
@@ -213,7 +219,7 @@ export class ChromeLauncher extends BrowserLauncher {
             return computeSystemExecutablePath({
                 browser: SupportedBrowsers.CHROME,
                 channel: convertPuppeteerChannelToBrowsersChannel(channel),
-            });
+            }, validatePath);
         }
         else {
             return await this.resolveExecutablePath(undefined, validatePath);

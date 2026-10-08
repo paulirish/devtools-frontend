@@ -7,12 +7,11 @@ import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
-import type {NameValue} from '../../../core/sdk/NetworkRequest.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import * as Protocol from '../../../generated/protocol.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
 import * as Persistence from '../../../models/persistence/persistence.js';
-import * as TextUtils from '../../../models/text_utils/text_utils.js';
 import type * as Workspace from '../../../models/workspace/workspace.js';
 import * as NetworkForward from '../../../panels/network/forward/forward.js';
 import * as Sources from '../../../panels/sources/sources.js';
@@ -42,18 +41,17 @@ const UIStrings = {
   /**
    * @description Explanation text for which cross-origin policy to set.
    */
-  chooseThisOptionIfTheResourceAnd:
-      'Choose this option if the resource and the document are served from the same site.',
+  chooseThisOptionIfTheResourceAnd: 'Choose this option if the resource and the document are served from the same site',
   /**
    * @description Explanation text for which cross-origin policy to set.
    */
   onlyChooseThisOptionIfAn:
-      'Only choose this option if an arbitrary website including this resource does not impose a security risk.',
+      'Only choose this option if an arbitrary website including this resource doesn’t impose a security risk',
   /**
    * @description Message in the Headers View of the Network panel when a cross-origin opener policy blocked loading a sandbox iframe.
    */
   thisDocumentWasBlockedFrom:
-      'The document was blocked from loading in a popup opened by a sandboxed iframe because this document specified a cross-origin opener policy.',
+      'The document was blocked from loading in a popup opened by a sandboxed iframe because this document specified a cross-origin opener policy',
   /**
    * @description Message in the Headers View of the Network panel when a cross-origin embedder policy header needs to be set.
    */
@@ -88,10 +86,10 @@ export interface ResponseHeaderSectionData {
 }
 
 class ResponseHeaderSectionBase extends HTMLElement {
-  protected readonly shadow = this.attachShadow({mode: 'open'});
+  protected readonly shadow: ShadowRoot = this.attachShadow({mode: 'open'});
   protected headerDetails: HeaderDetailsDescriptor[] = [];
 
-  protected setHeaders(headers: NameValue[]): void {
+  protected setHeaders(headers: SDK.NetworkRequest.NameValue[]): void {
     headers.sort(function(a, b) {
       return Platform.StringUtilities.compare(a.name.toLowerCase(), b.name.toLowerCase());
     });
@@ -170,12 +168,14 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
           BlockedReasonDetails.get((this.#request.blockedReason() as Protocol.Network.BlockedReason));
       if (headerWithIssues) {
         if (IssuesManager.RelatedIssue.hasIssueOfCategory(
-                this.#request, IssuesManager.Issue.IssueCategory.CROSS_ORIGIN_EMBEDDER_POLICY)) {
+                this.#request, IssuesManager.Issue.IssueCategory.CROSS_ORIGIN_EMBEDDER_POLICY,
+                IssuesManager.IssuesManager.IssuesManager.instance())) {
           const followLink = (): void => {
             Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.LEARN_MORE_LINK_COEP);
             if (this.#request) {
-              void IssuesManager.RelatedIssue.reveal(
-                  this.#request, IssuesManager.Issue.IssueCategory.CROSS_ORIGIN_EMBEDDER_POLICY);
+              void IssuesManager.RelatedIssue.reveal(this.#request,
+                                                     IssuesManager.IssuesManager.IssuesManager.instance(),
+                                                     IssuesManager.Issue.IssueCategory.CROSS_ORIGIN_EMBEDDER_POLICY);
             }
           };
           if (headerWithIssues.blockedDetails) {
@@ -279,7 +279,9 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
       if (!this.#overrides.every(Persistence.NetworkPersistenceManager.isHeaderOverride)) {
         throw new Error('Type mismatch after parsing');
       }
-      if (Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').get() &&
+      if (Common.Settings.Settings.instance()
+              .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+              .get() &&
           this.#isEditingAllowed === EditingAllowedStatus.DISABLED) {
         this.#isEditingAllowed = EditingAllowedStatus.ENABLED;
       }
@@ -564,11 +566,13 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
     const requestUrl = this.#request.url();
     const networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
     if (networkPersistenceManager.project()) {
-      Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(true);
+      Common.Settings.Settings.instance()
+          .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+          .set(true);
       await networkPersistenceManager.getOrCreateHeadersUISourceCodeFromUrl(requestUrl);
     } else {  // If folder for local overrides has not been provided yet
       UI.InspectorView.InspectorView.instance().displaySelectOverrideFolderInfobar(async () => {
-        await Sources.SourcesNavigator.OverridesNavigatorView.instance().setupNewWorkspace();
+        await Sources.SourcesNavigator.OverridesNavigatorView.setupNewWorkspace();
         await networkPersistenceManager.getOrCreateHeadersUISourceCodeFromUrl(requestUrl);
       });
     }

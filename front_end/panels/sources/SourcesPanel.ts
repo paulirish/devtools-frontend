@@ -48,6 +48,7 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as SettingsUI from '../../ui/legacy/components/settings_ui/settings_ui.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Settings from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Snippets from '../snippets/snippets.js';
 
@@ -55,119 +56,83 @@ import {CallStackSidebarPane} from './CallStackSidebarPane.js';
 import {DebuggerPausedMessage} from './DebuggerPausedMessage.js';
 import {NavigatorView} from './NavigatorView.js';
 import sourcesPanelStyles from './sourcesPanel.css.js';
-import {Events, SourcesView} from './SourcesView.js';
+import {type EditorClosedEvent, Events, SourcesView} from './SourcesView.js';
 import {ThreadsSidebarPane} from './ThreadsSidebarPane.js';
 import {UISourceCodeFrame} from './UISourceCodeFrame.js';
 
 const UIStrings = {
   /**
-   * @description Text that appears when user drag and drop something (for example, a file) in Sources Panel of the Sources panel
+   * @description Text that appears when user drags and drops a folder in the Sources panel.
    */
   dropWorkspaceFolderHere: 'Drop workspace folder here',
   /**
-   * @description Text to show more options
+   * @description Text to show more options.
    */
   moreOptions: 'More options',
   /**
-   * @description Tooltip for the the navigator toggle in the Sources panel. Command to open/show the
-   * sidebar containing the navigator tool.
-   */
-  showNavigator: 'Show navigator',
-  /**
-   * @description Tooltip for the the navigator toggle in the Sources panel. Command to close/hide
-   * the sidebar containing the navigator tool.
-   */
-  hideNavigator: 'Hide navigator',
-  /**
-   * @description Screen reader announcement when the navigator sidebar is shown in the Sources panel.
-   */
-  navigatorShown: 'Navigator sidebar shown',
-  /**
-   * @description Screen reader announcement when the navigator sidebar is hidden in the Sources panel.
-   */
-  navigatorHidden: 'Navigator sidebar hidden',
-  /**
-   * @description Screen reader announcement when the navigator sidebar is shown in the Sources panel.
-   */
-  debuggerShown: 'Debugger sidebar shown',
-  /**
-   * @description Screen reader announcement when the navigator sidebar is hidden in the Sources panel.
-   */
-  debuggerHidden: 'Debugger sidebar hidden',
-  /**
-   * @description Tooltip for the the debugger toggle in the Sources panel. Command to open/show the
-   * sidebar containing the debugger tool.
-   */
-  showDebugger: 'Show debugger',
-  /**
-   * @description Tooltip for the the debugger toggle in the Sources panel. Command to close/hide the
-   * sidebar containing the debugger tool.
-   */
-  hideDebugger: 'Hide debugger',
-  /**
-   * @description Text in Sources Panel of the Sources panel
+   * @description Text in Sources panel.
    */
   groupByFolder: 'Group by folder',
   /**
-   * @description Text in Sources Panel of the Sources panel
+   * @description Text in Sources panel.
    */
-  groupByAuthored: 'Group by Authored/Deployed',
+  groupByAuthored: 'Group by authored/deployed',
   /**
-   * @description Text in Sources Panel of the Sources panel
+   * @description Text in Sources panel.
    */
   hideIgnoreListed: 'Hide ignore-listed sources',
   /**
-   * @description Tooltip text that appears when hovering over the largeicon play button in the Sources Panel of the Sources panel
+   * @description Tooltip text that appears when hovering over the resume button in the Sources panel.
    */
   resumeWithAllPausesBlockedForMs: 'Resume with all pauses blocked for 500 ms',
   /**
-   * @description Tooltip text that appears when hovering over the largeicon terminate execution button in the Sources Panel of the Sources panel
+   * @description Tooltip text that appears when hovering over the terminate execution button in the Sources panel.
    */
   terminateCurrentJavascriptCall: 'Terminate current JavaScript call',
   /**
-   * @description Text in Sources Panel of the Sources panel
+   * @description Text in Sources panel.
    */
   pauseOnCaughtExceptions: 'Pause on caught exceptions',
   /**
-   * @description A context menu item in the Sources Panel of the Sources panel
+   * @description A context menu item in the Sources panel.
    */
   revealInSidebar: 'Reveal in navigator sidebar',
   /**
-   * @description A context menu item in the Sources Panel of the Sources panel when debugging JS code.
+   * @description A context menu item in the Sources panel when debugging JavaScript code.
    * When clicked, the execution is resumed until it reaches the line specified by the right-click that
    * opened the context menu.
    */
   continueToHere: 'Continue to here',
   /**
-   * @description A context menu item in the Console that stores selection as a temporary global variable
+   * @description A context menu item in the Console panel that stores selection as a temporary global variable.
    */
   storeAsGlobalVariable: 'Store as global variable',
   /**
-   * @description A context menu item in the Console, Sources, and Network panel
+   * @description A context menu item in the Console, Sources, and Network panels.
    * @example {string} PH1
    */
   copyS: 'Copy {PH1}',
   /**
-   * @description A context menu item for strings in the Console, Sources, and Network panel.
+   * @description A context menu item for strings in the Console, Sources, and Network panels.
    * When clicked, the raw contents of the string is copied to the clipboard.
    */
   copyStringContents: 'Copy string contents',
   /**
-   * @description A context menu item for strings in the Console, Sources, and Network panel.
+   * @description A context menu item for strings in the Console, Sources, and Network panels.
    * When clicked, the string is copied to the clipboard as a valid JavaScript literal.
    */
   copyStringAsJSLiteral: 'Copy string as JavaScript literal',
   /**
-   * @description A context menu item for strings in the Console, Sources, and Network panel.
+   * @description A context menu item for strings in the Console, Sources, and Network panels.
    * When clicked, the string is copied to the clipboard as a valid JSON literal.
    */
   copyStringAsJSONLiteral: 'Copy string as JSON literal',
   /**
-   * @description A context menu item in the Sources Panel of the Sources panel
+   * @description A context menu item in the Sources panel.
    */
   showFunctionDefinition: 'Show function definition',
   /**
-   * @description Text in Sources Panel of the Sources panel
+   * @description Text in Sources panel.
    */
   openInSourcesPanel: 'Open in Sources panel',
   /**
@@ -187,6 +152,22 @@ const UIStrings = {
    * @description Context menu item in Sources panel to explain input handling in a script via AI.
    */
   explainInputHandling: 'Explain input handling',
+  /**
+   * @description Screen reader announcement when the navigator sidebar is shown in the Sources panel.
+   */
+  navigatorShown: 'Navigator sidebar shown',
+  /**
+   * @description Screen reader announcement when the navigator sidebar is hidden in the Sources panel.
+   */
+  navigatorHidden: 'Navigator sidebar hidden',
+  /**
+   * @description Screen reader announcement when the debugger sidebar is shown in the Sources panel.
+   */
+  debuggerShown: 'Debugger sidebar shown',
+  /**
+   * @description Screen reader announcement when the debugger sidebar is hidden in the Sources panel.
+   */
+  debuggerHidden: 'Debugger sidebar hidden',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -212,8 +193,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
   editorView: UI.SplitWidget.SplitWidget;
   private navigatorTabbedLocation: UI.View.TabbedViewLocation;
   #sourcesView: SourcesView;
-  private readonly toggleNavigatorSidebarButton: UI.Toolbar.ToolbarButton;
-  private readonly toggleDebuggerSidebarButton: UI.Toolbar.ToolbarButton;
   private threadsSidebarPane: UI.View.View|null;
   private readonly watchSidebarPane: UI.View.View;
   private readonly callstackPane: CallStackSidebarPane;
@@ -221,7 +200,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   #paused?: boolean;
   private switchToPausedTargetTimeout?: number;
   private executionLineLocation?: Bindings.DebuggerWorkspaceBinding.Location|null;
-  private sidebarPaneStack?: UI.View.ViewLocation;
+  private sidebarPaneStack?: UI.ViewManager.StackLocation;
   private tabbedLocationHeader?: Element|null;
   private extensionSidebarPanesContainer?: UI.View.ViewLocation;
   sidebarPaneView?: UI.Widget.VBox|UI.SplitWidget.SplitWidget;
@@ -247,7 +226,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     this.debugToolbar = this.createDebugToolbar();
     this.debugToolbarDrawer = this.createDebugToolbarDrawer();
-    this.debuggerPausedMessage = new DebuggerPausedMessage();
+    this.debuggerPausedMessage =
+        new DebuggerPausedMessage(undefined, [SDK.EventBreakpointsModel.EventBreakpointsManager.instance()]);
 
     const initialDebugSidebarWidth = 225;
     this.splitWidget =
@@ -298,13 +278,24 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     this.#sourcesView = new SourcesView();
     this.#sourcesView.addEventListener(Events.EDITOR_SELECTED, this.editorSelected.bind(this));
+    this.#sourcesView.addEventListener(Events.EDITOR_CLOSED, this.editorClosed.bind(this));
 
-    this.toggleNavigatorSidebarButton = this.editorView.createShowHideSidebarButton(
-        i18nString(UIStrings.showNavigator), i18nString(UIStrings.hideNavigator), i18nString(UIStrings.navigatorShown),
-        i18nString(UIStrings.navigatorHidden), 'navigator');
-    this.toggleDebuggerSidebarButton = this.splitWidget.createShowHideSidebarButton(
-        i18nString(UIStrings.showDebugger), i18nString(UIStrings.hideDebugger), i18nString(UIStrings.debuggerShown),
-        i18nString(UIStrings.debuggerHidden), 'debugger');
+    if (!window.opener) {
+      window.addEventListener('beforeunload', this.handleBeforeUnload, true);
+    }
+
+    this.#sourcesView.onToggleNavigatorSidebar = this.toggleNavigatorSidebar.bind(this);
+    this.#sourcesView.onToggleDebuggerSidebar = this.toggleDebuggerSidebar.bind(this);
+    this.#sourcesView.isNavigatorSidebarOpen = this.editorView.sidebarIsShowing();
+    this.#sourcesView.isDebuggerSidebarOpen = this.splitWidget.sidebarIsShowing();
+
+    this.editorView.addEventListener(UI.SplitWidget.Events.SHOW_MODE_CHANGED, () => {
+      this.#sourcesView.isNavigatorSidebarOpen = this.editorView.sidebarIsShowing();
+    });
+
+    this.splitWidget.addEventListener(UI.SplitWidget.Events.SHOW_MODE_CHANGED, () => {
+      this.#sourcesView.isDebuggerSidebarOpen = this.splitWidget.sidebarIsShowing();
+    });
     this.editorView.setMainWidget(this.#sourcesView);
 
     this.threadsSidebarPane = null;
@@ -312,7 +303,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     this.callstackPane = CallStackSidebarPane.instance();
 
     Common.Settings.Settings.instance()
-        .moduleSetting('sidebar-position')
+        .resolve(Settings.MainSettings.sidebarPositionSettingDescriptor)
         .addChangeListener(this.updateSidebarPosition.bind(this));
     this.updateSidebarPosition();
 
@@ -320,7 +311,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     this.setTarget(UI.Context.Context.instance().flavor(SDK.Target.Target));
     Common.Settings.Settings.instance()
-        .moduleSetting('breakpoints-active')
+        .resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor)
         .addChangeListener(this.breakpointsActiveStateChanged, this);
     UI.Context.Context.instance().addFlavorChangeListener(SDK.Target.Target, this.onCurrentTargetChanged, this);
     UI.Context.Context.instance().addFlavorChangeListener(
@@ -355,26 +346,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   static updateResizerAndSidebarButtons(panel: SourcesPanel): void {
-    panel.#sourcesView.leftToolbar().removeToolbarItems();
-    panel.#sourcesView.rightToolbar().removeToolbarItems();
-    panel.#sourcesView.bottomToolbar().removeToolbarItems();
-    const isInWrapper = UI.Context.Context.instance().flavor(QuickSourceView) &&
+    const isInWrapper = Boolean(UI.Context.Context.instance().flavor(QuickSourceView)) &&
         !UI.InspectorView.InspectorView.instance().isDrawerMinimized();
-    if (panel.splitWidget.isVertical() || isInWrapper) {
-      panel.splitWidget.uninstallResizer(panel.#sourcesView.scriptViewToolbar());
-    } else {
-      panel.splitWidget.installResizer(panel.#sourcesView.scriptViewToolbar());
-    }
-    if (!isInWrapper) {
-      panel.#sourcesView.leftToolbar().appendToolbarItem(panel.toggleNavigatorSidebarButton);
-      if (!Root.Runtime.Runtime.isTraceApp()) {
-        if (panel.splitWidget.isVertical()) {
-          panel.#sourcesView.rightToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
-        } else {
-          panel.#sourcesView.bottomToolbar().appendToolbarItem(panel.toggleDebuggerSidebarButton);
-        }
-      }
-    }
+    panel.#sourcesView.setLayoutMode(panel.splitWidget.isVertical(), isInWrapper);
   }
 
   targetAdded(_target: SDK.Target.Target): void {
@@ -409,7 +383,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     } else {
       this.#paused = false;
       this.clearInterface();
-      this.toggleDebuggerSidebarButton.setEnabled(true);
+      this.#sourcesView.toggleDebuggerSidebarButtonEnabled(true);
     }
   }
 
@@ -462,21 +436,27 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   override onResize(): void {
-    if (Common.Settings.Settings.instance().moduleSetting('sidebar-position').get() === 'auto') {
+    if (Common.Settings.Settings.instance().resolve(Settings.MainSettings.sidebarPositionSettingDescriptor).get() ===
+        'auto') {
       this.element.window().requestAnimationFrame(this.updateSidebarPosition.bind(this));
     }  // Do not force layout.
   }
 
-  override searchableView(): UI.SearchableView.SearchableView {
+  override searchableView(): UI.SearchableView.SearchableView|null {
     return this.#sourcesView.searchableView();
   }
 
   toggleNavigatorSidebar(): void {
-    this.editorView.toggleSidebar();
+    const isOpen = this.editorView.toggleSidebar();
+    UI.ARIAUtils.LiveAnnouncer.alert(isOpen ? i18nString(UIStrings.navigatorShown) :
+                                              i18nString(UIStrings.navigatorHidden));
   }
 
   toggleDebuggerSidebar(): void {
-    this.splitWidget.toggleSidebar();
+    const isOpen = this.splitWidget.toggleSidebar();
+    UI.ARIAUtils.LiveAnnouncer.alert(isOpen ? i18nString(UIStrings.debuggerShown) :
+                                              i18nString(UIStrings.debuggerHidden));
+    this.sidebarPaneStack?.notifyVisibilityChanged(isOpen);
   }
 
   private debuggerPaused(event: Common.EventTarget.EventTargetEvent<SDK.DebuggerModel.DebuggerModel>): void {
@@ -494,6 +474,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
 
     Badges.UserBadges.instance().recordAction(Badges.BadgeAction.DEBUGGER_PAUSED);
+    window.dispatchEvent(new CustomEvent('DevTools.DebuggerPaused', {bubbles: true, cancelable: true}));
   }
 
   private debugInfoAttached(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
@@ -512,7 +493,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     this.#paused = true;
     void this.updateDebuggerButtonsAndStatus();
     UI.Context.Context.instance().setFlavor(SDK.DebuggerModel.DebuggerPausedDetails, details);
-    this.toggleDebuggerSidebarButton.setEnabled(false);
+    this.#sourcesView.toggleDebuggerSidebarButtonEnabled(false);
     this.revealDebuggerSidebar();
     const pausedTarget = details.debuggerModel.target();
     if (this.threadsSidebarPane && this.#lastPausedTarget?.deref() !== pausedTarget &&
@@ -527,7 +508,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     window.focus();
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.bringToFront();
     const withOverlay = UI.Context.Context.instance().flavor(SDK.Target.Target)?.model(SDK.OverlayModel.OverlayModel) &&
-        !Common.Settings.Settings.instance().moduleSetting('disable-paused-state-overlay').get();
+        !Common.Settings.Settings.instance().resolve(SDK.SDKSettings.disablePausedStateOverlaySettingDescriptor).get();
     if (withOverlay && !this.overlayLoggables) {
       this.overlayLoggables = {debuggerPausedMessage: {}, resumeButton: {}, stepOverButton: {}};
       VisualLogging.registerLoggable(
@@ -579,7 +560,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
     this.#paused = false;
     this.clearInterface();
-    this.toggleDebuggerSidebarButton.setEnabled(true);
+    this.#sourcesView.toggleDebuggerSidebarButtonEnabled(true);
     this.switchToPausedTargetTimeout = window.setTimeout(this.switchToPausedTarget.bind(this, debuggerModel), 500);
   }
 
@@ -596,9 +577,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
     return this.#sourcesView.visibleView();
   }
 
-  showUISourceCode(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, location?: SourceFrame.SourceFrame.RevealPosition,
-      omitFocus?: boolean): void {
+  async showUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode,
+                         location?: SourceFrame.SourceFrame.RevealPosition, omitFocus?: boolean): Promise<void> {
     if (omitFocus) {
       if (!this.isShowing() && !UI.Context.Context.instance().flavor(QuickSourceView)) {
         return;
@@ -606,7 +586,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     } else {
       this.showEditor();
     }
-    this.#sourcesView.showSourceLocation(uiSourceCode, location, omitFocus);
+    await this.#sourcesView.showSourceLocation(uiSourceCode, location, omitFocus);
   }
 
   private showEditor(): void {
@@ -616,9 +596,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
     void this.setAsCurrentPanel();
   }
 
-  showUILocation(uiLocation: Workspace.UISourceCode.UILocation, omitFocus?: boolean): void {
+  async showUILocation(uiLocation: Workspace.UISourceCode.UILocation, omitFocus?: boolean): Promise<void> {
     const {uiSourceCode, lineNumber, columnNumber} = uiLocation;
-    this.showUISourceCode(uiSourceCode, {lineNumber, columnNumber}, omitFocus);
+    await this.showUISourceCode(uiSourceCode, {lineNumber, columnNumber}, omitFocus);
   }
 
   async revealInNavigator(uiSourceCode: Workspace.UISourceCode.UISourceCode, skipReveal?: boolean): Promise<void> {
@@ -637,9 +617,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
   }
 
-  private addSettingMenuItem(
-      contextMenu: UI.ContextMenu.Section, settingName: string, menuText: Common.UIString.LocalizedString): void {
-    const setting = Common.Settings.Settings.instance().moduleSetting(settingName);
+  private addSettingMenuItem(contextMenu: UI.ContextMenu.Section, setting: Common.Settings.Setting<boolean>,
+                             menuText: Common.UIString.LocalizedString): void {
     contextMenu.appendCheckboxItem(
         menuText, () => setting.set(!setting.get()), {checked: setting.get(), jslogContext: setting.name});
   }
@@ -647,11 +626,17 @@ export class SourcesPanel extends UI.Panel.Panel implements
   private populateNavigatorMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
     contextMenu.appendItemsAtLocation('navigatorMenu');
     this.addSettingMenuItem(
-        contextMenu.viewSection(), 'navigator-group-by-folder', i18nString(UIStrings.groupByFolder));
+        contextMenu.viewSection(),
+        Common.Settings.Settings.instance().resolve(Settings.SourcesSettings.navigatorGroupByFolderSettingDescriptor),
+        i18nString(UIStrings.groupByFolder));
     this.addSettingMenuItem(
-        contextMenu.viewSection(), 'navigator-group-by-authored', i18nString(UIStrings.groupByAuthored));
+        contextMenu.viewSection(),
+        Common.Settings.Settings.instance().resolve(Settings.SourcesSettings.navigatorGroupByAuthoredSettingDescriptor),
+        i18nString(UIStrings.groupByAuthored));
     this.addSettingMenuItem(
-        contextMenu.viewSection(), 'navigator-just-my-code', i18nString(UIStrings.hideIgnoreListed));
+        contextMenu.viewSection(),
+        Common.Settings.Settings.instance().resolve(Settings.SourcesSettings.navigatorJustMyCodeSettingDescriptor),
+        i18nString(UIStrings.hideIgnoreListed));
   }
 
   updateLastModificationTime(): void {
@@ -669,7 +654,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     if (window.performance.now() - this.lastModificationTime < lastModificationTimeout) {
       return;
     }
-    this.#sourcesView.showSourceLocation(uiLocation.uiSourceCode, uiLocation, undefined, true);
+    await this.#sourcesView.showSourceLocation(uiLocation.uiSourceCode, uiLocation, undefined, true);
   }
 
   private async updateDebuggerButtonsAndStatus(): Promise<void> {
@@ -746,11 +731,39 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const uiSourceCode = event.data;
     UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
     if (this.editorView.mainWidget() &&
-        Common.Settings.Settings.instance().moduleSetting('auto-reveal-in-navigator').get()) {
+        Common.Settings.Settings.instance()
+            .resolve(Settings.SourcesSettings.autoRevealInNavigatorSettingDescriptor)
+            .get()) {
       void this.revealInNavigator(uiSourceCode, true);
     }
   }
 
+  private editorClosed({data: {uiSourceCode}}: Common.EventTarget.EventTargetEvent<EditorClosedEvent>): void {
+    const context = UI.Context.Context.instance();
+    if (context.flavor(Workspace.UISourceCode.UISourceCode) === uiSourceCode) {
+      context.setFlavor(Workspace.UISourceCode.UISourceCode, null);
+    }
+  }
+
+  handleBeforeUnload = (event: Event): void => {
+    if (event.returnValue) {
+      return;
+    }
+
+    const unsavedSourceCodes = Workspace.Workspace.WorkspaceImpl.instance()
+                                   .uiSourceCodesForProjectType(Workspace.Workspace.projectTypes.FileSystem)
+                                   .filter(uiSourceCode => uiSourceCode.isDirty());
+
+    if (!unsavedSourceCodes.length) {
+      return;
+    }
+
+    event.returnValue = true;
+    void UI.ViewManager.ViewManager.instance().showView('sources');
+    for (const sourceCode of unsavedSourceCodes) {
+      void Common.Revealer.reveal(sourceCode);
+    }
+  };
   togglePause(): boolean {
     const target = UI.Context.Context.instance().flavor(SDK.Target.Target);
     if (!target) {
@@ -849,13 +862,13 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   toggleBreakpointsActive(): void {
-    Common.Settings.Settings.instance()
-        .moduleSetting('breakpoints-active')
-        .set(!Common.Settings.Settings.instance().moduleSetting('breakpoints-active').get());
+    const setting = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor);
+    setting.set(!setting.get());
   }
 
   private breakpointsActiveStateChanged(): void {
-    const active = Common.Settings.Settings.instance().moduleSetting('breakpoints-active').get();
+    const active =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).get();
     this.toggleBreakpointsActiveAction.setToggled(!active);
     this.#sourcesView.toggleBreakpointsActiveState(active);
   }
@@ -894,7 +907,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
     debugToolbarDrawer.classList.add('scripts-debug-toolbar-drawer');
 
     const label = i18nString(UIStrings.pauseOnCaughtExceptions);
-    const setting = Common.Settings.Settings.instance().moduleSetting('pause-on-caught-exception');
+    const setting =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.pauseOnCaughtExceptionSettingDescriptor);
     debugToolbarDrawer.appendChild(SettingsUI.SettingsUI.createSettingCheckbox(label, setting));
 
     return debugToolbarDrawer;
@@ -932,7 +946,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const eventTarget = (event.target as Node);
     if (!uiSourceCode.project().isServiceProject() &&
         !eventTarget.isSelfOrDescendant(this.navigatorTabbedLocation.widget().element) &&
-        !(Common.Settings.Settings.instance().moduleSetting('navigator-just-my-code').get() &&
+        !(Common.Settings.Settings.instance()
+              .resolve(Settings.SourcesSettings.navigatorJustMyCodeSettingDescriptor)
+              .get() &&
           Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
               uiSourceCode))) {
       contextMenu.revealSection().appendItem(
@@ -1138,7 +1154,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
         await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().rawLocationToUILocation(
             response.location);
     if (uiLocation) {
-      this.showUILocation(uiLocation);
+      await this.showUILocation(uiLocation);
     }
   }
 
@@ -1157,7 +1173,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
   private updateSidebarPosition(): void {
     let vertically;
-    const position = Common.Settings.Settings.instance().moduleSetting('sidebar-position').get();
+    const position =
+        Common.Settings.Settings.instance().resolve(Settings.MainSettings.sidebarPositionSettingDescriptor).get();
     if (position === 'right') {
       vertically = false;
     } else if (position === 'bottom') {
@@ -1290,7 +1307,7 @@ export const minToolbarWidth = 215;
 
 export class UILocationRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UILocation> {
   async reveal(uiLocation: Workspace.UISourceCode.UILocation, omitFocus?: boolean): Promise<void> {
-    SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
+    await SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
   }
 }
 
@@ -1305,7 +1322,7 @@ export class UILocationRangeRevealer implements Common.Revealer.Revealer<Workspa
 
   async reveal(uiLocationRange: Workspace.UISourceCode.UILocationRange, omitFocus?: boolean): Promise<void> {
     const {uiSourceCode, range: {start: from, end: to}} = uiLocationRange;
-    SourcesPanel.instance().showUISourceCode(uiSourceCode, {from, to}, omitFocus);
+    await SourcesPanel.instance().showUISourceCode(uiSourceCode, {from, to}, omitFocus);
   }
 }
 
@@ -1315,14 +1332,14 @@ export class DebuggerLocationRevealer implements Common.Revealer.Revealer<SDK.De
         await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().rawLocationToUILocation(
             rawLocation);
     if (uiLocation) {
-      SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
+      await SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
     }
   }
 }
 
 export class UISourceCodeRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UISourceCode> {
   async reveal(uiSourceCode: Workspace.UISourceCode.UISourceCode, omitFocus?: boolean): Promise<void> {
-    SourcesPanel.instance().showUISourceCode(uiSourceCode, undefined, omitFocus);
+    await SourcesPanel.instance().showUISourceCode(uiSourceCode, undefined, omitFocus);
   }
 }
 
@@ -1363,7 +1380,9 @@ export class RevealingActionDelegate implements UI.ActionRegistration.ActionDele
         // Do not trigger a resume action, if: the shortcut was forwarded and the
         // paused overlay is enabled.
         const actionHandledInPausedOverlay = context.flavor(UI.ShortcutRegistry.ForwardedShortcut) &&
-            !Common.Settings.Settings.instance().moduleSetting('disable-paused-state-overlay').get();
+            !Common.Settings.Settings.instance()
+                 .resolve(SDK.SDKSettings.disablePausedStateOverlaySettingDescriptor)
+                 .get();
         if (actionHandledInPausedOverlay) {
           // Taken care of by inspector overlay: handled set to true to
           // register user metric.
@@ -1437,7 +1456,8 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         return true;
       }
       case 'sources.toggle-word-wrap': {
-        const setting = Common.Settings.Settings.instance().moduleSetting<boolean>('sources.word-wrap');
+        const setting =
+            Common.Settings.Settings.instance().resolve(Settings.SourcesSettings.sourcesWordWrapSettingDescriptor);
         setting.set(!setting.get());
         return true;
       }

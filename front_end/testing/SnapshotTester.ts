@@ -34,8 +34,7 @@ class BaseSnapshotTester {
   protected snapshotPath: string;
   #expected = new Map<string, string>();
   #actual = new Map<string, string>();
-  #anyFailures = false;
-  #newTests = false;
+  #seenTestObjects = new WeakSet<Mocha.Runnable>();
 
   constructor(context: Mocha.Suite, meta: ImportMeta) {
     if (context.timeout() > 0) {
@@ -55,13 +54,15 @@ class BaseSnapshotTester {
     // out/Default/gen/third_party/devtools-frontend/src/front_end/testing/SnapshotTester.test.js?8ee4f2b123e221040a4aa075a28d0e5b41d3d3ed
     // ->
     // front_end/testing/SnapshotTester.snapshot.txt
-    this.snapshotPath =
-        meta.url.substring(meta.url.lastIndexOf('front_end')).replace('.test.js', '.snapshot.txt').split('?')[0];
+    const relativePathStart =
+        meta.url.includes('/front_end/') ? meta.url.indexOf('front_end') : meta.url.indexOf('/test/') + 1;
+    this.snapshotPath = meta.url.substring(relativePathStart).replace('.test.js', '.snapshot.txt').split('?')[0];
   }
 
-  async load() {
+  async load(): Promise<void> {
     if (BaseSnapshotTester.#updateMode === null) {
-      BaseSnapshotTester.#updateMode = await this.checkIfUpdateMode();
+      const config = await this.checkIfUpdateMode();
+      BaseSnapshotTester.#updateMode = config.updateMode;
     }
     const content = await this.loadSnapshot(this.snapshotPath);
     if (content) {
@@ -69,11 +70,14 @@ class BaseSnapshotTester {
     }
   }
 
-  assert(context: Mocha.Context, actual: string) {
+  assert(context: Mocha.Context, actual: string): void {
     const title = context.test?.fullTitle() ?? '';
 
-    if (this.#actual.has(title)) {
+    if (context.test && this.#seenTestObjects.has(context.test)) {
       throw new Error('sorry, currently only support 1 snapshot assertion per test');
+    }
+    if (context.test) {
+      this.#seenTestObjects.add(context.test);
     }
 
     if (actual.includes('=== end content')) {
@@ -85,50 +89,23 @@ class BaseSnapshotTester {
 
     const expected = this.#expected.get(title);
     if (expected === undefined) {
-      this.#newTests = true;
       if (BaseSnapshotTester.#updateMode) {
         return;
       }
 
-      this.#anyFailures = true;
       throw new Error(`snapshot assertion failed! new snapshot found (${
           title}), must run \`npm run test -- --on-diff=update ...\` to accept it.`);
     }
 
     const isDifferent = actual !== expected;
-    if (isDifferent) {
-      this.#anyFailures = true;
-      if (!BaseSnapshotTester.#updateMode) {
-        assertSnapshotContent(actual, expected);
-      }
+    if (isDifferent && !BaseSnapshotTester.#updateMode) {
+      assertSnapshotContent(actual, expected);
     }
   }
 
-  async finish() {
-    let notRanTest: string|null = null;
-    for (const title of this.#expected.keys()) {
-      if (!this.#actual.has(title)) {
-        notRanTest = title;
-        break;
-      }
-    }
-
-    const hasChanges = this.#anyFailures || notRanTest || this.#newTests;
-    if (!hasChanges) {
-      return;
-    }
-
-    // If the update flag is on, post any and all changes (failures, new tests, removals).
+  async finish(): Promise<void> {
     if (BaseSnapshotTester.#updateMode) {
       await this.postUpdate();
-      return;
-    }
-
-    // Note: this does not handle test filtering (.only, --grep). Need a reliable way
-    // to distinguish a deleted test from a test that was filtered out.
-    if (notRanTest) {
-      throw new Error(`Snapshots are out of sync (a test was likely deleted or renamed).\nExpected test:\n${
-          notRanTest}\nRun with '--on-diff=update' to fix.`);
     }
   }
 
@@ -146,12 +123,28 @@ class BaseSnapshotTester {
   }
 
   protected serializeSnapshotFileContent(): string {
-    if (!this.#actual.size) {
+    const resultMap = new Map<string, string>();
+
+    for (const [title, expectedContent] of this.#expected) {
+      if (this.#actual.has(title)) {
+        resultMap.set(title, this.#actual.get(title)!);
+      } else {
+        resultMap.set(title, expectedContent);
+      }
+    }
+
+    for (const [title, actualContent] of this.#actual) {
+      if (!resultMap.has(title)) {
+        resultMap.set(title, actualContent);
+      }
+    }
+
+    if (!resultMap.size) {
       return '';
     }
 
     const lines = [];
-    for (const [title, result] of this.#actual) {
+    for (const [title, result] of resultMap) {
       lines.push(`Title: ${title}`);
       lines.push(`Content:\n${result}`);
       lines.push('=== end content\n');
@@ -161,8 +154,8 @@ class BaseSnapshotTester {
     return lines.join('\n').trim() + '\n';
   }
 
-  protected async checkIfUpdateMode(): Promise<boolean> {
-    return false;
+  protected async checkIfUpdateMode(): Promise<{updateMode: boolean}> {
+    return {updateMode: false};
   }
 
   protected async postUpdate(): Promise<void> {
@@ -175,10 +168,10 @@ class BaseSnapshotTester {
 }
 
 class WebSnapshotTester extends BaseSnapshotTester {
-  protected override async checkIfUpdateMode(): Promise<boolean> {
+  protected override async checkIfUpdateMode(): Promise<{updateMode: boolean}> {
     const response = await fetch('/snapshot-update-mode');
     const data = await response.json();
-    return data.updateMode === true;
+    return {updateMode: data.updateMode === true};
   }
 
   protected override async postUpdate(): Promise<void> {
@@ -207,9 +200,9 @@ class WebSnapshotTester extends BaseSnapshotTester {
 }
 
 class NodeSnapshotTester extends BaseSnapshotTester {
-  protected override async checkIfUpdateMode(): Promise<boolean> {
+  protected override async checkIfUpdateMode(): Promise<{updateMode: boolean}> {
     // cannot update in node mode yet.
-    return false;
+    return {updateMode: false};
   }
 
   protected override async postUpdate(): Promise<void> {
@@ -236,6 +229,6 @@ class NodeSnapshotTester extends BaseSnapshotTester {
 
 export type SnapshotTester = NodeSnapshotTester|WebSnapshotTester;
 
-const SnapshotTesterValue = (typeof window === 'undefined') ? NodeSnapshotTester : WebSnapshotTester;
+const SnapshotTesterValue: typeof WebSnapshotTester | typeof NodeSnapshotTester = (typeof window === 'undefined') ? NodeSnapshotTester : WebSnapshotTester;
 
 export {SnapshotTesterValue as SnapshotTester};

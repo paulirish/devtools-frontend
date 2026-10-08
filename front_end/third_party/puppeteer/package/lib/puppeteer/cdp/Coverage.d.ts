@@ -5,6 +5,7 @@
  */
 import type { Protocol } from 'devtools-protocol';
 import type { CDPSession } from '../api/CDPSession.js';
+import type { Logger } from '../common/Debug.js';
 /**
  * The CoverageEntry class represents one entry of the coverage report.
  * @public
@@ -43,6 +44,12 @@ export interface JSCoverageEntry extends CoverageEntry {
 export interface JSCoverageOptions {
     /**
      * Whether to reset coverage on every navigation.
+     *
+     * Setting this to `false` does not guarantee that coverage survives a
+     * navigation. Chrome may discard the previous page's JavaScript execution
+     * environment, including its coverage data, when navigating.
+     * To preserve coverage, call {@link Coverage.stopJSCoverage} before navigating
+     * away, then start a new collection for the next page and merge the reports.
      */
     resetOnNavigation?: boolean;
     /**
@@ -164,7 +171,7 @@ export declare class JSCoverage {
     /**
      * @internal
      */
-    constructor(client: CDPSession);
+    constructor(client: CDPSession, logger?: Logger);
     /**
      * @internal
      */
@@ -182,7 +189,7 @@ export declare class JSCoverage {
  */
 export declare class CSSCoverage {
     #private;
-    constructor(client: CDPSession);
+    constructor(client: CDPSession, logger?: Logger);
     /**
      * @internal
      */

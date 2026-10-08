@@ -32,18 +32,17 @@ devtools_ui_module("source_frame") {
     "XMLView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/host:bundle",
     "../../../../core/i18n:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/root:bundle",
     "../../../../core/sdk:bundle",
-    "../../../../entrypoints/formatter_worker:formatter_actions",
+    "../../../../core/text_utils:bundle",
+    "../../../../entrypoints/formatter_actions:bundle",
     "../../../../models/formatter:bundle",
-    "../../../../models/text_utils:bundle",
     "../../../../models/workspace:bundle",
-    "../../../../panels/common:bundle",
     "../../../../panels/linear_memory_inspector/components:bundle",
     "../../../../third_party/codemirror.next:bundle",
     "../../../../ui/components/highlighting:bundle",
@@ -51,19 +50,18 @@ devtools_ui_module("source_frame") {
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/components/object_ui:bundle",
     "../../../components/code_highlighter:bundle",
+    "../../../components/dialogs:bundle",
     "../../../kit:bundle",
     "../../../lit:bundle",
     "../../../visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "source_frame.ts"
 
-  deps = [
-    ":css_files",
-    ":source_frame",
-  ]
+  ts_deps = [ ":source_frame" ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/legacy/*,
@@ -87,8 +85,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "source_frame-meta.ts"
 
-  deps = [
-    ":bundle",
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/i18n:bundle",
   ]
@@ -102,23 +99,25 @@ devtools_ui_module("unittests") {
   sources = [
     "BinaryResourceViewFactory.test.ts",
     "FontView.test.ts",
+    "ImageView.test.ts",
     "JSONView.test.ts",
     "ResourceSourceFrame.test.ts",
     "SourceFrame.test.ts",
     "StreamingContentHexView.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../../core/common:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/root:bundle",
-    "../../../../models/text_utils:bundle",
+    "../../../../core/text_utils:bundle",
     "../../../../panels/linear_memory_inspector/components:bundle",
     "../../../../testing",
     "../../../../third_party/codemirror.next:bundle",
     "../../../../ui/legacy:bundle",
     "../../../components/buttons:bundle",
+    "../../../lit:bundle",
     "../object_ui:bundle",
   ]
 }

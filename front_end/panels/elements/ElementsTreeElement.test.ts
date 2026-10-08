@@ -3,19 +3,40 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import * as UI from '../../../front_end/ui/legacy/legacy.js';
 import * as Common from '../../core/common/common.js';
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as Protocol from '../../generated/protocol.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
+import * as Protocol from '../../generated/protocol.js';
+import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import type * as ChangeTracker from '../../models/change_tracker/change_tracker.js';
+import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import {assertScreenshot, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget, registerActions} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection, dispatchEvent} from '../../testing/MockConnection.js';
+import {findMenuItemWithLabel} from '../../testing/ContextMenuHelpers.js';
+import {assertScreenshot, raf, renderElementIntoDOM, setTestUniverseForWidgets} from '../../testing/DOMHelpers.js';
+import {
+  createTarget,
+  describeWithEnvironment,
+  registerActions,
+  updateHostConfig,
+} from '../../testing/EnvironmentHelpers.js';
+import {expectCall} from '../../testing/ExpectStubCall.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {dispatchEvent} from '../../testing/MockConnection.js';
+import {MockIssuesModel} from '../../testing/MockIssuesModel.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
+import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
+import type * as Adorners from '../../ui/components/adorners/adorners.js';
+import * as Highlighting from '../../ui/components/highlighting/highlighting.js';
+import type * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
+import * as UI from '../../ui/legacy/legacy.js';
+import {html} from '../../ui/lit/lit.js';
+import * as PanelsCommon from '../common/common.js';
 
 import * as Elements from './elements.js';
 
@@ -37,19 +58,23 @@ function getBaseViewInput(): Elements.ElementsTreeElement.ViewInput {
     showGridLanesAdorner: false,
     showMediaAdorner: false,
     showPopoverAdorner: false,
+    showInterestAdorner: false,
     showTopLayerAdorner: false,
     gridAdornerActive: false,
     popoverAdornerActive: false,
+    interestAdornerActive: false,
     isSubgrid: false,
     showViewSourceAdorner: false,
     showScrollAdorner: false,
     showScrollSnapAdorner: false,
     scrollSnapAdornerActive: false,
     showSlotAdorner: false,
+    showCustomElementAdorner: false,
     showStartingStyleAdorner: false,
     startingStyleAdornerActive: false,
     onStartingStyleAdornerClick: () => {},
     onSlotAdornerClick: () => {},
+    onCustomElementAdornerClick: () => {},
     topLayerIndex: -1,
     onViewSourceAdornerClick: () => {},
     onGutterClick: () => {},
@@ -58,10 +83,12 @@ function getBaseViewInput(): Elements.ElementsTreeElement.ViewInput {
     onGridAdornerClick: () => {},
     onMediaAdornerClick: () => {},
     onPopoverAdornerClick: () => {},
+    onInterestAdornerClick: () => {},
     onScrollSnapAdornerClick: () => {},
     onTopLayerAdornerClick: () => {},
     isHovered: false,
     isSelected: false,
+    canInspect: false,
     showAiButton: false,
     onAiButtonClick: () => {},
     decorations: [],
@@ -106,6 +133,45 @@ describe('ElementsTreeElement', () => {
       assert.strictEqual(result.text, expected.text);
       assert.deepEqual(result.entityRanges, expected.entityRanges);
     });
+
+    // Mirrors the special characters from legacy elements/elements-panel-structure.
+    const entityCases: Array<[string, string]> = [
+      ['\u00A0', '&nbsp;'],
+      ['\u00AD', '&shy;'],
+      ['\u2002', '&ensp;'],
+      ['\u2003', '&emsp;'],
+      ['\u2009', '&thinsp;'],
+      ['\u200A', '&hairsp;'],
+      ['\u200B', '&ZeroWidthSpace;'],
+      ['\u200C', '&zwnj;'],
+      ['\u200D', '&zwj;'],
+      ['\u200E', '&lrm;'],
+      ['\u200F', '&rlm;'],
+      ['\u202A', '&#x202A;'],
+      ['\u202B', '&#x202B;'],
+      ['\u202C', '&#x202C;'],
+      ['\u202D', '&#x202D;'],
+      ['\u202E', '&#x202E;'],
+      ['\u2060', '&NoBreak;'],
+      ['\uFEFF', '&#xFEFF;'],
+    ];
+    for (const [char, entity] of entityCases) {
+      it(`converts U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} to ${entity}`, () => {
+        const result = Elements.ElementsTreeElement.convertUnicodeCharsToHTMLEntities(`a${char}b`);
+        assert.strictEqual(result.text, `a${entity}b`);
+        assert.deepEqual(result.entityRanges, [new TextUtils.TextRange.SourceRange(1, entity.length)]);
+      });
+    }
+
+    it('converts the full legacy elements-panel-structure special character sequence', () => {
+      const input = ' ><"\' ' + entityCases.map(([char]) => char).join('_') + ' ';
+      const result = Elements.ElementsTreeElement.convertUnicodeCharsToHTMLEntities(input);
+      assert.strictEqual(
+          result.text,
+          ' ><"\' &nbsp;_&shy;_&ensp;_&emsp;_&thinsp;_&hairsp;_&ZeroWidthSpace;_&zwnj;_&zwj;_&lrm;_&rlm;_' +
+              '&#x202A;_&#x202B;_&#x202C;_&#x202D;_&#x202E;_&NoBreak;_&#xFEFF; ');
+      assert.lengthOf(result.entityRanges, entityCases.length);
+    });
   });
 
   it('renders gutter decorations correctly', async () => {
@@ -114,7 +180,7 @@ describe('ElementsTreeElement', () => {
     target.style.height = '20px';
     const style = document.createElement('style');
     // FIXME: styles are currently external to ElementsTreeElement.
-    style.innerText = Elements.ElementsTreeOutline.elementsTreeOutlineStyles;
+    style.innerText = Elements.DOMTreeWidget.elementsTreeOutlineStyles;
     target.append(style);
     renderElementIntoDOM(target, {
       includeCommonStyles: true,
@@ -126,20 +192,19 @@ describe('ElementsTreeElement', () => {
     const descendantDecorations = [
       {title: 'Descendant 1', color: 'green'},
     ];
-    Elements.ElementsTreeElement.DEFAULT_VIEW(
-        {
-          ...getBaseViewInput(),
-          decorations,
-          descendantDecorations,
-          decorationsTooltip: 'Title',
-          indent: 20,
-        },
-        {}, target);
+    Elements.ElementsTreeElement.DEFAULT_VIEW({
+      ...getBaseViewInput(),
+      decorations,
+      descendantDecorations,
+      decorationsTooltip: 'Title',
+      indent: 20,
+    },
+                                              {}, target);
     await assertScreenshot('elements/gutter_decorations.png');
   });
 });
 
-describeWithMockConnection('ElementsTreeElement', () => {
+describeWithEnvironment('ElementsTreeElement', () => {
   const DEFAULT_LAYOUT_PROPERTIES = {
     isFlex: false,
     isGrid: false,
@@ -149,7 +214,14 @@ describeWithMockConnection('ElementsTreeElement', () => {
     hasScroll: false,
   };
 
+  let universe: TestUniverse;
+
   beforeEach(() => {
+    universe = new TestUniverse();
+    setTestUniverseForWidgets(universe);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(universe.debuggerWorkspaceBinding);
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(universe.cssWorkspaceBinding);
     registerActions([{
       actionId: 'freestyler.element-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
@@ -161,52 +233,43 @@ describeWithMockConnection('ElementsTreeElement', () => {
     let target: SDK.Target.Target;
 
     beforeEach(() => {
-      const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
-      const targetManager = SDK.TargetManager.TargetManager.instance();
-      const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
-      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
-        forceNew: true,
-        resourceMapping: new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace),
-        targetManager,
-        ignoreListManager,
-        workspace,
-      });
+      sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(universe.workspace);
+      sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+      sinon.stub(Workspace.IgnoreListManager.IgnoreListManager, 'instance').returns(universe.ignoreListManager);
 
-      target = createTarget();
+      target = universe.createTarget();
     });
 
     it('renders fallback tooltip when no provenance is available', () => {
       const domTarget = document.createElement('div');
       renderElementIntoDOM(domTarget);
-      Elements.ElementsTreeElement.DEFAULT_VIEW(
-          {
-            ...getBaseViewInput(),
-            adTooltipId: 'ad-tooltip-test',
-            target,
-            adProvenance: {},
-          },
-          {}, domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        adTooltipId: 'ad-tooltip-test',
+        target,
+        adProvenance: {},
+      },
+                                                {}, domTarget);
 
       const adorners = domTarget.querySelectorAll('devtools-adorner');
       const adorner = Array.from(adorners).find(a => a.name === 'ad');
       assert.exists(adorner);
       const tooltip = domTarget.querySelector('devtools-tooltip');
       assert.exists(tooltip);
-      assert.strictEqual(
-          tooltip.querySelector('.ad-provenance-tooltip-title')?.textContent, 'No provenance data is available');
+      assert.strictEqual(tooltip.querySelector('.ad-provenance-tooltip-title')?.textContent,
+                         'No provenance data is available');
     });
 
     it('renders filter list rule', () => {
       const domTarget = document.createElement('div');
       renderElementIntoDOM(domTarget);
-      Elements.ElementsTreeElement.DEFAULT_VIEW(
-          {
-            ...getBaseViewInput(),
-            adTooltipId: 'ad-tooltip-test',
-            target,
-            adProvenance: {filterlistRule: '||ads.com^'},
-          },
-          {}, domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        adTooltipId: 'ad-tooltip-test',
+        target,
+        adProvenance: {filterlistRule: '||ads.com^'},
+      },
+                                                {}, domTarget);
 
       const tooltip = domTarget.querySelector('devtools-tooltip');
       assert.exists(tooltip);
@@ -238,19 +301,18 @@ describeWithMockConnection('ElementsTreeElement', () => {
       dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent);
 
       // Render the view.
-      Elements.ElementsTreeElement.DEFAULT_VIEW(
-          {
-            ...getBaseViewInput(),
-            adTooltipId: 'ad-tooltip-test',
-            target,
-            adProvenance: {
-              adScriptAncestry: {
-                ancestryChain: [{scriptId, debuggerId, name: ''}],
-                rootScriptFilterlistRule: '/ad-script.$script',
-              },
-            },
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        adTooltipId: 'ad-tooltip-test',
+        target,
+        adProvenance: {
+          adScriptAncestry: {
+            ancestryChain: [{scriptId, debuggerId, name: ''}],
+            rootScriptFilterlistRule: '/ad-script.$script',
           },
-          {}, domTarget);
+        },
+      },
+                                                {}, domTarget);
 
       // Wait for the asynchronous Linkifier to render the script name.
       await raf();
@@ -272,8 +334,142 @@ describeWithMockConnection('ElementsTreeElement', () => {
     });
   });
 
-  async function getContextMenuForElementWithLayoutProperties(layoutProperties: SDK.CSSModel.LayoutProperties|null):
-      Promise<UI.ContextMenu.ContextMenu> {
+  describe('Relation Attributes', () => {
+    let target: SDK.Target.Target;
+    let domModel: SDK.DOMModel.DOMModel;
+
+    beforeEach(() => {
+      target = createTarget();
+      domModel = target.model(SDK.DOMModel.DOMModel)!;
+    });
+
+    it('renders empty relation attribute without quotes if no relation', async () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+
+      const node = new SDK.DOMModel.DOMNode(domModel);
+      sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+      sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+      sinon.stub(node, 'nodeName').returns('DIV');
+      sinon.stub(node, 'hasAttributes').returns(true);
+      sinon.stub(node, 'attributes').returns([{name: 'popovertarget', value: ''}] as SDK.DOMModel.Attribute[]);
+
+      sinon.stub(domModel, 'getElementByRelation').resolves(undefined);
+
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        node,
+      },
+                                                {}, domTarget);
+
+      await raf();  // Wait for directive to run
+
+      const attributeElement = domTarget.querySelector('.webkit-html-attribute');
+      assert.exists(attributeElement);
+
+      const nameElement = attributeElement.querySelector('.webkit-html-attribute-name');
+      assert.exists(nameElement);
+      assert.strictEqual(nameElement.textContent, 'popovertarget');
+
+      // Should NOT have quotes or equals
+      assert.notInclude(attributeElement.textContent || '', '=');
+      assert.notInclude(attributeElement.textContent || '', '"');
+    });
+
+    it('renders empty relation attribute and linkifies it if relation exists', async () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+
+      const node = new SDK.DOMModel.DOMNode(domModel);
+      node.id = 1 as Protocol.DOM.NodeId;
+      sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+      sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+      sinon.stub(node, 'nodeName').returns('DIV');
+      sinon.stub(node, 'hasAttributes').returns(true);
+      sinon.stub(node, 'attributes').returns([{name: 'popovertarget', value: ''}] as SDK.DOMModel.Attribute[]);
+
+      const relatedNodeId = 2 as Protocol.DOM.NodeId;
+      const relatedNode = new SDK.DOMModel.DOMNode(domModel);
+      sinon.stub(domModel, 'getElementByRelation').resolves(relatedNodeId);
+      sinon.stub(domModel, 'nodeForId').withArgs(relatedNodeId).returns(relatedNode);
+
+      const fakeLink = html`<span>LINKIFIED_TARGET</span>`;
+      const linkifyStub = sinon.stub(PanelsCommon.DOMLinkifier.Linkifier.instance(), 'linkify').returns(fakeLink);
+
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        node,
+      },
+                                                {}, domTarget);
+
+      await raf();  // Wait for directive to run
+
+      const attributeElement = domTarget.querySelector('.webkit-html-attribute');
+      assert.exists(attributeElement);
+
+      // With Philip's model, we linkify the name!
+      const nameElement = attributeElement.querySelector('.webkit-html-attribute-name');
+      assert.exists(nameElement);
+
+      // Wait for async linkify to finish rendering
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.include(nameElement.textContent || '', 'LINKIFIED_TARGET');
+
+      // Value element should NOT exist
+      const valueElement = attributeElement.querySelector('.webkit-html-attribute-value');
+      assert.notExists(valueElement);
+
+      sinon.assert.calledOnce(linkifyStub);
+      const linkOptions = linkifyStub.firstCall.args[1] as PanelsCommon.DOMLinkifier.Options;
+      assert.strictEqual(linkOptions.textContent, 'popovertarget');
+    });
+
+    it('renders relation attribute with value and linkifies it', async () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+
+      const node = new SDK.DOMModel.DOMNode(domModel);
+      node.id = 1 as Protocol.DOM.NodeId;
+      sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
+      sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
+      sinon.stub(node, 'nodeName').returns('DIV');
+      sinon.stub(node, 'hasAttributes').returns(true);
+      sinon.stub(node, 'attributes').returns([{name: 'popovertarget',
+                                               value: 'targetNode'}] as SDK.DOMModel.Attribute[]);
+
+      const relatedNodeId = 2 as Protocol.DOM.NodeId;
+      const relatedNode = new SDK.DOMModel.DOMNode(domModel);
+      sinon.stub(domModel, 'getElementByRelation').resolves(relatedNodeId);
+      sinon.stub(domModel, 'nodeForId').withArgs(relatedNodeId).returns(relatedNode);
+
+      const fakeLink = html`<span>LINKIFIED_TARGET</span>`;
+      const linkifyStub = sinon.stub(PanelsCommon.DOMLinkifier.Linkifier.instance(), 'linkify').returns(fakeLink);
+
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        node,
+      },
+                                                {}, domTarget);
+
+      await raf();  // Wait for directive to run
+
+      const attributeElement = domTarget.querySelector('.webkit-html-attribute');
+      assert.exists(attributeElement);
+
+      const valueElement = attributeElement.querySelector('.webkit-html-attribute-value');
+      assert.exists(valueElement);
+
+      // Wait for async linkify to finish rendering
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.include(valueElement.textContent || '', 'LINKIFIED_TARGET');
+      sinon.assert.calledOnce(linkifyStub);
+    });
+  });
+
+  async function getContextMenuForElementWithLayoutProperties(layoutProperties: SDK.CSSModel.LayoutProperties|
+                                                              null): Promise<UI.ContextMenu.ContextMenu> {
     const target = createTarget();
     const domModel = target.model(SDK.DOMModel.DOMModel);
     const cssModel = target.model(SDK.CSSModel.CSSModel);
@@ -286,13 +482,10 @@ describeWithMockConnection('ElementsTreeElement', () => {
     sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
     sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
     sinon.stub(node, 'nodeName').returns('DIV');
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
-    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
-    treeElement.treeOutline = treeOutline;
-
+    const domTreeWidget = new Elements.DOMTreeWidget.DOMTreeWidget();
     const event = new Event('contextmenu');
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    await treeElement.populateNodeContextMenu(contextMenu);
+    await Elements.DOMTreeContextMenu.populateNodeContextMenu(contextMenu, domTreeWidget, node);
     return contextMenu;
   }
 
@@ -300,8 +493,8 @@ describeWithMockConnection('ElementsTreeElement', () => {
     const contextMenu = await getContextMenuForElementWithLayoutProperties(null);
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label), ['Start a chat', 'Assess visibility', 'Center element']);
+    assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label),
+                     ['Start a chat', 'Assess visibility', 'Center element']);
   });
 
   it('shows flexbox submenu items', async () => {
@@ -309,9 +502,8 @@ describeWithMockConnection('ElementsTreeElement', () => {
         await getContextMenuForElementWithLayoutProperties({...DEFAULT_LAYOUT_PROPERTIES, isFlex: true});
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Wrap these items', 'Distribute items evenly', 'Explain flexbox']);
+    assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label),
+                     ['Start a chat', 'Wrap these items', 'Distribute items evenly', 'Explain flexbox']);
   });
 
   it('shows grid submenu items', async () => {
@@ -319,9 +511,8 @@ describeWithMockConnection('ElementsTreeElement', () => {
         await getContextMenuForElementWithLayoutProperties({...DEFAULT_LAYOUT_PROPERTIES, isGrid: true});
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Align items', 'Add padding', 'Explain grid layout']);
+    assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label),
+                     ['Start a chat', 'Align items', 'Add padding', 'Explain grid layout']);
   });
 
   it('shows subgrid submenu items', async () => {
@@ -329,9 +520,8 @@ describeWithMockConnection('ElementsTreeElement', () => {
         {...DEFAULT_LAYOUT_PROPERTIES, isGrid: true, isSubgrid: true});
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Find grid definition', 'Change parent properties', 'Explain subgrids']);
+    assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label),
+                     ['Start a chat', 'Find grid definition', 'Change parent properties', 'Explain subgrids']);
   });
 
   it('shows scroll submenu items', async () => {
@@ -339,9 +529,8 @@ describeWithMockConnection('ElementsTreeElement', () => {
         await getContextMenuForElementWithLayoutProperties({...DEFAULT_LAYOUT_PROPERTIES, hasScroll: true});
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Remove scrollbars', 'Style scrollbars', 'Explain scrollbars']);
+    assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label),
+                     ['Start a chat', 'Remove scrollbars', 'Style scrollbars', 'Explain scrollbars']);
   });
 
   it('shows container submenu items', async () => {
@@ -353,6 +542,30 @@ describeWithMockConnection('ElementsTreeElement', () => {
         debugWithAiItem?.subItems?.map(item => item.label),
         ['Start a chat', 'Explain container queries', 'Explain container types', 'Explain container context']);
   });
+
+  it('opens element state pane when forced state is clicked in context menu', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    const buttonProvider = sinon.createStubInstance(Elements.ElementStatePaneWidget.ButtonProvider);
+    sinon.stub(Elements.ElementStatePaneWidget.ButtonProvider, 'instance').returns(buttonProvider);
+
+    const event = new Event('contextmenu');
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const node = new SDK.DOMModel.DOMNode(domModel);
+    Elements.ElementsTreeElement.ElementsTreeElement.populateForcedPseudoStateItems(contextMenu, node);
+
+    const subMenu = findMenuItemWithLabel(contextMenu.debugSection(), 'Force state');
+    assert.instanceOf(subMenu, UI.ContextMenu.SubMenu);
+    const hoverItem = findMenuItemWithLabel(subMenu.defaultSection(), ':hover');
+    assert.exists(hoverItem);
+
+    contextMenu.invokeHandler(hoverItem.id());
+
+    sinon.assert.calledOnce(buttonProvider.showPane);
+  });
+
   it('updates when persistent overlay state changes', async () => {
     const target = createTarget();
     const domModel = target.model(SDK.DOMModel.DOMModel);
@@ -361,28 +574,28 @@ describeWithMockConnection('ElementsTreeElement', () => {
     sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
     sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
     sinon.stub(node, 'nodeName').returns('DIV');
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
     const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
     treeElement.treeOutline = treeOutline;
 
     // Simulate binding to the tree
     treeElement.onbind();
 
-    const performUpdateSpy = sinon.spy(treeElement, 'performUpdate');
+    const requestUpdateSpy = sinon.spy(treeElement.widget, 'requestUpdate');
 
     // Trigger event
     node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.GRID_OVERLAY_STATE_CHANGED, {enabled: true});
 
-    sinon.assert.calledOnce(performUpdateSpy);
+    sinon.assert.calledOnce(requestUpdateSpy);
 
     // Simulate unbinding
     treeElement.onunbind();
-    performUpdateSpy.resetHistory();
+    requestUpdateSpy.resetHistory();
 
     // Trigger event again
     node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.GRID_OVERLAY_STATE_CHANGED, {enabled: false});
 
-    sinon.assert.notCalled(performUpdateSpy);
+    sinon.assert.notCalled(requestUpdateSpy);
   });
 
   it('updates when persistent scroll snap overlay state changes', async () => {
@@ -393,28 +606,27 @@ describeWithMockConnection('ElementsTreeElement', () => {
     sinon.stub(node, 'nodeType').returns(Node.ELEMENT_NODE);
     sinon.stub(node, 'nodeNameInCorrectCase').returns('div');
     sinon.stub(node, 'nodeName').returns('DIV');
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
     const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
     treeElement.treeOutline = treeOutline;
 
     // Simulate binding to the tree
     treeElement.onbind();
-
-    const performUpdateSpy = sinon.spy(treeElement, 'performUpdate');
+    const requestUpdateSpy = sinon.spy(treeElement.widget, 'requestUpdate');
 
     // Trigger event
     node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.SCROLL_SNAP_OVERLAY_STATE_CHANGED, {enabled: true});
 
-    sinon.assert.calledOnce(performUpdateSpy);
+    sinon.assert.calledOnce(requestUpdateSpy);
 
     // Simulate unbinding
     treeElement.onunbind();
-    performUpdateSpy.resetHistory();
+    requestUpdateSpy.resetHistory();
 
     // Trigger event again
     node.dispatchEventToListeners(SDK.DOMModel.DOMNodeEvents.SCROLL_SNAP_OVERLAY_STATE_CHANGED, {enabled: false});
 
-    sinon.assert.notCalled(performUpdateSpy);
+    sinon.assert.notCalled(requestUpdateSpy);
   });
 
   it('initializes the slot adorner if the node has an assigned slot', async () => {
@@ -435,7 +647,7 @@ describeWithMockConnection('ElementsTreeElement', () => {
         highlight: () => {},
       },
     } as unknown as SDK.DOMModel.DOMNodeShortcut;
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
 
     sinon.stub(node, 'hasAssignedSlot').returns(true);
     sinon.stub(node, 'assignedSlot').value(shortcut);
@@ -445,9 +657,10 @@ describeWithMockConnection('ElementsTreeElement', () => {
     // Simulate binding to the tree
     treeElement.onbind();
 
-    treeElement.performUpdate();
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
 
-    const adorner = treeElement.listItemElement.querySelector('devtools-adorner');
+    const adorner = treeElement.widget.contentElement.querySelector('devtools-adorner');
     assert.exists(adorner);
     assert.strictEqual(adorner.name, 'slot');
   });
@@ -464,16 +677,17 @@ describeWithMockConnection('ElementsTreeElement', () => {
     sinon.stub(node, 'nodeName').returns('DIV');
     node.id = 1 as Protocol.DOM.NodeId;
 
-    const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
 
     sinon.stub(node, 'affectedByStartingStyles').returns(true);
 
     const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
     treeElement.treeOutline = treeOutline;
     treeElement.onbind();
-    treeElement.performUpdate();
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
 
-    const adorner = treeElement.listItemElement.querySelector('.starting-style');
+    const adorner = treeElement.widget.contentElement.querySelector('.starting-style');
     assert.exists(adorner);
 
     const forceSpy = sinon.spy(cssModel, 'forceStartingStyle');
@@ -502,16 +716,17 @@ describeWithMockConnection('ElementsTreeElement', () => {
        };
        const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
 
-       const treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+       const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
        const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
        treeElement.treeOutline = treeOutline;
        treeElement.onbind();
 
        // Render the element initially
-       treeElement.performUpdate();
+       treeElement.requestUpdate();
+       await treeElement.updateComplete;
 
        // The attribute container DOM initially contains zero-width spaces (inserted for wrapping by rendering)
-       const attributeElement = treeElement.listItemElement.querySelector('.webkit-html-attribute');
+       const attributeElement = treeElement.widget.contentElement.querySelector('.webkit-html-attribute');
        assert.exists(attributeElement);
 
        // Count initial zero-width spaces
@@ -526,16 +741,18 @@ describeWithMockConnection('ElementsTreeElement', () => {
        assert.notInclude(attributeElement.textContent, '\u200B');
 
        // While editing is active, call performUpdate (or hover, etc.) which would re-render
-       treeElement.performUpdate();
+       treeElement.requestUpdate();
+       await treeElement.updateComplete;
 
        // Verify that the attribute element STILL does not contain zero-width spaces.
        assert.notInclude(attributeElement.textContent, '\u200B');
 
        // Cancel the editing session and clean up
        treeElement.editingCancelled(attributeElement, 'autofill-information');
+       await treeElement.updateComplete;
 
        // Re-query the newly rendered attribute element from the DOM
-       const finalAttributeElement = treeElement.listItemElement.querySelector('.webkit-html-attribute');
+       const finalAttributeElement = treeElement.widget.contentElement.querySelector('.webkit-html-attribute');
        assert.exists(finalAttributeElement);
 
        // After cancelling, the element is restored, and the zero-width spaces should be restored back to initial count
@@ -543,11 +760,309 @@ describeWithMockConnection('ElementsTreeElement', () => {
        const finalSpacesCount = finalAttributeElement.textContent.split('\u200B').length - 1;
        assert.strictEqual(finalSpacesCount, initialSpacesCount);
      });
+
+  it('starts editing boolean attributes without values via triggerEditAttribute', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    const nodePayload = {
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BUTTON',
+      localName: 'button',
+      nodeValue: '',
+      attributes: ['disabled', ''],
+      childNodeCount: 0,
+    };
+    const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    treeElement.onbind();
+
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
+
+    const attributeElement = treeElement.widget.contentElement.querySelector('.webkit-html-attribute');
+    assert.exists(attributeElement);
+    assert.isNull(attributeElement.querySelector('.webkit-html-attribute-value'));
+
+    const editStarted = treeElement.triggerEditAttribute('disabled');
+    assert.isTrue(editStarted);
+  });
+
+  it('starts editing boolean attribute on startEditing when it is the first attribute', async () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    const nodePayload = {
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BUTTON',
+      localName: 'button',
+      nodeValue: '',
+      attributes: ['disabled', ''],
+      childNodeCount: 0,
+    };
+    const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    treeElement.onbind();
+
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
+
+    treeElement.widget.isDOMNodeSelected = true;
+    const editStarted = treeElement.widget.startEditing();
+    assert.isTrue(editStarted);
+  });
+
+  it('truncates long data URL attribute values in the UI but shows them in full when editing', () => {
+    const target = createTarget();
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    const longDataUrl = 'data:text/plain;,' +
+        '1234567890'.repeat(10);
+    const nodePayload = {
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'A',
+      localName: 'a',
+      nodeValue: '',
+      attributes: ['href', longDataUrl, 'id', 'inspected'],
+      childNodeCount: 0,
+    };
+    const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+    // Stub resolveURL to return the URL as-is, which triggers DevTools linkification logic.
+    sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`${url}`);
+
+    const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    treeElement.performUpdate();
+
+    const attributeElement = treeElement.widget.contentElement.querySelector('.webkit-html-attribute');
+    assert.exists(attributeElement);
+    const attributeValueElement = attributeElement.querySelector('.webkit-html-attribute-value');
+    assert.exists(attributeValueElement);
+
+    // The expected trimmed value when rendered in the UI (with zero-width spaces stripped for comparison).
+    // DevTools trims it to 60 characters (including ZWSPs).
+    // "data:text/plain;,1234567890" (27 chars) + "…" (1 char) + "23456789012345678901234567890" (29 chars) = 57 chars
+    const expectedTrimmedUrlClean = 'data:text/plain;,1234567890…23456789012345678901234567890';
+
+    // We strip zero-width spaces from the actual text content to compare it with our clean expected value,
+    // avoiding issues with invisible characters in the assertion.
+    const cleanActualText = attributeValueElement.textContent?.trim().replace(/\u200B/g, '') ?? '';
+    assert.strictEqual(cleanActualText, expectedTrimmedUrlClean);
+
+    // Start editing the 'href' attribute.
+    const editStarted = treeElement.triggerEditAttribute('href');
+    assert.isTrue(editStarted);
+    // When editing, the full, untrimmed value should be displayed without zero-width spaces.
+    assert.strictEqual(attributeValueElement.textContent?.trim(), longDataUrl);
+
+    // Cancel editing.
+    treeElement.editingCancelled(attributeElement, 'href');
+
+    // The value should be trimmed again.
+    const attributeElementAfterCancel = treeElement.widget.contentElement.querySelector('.webkit-html-attribute');
+    assert.exists(attributeElementAfterCancel);
+    const attributeValueElementAfterCancel = attributeElementAfterCancel.querySelector('.webkit-html-attribute-value');
+    assert.exists(attributeValueElementAfterCancel);
+    const cleanActualTextAfterCancel =
+        attributeValueElementAfterCancel.textContent?.trim().replace(/\u200B/g, '') ?? '';
+    assert.strictEqual(cleanActualTextAfterCancel, expectedTrimmedUrlClean);
+  });
+
+  describe('Linkification', () => {
+    let target: SDK.Target.Target;
+    let domModel: SDK.DOMModel.DOMModel;
+
+    beforeEach(() => {
+      target = createTarget();
+      domModel = target.model(SDK.DOMModel.DOMModel)!;
+      assert.exists(domModel);
+    });
+
+    function renderTreeNode(node: SDK.DOMModel.DOMNode): Elements.ElementsTreeElement.ElementsTreeElement {
+      const treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+      const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+      treeElement.treeOutline = treeOutline;
+      treeElement.performUpdate();
+      return treeElement;
+    }
+
+    function getLinkOutputs(treeElement: Elements.ElementsTreeElement.ElementsTreeElement):
+        Array<{text: string, href: string}> {
+      const linkElements =
+          Array.from(treeElement.widget.contentElement.querySelectorAll('.webkit-html-attribute-value .devtools-link'));
+      assert.isNotEmpty(linkElements, 'Expected to find .devtools-link elements');
+
+      return linkElements.map(link => {
+        const text = link.textContent?.trim().replace(/\u200B/g, '') ?? '';
+        let href = '';
+        if (link.tagName.toLowerCase() === 'devtools-link') {
+          href = link.getAttribute('href') ?? '';
+        } else {
+          href = Components.Linkifier.Linkifier.linkInfo(link)?.url ?? '';
+        }
+        return {text, href};
+      });
+    }
+
+    it('renders src attribute on img as a link', () => {
+      const nodePayload = {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'IMG',
+        localName: 'img',
+        nodeValue: '',
+        attributes: ['src', 'image.png'],
+        childNodeCount: 0,
+      };
+      const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+      sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`http://example.com/${url}`);
+
+      const treeElement = renderTreeNode(node);
+      const links = getLinkOutputs(treeElement);
+
+      assert.lengthOf(links, 1);
+      assert.deepEqual(links[0], {text: 'image.png', href: 'http://example.com/image.png'});
+    });
+
+    it('renders srcset attribute on img as multiple links', () => {
+      const nodePayload = {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'IMG',
+        localName: 'img',
+        nodeValue: '',
+        attributes: ['srcset', '1x.png 1x, 2x.png 2x'],
+        childNodeCount: 0,
+      };
+      const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+      sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`http://example.com/${url}`);
+
+      const treeElement = renderTreeNode(node);
+      const links = getLinkOutputs(treeElement);
+
+      assert.lengthOf(links, 2);
+      assert.deepEqual(links[0], {text: '1x.png', href: 'http://example.com/1x.png'});
+      assert.deepEqual(links[1], {text: '2x.png', href: 'http://example.com/2x.png'});
+    });
+
+    it('renders href attribute on a as a devtools-link', () => {
+      const nodePayload = {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'A',
+        localName: 'a',
+        nodeValue: '',
+        attributes: ['href', 'http://example.com'],
+        childNodeCount: 0,
+      };
+      const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+      sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`${url}`);
+
+      const treeElement = renderTreeNode(node);
+      const links = getLinkOutputs(treeElement);
+
+      assert.lengthOf(links, 1);
+      assert.deepEqual(links[0], {text: 'http://example.com', href: 'http://example.com'});
+
+      const attributeValueElement = treeElement.widget.contentElement.querySelector('.webkit-html-attribute-value');
+      const linkElement = attributeValueElement?.querySelector('.devtools-link');
+      assert.strictEqual(linkElement?.tagName.toLowerCase(), 'devtools-link');
+    });
+
+    it('renders href attribute on SVG image as a link', () => {
+      const nodePayload = {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'image',
+        localName: 'image',
+        nodeValue: '',
+        attributes: ['href', 'image.png'],
+        childNodeCount: 0,
+      };
+      const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+      sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`http://example.com/${url}`);
+
+      const treeElement = renderTreeNode(node);
+      const links = getLinkOutputs(treeElement);
+
+      assert.lengthOf(links, 1);
+      assert.deepEqual(links[0], {text: 'image.png', href: 'http://example.com/image.png'});
+    });
+
+    it('updates attributes when shifting between plain and linkified values without throwing', () => {
+      const nodePayload = {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'SCRIPT',
+        localName: 'script',
+        nodeValue: '',
+        attributes: ['type', 'rocketlazyloadscript', 'src', 'app.js'],
+        childNodeCount: 0,
+      };
+      const node = SDK.DOMModel.DOMNode.create(domModel, null, false, nodePayload);
+      sinon.stub(node, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`http://example.com/${url}`);
+
+      const treeElement = renderTreeNode(node);
+      assert.deepEqual(getLinkOutputs(treeElement), [{text: 'app.js', href: 'http://example.com/app.js'}]);
+
+      // Removing 'type' shifts 'src' into the first attribute slot (previously ValueType.UNKNOWN).
+      domModel.attributeRemoved(node.id, 'type');
+      treeElement.updateTitle();
+      assert.deepEqual(getLinkOutputs(treeElement), [{text: 'app.js', href: 'http://example.com/app.js'}]);
+
+      // Replacing 'src' with a plain attribute transitions the slot from ValueType.SRC back to ValueType.UNKNOWN.
+      domModel.attributeRemoved(node.id, 'src');
+      domModel.attributeModified(node.id, 'type', 'module');
+      treeElement.updateTitle();
+      const attrValue = treeElement.widget.contentElement.querySelector('.webkit-html-attribute-value');
+      assert.strictEqual(attrValue?.textContent?.replace(/\u200B/g, ''), 'module');
+
+      // Also verify IMG transitions between plain attributes and srcset (ValueType.SRCSET).
+      const imgNode = SDK.DOMModel.DOMNode.create(domModel, null, false, {
+        nodeId: 2 as Protocol.DOM.NodeId,
+        backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'IMG',
+        localName: 'img',
+        nodeValue: '',
+        attributes: ['data-srcset', '1x.png 1x', 'srcset', '1x.png 1x, 2x.png 2x'],
+        childNodeCount: 0,
+      });
+      sinon.stub(imgNode, 'resolveURL').callsFake(url => Platform.DevToolsPath.urlString`http://example.com/${url}`);
+      const imgTreeElement = renderTreeNode(imgNode);
+      assert.lengthOf(getLinkOutputs(imgTreeElement), 2);
+
+      domModel.attributeRemoved(imgNode.id, 'data-srcset');
+      imgTreeElement.updateTitle();
+      assert.lengthOf(getLinkOutputs(imgTreeElement), 2);
+    });
+  });
 });
 
-describeWithMockConnection('ElementsTreeElement highlighting', () => {
+describeWithEnvironment('ElementsTreeElement highlighting', () => {
   let domModel: SDK.DOMModel.DOMModel;
-  let treeOutline: Elements.ElementsTreeOutline.ElementsTreeOutline;
+  let treeOutline: Elements.DOMTreeWidget.ElementsTreeOutline;
   let containerNode: SDK.DOMModel.DOMNode;
   let attrTestNode: SDK.DOMModel.DOMNode;
   let childTestNode: SDK.DOMModel.DOMNode;
@@ -599,7 +1114,12 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
   }
 
   beforeEach(async () => {
-    const target = createTarget();
+    const universe = new TestUniverse();
+    setTestUniverseForWidgets(universe);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(universe.debuggerWorkspaceBinding);
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(universe.cssWorkspaceBinding);
+    const target = universe.createTarget();
     domModel = target.model(SDK.DOMModel.DOMModel)!;
 
     const containerPayload = createDOMNodePayload('div', {id: 'container'});
@@ -614,7 +1134,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     childTestNode = containerNode.children()![1];
     textTestNode = containerNode.children()![2];
 
-    treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline();
+    treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline();
     treeOutline.wireToDOMModel(domModel);
 
     const containerTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(containerNode);
@@ -631,9 +1151,12 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     containerTreeElement.expand();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    attrTestTreeElement?.hideSearchHighlights();
     treeOutline.removeChildren();
     treeOutline.setVisible(false);
+    await UI.Widget.Widget.allUpdatesComplete;
+    Highlighting.HighlightManager.HighlightManager.removeInstance();
   });
 
   let stub: sinon.SinonStub<[], void>|undefined;
@@ -641,9 +1164,10 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     stub?.restore();
     return await new Promise(resolve => {
       stub = sinon.stub(treeOutline, 'updateModifiedNodes');
-      stub.callsFake(() => {
+      stub.callsFake(async () => {
         stub?.wrappedMethod.call(treeOutline);
-        resolve(element.listItemElement.querySelectorAll('.dom-update-highlight').length);
+        await element.updateComplete;
+        resolve(element.widget.contentElement.querySelectorAll('.dom-update-highlight').length);
       });
     });
   }
@@ -788,9 +1312,10 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     await textTestTreeElement.onpopulate();
 
     treeOutline.selectDOMNode(piNode, true);
+    await piTreeElement.updateComplete;
 
     const piElementDOM =
-        piTreeElement.listItemElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
+        piTreeElement.widget.contentElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
     assert.exists(piElementDOM);
 
     // Start editing by calling ondblclick
@@ -798,7 +1323,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     Object.defineProperty(event, 'target', {value: piElementDOM});
     assert.isFalse(piTreeElement.ondblclick(event));
 
-    assert.isTrue(piTreeElement.isEditing());
+    assert.isTrue(piTreeElement.isEditing);
 
     assert.strictEqual(piElementDOM.textContent, 'pi-data');
 
@@ -808,7 +1333,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     // The commit is triggered by blur or enter.
     piElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
 
-    assert.isFalse(piTreeElement.isEditing());
+    assert.isFalse(piTreeElement.isEditing);
 
     sinon.assert.calledOnce(setNodeValueSpy);
     sinon.assert.calledWith(setNodeValueSpy, 'New Data');
@@ -830,9 +1355,10 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     await textTestTreeElement.onpopulate();
 
     treeOutline.selectDOMNode(piNode, true);
+    await piTreeElement.updateComplete;
 
     const piElementDOM =
-        piTreeElement.listItemElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
+        piTreeElement.widget.contentElement.querySelector('.webkit-html-processing-instruction-value') as HTMLElement;
     assert.exists(piElementDOM);
 
     // Start editing by calling ondblclick
@@ -840,7 +1366,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     Object.defineProperty(event, 'target', {value: piElementDOM});
     assert.isFalse(piTreeElement.ondblclick(event));
 
-    assert.isTrue(piTreeElement.isEditing());
+    assert.isTrue(piTreeElement.isEditing);
 
     assert.strictEqual(piElementDOM.textContent, '');
 
@@ -850,7 +1376,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     // The commit is triggered by blur or enter.
     piElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
 
-    assert.isFalse(piTreeElement.isEditing());
+    assert.isFalse(piTreeElement.isEditing);
 
     sinon.assert.calledOnce(setNodeValueSpy);
     sinon.assert.calledWith(setNodeValueSpy, 'New Data');
@@ -888,8 +1414,10 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     await textTestTreeElement.onpopulate();
 
     treeOutline.selectDOMNode(textNode, true);
+    await textNodeTreeElement.updateComplete;
 
-    const textElementDOM = textNodeTreeElement.listItemElement.querySelector('.webkit-html-text-node') as HTMLElement;
+    const textElementDOM =
+        textNodeTreeElement.widget.contentElement.querySelector('.webkit-html-text-node') as HTMLElement;
     assert.exists(textElementDOM);
 
     // Start editing by calling ondblclick
@@ -897,7 +1425,7 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     Object.defineProperty(event, 'target', {value: textElementDOM});
     assert.isFalse(textNodeTreeElement.ondblclick(event));
 
-    assert.isTrue(textNodeTreeElement.isEditing());
+    assert.isTrue(textNodeTreeElement.isEditing);
 
     assert.strictEqual(textElementDOM.textContent, longText);
 
@@ -907,22 +1435,54 @@ describeWithMockConnection('ElementsTreeElement highlighting', () => {
     // The commit is triggered by blur or enter.
     textElementDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
 
-    assert.isFalse(textNodeTreeElement.isEditing());
+    assert.isFalse(textNodeTreeElement.isEditing);
 
     sinon.assert.calledOnce(setNodeValueSpy);
     sinon.assert.calledWith(setNodeValueSpy, 'New Text');
   });
+
+  it('highlights search results in ordered text ranges', async () => {
+    attrTestTreeElement.highlightSearchResults('foo');
+    await attrTestTreeElement.widget.updateComplete;
+    const highlight = CSS.highlights.get('highlighted-search-result');
+    assert.exists(highlight);
+    assert.deepEqual(Array.from(highlight).map(range => range.toString()), ['Foo', 'foo']);
+  });
+
+  it('hides search highlights and clears searchQuery without resurrecting on update', async () => {
+    attrTestTreeElement.highlightSearchResults('foo');
+    await attrTestTreeElement.widget.updateComplete;
+    let highlight = CSS.highlights.get('highlighted-search-result');
+    assert.exists(highlight);
+    assert.strictEqual(highlight.size, 2);
+
+    attrTestTreeElement.hideSearchHighlights();
+    await attrTestTreeElement.widget.updateComplete;
+    assert.isNull(attrTestTreeElement.widget.searchQuery);
+    highlight = CSS.highlights.get('highlighted-search-result');
+    assert.strictEqual(highlight?.size ?? 0, 0);
+
+    attrTestTreeElement.widget.requestUpdate();
+    await attrTestTreeElement.widget.updateComplete;
+    highlight = CSS.highlights.get('highlighted-search-result');
+    assert.strictEqual(highlight?.size ?? 0, 0);
+  });
 });
 
-describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
+describeWithEnvironment('ElementsTreeElement in Snapshot Mode', () => {
   let target: SDK.Target.Target;
   let domModel: SDK.DOMModel.DOMModel;
-  let treeOutline: Elements.ElementsTreeOutline.ElementsTreeOutline;
+  let treeOutline: Elements.DOMTreeWidget.ElementsTreeOutline;
   let node: SDK.DOMModel.DOMNode;
   let treeElement: Elements.ElementsTreeElement.ElementsTreeElement;
 
   beforeEach(() => {
-    target = createTarget();
+    const universe = new TestUniverse();
+    setTestUniverseForWidgets(universe);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(universe.debuggerWorkspaceBinding);
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(universe.cssWorkspaceBinding);
+    target = universe.createTarget();
     domModel = target.model(SDK.DOMModel.DOMModel)!;
     node = new SDK.DOMModel.DOMNode(domModel);
     node.id = 1 as Protocol.DOM.NodeId;
@@ -932,7 +1492,7 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
     sinon.stub(node, 'adProvenance').returns({} as Protocol.Network.AdProvenance);
     sinon.stub(node, 'isMediaNode').returns(true);
 
-    treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline(
+    treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline(
         /* omitRootDOMNode */ false, /* selectEnabled */ true, /* hideGutter */ false, /* maxTreeDepth */ 2,
         /* enableContextMenu */ false, /* showComments */ false, /* showAIButton */ false, /* disableEdits */ true);
     treeOutline.wireToDOMModel(domModel);
@@ -966,7 +1526,7 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
     const nodeSnapshot = snapshot.children()?.[0];
     assert.exists(nodeSnapshot);
 
-    treeOutline = new Elements.ElementsTreeOutline.ElementsTreeOutline(
+    treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline(
         /* omitRootDOMNode */ false, /* selectEnabled */ true, /* hideGutter */ false, /* maxTreeDepth */ 2,
         /* enableContextMenu */ false, /* showComments */ false, /* showAIButton */ false, /* disableEdits */ true);
     treeOutline.wireToDOMModel(domModel);
@@ -985,9 +1545,10 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
       execute: () => {},
     } as unknown as UI.ActionRegistration.Action);
 
-    treeElement.performUpdate();
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
 
-    const aiButton = treeElement.listItemElement.querySelector('devtools-floating-button');
+    const aiButton = treeElement.widget.contentElement.querySelector('devtools-floating-button');
     assert.isNull(aiButton, 'Ask AI button should not be present in snapshot mode');
   });
 
@@ -1007,7 +1568,8 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
         isSubgrid: true,
       } as SDK.CSSModel.LayoutProperties);
 
-      sinon.stub(node, 'attributes').returns([{name: 'popover', value: ''}] as SDK.DOMModel.Attribute[]);
+      sinon.stub(node, 'attributes').returns([{name: 'popover', value: ''},
+                                              {name: 'interesttarget', value: ''}] as SDK.DOMModel.Attribute[]);
       sinon.stub(node, 'topLayerIndex').returns(1);
       sinon.stub(node, 'affectedByStartingStyles').returns(true);
 
@@ -1025,11 +1587,12 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
       sinon.stub(node, 'assignedSlot').value(slot);
     });
 
-    it('media adorner click is no-op', () => {
+    it('media adorner click is no-op', async () => {
       treeElement.updateAdorners();
-      treeElement.performUpdate();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
 
-      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
       const mediaAdorner = Array.from(adorners).find(a => a.name === 'media');
       assert.exists(mediaAdorner);
 
@@ -1040,44 +1603,62 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
       sinon.assert.notCalled(showViewSpy);
     });
 
-    it('popover adorner click is no-op', () => {
-      // Force allow popover for test
-      const originalDevToolsAllowPopoverForcing = Root.Runtime.hostConfig.devToolsAllowPopoverForcing;
-      Root.Runtime.hostConfig.devToolsAllowPopoverForcing = {enabled: true};
-
+    it('popover adorner click is no-op', async () => {
       treeElement.updateAdorners();
-      treeElement.performUpdate();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
 
-      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
       const popoverAdorner = Array.from(adorners).find(a => a.name === 'popover');
       assert.exists(popoverAdorner);
 
       const agentSpy = sinon.spy(domModel.agent, 'invoke_forceShowPopover');
       popoverAdorner!.dispatchEvent(new Event('click'));
       sinon.assert.notCalled(agentSpy);
-
-      // Restore
-      Root.Runtime.hostConfig.devToolsAllowPopoverForcing = originalDevToolsAllowPopoverForcing;
     });
 
-    it('top-layer adorner click is no-op', () => {
-      treeElement.updateAdorners();
-      treeElement.performUpdate();
+    it('interest adorner click is no-op', async () => {
+      // Force allow interest for test
+      const originalDevToolsAllowInterestForcing = Root.Runtime.hostConfig.devToolsAllowInterestForcing;
+      Root.Runtime.hostConfig.devToolsAllowInterestForcing = {enabled: true};
 
-      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      treeElement.updateAdorners();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
+
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
+      const interestAdorner = Array.from(adorners).find(a => a.name === 'interest');
+      assert.exists(interestAdorner);
+
+      const agentSpy = sinon.spy(domModel.agent, 'invoke_forceShowInterest');
+      interestAdorner!.dispatchEvent(new Event('click'));
+      sinon.assert.notCalled(agentSpy);
+
+      // Restore
+      Root.Runtime.hostConfig.devToolsAllowInterestForcing = originalDevToolsAllowInterestForcing;
+    });
+
+    it('top-layer adorner click is no-op', async () => {
+      treeElement.updateAdorners();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
+
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
       const topLayerAdorner = Array.from(adorners).find(a => a.name === 'top-layer');
       assert.exists(topLayerAdorner);
 
-      const revealSpy = sinon.spy(treeElement.treeOutline!, 'revealInTopLayer');
+      const revealSpy =
+          sinon.spy((treeElement.treeOutline as Elements.DOMTreeWidget.ElementsTreeOutline)!, 'revealInTopLayer');
       topLayerAdorner!.dispatchEvent(new Event('click'));
       sinon.assert.notCalled(revealSpy);
     });
 
-    it('starting-style adorner click is no-op', () => {
+    it('starting-style adorner click is no-op', async () => {
       treeElement.updateAdorners();
-      treeElement.performUpdate();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
 
-      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
       const startingStyleAdorner = Array.from(adorners).find(a => a.name === 'starting-style');
       assert.exists(startingStyleAdorner);
 
@@ -1086,11 +1667,12 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
       sinon.assert.notCalled(forceStartingStyleSpy);
     });
 
-    it('slot adorner click works', () => {
+    it('slot adorner click works', async () => {
       treeElement.updateAdorners();
-      treeElement.performUpdate();
+      treeElement.requestUpdate();
+      await treeElement.updateComplete;
 
-      const adorners = treeElement.listItemElement.querySelectorAll('devtools-adorner');
+      const adorners = treeElement.widget.contentElement.querySelectorAll('devtools-adorner');
       const slotAdorner = Array.from(adorners).find(a => a.name === 'slot');
       assert.exists(slotAdorner);
 
@@ -1098,5 +1680,1290 @@ describeWithMockConnection('ElementsTreeElement in Snapshot Mode', () => {
       slotAdorner!.dispatchEvent(new Event('click'));
       sinon.assert.called(revealSpy);
     });
+  });
+
+  describe('selected hint', () => {
+    it('renders selected hint when selected and inspectable', () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        isSelected: true,
+        canInspect: true,
+      },
+                                                {}, domTarget);
+
+      const hint = domTarget.querySelector('.selected-hint');
+      assert.exists(hint);
+    });
+
+    it('does not render selected hint when selected but not inspectable', () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        isSelected: true,
+        canInspect: false,
+      },
+                                                {}, domTarget);
+
+      const hint = domTarget.querySelector('.selected-hint');
+      assert.isNull(hint);
+    });
+
+    it('does not render selected hint when not selected', () => {
+      const domTarget = document.createElement('div');
+      renderElementIntoDOM(domTarget);
+      Elements.ElementsTreeElement.DEFAULT_VIEW({
+        ...getBaseViewInput(),
+        isSelected: false,
+        canInspect: true,
+      },
+                                                {}, domTarget);
+
+      const hint = domTarget.querySelector('.selected-hint');
+      assert.isNull(hint);
+    });
+  });
+
+  it('triggers invoke_forceShowInterest on interest adorner click', async () => {
+    const originalDevToolsAllowInterestForcing = Root.Runtime.hostConfig.devToolsAllowInterestForcing;
+    Root.Runtime.hostConfig.devToolsAllowInterestForcing = {enabled: true};
+
+    sinon.stub(node, 'attributes').returns([{name: 'interestfor', value: 'my-tooltip'}] as SDK.DOMModel.Attribute[]);
+
+    treeOutline = new Elements.DOMTreeWidget.ElementsTreeOutline(
+        /* omitRootDOMNode */ false, /* selectEnabled */ true, /* hideGutter */ false, /* maxTreeDepth */ 2,
+        /* enableContextMenu */ false, /* showComments */ false, /* showAIButton */ false, /* disableEdits */ false);
+    treeOutline.wireToDOMModel(domModel);
+
+    treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+    treeElement.treeOutline = treeOutline;
+    treeElement.onbind();
+
+    treeElement.updateAdorners();
+    treeElement.requestUpdate();
+    await treeElement.updateComplete;
+
+    const adorners = treeElement.widget.contentElement.querySelectorAll<Adorners.Adorner.Adorner>('devtools-adorner');
+    const interestAdorner = Array.from(adorners).find(a => a.name === 'interest');
+    assert.exists(interestAdorner);
+
+    const agentSpy = sinon.spy(domModel.agent, 'invoke_forceShowInterest');
+    interestAdorner.dispatchEvent(new Event('click'));
+    sinon.assert.calledWith(agentSpy, {nodeId: node.id, enable: true});
+
+    // Restore
+    Root.Runtime.hostConfig.devToolsAllowInterestForcing = originalDevToolsAllowInterestForcing;
+  });
+
+  describe('ondelete', () => {
+    it('returns false if treeOutline is not set', () => {
+      const treeElementNoOutline = new Elements.ElementsTreeElement.ElementsTreeElement(node);
+      assert.isFalse(treeElementNoOutline.ondelete());
+    });
+
+    it('calls remove on tree element for node', () => {
+      const removeSpy = sinon.spy(treeElement, 'remove');
+      const handled = treeElement.ondelete();
+      assert.isTrue(handled);
+      sinon.assert.calledOnce(removeSpy);
+    });
+
+    it('calls remove on start tag tree element when ondelete is called on closing tag', () => {
+      treeElement.onbind();
+      const closingTagTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node, true);
+      closingTagTreeElement.treeOutline = treeOutline;
+      const removeSpy = sinon.spy(treeElement, 'remove');
+      const handled = closingTagTreeElement.ondelete();
+      assert.isTrue(handled);
+      sinon.assert.calledOnce(removeSpy);
+    });
+  });
+});
+
+describeWithEnvironment('ElementsTreeElement issue management', () => {
+  let universe: TestUniverse;
+  let target: SDK.Target.Target;
+  let testDomModel: SDK.DOMModel.DOMModel;
+  let domIssuesManager: IssuesManager.DOMIssuesManager.DOMIssuesManager;
+  let issuesManager: IssuesManager.IssuesManager.IssuesManager;
+  let labelNode: SDK.DOMModel.DOMNode;
+  let outline: Elements.DOMTreeWidget.ElementsTreeOutline;
+  let testTreeElement: Elements.ElementsTreeElement.ElementsTreeElement;
+  let mockModel: SDK.IssuesModel.IssuesModel;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    setTestUniverseForWidgets(universe);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(universe.debuggerWorkspaceBinding);
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(universe.cssWorkspaceBinding);
+    target = universe.createTarget();
+    testDomModel = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+    domIssuesManager = universe.domIssuesManager;
+    issuesManager = universe.issuesManager;
+
+    const labelNodePayload = {
+      nodeId: 2 as Protocol.DOM.NodeId,
+      parentId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'LABEL',
+      localName: 'label',
+      nodeValue: 'A label',
+      attributes: ['for', 'input-id'],
+      childNodeCount: 0,
+    };
+    const rootNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BODY',
+      localName: 'body',
+      nodeValue: 'Body',
+      childNodeCount: 1,
+      children: [labelNodePayload],
+    });
+    assert.isNotNull(rootNode);
+    labelNode = rootNode.children()![0];
+    assert.isNotNull(labelNode);
+
+    outline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+    outline.wireToDOMModel(testDomModel);
+    outline.setVisible(true);
+    renderElementIntoDOM(outline.element);
+    testTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(labelNode, false);
+    outline.appendChild(testTreeElement);
+    testTreeElement.widget.performUpdate();
+
+    sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(labelNode);
+
+    mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
+  });
+
+  it('adds generic tag issue to tree element and highlights tag name', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.GenericIssue,
+      details: {
+        genericIssueDetails: {
+          errorType: Protocol.Audits.GenericIssueErrorType.FormLabelForNameError,
+          frameId: 'main' as Protocol.Page.FrameId,
+          violatingNodeId: 2 as Protocol.DOM.BackendNodeId,
+        },
+      },
+    };
+    const issue = IssuesManager.GenericIssue.GenericIssue.fromInspectorIssue(mockModel, inspectorIssue)[0];
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isTrue(tagElement.classList.contains('violating-element'));
+    assert.deepEqual(domIssuesManager.issuesForNode(labelNode), [issue]);
+  });
+
+  it('adds select accessibility issue to tree element and highlights tag name', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.ElementAccessibilityIssue,
+      details: {
+        elementAccessibilityIssueDetails: {
+          nodeId: 2 as Protocol.DOM.BackendNodeId,
+          elementAccessibilityIssueReason: Protocol.Audits.ElementAccessibilityIssueReason.DisallowedSelectChild,
+          hasDisallowedAttributes: false,
+        },
+      },
+    };
+    const issue = IssuesManager.ElementAccessibilityIssue.ElementAccessibilityIssue.fromInspectorIssue(
+        mockModel, inspectorIssue)[0];
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isTrue(tagElement.classList.contains('violating-element'));
+    assert.deepEqual(domIssuesManager.issuesForNode(labelNode), [issue]);
+  });
+
+  it('adds attribute-specific issue to tree element and highlights attribute name', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.GenericIssue,
+      details: {
+        genericIssueDetails: {
+          errorType: Protocol.Audits.GenericIssueErrorType.FormLabelForMatchesNonExistingIdError,
+          frameId: 'main' as Protocol.Page.FrameId,
+          violatingNodeId: 2 as Protocol.DOM.BackendNodeId,
+          violatingNodeAttribute: 'for',
+        },
+      },
+    };
+    const issue = IssuesManager.GenericIssue.GenericIssue.fromInspectorIssue(mockModel, inspectorIssue)[0];
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const attrElement = testTreeElement.widget.contentElement.querySelector('.webkit-html-attribute-name');
+    assert.isNotNull(attrElement);
+    assert.isTrue(attrElement!.classList.contains('violating-element'));
+    assert.include(domIssuesManager.issuesForNode(labelNode), issue);
+  });
+
+  it('does not highlight tree element for non-supported issue', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue,
+      details: {},
+    };
+    const issue = IssuesManager.ContentSecurityPolicyIssue.ContentSecurityPolicyIssue.fromInspectorIssue(
+        mockModel, inspectorIssue)[0];
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isFalse(tagElement.classList.contains('violating-element'));
+  });
+
+  it('removes highlight when issue is hidden', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.GenericIssue,
+      details: {
+        genericIssueDetails: {
+          errorType: Protocol.Audits.GenericIssueErrorType.FormInputWithNoLabelError,
+          frameId: 'main' as Protocol.Page.FrameId,
+          violatingNodeId: 2 as Protocol.DOM.BackendNodeId,
+        },
+      },
+    };
+    const issue = IssuesManager.GenericIssue.GenericIssue.fromInspectorIssue(mockModel, inspectorIssue)[0];
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isTrue(tagElement.classList.contains('violating-element'));
+
+    issue.setHidden(true);
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_HIDDEN_STATUS_UPDATED, {issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.isFalse(tagElement.classList.contains('violating-element'));
+  });
+
+  it('restores highlight when hidden issue is unhidden', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.GenericIssue,
+      details: {
+        genericIssueDetails: {
+          errorType: Protocol.Audits.GenericIssueErrorType.FormInputWithNoLabelError,
+          frameId: 'main' as Protocol.Page.FrameId,
+          violatingNodeId: 2 as Protocol.DOM.BackendNodeId,
+        },
+      },
+    };
+    const issue = IssuesManager.GenericIssue.GenericIssue.fromInspectorIssue(mockModel, inspectorIssue)[0];
+    issue.setHidden(true);
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isFalse(tagElement.classList.contains('violating-element'));
+
+    issue.setHidden(false);
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_HIDDEN_STATUS_UPDATED, {issue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.isTrue(tagElement.classList.contains('violating-element'));
+  });
+
+  it('does not highlight tree element for pre-hidden issue', async () => {
+    const inspectorIssue = {
+      code: Protocol.Audits.InspectorIssueCode.GenericIssue,
+      details: {
+        genericIssueDetails: {
+          errorType: Protocol.Audits.GenericIssueErrorType.FormInputWithNoLabelError,
+          frameId: 'main' as Protocol.Page.FrameId,
+          violatingNodeId: 2 as Protocol.DOM.BackendNodeId,
+        },
+      },
+    };
+    const preHiddenIssue = IssuesManager.GenericIssue.GenericIssue.fromInspectorIssue(mockModel, inspectorIssue)[0];
+    preHiddenIssue.setHidden(true);
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.ISSUE_ADDED,
+                                           {issuesModel: mockModel, issue: preHiddenIssue});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const tagElement = testTreeElement.widget.contentElement.querySelectorAll('.webkit-html-tag-name')[0];
+    assert.isFalse(tagElement.classList.contains('violating-element'));
+  });
+
+  describe('in-place editing', () => {
+    it('supports starting in-place editing, adding attributes, and cancelling in ElementsTreeWidget', async () => {
+      const widget = testTreeElement.widget;
+      widget.isDOMNodeSelected = true;
+
+      const startEditingSpy = sinon.spy(widget, 'startEditing');
+      const addNewAttributeSpy = sinon.spy(widget, 'addNewAttribute');
+
+      // 1. Trigger startEditing
+      assert.isFalse(widget.isEditing);
+      widget.startEditing();
+      sinon.assert.calledOnce(startEditingSpy);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+
+      // 2. Trigger addNewAttribute
+      widget.addNewAttribute();
+      sinon.assert.calledOnce(addNewAttributeSpy);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+    });
+
+    it('supports editing tag name and starting attribute editing on an existing attribute', async () => {
+      const widget = testTreeElement.widget;
+      widget.isDOMNodeSelected = true;
+
+      // 1. Start editing tag name
+      assert.isFalse(widget.isEditing);
+      const tagEditingResult = widget.startEditingTagName();
+      assert.isTrue(tagEditingResult);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+
+      // 2. Start editing an existing attribute
+      const attrElement = widget.contentElement.querySelector('.webkit-html-attribute');
+      assert.exists(attrElement);
+      const attrEditingResult = widget.startEditingAttribute(attrElement, attrElement);
+      assert.isTrue(attrEditingResult);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+    });
+
+    it('cancels tag name editing when the new tag name is empty', () => {
+      const widget = testTreeElement.widget;
+      const setNodeNameStub = sinon.stub(labelNode, 'setNodeName');
+      const editingCancelledSpy = sinon.spy(widget, 'editingCancelled');
+
+      assert.isTrue(widget.startEditingTagName());
+      const tagNameElement = widget.contentElement.querySelector('.webkit-html-tag-name');
+      assert.exists(tagNameElement);
+      tagNameElement.textContent = '   ';
+      widget.editing?.commit();
+
+      sinon.assert.notCalled(setNodeNameStub);
+      sinon.assert.calledOnce(editingCancelledSpy);
+    });
+
+    it('records a renamed tag without a selectNodeAfterEdit hook', () => {
+      const widget = testTreeElement.widget;
+      widget.selectNodeAfterEdit = undefined;
+      const recordActionStub = sinon.stub(Badges.UserBadges.instance(), 'recordAction');
+      sinon.stub(labelNode, 'setNodeName').callsFake((_name, callback) => callback?.(null, labelNode));
+
+      assert.isTrue(widget.startEditingTagName());
+      const tagNameElement = widget.contentElement.querySelector('.webkit-html-tag-name');
+      assert.exists(tagNameElement);
+      tagNameElement.textContent = 'section';
+      widget.editing?.commit();
+
+      sinon.assert.calledOnceWithExactly(recordActionStub, Badges.BadgeAction.DOM_ELEMENT_OR_ATTRIBUTE_EDITED);
+    });
+
+    it('supports double click on tag name or attribute to initiate editing', async () => {
+      const widget = testTreeElement.widget;
+      widget.isDOMNodeSelected = true;
+
+      // Double click on tag name
+      const tagNameElement = widget.contentElement.querySelector('.webkit-html-tag-name');
+      assert.exists(tagNameElement);
+      const tagDblClickEvent = new MouseEvent('dblclick', {bubbles: true});
+      Object.defineProperty(tagDblClickEvent, 'target', {value: tagNameElement});
+      widget.ondblclick(tagDblClickEvent);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+
+      // Double click on attribute
+      const attrElement = widget.contentElement.querySelector('.webkit-html-attribute');
+      assert.exists(attrElement);
+      const attrDblClickEvent = new MouseEvent('dblclick', {bubbles: true});
+      Object.defineProperty(attrDblClickEvent, 'target', {value: attrElement});
+      widget.ondblclick(attrDblClickEvent);
+      assert.isTrue(widget.isEditing);
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+    });
+
+    it('does not abort in-place editing on second double-click on expandable node', async () => {
+      testTreeElement.setExpandable(true);
+      testTreeElement.select();
+      assert.isFalse(testTreeElement.expanded);
+
+      const widget = testTreeElement.widget;
+      const attrElement = widget.contentElement.querySelector('.webkit-html-attribute');
+      assert.exists(attrElement);
+
+      // First double-click starts editing
+      const firstDblClick = new MouseEvent('dblclick', {bubbles: true, cancelable: true});
+      attrElement.dispatchEvent(firstDblClick);
+      assert.isTrue(widget.isEditing);
+      assert.isFalse(testTreeElement.expanded);
+
+      // Second double-click on editor must not steal focus and abort editing
+      const secondDblClick = new MouseEvent('dblclick', {bubbles: true, cancelable: true});
+      attrElement.dispatchEvent(secondDblClick);
+      assert.isTrue(widget.isEditing);
+
+      widget.editing?.cancel();
+      assert.isFalse(widget.isEditing);
+    });
+
+    it('adds and commits a new attribute without duplicating attribute elements', async () => {
+      const widget = testTreeElement.widget;
+      widget.isDOMNodeSelected = true;
+
+      // Check initial attribute count
+      const initialAttrs = widget.contentElement.querySelectorAll('.webkit-html-attribute');
+      assert.lengthOf(initialAttrs, 1);
+
+      // Start adding new attribute
+      const added = widget.addNewAttribute();
+      assert.isTrue(added);
+      assert.isTrue(widget.isEditing);
+
+      // Verify temporary attribute is present
+      let attrs = widget.contentElement.querySelectorAll('.webkit-html-attribute');
+      assert.lengthOf(attrs, 2);
+
+      // Commit the new attribute
+      sinon.stub(testDomModel.agent, 'invoke_setAttributesAsText').resolves({getError: () => undefined} as never);
+      testDomModel.attributeModified(labelNode.id, 'data-new', 'value123');
+      widget.editing?.commit();
+
+      await UI.Widget.Widget.allUpdatesComplete;
+
+      // Verify no duplicate attributes exist after commit and update
+      attrs = widget.contentElement.querySelectorAll('.webkit-html-attribute');
+      assert.lengthOf(attrs, 2);
+      const getText = (el: Element): string => el.textContent?.replace(/\u200B/g, '') ?? '';
+      assert.strictEqual(getText(attrs[0]), 'for="input-id"');
+      assert.strictEqual(getText(attrs[1]), 'data-new="value123"');
+    });
+  });
+
+  describe('Popover adorner', () => {
+    let popoverNode: SDK.DOMModel.DOMNode;
+    let candidate1: SDK.DOMModel.DOMNode;
+    let candidate2: SDK.DOMModel.DOMNode;
+    let deferredCandidate1: SDK.DOMModel.DeferredDOMNode;
+    let deferredCandidate2: SDK.DOMModel.DeferredDOMNode;
+    let connection: MockCDPConnection;
+    let target: SDK.Target.Target;
+    let domModel: SDK.DOMModel.DOMModel;
+
+    beforeEach(() => {
+      sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(universe.workspace);
+      sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+      sinon.stub(Workspace.IgnoreListManager.IgnoreListManager, 'instance').returns(universe.ignoreListManager);
+
+      connection = new MockCDPConnection();
+      target = universe.createTarget({connection});
+      domModel = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+
+      const popoverNodePayload = {
+        nodeId: 2 as Protocol.DOM.NodeId,
+        parentId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'DIV',
+        localName: 'div',
+        nodeValue: '',
+        attributes: ['popover', 'auto', 'id', 'my-popover'],
+        childNodeCount: 0,
+      };
+      const candidate1Payload = {
+        nodeId: 3 as Protocol.DOM.NodeId,
+        parentId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'BUTTON',
+        localName: 'button',
+        nodeValue: '',
+        attributes: ['id', 'btn1', 'class', 'primary btn-lg'],
+        childNodeCount: 0,
+      };
+      const candidate2Payload = {
+        nodeId: 4 as Protocol.DOM.NodeId,
+        parentId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 20 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'BUTTON',
+        localName: 'button',
+        nodeValue: '',
+        attributes: ['id', 'btn2', 'class', 'secondary'],
+        childNodeCount: 0,
+      };
+
+      const rootNode = SDK.DOMModel.DOMNode.create(domModel, null, false, {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'BODY',
+        localName: 'body',
+        nodeValue: 'Body',
+        childNodeCount: 3,
+        children: [popoverNodePayload, candidate1Payload, candidate2Payload],
+      });
+      assert.isNotNull(rootNode);
+      popoverNode = rootNode.children()![0];
+      candidate1 = rootNode.children()![1];
+      candidate2 = rootNode.children()![2];
+      assert.isNotNull(popoverNode);
+      assert.isNotNull(candidate1);
+      assert.isNotNull(candidate2);
+      deferredCandidate1 = new SDK.DOMModel.DeferredDOMNode(target, candidate1.backendNodeId());
+      deferredCandidate2 = new SDK.DOMModel.DeferredDOMNode(target, candidate2.backendNodeId());
+      deferredCandidate1.resolvePromise = () => Promise.resolve(candidate1);
+      deferredCandidate2.resolvePromise = () => Promise.resolve(candidate2);
+    });
+
+    function createWidget(
+        node: SDK.DOMModel.DOMNode,
+        view: ViewFunctionStub<typeof Elements.ElementsTreeElement.ElementsTreeWidget>,
+        ): Elements.ElementsTreeElement.ElementsTreeWidget {
+      const widget = new Elements.ElementsTreeElement.ElementsTreeWidget(undefined, [undefined], view);
+      widget.node = node;
+      return widget;
+    }
+
+    it('eagerly fetches implicit anchor candidates when adorner is updated', async () => {
+      const candidatesStub =
+          sinon.stub(popoverNode, 'getImplicitAnchorCandidates').resolves([deferredCandidate1, deferredCandidate2]);
+      const view = createViewFunctionStub(Elements.ElementsTreeElement.ElementsTreeWidget);
+
+      createWidget(popoverNode, view);
+      await view.nextInput;
+
+      sinon.assert.called(candidatesStub);
+
+      const nonPopoverNode = candidate1;
+      const nonPopoverStub = sinon.stub(nonPopoverNode, 'getImplicitAnchorCandidates');
+      const nonPopoverView = createViewFunctionStub(Elements.ElementsTreeElement.ElementsTreeWidget);
+      createWidget(nonPopoverNode, nonPopoverView);
+      await nonPopoverView.nextInput;
+
+      sinon.assert.notCalled(nonPopoverStub);
+    });
+
+    it('toggles forceShowPopover directly when candidate count <= 1', async () => {
+      sinon.stub(popoverNode, 'getImplicitAnchorCandidates').resolves([deferredCandidate1]);
+
+      const forceShowStub = sinon.stub<[Protocol.DOM.ForceShowPopoverRequest]>();
+      connection.setSuccessHandler('DOM.forceShowPopover', forceShowStub);
+
+      const view = createViewFunctionStub(Elements.ElementsTreeElement.ElementsTreeWidget);
+      createWidget(popoverNode, view);
+      await view.nextInput;
+
+      assert.isTrue(view.input.showPopoverAdorner);
+      assert.isFalse(view.input.popoverAdornerActive);
+
+      // Click to force-show
+      let nextInput = view.nextInput;
+      const firstForceShowCall =
+          expectCall<[Protocol.DOM.ForceShowPopoverRequest]>(forceShowStub, {fakeFn: () => ({})});
+      view.input.onPopoverAdornerClick(new Event('click'));
+      const [firstParams] = await firstForceShowCall;
+      let input = await nextInput;
+
+      assert.deepEqual(firstParams, {
+        nodeId: popoverNode.id,
+        enable: true,
+        invokerNodeId: 10 as Protocol.DOM.BackendNodeId,
+      });
+      assert.isTrue(input.popoverAdornerActive);
+
+      // Click again to unforce
+      nextInput = view.nextInput;
+      const secondForceShowCall =
+          expectCall<[Protocol.DOM.ForceShowPopoverRequest]>(forceShowStub, {callCount: 2, fakeFn: () => ({})});
+      input.onPopoverAdornerClick(new Event('click'));
+      const [secondParams] = await secondForceShowCall;
+      input = await nextInput;
+
+      assert.deepEqual(secondParams, {
+        nodeId: popoverNode.id,
+        enable: false,
+        invokerNodeId: undefined,
+      });
+      assert.isFalse(input.popoverAdornerActive);
+    });
+
+    it('shows context menu with candidates when candidate count > 1', async () => {
+      sinon.stub(popoverNode, 'getImplicitAnchorCandidates').resolves([deferredCandidate1, deferredCandidate2]);
+
+      const forceShowStub = sinon.stub<[Protocol.DOM.ForceShowPopoverRequest]>();
+      connection.setSuccessHandler('DOM.forceShowPopover', forceShowStub);
+
+      const contextMenuShow = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show');
+
+      const view = createViewFunctionStub(Elements.ElementsTreeElement.ElementsTreeWidget);
+      createWidget(popoverNode, view);
+      await view.nextInput;
+
+      assert.isTrue(view.input.showPopoverAdorner);
+      assert.isFalse(view.input.popoverAdornerActive);
+
+      // Click adorner with 2 candidates
+      const showMenuCall1 = expectCall(contextMenuShow, {fakeFn: () => Promise.resolve()});
+      view.input.onPopoverAdornerClick(new Event('click'));
+      await showMenuCall1;
+      const menu1 = contextMenuShow.lastCall.thisValue as UI.ContextMenu.ContextMenu;
+
+      // Should not invoke forceShowPopover directly
+      assert.lengthOf(forceShowStub.args, 0);
+
+      const items = menu1.defaultSection().items;
+      assert.lengthOf(items, 2);
+
+      const desc1 = items[0].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor;
+      const desc2 = items[1].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor;
+      assert.strictEqual(desc1.label, 'button#btn1.primary.btn-lg');
+      assert.isFalse(desc1.checked);
+      assert.strictEqual(desc2.label, 'button#btn2.secondary');
+      assert.isFalse(desc2.checked);
+
+      // Test hover highlight
+      const highlightSpy1 = sinon.spy(deferredCandidate1, 'highlight');
+      const hideHighlightSpy = sinon.spy(SDK.OverlayModel.OverlayModel, 'hideDOMNodeHighlight');
+
+      desc1.onHover?.(true);
+      sinon.assert.calledOnce(highlightSpy1);
+
+      desc1.onHover?.(false);
+      sinon.assert.calledOnce(hideHighlightSpy);
+
+      // Select candidate 1
+      let nextInput = view.nextInput;
+      const forceShowCall1 = expectCall<[Protocol.DOM.ForceShowPopoverRequest]>(forceShowStub, {fakeFn: () => ({})});
+      menu1.invokeHandler(items[0].id());
+      const [forceParams1] = await forceShowCall1;
+      let input = await nextInput;
+
+      assert.deepEqual(forceParams1, {
+        nodeId: popoverNode.id,
+        enable: true,
+        invokerNodeId: 10 as Protocol.DOM.BackendNodeId,
+      });
+      assert.isTrue(input.popoverAdornerActive);
+
+      // Click adorner again: active candidate should be checked
+      const showMenuCall2 = expectCall(contextMenuShow, {callCount: 2, fakeFn: () => Promise.resolve()});
+      input.onPopoverAdornerClick(new Event('click'));
+      await showMenuCall2;
+      const menu2 = contextMenuShow.lastCall.thisValue as UI.ContextMenu.ContextMenu;
+
+      const itemsAfter = menu2.defaultSection().items;
+      assert.isTrue((itemsAfter[0].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor).checked);
+      assert.isFalse((itemsAfter[1].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor).checked);
+
+      // Directly selecting a different candidate unforces the old one and forces the new one
+      nextInput = view.nextInput;
+      const forceShowCall3 =
+          expectCall<[Protocol.DOM.ForceShowPopoverRequest]>(forceShowStub, {callCount: 3, fakeFn: () => ({})});
+      menu2.invokeHandler(itemsAfter[1].id());
+      await forceShowCall3;
+      input = await nextInput;
+
+      assert.deepEqual(forceShowStub.getCall(1).args[0], {nodeId: popoverNode.id, enable: false});
+      assert.deepEqual(forceShowStub.getCall(2).args[0], {
+        nodeId: popoverNode.id,
+        enable: true,
+        invokerNodeId: 20 as Protocol.DOM.BackendNodeId,
+      });
+      assert.isTrue(input.popoverAdornerActive);
+
+      // Click adorner again: candidate 2 should now be checked
+      const showMenuCall3 = expectCall(contextMenuShow, {callCount: 3, fakeFn: () => Promise.resolve()});
+      input.onPopoverAdornerClick(new Event('click'));
+      await showMenuCall3;
+      const menu3 = contextMenuShow.lastCall.thisValue as UI.ContextMenu.ContextMenu;
+
+      const itemsAfter2 = menu3.defaultSection().items;
+      assert.isFalse((itemsAfter2[0].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor).checked);
+      assert.isTrue((itemsAfter2[1].buildDescriptor() as UI.SoftContextMenu.SoftContextMenuDescriptor).checked);
+
+      // Clicking active candidate 2 un-forces popover
+      nextInput = view.nextInput;
+      const forceShowCall4 =
+          expectCall<[Protocol.DOM.ForceShowPopoverRequest]>(forceShowStub, {callCount: 4, fakeFn: () => ({})});
+      menu3.invokeHandler(itemsAfter2[1].id());
+      const [forceParams4] = await forceShowCall4;
+      input = await nextInput;
+
+      assert.deepEqual(forceParams4, {nodeId: popoverNode.id, enable: false});
+      assert.isFalse(input.popoverAdornerActive);
+    });
+  });
+});
+
+describeWithEnvironment('ElementsTreeElement Change Tracking', () => {
+  let target: SDK.Target.Target;
+  let testDomModel: SDK.DOMModel.DOMModel;
+  let universe: TestUniverse;
+  let tracker: ChangeTracker.ChangeTracker.ChangeTracker;
+  let node: SDK.DOMModel.DOMNode;
+  let treeElement: Elements.ElementsTreeElement.ElementsTreeElement;
+  let outline: Elements.DOMTreeWidget.ElementsTreeOutline;
+
+  /**
+   * `ChangeTracker` records changes on comment threads in `CommentManager`.
+   */
+  function lastChangeBackendNodeId(): number|undefined {
+    return universe.commentManager.getCommentThreads().at(-1)?.anchor.node?.backendNodeId;
+  }
+
+  function lastChange(): string|undefined {
+    return universe.commentManager.getCommentThreads().at(-1)?.comments[0]?.text;
+  }
+
+  /** Types `newText` into the attribute that is currently edited in place and commits it. */
+  function commitEditedAttribute(newText: string): void {
+    const editedAttribute = treeElement.widget.contentElement.querySelector('.webkit-html-attribute.editing');
+    assert.exists(editedAttribute);
+    editedAttribute.textContent = newText;
+    treeElement.widget.editing?.commit();
+  }
+
+  /** Starts in-place editing of the tag name, types `newTagName` and commits it. */
+  function editTagName(newTagName: string): void {
+    assert.isTrue(treeElement.widget.startEditingTagName());
+    const tagNameElement = treeElement.widget.contentElement.querySelector('.webkit-html-tag-name');
+    assert.exists(tagNameElement);
+    tagNameElement.textContent = newTagName;
+    treeElement.widget.editing?.commit();
+  }
+
+  /** Starts in-place editing of the inline text node, types `newText` and commits it. */
+  function editInlineTextNode(newText: string): void {
+    const textNodeElement = treeElement.widget.contentElement.querySelector('.webkit-html-text-node');
+    assert.exists(textNodeElement);
+    assert.isTrue(treeElement.widget.startEditingTextNode(textNodeElement));
+    textNodeElement.textContent = newText;
+    treeElement.widget.editing?.commit();
+  }
+
+  /** Starts editing the node as HTML and waits for the multiline editor to be rendered. */
+  async function startEditingAsHTML(): Promise<TextEditor.TextEditor.TextEditor> {
+    treeElement.toggleEditAsHTML();
+    // `toggleEditAsHTML` reads the outer HTML asynchronously before it creates the editor.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    const editor =
+        treeElement.widget.contentElement.querySelector<TextEditor.TextEditor.TextEditor>('devtools-text-editor');
+    assert.exists(editor);
+    return editor;
+  }
+
+  /** Replaces the content of the multiline HTML editor with `newHTML` and commits it. */
+  function commitEditedHTML(editor: TextEditor.TextEditor.TextEditor, newHTML: string): void {
+    editor.dispatch({changes: {from: 0, to: editor.state.doc.length, insert: newHTML}});
+    treeElement.widget.editing?.commit();
+  }
+
+  beforeEach(() => {
+    updateHostConfig({
+      devToolsComments: {
+        enabled: true,
+      },
+    });
+    universe = new TestUniverse();
+    universe.commentManager.setAgentAttached(true);
+    tracker = universe.changeTracker;
+    setTestUniverseForWidgets(universe);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(universe.debuggerWorkspaceBinding);
+    sinon.stub(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding, 'instance').returns(universe.cssWorkspaceBinding);
+    target = universe.createTarget();
+    testDomModel = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+
+    const rootNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      attributes: ['id', 'main-div', 'class', 'container'],
+      childNodeCount: 1,
+      children: [{
+        nodeId: 2 as Protocol.DOM.NodeId,
+        parentId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: 'Initial Text',
+        childNodeCount: 0,
+      }],
+    });
+    assert.isNotNull(rootNode);
+    node = rootNode;
+
+    outline = new Elements.DOMTreeWidget.ElementsTreeOutline();
+    treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node, false);
+    treeElement.widget = new Elements.ElementsTreeElement.ElementsTreeWidget(undefined, [undefined, tracker]);
+    treeElement.widget.node = node;
+    treeElement.widget.selectTreeElement = (omitFocus, selectedByUser) => treeElement.select(omitFocus, selectedByUser);
+    outline.appendChild(treeElement);
+    treeElement.widget.performUpdate();
+  });
+
+  it('records a change when adding a new attribute', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.(null));
+
+    assert.isTrue(treeElement.widget.addNewAttribute());
+    commitEditedAttribute('data-test="value"');
+
+    assert.strictEqual(lastChange(), 'Added attribute data-test="value"');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('records a change when modifying an existing attribute', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.(null));
+
+    assert.isTrue(treeElement.widget.triggerEditAttribute('class'));
+    commitEditedAttribute('class="container active"');
+
+    assert.strictEqual(lastChange(), 'Changed attribute "class" from "container" to "container active"');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('records a change when renaming an existing attribute', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.(null));
+
+    assert.isTrue(treeElement.widget.triggerEditAttribute('class'));
+    commitEditedAttribute('foo="container"');
+
+    assert.strictEqual(lastChange(), 'Renamed attribute "class" to "foo"');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('records a change when renaming and modifying an existing attribute', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.(null));
+
+    assert.isTrue(treeElement.widget.triggerEditAttribute('class'));
+    commitEditedAttribute('foo="bar"');
+
+    assert.strictEqual(lastChange(), 'Renamed attribute "class"="container" to "foo"="bar"');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('records a change when deleting an attribute', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.(null));
+
+    assert.isTrue(treeElement.widget.triggerEditAttribute('class'));
+    commitEditedAttribute('');
+
+    assert.strictEqual(lastChange(), 'Removed attribute "class"');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('does not record a change when setAttribute fails with an error', () => {
+    sinon.stub(node, 'setAttribute').callsFake((_name, _text, callback) => callback?.('Invalid attribute name syntax'));
+
+    assert.isTrue(treeElement.widget.addNewAttribute());
+    commitEditedAttribute('invalid<attr>=1');
+
+    assert.isUndefined(lastChange());
+    assert.isEmpty(universe.commentManager.getCommentThreads());
+  });
+
+  it('records a change when renaming a tag name', () => {
+    let callbackCaptured: ((error: string|null, newNode: SDK.DOMModel.DOMNode|null) => void)|undefined;
+    sinon.stub(node, 'setNodeName').callsFake((_name, callback) => {
+      callbackCaptured = callback;
+    });
+    treeElement.widget.selectNodeAfterEdit = sinon.stub().returns(null);
+
+    editTagName('section');
+
+    assert.exists(callbackCaptured);
+    callbackCaptured(null, node);
+
+    assert.strictEqual(lastChange(), 'Renamed tag from <div> to <section>');
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('does not record a change when renaming a tag name fails', () => {
+    let callbackCaptured: ((error: string|null, newNode: SDK.DOMModel.DOMNode|null) => void)|undefined;
+    sinon.stub(node, 'setNodeName').callsFake((_name, callback) => {
+      callbackCaptured = callback;
+    });
+
+    editTagName('invalid<tag>');
+
+    assert.exists(callbackCaptured);
+    callbackCaptured('Invalid tag name syntax', null);
+
+    assert.isUndefined(lastChange());
+    assert.isEmpty(universe.commentManager.getCommentThreads());
+  });
+
+  it('records a change when editing an inline text node', () => {
+    const textNode = node.children()![0];
+    sinon.stub(textNode, 'setNodeValue').callsFake((_value, callback) => callback?.(null));
+
+    editInlineTextNode('Updated Text');
+
+    assert.strictEqual(lastChange(), 'Changed text from "Initial Text" to "Updated Text"');
+    assert.strictEqual(lastChangeBackendNodeId(), 2);
+  });
+
+  it('does not record a change when editing inline text node fails with an error', () => {
+    const textNode = node.children()![0];
+    const setNodeValue = sinon.stub(textNode, 'setNodeValue').callsFake((_value, callback) => {
+      callback?.('Failed to set text');
+    });
+
+    editInlineTextNode('Updated Text');
+
+    sinon.assert.calledOnceWithMatch(setNodeValue, 'Updated Text');
+    assert.isUndefined(lastChange());
+    assert.isEmpty(universe.commentManager.getCommentThreads());
+  });
+
+  it('records a change when editing as HTML', async () => {
+    sinon.stub(node, 'getOuterHTML').resolves('<div id="main-div" class="container"></div>');
+    sinon.stub(node, 'setOuterHTML').callsFake((_value, callback) => callback?.(null));
+
+    const editor = await startEditingAsHTML();
+    commitEditedHTML(editor, '<div id="main-div" class="container"><p>New Child</p></div>');
+
+    assert.strictEqual(
+        lastChange(),
+        'Changed HTML from "<div id="main-div" class="container"></div>" to ' +
+            '"<div id="main-div" class="container"><p>New Child</p></div>"',
+    );
+    assert.strictEqual(lastChangeBackendNodeId(), 1);
+  });
+
+  it('does not record a change when editing as HTML fails with an error', async () => {
+    sinon.stub(node, 'getOuterHTML').resolves('<div id="main-div" class="container"></div>');
+    const setOuterHTML = sinon.stub(node, 'setOuterHTML').callsFake((_value, callback) => {
+      callback?.('Malformed HTML');
+    });
+
+    const editor = await startEditingAsHTML();
+    commitEditedHTML(editor, '<div id="main-div" class="container"><p>New Child</p></div>');
+
+    sinon.assert.calledOnceWithMatch(setOuterHTML, '<div id="main-div" class="container"><p>New Child</p></div>');
+    assert.isUndefined(lastChange());
+    assert.isEmpty(universe.commentManager.getCommentThreads());
+  });
+
+  it('records a change when removing a node', async () => {
+    const parentNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 10 as Protocol.DOM.NodeId,
+      backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BODY',
+      localName: 'body',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 11 as Protocol.DOM.NodeId,
+        parentId: 10 as Protocol.DOM.NodeId,
+        backendNodeId: 11 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'SPAN',
+        localName: 'span',
+        nodeValue: '',
+        childNodeCount: 0,
+      }],
+    });
+    const childNode = parentNode!.children()![0];
+    sinon.stub(childNode, 'removeNode').callsFake(async callback => {
+      callback?.(null);
+    });
+
+    const childTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(childNode, false);
+    childTreeElement.widget = new Elements.ElementsTreeElement.ElementsTreeWidget(undefined, [undefined, tracker]);
+    childTreeElement.widget.node = childNode;
+    await childTreeElement.widget.remove();
+
+    assert.strictEqual(lastChange(), 'Removed node <span>');
+    assert.strictEqual(lastChangeBackendNodeId(), 11);
+  });
+
+  it('does not record a change when removing a node fails with an error', async () => {
+    const parentNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 10 as Protocol.DOM.NodeId,
+      backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BODY',
+      localName: 'body',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 11 as Protocol.DOM.NodeId,
+        parentId: 10 as Protocol.DOM.NodeId,
+        backendNodeId: 11 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'SPAN',
+        localName: 'span',
+        nodeValue: '',
+        childNodeCount: 0,
+      }],
+    });
+    const childNode = parentNode!.children()![0];
+    sinon.stub(childNode, 'removeNode').callsFake(async callback => {
+      callback?.('Cannot remove node');
+    });
+
+    const childTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(childNode, false);
+    childTreeElement.widget = new Elements.ElementsTreeElement.ElementsTreeWidget(undefined, [undefined, tracker]);
+    childTreeElement.widget.node = childNode;
+    await childTreeElement.widget.remove();
+
+    assert.isUndefined(lastChange());
+    assert.isEmpty(universe.commentManager.getCommentThreads());
+  });
+
+  it('unhides hidden node before removal without recording an additional change', async () => {
+    const parentNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 10 as Protocol.DOM.NodeId,
+      backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'BODY',
+      localName: 'body',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 11 as Protocol.DOM.NodeId,
+        parentId: 10 as Protocol.DOM.NodeId,
+        backendNodeId: 11 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'SPAN',
+        localName: 'span',
+        nodeValue: '',
+        childNodeCount: 0,
+      }],
+    });
+    const childNode = parentNode!.children()![0];
+    sinon.stub(childNode, 'isToggledToHidden').returns(true);
+    const toggleHideStub = sinon.stub(childNode, 'toggleHideElement').resolves();
+    sinon.stub(childNode, 'removeNode').callsFake(async callback => {
+      callback?.(null);
+    });
+
+    const childTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(childNode, false);
+    childTreeElement.widget = new Elements.ElementsTreeElement.ElementsTreeWidget(undefined, [undefined, tracker]);
+    childTreeElement.widget.isToggledToHidden = node => node.isToggledToHidden();
+    childTreeElement.widget.node = childNode;
+    await childTreeElement.widget.remove();
+
+    sinon.assert.calledOnce(toggleHideStub);
+    const threads = universe.commentManager.getCommentThreads();
+    assert.lengthOf(threads, 1);
+    assert.strictEqual(threads[0].comments[0].text, 'Removed node <span>');
+  });
+
+  it('renders RTL and BiDi Arabic and Hebrew text in attributes and text nodes', () => {
+    const bidiNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 20 as Protocol.DOM.NodeId,
+      backendNodeId: 20 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      attributes: ['title', 'اختبار النص العربي'],
+      childNodeCount: 1,
+      children: [{
+        nodeId: 21 as Protocol.DOM.NodeId,
+        parentId: 20 as Protocol.DOM.NodeId,
+        backendNodeId: 21 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: 'טקסט בעברית',
+        childNodeCount: 0,
+      }],
+    });
+    const bidiTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(bidiNode, false);
+    outline.appendChild(bidiTreeElement);
+    bidiTreeElement.widget.performUpdate();
+
+    const attrVal = bidiTreeElement.widget.contentElement.querySelector('.webkit-html-attribute-value');
+    const textEl = bidiTreeElement.widget.contentElement.querySelector('.webkit-html-text-node');
+    assert.strictEqual(attrVal?.textContent?.replace(/\u200B/g, '').trim(), 'اختبار النص العربي');
+    assert.strictEqual(textEl?.textContent, 'טקסט בעברית');
+  });
+
+  it('renders lowercase HTML tag names and camelCase SVG tag names via nodeNameInCorrectCase', () => {
+    const htmlNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 30 as Protocol.DOM.NodeId,
+      backendNodeId: 30 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      childNodeCount: 0,
+    });
+    const svgNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 31 as Protocol.DOM.NodeId,
+      backendNodeId: 31 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'feComposite',
+      localName: 'feComposite',
+      nodeValue: '',
+      childNodeCount: 0,
+    });
+    const htmlEl = new Elements.ElementsTreeElement.ElementsTreeElement(htmlNode, false);
+    const svgEl = new Elements.ElementsTreeElement.ElementsTreeElement(svgNode, false);
+    outline.appendChild(htmlEl);
+    outline.appendChild(svgEl);
+    htmlEl.widget.performUpdate();
+    svgEl.widget.performUpdate();
+
+    assert.strictEqual(htmlNode.nodeNameInCorrectCase(), 'div');
+    assert.strictEqual(svgNode.nodeNameInCorrectCase(), 'feComposite');
+    assert.strictEqual(htmlEl.widget.contentElement.querySelector('.webkit-html-tag-name')?.textContent, 'div');
+    assert.strictEqual(svgEl.widget.contentElement.querySelector('.webkit-html-tag-name')?.textContent, 'feComposite');
+  });
+
+  it('renders special whitespace and entities in ElementsTreeElement', () => {
+    const entityNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 40 as Protocol.DOM.NodeId,
+      backendNodeId: 40 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'SPAN',
+      localName: 'span',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 41 as Protocol.DOM.NodeId,
+        parentId: 40 as Protocol.DOM.NodeId,
+        backendNodeId: 41 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: 'a\u00A0b\u00ADc\uFEFFd\u200Be',
+        childNodeCount: 0,
+      }],
+    });
+    const entityEl = new Elements.ElementsTreeElement.ElementsTreeElement(entityNode, false);
+    outline.appendChild(entityEl);
+    entityEl.widget.performUpdate();
+
+    const entities = Array.from(entityEl.widget.contentElement.querySelectorAll('.webkit-html-entity-value'))
+                         .map(el => el.textContent);
+    assert.deepEqual(entities, ['&nbsp;', '&shy;', '&#xFEFF;', '&ZeroWidthSpace;']);
+  });
+
+  it('renders ZWNJ inside BiDi attribute values and text nodes as &zwnj; entities', () => {
+    // Mirrors legacy elements/bidi-dom-tree.
+    const bidiValue =
+        '\u0648\u06CC\u06A9\u06CC\u200C\u067E\u062F\u06CC\u0627:\u062E\u0648\u0634\u200C\u0622\u0645\u062F\u06CC\u062F';
+    const expectedValue =
+        '\u0648\u06CC\u06A9\u06CC&zwnj;\u067E\u062F\u06CC\u0627:\u062E\u0648\u0634&zwnj;\u0622\u0645\u062F\u06CC\u062F';
+    const bidiNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 60 as Protocol.DOM.NodeId,
+      backendNodeId: 60 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      attributes: ['title', bidiValue],
+      childNodeCount: 1,
+      children: [{
+        nodeId: 61 as Protocol.DOM.NodeId,
+        parentId: 60 as Protocol.DOM.NodeId,
+        backendNodeId: 61 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: bidiValue,
+        childNodeCount: 0,
+      }],
+    });
+    const bidiTreeElement = new Elements.ElementsTreeElement.ElementsTreeElement(bidiNode, false);
+    outline.appendChild(bidiTreeElement);
+    bidiTreeElement.widget.performUpdate();
+
+    const attrVal = bidiTreeElement.widget.contentElement.querySelector('.webkit-html-attribute-value');
+    const textEl = bidiTreeElement.widget.contentElement.querySelector('.webkit-html-text-node');
+    assert.strictEqual(attrVal?.textContent?.replace(/\u200B/g, ''), expectedValue);
+    assert.strictEqual(textEl?.textContent, expectedValue);
+    assert.notInclude(attrVal?.textContent ?? '', '\u200C');
+    assert.notInclude(textEl?.textContent ?? '', '\u200C');
+    const attrEntities =
+        Array.from(attrVal?.querySelectorAll('.webkit-html-entity-value') ?? []).map(e => e.textContent);
+    const textEntities =
+        Array.from(textEl?.querySelectorAll('.webkit-html-entity-value') ?? []).map(e => e.textContent);
+    assert.deepEqual(attrEntities, ['&zwnj;', '&zwnj;']);
+    assert.deepEqual(textEntities, ['&zwnj;', '&zwnj;']);
+  });
+
+  it('renders a text child consisting of only U+FEFF inline as &#xFEFF;', () => {
+    // Mirrors the #replacement-character element from legacy elements/elements-panel-structure.
+    const node = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 70 as Protocol.DOM.NodeId,
+      backendNodeId: 70 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'DIV',
+      localName: 'div',
+      nodeValue: '',
+      attributes: ['id', 'replacement-character'],
+      childNodeCount: 1,
+      children: [{
+        nodeId: 71 as Protocol.DOM.NodeId,
+        parentId: 70 as Protocol.DOM.NodeId,
+        backendNodeId: 71 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: '\uFEFF',
+        childNodeCount: 0,
+      }],
+    });
+    assert.isTrue(Elements.ElementsTreeElement.ElementsTreeElement.canShowInlineText(node));
+    const treeElement = new Elements.ElementsTreeElement.ElementsTreeElement(node, false);
+    outline.appendChild(treeElement);
+    treeElement.widget.performUpdate();
+
+    const textEl = treeElement.widget.contentElement.querySelector('.webkit-html-text-node');
+    assert.strictEqual(textEl?.textContent, '&#xFEFF;');
+    assert.strictEqual(textEl?.querySelector('.webkit-html-entity-value')?.textContent, '&#xFEFF;');
+    assert.strictEqual(treeElement.widget.contentElement.textContent?.replace(/\u200B/g, '').replace(/\s+/g, ''),
+                       '<divid="replacement-character">&#xFEFF;</div>');
+  });
+
+  it('updates inline <style> ElementsTreeElement title when CharacterDataModified fires', () => {
+    outline.wireToDOMModel(testDomModel);
+    const styleNode = SDK.DOMModel.DOMNode.create(testDomModel, null, false, {
+      nodeId: 50 as Protocol.DOM.NodeId,
+      backendNodeId: 50 as Protocol.DOM.BackendNodeId,
+      nodeType: Node.ELEMENT_NODE,
+      nodeName: 'STYLE',
+      localName: 'style',
+      nodeValue: '',
+      childNodeCount: 1,
+      children: [{
+        nodeId: 51 as Protocol.DOM.NodeId,
+        parentId: 50 as Protocol.DOM.NodeId,
+        backendNodeId: 51 as Protocol.DOM.BackendNodeId,
+        nodeType: Node.TEXT_NODE,
+        nodeName: '#text',
+        localName: '',
+        nodeValue: 'body { color: red; }',
+        childNodeCount: 0,
+      }],
+    });
+    outline.rootDOMNode = styleNode;
+    const styleEl = outline.findTreeElement(styleNode)!;
+    styleEl.widget.performUpdate();
+    assert.include(styleEl.widget.contentElement.textContent, 'body { color: red; }');
+
+    testDomModel.characterDataModified(51 as Protocol.DOM.NodeId, 'body { color: blue; }');
+    outline.runPendingUpdates();
+    styleEl.widget.performUpdate();
+    assert.include(styleEl.widget.contentElement.textContent, 'body { color: blue; }');
   });
 });

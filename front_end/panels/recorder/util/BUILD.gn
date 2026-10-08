@@ -8,14 +8,12 @@ import("../../../../scripts/build/typescript/typescript.gni")
 
 devtools_ui_module("util") {
   sources = [ "SharedObject.ts" ]
-
-  deps = [ "../../../core/common:bundle" ]
+  ts_deps = [ "../../../core/common:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "util.ts"
-
-  deps = [ ":util" ]
+  ts_deps = [ ":util" ]
 
   visibility = [
     ":*",
@@ -27,6 +25,5 @@ devtools_ui_module("unittests") {
   testonly = true
 
   sources = [ "SharedObject.test.ts" ]
-
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 }

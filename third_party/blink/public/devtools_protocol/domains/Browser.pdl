@@ -225,6 +225,16 @@ domain Browser
       # Commandline parameters
       array of string arguments
 
+  # Adds or updates a mock camera in the shared video capture device list for
+  # test automation. The mock camera is not scoped to a particular page or
+  # frame and is removed when the DevTools session that created it disconnects.
+  experimental command addMockCamera
+    parameters
+      # Required non-empty identifier for the mock camera. This is mapped to an
+      # internal virtual-device identifier and is not the MediaDeviceInfo.deviceId
+      # exposed to the page.
+      string deviceId
+
   # Chrome histogram bucket.
   experimental type Bucket extends object
     properties
@@ -333,20 +343,16 @@ domain Browser
     parameters
       string url
 
-  experimental type PrivacySandboxAPI extends string
-    enum
-      BiddingAndAuctionServices
-      TrustedKeyValue
+  # Gets the current globally-applied privacy control status
+  # See https://www.w3.org/TR/gpc/#get-global-privacy-control
+  experimental command getGlobalPrivacyControl
+    returns
+      boolean gpc
 
-  # Configures encryption keys used with a given privacy sandbox API to talk
-  # to a trusted coordinator.  Since this is intended for test automation only,
-  # coordinatorOrigin must be a .test domain. No existing coordinator
-  # configuration for the origin may exist.
-  command addPrivacySandboxCoordinatorKeyConfig
+  # Sets and then gets the current globally-applied privacy control status
+  # See https://www.w3.org/TR/gpc/#set-global-privacy-control
+  experimental command setGlobalPrivacyControl
     parameters
-      PrivacySandboxAPI api
-      string coordinatorOrigin
-      string keyConfig
-      # BrowserContext to perform the action in. When omitted, default browser
-      # context is used.
-      optional BrowserContextID browserContextId
+      boolean gpc
+    returns
+      boolean gpc

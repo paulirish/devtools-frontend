@@ -8,7 +8,11 @@ import type {ChildProcess} from 'node:child_process';
 
 import type {Protocol} from 'devtools-protocol';
 
-import type {CreatePageOptions, DebugInfo} from '../api/Browser.js';
+import type {
+  CreatePageOptions,
+  DebugInfo,
+  ExtensionInstallOptions,
+} from '../api/Browser.js';
 import {
   Browser as BrowserBase,
   BrowserEvent,
@@ -20,14 +24,23 @@ import {
   type AddScreenParams,
   type WindowBounds,
   type WindowId,
+  type InstallPWAOptions,
+  type UninstallPWAOptions,
+  type LaunchPWAOptions,
+  type GetPWAStateOptions,
+  type PWAState,
 } from '../api/Browser.js';
 import {BrowserContextEvent} from '../api/BrowserContext.js';
 import {CDPSessionEvent} from '../api/CDPSession.js';
 import type {Extension} from '../api/Extension.js';
 import type {Page} from '../api/Page.js';
 import type {Target} from '../api/Target.js';
+import type {Logger} from '../common/Debug.js';
 import type {DownloadBehavior} from '../common/DownloadBehavior.js';
+import {EventEmitter} from '../common/EventEmitter.js';
 import type {Viewport} from '../common/Viewport.js';
+import {Deferred} from '../util/Deferred.js';
+import {DisposableStack} from '../util/disposable.js';
 
 import {CdpBrowserContext} from './BrowserContext.js';
 import type {CdpCDPSession} from './CdpSession.js';
@@ -61,18 +74,19 @@ export class CdpBrowser extends BrowserBase {
     connection: Connection,
     contextIds: string[],
     acceptInsecureCerts: boolean,
-    defaultViewport?: Viewport | null,
-    downloadBehavior?: DownloadBehavior,
-    process?: ChildProcess,
-    closeCallback?: BrowserCloseCallback,
-    targetFilterCallback?: TargetFilterCallback,
-    isPageTargetCallback?: IsPageTargetCallback,
+    defaultViewport: Viewport | null | undefined = undefined,
+    downloadBehavior: DownloadBehavior | undefined = undefined,
+    process: ChildProcess | undefined = undefined,
+    closeCallback: BrowserCloseCallback | undefined = undefined,
+    targetFilterCallback: TargetFilterCallback | undefined = undefined,
+    isPageTargetCallback: IsPageTargetCallback | undefined = undefined,
     waitForInitiallyDiscoveredTargets = true,
     networkEnabled = true,
     issuesEnabled = true,
     handleDevToolsAsPage = false,
-    blocklist?: string[],
-    allowlist?: string[],
+    blocklist: string[] | undefined = undefined,
+    allowlist: string[] | undefined = undefined,
+    logger: Logger,
   ): Promise<CdpBrowser> {
     const browser = new CdpBrowser(
       connection,
@@ -88,6 +102,7 @@ export class CdpBrowser extends BrowserBase {
       handleDevToolsAsPage,
       blocklist,
       allowlist,
+      logger,
     );
 
     if (allowlist) {
@@ -121,23 +136,27 @@ export class CdpBrowser extends BrowserBase {
   #targetManager: TargetManager;
   #handleDevToolsAsPage = false;
   #extensions = new Map<string, Extension>();
+  #version?: Deferred<Protocol.Browser.GetVersionResponse>;
+  #hasNetworkRestrictions = false;
+  #subscriptions = new DisposableStack();
 
   constructor(
     connection: Connection,
     contextIds: string[],
-    defaultViewport?: Viewport | null,
-    process?: ChildProcess,
-    closeCallback?: BrowserCloseCallback,
-    targetFilterCallback?: TargetFilterCallback,
-    isPageTargetCallback?: IsPageTargetCallback,
+    defaultViewport: Viewport | null | undefined = undefined,
+    process: ChildProcess | undefined = undefined,
+    closeCallback: BrowserCloseCallback | undefined = undefined,
+    targetFilterCallback: TargetFilterCallback | undefined = undefined,
+    isPageTargetCallback: IsPageTargetCallback | undefined = undefined,
     waitForInitiallyDiscoveredTargets = true,
     networkEnabled = true,
     issuesEnabled = true,
     handleDevToolsAsPage = false,
-    blocklist?: string[],
-    allowlist?: string[],
+    blocklist: string[] | undefined = undefined,
+    allowlist: string[] | undefined = undefined,
+    logger: Logger,
   ) {
-    super();
+    super(logger);
     this.#networkEnabled = networkEnabled;
     this.#issuesEnabled = issuesEnabled;
     this.#defaultViewport = defaultViewport;
@@ -151,10 +170,12 @@ export class CdpBrowser extends BrowserBase {
       });
     this.#handleDevToolsAsPage = handleDevToolsAsPage;
     this.#setIsPageTargetCallback(isPageTargetCallback);
-    connection.rejectEmulateNetworkConditionsCalls = Boolean(
+    this.#hasNetworkRestrictions = Boolean(
       (blocklist && blocklist.length > 0) ||
       (allowlist && allowlist.length > 0),
     );
+    connection.rejectEmulateNetworkConditionsCalls =
+      this.#hasNetworkRestrictions;
     this.#targetManager = new TargetManager(
       connection,
       this.#createTarget,
@@ -162,12 +183,18 @@ export class CdpBrowser extends BrowserBase {
       waitForInitiallyDiscoveredTargets,
       blocklist,
       allowlist,
+      logger,
     );
-    this.#defaultContext = new CdpBrowserContext(this.#connection, this);
+    this.#defaultContext = new CdpBrowserContext(
+      this.#connection,
+      this,
+      undefined,
+      logger,
+    );
     for (const contextId of contextIds) {
       this.#contexts.set(
         contextId,
-        new CdpBrowserContext(this.#connection, this, contextId),
+        new CdpBrowserContext(this.#connection, this, contextId, logger),
       );
     }
   }
@@ -177,23 +204,29 @@ export class CdpBrowser extends BrowserBase {
   };
 
   async _attach(downloadBehavior: DownloadBehavior | undefined): Promise<void> {
-    this.#connection.on(CDPSessionEvent.Disconnected, this.#emitDisconnected);
+    const connectionEmitter = this.#subscriptions.use(
+      new EventEmitter(this.#connection),
+    );
+    connectionEmitter.on(CDPSessionEvent.Disconnected, this.#emitDisconnected);
     if (downloadBehavior) {
       await this.#defaultContext.setDownloadBehavior(downloadBehavior);
     }
-    this.#targetManager.on(
+    const targetManagerEmitter = this.#subscriptions.use(
+      new EventEmitter(this.#targetManager),
+    );
+    targetManagerEmitter.on(
       TargetManagerEvent.TargetAvailable,
       this.#onAttachedToTarget,
     );
-    this.#targetManager.on(
+    targetManagerEmitter.on(
       TargetManagerEvent.TargetGone,
       this.#onDetachedFromTarget,
     );
-    this.#targetManager.on(
+    targetManagerEmitter.on(
       TargetManagerEvent.TargetChanged,
       this.#onTargetChanged,
     );
-    this.#targetManager.on(
+    targetManagerEmitter.on(
       TargetManagerEvent.TargetDiscovered,
       this.#onTargetDiscovered,
     );
@@ -201,23 +234,7 @@ export class CdpBrowser extends BrowserBase {
   }
 
   _detach(): void {
-    this.#connection.off(CDPSessionEvent.Disconnected, this.#emitDisconnected);
-    this.#targetManager.off(
-      TargetManagerEvent.TargetAvailable,
-      this.#onAttachedToTarget,
-    );
-    this.#targetManager.off(
-      TargetManagerEvent.TargetGone,
-      this.#onDetachedFromTarget,
-    );
-    this.#targetManager.off(
-      TargetManagerEvent.TargetChanged,
-      this.#onTargetChanged,
-    );
-    this.#targetManager.off(
-      TargetManagerEvent.TargetDiscovered,
-      this.#onTargetDiscovered,
-    );
+    this.#subscriptions.dispose();
   }
 
   override process(): ChildProcess | null {
@@ -263,6 +280,7 @@ export class CdpBrowser extends BrowserBase {
       this.#connection,
       this,
       browserContextId,
+      this.logger,
     );
     if (downloadBehavior) {
       await context.setDownloadBehavior(downloadBehavior);
@@ -312,6 +330,7 @@ export class CdpBrowser extends BrowserBase {
       context,
       this.#targetManager,
       createSession,
+      this.logger,
     );
     if (targetInfo.url && isDevToolsPageTarget(targetInfo.url)) {
       return new DevToolsTarget(
@@ -321,6 +340,7 @@ export class CdpBrowser extends BrowserBase {
         this.#targetManager,
         createSession,
         this.#defaultViewport ?? null,
+        this.logger,
       );
     }
     if (this.#isPageTargetCallback(otherTarget)) {
@@ -331,6 +351,7 @@ export class CdpBrowser extends BrowserBase {
         this.#targetManager,
         createSession,
         this.#defaultViewport ?? null,
+        this.logger,
       );
     }
     if (
@@ -343,6 +364,7 @@ export class CdpBrowser extends BrowserBase {
         context,
         this.#targetManager,
         createSession,
+        this.logger,
       );
     }
     return otherTarget;
@@ -475,8 +497,14 @@ export class CdpBrowser extends BrowserBase {
     return response.targetId;
   }
 
-  override async installExtension(path: string): Promise<string> {
-    const {id} = await this.#connection.send('Extensions.loadUnpacked', {path});
+  override async installExtension(
+    path: string,
+    options?: ExtensionInstallOptions,
+  ): Promise<string> {
+    const {id} = await this.#connection.send('Extensions.loadUnpacked', {
+      path,
+      enableInIncognito: options?.enabledInIncognito ?? false,
+    });
     this.#extensions.delete(id);
     return id;
   }
@@ -509,6 +537,87 @@ export class CdpBrowser extends BrowserBase {
     await Promise.all(targetDestroyedPromises);
 
     this.#extensions.delete(id);
+  }
+
+  override async installPWA(options: InstallPWAOptions): Promise<string> {
+    if (this.#hasNetworkRestrictions) {
+      throw new Error(
+        'PWA APIs are not supported when network restrictions are configured.',
+      );
+    }
+    await this.#connection.send('PWA.install', {
+      manifestId: options.manifestId,
+      installUrlOrBundleUrl: options.installUrlOrBundleUrl,
+    });
+    if (options.displayMode) {
+      await this.#connection.send('PWA.changeAppUserSettings', {
+        manifestId: options.manifestId,
+        displayMode: options.displayMode,
+      });
+    }
+    return options.manifestId;
+  }
+
+  override async uninstallPWA(options: UninstallPWAOptions): Promise<void> {
+    if (this.#hasNetworkRestrictions) {
+      throw new Error(
+        'PWA APIs are not supported when network restrictions are configured.',
+      );
+    }
+    await this.#connection.send('PWA.uninstall', {
+      manifestId: options.manifestId,
+    });
+  }
+
+  override async launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    if (this.#hasNetworkRestrictions) {
+      throw new Error(
+        'PWA APIs are not supported when network restrictions are configured.',
+      );
+    }
+    // `PWA.launch` resolves with the id of the launched *tab* target (see the
+    // CDP `PWA.LaunchResponse` docs). Tab targets sit above page targets in the
+    // target hierarchy and are not exposed through `browser.targets()`, so the
+    // returned id can't be awaited directly.
+    const {targetId: tabTargetId} = await this.#connection.send('PWA.launch', {
+      manifestId: options.manifestId,
+      url: options.url,
+    });
+    const target = (await this.waitForTarget(
+      candidate => {
+        const tab = this.#targetManager.getAvailableTargets().get(tabTargetId);
+        if (tab?.type() !== 'tab') {
+          return false;
+        }
+        for (const child of tab._childTargets()) {
+          if (child === candidate) {
+            return true;
+          }
+        }
+        return false;
+      },
+      {timeout: options.timeout},
+    )) as CdpTarget;
+    const page = await target.page();
+    if (!page) {
+      throw new Error(
+        `Failed to create a page for the launched PWA (manifestId = ${options.manifestId})`,
+      );
+    }
+    return page;
+  }
+
+  override async getPWAState(options: GetPWAStateOptions): Promise<PWAState> {
+    if (this.#hasNetworkRestrictions) {
+      throw new Error(
+        'PWA APIs are not supported when network restrictions are configured.',
+      );
+    }
+    const {badgeCount, fileHandlers} = await this.#connection.send(
+      'PWA.getOsAppState',
+      {manifestId: options.manifestId},
+    );
+    return {badgeCount, fileHandlers};
   }
 
   override async screens(): Promise<ScreenInfo[]> {
@@ -601,8 +710,18 @@ export class CdpBrowser extends BrowserBase {
     return !this.#connection._closed;
   }
 
-  #getVersion(): Promise<Protocol.Browser.GetVersionResponse> {
-    return this.#connection.send('Browser.getVersion');
+  async #getVersion(): Promise<Protocol.Browser.GetVersionResponse> {
+    if (!this.#version) {
+      this.#version = Deferred.create<Protocol.Browser.GetVersionResponse>();
+      try {
+        this.#version.resolve(
+          await this.#connection.send('Browser.getVersion'),
+        );
+      } catch (error) {
+        this.#version.reject(error as Error);
+      }
+    }
+    return await this.#version.valueOrThrow();
   }
 
   override get debugInfo(): DebugInfo {
@@ -634,6 +753,7 @@ export class CdpBrowser extends BrowserBase {
           currExtension.path,
           currExtension.enabled,
           this,
+          this.logger,
         );
 
         extensionsMap.set(currExtension.id, newExtension);

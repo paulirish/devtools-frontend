@@ -31,8 +31,8 @@ import {
   switchToCallFrame,
   WasmLocationLabels,
 } from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 const DEVELOPER_RESOURCES_TAB_SELECTOR = '#tab-developer-resources';
 declare global {
@@ -67,7 +67,7 @@ function goToWasmResource(
  * for debugging the WebAssembly.
  **/
 async function addDummyExternalDWARFInfo(wasmFile: string, devToolsPage: DevToolsPage) {
-  await openFileInEditor(wasmFile, devToolsPage);
+  await openFileInEditor(devToolsPage, wasmFile);
   await devToolsPage.click('aria/Code editor', {clickOptions: {button: 'right'}});
   await devToolsPage.click('aria/Add DWARF debug info…');
   await devToolsPage.waitFor('.add-source-map');
@@ -83,9 +83,10 @@ describe('The Debugger Language Plugins', () => {
   // Load a simple wasm file and verify that the source file shows up in the file tree.
   it('can show C filenames after loading the module', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess*/ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess*/ true);
     await extension.evaluate(() => {
       /** A simple plugin that resolves to a single source file **/
       class SingleFilePlugin {
@@ -102,9 +103,9 @@ describe('The Debugger Language Plugins', () => {
     await goToWasmResource('/test/e2e/resources/extensions/global_variable.wasm', undefined, inspectedPage);
     await openSourcesPanel(devToolsPage);
 
-    const capturedFileNames = captureAddedSourceFiles(2, async () => {
+    const capturedFileNames = captureAddedSourceFiles(devToolsPage, 2, async () => {
       await inspectedPage.evaluate('loadModule();');
-    }, devToolsPage);
+    });
     await addDummyExternalDWARFInfo('global_variable.wasm', devToolsPage);
 
     assert.deepEqual(await capturedFileNames, [
@@ -116,9 +117,10 @@ describe('The Debugger Language Plugins', () => {
   // Resolve a single code offset to a source line to test the correctness of offset computations.
   it('use correct code offsets to interpret raw locations', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     const locationLabels = WasmLocationLabels.load(
         'extensions/unreachable.wat', 'extensions/unreachable.wasm', devToolsPage, inspectedPage);
     await extension.evaluate((mappings: LabelMapping[]) => {
@@ -167,7 +169,7 @@ describe('The Debugger Language Plugins', () => {
     });
     const callframes = error.message?.split('\n').slice(1);
     assert.deepEqual(callframes, [
-      `    at Main (unreachable.wat:${pauseLocation.sourceLine})`,
+      `    at Main (unreachable.wat:${pauseLocation.sourceLine}:0)`,
       '    at window.loadModule (wasm_module.html?mod…&autorun=Main:24:46)',
     ]);
   });
@@ -177,9 +179,10 @@ describe('The Debugger Language Plugins', () => {
     const locationLabels = WasmLocationLabels.load(
         'extensions/global_variable.wat', 'extensions/global_variable.wasm', devToolsPage, inspectedPage);
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate((mappings: LabelMapping[]) => {
       /**
        * This plugin will emulate a source mapping with a single file and a single corresponding source line and byte
@@ -243,7 +246,7 @@ describe('The Debugger Language Plugins', () => {
         '/test/e2e/resources/extensions/global_variable.wasm', {autoLoadModule: true}, inspectedPage);
     await openSourcesPanel(devToolsPage);
     await addDummyExternalDWARFInfo('global_variable.wasm', devToolsPage);
-    await openFileInEditor('global_variable.wat', devToolsPage);
+    await openFileInEditor(devToolsPage, 'global_variable.wat');
 
     const toolbarLink = await devToolsPage.waitFor('devtools-toolbar .devtools-link');
     const toolbarLinkText = await toolbarLink.evaluate(({textContent}) => textContent);
@@ -256,9 +259,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows top-level and nested variables', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluateHandle(() => {
       class VariableListingPlugin {
         private modules = new Map<
@@ -310,17 +314,18 @@ describe('The Debugger Language Plugins', () => {
     await addDummyExternalDWARFInfo('unreachable.wasm', devToolsPage);
     await devToolsPage.waitFor(RESUME_BUTTON);
 
-    const locals = await getValuesForScope('LOCAL', 0, 1, devToolsPage);
+    const locals = await getValuesForScope(devToolsPage, 'LOCAL', 0, 1);
     assert.deepEqual(locals, ['localX: undefined']);
-    const globals = await getValuesForScope('GLOBAL', 2, 3, devToolsPage);
+    const globals = await getValuesForScope(devToolsPage, 'GLOBAL', 2, 3);
     assert.deepEqual(globals, ['n1: namespace', 'n2: namespace', 'globalY: undefined']);
   });
 
   it('shows inline frames', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class InliningPlugin {
         private modules = new Map<string, {
@@ -398,14 +403,14 @@ describe('The Debugger Language Plugins', () => {
         ['unreachable.ll:6', 'unreachable.ll:11', 'unreachable.ll:16', 'unreachable.html:27', 'unreachable.html:30']);
 
     // We see variables for innermost frame.
-    assert.deepEqual(await getValuesForScope('LOCAL', 0, 1, devToolsPage), ['localX0: undefined']);
+    assert.deepEqual(await getValuesForScope(devToolsPage, 'LOCAL', 0, 1), ['localX0: undefined']);
 
     // Switching frames affects what variables we see.
-    await switchToCallFrame(2, devToolsPage);
-    assert.deepEqual(await getValuesForScope('LOCAL', 0, 1, devToolsPage), ['localX1: undefined']);
+    await switchToCallFrame(devToolsPage, 2);
+    assert.deepEqual(await getValuesForScope(devToolsPage, 'LOCAL', 0, 1), ['localX1: undefined']);
 
-    await switchToCallFrame(3, devToolsPage);
-    assert.deepEqual(await getValuesForScope('LOCAL', 0, 1, devToolsPage), ['localX2: undefined']);
+    await switchToCallFrame(devToolsPage, 3);
+    assert.deepEqual(await getValuesForScope(devToolsPage, 'LOCAL', 0, 1), ['localX2: undefined']);
 
     await devToolsPage.click(RESUME_BUTTON);
     await devToolsPage.waitForFunction(async () => {
@@ -415,18 +420,19 @@ describe('The Debugger Language Plugins', () => {
       }
       const message = messages[messages.length - 1];
       return message.message === `Uncaught (in promise) RuntimeError: unreachable
-    at inner_inline_func (unreachable.ll:6)
-    at outer_inline_func (unreachable.ll:11)
-    at Main (unreachable.ll:16)
+    at inner_inline_func (unreachable.ll:6:3)
+    at outer_inline_func (unreachable.ll:11:3)
+    at Main (unreachable.ll:16:3)
     at go (unreachable.html:27:29)`;
     });
   });
 
   it('falls back to wasm function names when inline info not present', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class InliningPlugin {
         private modules = new Map<string, {
@@ -496,9 +502,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows a warning when no debug info is present', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class MissingInfoPlugin {
         async addRawModule() {
@@ -521,7 +528,7 @@ describe('The Debugger Language Plugins', () => {
     const infoBar = await devToolsPage.waitFor(`.infobar-error[aria-label="${incompleteMessage}"`);
     const details = await devToolsPage.waitFor('.infobar-details-rows', infoBar);
     const text = await details.evaluate(e => e.textContent);
-    assert.deepEqual(text, 'Failed to load debug file "test.wasm".');
+    assert.deepEqual(text, 'Failed to load debug file "test.wasm"');
 
     const banners = await devToolsPage.$$('.call-frame-warnings-message');
     const bannerTexts = await Promise.all(banners.map(e => e.evaluate(e => e.textContent)));
@@ -534,9 +541,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows warnings when function info not present', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class MissingInfoPlugin {
         private modules = new Map<string, {
@@ -591,7 +599,7 @@ describe('The Debugger Language Plugins', () => {
     const infoBar = await devToolsPage.waitFor(`.infobar-error[aria-label="${incompleteMessage}"`);
     const details = await devToolsPage.waitFor('.infobar-details-rows', infoBar);
     const text = await details.evaluate(e => e.textContent);
-    assert.deepEqual(text, 'Failed to load debug file "test.dwo".');
+    assert.deepEqual(text, 'Failed to load debug file "test.dwo"');
 
     const banners = await devToolsPage.$$('.call-frame-warnings-message');
     const bannerTexts = await Promise.all(banners.map(e => e.evaluate(e => e.textContent)));
@@ -605,9 +613,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('connects warnings to the developer resource panel', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class MissingInfoPlugin {
         async addRawModule() {
@@ -638,7 +647,7 @@ describe('The Debugger Language Plugins', () => {
     assert.deepEqual(await devToolsPage.getTextContent('devtools-button', infoBar), 'Show request');
     await devToolsPage.click('devtools-button', {root: infoBar});
 
-    await checkIfTabExistsInDrawer(DEVELOPER_RESOURCES_TAB_SELECTOR, devToolsPage);
+    await checkIfTabExistsInDrawer(devToolsPage, DEVELOPER_RESOURCES_TAB_SELECTOR);
 
     const resourcesGrid = await devToolsPage.waitFor('.developer-resource-view-results');
     const selectedReportedResource = await devToolsPage.waitFor('.data-grid-data-grid-node.selected', resourcesGrid);
@@ -646,7 +655,7 @@ describe('The Debugger Language Plugins', () => {
 
     const dwoUrl = 'http://test.com/test.dwo';
     assert.deepEqual(selectedDetails, [
-      'failure',
+      'Failure',
       dwoUrl,
       inspectedPage.domain('extensions.test'),
       '',
@@ -658,9 +667,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows variable values with the evaluate API', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class EvalPlugin {
         private modules = new Map<
@@ -770,7 +780,7 @@ describe('The Debugger Language Plugins', () => {
     await addDummyExternalDWARFInfo('unreachable.wasm', devToolsPage);
     await devToolsPage.waitFor(RESUME_BUTTON);
 
-    const locals = await getValuesForScope('LOCAL', 3, 5, devToolsPage);
+    const locals = await getValuesForScope(devToolsPage, 'LOCAL', 3, 5);
     assert.deepEqual(locals, [
       'local: TestType',
       'member: TestTypeMember',
@@ -782,9 +792,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows variable value in popover', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class VariableListingPlugin {
         private modules = new Map<
@@ -846,7 +857,7 @@ describe('The Debugger Language Plugins', () => {
     await inspectedPage.goToResource('sources/wasm/unreachable.html');
     await addDummyExternalDWARFInfo('unreachable.wasm', devToolsPage);
     await devToolsPage.waitFor(RESUME_BUTTON);
-    await openFileInEditor('unreachable.ll', devToolsPage);
+    await openFileInEditor(devToolsPage, 'unreachable.ll');
 
     const pausedPosition = await devToolsPage.waitForFunction(async () => {
       const element = await devToolsPage.$('.cm-executionToken');
@@ -864,9 +875,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('shows sensible error messages.', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class FormattingErrorsPlugin {
         private modules = new Map<
@@ -925,7 +937,7 @@ describe('The Debugger Language Plugins', () => {
     await inspectedPage.goToResource('sources/wasm/unreachable.html');
     await addDummyExternalDWARFInfo('unreachable.wasm', devToolsPage);
     await devToolsPage.waitFor(RESUME_BUTTON);
-    const locals = await getValuesForScope('LOCAL', 0, 1, devToolsPage);
+    const locals = await getValuesForScope(devToolsPage, 'LOCAL', 0, 1);
     assert.deepEqual(locals, ['unreachable: undefined']);
 
     const watchPane = await devToolsPage.waitFor('[aria-label="Watch"]');
@@ -955,12 +967,19 @@ describe('The Debugger Language Plugins', () => {
     });
     assert.deepEqual(watchTexts, ['foo: 23', 'bar: <not available>']);
 
-    const tooltipText = await watchResults[1].evaluate(e => {
-      const errorElement = e.querySelector('.watch-expression-error');
-      if (!errorElement) {
-        return 'NO ERROR COULD BE FOUND';
+    const tooltipText = await devToolsPage.waitForFunction(async () => {
+      const watchResults = await devToolsPage.$$('.watch-expression');
+      if (watchResults.length < 2) {
+        return null;
       }
-      return errorElement.getAttribute('title');
+      return await watchResults[1].evaluate(e => {
+        const errorElement = e.querySelector('.watch-expression-error');
+        if (!errorElement) {
+          return null;
+        }
+        const title = errorElement.getAttribute('title');
+        return title ? title : null;
+      });
     });
     assert.strictEqual(tooltipText, 'No typeinfo for bar');
 
@@ -975,15 +994,16 @@ describe('The Debugger Language Plugins', () => {
       return document.querySelectorAll('.console-user-command-result').length === 1;
     });
 
-    const messages = await getCurrentConsoleMessages(undefined, undefined, undefined, devToolsPage);
+    const messages = await getCurrentConsoleMessages(devToolsPage, undefined, undefined, undefined);
     assert.deepEqual(messages.filter(m => !m.startsWith('[Formatter Errors]')), ['Uncaught No typeinfo for bar']);
   });
 
   it('can access wasm data directly', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       class WasmDataExtension {
         async addRawModule(_rawModuleId: string, symbols: string, rawModule: Chrome.DevTools.RawModule) {
@@ -1057,9 +1077,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('lets users manually attach debug info', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     await extension.evaluate(() => {
       /** A simple plugin that resolves to a single source file **/
       class DWARFSymbolsWithSingleFilePlugin {
@@ -1081,22 +1102,22 @@ describe('The Debugger Language Plugins', () => {
     await openSourcesPanel(devToolsPage);
 
     {
-      const capturedFileNames = await captureAddedSourceFiles(1, async () => {
+      const capturedFileNames = await captureAddedSourceFiles(devToolsPage, 1, async () => {
         await inspectedPage.evaluate('loadModule();');
-      }, devToolsPage);
+      });
       assert.deepEqual(capturedFileNames, ['/test/e2e/resources/extensions/global_variable.wasm']);
     }
 
     {
-      const capturedFileNames = await captureAddedSourceFiles(1, async () => {
-        await openFileInEditor('global_variable.wasm', devToolsPage);
+      const capturedFileNames = await captureAddedSourceFiles(devToolsPage, 1, async () => {
+        await openFileInEditor(devToolsPage, 'global_variable.wasm');
 
         await devToolsPage.click('aria/Code editor', {clickOptions: {button: 'right'}});
         await devToolsPage.click('aria/Add DWARF debug info…');
         await devToolsPage.waitFor('.add-source-map');
         await devToolsPage.typeText('foobar81');
         await devToolsPage.pressKey('Enter');
-      }, devToolsPage);
+      });
 
       assert.deepEqual(capturedFileNames, ['/source_file.c']);
     }
@@ -1135,9 +1156,10 @@ describe('The Debugger Language Plugins', () => {
 
   it('auto-steps over unmapped code correctly', async ({devToolsPage, inspectedPage}) => {
     await inspectedPage.goToResource('empty.html');
-    const extension = await loadExtension(
-        'TestExtension', `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
-        /* allowFileAccess */ true, devToolsPage, inspectedPage);
+    const extension =
+        await loadExtension(devToolsPage, inspectedPage, 'TestExtension',
+                            `${inspectedPage.getResourcesPath('extensions.test')}/extensions/language_extensions.html`,
+                            /* allowFileAccess */ true);
     const locationLabels =
         WasmLocationLabels.load('extensions/stepping.wat', 'extensions/stepping.wasm', devToolsPage, inspectedPage);
 

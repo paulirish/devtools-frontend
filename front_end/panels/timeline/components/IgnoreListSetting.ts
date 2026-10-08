@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../../ui/components/menus/menus.js';
-
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -20,35 +18,33 @@ const {live} = Directives;
 
 const UIStrings = {
   /**
-   * @description Text title for the button to open the ignore list setting.
+   * @description Tooltip text for the button to open the ignore list settings dialog in the Performance panel.
    */
   showIgnoreListSettingDialog: 'Show ignore list setting dialog',
   /**
-   * @description Text title for ignore list setting.
+   * @description Header title for the ignore list settings dialog in the Performance panel.
    */
   ignoreList: 'Ignore list',
   /**
-   * @description Text description for ignore list setting.
+   * @description Description text in the ignore list settings dialog of the Performance panel.
    */
-  ignoreListDescription: 'Add regular expression rules to remove matching scripts from the flame chart.',
+  ignoreListDescription: 'Add regular expression rules to remove matching scripts from the flame chart',
   /**
-   * @description Pattern title in Framework Ignore List Settings Tab of the Settings
+   * @description Label for a pattern rule in the ignore list settings dialog of the Performance panel.
    * @example {ad.*?} regex
    */
   ignoreScriptsWhoseNamesMatchS: 'Ignore scripts whose names match \'\'{regex}\'\'',
   /**
-   * @description Label for the button to remove an regex
+   * @description Accessible label for the button to remove a regular expression rule in the ignore list settings dialog of the Performance panel.
    * @example {ad.*?} regex
    */
   removeRegex: 'Remove the regex: \'\'{regex}\'\'',
   /**
-   * @description Aria accessible name in Ignore List Settings Dialog in Performance panel. It labels the input
-   * field used to add new or edit existing regular expressions that match file names to ignore in the debugger.
+   * @description Accessible label for the text input to add a regular expression rule in the ignore list settings dialog of the Performance panel.
    */
-  addNewRegex: 'Add a regular expression rule for the script\'s URL',
+  addNewRegex: 'Add a regular expression rule for the script’s URL',
   /**
-   * @description Aria accessible name in Ignore List Settings Dialog in Performance panel. It labels the checkbox of
-   * the input field used to enable the new regular expressions that match file names to ignore in the debugger.
+   * @description Accessible label for the checkbox to enable a new regular expression rule in the ignore list settings dialog of the Performance panel.
    */
   ignoreScriptsWhoseNamesMatchNewRegex: 'Ignore scripts whose names match the new regex',
 } as const;
@@ -173,7 +169,7 @@ export class IgnoreListSetting extends UI.Widget.Widget {
 
   #view: View;
   readonly #ignoreListEnabled: Common.Settings.Setting<boolean> =
-      Common.Settings.Settings.instance().moduleSetting('enable-ignore-listing');
+      Common.Settings.Settings.instance().resolve(Workspace.IgnoreListManager.enableIgnoreListingSettingDescriptor);
   readonly #regexPatterns = this.#getSkipStackFramesPatternSetting().getAsArray();
   #newRegexValue = '';
   #newRegexChecked = false;
@@ -187,17 +183,17 @@ export class IgnoreListSetting extends UI.Widget.Widget {
     this.element.classList.remove('vbox', 'flex-auto');
 
     Common.Settings.Settings.instance()
-        .moduleSetting('skip-stack-frames-pattern')
+        .resolve(Workspace.IgnoreListManager.skipStackFramesPatternSettingDescriptor)
         .addChangeListener(this.requestUpdate.bind(this));
     Common.Settings.Settings.instance()
-        .moduleSetting('enable-ignore-listing')
+        .resolve(Workspace.IgnoreListManager.enableIgnoreListingSettingDescriptor)
         .addChangeListener(this.requestUpdate.bind(this));
     this.requestUpdate();
   }
 
   #getSkipStackFramesPatternSetting(): Common.Settings.RegExpSetting {
-    return Common.Settings.Settings.instance().moduleSetting('skip-stack-frames-pattern') as
-        Common.Settings.RegExpSetting;
+    return Common.Settings.Settings.instance().resolve(
+               Workspace.IgnoreListManager.skipStackFramesPatternSettingDescriptor) as Common.Settings.RegExpSetting;
   }
 
   #onNewRegexInputFocus(value: string): void {

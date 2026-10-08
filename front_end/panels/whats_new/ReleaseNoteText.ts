@@ -40,22 +40,22 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 149,
-  header: 'What’s new in DevTools 149',
+  version: 154,
+  header: 'New in DevTools (October 2026)',
   markdownLinks: [
     {
-      key: 'devtools-for-agents',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#devtools-for-agents',
+      key: 'mcp',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-october-2026/#mcp',
     },
     {
-      key: 'ai-assistance',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#ai-assistance',
+      key: 'performance',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-october-2026/#performance',
     },
     {
-      key: 'css-code-completion',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-149/#css-code-completion',
-    }
+      key: 'edit-and-resend-as-fetch-in-co',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-october-2026/#edit-and-resend-as-fetch-in-co',
+    },
   ],
   videoLinks: [],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-149/',
+  link: 'https://developer.chrome.com/blog/new-in-devtools-october-2026/',
 };

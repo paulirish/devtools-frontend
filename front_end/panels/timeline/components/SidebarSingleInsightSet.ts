@@ -9,7 +9,6 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 
 import {CWVMetrics, getFieldMetrics} from './CWVMetrics.js';
-import {shouldRenderForCategory} from './insights/Helpers.js';
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
 import sidebarSingleInsightSetStyles from './sidebarSingleInsightSet.css.js';
@@ -45,7 +44,7 @@ const INSIGHT_NAME_TO_COMPONENT = {
 
 const UIStrings = {
   /**
-   * @description Summary text for an expandable dropdown that contains all insights in a passing state.
+   * @description Summary text for an expandable dropdown that contains all insights in a passing state in the Performance panel sidebar.
    * @example {4} PH1
    */
   passedInsights: 'Passed insights ({PH1})',
@@ -182,7 +181,7 @@ export class SidebarSingleInsightSet extends UI.Widget.Widget {
     const passedInsights: InsightData[] = [];
 
     for (const [insightName, model] of Object.entries(insightSet.model)) {
-      if (!model || !shouldRenderForCategory({activeCategory, insightCategory: model.category})) {
+      if (!model || !Insights.Helpers.shouldRenderForCategory({activeCategory, insightCategory: model.category})) {
         continue;
       }
 

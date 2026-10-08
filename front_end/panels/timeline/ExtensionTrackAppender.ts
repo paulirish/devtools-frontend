@@ -18,7 +18,7 @@ import * as Extensions from './extensions/extensions.js';
 
 const UIStrings = {
   /**
-   * @description The subtitle to show (by the side of the track name).
+   * @description Subtitle shown next to the track name for an extension track in the timeline flame chart.
    */
   customTrackSubtitle: '— Custom',
 } as const;
@@ -77,7 +77,7 @@ export class ExtensionTrackAppender implements TrackAppender {
       shareHeaderLine: false,
       padding: 2,
       nestingLevel: 1,
-      collapsible: PerfUI.FlameChart.GroupCollapsibleState.ALWAYS
+      collapsible: PerfUI.FlameChart.GroupCollapsibleState.ALWAYS,
     });
     const group = buildTrackHeader(
         VisualLoggingTrackName.EXTENSION, trackStartLevel, headerTitle, style,

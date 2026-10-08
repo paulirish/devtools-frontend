@@ -12,53 +12,52 @@ import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import cwvMetricsStyles from './cwvMetrics.css.js';
-import {md} from './insights/Helpers.js';
 import * as Insights from './insights/insights.js';
+import metricValueStyles from './metricValueStyles.css.js';
 import {isFieldWorseThanLocal, NumberWithUnit} from './Utils.js';
 
 const {html} = Lit.StaticHtml;
 
 const UIStrings = {
   /**
-   * @description title used for a metric value to tell the user about its score classification
+   * @description Tooltip and aria label for a metric value indicating its score classification in the Performance panel.
    * @example {INP} PH1
    * @example {1.2s} PH2
    * @example {poor} PH3
    */
   metricScore: '{PH1}: {PH2} {PH3} score',
   /**
-   * @description title used for a metric value to tell the user that the data is unavailable
+   * @description Tooltip and aria label for a metric value indicating that the data is unavailable in the Performance panel.
    * @example {INP} PH1
    */
   metricScoreUnavailable: '{PH1}: unavailable',
   /**
-   * @description Label denoting that metrics were observed in the field, from real use data (CrUX). Also denotes if from URL or Origin dataset.
+   * @description Label denoting that metrics were observed in the field from real user data (CrUX), and whether the data is from the URL or origin dataset in the Performance panel.
    * @example {URL} PH1
    */
   fieldScoreLabel: 'Field ({PH1})',
   /**
-   * @description Label for an option that selects the page's specific URL as opposed to it's entire origin/domain.
+   * @description Label for an option that selects the specific URL in the Performance panel.
    */
   urlOption: 'URL',
   /**
-   * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
+   * @description Label for an option that selects the entire origin in the Performance panel.
    */
   originOption: 'Origin',
   /**
-   * @description Title for button that closes a warning popup.
+   * @description Tooltip text for the dismiss button that closes a warning popup in the Performance panel.
    */
   dismissTitle: 'Dismiss',
   /**
-   * @description Title shown in a warning dialog when field metrics (collected from real users) is worse than the locally observed metrics.
+   * @description Title shown in a warning dialog when field metrics are worse than locally observed metrics in the Performance panel.
    */
   fieldMismatchTitle: 'Field & local metrics mismatch',
   /**
-   * @description Text shown in a warning dialog when field metrics (collected from real users) is worse than the locally observed metrics.
-   * Asks user to use features such as throttling and device emulation.
+   * @description Warning notice shown when field metrics are worse than locally observed metrics in the Performance panel.
    */
   fieldMismatchNotice:
-      'There are many reasons why local and field metrics [may not match](https://web.dev/articles/lab-and-field-data-differences). ' +
-      'Adjust [throttling settings and device emulation](https://developer.chrome.com/docs/devtools/device-mode) to analyze traces more similar to the average user\'s environment.',
+      'Local and field metrics [may not match](https://web.dev/articles/lab-and-field-data-differences) for several reasons. ' +
+      'Adjust [throttling settings and device emulation](https://developer.chrome.com/docs/devtools/device-mode) to analyze traces more similar to the average user’s environment.',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/CWVMetrics.ts', UIStrings);
@@ -204,6 +203,16 @@ const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
   const inpEl = renderMetricValue('INP', local?.inp?.value ?? null, local?.inp?.event ?? null);
   const clsEl = renderMetricValue('CLS', local?.cls?.value ?? null, local?.cls?.worstClusterEvent ?? null);
 
+  const navigation = parsedTrace?.insights?.get(insightSetKey ?? '')?.navigation;
+  const isSoftNav = navigation && Trace.Types.Events.isSoftNavigationStart(navigation);
+
+  const softNavBadgeTemplate = isSoftNav ? html`
+    <div class="metrics-row soft-nav-badge-row">
+      <span class="badge">SOFT NAV</span>
+    </div>
+  ` :
+                                           Lit.nothing;
+
   const localMetricsTemplateResult = html`
     <div class="metrics-row">
       <span>${lcpEl}</span>
@@ -211,6 +220,7 @@ const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
       <span>${clsEl}</span>
       <span class="row-label">Local</span>
     </div>
+    ${!field ? softNavBadgeTemplate : Lit.nothing}
     ${!field && input.skipBottomBorder ? Lit.nothing : html`<span class="row-border"></span>`}
   `;
 
@@ -235,6 +245,7 @@ const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
         <span>${clsEl}</span>
         <span class="row-label">${i18nString(UIStrings.fieldScoreLabel, {PH1: scope})}</span>
       </div>
+      ${softNavBadgeTemplate}
       ${input.skipBottomBorder ? Lit.nothing : html`<span class="row-border"></span>`}
     `;
     // clang-format on
@@ -253,7 +264,7 @@ const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
           .jslogContext=${'timeline.insights.dismiss-field-mismatch'}
           @click=${onDismisFieldMismatchNotice}
         ></devtools-button>
-        <div class="field-mismatch-notice__body">${md(i18nString(UIStrings.fieldMismatchNotice))}</div>
+        <div class="field-mismatch-notice__body">${Insights.Helpers.md(i18nString(UIStrings.fieldMismatchNotice))}</div>
       </div>
     `;
     // clang-format on
@@ -271,13 +282,13 @@ const CWV_METRICS_VIEW: MetricsView = (input, _output, target) => {
     ${fieldMetricsTemplateResult}
   </div>`;
 
-  Lit.render(
-      html`
+  Lit.render(html`
     <style>${cwvMetricsStyles}</style>
+    <style>${metricValueStyles}</style>
     ${metricsTableEl}
     ${fieldIsDifferentEl}
   `,
-      target);
+             target);
 };
 
 export interface CWVMetricsData {

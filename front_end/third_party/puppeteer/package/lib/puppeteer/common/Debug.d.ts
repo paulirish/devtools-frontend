@@ -3,14 +3,60 @@
  * Copyright 2020 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { debuglog } from 'node:util';
 declare global {
     const __PUPPETEER_DEBUG: string;
 }
 /**
- * @internal
+ * @public
+ * @experimental
  */
-export declare function importDebug(): Promise<typeof debuglog>;
+export declare const DEBUG_PREFIXES: {
+    readonly cdpSend: "puppeteer:protocol:SEND ►";
+    readonly cdpReceive: "puppeteer:protocol:RECV ◀";
+    readonly bidiSend: "puppeteer:webDriverBiDi:SEND ►";
+    readonly bidiReceive: "puppeteer:webDriverBiDi:RECV ◀";
+    readonly error: "puppeteer:error";
+    readonly ffmpeg: "puppeteer:ffmpeg";
+};
+/**
+ * @public
+ * @experimental
+ */
+export type DebugPrefix = (typeof DEBUG_PREFIXES)[keyof typeof DEBUG_PREFIXES];
+/**
+ * A function called by Puppeteer to output debug messages.
+ *
+ * @param args - Arbitrary values to log for a debug event.
+ *
+ * @public
+ * @experimental
+ */
+export type LoggerFunction = (...args: unknown[]) => void;
+/**
+ * A logger factory function that receives a debug channel prefix and returns
+ * a {@link LoggerFunction} to emit logs for that channel, or `undefined` if
+ * logging is disabled for that channel.
+ *
+ * @example
+ *
+ * ```ts
+ * const customLogger: Logger = (prefix: string) => {
+ *   if (prefix.includes('protocol')) {
+ *     return (...args: unknown[]) =>
+ *       console.log(`[DEBUG: ${prefix}]`, ...args);
+ *   }
+ *   return undefined;
+ * };
+ * ```
+ *
+ * @param prefix - A debug channel prefix, one of {@link DebugPrefix}.
+ * @returns A {@link LoggerFunction} to log messages for the channel,
+ * or `undefined` if logging is disabled.
+ *
+ * @public
+ * @experimental
+ */
+export type Logger = (prefix: string) => LoggerFunction | undefined;
 /**
  * A debug function that can be used in any environment.
  *
@@ -38,7 +84,7 @@ export declare function importDebug(): Promise<typeof debuglog>;
  * @example
  *
  * ```
- * const log = debug('Page');
+ * const log = debug(DEBUG_PREFIXES.error);
  *
  * log('new page created')
  * // logs "Page: new page created"
@@ -49,13 +95,5 @@ export declare function importDebug(): Promise<typeof debuglog>;
  *
  * @internal
  */
-export declare const debug: (prefix: string) => ((...args: unknown[]) => void);
-/**
- * @internal
- */
-export declare function setLogCapture(value: boolean): void;
-/**
- * @internal
- */
-export declare function getCapturedLogs(): string[];
+export declare const debug: Logger;
 //# sourceMappingURL=Debug.d.ts.map

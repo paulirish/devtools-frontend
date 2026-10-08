@@ -16,15 +16,11 @@ import ruleSetDetailsViewStyles from './RuleSetDetailsView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in RuleSetDetailsView of the Application panel if no element is selected. An element here is an item in a
-   *             table of speculation rules. Speculation rules define the rules when and which urls should be prefetched.
-   *             https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state header in the rule set details view of the Application panel when no element is selected.
    */
   noElementSelected: 'No element selected',
   /**
-   * @description Text in RuleSetDetailsView of the Application panel if no element is selected. An element here is an item in a
-   *             table of speculation rules. Speculation rules define the rules when and which urls should be prefetched.
-   *             https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state description in the rule set details view of the Application panel prompting the user to select an element.
    */
   selectAnElementForMoreDetails: 'Select an element for more details',
 } as const;
@@ -79,7 +75,8 @@ export class RuleSetDetailsView extends UI.Widget.VBox {
   #ruleSet: RuleSet|null = null;
   #shouldPrettyPrint = true;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement,
+              view: (input: ViewInput|null, _output: object, target: HTMLElement) => void = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.#view = view;
   }
@@ -129,8 +126,8 @@ export class RuleSetDetailsView extends UI.Widget.VBox {
 
   async #getSourceText(): Promise<string> {
     if (this.#shouldPrettyPrint && this.#ruleSet?.sourceText !== undefined) {
-      const formattedResult =
-          await Formatter.ScriptFormatter.formatScriptContent('application/json', this.#ruleSet.sourceText);
+      const formattedResult = await Formatter.ScriptFormatter.formatScriptContent(
+          SDK.TargetManager.TargetManager.instance().settings, 'application/json', this.#ruleSet.sourceText);
       return formattedResult.formattedContent;
     }
 

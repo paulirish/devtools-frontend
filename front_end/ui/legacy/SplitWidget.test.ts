@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
@@ -27,6 +28,17 @@ describeWithEnvironment('SplitWidget', () => {
 
       // Now it toggles to make it visible again
       assert.isTrue(widget.toggleSidebar());
+    });
+
+    it('does not alert LiveAnnouncer when sidebar strings are empty', () => {
+      const alertSpy = sinon.spy(UI.ARIAUtils.LiveAnnouncer, 'alert');
+      const widget = new SplitWidget(true, false);
+      widget.showBoth();
+
+      widget.toggleSidebar();
+      widget.toggleSidebar();
+
+      sinon.assert.notCalled(alertSpy);
     });
   });
 
@@ -60,5 +72,30 @@ describeWithEnvironment('SplitWidget', () => {
     assert.exists(widget.mainWidget());
     assert.strictEqual(widget.mainWidget()!.contentElement.textContent!.trim(), 'Main content');
     assert.strictEqual(widget.sidebarWidget()!.contentElement.textContent!.trim(), 'Sidebar content');
+
+    widget.detach();
+  });
+
+  it('does not revert main widget when previous widget uses hideOnDetach', async () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+
+    const splitWidget = new SplitWidget(true, false);
+    splitWidget.markAsRoot();
+    splitWidget.show(container);
+
+    const widget1 = new UI.Widget.Widget();
+    widget1.setHideOnDetach();
+    splitWidget.setMainWidget(widget1);
+    assert.strictEqual(splitWidget.mainWidget(), widget1);
+
+    const widget2 = new UI.Widget.Widget();
+    splitWidget.setMainWidget(widget2);
+    assert.strictEqual(splitWidget.mainWidget(), widget2);
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.strictEqual(splitWidget.mainWidget(), widget2);
+
+    splitWidget.detach();
   });
 });

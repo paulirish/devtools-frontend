@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Cookie, CookieData, DeleteCookiesRequest } from '../common/Cookie.js';
+import { type Logger } from '../common/Debug.js';
 import { EventEmitter, type EventType } from '../common/EventEmitter.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 import { Mutex } from '../util/Mutex.js';
@@ -85,7 +86,11 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
     /**
      * @internal
      */
-    constructor();
+    constructor(logger: Logger);
+    /**
+     * @internal
+     */
+    protected get logger(): Logger;
     /**
      * Gets all active {@link Target | targets} inside this
      * {@link BrowserContext | browser context}.
@@ -222,9 +227,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * Identifier for this {@link BrowserContext | browser context}.
      */
     get id(): string | undefined;
-    /** @internal */
     [disposeSymbol](): void;
-    /** @internal */
     [asyncDisposeSymbol](): Promise<void>;
 }
 //# sourceMappingURL=BrowserContext.d.ts.map

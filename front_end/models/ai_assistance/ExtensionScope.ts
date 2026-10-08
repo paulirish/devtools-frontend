@@ -3,26 +3,22 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as Bindings from '../bindings/bindings.js';
 
+import {getOrCreateIsolatedWorld} from './agents/ExecuteJavascript.js';
 import type {ChangeManager} from './ChangeManager.js';
+import {sanitizeStyleChanges} from './DOMHelpers.js';
 import {
   AI_ASSISTANCE_CSS_CLASS_NAME,
   type FreestyleCallbackArgs,
   FREESTYLER_BINDING_NAME,
-  FREESTYLER_WORLD_NAME,
   freestylerBinding,
-  injectedFunctions
+  injectedFunctions,
 } from './injected.js';
 
 interface ElementContext {
   selector: string;
-  simpleSelector?: string;
-  sourceLocation?: string;
-  backendNodeId?: Protocol.DOM.BackendNodeId;
 }
 
 /**
@@ -34,7 +30,6 @@ export class ExtensionScope {
                     }) => Promise<void>> = [];
   #changeManager: ChangeManager;
   #agentId: string;
-  #turnId?: number;
   /** Don't use directly use the getter */
   #frameId?: Protocol.Page.FrameId|null;
   /** Don't use directly use the getter */
@@ -42,12 +37,11 @@ export class ExtensionScope {
 
   readonly #bindingMutex = new Common.Mutex.Mutex();
 
-  constructor(changes: ChangeManager, agentId: string, selectedNode: SDK.DOMModel.DOMNode|null, turnId?: number) {
+  constructor(changes: ChangeManager, agentId: string, selectedNode: SDK.DOMModel.DOMNode|null) {
     this.#changeManager = changes;
     const frameId = selectedNode?.frameId();
     const target = selectedNode?.domModel().target();
     this.#agentId = agentId;
-    this.#turnId = turnId;
     this.#target = target;
     this.#frameId = frameId;
   }
@@ -72,24 +66,15 @@ export class ExtensionScope {
   }
 
   async install(): Promise<void> {
+    const isolatedWorldContext = await getOrCreateIsolatedWorld(this.target, this.frameId);
     const runtimeModel = this.target.model(SDK.RuntimeModel.RuntimeModel);
-    const pageAgent = this.target.pageAgent();
-
-    // This returns previously created world if it exists for the frame.
-    const {executionContextId} =
-        await pageAgent.invoke_createIsolatedWorld({frameId: this.frameId, worldName: FREESTYLER_WORLD_NAME});
-
-    const isolatedWorldContext = runtimeModel?.executionContext(executionContextId);
-    if (!isolatedWorldContext) {
-      throw new Error('Execution context is not found for executing code');
-    }
 
     const handler = this.#bindingCalled.bind(this, isolatedWorldContext);
     runtimeModel?.addEventListener(SDK.RuntimeModel.Events.BindingCalled, handler);
     this.#listeners.push(handler);
     await this.target.runtimeAgent().invoke_addBinding({
       name: FREESTYLER_BINDING_NAME,
-      executionContextId,
+      executionContextId: isolatedWorldContext.id,
     });
     await this.#simpleEval(isolatedWorldContext, freestylerBinding);
     await this.#simpleEval(isolatedWorldContext, injectedFunctions);
@@ -115,18 +100,17 @@ export class ExtensionScope {
       ): Promise<{
     object: SDK.RemoteObject.RemoteObject,
   }> {
-    const response = await context.evaluate(
-        {
-          expression,
-          replMode: true,
-          includeCommandLineAPI: false,
-          returnByValue,
-          silent: false,
-          generatePreview: false,
-          allowUnsafeEvalBlockedByCSP: true,
-          throwOnSideEffect: false,
-        },
-        /* userGesture */ false, /* awaitPromise */ true);
+    const response = await context.evaluateWithSelectedFrameFallback({
+      expression,
+      replMode: true,
+      includeCommandLineAPI: false,
+      returnByValue,
+      silent: false,
+      generatePreview: false,
+      allowUnsafeEvalBlockedByCSP: true,
+      throwOnSideEffect: false,
+    },
+                                                                     /* userGesture */ false, /* awaitPromise */ true);
 
     if (!response) {
       throw new Error('Response is not found');
@@ -239,23 +223,6 @@ export class ExtensionScope {
     return node.localName() || node.nodeName().toLowerCase();
   }
 
-  static getSourceLocation(styleRule: SDK.CSSRule.CSSStyleRule): string|undefined {
-    const styleSheetHeader = styleRule.header;
-    if (!styleSheetHeader) {
-      return;
-    }
-
-    const range = styleRule.selectorRange();
-    if (!range) {
-      return;
-    }
-    const lineNumber = styleSheetHeader.lineNumberInSource(range.startLine);
-    const columnNumber = styleSheetHeader.columnNumberInSource(range.startLine, range.startColumn);
-    const location = new SDK.CSSModel.CSSLocation(styleSheetHeader, lineNumber, columnNumber);
-    const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().rawLocationToUILocation(location);
-    return uiLocation?.linkText(/* skipTrim= */ true, /* showColumnNumber= */ true);
-  }
-
   async #computeContextFromElement(remoteObject: SDK.RemoteObject.RemoteObject): Promise<ElementContext> {
     if (!remoteObject.objectId) {
       throw new Error('DOMModel is not found');
@@ -276,7 +243,6 @@ export class ExtensionScope {
       throw new Error('Node is not found');
     }
 
-    const backendNodeId = node.backendNodeId();
     try {
       const matchedStyles = await cssModel.getMatchedStyles(node.id);
 
@@ -298,9 +264,6 @@ export class ExtensionScope {
 
       return {
         selector,
-        simpleSelector: ExtensionScope.getSelectorForNode(node),
-        sourceLocation: ExtensionScope.getSourceLocation(styleRule),
-        backendNodeId,
       };
     } catch {
       // no-op to allow the fallback below to run.
@@ -309,7 +272,6 @@ export class ExtensionScope {
     // Fallback
     return {
       selector: ExtensionScope.getSelectorForNode(node),
-      backendNodeId,
     };
   }
 
@@ -331,7 +293,7 @@ export class ExtensionScope {
       const id = data.payload;
       const [args, element] = await Promise.all([
         this.#simpleEval(executionContext, `freestyler.getArgs(${id})`),
-        this.#simpleEval(executionContext, `freestyler.getElement(${id})`, false)
+        this.#simpleEval(executionContext, `freestyler.getElement(${id})`, false),
       ]);
 
       const arg = JSON.parse(args.object.value) as Omit<FreestyleCallbackArgs, 'element'>;
@@ -343,7 +305,6 @@ export class ExtensionScope {
       let context: ElementContext = {
         // TODO: Should this a be a *?
         selector: '',
-        backendNodeId: undefined,
       };
       try {
         context = await this.#computeContextFromElement(element.object);
@@ -357,13 +318,9 @@ export class ExtensionScope {
         const sanitizedStyles = await this.sanitizedStyleChanges(context.selector, arg.styles);
         const styleChanges = await this.#changeManager.addChange(cssModel, this.frameId, {
           groupId: this.#agentId,
-          turnId: this.#turnId,
-          sourceLocation: context.sourceLocation,
           selector: context.selector,
-          simpleSelector: context.simpleSelector,
           className: arg.className,
           styles: sanitizedStyles,
-          backendNodeId: context.backendNodeId,
         });
         await this.#simpleEval(executionContext, `freestyler.respond(${id}, ${JSON.stringify(styleChanges)})`);
       } catch (error) {
@@ -373,36 +330,7 @@ export class ExtensionScope {
   }
 
   async sanitizedStyleChanges(selector: string, styles: Record<string, string>): Promise<Record<string, string>> {
-    const cssStyleValue: string[] = [];
-    const changedStyles: string[] = [];
-    const styleSheet = new CSSStyleSheet({disabled: true});
-    const kebabStyles = Platform.StringUtilities.toKebabCaseKeys(styles);
-    for (const [style, value] of Object.entries(kebabStyles)) {
-      // Build up the CSS style
-      cssStyleValue.push(`${style}: ${value};`);
-      // Keep track of what style changed to query later.
-      changedStyles.push(style);
-    }
-
-    // Build up the CSS stylesheet value.
-    await styleSheet.replace(`${selector} { ${cssStyleValue.join(' ')} }`);
-
-    const sanitizedStyles: Record<string, string> = {};
-    for (const cssRule of styleSheet.cssRules) {
-      if (!(cssRule instanceof CSSStyleRule)) {
-        continue;
-      }
-      for (const style of changedStyles) {
-        // We need to use the style rather then the stylesMap
-        // as the latter expands the styles to each separate part
-        // Example:
-        // padding: 10px 20px -> padding-top: 10px, padding-bottom: 10px, etc.
-        const value = cssRule.style.getPropertyValue(style);
-        if (value) {
-          sanitizedStyles[style] = value;
-        }
-      }
-    }
+    const sanitizedStyles = await sanitizeStyleChanges(selector, styles);
 
     if (Object.keys(sanitizedStyles).length === 0) {
       throw new Error(

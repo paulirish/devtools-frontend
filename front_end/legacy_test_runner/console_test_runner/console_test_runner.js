@@ -401,7 +401,7 @@ ConsoleTestRunner.dumpConsoleCounters = async function() {
 /**
  * @param {!Function} callback
  * @param {function(!Element):boolean} deepFilter
- * @param {function(!ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection):boolean} sectionFilter
+ * @param {function(!ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionWidget):boolean} sectionFilter
  */
 ConsoleTestRunner.expandConsoleMessages = function(callback, deepFilter, sectionFilter) {
   Console.ConsoleView.ConsoleView.instance().invalidateViewport();
@@ -418,25 +418,31 @@ ConsoleTestRunner.expandConsoleMessages = function(callback, deepFilter, section
     for (let i = 0; i < messageViews.length; ++i) {
       const element = messageViews[i].element();
       for (let node = element; node; node = node.traverseNextNode(element)) {
-        if (node.treeElementForTest) {
-          node.treeElementForTest.expand();
+        if (node.domTreeWidgetForTest) {
+          const domTree = node.domTreeWidgetForTest;
+          if (domTree.rootDOMNode) {
+            domTree.setNodeExpanded(domTree.rootDOMNode, true);
+          }
         }
         if (node.expandStackTraceForTest) {
           node.expandStackTraceForTest();
         }
-        const section = ObjectUI.ObjectPropertiesSection.getObjectPropertiesSectionFrom(node);
-        if (!section) {
+        const section = UI.Widget.Widget.get(node);
+        if (!(section instanceof ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionWidget)) {
           continue;
         }
         if (sectionFilter && !sectionFilter(section)) {
           continue;
         }
-        section.expand();
+        if (section.objectTree) {
+          section.objectTree.expanded = true;
+        }
 
         if (!deepFilter) {
           continue;
         }
-        const treeElements = section.rootElement().children();
+        const treeOutline = section.element.querySelector('devtools-tree')?.getInternalTreeOutlineForTest();
+        const treeElements = treeOutline?.rootElement().children() || [];
         for (let j = 0; j < treeElements.length; ++j) {
           for (let treeElement = treeElements[j]; treeElement;
                treeElement = treeElement.traverseNextTreeElement(true, null, true)) {
@@ -447,6 +453,7 @@ ConsoleTestRunner.expandConsoleMessages = function(callback, deepFilter, section
         }
       }
     }
+    await UI.Widget.Widget.allUpdatesComplete;
     await new Promise(requestAnimationFrame);
     TestRunner.deprecatedRunAfterPendingDispatches(callback);
   }
@@ -454,11 +461,18 @@ ConsoleTestRunner.expandConsoleMessages = function(callback, deepFilter, section
 
 /**
  * @param {function(!Element):boolean} deepFilter
- * @param {function(!ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection):boolean} sectionFilter
+ * @param {function(!ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionWidget):boolean} sectionFilter
  * @returns {!Promise}
  */
 ConsoleTestRunner.expandConsoleMessagesPromise = function(deepFilter, sectionFilter) {
   return new Promise(fulfill => ConsoleTestRunner.expandConsoleMessages(fulfill, deepFilter, sectionFilter));
+};
+
+/**
+ * @returns {!Promise<void>}
+ */
+ConsoleTestRunner.waitForAllPopulations = function() {
+  return new Promise(resolve => TestRunner.deprecatedRunAfterPendingDispatches(resolve));
 };
 
 /**
@@ -469,9 +483,8 @@ ConsoleTestRunner.expandGettersInConsoleMessages = async function(callback) {
   const messageViews = Console.ConsoleView.ConsoleView.instance().visibleViewMessages;
   const properties = [];
   let propertiesCount = 0;
-  TestRunner.addSniffer(
-      ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement.prototype, 'updateExpandable',
-      propertyExpandableUpdated);
+  TestRunner.addSniffer(ObjectUI.ObjectPropertiesSection.ObjectTreeNode.prototype, 'invokeGetter',
+                        propertyExpandableUpdated, true);
   for (let i = 0; i < messageViews.length; ++i) {
     const element = messageViews[i].element();
     for (let node = element; node; node = node.traverseNextNode(element)) {
@@ -482,19 +495,22 @@ ConsoleTestRunner.expandGettersInConsoleMessages = async function(callback) {
       }
     }
   }
+  if (propertiesCount === 0) {
+    TestRunner.deprecatedRunAfterPendingDispatches(callback);
+    return;
+  }
 
-  async function propertyExpandableUpdated() {
+  async function propertyExpandableUpdated(getter, promise) {
+    await promise;
+    await UI.Widget.Widget.allUpdatesComplete;
     --propertiesCount;
     if (propertiesCount === 0) {
       for (let i = 0; i < properties.length; ++i) {
         properties[i].click();
       }
+      await UI.Widget.Widget.allUpdatesComplete;
       await new Promise(requestAnimationFrame);
       TestRunner.deprecatedRunAfterPendingDispatches(callback);
-    } else {
-      TestRunner.addSniffer(
-          ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement.prototype, 'updateExpandable',
-          propertyExpandableUpdated);
     }
   }
 };

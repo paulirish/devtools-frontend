@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -41,6 +42,7 @@ describe('Persistence', () => {
       it('initially doesn\'t report an automatic file system', () => {
         const {inspectorFrontendHost, projectSettingsModel} = createStubInstances('available', {});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -53,6 +55,7 @@ describe('Persistence', () => {
       it('listens to FileSystemRemoved events', () => {
         const {inspectorFrontendHost, projectSettingsModel} = createStubInstances('available', {});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const automaticFileSystemManager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -68,6 +71,7 @@ describe('Persistence', () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -83,6 +87,7 @@ describe('Persistence', () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -100,6 +105,7 @@ describe('Persistence', () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -116,6 +122,7 @@ describe('Persistence', () => {
       it('performs first-time setup of automatic file system correctly', async () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -143,6 +150,7 @@ describe('Persistence', () => {
       it('correctly disconnects automatic file systems', async () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -164,6 +172,7 @@ describe('Persistence', () => {
       it('reflects disconnected state correctly when the file system is removed', async () => {
         const {inspectorFrontendHost, projectSettingsModel} =
             createStubInstances('available', {workspace: {root, uuid}});
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -185,6 +194,7 @@ describe('Persistence', () => {
       it('reports available when project settings are available', () => {
         const {inspectorFrontendHost, projectSettingsModel} = createStubInstances('available', {});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,
@@ -197,6 +207,7 @@ describe('Persistence', () => {
       it('reports unavailable when project settings are unavailable', () => {
         const {inspectorFrontendHost, projectSettingsModel} = createStubInstances('unavailable', {});
 
+        // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         const manager = AutomaticFileSystemManager.instance({
           forceNew: true,
           inspectorFrontendHost,

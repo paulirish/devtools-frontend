@@ -10,13 +10,13 @@ import {VBox} from './Widget.js';
 
 const UIStrings = {
   /**
-   * @description Text in dialog box when the target page crashed
+   * @description Message shown when the inspected page crashes and DevTools is disconnected.
    */
-  devtoolsWasDisconnectedFromThe: 'DevTools was disconnected from the page.',
+  devtoolsWasDisconnectedFromThe: 'DevTools was disconnected from the page',
   /**
-   * @description Text content of content element
+   * @description Message explaining that DevTools will reconnect once the page is reloaded.
    */
-  oncePageIsReloadedDevtoolsWill: 'Once page is reloaded, DevTools will automatically reconnect.',
+  oncePageIsReloadedDevtoolsWill: 'Once page is reloaded, DevTools will automatically reconnect',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/TargetCrashedScreen.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -35,7 +35,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
 
 export class TargetCrashedScreen extends VBox {
   private readonly hideCallback: () => void;
-  constructor(hideCallback: () => void, view = DEFAULT_VIEW) {
+  constructor(hideCallback: () => void, view: View = DEFAULT_VIEW) {
     super({useShadowDom: true});
     view({}, {}, this.contentElement);
     this.hideCallback = hideCallback;

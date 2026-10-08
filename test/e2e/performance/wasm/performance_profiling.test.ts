@@ -8,7 +8,6 @@ import type * as puppeteer from 'puppeteer-core';
 import {
   BOTTOM_UP_SELECTOR,
   CALL_TREE_SELECTOR,
-  getTotalTimeFromPie,
   increaseTimeoutForPerfPanel,
   navigateToBottomUpTab,
   navigateToCallTreeTab,
@@ -19,12 +18,12 @@ import {
   SUMMARY_TAB_SELECTOR,
   uploadTraceFile,
 } from '../../helpers/performance-helpers.js';
-import type {DevToolsPage} from '../../shared/frontend-helper.js';
-import type {InspectedPage} from '../../shared/target-helper.js';
+import type {DevToolsPage} from '../../shared/DevToolsPage.js';
+import type {InspectedPage} from '../../shared/InspectedPage.js';
 
 async function searchForWasmCall(devToolsPage: DevToolsPage) {
   await devToolsPage.waitForFunction(async () => {
-    await searchForComponent('mainWasm', devToolsPage);
+    await searchForComponent(devToolsPage, 'mainWasm');
     const title = await devToolsPage.$('.timeline-details-chip-title');
     if (!title) {
       return false;
@@ -64,13 +63,13 @@ describe('The Performance panel', function() {
   increaseTimeoutForPerfPanel(this);
 
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-    await navigateToPerformanceTab('wasm/profiling', devToolsPage, inspectedPage);
+    await navigateToPerformanceTab(devToolsPage, inspectedPage, 'wasm/profiling');
     await uploadTraceFile(devToolsPage, 'test/e2e/resources/performance/wasm/mainWasm_profile.json');
     await searchForWasmCall(devToolsPage);
   }
 
   it('is able to record performance', async ({devToolsPage, inspectedPage}) => {
-    await navigateToPerformanceTab('wasm/profiling', devToolsPage, inspectedPage);
+    await navigateToPerformanceTab(devToolsPage, inspectedPage, 'wasm/profiling');
     await devToolsPage.page.keyboard.press('Escape');
     await devToolsPage.waitFor('.console-searchable-view');
     await startRecording(devToolsPage);
@@ -80,13 +79,6 @@ describe('The Performance panel', function() {
     await devToolsPage.waitFor(SUMMARY_TAB_SELECTOR);
     await devToolsPage.waitFor(BOTTOM_UP_SELECTOR);
     await devToolsPage.waitFor(CALL_TREE_SELECTOR);
-  });
-
-  it('is able to display the execution time for a wasm function', async ({devToolsPage, inspectedPage}) => {
-    await setupPerformancePanel(devToolsPage, inspectedPage);
-
-    const totalTime = await getTotalTimeFromPie(devToolsPage);
-    assert.isAbove(totalTime, 0, 'mainWasm function execution time is displayed incorrectly');
   });
 
   it('is able to inspect the call stack for a wasm function from the bottom up',

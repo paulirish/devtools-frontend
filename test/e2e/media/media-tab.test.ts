@@ -5,8 +5,8 @@
 import {assert} from 'chai';
 
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('Media Tab', () => {
   async function playMediaFile(media: string, inspectedPage: InspectedPage) {
@@ -75,7 +75,7 @@ describe('Media Tab', () => {
   }
 
   it('ensures video playback adds entry', async ({devToolsPage, inspectedPage}) => {
-    await openPanelViaMoreTools('Media', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Media');
     await playMediaFile('fisch.webm', inspectedPage);
     await devToolsPage.waitForFunction(async () => {
       const entryName = await getPlayerButtonText(devToolsPage);
@@ -85,14 +85,14 @@ describe('Media Tab', () => {
 
   it('ensures video playback adds entry for web worker', async ({devToolsPage, inspectedPage}) => {
     await devToolsPage.bringToFront();
-    await openPanelViaMoreTools('Media', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Media');
     await inspectedPage.goToResource('media/codec_worker.html');
     await waitForPlayerButtonTexts(4, devToolsPage);
   });
 
   it('ensures that errors are rendered nicely', async ({devToolsPage, inspectedPage}) => {
     await devToolsPage.bringToFront();
-    await openPanelViaMoreTools('Media', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Media');
     await inspectedPage.goToResource('media/corrupt.webm');
     await inspectedPage.bringToFront();
     await inspectedPage.evaluate(() => {

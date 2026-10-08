@@ -11,14 +11,14 @@ import {
   navigateToStorage,
   waitForQuotaUsage,
 } from '../helpers/application-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 // The parent suffix makes sure we wait for the Cookies item to have children before trying to click it.
 const CLEAR_SITE_DATA_BUTTON_SELECTOR = '#storage-view-clear-button';
 
 async function navigateToAppStorage(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-  await navigateToApplicationTab('storage-quota', devToolsPage, inspectedPage);
+  await navigateToApplicationTab(devToolsPage, inspectedPage, 'storage-quota');
   await navigateToStorage(devToolsPage);
 }
 
@@ -44,7 +44,7 @@ describe('The Application Tab', () => {
         await new Promise(resolve => addIDBValue(resolve, 'Database1', 'Store1', {key: 1, value: array}, ''));
       });
 
-      await waitForQuotaUsage(quota => quota > 800, devToolsPage);
+      await waitForQuotaUsage(devToolsPage, quota => quota > 800);
 
       // We may click too early. If the total quota exceeds 2999, some remaining
       // quota may show. Instead,
@@ -71,7 +71,7 @@ describe('The Application Tab', () => {
         await new Promise(resolve => addIDBValue(resolve, 'Database1', 'Store1', {key: 1, value: array}, ''));
       });
 
-      await waitForQuotaUsage(quota => quota > 800, devToolsPage);
+      await waitForQuotaUsage(devToolsPage, quota => quota > 800);
 
       const rows = await getPieChartLegendRows(devToolsPage);
       // Only assert that the legend entries are correct.

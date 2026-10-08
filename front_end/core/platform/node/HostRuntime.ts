@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Fs from 'node:fs';
+import * as Url from 'node:url';
 import * as WorkerThreads from 'node:worker_threads';
 
 import type * as Api from '../api/api.js';
@@ -19,14 +21,16 @@ class NodeWorkerScope implements Api.HostRuntime.WorkerScope {
 }
 
 class NodeWorker implements Api.HostRuntime.Worker {
+  readonly #worker: WorkerThreads.Worker;
   readonly #workerPromise: Promise<WorkerThreads.Worker>;
   #disposed = false;
   #rejectWorkerPromise?: (error: Error) => void;
 
   constructor(url: string) {
-    this.#workerPromise = new Promise((resolve, reject) => {
+    const worker = new WorkerThreads.Worker(new URL(url));
+    this.#worker = worker;
+    this.#workerPromise = new Promise<WorkerThreads.Worker>((resolve, reject) => {
       this.#rejectWorkerPromise = reject;
-      const worker = new WorkerThreads.Worker(new URL(url));
       worker.once('message', (message: unknown) => {
         if (message === 'workerReady') {
           resolve(worker);
@@ -34,6 +38,8 @@ class NodeWorker implements Api.HostRuntime.Worker {
       });
       worker.on('error', reject);
     });
+    // Prevent unhandled promise rejections if the worker is terminated early.
+    this.#workerPromise.catch(() => {});
   }
 
   postMessage(message: unknown, transfer?: Api.HostRuntime.WorkerTransferable[]): void {
@@ -46,7 +52,7 @@ class NodeWorker implements Api.HostRuntime.Worker {
 
   dispose(): void {
     this.#disposed = true;
-    void this.#workerPromise.then(worker => worker.terminate());
+    void this.#worker.terminate();
   }
 
   terminate(immediately?: boolean): void {
@@ -77,6 +83,37 @@ class NodeWorker implements Api.HostRuntime.Worker {
   }
 }
 
+class NodeCacheEntry implements Api.HostRuntime.CacheEntry {
+  readonly #entries = new Map<string, Response>();
+
+  async put(url: string, response: Response): Promise<void> {
+    this.#entries.set(url, response.clone());
+  }
+
+  async match(url: string): Promise<Response|undefined> {
+    return this.#entries.get(url)?.clone();
+  }
+}
+
+class NodeCacheStorage implements Api.HostRuntime.CacheStorageLike {
+  readonly #caches = new Map<string, NodeCacheEntry>();
+
+  async open(name: string): Promise<Api.HostRuntime.CacheEntry> {
+    let cache = this.#caches.get(name);
+    if (!cache) {
+      cache = new NodeCacheEntry();
+      this.#caches.set(name, cache);
+    }
+    return cache;
+  }
+
+  async delete(name: string): Promise<boolean> {
+    return this.#caches.delete(name);
+  }
+}
+
+const nodeCacheStorage = new NodeCacheStorage();
+
 export const HOST_RUNTIME: Api.HostRuntime.HostRuntime = {
   createWorker(url: string): Api.HostRuntime.Worker {
     return new NodeWorker(url);
@@ -92,4 +129,21 @@ export const HOST_RUNTIME: Api.HostRuntime.HostRuntime = {
       undefined {
         return undefined;
       },
+  getCacheStorage(): Api.HostRuntime.CacheStorageLike |
+      undefined {
+        return nodeCacheStorage;
+      },
+  getDevicePixelRatio(): number {
+    return 1;
+  },
+  async saveScreenshot(_options: Api.HostRuntime.ScreenshotOptions): Promise<void>{},
+  revokeLastScreenshotUrl(): void{},
+  async loadTextFile(url: URL): Promise<string> {
+    return await Fs.promises.readFile(Url.fileURLToPath(url), 'utf-8');
+  },
+  evaluateCSS(_dataValue: string|null, _customExpr: string): string |
+      null {
+        return null;
+      },
+  removeCSSEvaluationElement(): void{},
 };

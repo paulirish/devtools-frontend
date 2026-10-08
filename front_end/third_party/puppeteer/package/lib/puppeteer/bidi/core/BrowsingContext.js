@@ -58,6 +58,8 @@ let BrowsingContext = (() => {
     let _dispose_decorators;
     let _activate_decorators;
     let _captureScreenshot_decorators;
+    let _startScreencast_decorators;
+    let _stopScreencast_decorators;
     let _close_decorators;
     let _traverseHistory_decorators;
     let _navigate_decorators;
@@ -75,6 +77,7 @@ let BrowsingContext = (() => {
     let _removePreloadScript_decorators;
     let _setGeolocationOverride_decorators;
     let _setTimezoneOverride_decorators;
+    let _setLocaleOverride_decorators;
     let _setScreenOrientationOverride_decorators;
     let _getCookies_decorators;
     let _setCookie_decorators;
@@ -97,6 +100,8 @@ let BrowsingContext = (() => {
             __esDecorate(this, null, _dispose_decorators, { kind: "method", name: "dispose", static: false, private: false, access: { has: obj => "dispose" in obj, get: obj => obj.dispose }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _activate_decorators, { kind: "method", name: "activate", static: false, private: false, access: { has: obj => "activate" in obj, get: obj => obj.activate }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _captureScreenshot_decorators, { kind: "method", name: "captureScreenshot", static: false, private: false, access: { has: obj => "captureScreenshot" in obj, get: obj => obj.captureScreenshot }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _startScreencast_decorators, { kind: "method", name: "startScreencast", static: false, private: false, access: { has: obj => "startScreencast" in obj, get: obj => obj.startScreencast }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _stopScreencast_decorators, { kind: "method", name: "stopScreencast", static: false, private: false, access: { has: obj => "stopScreencast" in obj, get: obj => obj.stopScreencast }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _close_decorators, { kind: "method", name: "close", static: false, private: false, access: { has: obj => "close" in obj, get: obj => obj.close }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _traverseHistory_decorators, { kind: "method", name: "traverseHistory", static: false, private: false, access: { has: obj => "traverseHistory" in obj, get: obj => obj.traverseHistory }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _navigate_decorators, { kind: "method", name: "navigate", static: false, private: false, access: { has: obj => "navigate" in obj, get: obj => obj.navigate }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -114,6 +119,7 @@ let BrowsingContext = (() => {
             __esDecorate(this, null, _removePreloadScript_decorators, { kind: "method", name: "removePreloadScript", static: false, private: false, access: { has: obj => "removePreloadScript" in obj, get: obj => obj.removePreloadScript }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setGeolocationOverride_decorators, { kind: "method", name: "setGeolocationOverride", static: false, private: false, access: { has: obj => "setGeolocationOverride" in obj, get: obj => obj.setGeolocationOverride }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setTimezoneOverride_decorators, { kind: "method", name: "setTimezoneOverride", static: false, private: false, access: { has: obj => "setTimezoneOverride" in obj, get: obj => obj.setTimezoneOverride }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _setLocaleOverride_decorators, { kind: "method", name: "setLocaleOverride", static: false, private: false, access: { has: obj => "setLocaleOverride" in obj, get: obj => obj.setLocaleOverride }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setScreenOrientationOverride_decorators, { kind: "method", name: "setScreenOrientationOverride", static: false, private: false, access: { has: obj => "setScreenOrientationOverride" in obj, get: obj => obj.setScreenOrientationOverride }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _getCookies_decorators, { kind: "method", name: "getCookies", static: false, private: false, access: { has: obj => "getCookies" in obj, get: obj => obj.getCookies }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setCookie_decorators, { kind: "method", name: "setCookie", static: false, private: false, access: { has: obj => "setCookie" in obj, get: obj => obj.setCookie }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -314,6 +320,19 @@ let BrowsingContext = (() => {
             });
             return data;
         }
+        async startScreencast(options = {}) {
+            const { result } = await this.#session.send('browsingContext.startScreencast', {
+                context: this.id,
+                ...options,
+            });
+            return result;
+        }
+        async stopScreencast(screencast) {
+            const { result } = await this.#session.send('browsingContext.stopScreencast', {
+                screencast,
+            });
+            return result;
+        }
         async close(promptUnload) {
             // The WebDriver BiDi specification only allows closing top-level browsing contexts.
             // Closing a top-level context automatically closes all its children, so there is
@@ -423,6 +442,12 @@ let BrowsingContext = (() => {
                 contexts: [this.id],
             });
         }
+        async setLocaleOverride(locale) {
+            await this.userContext.browser.session.send('emulation.setLocaleOverride', {
+                locale: locale ?? null,
+                contexts: [this.id],
+            });
+        }
         async setScreenOrientationOverride(screenOrientation) {
             await this.#session.send('emulation.setScreenOrientationOverride', {
                 screenOrientation,
@@ -465,6 +490,12 @@ let BrowsingContext = (() => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
             })], _captureScreenshot_decorators = [throwIfDisposed(context => {
+                // SAFETY: Disposal implies this exists.
+                return context.#reason;
+            })], _startScreencast_decorators = [throwIfDisposed(context => {
+                // SAFETY: Disposal implies this exists.
+                return context.#reason;
+            })], _stopScreencast_decorators = [throwIfDisposed(context => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
             })], _close_decorators = [throwIfDisposed(context => {
@@ -516,6 +547,9 @@ let BrowsingContext = (() => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
             })], _setTimezoneOverride_decorators = [throwIfDisposed(context => {
+                // SAFETY: Disposal implies this exists.
+                return context.#reason;
+            })], _setLocaleOverride_decorators = [throwIfDisposed(context => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
             })], _setScreenOrientationOverride_decorators = [throwIfDisposed(context => {

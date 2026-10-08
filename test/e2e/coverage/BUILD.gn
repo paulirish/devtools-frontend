@@ -10,5 +10,8 @@ ts_e2e_library("coverage") {
     "coverage.test.ts",
   ]
 
-  deps = [ "../helpers" ]
+  ts_deps = [
+    "../helpers",
+    "../shared",
+  ]
 }

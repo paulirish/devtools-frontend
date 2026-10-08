@@ -13,27 +13,27 @@ import {projectTypes} from './WorkspaceImpl.js';
 
 const UIStrings = {
   /**
-   * @description Text to stop preventing the debugger from stepping into library code
+   * @description Text to stop preventing the debugger from stepping into library code.
    */
   removeFromIgnoreList: 'Remove from ignore list',
   /**
-   * @description Text for scripts that should not be stepped into when debugging
+   * @description Text for scripts that should not be stepped into when debugging.
    */
   addScriptToIgnoreList: 'Add script to ignore list',
   /**
-   * @description Text for directories whose scripts should not be stepped into when debugging
+   * @description Text for directories whose scripts should not be stepped into when debugging.
    */
   addDirectoryToIgnoreList: 'Add directory to ignore list',
   /**
-   * @description A context menu item in the Call Stack Sidebar Pane of the Sources panel
+   * @description A context menu item in the Call Stack sidebar of the Sources panel.
    */
   addAllContentScriptsToIgnoreList: 'Add all extension scripts to ignore list',
   /**
-   * @description A context menu item in the Call Stack Sidebar Pane of the Sources panel
+   * @description A context menu item in the Call Stack sidebar of the Sources panel.
    */
   addAllThirdPartyScriptsToIgnoreList: 'Add all third-party scripts to ignore list',
   /**
-   * @description A context menu item in the Call Stack Sidebar Pane of the Sources panel
+   * @description A context menu item in the Call Stack sidebar of the Sources panel.
    */
   addAllAnonymousScriptsToIgnoreList: 'Add all anonymous scripts to ignore list',
 } as const;
@@ -46,6 +46,42 @@ export interface IgnoreListGeneralRules {
   isKnownThirdParty?: boolean;
   isCurrentlyIgnoreListed?: boolean;
 }
+
+export const skipStackFramesPatternSettingDescriptor: Common.Settings.SettingDescriptor<string> = {
+  name: 'skip-stack-frames-pattern',
+  type: Common.Settings.SettingType.REGEX,
+  defaultValue: '/node_modules/|^node:',
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+};
+
+export const skipContentScriptsSettingDescriptor: Common.Settings.SettingDescriptor<boolean> = {
+  name: 'skip-content-scripts',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+};
+
+export const automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor:
+    Common.Settings.SettingDescriptor<boolean> = {
+  name: 'automatically-ignore-list-known-third-party-scripts',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+};
+
+export const skipAnonymousScriptsSettingDescriptor: Common.Settings.SettingDescriptor<boolean> = {
+  name: 'skip-anonymous-scripts',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+};
+
+export const enableIgnoreListingSettingDescriptor: Common.Settings.SettingDescriptor<boolean> = {
+  name: 'enable-ignore-listing',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+};
 
 export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDK.TargetManager.SDKModelObserver<SDK.DebuggerModel.DebuggerModel> {
@@ -70,12 +106,12 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
     this.#targetManager.addModelListener(
         SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed,
         this.onExecutionContextDestroyed, this, {scoped: true});
-    this.#settings.moduleSetting('skip-stack-frames-pattern').addChangeListener(this.patternChanged.bind(this));
-    this.#settings.moduleSetting('skip-content-scripts').addChangeListener(this.patternChanged.bind(this));
-    this.#settings.moduleSetting('automatically-ignore-list-known-third-party-scripts')
+    this.#settings.resolve(skipStackFramesPatternSettingDescriptor).addChangeListener(this.patternChanged.bind(this));
+    this.#settings.resolve(skipContentScriptsSettingDescriptor).addChangeListener(this.patternChanged.bind(this));
+    this.#settings.resolve(automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor)
         .addChangeListener(this.patternChanged.bind(this));
-    this.#settings.moduleSetting('enable-ignore-listing').addChangeListener(this.patternChanged.bind(this));
-    this.#settings.moduleSetting('skip-anonymous-scripts').addChangeListener(this.patternChanged.bind(this));
+    this.#settings.resolve(enableIgnoreListingSettingDescriptor).addChangeListener(this.patternChanged.bind(this));
+    this.#settings.resolve(skipAnonymousScriptsSettingDescriptor).addChangeListener(this.patternChanged.bind(this));
 
     this.#targetManager.observeModels(SDK.DebuggerModel.DebuggerModel, this);
   }
@@ -92,7 +128,9 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
       Root.DevToolsContext.globalInstance().set(
           IgnoreListManager,
           new IgnoreListManager(
+              // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
               opts.settings ?? Common.Settings.Settings.instance(),
+              // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
               opts.targetManager ?? SDK.TargetManager.TargetManager.instance()));
     }
 
@@ -160,7 +198,7 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   }
 
   private getSkipStackFramesPatternSetting(): Common.Settings.RegExpSetting {
-    return this.#settings.moduleSetting('skip-stack-frames-pattern') as Common.Settings.RegExpSetting;
+    return this.#settings.resolve(skipStackFramesPatternSettingDescriptor) as Common.Settings.RegExpSetting;
   }
 
   private setIgnoreListPatterns(debuggerModel: SDK.DebuggerModel.DebuggerModel): Promise<boolean> {
@@ -257,13 +295,24 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   private async updateScriptRanges(script: SDK.Script.Script, sourceMap: SDK.SourceMap.SourceMap|undefined):
       Promise<void> {
     let hasIgnoreListedMappings = false;
+    let artificialRanges: Array<{start: SourceRange, end: SourceRange}> = [];
     if (!this.isUserIgnoreListedURL(script.sourceURL, {isContentScript: script.isContentScript()})) {
       hasIgnoreListedMappings =
           sourceMap?.sourceURLs().some(
               url => this.isUserIgnoreListedURL(url, {isKnownThirdParty: sourceMap.hasIgnoreListHint(url)})) ??
           false;
+      // Artificial functions (compiler helpers without authored code, from encoded source map scopes) are blackboxed
+      // independently of user ignore-listing, so that stepping never stops in them. Same coordinates as the
+      // `findRanges` output below. (Not needed for ignore-listed scripts: V8 checks the blackbox patterns before the
+      // per-script ranges.)
+      if (Root.Runtime.hostConfig.devToolsSourceMapScopesInSourcesPanel?.enabled) {
+        const toSourceRange = ({line, column}: {line: number, column: number}): SourceRange =>
+            ({lineNumber: line, columnNumber: column});
+        const ranges = sourceMap?.artificialFunctionRanges() ?? [];
+        artificialRanges = ranges.map(({start, end}) => ({start: toSourceRange(start), end: toSourceRange(end)}));
+      }
     }
-    if (!hasIgnoreListedMappings) {
+    if (!hasIgnoreListedMappings && artificialRanges.length === 0) {
       if (scriptToRange.get(script) && await script.setBlackboxedRanges([])) {
         scriptToRange.delete(script);
       }
@@ -275,12 +324,13 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
       return;
     }
 
+    const userRanges = hasIgnoreListedMappings ?
+        sourceMap.findRanges(
+            srcURL => this.isUserIgnoreListedURL(srcURL, {isKnownThirdParty: sourceMap.hasIgnoreListHint(srcURL)}),
+            {isStartMatching: true}) :
+        [];
     const newRanges =
-        sourceMap
-            .findRanges(
-                srcURL => this.isUserIgnoreListedURL(srcURL, {isKnownThirdParty: sourceMap.hasIgnoreListHint(srcURL)}),
-                {isStartMatching: true})
-            .flatMap(range => [range.start, range.end]);
+        mergeSourceRanges([...userRanges, ...artificialRanges]).flatMap(range => [range.start, range.end]);
 
     const oldRanges = scriptToRange.get(script) || [];
     if (!isEqual(oldRanges, newRanges) && await script.setBlackboxedRanges(newRanges)) {
@@ -322,57 +372,57 @@ export class IgnoreListManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   }
 
   get enableIgnoreListing(): boolean {
-    return this.#settings.moduleSetting('enable-ignore-listing').get();
+    return this.#settings.resolve(enableIgnoreListingSettingDescriptor).get();
   }
 
   set enableIgnoreListing(value: boolean) {
-    this.#settings.moduleSetting('enable-ignore-listing').set(value);
+    this.#settings.resolve(enableIgnoreListingSettingDescriptor).set(value);
   }
 
   get skipContentScripts(): boolean {
-    return this.enableIgnoreListing && this.#settings.moduleSetting('skip-content-scripts').get();
+    return this.enableIgnoreListing && this.#settings.resolve(skipContentScriptsSettingDescriptor).get();
   }
 
   get skipAnonymousScripts(): boolean {
-    return this.enableIgnoreListing && this.#settings.moduleSetting('skip-anonymous-scripts').get();
+    return this.enableIgnoreListing && this.#settings.resolve(skipAnonymousScriptsSettingDescriptor).get();
   }
 
   get automaticallyIgnoreListKnownThirdPartyScripts(): boolean {
     return this.enableIgnoreListing &&
-        this.#settings.moduleSetting('automatically-ignore-list-known-third-party-scripts').get();
+        this.#settings.resolve(automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor).get();
   }
 
   ignoreListContentScripts(): void {
     if (!this.enableIgnoreListing) {
       this.enableIgnoreListing = true;
     }
-    this.#settings.moduleSetting('skip-content-scripts').set(true);
+    this.#settings.resolve(skipContentScriptsSettingDescriptor).set(true);
   }
 
   unIgnoreListContentScripts(): void {
-    this.#settings.moduleSetting('skip-content-scripts').set(false);
+    this.#settings.resolve(skipContentScriptsSettingDescriptor).set(false);
   }
 
   ignoreListAnonymousScripts(): void {
     if (!this.enableIgnoreListing) {
       this.enableIgnoreListing = true;
     }
-    this.#settings.moduleSetting('skip-anonymous-scripts').set(true);
+    this.#settings.resolve(skipAnonymousScriptsSettingDescriptor).set(true);
   }
 
   unIgnoreListAnonymousScripts(): void {
-    this.#settings.moduleSetting('skip-anonymous-scripts').set(false);
+    this.#settings.resolve(skipAnonymousScriptsSettingDescriptor).set(false);
   }
 
   ignoreListThirdParty(): void {
     if (!this.enableIgnoreListing) {
       this.enableIgnoreListing = true;
     }
-    this.#settings.moduleSetting('automatically-ignore-list-known-third-party-scripts').set(true);
+    this.#settings.resolve(automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor).set(true);
   }
 
   unIgnoreListThirdParty(): void {
-    this.#settings.moduleSetting('automatically-ignore-list-known-third-party-scripts').set(false);
+    this.#settings.resolve(automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor).set(false);
   }
 
   ignoreListURL(url: Platform.DevToolsPath.UrlString): void {
@@ -612,6 +662,26 @@ export interface SourceRange {
 }
 
 const scriptToRange = new WeakMap<SDK.Script.Script, SourceRange[]>();
+
+/** Sorts `ranges` by start and merges overlapping or touching ranges. Doesn't modify the input. */
+function mergeSourceRanges(ranges: ReadonlyArray<{readonly start: SourceRange, readonly end: SourceRange}>):
+    Array<{start: SourceRange, end: SourceRange}> {
+  const compare = (a: SourceRange, b: SourceRange): number =>
+      (a.lineNumber - b.lineNumber) || (a.columnNumber - b.columnNumber);
+  const sorted = ranges.map(({start, end}) => ({start, end})).sort((a, b) => compare(a.start, b.start));
+  const result: Array<{start: SourceRange, end: SourceRange}> = [];
+  for (const range of sorted) {
+    const last = result.at(-1);
+    if (last && compare(range.start, last.end) <= 0) {
+      if (compare(range.end, last.end) > 0) {
+        last.end = range.end;
+      }
+    } else {
+      result.push(range);
+    }
+  }
+  return result;
+}
 
 export const enum Events {
   IGNORED_SCRIPT_RANGES_UPDATED = 'IGNORED_SCRIPT_RANGES_UPDATED',

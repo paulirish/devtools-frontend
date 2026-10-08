@@ -6,8 +6,8 @@ import {assert} from 'chai';
 import type {ElementHandle} from 'puppeteer-core';
 
 import {navigateToNetworkTab} from '../helpers/network-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 interface Navigator {
   userAgentData?: {
@@ -29,11 +29,6 @@ describe('The Network Tab', () => {
     const networkConditionsButton = await devToolsPage.waitForAria('More network conditions…');
     await networkConditionsButton.click();
     return await devToolsPage.waitFor(sectionClassName);
-  }
-
-  async function assertDisabled(checkbox: ElementHandle<HTMLInputElement>, expected: boolean) {
-    const disabled = await checkbox.evaluate(el => el.disabled);
-    assert.strictEqual(disabled, expected);
   }
 
   async function assertChecked(checkbox: ElementHandle<HTMLInputElement>, expected: boolean) {
@@ -62,53 +57,8 @@ describe('The Network Tab', () => {
     return await target.evaluate(getUserAgentMetaDataStr);
   }
 
-  it('can change accepted content encodings', async ({devToolsPage, inspectedPage}) => {
-    await navigateToNetworkTab('empty.html', devToolsPage, inspectedPage);
-    const section = await openNetworkConditions(devToolsPage, '.network-config-accepted-encoding');
-    const autoCheckbox = await (await devToolsPage.waitForAria('Use browser default', section)).toElement('input');
-    const deflateCheckbox = await (await devToolsPage.waitForAria('deflate', section)).toElement('input');
-    const gzipCheckbox = await (await devToolsPage.waitForAria('gzip', section)).toElement('input');
-    const brotliCheckbox = await (await devToolsPage.waitForAria('br', section)).toElement('input');
-    await brotliCheckbox.evaluate(el => el.scrollIntoView(true));
-    await assertChecked(autoCheckbox, true);
-    await assertChecked(deflateCheckbox, true);
-    await assertChecked(gzipCheckbox, true);
-    await assertChecked(brotliCheckbox, true);
-    await assertDisabled(autoCheckbox, false);
-    await assertDisabled(deflateCheckbox, true);
-    await assertDisabled(gzipCheckbox, true);
-    await assertDisabled(brotliCheckbox, true);
-    await autoCheckbox.click();
-    await assertChecked(autoCheckbox, false);
-    await assertChecked(deflateCheckbox, true);
-    await assertChecked(gzipCheckbox, true);
-    await assertChecked(brotliCheckbox, true);
-    await assertDisabled(autoCheckbox, false);
-    await assertDisabled(deflateCheckbox, false);
-    await assertDisabled(gzipCheckbox, false);
-    await assertDisabled(brotliCheckbox, false);
-    await brotliCheckbox.click();
-    await assertChecked(autoCheckbox, false);
-    await assertChecked(deflateCheckbox, true);
-    await assertChecked(gzipCheckbox, true);
-    await assertChecked(brotliCheckbox, false);
-    await assertDisabled(autoCheckbox, false);
-    await assertDisabled(deflateCheckbox, false);
-    await assertDisabled(gzipCheckbox, false);
-    await assertDisabled(brotliCheckbox, false);
-    await autoCheckbox.click();
-    await assertChecked(autoCheckbox, true);
-    await assertChecked(deflateCheckbox, true);
-    await assertChecked(gzipCheckbox, true);
-    await assertChecked(brotliCheckbox, false);
-    await assertDisabled(autoCheckbox, false);
-    await assertDisabled(deflateCheckbox, true);
-    await assertDisabled(gzipCheckbox, true);
-    await assertDisabled(brotliCheckbox, true);
-  });
-
   it('can override userAgentMetadata', async ({browser, devToolsPage, inspectedPage}) => {
-    await navigateToNetworkTab('empty.html', devToolsPage, inspectedPage);
+    await navigateToNetworkTab(devToolsPage, inspectedPage, 'empty.html');
     const fullVersion = (await browser.browser.version()).split('/')[1];
     const majorVersion = fullVersion.split('.', 1)[0];
     const fixedVersionUAValue =
@@ -186,7 +136,7 @@ describe('The Network Tab', () => {
   });
 
   it('restores default userAgentMetadata', async ({browser, devToolsPage, inspectedPage}) => {
-    await navigateToNetworkTab('empty.html', devToolsPage, inspectedPage);
+    await navigateToNetworkTab(devToolsPage, inspectedPage, 'empty.html');
     const fullVersion = (await browser.browser.version()).split('/')[1];
     const majorVersion = fullVersion.split('.', 1)[0];
     const customUAValue = `Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${
@@ -213,7 +163,7 @@ describe('The Network Tab', () => {
   });
 
   it('can apply customized userAgentMetadata', async ({devToolsPage, inspectedPage}) => {
-    await navigateToNetworkTab('empty.html', devToolsPage, inspectedPage);
+    await navigateToNetworkTab(devToolsPage, inspectedPage, 'empty.html');
     const section = await openNetworkConditions(devToolsPage, '.network-config-ua');
     const autoCheckbox = await (await devToolsPage.waitForAria('Use browser default', section)).toElement('input');
     const uaDropdown = await devToolsPage.waitForAria('User agent', section);

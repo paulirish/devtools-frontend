@@ -7,18 +7,18 @@ import("../../../../../scripts/build/ninja/devtools_module.gni")
 import("../../../../../scripts/build/typescript/typescript.gni")
 import("../../../visibility.gni")
 
-devtools_module("core") {
+devtools_foundation_module("core") {
   sources = [
     "LanternError.ts",
     "NetworkAnalyzer.ts",
   ]
 
-  deps = [ "../types:bundle" ]
+  ts_deps = [ "../types:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "core.ts"
-  deps = [ ":core" ]
+  ts_deps = [ ":core" ]
   visibility = [
     ":*",
     "../*",
@@ -27,12 +27,12 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "NetworkAnalyzer.test.ts" ]
 
-  deps = [
+  ts_deps = [
     "../:bundle",  # Lantern bundle
     "../../:bundle",  # Trace engine bundle
     "../../../../testing",

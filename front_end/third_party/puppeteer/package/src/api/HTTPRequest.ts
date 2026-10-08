@@ -5,8 +5,10 @@
  */
 import type {Protocol} from 'devtools-protocol';
 
+import {DEBUG_PREFIXES} from '../common/Debug.js';
+import type {Logger} from '../common/Debug.js';
 import type {ProtocolError} from '../common/Errors.js';
-import {debugError, isString} from '../common/util.js';
+import {isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
 import {typedArrayToBase64} from '../util/encoding.js';
 
@@ -622,17 +624,17 @@ export function headersArray(
   headers: Record<string, string | string[]>,
 ): Array<{name: string; value: string}> {
   const result = [];
-  for (const name in headers) {
+  for (const name of Object.keys(headers)) {
     const value = headers[name];
 
-    if (!Object.is(value, undefined)) {
-      const values = Array.isArray(value) ? value : [value];
-
-      result.push(
-        ...values.map(value => {
-          return {name, value: value + ''};
-        }),
-      );
+    if (value !== undefined) {
+      if (Array.isArray(value)) {
+        for (const v of value) {
+          result.push({name, value: v + ''});
+        }
+      } else {
+        result.push({name, value: value + ''});
+      }
     }
   }
   return result;
@@ -731,7 +733,7 @@ const errorReasons: Record<ErrorCode, Protocol.Network.ErrorReason> = {
 /**
  * @internal
  */
-export function handleError(error: ProtocolError): void {
+export function handleError(error: ProtocolError, logger: Logger): void {
   // Firefox throws an invalid argument error with a message starting with
   // 'Expected "header" [...]'.
   if (
@@ -746,5 +748,5 @@ export function handleError(error: ProtocolError): void {
   // In certain cases, protocol will return error if the request was
   // already canceled or the page was closed. We should tolerate these
   // errors.
-  debugError(error);
+  logger?.(DEBUG_PREFIXES.error)?.(error);
 }

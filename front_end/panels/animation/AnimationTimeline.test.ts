@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {
-  createTarget,
-  stubNoopSettings,
-  waitFor,
-} from '../../testing/EnvironmentHelpers.js';
+import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {cleanTestDOM} from '../../testing/DOMHooks.js';
+import {createTarget, describeWithEnvironment, waitFor} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 
 import * as Animation from './animation.js';
@@ -126,12 +123,11 @@ const waitForAll = async(selector: string, root?: Element|ShadowRoot): Promise<N
   return elements || null;
 };
 
-describeWithMockConnection('AnimationTimeline', () => {
+describeWithEnvironment('AnimationTimeline', () => {
   let target: SDK.Target.Target;
   let view: Animation.AnimationTimeline.AnimationTimeline;
 
   beforeEach(() => {
-    stubNoopSettings();
     target = createTarget();
 
     const runtimeAgent = target.model(SDK.RuntimeModel.RuntimeModel)?.agent!;
@@ -152,8 +148,10 @@ describeWithMockConnection('AnimationTimeline', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     view.detach();
+    cleanTestDOM();
+    await raf();
   });
 
   const updatesUiOnEvent = (inScope: boolean) => async () => {
@@ -333,10 +331,28 @@ describeWithMockConnection('AnimationTimeline', () => {
 
         const animationNodeRow = view.element.shadowRoot!.querySelector('.animation-node-row') as HTMLElement;
         assert.exists(animationNodeRow);
+        assert.strictEqual(animationNodeRow.getAttribute('data-backend-node-id'), '1');
+        assert.strictEqual(animationNodeRow.getAttribute('data-target-id'), target.id());
         assert.isFalse(animationNodeRow.classList.contains('animation-node-removed'));
 
         domModel.dispatchEventToListeners(SDK.DOMModel.Events.NodeRemoved, {node: domNode, parent: contentDocument});
         assert.isTrue(animationNodeRow.classList.contains('animation-node-removed'));
+      });
+
+      it('sets data-backend-node-id and data-target-id on the row element when node is resolved', () => {
+        const effect = sinon.createStubInstance(SDK.AnimationModel.AnimationEffect);
+        const nodeUi = new Animation.AnimationTimeline.NodeUI(effect);
+        const domNode = SDK.DOMModel.DOMNode.create(domModel, contentDocument, false, {
+          nodeId: 2 as Protocol.DOM.NodeId,
+          backendNodeId: 123 as Protocol.DOM.BackendNodeId,
+          nodeType: Node.ELEMENT_NODE,
+          nodeName: 'div',
+          localName: 'div',
+          nodeValue: '',
+        });
+        nodeUi.nodeResolved(domNode);
+        assert.strictEqual(nodeUi.element.getAttribute('data-backend-node-id'), '123');
+        assert.strictEqual(nodeUi.element.getAttribute('data-target-id'), target.id());
       });
     });
 
@@ -466,7 +482,15 @@ describeWithMockConnection('AnimationTimeline', () => {
         preview.click();
         await waitForAnimationGroupSelectedPromise.wait();
 
-        void animationModel.animationUpdated(TIME_ANIMATION_PAYLOAD);
+        void animationModel.animationUpdated({
+          ...TIME_ANIMATION_PAYLOAD,
+          source: {
+            ...TIME_ANIMATION_PAYLOAD.source,
+            iterations: 3,
+            duration: 10,
+          },
+        });
+
         await waitForScheduleRedrawAfterAnimationGroupUpdated.wait();
         await waitForScrubberOnFinish.wait();
       });
@@ -673,7 +697,7 @@ describeWithMockConnection('AnimationTimeline', () => {
   });
 });
 
-describeWithMockConnection('AnimationTimeline', () => {
+describeWithEnvironment('AnimationTimeline', () => {
   it('shows placeholder showing that the panel is waiting for animations', async () => {
     const view = Animation.AnimationTimeline.AnimationTimeline.instance({forceNew: true});
     const placeholder = await waitFor('.animation-timeline-buffer-hint', view.element.shadowRoot!) as HTMLElement;
@@ -684,10 +708,12 @@ describeWithMockConnection('AnimationTimeline', () => {
     renderElementIntoDOM(view);
     assert.deepEqual(window.getComputedStyle(placeholder).display, 'flex');
 
-    assert.deepEqual(placeholder.querySelector('.empty-state-header')?.textContent, 'Currently waiting for animations');
-    assert.deepEqual(
-        placeholder.querySelector('.empty-state-description span')?.textContent,
-        'On this page you can inspect and modify animations.');
+    const emptyWidget = placeholder.firstElementChild as HTMLElement;
+    assert.exists(emptyWidget);
+    assert.deepEqual(emptyWidget.shadowRoot?.querySelector('.empty-state-header')?.textContent,
+                     'Currently waiting for animations');
+    assert.deepEqual(emptyWidget.shadowRoot?.querySelector('.empty-state-description span')?.textContent,
+                     'On this page you can inspect and modify animations');
 
     view.detach();
   });
@@ -716,10 +742,12 @@ describeWithMockConnection('AnimationTimeline', () => {
     assert.exists(placeholder);
 
     assert.deepEqual(window.getComputedStyle(placeholder).display, 'flex');
-    assert.deepEqual(placeholder.querySelector('.empty-state-header')?.textContent, 'No animation effect selected');
-    assert.deepEqual(
-        placeholder.querySelector('.empty-state-description span')?.textContent,
-        'Select an effect above to inspect and modify');
+    const emptyWidget = placeholder.firstElementChild as HTMLElement;
+    assert.exists(emptyWidget);
+    assert.deepEqual(emptyWidget.shadowRoot?.querySelector('.empty-state-header')?.textContent,
+                     'No animation effect selected');
+    assert.deepEqual(emptyWidget.shadowRoot?.querySelector('.empty-state-description span')?.textContent,
+                     'Select an effect above to inspect and modify');
 
     view.detach();
   });

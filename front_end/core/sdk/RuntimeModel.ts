@@ -10,6 +10,7 @@ import type * as Platform from '../platform/platform.js';
 
 import {DebuggerModel, type FunctionDetails} from './DebuggerModel.js';
 import {HeapProfilerModel} from './HeapProfilerModel.js';
+import {toStringForClipboard} from './PageFunctions.js';
 import {
   RemoteFunction,
   RemoteObject,
@@ -19,6 +20,7 @@ import {
   ScopeRemoteObject,
 } from './RemoteObject.js';
 import {SDKModel} from './SDKModel.js';
+import {customFormattersSettingDescriptor} from './SDKSettings.js';
 import {Capability, type Target, Type} from './Target.js';
 
 export class RuntimeModel extends SDKModel<EventTypes> {
@@ -32,12 +34,13 @@ export class RuntimeModel extends SDKModel<EventTypes> {
     this.target().registerRuntimeDispatcher(new RuntimeDispatcher(this));
     void this.agent.invoke_enable();
 
-    const settings = this.target().targetManager().context.get(Common.Settings.Settings);
-    if (settings.moduleSetting('custom-formatters').get()) {
+    const customFormattersSetting =
+        this.target().targetManager().context.get(Common.Settings.Settings).resolve(customFormattersSettingDescriptor);
+    if (customFormattersSetting.get()) {
       void this.agent.invoke_setCustomObjectFormatterEnabled({enabled: true});
     }
 
-    settings.moduleSetting('custom-formatters').addChangeListener(this.customFormattersStateChanged.bind(this));
+    customFormattersSetting.addChangeListener(this.customFormattersStateChanged.bind(this));
   }
 
   static isSideEffectFailure(response: Protocol.Runtime.EvaluateResponse|EvaluationResult): boolean {
@@ -311,33 +314,13 @@ export class RuntimeModel extends SDKModel<EventTypes> {
                           }])
         .then(Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
             Host.InspectorFrontendHost.InspectorFrontendHostInstance));
-
-    function toStringForClipboard(this: Object, data: {
-      subtype: string,
-      indent: string,
-    }): string|undefined {
-      const subtype = data.subtype;
-      const indent = data.indent;
-
-      if (subtype === 'node') {
-        return this instanceof Element ? this.outerHTML : undefined;
-      }
-      if (subtype && typeof this === 'undefined') {
-        return String(subtype);
-      }
-      try {
-        return JSON.stringify(this, null, indent);
-      } catch {
-        return String(this);
-      }
-    }
   }
 
   private async queryObjectsRequested(object: RemoteObject, executionContextId?: number): Promise<void> {
     const result = await this.queryObjects(object);
     object.release();
     if ('error' in result) {
-      Common.Console.Console.instance().error(result.error);
+      this.target().targetManager().getConsole().error(result.error);
       return;
     }
     this.dispatchEventToListeners(Events.QueryObjectRequested, {objects: result.objects, executionContextId});
@@ -587,12 +570,13 @@ export class ExecutionContext {
     return a.name.localeCompare(b.name);
   }
 
-  async evaluate(options: EvaluationOptions, userGesture: boolean, awaitPromise: boolean): Promise<EvaluationResult> {
+  async evaluateWithSelectedFrameFallback(options: EvaluationOptions, userGesture: boolean,
+                                          awaitPromise: boolean): Promise<EvaluationResult> {
     // FIXME: It will be moved to separate ExecutionContext.
     if (this.debuggerModel.selectedCallFrame()) {
       return await this.debuggerModel.evaluateOnSelectedCallFrame(options);
     }
-    return await this.evaluateGlobal(options, userGesture, awaitPromise);
+    return await this.evaluate(options, userGesture, awaitPromise);
   }
 
   globalObject(objectGroup: string, generatePreview: boolean): Promise<EvaluationResult> {
@@ -604,7 +588,7 @@ export class ExecutionContext {
       returnByValue: false,
       generatePreview,
     };
-    return this.evaluateGlobal((evaluationOptions as EvaluationOptions), false, false);
+    return this.evaluate((evaluationOptions as EvaluationOptions), false, false);
   }
 
   async callFunctionOn(options: CallFunctionOptions): Promise<EvaluationResult> {
@@ -627,8 +611,7 @@ export class ExecutionContext {
     return {object: this.runtimeModel.createRemoteObject(response.result), exceptionDetails: response.exceptionDetails};
   }
 
-  private async evaluateGlobal(options: EvaluationOptions, userGesture: boolean, awaitPromise: boolean):
-      Promise<EvaluationResult> {
+  async evaluate(options: EvaluationOptions, userGesture: boolean, awaitPromise: boolean): Promise<EvaluationResult> {
     if (!options.expression) {
       // There is no expression, so the completion should happen against global properties.
       options.expression = 'this';
@@ -716,6 +699,11 @@ export interface EvaluationOptions {
   replMode?: boolean;
   allowUnsafeEvalBlockedByCSP?: boolean;
   contextId?: number;
+  /**
+   * Index into `CallFrame.scopeChain()` denoting the scope in which the expression is evaluated.
+   * Defaults to 0, i.e. the inner-most scope. Only honored by `CallFrame.evaluate`.
+   */
+  scopeNumber?: number;
 }
 
 export interface CallFunctionOptions {

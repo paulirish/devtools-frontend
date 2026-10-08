@@ -35,9 +35,11 @@
  */
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Buttons from '../components/buttons/buttons.js';
 import * as Highlighting from '../components/highlighting/highlighting.js';
 import type {Icon} from '../kit/kit.js';
@@ -56,9 +58,26 @@ import {
   deepElementFromPoint,
   enclosingNodeOrSelfWithNodeNameInArray,
   HTMLElementWithLightDOMTemplate,
-  InterceptBindingDirective,
   isEditing,
 } from './UIUtils.js';
+import {Widget} from './Widget.js';
+
+const UIStrings = {
+  /**
+   * @description Screen reader announcement made when the user expands a tree item, such as a DOM
+   * node in the Elements panel. Uses a polite live region so the tree item's name, role, and
+   * position are announced before this state update.
+   */
+  expanded: 'expanded',
+  /**
+   * @description Screen reader announcement made when the user collapses a tree item, such as a DOM
+   * node in the Elements panel. Uses a polite live region so the tree item's name, role, and
+   * position are announced before this state update.
+   */
+  collapsed: 'collapsed',
+} as const;
+const str_ = i18n.i18n.registerUIStrings('ui/legacy/Treeoutline.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 const {render} = Lit;
@@ -409,11 +428,11 @@ export class TreeOutlineInShadow extends TreeOutline {
   shadowRoot: ShadowRoot;
   private readonly disclosureElement: Element;
   override renderSelection: boolean;
-  constructor(variant: TreeVariant = TreeVariant.OTHER, element?: HTMLElement) {
+  constructor(variant: TreeVariant = TreeVariant.OTHER, element?: HTMLElement, delegatesFocus?: boolean) {
     super();
     this.contentElement.classList.add('tree-outline');
     this.element = element ?? document.createElement('div');
-    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus});
     this.disclosureElement = this.shadowRoot.createChild('div', 'tree-outline-disclosure');
     this.disclosureElement.appendChild(this.contentElement);
     this.renderSelection = true;
@@ -441,6 +460,19 @@ export class TreeOutlineInShadow extends TreeOutline {
     this.contentElement.classList.toggle('tree-outline-dense', dense);
   }
 
+  setDisclosureClass(disclosureClass: string): void {
+    const isHideOverflow = this.disclosureElement.classList.contains('tree-outline-disclosure-hide-overflow');
+    this.disclosureElement.className = 'tree-outline-disclosure';
+    if (isHideOverflow) {
+      this.disclosureElement.classList.add('tree-outline-disclosure-hide-overflow');
+    }
+    for (const cls of disclosureClass.split(/\s+/)) {
+      if (cls) {
+        this.disclosureElement.classList.add(cls);
+      }
+    }
+  }
+
   override onStartedEditingTitle(treeElement: TreeElement): void {
     const selection = this.shadowRoot.getSelection();
     if (selection) {
@@ -449,7 +481,7 @@ export class TreeOutlineInShadow extends TreeOutline {
   }
 }
 
-export const treeElementBylistItemNode = new WeakMap<Node, TreeElement>();
+export const treeElementBylistItemNode: WeakMap<Node, TreeElement> = new WeakMap<Node, TreeElement>();
 export class TreeElement {
   treeOutline: TreeOutline|null;
   parent: TreeElement|null;
@@ -615,8 +647,8 @@ export class TreeElement {
       throw new Error('child can\'t be undefined or null');
     }
 
-    console.assert(
-        !child.parent, 'Attempting to insert a child that is already in the tree, reparenting is not supported.');
+    console.assert(!child.parent,
+                   'Attempting to insert a child that is already in the tree, reparenting is not supported.');
 
     const previousChild = (index > 0 ? this.childrenInternal[index - 1] : null);
     if (previousChild) {
@@ -645,6 +677,7 @@ export class TreeElement {
     for (let current = child.firstChild(); this.treeOutline && current;
          current = current.traverseNextTreeElement(false, child, true)) {
       this.treeOutline.bindTreeElement(current);
+      current.ensureSelection();
     }
     child.onattach();
     child.ensureSelection();
@@ -755,6 +788,9 @@ export class TreeElement {
 
   set selectable(x: boolean) {
     this.selectableInternal = x;
+    if (!x && this.selected) {
+      this.deselect();
+    }
   }
 
   get listItemElement(): HTMLLIElement {
@@ -826,6 +862,21 @@ export class TreeElement {
     render(icons, this.leadingIconsElement);
   }
 
+  setTrailingIcons(icons: Icon[]|Lit.TemplateResult[]): void {
+    if (!this.trailingIconsElement && !icons.length) {
+      return;
+    }
+    if (!this.trailingIconsElement) {
+      this.trailingIconsElement = document.createElement('div');
+      this.trailingIconsElement.classList.add('trailing-icons');
+      this.trailingIconsElement.classList.add('icons-container');
+      this.listItemNode.appendChild(this.trailingIconsElement);
+      this.ensureSelection();
+    }
+    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+    render(icons, this.trailingIconsElement);
+  }
+
   get tooltip(): string {
     return this.tooltipInternal;
   }
@@ -854,8 +905,8 @@ export class TreeElement {
       this.collapse();
       ARIAUtils.unsetExpandable(this.listItemNode);
     } else {
-      VisualLogging.registerLoggable(
-          this.expandLoggable, `${VisualLogging.expand()}`, this.listItemNode, new DOMRect(0, 0, 16, 16));
+      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.expand()}`, this.listItemNode,
+                                     new DOMRect(0, 0, 16, 16));
       ARIAUtils.setExpanded(this.listItemNode, false);
     }
   }
@@ -912,7 +963,7 @@ export class TreeElement {
     }
   }
 
-  private ensureSelection(): void {
+  protected ensureSelection(): void {
     if (!this.treeOutline?.renderSelection) {
       return;
     }
@@ -938,17 +989,7 @@ export class TreeElement {
       return;
     }
 
-    if (this.expanded) {
-      if (event.altKey) {
-        this.collapseRecursively();
-      } else {
-        this.collapse();
-      }
-    } else if (event.altKey) {
-      void this.expandRecursively();
-    } else {
-      this.expand();
-    }
+    void this.#setExpandedFromUser(!this.expanded, event.altKey);
     void VisualLogging.logClick(this.expandLoggable, event);
     event.consume();
   }
@@ -978,12 +1019,44 @@ export class TreeElement {
       return;
     }
 
+    if (event.defaultPrevented) {
+      return;
+    }
+
     const handled = this.ondblclick(event);
     if (handled) {
       return;
     }
     if (this.expandable && !this.expanded) {
-      this.expand();
+      void this.#setExpandedFromUser(true, false);
+      // An inline editor or other interactive child may already hold the focus
+      // inside this row; expanding must not take it away from them.
+      if (!this.listItemElement.hasFocus()) {
+        this.listItemElement.focus();
+      }
+    }
+  }
+
+  async #setExpandedFromUser(shouldExpand: boolean, recursively: boolean): Promise<void> {
+    const wasExpanded = this.expanded;
+    if (shouldExpand) {
+      if (recursively) {
+        await this.expandRecursively();
+      } else {
+        this.expand();
+      }
+    } else if (recursively) {
+      this.collapseRecursively();
+    } else {
+      this.collapse();
+    }
+
+    // When a tree item stays focused, VoiceOver on macOS does not announce the updated
+    // `aria-expanded` state, leaving the user without feedback. Other screen readers announce it
+    // natively, so restrict this live-region announcement to macOS to avoid announcing the state
+    // twice elsewhere.
+    if (this.expanded !== wasExpanded && Host.Platform.isMac()) {
+      ARIAUtils.LiveAnnouncer.status(this.expanded ? i18nString(UIStrings.expanded) : i18nString(UIStrings.collapsed));
     }
   }
 
@@ -1079,11 +1152,7 @@ export class TreeElement {
 
   collapseOrAscend(altKey: boolean): boolean {
     if (this.expanded && this.collapsible) {
-      if (altKey) {
-        this.collapseRecursively();
-      } else {
-        this.collapse();
-      }
+      void this.#setExpandedFromUser(false, altKey);
       return true;
     }
 
@@ -1114,11 +1183,7 @@ export class TreeElement {
     }
 
     if (!this.expanded) {
-      if (altKey) {
-        void this.expandRecursively();
-      } else {
-        this.expand();
-      }
+      void this.#setExpandedFromUser(true, altKey);
       return true;
     }
 
@@ -1243,9 +1308,9 @@ export class TreeElement {
     }
   }
 
-  revealAndSelect(omitFocus?: boolean): void {
+  revealAndSelect(omitFocus?: boolean, selectedByUser?: boolean): void {
     this.reveal(true);
-    this.select(omitFocus);
+    this.select(omitFocus, selectedByUser ?? false);
   }
 
   deselect(): void {
@@ -1276,15 +1341,13 @@ export class TreeElement {
   }
 
   onenter(): boolean {
-    if (this.expandable && !this.expanded) {
-      this.expand();
-      return true;
+    // Expanding requires an expandable node; collapsing requires a collapsible one.
+    const canToggle = this.expanded ? this.collapsible : this.expandable;
+    if (!canToggle) {
+      return false;
     }
-    if (this.collapsible && this.expanded) {
-      this.collapse();
-      return true;
-    }
-    return false;
+    void this.#setExpandedFromUser(!this.expanded, false);
+    return true;
   }
 
   ondelete(): boolean {
@@ -1377,9 +1440,8 @@ export class TreeElement {
       if (!dontPopulate) {
         void element.populateIfNeeded();
       }
-      element =
-          (skipUnrevealed ? (element.revealed() && element.expanded ? element.lastChild() : null) :
-                            element.lastChild());
+      element = (skipUnrevealed ? (element.revealed() && element.expanded ? element.lastChild() : null) :
+                                  element.lastChild());
     }
 
     if (element) {
@@ -1412,8 +1474,8 @@ function hasBooleanAttribute(element: Element, name: string): boolean {
   return element.hasAttribute(name) && element.getAttribute(name) !== 'false';
 }
 
-interface TreeNode<NodeT> {
-  children(): NodeT[];
+export interface TreeNode<NodeT> {
+  treeNodeChildren(): Iterable<NodeT>;
 }
 
 export interface TreeSearchResult<NodeT> {
@@ -1423,15 +1485,21 @@ export interface TreeSearchResult<NodeT> {
 }
 
 export class TreeSearch < NodeT extends TreeNode<NodeT>,
-                                        SearchResultT extends TreeSearchResult<NodeT >= TreeSearchResult<NodeT>> {
+                                        SearchResultT extends TreeSearchResult<NodeT >= TreeSearchResult<NodeT>> extends
+    Common.ObjectWrapper.ObjectWrapper<TreeSearch.EventTypes> {
   #matches: SearchResultT[] = [];
   #currentMatchIndex = 0;
   #nodeMatchMap: WeakMap<NodeT, SearchResultT[]>|undefined;
 
-  reset(): void {
+  #reset(): void {
     this.#matches = [];
     this.#nodeMatchMap = undefined;
     this.#currentMatchIndex = 0;
+  }
+
+  reset(): void {
+    this.#reset();
+    this.dispatchEventToListeners(TreeSearch.Events.SEARCH_CHANGED);
   }
 
   currentMatch(): SearchResultT|undefined {
@@ -1457,8 +1525,8 @@ export class TreeSearch < NodeT extends TreeNode<NodeT>,
     return this.#getNodeMatchMap().get(node) ?? [];
   }
 
-  static highlight(ranges: TextUtils.TextRange.SourceRange[], selectedRange: TextUtils.TextRange.SourceRange|undefined):
-      ReturnType<typeof Lit.Directives.ref> {
+  static highlight(ranges: TextUtils.TextRange.SourceRange[],
+                   selectedRange: TextUtils.TextRange.SourceRange|undefined): ReturnType<typeof Lit.Directives.ref> {
     return Lit.Directives.ref(element => {
       if (!(element instanceof HTMLElement)) {
         return;
@@ -1466,8 +1534,8 @@ export class TreeSearch < NodeT extends TreeNode<NodeT>,
       const configListItem = element.closest<HTMLLIElement>('li[role="treeitem"]');
       const titleElement = configListItem ? TreeViewTreeElement.get(configListItem)?.titleElement : undefined;
       if (configListItem && titleElement) {
-        const targetElement = HTMLElementWithLightDOMTemplate.findCorrespondingElement(
-            element, configListItem, titleElement as HTMLElement);
+        const targetElement = HTMLElementWithLightDOMTemplate.findCorrespondingElement(element, configListItem,
+                                                                                       titleElement as HTMLElement);
         if (targetElement) {
           Highlighting.HighlightManager.HighlightManager.instance().set(targetElement, ranges, selectedRange);
         }
@@ -1482,19 +1550,20 @@ export class TreeSearch < NodeT extends TreeNode<NodeT>,
 
   next(): SearchResultT|undefined {
     this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex + 1, this.#matches.length);
+    this.dispatchEventToListeners(TreeSearch.Events.SEARCH_CHANGED);
     return this.currentMatch();
   }
 
   prev(): SearchResultT|undefined {
     this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex - 1, this.#matches.length);
+    this.dispatchEventToListeners(TreeSearch.Events.SEARCH_CHANGED);
     return this.currentMatch();
   }
 
   // This is a generator to sidestep stack overflow risks
   *
-      #innerSearch(
-          node: NodeT, currentMatch: SearchResultT|undefined, jumpBackwards: boolean,
-          match: (node: NodeT, isPostOrder: boolean) => SearchResultT[]): Generator<SearchResultT> {
+      #innerSearch(node: NodeT, currentMatch: SearchResultT|undefined, jumpBackwards: boolean,
+                   match: (node: NodeT, isPostOrder: boolean) => SearchResultT[]): Generator<SearchResultT> {
     const updateCurrentMatchIndex = (isPostOrder: boolean): void => {
       if (currentMatch?.node === node && currentMatch.isPostOrderMatch === isPostOrder) {
         // We're current matching the node that contains the currently focused search result, the n-th result
@@ -1514,7 +1583,7 @@ export class TreeSearch < NodeT extends TreeNode<NodeT>,
     this.#matches.push(...preOrderMatches);
     updateCurrentMatchIndex(/* isPostOrder=*/ false);
     yield* preOrderMatches.values();
-    for (const child of node.children()) {
+    for (const child of node.treeNodeChildren()) {
       yield* this.#innerSearch(child, currentMatch, jumpBackwards, match);
     }
     const postOrderMatches = match(node, /* isPostOrder=*/ true);
@@ -1525,23 +1594,33 @@ export class TreeSearch < NodeT extends TreeNode<NodeT>,
 
   search(node: NodeT, jumpBackwards: boolean, match: (node: NodeT, isPostOrder: boolean) => SearchResultT[]): number {
     const currentMatch = this.currentMatch();
-    this.reset();
+    this.#reset();
     // eslint-disable-next-line @typescript-eslint/naming-convention,@typescript-eslint/no-unused-vars
     for (const _ of this.#innerSearch(node, currentMatch, jumpBackwards, match)) {
       // run the generator
     }
     this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex, this.#matches.length);
+    this.dispatchEventToListeners(TreeSearch.Events.SEARCH_CHANGED);
     return this.#matches.length;
   }
 }
 
+export namespace TreeSearch {
+  export const enum Events {
+    SEARCH_CHANGED = 'SearchChanged',
+  }
+
+  export interface EventTypes {
+    [Events.SEARCH_CHANGED]: void;
+  }
+}
+
 class TreeViewTreeElement extends TreeElement {
-  static readonly CLONED_ATTRIBUTES = SDK.DOMModel.ARIA_ATTRIBUTES.union(new Set(['jslog']));
+  static readonly CLONED_ATTRIBUTES = SDK.DOMModel.ARIA_ATTRIBUTES.union(new Set(['jslog', 'draggable', 'style']));
   #clonedAttributes = new Set<string>();
   #clonedClasses = new Set<string>();
-  #userExpanded = false;
-  #isProcessingAttribute = false;
   #previousOpenAttributeValue?: string|null;
+  #refreshScheduled = false;
 
   static #elementToTreeElement = new WeakMap<Node, TreeViewTreeElement>();
   readonly configElement: HTMLLIElement;
@@ -1553,54 +1632,53 @@ class TreeViewTreeElement extends TreeElement {
     this.refresh();
   }
 
-  override onexpand(): void {
-    if (!this.#isProcessingAttribute) {
-      this.#userExpanded = true;
-    }
-  }
-
-  override oncollapse(): void {
-    if (!this.#isProcessingAttribute) {
-      this.#userExpanded = false;
-    }
-  }
-
   updateExpansionFromAttribute(): void {
-    this.#isProcessingAttribute = true;
-    try {
-      const openAttr = this.configElement.getAttribute('open');
-      if (openAttr === this.#previousOpenAttributeValue) {
-        return;
-      }
-      this.#previousOpenAttributeValue = openAttr;
-      if (openAttr === null) {
-        if (this.#userExpanded) {
-          this.expand();
-        } else {
-          this.collapse();
-        }
-      } else if (openAttr === 'false') {
-        this.collapse();
-      } else {
-        this.expand();
-      }
-    } finally {
-      this.#isProcessingAttribute = false;
+    if (!this.isExpandable()) {
+      this.#previousOpenAttributeValue = undefined;
+      return;
+    }
+    const openAttr = this.configElement.getAttribute('open');
+    if (openAttr === this.#previousOpenAttributeValue) {
+      return;
+    }
+    this.#previousOpenAttributeValue = openAttr;
+    if (openAttr !== null && openAttr !== 'false') {
+      this.expand();
+    } else {
+      this.collapse();
     }
   }
 
-  refresh(): void {
-    const expandable = Boolean(this.configElement.querySelector('ul[role="group"]'));
+  refreshSoon(): void {
+    if (this.#refreshScheduled) {
+      return;
+    }
+    this.#refreshScheduled = true;
+    queueMicrotask(() => {
+      if (this.#refreshScheduled) {
+        this.refresh();
+      }
+    });
+  }
+
+  flushPendingRefreshForTesting(): void {
+    if (this.#refreshScheduled) {
+      this.refresh();
+    }
+  }
+
+  updateAttributes(): void {
+    const expandable = Boolean(this.configElement.querySelector(':scope > ul[role="group"]'));
     this.setExpandable(expandable);
 
-    this.titleElement.textContent = '';
     this.#clonedAttributes.forEach(attr => this.listItemElement.attributes.removeNamedItem(attr));
     this.#clonedClasses.forEach(className => this.listItemElement.classList.remove(className));
     this.#clonedAttributes.clear();
     this.#clonedClasses.clear();
     for (let i = 0; i < this.configElement.attributes.length; ++i) {
       const attribute = this.configElement.attributes.item(i);
-      if (attribute && attribute.name !== 'role' && TreeViewTreeElement.CLONED_ATTRIBUTES.has(attribute.name)) {
+      if (attribute && attribute.name !== 'role' &&
+          (TreeViewTreeElement.CLONED_ATTRIBUTES.has(attribute.name) || attribute.name.startsWith('data-'))) {
         this.listItemElement.setAttribute(attribute.name, attribute.value);
         this.#clonedAttributes.add(attribute.name);
       }
@@ -1609,7 +1687,20 @@ class TreeViewTreeElement extends TreeElement {
       this.listItemElement.classList.add(className);
       this.#clonedClasses.add(className);
     }
-    InterceptBindingDirective.setEventListeners(this.configElement, this.listItemElement);
+    this.hidden = hasBooleanAttribute(this.configElement, 'hidden');
+    this.selectable =
+        !this.configElement.hasAttribute('selectable') || hasBooleanAttribute(this.configElement, 'selectable');
+    this.updateExpansionFromAttribute();
+  }
+
+  refresh(): void {
+    this.#refreshScheduled = false;
+    const hadFocus = this.listItemElement.hasFocus();
+    this.titleElement.textContent = '';
+    this.updateAttributes();
+    const childUl = this.configElement.querySelector(':scope > ul[role="group"]');
+    const templateElements = childUl ? [this.configElement, childUl] : [this.configElement];
+    Lit.CustomDirectives.InterceptBindingDirective.setEventListeners(templateElements, this.listItemElement);
 
     for (const child of this.configElement.childNodes) {
       if (child instanceof HTMLUListElement && child.role === 'group') {
@@ -1619,19 +1710,37 @@ class TreeViewTreeElement extends TreeElement {
     }
 
     this.hidden = hasBooleanAttribute(this.configElement, 'hidden');
+    this.toggleOnClick = hasBooleanAttribute(this.configElement, 'toggle-on-click');
     this.updateExpansionFromAttribute();
 
     Highlighting.HighlightManager.HighlightManager.instance().apply(this.titleElement);
+    if (hadFocus && this.selected) {
+      this.listItemElement.focus();
+    }
   }
 
   static get(configElement: Node|undefined): TreeViewTreeElement|undefined {
     return configElement && TreeViewTreeElement.#elementToTreeElement.get(configElement);
   }
 
-  remove(): void {
-    removeNode(
-        this,
-        Boolean(this.parent && (this.parent as TreeViewTreeElement).configElement?.querySelector('ul[role="group"]')));
+  override onselect(selectedByUser?: boolean): boolean {
+    this.listItemElement.dispatchEvent(new TreeViewElement.SelectEvent({selectedByUser: Boolean(selectedByUser)}));
+    return super.onselect(selectedByUser);
+  }
+
+  override onenter(): boolean {
+    const enterEvent = new TreeViewElement.EnterEvent();
+    const shouldExpand = this.listItemElement.dispatchEvent(enterEvent);
+    if (!shouldExpand) {
+      return false;
+    }
+    return super.onenter();
+  }
+
+  removeFromTree(): void {
+    removeNode(this,
+               Boolean(this.parent &&
+                       (this.parent as TreeViewTreeElement).configElement?.querySelector(':scope > ul[role="group"]')));
     TreeViewTreeElement.#elementToTreeElement.delete(this.configElement);
   }
 }
@@ -1646,7 +1755,7 @@ function getTreeNodes(nodeList: NodeList|Node[]): Array<HTMLLIElement|TreeElemen
           return [
             node,
             ...node.querySelectorAll<HTMLLIElement|TreeElementWrapper>(
-                'ul[role="group"] li[role="treeitem"],ul[role="group"] devtools-tree-wrapper')
+                'ul[role="group"] li[role="treeitem"],ul[role="group"] devtools-tree-wrapper'),
           ];
         }
         if (node instanceof HTMLElement) {
@@ -1736,10 +1845,10 @@ function removeNode(node: TreeElement, preserveParentExpandable = false): void {
  * This section is only relevant if NOT using the `template`.
  *
  * Since config elements are cloned into the shadow DOM, it's not possible to directly attach event listeners to the
- * children of config elements. Instead, the `UI.UIUtils.InterceptBindingDirective` directive needs to be used as a
+ * children of config elements. Instead, the `Lit.CustomDirectives.InterceptBindingDirective` directive needs to be used as a
  * wrapper:
  * ```
- * const on = Lit.Directive.directive(UI.UIUtils.InterceptBindingDirective);
+ * const on = Lit.Directive.directive(Lit.CustomDirectives.InterceptBindingDirective);
  *
  * html`<li role="treeitem">
  *   <button @click=${on(clickHandler)}>click me</button>
@@ -1752,15 +1861,25 @@ function removeNode(node: TreeElement, preserveParentExpandable = false): void {
  * @attribute hide-overflow
  */
 export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
-  static readonly observedAttributes =
-      ['navigation-variant', 'hide-overflow', 'dense', 'show-selection-on-keyboard-focus'];
-  readonly #treeOutline = new TreeOutlineInShadow(undefined, this);
+  static readonly observedAttributes: string[] =
+      ['navigation-variant', 'hide-overflow', 'dense', 'show-selection-on-keyboard-focus', 'disclosure-class'];
+  readonly #treeOutline = new TreeOutlineInShadow(undefined, this, true);
+  readonly #syncedTreeClasses = new Set<string>();
 
   constructor() {
     super();
-    this.#treeOutline.addEventListener(Events.ElementSelected, event => {
-      if (event.data instanceof TreeViewTreeElement) {
-        event.data.listItemElement.dispatchEvent(new TreeViewElement.SelectEvent());
+    this.#treeOutline.contentElement.removeAttribute('jslog');
+    if (!this.hasAttribute('jslog')) {
+      this.setAttribute('jslog', `${VisualLogging.tree()}`);
+    }
+    if (this.hasAttribute('disclosure-class')) {
+      this.#treeOutline.setDisclosureClass(this.getAttribute('disclosure-class') ?? '');
+    }
+    this.addEventListener('focusin', (event: Event) => {
+      const actualTarget = event.composedPath()[0];
+      if (actualTarget === this.#treeOutline.contentElement && !this.#treeOutline.selectedTreeElement &&
+          this.#treeOutline.firstChild()) {
+        this.#treeOutline.firstChild()?.select(/* omitFocus */ true, /* selectedByUser */ false);
       }
     });
     this.#treeOutline.addEventListener(Events.ElementExpanded, event => {
@@ -1784,28 +1903,81 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
     return this.#treeOutline;
   }
 
+  flushPendingUpdatesForTesting(): void {
+    this.flushPendingMutationsForTesting();
+    const stack: TreeElement[] = [...this.#treeOutline.rootElement().children()];
+    while (stack.length > 0) {
+      const item = stack.pop();
+      if (!item) {
+        continue;
+      }
+      if (item instanceof TreeViewTreeElement) {
+        item.flushPendingRefreshForTesting();
+      }
+      if (item.children()) {
+        stack.push(...item.children());
+      }
+    }
+    for (const widgetEl of this.#treeOutline.shadowRoot.querySelectorAll('devtools-widget')) {
+      void Widget.get(widgetEl)?.performUpdate();
+    }
+  }
+
+  override focus(): void {
+    if (!this.#treeOutline.selectedTreeElement && this.#treeOutline.firstChild()) {
+      this.#treeOutline.firstChild()?.select(/* omitFocus */ true, /* selectedByUser */ false);
+    } else {
+      this.#treeOutline.focus();
+    }
+  }
+
   #getParentTreeElement(element: HTMLLIElement|TreeElementWrapper):
-      {treeElement: TreeElement, expanded: boolean, classes: DOMTokenList}|null {
+      {treeElement: TreeElement, expanded: boolean, classes: DOMTokenList, attributes?: NamedNodeMap}|null {
     const subtreeRoot = element.parentElement;
     if (!(subtreeRoot instanceof HTMLUListElement)) {
       return null;
     }
     if (subtreeRoot.role === 'tree') {
-      return {treeElement: this.#treeOutline.rootElement(), expanded: false, classes: subtreeRoot.classList};
+      return {
+        treeElement: this.#treeOutline.rootElement(),
+        expanded: false,
+        classes: subtreeRoot.classList,
+        attributes: subtreeRoot.attributes,
+      };
     }
     if (subtreeRoot.role !== 'group' || !subtreeRoot.parentElement) {
       return null;
     }
     const treeElement = TreeViewTreeElement.get(subtreeRoot.parentElement);
     const expanded = treeElement ? treeElement.expanded : hasBooleanAttribute(subtreeRoot.parentElement, 'open');
-    return treeElement ? {expanded, treeElement, classes: subtreeRoot.classList} : null;
+    return treeElement ? {expanded, treeElement, classes: subtreeRoot.classList, attributes: subtreeRoot.attributes} :
+                         null;
   }
 
   protected override updateNode(node: Node, attributeName: string|null): void {
-    while (node?.parentNode && !(node instanceof HTMLElement)) {
-      node = node.parentNode;
+    if (node instanceof HTMLUListElement && node.role === 'tree') {
+      if (attributeName === null || attributeName === 'class') {
+        for (const cls of this.#syncedTreeClasses) {
+          if (!node.classList.contains(cls)) {
+            this.#treeOutline.contentElement.classList.remove(cls);
+          }
+        }
+        this.#syncedTreeClasses.clear();
+        for (const cls of node.classList) {
+          if (cls) {
+            this.#syncedTreeClasses.add(cls);
+            this.#treeOutline.contentElement.classList.add(cls);
+          }
+        }
+        this.#treeOutline.contentElement.classList.add('tree-outline');
+      }
+      return;
     }
-    const treeNode = node instanceof HTMLElement ? node.closest('li[role="treeitem"]') : null;
+    let current: Node|null = node;
+    while (current?.parentNode && !(current instanceof HTMLElement)) {
+      current = current.parentNode;
+    }
+    const treeNode = current instanceof HTMLElement ? current.closest('li[role="treeitem"]') : null;
     if (!treeNode) {
       return;
     }
@@ -1813,16 +1985,20 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
     if (!treeElement) {
       return;
     }
-    treeElement.refresh();
-    if (node === treeNode && attributeName === 'selected' && hasBooleanAttribute(treeNode, 'selected')) {
-      treeElement.revealAndSelect(true);
+    if (node === treeNode) {
+      treeElement.updateAttributes();
+      if (attributeName === 'selected' && hasBooleanAttribute(treeNode, 'selected')) {
+        treeElement.revealAndSelect(true);
+      }
+      return;
     }
-    if (node === treeNode && attributeName === 'open') {
-      treeElement.updateExpansionFromAttribute();
+    if (node === treeNode && attributeName === 'toggle-on-click') {
+      treeElement.toggleOnClick = hasBooleanAttribute(treeNode, 'toggle-on-click');
     }
+    treeElement.refreshSoon();
   }
 
-  protected override addNodes(nodes: NodeList|Node[], nextSibling?: Node|null): void {
+  protected override addNodes(nodes: NodeList|Node[]): void {
     for (const node of getTreeNodes(nodes)) {
       if (TreeViewTreeElement.get(node)) {
         continue;  // Not sure this can happen
@@ -1833,16 +2009,29 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
       }
       if (parent.treeElement.childCount() === 0) {
         parent.treeElement.childrenListElement.classList.add(...parent.classes.values());
+        for (const attr of parent.attributes || []) {
+          if (attr.name !== 'role' && attr.name !== 'class') {
+            parent.treeElement.childrenListElement.setAttribute(attr.name, attr.value);
+          }
+        }
       }
-      while (nextSibling && nextSibling.nodeType !== Node.ELEMENT_NODE) {
-        nextSibling = nextSibling.nextSibling;
+      let nextElement: TreeElement|null = null;
+      for (let e: Element|null = node.nextElementSibling; e; e = e.nextElementSibling) {
+        const nextTreeEl = TreeViewTreeElement.get(e);
+        if (nextTreeEl) {
+          nextElement = nextTreeEl;
+          break;
+        }
+        if (e instanceof TreeElementWrapper && e.treeElement && e.treeElement.parent === parent.treeElement) {
+          nextElement = e.treeElement;
+          break;
+        }
       }
-      const nextElement = nextSibling ? TreeViewTreeElement.get(nextSibling) : null;
       const index = nextElement ? parent.treeElement.indexOfChild(nextElement) : parent.treeElement.children().length;
       let treeElement;
       if (node instanceof HTMLLIElement) {
         treeElement = new TreeViewTreeElement(this.#treeOutline, node);
-        const expandable = Boolean(node.querySelector('ul[role="group"]'));
+        const expandable = Boolean(node.querySelector(':scope > ul[role="group"]'));
         treeElement.setExpandable(expandable);
         treeElement.updateExpansionFromAttribute();
       } else {
@@ -1853,6 +2042,9 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
           removeNode(treeElement);
         }
         parent.treeElement.insertChild(treeElement, index);
+        if (parent.treeElement instanceof TreeViewTreeElement) {
+          parent.treeElement.updateExpansionFromAttribute();
+        }
         if (hasBooleanAttribute(node, 'selected')) {
           treeElement.revealAndSelect(true);
         }
@@ -1861,21 +2053,20 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
         }
       }
     }
-    for (const element of getStyleElements(nodes)) {
+    for (const element of new Set(getStyleElements(nodes))) {
       this.#treeOutline.shadowRoot.appendChild(element.cloneNode(true));
     }
   }
 
-  protected override removeNodes(nodes: NodeList): void {
+  protected override removeNodes(nodes: NodeList|Node[]): void {
     for (const node of getTreeNodes(nodes)) {
       if (node instanceof HTMLLIElement) {
-        TreeViewTreeElement.get(node)?.remove();
+        TreeViewTreeElement.get(node)?.removeFromTree();
       } else if (node.treeElement) {
-        removeNode(
-            node.treeElement,
-            Boolean(
-                node.treeElement.parent &&
-                (node.treeElement.parent as TreeViewTreeElement).configElement?.querySelector('ul[role="group"]')));
+        removeNode(node.treeElement,
+                   Boolean(node.treeElement.parent &&
+                           (node.treeElement.parent as TreeViewTreeElement)
+                               .configElement?.querySelector(':scope > ul[role="group"]')));
       }
     }
   }
@@ -1922,20 +2113,29 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
       case 'show-selection-on-keyboard-focus':
         this.#treeOutline.setShowSelectionOnKeyboardFocus(booleanValueIsTrue);
         break;
+      case 'disclosure-class':
+        this.#treeOutline.setDisclosureClass(newValue ?? '');
+        break;
     }
   }
 }
 
 export namespace TreeViewElement {
-  export class SelectEvent extends CustomEvent<void> {
-    constructor() {
-      super('select');
+  export class SelectEvent extends CustomEvent<{selectedByUser?: boolean}> {
+    constructor(detail?: {selectedByUser?: boolean}) {
+      super('select', {detail});
     }
   }
 
   export class ExpandEvent extends CustomEvent<{expanded: boolean}> {
     constructor(detail: {expanded: boolean}) {
       super('expand', {detail});
+    }
+  }
+
+  export class EnterEvent extends CustomEvent<void> {
+    constructor() {
+      super('enter', {bubbles: true, cancelable: true, composed: true});
     }
   }
 
@@ -1959,8 +2159,15 @@ class IfExpandedDirective extends Lit.Directive.Directive {
     this.#partInfo = partInfo as {type: Lit.Directive.PartType, startNode: Node};
   }
 
-  render(content: Lit.LitTemplate|Iterable<Lit.LitTemplate>): Lit.LitTemplate|Iterable<Lit.LitTemplate> {
-    return this.#isInExpandedRow(this.#partInfo.startNode) ? content : Lit.nothing;
+  render(content: Lit.LitTemplate|Iterable<Lit.LitTemplate>|
+         (() => Lit.LitTemplate | Iterable<Lit.LitTemplate>)): Lit.LitTemplate|Iterable<Lit.LitTemplate> {
+    if (!this.#isInExpandedRow(this.#partInfo.startNode)) {
+      return Lit.nothing;
+    }
+    if (typeof content === 'function') {
+      return content();
+    }
+    return content;
   }
 
   #isInExpandedRow(element: Node|null|undefined): boolean {
@@ -1987,11 +2194,16 @@ class IfExpandedDirective extends Lit.Directive.Directive {
     return node.expanded;
   }
 }
-export const ifExpanded = Lit.Directive.directive(IfExpandedDirective);
+export const ifExpanded:
+    (content: Lit.LitTemplate|Iterable<Lit.LitTemplate>|(() => Lit.LitTemplate | Iterable<Lit.LitTemplate>)) =>
+        Lit.DirectiveResult<typeof IfExpandedDirective> = Lit.Directive.directive(IfExpandedDirective);
 
 export class TreeElementWrapper extends HTMLElement {
   #treeElement?: TreeElement;
   set treeElement(treeElement: TreeElement) {
+    if (this.#treeElement === treeElement) {
+      return;
+    }
     if (this.#treeElement?.parent) {
       const parent = this.#treeElement.parent;
       const index = parent.indexOfChild(this.#treeElement);

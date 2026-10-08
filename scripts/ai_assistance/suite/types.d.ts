@@ -2,39 +2,49 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-export interface ProcessedQuery {
-  request: {
-    availableFunctionNames: string[],
-    // Populated if the user typed a query
-    prompt?: string,
-    // Populated if the model decided it needed to call a function; this is the
-    // frontend sending the data back to the server.
-    functionCallResponse?: string,
-  };
-  response: {
-    rpcGlobalId: string,
-    // Populated if the LLM returned a text explanation that was complete.
-    text?: string,
-    // Populated as the name of the functions if the LLM requested it to be called
-    functionCallRequests?: Array<{name: string, args: Record<string, unknown>}>,
-  };
+import type {SessionId, TaskId} from '../types.d.ts';
+
+/* eslint-disable @typescript-eslint/naming-convention */
+export interface Turn {
+  turn_id: string;
+  role: 'user'|'gemini';
+  timestamp: number;
+  tokens: Record<string, never>;
+  content: string[];
+  thoughts: Array<{
+    subject: string,
+    description: string,
+    timestamp: number,
+  }>;
+  tool_calls: Array<{
+    name: string,
+    args: Record<string, unknown>,
+    timestamp: number,
+    status?: 'success'|'error',
+    result?: unknown,
+  }>;
 }
 
-export interface EvalFileOutput {
+/**
+ * Represents the evaluation output format for a single conversation session,
+ * containing metadata and the query/response turns.
+ */
+export interface Trajectory {
   metadata: {
-    createdAt: string,
-    id: string,
+    /**
+     * Deterministic identifier for this trajectory session (`<15-char-hash>-<index>`,
+     * e.g. `'07a8fb33eca1976-0'`), used in HTML reports and `.eval.json` filenames.
+     */
+    session_id: SessionId,
+    /** LLM model identifier resolved by AIDA (e.g. `'gemini-2.5-pro'`). */
+    model: string,
+    chrome_version: string,
+    /**
+     * Identifies the auto-run task/example that produced this trajectory (e.g. `'life-with-charlie'`).
+     * Matches `task_id` in `eval_task_completed.json` and the GCS `tasks/<taskId>/` directory.
+     */
+    task_id: TaskId,
   };
-  conversations: Conversation[];
+  data: Turn[];
 }
-
-export interface Conversation {
-  id: string;
-  chromeVersion: string;
-  autoRunExampleId: string;
-  // These are explanations found in the input example HTML that can be used to
-  // judge the AI's output.
-  explanation: string;
-  model: {id: string, version: string};
-  queries: ProcessedQuery[];
-}
+/* eslint-enable @typescript-eslint/naming-convention */

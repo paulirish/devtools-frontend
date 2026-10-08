@@ -14,12 +14,23 @@ import {DeferredDOMNode, DOMModel, type DOMNode, DOMNodeEvents, Events as DOMMod
 import {OverlayPersistentHighlighter} from './OverlayPersistentHighlighter.js';
 import type {RemoteObject} from './RemoteObject.js';
 import {SDKModel} from './SDKModel.js';
+import {
+  apcaSettingDescriptor,
+  disablePausedStateOverlaySettingDescriptor,
+  showAdHighlightsSettingDescriptor,
+  showDebugBordersSettingDescriptor,
+  showFPSCounterSettingDescriptor,
+  showLayoutShiftRegionsSettingDescriptor,
+  showMetricsRulersSettingDescriptor,
+  showPaintRectsSettingDescriptor,
+  showScrollBottleneckRectsSettingDescriptor,
+} from './SDKSettings.js';
 import {Capability, type Target} from './Target.js';
-import {TargetManager} from './TargetManager.js';
+import type {TargetManager} from './TargetManager.js';
 
 const UIStrings = {
   /**
-   * @description Text in Overlay Model
+   * @description Overlay message indicating that execution is paused in the debugger.
    */
   pausedInDebugger: 'Paused in debugger',
 } as const;
@@ -49,6 +60,19 @@ export interface Hinge {
   contentColor: HighlightColor;
   outlineColor: HighlightColor;
 }
+export interface BaseDisplayCutout {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  shape: Protocol.Overlay.DisplayCutoutShape;
+  contentColor?: HighlightColor;
+}
+export type DisplayCutout =
+    BaseDisplayCutout&({shape: Protocol.Overlay.DisplayCutoutShape.Rectangle}|
+                       {shape: Protocol.Overlay.DisplayCutoutShape.Pill, borderRadius: number}|
+                       {shape: Protocol.Overlay.DisplayCutoutShape.Notch, upperRadius: number, lowerRadius: number}|
+                       {shape: Protocol.Overlay.DisplayCutoutShape.Circle, cx: number, cy: number, radius: number});
 
 export const enum EmulatedOSType {
   WINDOWS = 'Windows',
@@ -73,7 +97,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
   overlayAgent: ProtocolProxyApi.OverlayApi;
   readonly #debuggerModel: DebuggerModel|null;
   #inspectModeEnabled = false;
-  #hideHighlightTimeout: number|null = null;
+  #hideHighlightTimeout?: ReturnType<typeof setTimeout>;
   #defaultHighlighter: Highlighter;
   #highlighter: Highlighter;
   #showPaintRectsSetting: Common.Settings.Setting<boolean>;
@@ -99,7 +123,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     const settings = this.target().targetManager().settings;
     this.#debuggerModel = target.model(DebuggerModel);
     if (this.#debuggerModel) {
-      settings.moduleSetting('disable-paused-state-overlay')
+      settings.resolve(disablePausedStateOverlaySettingDescriptor)
           .addChangeListener(this.updatePausedInDebuggerMessage, this);
       this.#debuggerModel.addEventListener(
           DebuggerModelEvents.DebuggerPaused, this.updatePausedInDebuggerMessage, this);
@@ -113,12 +137,12 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     this.#defaultHighlighter = new DefaultHighlighter(this);
     this.#highlighter = this.#defaultHighlighter;
 
-    this.#showPaintRectsSetting = settings.moduleSetting<boolean>('show-paint-rects');
-    this.#showLayoutShiftRegionsSetting = settings.moduleSetting<boolean>('show-layout-shift-regions');
-    this.#showAdHighlightsSetting = settings.moduleSetting<boolean>('show-ad-highlights');
-    this.#showDebugBordersSetting = settings.moduleSetting<boolean>('show-debug-borders');
-    this.#showFPSCounterSetting = settings.moduleSetting<boolean>('show-fps-counter');
-    this.#showScrollBottleneckRectsSetting = settings.moduleSetting<boolean>('show-scroll-bottleneck-rects');
+    this.#showPaintRectsSetting = settings.resolve(showPaintRectsSettingDescriptor);
+    this.#showLayoutShiftRegionsSetting = settings.resolve(showLayoutShiftRegionsSettingDescriptor);
+    this.#showAdHighlightsSetting = settings.resolve(showAdHighlightsSettingDescriptor);
+    this.#showDebugBordersSetting = settings.resolve(showDebugBordersSettingDescriptor);
+    this.#showFPSCounterSetting = settings.resolve(showFPSCounterSettingDescriptor);
+    this.#showScrollBottleneckRectsSetting = settings.resolve(showScrollBottleneckRectsSettingDescriptor);
 
     if (!target.suspended()) {
       void this.overlayAgent.invoke_enable();
@@ -178,27 +202,27 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     }
   }
 
-  static hideDOMNodeHighlight(targetManager: TargetManager = TargetManager.instance()): void {
+  static hideDOMNodeHighlight(targetManager: TargetManager): void {
     for (const overlayModel of targetManager.models(OverlayModel)) {
       overlayModel.delayedHideHighlight(0);
     }
   }
 
-  static async muteHighlight(targetManager: TargetManager = TargetManager.instance()): Promise<void[]> {
+  static async muteHighlight(targetManager: TargetManager): Promise<void[]> {
     return await Promise.all(targetManager.models(OverlayModel).map(model => model.suspendModel()));
   }
 
-  static async unmuteHighlight(targetManager: TargetManager = TargetManager.instance()): Promise<void[]> {
+  static async unmuteHighlight(targetManager: TargetManager): Promise<void[]> {
     return await Promise.all(targetManager.models(OverlayModel).map(model => model.resumeModel()));
   }
 
-  static highlightRect(rect: HighlightRect, targetManager: TargetManager = TargetManager.instance()): void {
+  static highlightRect(rect: HighlightRect, targetManager: TargetManager): void {
     for (const overlayModel of targetManager.models(OverlayModel)) {
       void overlayModel.highlightRect(rect);
     }
   }
 
-  static clearHighlight(targetManager: TargetManager = TargetManager.instance()): void {
+  static clearHighlight(targetManager: TargetManager): void {
     for (const overlayModel of targetManager.models(OverlayModel)) {
       void overlayModel.clearHighlight();
     }
@@ -290,7 +314,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     }
     const settings = this.target().targetManager().settings;
     const message = this.#debuggerModel && this.#debuggerModel.isPaused() &&
-            !settings.moduleSetting('disable-paused-state-overlay').get() ?
+            !settings.resolve(disablePausedStateOverlaySettingDescriptor).get() ?
         i18nString(UIStrings.pausedInDebugger) :
         undefined;
     void this.overlayAgent.invoke_setPausedInDebuggerMessage({message});
@@ -318,10 +342,9 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
       // overlay, so that it is not cleared by the highlight
       return;
     }
-    if (this.#hideHighlightTimeout) {
-      clearTimeout(this.#hideHighlightTimeout);
-      this.#hideHighlightTimeout = null;
-    }
+    clearTimeout(this.#hideHighlightTimeout);
+    this.#hideHighlightTimeout = undefined;
+
     const highlightConfig = this.buildHighlightConfig(mode);
     if (typeof showInfo !== 'undefined') {
       highlightConfig.showInfo = showInfo;
@@ -473,17 +496,18 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
   }
 
   private delayedHideHighlight(delay: number): void {
-    if (this.#hideHighlightTimeout === null) {
-      this.#hideHighlightTimeout = window.setTimeout(() => this.highlightInOverlay({clear: true}), delay);
-    }
+    clearTimeout(this.#hideHighlightTimeout);
+    this.#hideHighlightTimeout = globalThis.setTimeout(
+        () => this.highlightInOverlay({clear: true}),
+        delay,
+    );
   }
 
   highlightFrame(frameId: Protocol.Page.FrameId): void {
-    if (this.#hideHighlightTimeout) {
       clearTimeout(this.#hideHighlightTimeout);
-      this.#hideHighlightTimeout = null;
-    }
-    this.#highlighter.highlightFrame(frameId);
+      this.#hideHighlightTimeout = undefined;
+
+      this.#highlighter.highlightFrame(frameId);
   }
 
   showHingeForDualScreen(hinge: Hinge|null): void {
@@ -494,6 +518,32 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
       });
     } else {
       void this.overlayAgent.invoke_setShowHinge({});
+    }
+  }
+
+  showDisplayCutout(cutout: DisplayCutout|null): void {
+    if (cutout) {
+      const {x, y, width, height, shape, contentColor} = cutout;
+      const displayCutoutConfig: Protocol.Overlay.DisplayCutoutConfig = {
+        rect: {x, y, width, height},
+        shape,
+        contentColor,
+      };
+      if (shape === Protocol.Overlay.DisplayCutoutShape.Pill) {
+        displayCutoutConfig.borderRadius = cutout.borderRadius;
+      } else if (shape === Protocol.Overlay.DisplayCutoutShape.Notch) {
+        displayCutoutConfig.upperRadius = cutout.upperRadius;
+        displayCutoutConfig.lowerRadius = cutout.lowerRadius;
+      } else if (shape === Protocol.Overlay.DisplayCutoutShape.Circle) {
+        displayCutoutConfig.cx = cutout.cx;
+        displayCutoutConfig.cy = cutout.cy;
+        displayCutoutConfig.radius = cutout.radius;
+      }
+      void this.overlayAgent.invoke_setShowDisplayCutout({
+        displayCutoutConfig,
+      });
+    } else {
+      void this.overlayAgent.invoke_setShowDisplayCutout({});
     }
   }
 
@@ -523,7 +573,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
   private buildHighlightConfig(mode: string|undefined = 'all', showDetailedToolip: boolean|undefined = false):
       Protocol.Overlay.HighlightConfig {
     const settings = this.target().targetManager().settings;
-    const showRulers = settings.moduleSetting('show-metrics-rulers').get();
+    const showRulers = settings.resolve(showMetricsRulersSettingDescriptor).get();
     const highlightConfig: Protocol.Overlay.HighlightConfig = {
       showInfo: mode === 'all' || mode === 'container-outline',
       showRulers,
@@ -533,8 +583,8 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
       gridHighlightConfig: {},
       flexContainerHighlightConfig: {},
       flexItemHighlightConfig: {},
-      contrastAlgorithm: settings.moduleSetting('apca').get() ? Protocol.Overlay.ContrastAlgorithm.Apca :
-                                                                Protocol.Overlay.ContrastAlgorithm.Aa,
+      contrastAlgorithm: settings.resolve(apcaSettingDescriptor).get() ? Protocol.Overlay.ContrastAlgorithm.Apca :
+                                                                         Protocol.Overlay.ContrastAlgorithm.Aa,
     };
 
     if (mode === 'all' || mode === 'content') {
@@ -611,6 +661,18 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
         flexibilityArrow: {
           color: Common.Color.PageHighlight.LayoutLine.toProtocolRGBA(),
         },
+      };
+
+      highlightConfig.imcbHighlightConfig = {
+        imcbBorderColor: Common.Color.PageHighlight.AnchorIMCB.toProtocolRGBA(),
+        imcbBackgroundColor: Common.Color.PageHighlight.AnchorIMCBBackground.toProtocolRGBA(),
+        insetsBackgroundColor: Common.Color.PageHighlight.AnchorInsetsBackground.toProtocolRGBA(),
+        insetsHatchColor: Common.Color.PageHighlight.AnchorInsetsHatch.toProtocolRGBA(),
+        anchorBorderColor: Common.Color.PageHighlight.AnchorTarget.toProtocolRGBA(),
+        anchorBackgroundColor: Common.Color.PageHighlight.AnchorTargetBackground.toProtocolRGBA(),
+        showPositionAreaGrid: true,
+        positionAreaGridLineColor: Common.Color.PageHighlight.AnchorTarget.toProtocolRGBA(),
+        positionAreaActiveRegionColor: Common.Color.PageHighlight.AnchorTargetBackground.toProtocolRGBA(),
       };
     }
 
@@ -740,6 +802,41 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
           color: Common.Color.PageHighlight.LayoutLine.toProtocolRGBA(),
           pattern: Protocol.Overlay.LineStylePattern.Dashed,
         },
+      };
+    }
+
+    const baseImcbHighlightConfig = {
+      imcbBorderColor: Common.Color.PageHighlight.AnchorIMCB.toProtocolRGBA(),
+      imcbBackgroundColor: Common.Color.PageHighlight.AnchorIMCBBackground.toProtocolRGBA(),
+      anchorBorderColor: Common.Color.PageHighlight.AnchorTarget.toProtocolRGBA(),
+      anchorBackgroundColor: Common.Color.PageHighlight.AnchorTargetBackground.toProtocolRGBA(),
+    };
+
+    if (mode === 'anchor-positioning') {
+      highlightConfig.imcbHighlightConfig = {
+        ...baseImcbHighlightConfig,
+        insetsBackgroundColor: Common.Color.PageHighlight.AnchorInsetsBackground.toProtocolRGBA(),
+        insetsHatchColor: Common.Color.PageHighlight.AnchorInsetsHatch.toProtocolRGBA(),
+        showPositionAreaGrid: true,
+        positionAreaGridLineColor: Common.Color.PageHighlight.AnchorTarget.toProtocolRGBA(),
+        positionAreaActiveRegionColor: Common.Color.PageHighlight.AnchorTargetBackground.toProtocolRGBA(),
+      };
+    }
+
+    if (mode === 'position-area') {
+      highlightConfig.imcbHighlightConfig = {
+        ...baseImcbHighlightConfig,
+        showPositionAreaGrid: true,
+        positionAreaGridLineColor: Common.Color.PageHighlight.AnchorTarget.toProtocolRGBA(),
+        positionAreaActiveRegionColor: Common.Color.PageHighlight.AnchorTargetBackground.toProtocolRGBA(),
+      };
+    }
+
+    if (mode === 'insets') {
+      highlightConfig.imcbHighlightConfig = {
+        ...baseImcbHighlightConfig,
+        insetsBackgroundColor: Common.Color.PageHighlight.AnchorInsetsBackground.toProtocolRGBA(),
+        insetsHatchColor: Common.Color.PageHighlight.AnchorInsetsHatch.toProtocolRGBA(),
       };
     }
 

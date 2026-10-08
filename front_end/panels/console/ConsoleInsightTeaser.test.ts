@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -12,9 +13,10 @@ import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js'
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
+import * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import * as Tooltips from '../../ui/components/tooltips/tooltips.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as PanelCommon from '../common/common.js';
+import * as Settings from '../../ui/settings/settings.js';
 
 import * as Console from './console.js';
 
@@ -32,6 +34,14 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
   beforeEach(() => {
     // @ts-expect-error
     originalLanguageModel = window.LanguageModel;
+    updateHostConfig({
+      aidaAvailability: {
+        enabled: true,
+      },
+      devToolsConsoleInsights: {
+        enabled: true,
+      },
+    });
   });
 
   afterEach(() => {
@@ -103,13 +113,13 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
       yield ' explanation';
     });
 
-    const builtInAi = AiAssistanceModel.BuiltInAi.BuiltInAi.instance();
+    const builtInAi = new AiAssistanceModel.BuiltInAi.BuiltInAi();
     assert.isDefined(builtInAi);
     await builtInAi.initDoneForTesting;
 
     const view = createViewFunctionStub(Console.ConsoleInsightTeaser.ConsoleInsightTeaser);
-    const teaser =
-        new Console.ConsoleInsightTeaser.ConsoleInsightTeaser('test-uuid', consoleViewMessage, undefined, view);
+    const teaser = new Console.ConsoleInsightTeaser.ConsoleInsightTeaser('test-uuid', consoleViewMessage, undefined,
+                                                                         view, builtInAi);
     teaser.maybeGenerateTeaser();
     const input = await view.nextInput;
     assert.isFalse(input.isInactive);
@@ -135,10 +145,10 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
         });
       },
     };
-    const builtInAi = AiAssistanceModel.BuiltInAi.BuiltInAi.instance();
+    const builtInAi = new AiAssistanceModel.BuiltInAi.BuiltInAi();
     const view = createViewFunctionStub(Console.ConsoleInsightTeaser.ConsoleInsightTeaser);
-    const teaser =
-        new Console.ConsoleInsightTeaser.ConsoleInsightTeaser('test-uuid', consoleViewMessage, undefined, view);
+    const teaser = new Console.ConsoleInsightTeaser.ConsoleInsightTeaser('test-uuid', consoleViewMessage, undefined,
+                                                                         view, builtInAi);
     teaser.maybeGenerateTeaser();
     let input = await view.nextInput;
     assert.strictEqual(input.state, 'no-model');
@@ -170,14 +180,14 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
   });
 
   it('shows FRE dialog on "Tell me more" click', async () => {
-    Common.Settings.settingForTest('console-insights-enabled').set(false);
-    const show = sinon.stub(PanelCommon.FreDialog, 'show');
+    Common.Settings.Settings.instance().settingForTest('console-insights-enabled').set(false);
+    const show = sinon.stub(Dialogs.FreDialog.FreDialog, 'show');
     const view = createViewFunctionStub(Console.ConsoleInsightTeaser.ConsoleInsightTeaser);
     new Console.ConsoleInsightTeaser.ConsoleInsightTeaser('test-uuid', consoleViewMessage, undefined, view);
     const input = await view.nextInput;
     await input.onTellMeMoreClick(new Event('click'));
     sinon.assert.calledOnce(show);
-    Common.Settings.settingForTest('console-insights-enabled').set(true);
+    Common.Settings.Settings.instance().settingForTest('console-insights-enabled').set(true);
     show.restore();
   });
 
@@ -190,10 +200,16 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
         checked: true,
       } as unknown as EventTarget,
     } as Event;
-    assert.isTrue(Common.Settings.moduleSetting('console-insight-teasers-enabled').get());
+    const {
+      consoleInsightTeasersEnabledSettingDescriptor,
+    } = Settings.ConsoleSettings;
+    const teasersEnabledSetting = Common.Settings.Settings.instance().resolve(
+        consoleInsightTeasersEnabledSettingDescriptor,
+    );
+    assert.isTrue(teasersEnabledSetting.get());
     input.dontShowChanged(event);
-    assert.isFalse(Common.Settings.moduleSetting('console-insight-teasers-enabled').get());
-    Common.Settings.settingForTest('console-insight-teasers-enabled').set(true);
+    assert.isFalse(teasersEnabledSetting.get());
+    teasersEnabledSetting.set(true);
   });
 
   it('updates its view if teaser generation is slow', async () => {
@@ -269,9 +285,8 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
     let input = await view.nextInput;
     assert.isTrue(input.hasTellMeMoreButton);
 
-    checkAccessPreconditionsStub.resolves(Host.AidaClient.AidaAccessPreconditions.NO_INTERNET);
     Host.AidaClient.HostConfigTracker.instance().dispatchEventToListeners(
-        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED);
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, Host.AidaClient.AidaAccessPreconditions.NO_INTERNET);
     input = await view.nextInput;
     assert.isFalse(input.hasTellMeMoreButton);
     teaser.detach();

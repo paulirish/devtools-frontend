@@ -9,5 +9,5 @@ ts_library("testing") {
 
   sources = [ "InspectorOverlayHelpers.ts" ]
 
-  deps = [ "..:inspector_overlay" ]
+  ts_deps = [ "..:inspector_overlay" ]
 }

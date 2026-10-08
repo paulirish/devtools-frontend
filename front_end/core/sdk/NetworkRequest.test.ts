@@ -3,16 +3,18 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import {expectCookie} from '../../testing/Cookies.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-  setMockConnectionResponseHandler,
-} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {mockResourceTree} from '../../testing/ResourceTreeHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as Platform from '../platform/platform.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import * as SDK from './sdk.js';
 
@@ -194,7 +196,7 @@ describe('NetworkRequest', () => {
       exemptedResponseCookies: [{
         cookie,
         cookieLine: cookie.getCookieLine() as string,
-        exemptionReason: Protocol.Network.CookieExemptionReason.TPCDHeuristics,
+        exemptionReason: Protocol.Network.CookieExemptionReason.UserSetting,
       }],
     });
 
@@ -206,9 +208,8 @@ describe('NetworkRequest', () => {
     assert.deepEqual(
         request.exemptedResponseCookies().map(cookie => cookie.cookie.getCookieLine()),
         ['name=value; Path=/; SameSite=None; Secure;']);
-    assert.deepEqual(
-        request.exemptedResponseCookies().map(cookie => cookie.exemptionReason),
-        [Protocol.Network.CookieExemptionReason.TPCDHeuristics]);
+    assert.deepEqual(request.exemptedResponseCookies().map(cookie => cookie.exemptionReason),
+                     [Protocol.Network.CookieExemptionReason.UserSetting]);
 
     request.addExtraRequestInfo({
       blockedRequestCookies: [],
@@ -244,16 +245,34 @@ describe('NetworkRequest', () => {
     request.originalResponseHeaders = [{name: 'duplicate', value: 'first'}, {name: 'duplicate', value: 'second'}];
     assert.isFalse(request.hasOverriddenHeaders());
   });
+
+  it('determines whether the request is a preload request', () => {
+    const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest('requestId', urlString`url`,
+                                                                                  urlString`documentURL`, null);
+    assert.isFalse(request.isPreloadRequest());
+
+    const preloadRequest = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+        'requestId', urlString`url`, urlString`documentURL`, {type: Protocol.Network.InitiatorType.Preload});
+    assert.isTrue(preloadRequest.isPreloadRequest());
+  });
 });
 
-describeWithMockConnection('NetworkRequest', () => {
+describe('NetworkRequest (MockConnection)', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
   let networkManagerForRequestStub: sinon.SinonStub;
   let cookie: SDK.Cookie.Cookie;
   let addBlockedCookieSpy: sinon.SinonSpy;
   let target: SDK.Target.Target;
+  let universe: TestUniverse;
+  let connection: MockCDPConnection;
 
   beforeEach(() => {
-    target = createTarget();
+    universe = new TestUniverse();
+    connection = new MockCDPConnection();
+    mockResourceTree(connection);
+    target = universe.createTarget({connection});
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
     networkManagerForRequestStub = sinon.stub(SDK.NetworkManager.NetworkManager, 'forRequest').returns(networkManager);
@@ -267,7 +286,7 @@ describeWithMockConnection('NetworkRequest', () => {
 
   it('adds blocked response cookies to - and removes exempted cookies from cookieModel', async () => {
     const removeBlockedCookieSpy = sinon.spy(SDK.CookieModel.CookieModel.prototype, 'removeBlockedCookie');
-    setMockConnectionResponseHandler('Network.getCookies', () => ({cookies: []}));
+    connection.setSuccessHandler('Network.getCookies', () => ({cookies: []}));
     const cookieModel = target.model(SDK.CookieModel.CookieModel);
     assert.exists(cookieModel);
     const url = urlString`url`;
@@ -306,20 +325,175 @@ describeWithMockConnection('NetworkRequest', () => {
       exemptedResponseCookies: [{
         cookie,
         cookieLine: cookie.getCookieLine() as string,
-        exemptionReason: Protocol.Network.CookieExemptionReason.TPCDHeuristics,
+        exemptionReason: Protocol.Network.CookieExemptionReason.UserSetting,
       }],
     });
     assert.isTrue(removeBlockedCookieSpy.calledOnceWith(cookie));
     assert.isEmpty(await cookieModel.getCookiesForDomain(''));
   });
+
+  it('searches cached contentData locally without calling Network.searchInResponseBody', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId,
+        urlString`https://www.google.com/`,
+        urlString`https://www.google.com/`,
+        null,
+        null,
+        null,
+    );
+    request.mimeType = 'text/html';
+    request.finished = true;
+
+    connection.setSuccessHandler('Network.getResponseBody', () => ({
+                                                              body: '<div>Google offered in: English</div>',
+                                                              base64Encoded: false,
+                                                            }));
+    const searchSpy = sinon.spy(target.networkAgent(), 'invoke_searchInResponseBody');
+
+    const contentData = await request.requestContentData();
+    assert.isFalse(TextUtils.ContentData.ContentData.isError(contentData));
+
+    const matches = await request.searchInContent('Google offered', false, false);
+    sinon.assert.notCalled(searchSpy);
+    assert.deepEqual(matches, [
+      new TextUtils.ContentProvider.SearchMatch(0, '<div>Google offered in: English</div>', 5, 14),
+    ]);
+  });
+
+  it('falls back to Network.searchInResponseBody when cached contentData is an error', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId,
+        urlString`https://www.google.com/`,
+        urlString`https://www.google.com/`,
+        null,
+        null,
+        null,
+    );
+    request.mimeType = 'text/html';
+    request.finished = true;
+
+    sinon.stub(target.networkAgent(), 'invoke_getResponseBody').resolves({
+      body: '',
+      base64Encoded: false,
+      getError: () => 'No resource with given identifier found',
+    });
+    const searchStub = sinon.stub(target.networkAgent(), 'invoke_searchInResponseBody').resolves({
+      result: [{lineNumber: 0, lineContent: '<div>Google offered in: English</div>'}],
+      getError: () => undefined,
+    });
+
+    const contentData = await request.requestContentData();
+    assert.isTrue(TextUtils.ContentData.ContentData.isError(contentData));
+
+    const matches = await request.searchInContent('Google offered', false, false);
+    sinon.assert.calledOnce(searchStub);
+    assert.lengthOf(matches, 1);
+    assert.strictEqual(matches[0].lineContent, '<div>Google offered in: English</div>');
+  });
+
+  it('falls back to Network.searchInResponseBody when cached base64 contentData has non-text MIME type', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId,
+        urlString`https://www.google.com/data.bin`,
+        urlString`https://www.google.com/`,
+        null,
+        null,
+        null,
+    );
+    request.mimeType = 'application/octet-stream';
+    request.finished = true;
+
+    connection.setSuccessHandler('Network.getResponseBody',
+                                 () => ({
+                                   body: 'PGRpdj5Hb29nbGUgb2ZmZXJlZCBpbjogRW5nbGlzaDwvZGl2Pg==',
+                                   base64Encoded: true,
+                                 }));
+    const searchStub = sinon.stub(target.networkAgent(), 'invoke_searchInResponseBody').resolves({
+      result: [{lineNumber: 0, lineContent: '<div>Google offered in: English</div>'}],
+      getError: () => undefined,
+    });
+
+    const contentData = await request.requestContentData();
+    if (TextUtils.ContentData.ContentData.isError(contentData)) {
+      assert.fail(contentData.error);
+    }
+    assert.isFalse(contentData.isTextContent);
+
+    const matches = await request.searchInContent('Google offered', false, false);
+    sinon.assert.calledOnce(searchStub);
+    assert.lengthOf(matches, 1);
+  });
+
+  it('searches cached base64 text contentData locally even with an unsupported charset', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId,
+        urlString`https://www.google.com/`,
+        urlString`https://www.google.com/`,
+        null,
+        null,
+        null,
+    );
+    request.mimeType = 'text/html';
+    request.setCharset('not-a-charset');
+    request.finished = true;
+
+    connection.setSuccessHandler('Network.getResponseBody',
+                                 () => ({
+                                   body: 'PGRpdj5Hb29nbGUgb2ZmZXJlZCBpbjogRW5nbGlzaDwvZGl2Pg==',
+                                   base64Encoded: true,
+                                 }));
+    const searchSpy = sinon.spy(target.networkAgent(), 'invoke_searchInResponseBody');
+
+    const contentData = await request.requestContentData();
+    assert.isFalse(TextUtils.ContentData.ContentData.isError(contentData));
+
+    const matches = await request.searchInContent('Google offered', false, false);
+    sinon.assert.notCalled(searchSpy);
+    assert.deepEqual(matches, [
+      new TextUtils.ContentProvider.SearchMatch(0, '<div>Google offered in: English</div>', 5, 14),
+    ]);
+  });
+
+  it('does not hang on unresolved streamingContentData when request has not received headers', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId,
+        urlString`https://www.google.com/`,
+        urlString`https://www.google.com/`,
+        null,
+        null,
+        null,
+    );
+    request.mimeType = 'text/plain';
+    request.finished = false;
+
+    void request.requestStreamingContent();
+    request.failed = true;
+
+    const searchStub = sinon.stub(target.networkAgent(), 'invoke_searchInResponseBody').resolves({
+      result: [],
+      getError: () => undefined,
+    });
+
+    const matches = await request.searchInContent('test', false, false);
+    sinon.assert.calledOnce(searchStub);
+    assert.isEmpty(matches);
+  });
 });
 
-describeWithMockConnection('ServerSentEvents', () => {
+describe('ServerSentEvents', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
   let target: SDK.Target.Target;
   let networkManager: SDK.NetworkManager.NetworkManager;
+  let universe: TestUniverse;
+  let connection: MockCDPConnection;
 
   beforeEach(() => {
-    target = createTarget();
+    universe = new TestUniverse();
+    connection = new MockCDPConnection();
+    mockResourceTree(connection);
+    target = universe.createTarget({connection});
     networkManager = target.model(SDK.NetworkManager.NetworkManager) as SDK.NetworkManager.NetworkManager;
   });
 
@@ -364,12 +538,9 @@ describeWithMockConnection('ServerSentEvents', () => {
   });
 
   it('sends EventSourceMessageAdded events for raw text/event-stream', async () => {
-    setMockConnectionResponseHandler('Network.streamResourceContent', () => ({
-                                                                        getError() {
-                                                                          return undefined;
-                                                                        },
-                                                                        bufferedData: '',
-                                                                      }));
+    connection.setSuccessHandler('Network.streamResourceContent', () => ({
+                                                                    bufferedData: '',
+                                                                  }));
     networkManager.dispatcher.requestWillBeSent({
       requestId: '1' as Protocol.Network.RequestId,
       request: {
@@ -425,12 +596,17 @@ data: bar\n\n`;
   });
 });
 
-describeWithMockConnection('requestStreamingContent', () => {
+describe('requestStreamingContent', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+  let universe: TestUniverse;
   let target: SDK.Target.Target;
   let networkManager: SDK.NetworkManager.NetworkManager;
 
   beforeEach(() => {
-    target = createTarget();
+    universe = new TestUniverse();
+    target = universe.createTarget();
     networkManager = target.model(SDK.NetworkManager.NetworkManager) as SDK.NetworkManager.NetworkManager;
   });
 
@@ -548,5 +724,218 @@ describeWithMockConnection('requestStreamingContent', () => {
     assert.isFalse(TextUtils.StreamingContentData.isError(maybeStreamingContent));
     const streamingContent = maybeStreamingContent as TextUtils.StreamingContentData.StreamingContentData;
     assert.strictEqual(streamingContent.mimeType, 'text/html');
+  });
+
+  describe('WebSocketFrame', () => {
+    it('adds sent and received frames and dispatches WEBSOCKET_FRAME_ADDED event', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'requestId', urlString`ws://example.com`, urlString`documentURL`, null);
+      const addedFrames: SDK.NetworkRequest.WebSocketFrame[] = [];
+      request.addEventListener(SDK.NetworkRequest.Events.WEBSOCKET_FRAME_ADDED, event => {
+        addedFrames.push(event.data);
+      });
+
+      request.addProtocolFrame(
+          {
+            opcode: 1,
+            mask: true,
+            payloadData: 'send-message',
+          },
+          1,
+          true,
+      );
+      request.addProtocolFrame(
+          {
+            opcode: 1,
+            mask: false,
+            payloadData: 'receive-message',
+          },
+          2,
+          false,
+      );
+      request.addProtocolFrameError('websocket error', 3);
+
+      assert.lengthOf(addedFrames, 3);
+      assert.deepEqual(request.frames(), [
+        {
+          type: SDK.NetworkRequest.WebSocketFrameType.Send,
+          text: 'send-message',
+          time: request.pseudoWallTime(1),
+          opCode: 1,
+          mask: true,
+        },
+        {
+          type: SDK.NetworkRequest.WebSocketFrameType.Receive,
+          text: 'receive-message',
+          time: request.pseudoWallTime(2),
+          opCode: 1,
+          mask: false,
+        },
+        {
+          type: SDK.NetworkRequest.WebSocketFrameType.Error,
+          text: 'websocket error',
+          time: request.pseudoWallTime(3),
+          opCode: -1,
+          mask: false,
+        },
+      ]);
+    });
+  });
+
+  describe('requestURLSecurityOrigin', () => {
+    it('returns standard origin matching scheme, host, and port for web URLs', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`https://example.com:8080/api/users?id=1`,
+          urlString`https://example.com:8080/index.html`,
+          null,
+      );
+      const origin = request.requestURLSecurityOrigin();
+      const expectedOrigin = SDK.SecurityOrigin.SecurityOrigin.create('https://example.com:8080');
+
+      assert.isFalse(origin.isOpaque());
+      assert.isTrue(origin.isSameOriginWith(expectedOrigin));
+      assert.strictEqual(origin.siteId(), 'https://example.com:8080');
+    });
+
+    it('returns path-scoped origin for file:// URLs', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`file:///home/user/app.js`,
+          urlString`file:///home/user/index.html`,
+          null,
+      );
+      const origin = request.requestURLSecurityOrigin();
+      const expectedOrigin = SDK.SecurityOrigin.SecurityOrigin.create('file:///home/user/app.js');
+
+      assert.isFalse(origin.isOpaque());
+      assert.isTrue(origin.isSameOriginWith(expectedOrigin));
+      assert.strictEqual(origin.siteId(), 'file:///home/user/app.js');
+    });
+
+    it('returns a stable opaque origin for data: URLs', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`data:text/html,<h1>Hello</h1>`,
+          urlString`https://example.com/`,
+          null,
+      );
+      const origin = request.requestURLSecurityOrigin();
+      const anotherOrigin = request.requestURLSecurityOrigin();
+
+      assert.isTrue(origin.isOpaque());
+      assert.strictEqual(origin, anotherOrigin);
+      assert.isTrue(origin.isSameOriginWith(anotherOrigin));
+    });
+
+    it('does not treat different data: requests as same-origin', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`data:text/html,<h1>Hello</h1>`,
+          urlString`https://example.com/`,
+          null,
+      );
+      const otherRequest = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req2',
+          urlString`data:text/html,<h1>Hello</h1>`,
+          urlString`https://example.com/`,
+          null,
+      );
+
+      assert.isFalse(request.requestURLSecurityOrigin().isSameOriginWith(otherRequest.requestURLSecurityOrigin()));
+    });
+
+    it('recomputes the origin after setUrl() changes the URL', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`https://a.example.com/data`,
+          urlString`https://example.com/index.html`,
+          null,
+      );
+      const originBefore = request.requestURLSecurityOrigin();
+      request.setUrl(urlString`https://b.example.com/data`);
+      const originAfter = request.requestURLSecurityOrigin();
+
+      assert.isTrue(originBefore.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://a.example.com')));
+      assert.isTrue(originAfter.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://b.example.com')));
+      assert.isFalse(originAfter.isSameOriginWith(originBefore));
+    });
+
+    it('returns virtual imported-har origin for imported HAR requests', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createForImportedHar(
+          'req1',
+          urlString`https://api.example.com/data`,
+          urlString`https://example.com/index.html`,
+          null,
+      );
+      const origin = request.requestURLSecurityOrigin();
+      const liveOrigin = SDK.SecurityOrigin.SecurityOrigin.create('https://api.example.com');
+      const expectedHarOrigin = SDK.SecurityOrigin.SecurityOrigin.create('imported-har://api.example.com');
+
+      assert.isTrue(request.isImportedHar());
+      assert.isUndefined(request.backendRequestId());
+      assert.isFalse(origin.isOpaque());
+      assert.isTrue(origin.isSameOriginWith(expectedHarOrigin));
+      assert.isFalse(origin.isSameOriginWith(liveOrigin));
+      assert.strictEqual(origin.siteId(), 'imported-har://api.example.com');
+    });
+  });
+
+  describe('initiatorSecurityOrigin', () => {
+    it('returns standard origin matching documentURL', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`https://api.example.com/data`,
+          urlString`https://example.com:8443/index.html`,
+          null,
+      );
+      const initiatorOrigin = request.initiatorSecurityOrigin();
+      const expectedOrigin = SDK.SecurityOrigin.SecurityOrigin.create('https://example.com:8443');
+
+      assert.isFalse(initiatorOrigin.isOpaque());
+      assert.isTrue(initiatorOrigin.isSameOriginWith(expectedOrigin));
+      assert.strictEqual(initiatorOrigin.siteId(), 'https://example.com:8443');
+    });
+
+    it('returns virtual imported-har origin for imported HAR documentURL', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createForImportedHar(
+          'req1',
+          urlString`https://api.example.com/data`,
+          urlString`https://example.com/index.html`,
+          null,
+      );
+      const initiatorOrigin = request.initiatorSecurityOrigin();
+      const expectedHarOrigin = SDK.SecurityOrigin.SecurityOrigin.create('imported-har://example.com');
+
+      assert.isFalse(initiatorOrigin.isOpaque());
+      assert.isTrue(initiatorOrigin.isSameOriginWith(expectedHarOrigin));
+      assert.strictEqual(initiatorOrigin.siteId(), 'imported-har://example.com');
+    });
+
+    it('returns opaque origin when documentURL is empty or opaque', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`https://api.example.com/data`,
+          urlString``,
+          null,
+      );
+      const initiatorOrigin = request.initiatorSecurityOrigin();
+
+      assert.isTrue(initiatorOrigin.isOpaque());
+    });
+
+    it('returns stable initiatorSecurityOrigin instance across multiple calls', () => {
+      const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
+          'req1',
+          urlString`https://api.example.com/data`,
+          urlString``,
+          null,
+      );
+      const origin1 = request.initiatorSecurityOrigin();
+      const origin2 = request.initiatorSecurityOrigin();
+
+      assert.strictEqual(origin1, origin2);
+      assert.isTrue(origin1.isSameOriginWith(origin2));
+    });
   });
 });

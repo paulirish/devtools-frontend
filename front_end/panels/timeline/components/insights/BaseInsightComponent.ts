@@ -8,7 +8,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Root from '../../../../core/root/root.js';
 import * as AIAssistance from '../../../../models/ai_assistance/ai_assistance.js';
 import * as Badges from '../../../../models/badges/badges.js';
-import type {InsightModel} from '../../../../models/trace/insights/types.js';
+import type * as Insights from '../../../../models/trace/insights/insights.js';
 import type * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
@@ -21,44 +21,43 @@ import {md} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import type {TableState} from './Table.js';
 
+type InsightModel = Insights.Types.InsightModel;
+
 const {html} = Lit;
 
 const UIStrings = {
   /**
-   * @description Text to tell the user the estimated time or size savings for this insight. "&" means "and" - space is limited to prefer abbreviated terms if possible. Text will still fit if not short, it just won't look very good, so using no abbreviations is fine if necessary.
+   * @description Estimated time or size savings for an insight in the Performance panel sidebar.
    * @example {401 ms} PH1
-   * @example {112 kB} PH1
    */
   estimatedSavings: 'Est savings: {PH1}',
   /**
-   * @description Text to tell the user the estimated time and size savings for this insight. "&" means "and", "Est" means "Estimated" - space is limited to prefer abbreviated terms if possible. Text will still fit if not short, it just won't look very good, so using no abbreviations is fine if necessary.
+   * @description Estimated time and size savings for an insight in the Performance panel sidebar.
    * @example {401 ms} PH1
    * @example {112 kB} PH2
    */
   estimatedSavingsTimingAndBytes: 'Est savings: {PH1} & {PH2}',
   /**
-   * @description Text to tell the user the estimated time savings for this insight that is used for screen readers.
+   * @description Accessible label for the estimated time savings of an insight in the Performance panel sidebar.
    * @example {401 ms} PH1
-   * @example {112 kB} PH1
    */
   estimatedSavingsAriaTiming: 'Estimated savings for this insight: {PH1}',
   /**
-   * @description Text to tell the user the estimated size savings for this insight that is used for screen readers. Value is in terms of "transfer size", aka encoded/compressed data length.
-   * @example {401 ms} PH1
+   * @description Accessible label for the estimated size savings of an insight in the Performance panel sidebar.
    * @example {112 kB} PH1
    */
   estimatedSavingsAriaBytes: 'Estimated savings for this insight: {PH1} transfer size',
   /**
-   * @description Text to tell the user the estimated time and size savings for this insight that is used for screen readers.
+   * @description Accessible label for both estimated time and size savings of an insight in the Performance panel sidebar.
    * @example {401 ms} PH1
    * @example {112 kB} PH2
    */
   estimatedSavingsTimingAndBytesAria: 'Estimated savings for this insight: {PH1} and {PH2} transfer size',
   /**
-   * @description Used for screen-readers as a label on the button to expand an insight to view details
+   * @description Accessible label for the button to expand an insight to view details in the Performance panel sidebar.
    * @example {LCP breakdown} PH1
    */
-  viewDetails: 'View details for {PH1} insight.',
+  viewDetails: 'View details for {PH1} insight',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/BaseInsightComponent.ts', UIStrings);
@@ -109,8 +108,7 @@ const DEFAULT_VIEW: View = (input, _output, target) => {
 
   let ariaLabel = `${i18nString(UIStrings.viewDetails, {PH1: model.title})}`;
   if (estimatedSavingsAriaLabel) {
-    // space prefix is deliberate to add a gap after the view details text
-    ariaLabel += ` ${estimatedSavingsAriaLabel}`;
+    ariaLabel += `. ${estimatedSavingsAriaLabel}`;
   }
 
   function renderInsightContent(): Lit.LitTemplate {

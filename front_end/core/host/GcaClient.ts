@@ -11,7 +11,7 @@ import {
   debugLog,
   type DoConversationRequest,
   type GenerateCodeRequest,
-  type GenerateCodeResponse
+  type GenerateCodeResponse,
 } from './AidaClientTypes.js';
 import {
   aidaCompletionRequestToGcaRequest,
@@ -19,7 +19,7 @@ import {
   aidaEventToGcaTelemetryRequest,
   aidaGenerateCodeRequestToGcaRequest,
   gcaResponseToAidaCompletionResponse,
-  gcaResponseToAidaGenerateCodeResponse
+  gcaResponseToAidaGenerateCodeResponse,
 } from './AidaGcaTranslation.js';
 import * as DispatchHttpRequestClient from './DispatchHttpRequestClient.js';
 import type {GenerateContentRequest, GenerateContentResponse} from './GcaTypes.js';
@@ -77,22 +77,20 @@ export class GcaClient {
         });
   }
 
-  async completeCode(request: CompletionRequest): Promise<CompletionResponse|null> {
+  async completeCode(request: CompletionRequest): Promise<CompletionResponse> {
     const gcaRequest = aidaCompletionRequestToGcaRequest(request);
     const result = await this.#requestContent(gcaRequest);
-    const aidaResult = result ? gcaResponseToAidaCompletionResponse(result) : null;
-    return aidaResult;
+    return gcaResponseToAidaCompletionResponse(result);
   }
 
-  async generateCode(request: GenerateCodeRequest, options?: {signal?: AbortSignal}):
-      Promise<GenerateCodeResponse|null> {
+  async generateCode(request: GenerateCodeRequest, options?: {signal?: AbortSignal}): Promise<GenerateCodeResponse> {
     const gcaRequest = aidaGenerateCodeRequestToGcaRequest(request);
     const result = await this.#requestContent(gcaRequest, options);
-    return result ? gcaResponseToAidaGenerateCodeResponse(result) : null;
+    return gcaResponseToAidaGenerateCodeResponse(result);
   }
 
-  async #requestContent(request: GenerateContentRequest, options?: {signal?: AbortSignal}):
-      Promise<GenerateContentResponse|null> {
+  async #requestContent(request: GenerateContentRequest,
+                        options?: {signal?: AbortSignal}): Promise<GenerateContentResponse> {
     try {
       const response = await DispatchHttpRequestClient.makeHttpRequest<GenerateContentResponse>(
           {
@@ -106,7 +104,7 @@ export class GcaClient {
       return response;
     } catch (err) {
       debugLog('GCA request failed:', JSON.stringify(request), err);
-      return null;
+      throw err;
     }
   }
 }

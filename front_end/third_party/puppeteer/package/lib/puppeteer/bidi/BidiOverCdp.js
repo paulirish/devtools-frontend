@@ -3,17 +3,18 @@
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import * as BidiMapper from 'chromium-bidi/lib/bidiMapper/BidiMapper.js';
-import { debug } from '../common/Debug.js';
+import { BidiMapper } from 'chromium-bidi';
 import { TargetCloseError } from '../common/Errors.js';
 import { BidiConnection } from './Connection.js';
-const bidiServerLogger = (prefix, ...args) => {
-    debug(`bidi:${prefix}`)(args);
-};
 /**
  * @internal
  */
-export async function connectBidiOverCdp(cdp) {
+export async function connectBidiOverCdp(cdp, logger) {
+    const bidiServerLogger = logger
+        ? (prefix) => {
+            return logger(`bidi:${prefix}`);
+        }
+        : undefined;
     const transportBiDi = new NoOpTransport();
     const cdpConnectionAdapter = new CdpConnectionAdapter(cdp);
     const pptrTransport = {
@@ -34,7 +35,7 @@ export async function connectBidiOverCdp(cdp) {
         // Forwards a BiDi event sent by BidiServer to Puppeteer.
         pptrTransport.onmessage(JSON.stringify(message));
     });
-    const pptrBiDiConnection = new BidiConnection(cdp.url(), pptrTransport, cdp._idGenerator, cdp.delay, cdp.timeout);
+    const pptrBiDiConnection = new BidiConnection(cdp.url(), pptrTransport, cdp._idGenerator, cdp.delay, cdp.timeout, logger);
     const bidiServer = await BidiMapper.BidiServer.createAndStart(transportBiDi, cdpConnectionAdapter, cdpConnectionAdapter.browserClient(), 
     /* selfTargetId= */ '', undefined, bidiServerLogger);
     return pptrBiDiConnection;

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -16,10 +17,13 @@ import {
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {setupUserMetricHooks} from '../../../testing/UserMetricsHelpers.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 
 import * as NetworkComponents from './components.js';
-import type {EditableSpan} from './EditableSpan.js';
+
+type EditableSpan = NetworkComponents.EditableSpan.EditableSpan;
 
 async function renderHeaderSectionRow(header: NetworkComponents.HeaderSectionRow.HeaderDescriptor): Promise<{
   component: NetworkComponents.HeaderSectionRow.HeaderSectionRow,
@@ -64,6 +68,7 @@ const hasReloadPrompt = (shadowRoot: ShadowRoot) => {
 };
 
 describeWithEnvironment('HeaderSectionRow', () => {
+  setupUserMetricHooks();
   it('emits UMA event when a header value is being copied', async () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
@@ -149,7 +154,7 @@ Learn more`,
 
     assert.strictEqual(
         getCleanTextContentFromElements(component.shadowRoot, '.header-value code')[0],
-        'message ClientVariations { // Active Google-visible variation IDs on this client. These are reported for analysis, but do not directly affect any server-side behavior. repeated int32 variation_id = [3300118, 3300132, 3330195];\n}',
+        'message ClientVariations { // Active client experiment variation IDs repeated int32 variation_id = [3300118, 3300132, 3330195];\n}',
     );
   });
 
@@ -175,12 +180,11 @@ Learn more`,
     const icon = component.shadowRoot.querySelector('devtools-icon');
     assert.instanceOf(icon, HTMLElement);
 
-    assert.strictEqual(
-        icon.title,
-        'This attempt to set a cookie via a Set-Cookie header was blocked because it had the ' +
-            '"Secure" attribute but was not received over a secure connection.\nThis attempt to ' +
-            'set a cookie via a Set-Cookie header was blocked because it was not sent over a ' +
-            'secure connection and would have overwritten a cookie with the Secure attribute.');
+    assert.strictEqual(icon.title,
+                       'This attempt to set a cookie via a "Set-Cookie" header was blocked because it had the ' +
+                           '"Secure" attribute but wasn’t received over a secure connection\nThis attempt to ' +
+                           'set a cookie via a "Set-Cookie" header was blocked because it wasn’t sent over a ' +
+                           'secure connection and would have overwritten a cookie with the "Secure" attribute');
   });
 
   it('can be highlighted', async () => {
@@ -657,5 +661,37 @@ Learn more`,
     assert.strictEqual(headerEditedEventCount, 2);
     assert.strictEqual(headerNameFromEvent, editedHeaderName.trim());
     assert.strictEqual(headerValueFromEvent, editedHeaderValue.trim());
+  });
+
+  it('shows context menu and copies header value', async () => {
+    const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
+      name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
+      value: 'someHeaderValue',
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.DISABLED,
+    };
+    const {component} = await renderHeaderSectionRow(headerData);
+    assert.isNotNull(component.shadowRoot);
+
+    const headerValue = component.shadowRoot.querySelector('.header-value');
+    assert.instanceOf(headerValue, HTMLElement);
+
+    const copyTextStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'copyText');
+    const actionTakenStub = sinon.stub(Host.userMetrics, 'actionTaken');
+    const contextMenuShow = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
+
+    const event = new MouseEvent('contextmenu');
+    headerValue.dispatchEvent(event);
+
+    sinon.assert.calledOnce(contextMenuShow);
+    const contextMenu = contextMenuShow.thisValues[0];
+
+    const copyValueItem = contextMenu.clipboardSection().items.find((item: UI.ContextMenu.Item) =>
+                                                                        item.buildDescriptor().label === 'Copy value');
+    assert.exists(copyValueItem);
+
+    contextMenu.invokeHandler(copyValueItem.id());
+
+    sinon.assert.calledOnceWithExactly(copyTextStub, 'someHeaderValue');
+    sinon.assert.calledOnceWithExactly(actionTakenStub, Host.UserMetrics.Action.NetworkPanelCopyValue);
   });
 });

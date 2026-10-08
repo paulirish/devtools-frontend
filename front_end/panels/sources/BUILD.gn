@@ -22,6 +22,7 @@ generate_css("css_files") {
     "sourcesNavigator.css",
     "sourcesPanel.css",
     "sourcesView.css",
+    "tabbedEditorContainer.css",
     "threadsSidebarPane.css",
     "watchExpressionsSidebarPane.css",
   ]
@@ -31,7 +32,6 @@ devtools_ui_module("sources") {
   sources = [
     "AddSourceMapURLDialog.ts",
     "AiCodeCompletionPlugin.ts",
-    "AiWarningInfobarPlugin.ts",
     "BreakpointEditDialog.ts",
     "BreakpointsView.ts",
     "BreakpointsViewUtils.ts",
@@ -42,10 +42,10 @@ devtools_ui_module("sources") {
     "DebuggerPausedMessage.ts",
     "DebuggerPlugin.ts",
     "EditingLocationHistoryManager.ts",
+    "EditorHistory.ts",
     "FilePathScoreFunction.ts",
     "FilteredUISourceCodeListProvider.ts",
     "GoToLineQuickOpen.ts",
-    "InplaceFormatterEditorAction.ts",
     "NavigatorView.ts",
     "OpenFileQuickOpen.ts",
     "OutlineQuickOpen.ts",
@@ -66,14 +66,15 @@ devtools_ui_module("sources") {
     "WatchExpressionsSidebarPane.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
-    "../../entrypoints/formatter_worker:formatter_actions",
+    "../../core/text_utils:bundle",
+    "../../entrypoints/formatter_actions:bundle",
     "../../generated",
     "../../models/ai_assistance:bundle",
     "../../models/ai_code_completion:bundle",
@@ -82,19 +83,16 @@ devtools_ui_module("sources") {
     "../../models/bindings:bundle",
     "../../models/breakpoints:bundle",
     "../../models/formatter:bundle",
-    "../../models/geometry:bundle",
     "../../models/issues_manager:bundle",
     "../../models/persistence:bundle",
     "../../models/source_map_scopes:bundle",
     "../../models/stack_trace:bundle",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../panels/coverage:bundle",
     "../../panels/search:bundle",
     "../../panels/snippets:bundle",
     "../../panels/utils:bundle",
     "../../third_party/codemirror.next:bundle",
-    "../../third_party/diff:bundle",
     "../../ui/components/buttons:bundle",
     "../../ui/components/highlighting:bundle",
     "../../ui/components/input:bundle",
@@ -103,6 +101,7 @@ devtools_ui_module("sources") {
     "../../ui/components/spinners:bundle",
     "../../ui/components/text_editor:bundle",
     "../../ui/components/tooltips:bundle",
+    "../../ui/geometry:bundle",
     "../../ui/i18n:bundle",
     "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
@@ -114,21 +113,22 @@ devtools_ui_module("sources") {
     "../../ui/legacy/components/source_frame:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../../ui/visual_logging:bundle",
     "../common:bundle",
     "../utils:bundle",
     "./components:bundle",
+  ]
+  deps = [
+    ":css_files",
+    "../../ui/legacy/components/object_ui:css_files",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "sources.ts"
 
-  deps = [
-    ":css_files",
-    ":sources",
-    "../../ui/legacy/components/object_ui:bundle",
-  ]
+  ts_deps = [ ":sources" ]
 
   visibility = [
     ":*",
@@ -144,7 +144,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "sources-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/host:bundle",
@@ -157,6 +157,7 @@ devtools_entrypoint("meta") {
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/quick_open:bundle",
+    "../../ui/settings:bundle",
   ]
 
   visibility = [ "../../entrypoints/*" ]
@@ -175,6 +176,7 @@ devtools_ui_module("unittests") {
     "CoveragePlugin.test.ts",
     "DebuggerPausedMessage.test.ts",
     "DebuggerPlugin.test.ts",
+    "EditorHistory.test.ts",
     "FilePathScoreFunction.test.ts",
     "FilteredUISourceCodeListProvider.test.ts",
     "NavigatorView.test.ts",
@@ -184,6 +186,7 @@ devtools_ui_module("unittests") {
     "ScopeChainSidebarPane.test.ts",
     "SourcesNavigator.test.ts",
     "SourcesPanel.test.ts",
+    "SourcesSearchScope.test.ts",
     "SourcesView.test.ts",
     "TabbedEditorContainer.test.ts",
     "ThreadsSidebarPane.test.ts",
@@ -191,18 +194,20 @@ devtools_ui_module("unittests") {
     "WatchExpressionsSidebarPane.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/bindings:bundle",
     "../../models/breakpoints:bundle",
     "../../models/persistence:bundle",
+    "../../models/source_map_scopes:bundle",
     "../../models/stack_trace:bundle",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../testing",
     "../../third_party/codemirror.next:bundle",
@@ -211,10 +216,11 @@ devtools_ui_module("unittests") {
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/source_frame:bundle",
-    "../../ui/legacy/components/utils:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../common:bundle",
     "../coverage:bundle",
+    "../search:bundle",
     "components:bundle",
   ]
 }

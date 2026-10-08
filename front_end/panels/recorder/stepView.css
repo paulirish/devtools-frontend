@@ -1,0 +1,248 @@
+/*
+ * Copyright 2023 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-size: inherit;
+}
+
+.title-container {
+  /* Vertically center items with min-width: 0; */
+  min-width: 0;
+  font-size: var(--sys-size-7);
+  display: flex;
+  flex-direction: row;
+  gap: var(--sys-size-2);
+  outline-offset: var(--sys-size-2);
+  flex-grow: 1;
+  align-items: center;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+}
+
+.is-start-of-group .title {
+  font-weight: bold;
+}
+
+.error-icon {
+  display: none;
+}
+
+.breakpoint-icon {
+  visibility: hidden;
+  cursor: pointer;
+  opacity: 0%;
+  fill: var(--sys-color-primary);
+  stroke: #1a73e8; /* stylelint-disable-line plugin/use_theme_colors */
+  transform: translate(-1.92px, -3px);
+}
+
+.circle-icon {
+  fill: var(--sys-color-primary);
+  stroke: var(--sys-color-cdt-base-container);
+  stroke-width: var(--sys-size-3);
+  r: 5px;
+  cx: var(--sys-size-5);
+  cy: var(--sys-size-5);
+}
+
+.is-start-of-group:not(:first-of-type) .circle-icon {
+  r: 7px;
+  fill: var(--sys-color-cdt-base-container);
+  stroke: var(--sys-color-primary);
+  stroke-width: var(--sys-size-2);
+}
+
+.step.is-success .circle-icon {
+  fill: var(--sys-color-primary);
+  stroke: var(--sys-color-primary);
+}
+
+.step.is-current .circle-icon {
+  stroke-dasharray: 24 10;
+  animation: rotate 1s linear infinite;
+  fill: var(--sys-color-cdt-base-container);
+  stroke: var(--sys-color-primary);
+  stroke-width: var(--sys-size-2);
+}
+
+.error {
+  margin: var(--sys-size-8) 0 0;
+  padding: var(--sys-size-5);
+  background: var(--sys-color-error-container);
+  color: var(--sys-color-error);
+  position: relative;
+}
+
+@keyframes rotate {
+  0% {
+    transform: translate(var(--sys-size-5), var(--sys-size-5)) rotate(0) translate(calc(-1 * var(--sys-size-5)), calc(-1 * var(--sys-size-5)));
+  }
+
+  100% {
+    transform: translate(var(--sys-size-5), var(--sys-size-5)) rotate(360deg) translate(calc(-1 * var(--sys-size-5)), calc(-1 * var(--sys-size-5)));
+  }
+}
+
+.step.is-error .circle-icon {
+  fill: var(--sys-color-error);
+  stroke: var(--sys-color-error);
+}
+
+.step.is-error .error-icon {
+  display: block;
+  transform: translate(var(--sys-size-3), var(--sys-size-3));
+}
+
+:host-context(.was-successful) .circle-icon {
+  animation: flash-circle 2s;
+}
+
+:host-context(.was-successful) .breakpoint-icon {
+  animation: flash-breakpoint-icon 2s;
+}
+
+@keyframes flash-circle {
+  25% {
+    fill: var(--override-color-recording-successful-text);
+    stroke: var(--override-color-recording-successful-text);
+  }
+
+  75% {
+    fill: var(--override-color-recording-successful-text);
+    stroke: var(--override-color-recording-successful-text);
+  }
+}
+
+@keyframes flash-breakpoint-icon {
+  25% {
+    fill: var(--override-color-recording-successful-text);
+    stroke: var(--override-color-recording-successful-text);
+  }
+
+  75% {
+    fill: var(--override-color-recording-successful-text);
+    stroke: var(--override-color-recording-successful-text);
+  }
+}
+
+.chevron {
+  width: var(--sys-size-7);
+  height: var(--sys-size-7);
+  transition: 200ms;
+  position: absolute;
+  top: var(--sys-size-7);
+  left: var(--sys-size-11);
+  transform: rotate(-90deg);
+  color: var(--sys-color-on-surface);
+}
+
+.expanded .chevron {
+  transform: rotate(0deg);
+}
+
+.is-start-of-group .chevron {
+  top: 34px;
+}
+
+.details {
+  display: none;
+  margin-top: var(--sys-size-5);
+  position: relative;
+}
+
+.expanded .details {
+  display: block;
+}
+
+.step-details {
+  overflow: auto;
+}
+
+devtools-recorder-step-editor {
+  border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+  padding: 3px 6px 6px;
+  margin-left: calc(-1 * var(--sys-size-4));
+  border-radius: 3px;
+}
+
+devtools-recorder-step-editor:hover {
+  border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+}
+
+devtools-recorder-step-editor.is-selected {
+  background-color: color-mix(
+    in srgb,
+    var(--sys-color-tonal-container),
+    var(--sys-color-cdt-base-container) 50%
+  );
+  border: var(--sys-size-1) solid var(--sys-color-tonal-outline);
+}
+
+.summary {
+  display: flex;
+  flex-flow: row nowrap;
+}
+
+.subtitle {
+  font-weight: normal;
+  color: var(--sys-color-on-surface-subtle);
+  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main-title {
+  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-actions {
+  border: none;
+  border-radius: 0;
+  flex-shrink: 0;
+  height: var(--sys-size-11);
+
+  --override-select-menu-show-button-border-radius: 0;
+  --override-select-menu-show-button-outline: none;
+  --override-select-menu-show-button-padding: 0;
+}
+
+.step.has-breakpoint .circle-icon {
+  visibility: hidden;
+}
+
+.step:not(.is-start-of-group).has-breakpoint .breakpoint-icon {
+  visibility: visible;
+  opacity: 100%;
+}
+
+.step:not(.is-start-of-group, .has-breakpoint) .icon:hover .circle-icon {
+  transition: opacity 0.2s;
+  opacity: 0%;
+}
+
+.step:not(.is-start-of-group, .has-breakpoint) .icon:hover .error-icon {
+  visibility: hidden;
+}
+
+.step:not(.is-start-of-group, .has-breakpoint) .icon:hover .breakpoint-icon {
+  transition: opacity 0.2s;
+  visibility: visible;
+  opacity: 50%;
+}

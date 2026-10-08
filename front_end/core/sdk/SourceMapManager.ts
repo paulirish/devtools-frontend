@@ -7,28 +7,45 @@ import * as Platform from '../platform/platform.js';
 
 import type {FrameAssociated} from './FrameAssociated.js';
 import {PageResourceLoader, type PageResourceLoadInitiator, type ResourceLoader} from './PageResourceLoader.js';
-import {type DebugId, parseSourceMap, SourceMap, type SourceMapV3} from './SourceMap.js';
+import {SecurityOrigin} from './SecurityOrigin.js';
+import {type DebugId, parseSourceMap, SourceMap, type SourceMapProvenance, type SourceMapV3} from './SourceMap.js';
 import {SourceMapCache} from './SourceMapCache.js';
 import {type Target, Type} from './Target.js';
 
 export type SourceMapFactory<T> =
     (compiledURL: Platform.DevToolsPath.UrlString, sourceMappingURL: Platform.DevToolsPath.UrlString,
-     payload: SourceMapV3, client: T) => SourceMap;
+     payload: SourceMapV3, client: T, provenance: SourceMapProvenance) => SourceMap;
+
+export const lazyLoadingSettingDescriptor: Common.Settings.SettingDescriptor<boolean> = {
+  name: 'source-maps-lazy-loading',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
+  storageType: Common.Settings.SettingStorageType.LOCAL,
+};
 
 export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWrapper.ObjectWrapper<EventTypes<T>> {
   readonly #target: Target;
   readonly #factory: SourceMapFactory<T>;
+  readonly #lazyLoadingSetting: Common.Settings.Setting<boolean>;
   #isEnabled = true;
   readonly #clientData = new Map<T, ClientData>();
   readonly #sourceMaps = new Map<SourceMap, T>();
   #attachingClient: T|null = null;
+  readonly #sourceMapCache = SourceMapCache.create();
 
   constructor(target: Target, factory?: SourceMapFactory<T>) {
     super();
 
     this.#target = target;
-    this.#factory =
-        factory ?? ((compiledURL, sourceMappingURL, payload) => new SourceMap(compiledURL, sourceMappingURL, payload));
+    this.#factory = factory ??
+        ((compiledURL, sourceMappingURL, payload, _client, provenance) => new SourceMap(
+             compiledURL, sourceMappingURL, payload, this.#target.targetManager().getConsole(), undefined, provenance));
+    const settings = target.targetManager().settings;
+    this.#lazyLoadingSetting = settings.resolve(lazyLoadingSettingDescriptor);
+  }
+
+  isLazyLoadEnabled(): boolean {
+    return this.#lazyLoadingSetting.get();
   }
 
   setEnabled(isEnabled: boolean): void {
@@ -44,8 +61,8 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       this.detachSourceMap(client);
     }
     this.#isEnabled = isEnabled;
-    for (const [client, {relativeSourceURL, relativeSourceMapURL}] of clientData) {
-      this.attachSourceMap(client, relativeSourceURL, relativeSourceMapURL);
+    for (const [client, {relativeSourceURL, relativeSourceMapURL, provenance}] of clientData) {
+      this.attachSourceMap(client, relativeSourceURL, relativeSourceMapURL, provenance);
     }
   }
 
@@ -73,7 +90,7 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       return Promise.resolve(undefined);
     }
 
-    return clientData.sourceMapPromise;
+    return clientData.getSourceMap();
   }
 
   clientForSourceMap(sourceMap: SourceMap): T|undefined {
@@ -81,8 +98,8 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   }
 
   // TODO(bmeurer): We are lying about the type of |relativeSourceURL| here.
-  attachSourceMap(
-      client: T, relativeSourceURL: Platform.DevToolsPath.UrlString, relativeSourceMapURL: string|undefined): void {
+  attachSourceMap(client: T, relativeSourceURL: Platform.DevToolsPath.UrlString, relativeSourceMapURL: string|undefined,
+                  provenance: SourceMapProvenance): void {
     if (this.#clientData.has(client)) {
       throw new Error('SourceMap is already attached or being attached to client');
     }
@@ -90,64 +107,78 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       return;
     }
 
-    let clientData: ClientData|null = {
+    const clientData: ClientData = {
       relativeSourceURL,
       relativeSourceMapURL,
-      sourceMapPromise: Promise.resolve(undefined),
+      provenance,
+      getSourceMap: () => Promise.resolve(undefined),
     };
+    this.#clientData.set(client, clientData);
+
     if (this.#isEnabled) {
       // The `// #sourceURL=foo` can be a random string, but is generally an absolute path.
       // Complete it to inspected page url for relative links.
       const sourceURL = SourceMapManager.resolveRelativeSourceURL(this.#target, relativeSourceURL);
       const sourceMapURL = Common.ParsedURL.ParsedURL.completeURL(sourceURL, relativeSourceMapURL);
       if (sourceMapURL) {
-        if (this.#attachingClient) {
-          // This should not happen
-          console.error('Attaching source map may cancel previously attaching source map');
-        }
-        this.#attachingClient = client;
-        this.dispatchEventToListeners(Events.SourceMapWillAttach, {client});
+        let sourceMapPromise: Promise<SourceMap|undefined>|undefined;
+        const doLoad = (): Promise<SourceMap|undefined> => {
+          if (!sourceMapPromise) {
+            if (this.#attachingClient) {
+              // This should not happen
+              console.error('Attaching source map may cancel previously attaching source map');
+            }
+            this.#attachingClient = client;
+            this.dispatchEventToListeners(Events.SourceMapWillAttach, {client});
 
-        if (this.#attachingClient === client) {
-          this.#attachingClient = null;
-          const initiator = client.createPageResourceLoadInitiator();
-          // TODO(crbug.com/458180550): Pass PageResourceLoader via constructor.
-          //     The reason we grab it here lazily from the context is that otherwise every
-          //     unit test using `createTarget` would need to set up a `PageResourceLoader`, as
-          //     CSSModel and DebuggerModel are autostarted by default, and they create a
-          //     SourceMapManager in their respective constructors.
-          const resourceLoader = this.#target.targetManager().context.get(PageResourceLoader);
-          clientData.sourceMapPromise =
-              loadSourceMap(resourceLoader, sourceMapURL, client.debugId(), initiator)
-                  .then(
-                      payload => {
-                        const sourceMap = this.#factory(sourceURL, sourceMapURL, payload, client);
-                        if (this.#clientData.get(client) === clientData) {
-                          clientData.sourceMap = sourceMap;
-                          this.#sourceMaps.set(sourceMap, client);
-                          this.dispatchEventToListeners(Events.SourceMapAttached, {client, sourceMap});
-                        }
-                        return sourceMap;
-                      },
-                      () => {
-                        if (this.#clientData.get(client) === clientData) {
-                          this.dispatchEventToListeners(Events.SourceMapFailedToAttach, {client});
-                        }
-                        return undefined;
-                      });
-        } else {
-          // Assume cancelAttachSourceMap was called.
-          if (this.#attachingClient) {
-            // This should not happen
-            console.error('Cancelling source map attach because another source map is attaching');
+            if (this.#attachingClient === client) {
+              this.#attachingClient = null;
+              const initiator = client.createPageResourceLoadInitiator();
+              // TODO(crbug.com/458180550): Pass PageResourceLoader via constructor.
+              //     The reason we grab it here lazily from the context is that otherwise every
+              //     unit test using `createTarget` would need to set up a `PageResourceLoader`, as
+              //     CSSModel and DebuggerModel are autostarted by default, and they create a
+              //     SourceMapManager in their respective constructors.
+              const resourceLoader = this.#target.targetManager().context.get(PageResourceLoader);
+              sourceMapPromise =
+                  loadSourceMap(resourceLoader, this.#sourceMapCache, sourceMapURL, client.debugId(), initiator)
+                      .then(
+                          payload => {
+                            const sourceMap = this.#factory(sourceURL, sourceMapURL, payload, client, provenance);
+                            if (this.#clientData.get(client) === clientData) {
+                              clientData.sourceMap = sourceMap;
+                              this.#sourceMaps.set(sourceMap, client);
+                              this.dispatchEventToListeners(Events.SourceMapAttached, {client, sourceMap});
+                            }
+                            return sourceMap;
+                          },
+                          () => {
+                            if (this.#clientData.get(client) === clientData) {
+                              this.dispatchEventToListeners(Events.SourceMapFailedToAttach, {client});
+                            }
+                            return undefined;
+                          });
+            } else {
+              // Assume cancelAttachSourceMap was called.
+              if (this.#attachingClient) {
+                // This should not happen
+                console.error('Cancelling source map attach because another source map is attaching');
+              }
+              this.#clientData.delete(client);
+              this.dispatchEventToListeners(Events.SourceMapFailedToAttach, {client});
+              sourceMapPromise = Promise.resolve(undefined);
+            }
           }
-          clientData = null;
-          this.dispatchEventToListeners(Events.SourceMapFailedToAttach, {client});
+          return sourceMapPromise;
+        };
+
+        if (this.isLazyLoadEnabled()) {
+          clientData.getSourceMap = doLoad;
+        } else {
+          const promise = doLoad();
+          clientData.getSourceMap = () => promise;
         }
       }
-    }
-    if (clientData) {
-      this.#clientData.set(client, clientData);
     }
   }
 
@@ -185,14 +216,24 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   }
 }
 
-async function loadSourceMap(
-    resourceLoader: ResourceLoader, url: Platform.DevToolsPath.UrlString, debugId: DebugId|null,
-    initiator: PageResourceLoadInitiator): Promise<SourceMapV3> {
+function getCacheOrigin(initiator: PageResourceLoadInitiator): Platform.DevToolsPath.UrlString|null {
+  if (!initiator.initiatorUrl) {
+    return null;
+  }
+  const securityOrigin = SecurityOrigin.create(initiator.initiatorUrl);
+  if (securityOrigin.isOpaque() || (securityOrigin.isFile() && securityOrigin.siteId() === 'file:///')) {
+    return null;
+  }
+  return securityOrigin.siteId() as Platform.DevToolsPath.UrlString;
+}
+
+async function loadSourceMap(resourceLoader: ResourceLoader, sourceMapCache: SourceMapCache,
+                             url: Platform.DevToolsPath.UrlString, debugId: DebugId|null,
+                             initiator: PageResourceLoadInitiator): Promise<SourceMapV3> {
   try {
-    if (debugId) {
-      const securityOrigin = initiator.initiatorUrl ? Common.ParsedURL.ParsedURL.extractOrigin(initiator.initiatorUrl) :
-                                                      Platform.DevToolsPath.EmptyUrlString;
-      const cachedSourceMap = await SourceMapCache.instance().get(debugId, securityOrigin);
+    const cacheOrigin = debugId ? getCacheOrigin(initiator) : null;
+    if (debugId && cacheOrigin) {
+      const cachedSourceMap = await sourceMapCache.get(debugId, cacheOrigin);
       if (cachedSourceMap) {
         return cachedSourceMap;
       }
@@ -200,11 +241,9 @@ async function loadSourceMap(
 
     const {content} = await resourceLoader.loadResource(url, initiator);
     const sourceMap = parseSourceMap(content);
-    if (debugId && 'debugId' in sourceMap && sourceMap.debugId === debugId) {
+    if (debugId && cacheOrigin && 'debugId' in sourceMap && sourceMap.debugId === debugId) {
       // In case something goes wrong with updating the cache, we still want to use the source map.
-      const securityOrigin = initiator.initiatorUrl ? Common.ParsedURL.ParsedURL.extractOrigin(initiator.initiatorUrl) :
-                                                      Platform.DevToolsPath.EmptyUrlString;
-      await SourceMapCache.instance().set(sourceMap.debugId as DebugId, securityOrigin, sourceMap).catch();
+      await sourceMapCache.set(sourceMap.debugId as DebugId, cacheOrigin, sourceMap).catch();
     }
     return sourceMap;
   } catch (cause) {
@@ -216,7 +255,7 @@ export async function tryLoadSourceMap(
     resourceLoader: ResourceLoader, url: Platform.DevToolsPath.UrlString,
     initiator: PageResourceLoadInitiator): Promise<SourceMapV3|null> {
   try {
-    return await loadSourceMap(resourceLoader, url, null, initiator);
+    return await loadSourceMap(resourceLoader, SourceMapCache.create(), url, null, initiator);
   } catch (cause) {
     console.error(cause);
     return null;
@@ -228,8 +267,9 @@ interface ClientData {
   // Stores the raw sourceMappingURL as provided by V8. These are not guaranteed to
   // be valid URLs and will be checked and resolved once `attachSourceMap` is called.
   relativeSourceMapURL: string;
+  provenance: SourceMapProvenance;
   sourceMap?: SourceMap;
-  sourceMapPromise: Promise<SourceMap|undefined>;
+  getSourceMap: () => Promise<SourceMap|undefined>;
 }
 
 export enum Events {

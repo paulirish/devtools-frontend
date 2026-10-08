@@ -71,7 +71,7 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DocumentLatency.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 // Due to the way that DevTools throttling works we cannot see if server response took less than ~570ms.
 // We set our failure threshold to 600ms to avoid those false positives but we want devs to shoot for 100ms.
@@ -191,7 +191,7 @@ function finalize(partialModel: PartialInsightModel<DocumentLatencyInsightModel>
 
 export function generateInsight(
     data: Handlers.Types.HandlerData, context: InsightSetContext): DocumentLatencyInsightModel {
-  if (!context.navigation) {
+  if (!context.navigation || !('navigationId' in context)) {
     return finalize({});
   }
 
@@ -242,18 +242,18 @@ export function generateInsight(
             PH1: documentRequest.args.data.redirects.length,
             PH2: millisToString(redirectDuration),
           }),
-          value: noRedirects
+          value: noRedirects,
         },
         serverResponseIsFast: {
           label: serverResponseIsFast ?
               i18nString(UIStrings.passingServerResponseTime, {PH1: millisToString(serverResponseTime)}) :
               i18nString(UIStrings.failedServerResponseTime, {PH1: millisToString(serverResponseTime)}),
-          value: serverResponseIsFast
+          value: serverResponseIsFast,
         },
         usesCompression: {
           label: usesCompression ? i18nString(UIStrings.passingTextCompression) :
                                    i18nString(UIStrings.failedTextCompression),
-          value: usesCompression
+          value: usesCompression,
         },
       },
     },

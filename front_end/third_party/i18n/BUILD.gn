@@ -12,12 +12,12 @@ devtools_module("i18n") {
     "localized-string-set.ts",
   ]
 
-  deps = [ "../intl-messageformat:bundle" ]
+  ts_deps = [ "../intl-messageformat:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "i18n.ts"
-  deps = [ ":i18n" ]
+  ts_deps = [ ":i18n" ]
 
   visibility = [ "*" ]
 }
@@ -27,5 +27,5 @@ ts_library("unittests") {
 
   sources = [ "i18n.test.ts" ]
 
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 }

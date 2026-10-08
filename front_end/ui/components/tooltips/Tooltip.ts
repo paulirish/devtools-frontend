@@ -100,7 +100,7 @@ const positioningUtils = {
 
     return rect1 && rect1.left === rect2.left && rect1.top === rect2.top && rect1.width === rect2.width &&
         rect1.height === rect2.height;
-  }
+  },
 };
 
 export const proposedRectForRichTooltip = ({inspectorViewRect, anchorRect, currentPopoverRect, preferredPositions}: {
@@ -228,7 +228,7 @@ export interface TooltipProperties {
  *                  as well, `"trigger"` takes precedence.
  */
 export class Tooltip extends HTMLElement {
-  static readonly observedAttributes = ['id', 'variant', 'jslogcontext', 'trigger'];
+  static readonly observedAttributes = ['id', 'variant', 'jslogcontext', 'trigger'] as const;
   static lastOpenedTooltipId: string|null = null;
 
   readonly #shadow = this.attachShadow({mode: 'open'});

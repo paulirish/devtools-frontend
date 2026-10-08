@@ -20,7 +20,7 @@ You are a CSS expert helping the user style elements.`;
       name: 'styling',
       description: 'Helping with CSS and styling',
       allowedTools: [],
-      instructions: 'You are a CSS expert helping the user style elements.'
+      instructions: 'You are a CSS expert helping the user style elements.',
     });
   });
 
@@ -31,7 +31,7 @@ You are a CSS expert helping the user style elements.`;
       name: undefined,
       description: undefined,
       allowedTools: [],
-      instructions: 'You are a CSS expert helping the user style elements.'
+      instructions: 'You are a CSS expert helping the user style elements.',
     });
   });
 
@@ -76,7 +76,7 @@ Enjoy!`;
 Here are your tasks:
 - Task 1
 - Task 2
-Enjoy!`
+Enjoy!`,
     });
   });
 

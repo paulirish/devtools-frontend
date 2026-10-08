@@ -11,16 +11,16 @@ ts_library("testing") {
 
   testonly = true
 
-  deps = [
+  ts_deps = [
     "../:bundle",
     "../../:bundle",
-    "../../../../testing",
   ]
 }
 
 devtools_entrypoint("bundle") {
+  testonly = true
   entrypoint = "testing.ts"
-  deps = [ ":testing" ]
+  ts_deps = [ ":testing" ]
   visibility = [
     ":*",
     "../*",

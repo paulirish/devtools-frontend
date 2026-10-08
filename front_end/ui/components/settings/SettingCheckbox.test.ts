@@ -4,13 +4,11 @@
 
 import {assert} from 'chai';
 
-import * as Common from '../../../core/common/common.js';
-import type * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import {
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
-import {createFakeSetting, stubNoopSettings} from '../../../testing/EnvironmentHelpers.js';
+import {createFakeSetting} from '../../../testing/EnvironmentHelpers.js';
 
 import * as Settings from './settings.js';
 
@@ -87,121 +85,18 @@ describe('SettingCheckbox', () => {
 
   it('ignores clicks when disabled', () => {
     const setting = createFakeSetting<boolean>('setting', false);
-    setting.setDisabled(true);
-    const {checkbox} = renderSettingCheckbox({setting});
+    const {checkbox} = renderSettingCheckbox({setting, disabled: true});
 
     checkbox.click();
 
     assert.isFalse(setting.get());
   });
 
-  it('can be disabled via registration', () => {
-    stubNoopSettings();
+  it('disables checkbox when disabled property is true', () => {
     const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      disabledCondition: () => {
-        return {disabled: true, reasons: ['reason' as Platform.UIString.LocalizedString]};
-      },
-    });
 
-    const {checkbox} = renderSettingCheckbox({setting});
+    const {checkbox} = renderSettingCheckbox({setting, disabled: true});
 
-    checkbox.click();
-
-    assert.isFalse(setting.get());
     assert.isTrue(checkbox.disabled);
-  });
-
-  it('shows disabled reason', () => {
-    stubNoopSettings();
-    const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      disabledCondition: () => {
-        return {disabled: true, reasons: ['reason' as Platform.UIString.LocalizedString]};
-      },
-    });
-
-    const {component} = renderSettingCheckbox({setting});
-
-    assert.strictEqual(
-        (component.shadowRoot!.querySelector('.disabled-reason') as HTMLElement).getAttribute('title'), 'reason');
-  });
-
-  it('is disabled for a disabled deprecated settings', () => {
-    const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      deprecationNotice: {
-        warning: () => 'Setting deprecated' as Platform.UIString.LocalizedString,
-        disabled: true,
-      },
-    });
-
-    const {checkbox} = renderSettingCheckbox({setting});
-    assert.isTrue(checkbox.disabled);
-  });
-
-  it('is enabled for a disabled deprecated settings with enabled experiment', () => {
-    const experiment = 'test-experiment';
-    Root.Runtime.experiments.register(experiment as Root.ExperimentNames.ExperimentName, experiment);
-    Root.Runtime.experiments.setEnabled(experiment as Root.ExperimentNames.ExperimentName, true);
-    const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      deprecationNotice: {
-        warning: () => 'Setting deprecated' as Platform.UIString.LocalizedString,
-        disabled: true,
-        experiment,
-      },
-    });
-
-    const {checkbox} = renderSettingCheckbox({setting});
-    assert.isTrue(checkbox.disabled);
-  });
-
-  it('is enabled for a disabled deprecated settings with disabled experiment', () => {
-    const experiment = 'test-experiment';
-    Root.Runtime.experiments.register(experiment as Root.ExperimentNames.ExperimentName, experiment);
-    Root.Runtime.experiments.setEnabled(experiment as Root.ExperimentNames.ExperimentName, false);
-    const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      deprecationNotice: {
-        warning: () => 'Setting deprecated' as Platform.UIString.LocalizedString,
-        disabled: true,
-        experiment,
-      },
-    });
-
-    const {checkbox} = renderSettingCheckbox({setting});
-    assert.isFalse(checkbox.disabled);
-  });
-
-  it('is disabled for an enabled deprecated settings', () => {
-    const setting = createFakeSetting<boolean>('setting', false);
-    setting.setRegistration({
-      settingName: 'setting',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-      deprecationNotice: {
-        warning: () => 'Setting deprecated' as Platform.UIString.LocalizedString,
-        disabled: false,
-      },
-    });
-
-    const {checkbox} = renderSettingCheckbox({setting});
-    assert.isFalse(checkbox.disabled);
   });
 });

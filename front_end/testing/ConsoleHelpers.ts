@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
@@ -10,9 +11,13 @@ import * as Logs from '../models/logs/logs.js';
 import * as Console from '../panels/console/console.js';
 import * as Components from '../ui/legacy/components/utils/utils.js';
 
-export function createConsoleViewMessageWithStubDeps(rawMessage: SDK.ConsoleModel.ConsoleMessage) {
+export function createConsoleViewMessageWithStubDeps(rawMessage: SDK.ConsoleModel.ConsoleMessage): {
+  message: Console.ConsoleViewMessage.ConsoleViewMessage,
+  linkifier: sinon.SinonStubbedInstance<Components.Linkifier.Linkifier>,
+} {
   const linkifier = sinon.createStubInstance(Components.Linkifier.Linkifier);
   const requestResolver = sinon.createStubInstance(Logs.RequestResolver.RequestResolver);
+  requestResolver.waitFor.returns(Promise.reject());
   const issuesResolver = sinon.createStubInstance(IssuesManager.IssueResolver.IssueResolver);
   const message = new Console.ConsoleViewMessage.ConsoleViewMessage(
       rawMessage, linkifier, requestResolver, issuesResolver, /* onResize */ () => {});

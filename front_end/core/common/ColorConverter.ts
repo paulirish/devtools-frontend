@@ -274,9 +274,9 @@ export class ColorConverter {
     const xyzInput = new Vector3([x, y, z]);
     const lmsIntermediate = XYZ_TO_LMS_MATRIX.multiply(xyzInput);
 
-    lmsIntermediate.values[0] = Math.pow(lmsIntermediate.values[0], 1.0 / 3.0);
-    lmsIntermediate.values[1] = Math.pow(lmsIntermediate.values[1], 1.0 / 3.0);
-    lmsIntermediate.values[2] = Math.pow(lmsIntermediate.values[2], 1.0 / 3.0);
+    lmsIntermediate.values[0] = Math.cbrt(lmsIntermediate.values[0]);
+    lmsIntermediate.values[1] = Math.cbrt(lmsIntermediate.values[1]);
+    lmsIntermediate.values[2] = Math.cbrt(lmsIntermediate.values[2]);
 
     const labOutput = LMS_TO_OKLAB_MATRIX.multiply(lmsIntermediate);
     return [labOutput.values[0], labOutput.values[1], labOutput.values[2]];
@@ -306,6 +306,18 @@ export class ColorConverter {
     const rgbOutput = NAMED_GAMUTS.displayP3_INVERSE.multiply(xyzInput);
     return applyTransferFns(
         NAMED_TRANSFER_FN.sRGB_INVERSE, rgbOutput.values[0], rgbOutput.values[1], rgbOutput.values[2]);
+  }
+
+  static displayP3LinearToXyzd50(r: number, g: number, b: number): [number, number, number] {
+    const rgbInput = new Vector3([r, g, b]);
+    const xyzOutput = NAMED_GAMUTS.displayP3.multiply(rgbInput);
+    return xyzOutput.values;
+  }
+
+  static xyzd50ToDisplayP3Linear(x: number, y: number, z: number): [number, number, number] {
+    const xyzInput = new Vector3([x, y, z]);
+    const rgbResult = NAMED_GAMUTS.displayP3_INVERSE.multiply(xyzInput);
+    return rgbResult.values;
   }
 
   static proPhotoToXyzd50(r: number, g: number, b: number): [number, number, number] {

@@ -7,7 +7,7 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("bindings") {
+devtools_foundation_module("bindings") {
   sources = [
     "CSSWorkspaceBinding.ts",
     "CompilerScriptMapping.ts",
@@ -23,22 +23,23 @@ devtools_module("bindings") {
     "ResourceScriptMapping.ts",
     "ResourceUtils.ts",
     "SASSSourceMapping.ts",
+    "SourceMapStepping.ts",
     "StylesSourceMapping.ts",
     "SymbolizedError.ts",
     "TempFile.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../extension-api",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/stack_trace:bundle",
     "../../models/stack_trace:impl",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../formatter:bundle",
   ]
@@ -47,18 +48,21 @@ devtools_module("bindings") {
 devtools_entrypoint("bundle") {
   entrypoint = "bindings.ts"
 
-  deps = [ ":bindings" ]
+  ts_deps = [ ":bindings" ]
 
   visibility = [
     ":*",
     "../../../mcp/*",
     "../../core/sdk:foundation_unittests",
+    "../../core/sdk:foundation_unittests_checked",
     "../../core/sdk:foundation_unittests_node_typecheck",
     "../../core/sdk:unittests",
-    "../../entrypoints/inspector_main",
+    "../../core/sdk:unittests_checked",
+    "../../entrypoints/inspector_main/*",
     "../../entrypoints/main/*",
     "../../foundation/*",
     "../../legacy_test_runner/*",
+    "../../panels/ai_assistance/*",
     "../../panels/application/*",
     "../../panels/changes/*",
     "../../panels/common/*",
@@ -79,7 +83,9 @@ devtools_entrypoint("bundle") {
     "../../ui/components/docs/performance_panel/*",
     "../../ui/components/linkifier/*",
     "../../ui/components/text_editor/*",
+    "../../ui/legacy/components/cookie_table/*",
     "../../ui/legacy/components/inline_editor/*",
+    "../../ui/legacy/components/object_ui/*",
     "../../ui/legacy/components/perf_ui/*",
     "../../ui/legacy/components/utils/*",
     "../ai_assistance/*",
@@ -98,10 +104,11 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
+    "CSSWorkspaceBinding.test.ts",
     "CompilerScriptMapping.test.ts",
     "ContentProviderBasedProject.test.ts",
     "DebuggerLanguagePlugins.test.ts",
@@ -113,22 +120,27 @@ ts_library("unittests") {
     "ResourceMapping.test.ts",
     "ResourceScriptMapping.test.ts",
     "ResourceUtils.test.ts",
+    "SourceMapStepping.test.ts",
+    "StylesSourceMapping.test.ts",
     "SymbolizedError.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../extension-api",
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/protocol_client:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../testing",
     "../../third_party/source-map-scopes-codec:bundle",
+    "../formatter:bundle",
+    "../persistence:bundle",
     "../stack_trace:bundle",
     "../stack_trace:impl",
-    "../text_utils:bundle",
     "../workspace:bundle",
   ]
 }

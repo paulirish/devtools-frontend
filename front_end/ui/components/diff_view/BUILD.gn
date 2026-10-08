@@ -15,9 +15,9 @@ generate_css("css_files") {
 devtools_ui_module("diff_view") {
   sources = [ "DiffView.ts" ]
 
-  deps = [
-    ":css_files",
-    "../../../core/common:bundle",
+  deps = [ ":css_files" ]
+
+  ts_deps = [
     "../../../core/i18n:bundle",
     "../../../third_party/diff:bundle",
     "../../lit:bundle",
@@ -29,7 +29,7 @@ devtools_ui_module("diff_view") {
 devtools_entrypoint("bundle") {
   entrypoint = "diff_view.ts"
 
-  deps = [ ":diff_view" ]
+  ts_deps = [ ":diff_view" ]
 
   visibility = default_components_visibility
 }
@@ -39,7 +39,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "DiffView.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../../third_party/diff:bundle",

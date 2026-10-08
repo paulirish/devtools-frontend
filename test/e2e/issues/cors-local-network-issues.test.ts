@@ -58,36 +58,36 @@ describe('Cors Local Network issues', () => {
 
     await expandIssue(devToolsPage);
     const issueElement =
-        await getIssueByTitle('Ensure that local network requests are compatible with restrictions', devToolsPage);
+        await getIssueByTitle(devToolsPage, 'Ensure that local network requests are compatible with restrictions');
     assert.isOk(issueElement);
     const section =
-        await getResourcesElement('2 requests', issueElement, '.cors-issue-affected-resource-label', devToolsPage);
-    await ensureResourceSectionIsExpanded(section, devToolsPage);
+        await getResourcesElement(devToolsPage, '2 requests', issueElement, '.cors-issue-affected-resource-label');
+    await ensureResourceSectionIsExpanded(devToolsPage, section);
 
     const expectedTableRows = [
       [
         'Request',
         'Status',
-        'Resource Address',
-        'Initiator Address',
-        'Initiator Context',
+        'Resource address',
+        'Initiator address',
+        'Initiator context',
       ],
       [
         'localhost/',
-        'warning',
+        'Warning',
         'Local',
         'Public',
-        'insecure',
+        'Insecure',
       ],
       [
         'example.com/',
-        'warning',
+        'Warning',
         'Local',
         'Unknown',
-        'insecure',
+        'Insecure',
       ],
     ];
-    await waitForTableFromResourceSectionContents(section.content, expectedTableRows, devToolsPage);
+    await waitForTableFromResourceSectionContents(devToolsPage, section.content, expectedTableRows);
   });
 
   it('should display correct information for secure contexts', async ({devToolsPage, inspectedPage}) => {
@@ -134,34 +134,34 @@ describe('Cors Local Network issues', () => {
 
     await expandIssue(devToolsPage);
     const issueElement =
-        await getIssueByTitle('Ensure that local network requests are compatible with restrictions', devToolsPage);
+        await getIssueByTitle(devToolsPage, 'Ensure that local network requests are compatible with restrictions');
     assert.isOk(issueElement);
     const section =
-        await getResourcesElement('2 requests', issueElement, '.cors-issue-affected-resource-label', devToolsPage);
-    await ensureResourceSectionIsExpanded(section, devToolsPage);
+        await getResourcesElement(devToolsPage, '2 requests', issueElement, '.cors-issue-affected-resource-label');
+    await ensureResourceSectionIsExpanded(devToolsPage, section);
     const expectedTableRows = [
       [
         'Request',
         'Status',
-        'Resource Address',
-        'Initiator Address',
-        'Initiator Context',
+        'Resource address',
+        'Initiator address',
+        'Initiator context',
       ],
       [
         'localhost/',
-        'warning',
+        'Warning',
         'Local',
         'Public',
-        'secure',
+        'Secure',
       ],
       [
         'example.com/',
-        'warning',
+        'Warning',
         'Local',
         'Unknown',
-        'secure',
+        'Secure',
       ],
     ];
-    await waitForTableFromResourceSectionContents(section.content, expectedTableRows, devToolsPage);
+    await waitForTableFromResourceSectionContents(devToolsPage, section.content, expectedTableRows);
   });
 });

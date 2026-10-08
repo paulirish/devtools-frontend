@@ -14,13 +14,13 @@ devtools_module("browser") {
     "dom.iterable",
   ]
 
-  deps = [ "../api:bundle" ]
+  ts_deps = [ "../api" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "browser.ts"
 
-  deps = [ ":browser" ]
+  ts_deps = [ ":browser" ]
 
   visibility = [ "../*" ]
 }

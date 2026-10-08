@@ -17,11 +17,14 @@
 import {getLoadState} from '../lib/getLoadState.js';
 import {getSelector} from '../lib/getSelector.js';
 import {initUnique} from '../lib/initUnique.js';
-import {InteractionManager, Interaction} from '../lib/InteractionManager.js';
+import {
+  InteractionManager,
+  type Interaction,
+} from '../lib/InteractionManager.js';
 import {observe} from '../lib/observe.js';
 import {whenIdleOrHidden} from '../lib/whenIdleOrHidden.js';
 import {onINP as unattributedOnINP} from '../onINP.js';
-import {
+import type {
   INPAttribution,
   INPAttributionReportOpts,
   INPMetric,
@@ -63,7 +66,7 @@ const MAX_PENDING_FRAMES = 10;
  *
  * A custom `includeProcessedEventEntries` configuration option can optionally
  * be passed to control whether the `processedEventEntries` array in the
- * attribution object is populated. The default value is `true`.
+ * attribution object is populated. The default value is `false`.
  *
  * If the `reportAllChanges` configuration option is set to `true`, the
  * `callback` function will be called as soon as the value is initially
@@ -130,10 +133,19 @@ export const onINP = (
 
   const saveInteractionTarget = (interaction: Interaction) => {
     if (!interactionTargetMap.get(interaction)) {
-      const node = interaction.entries[0].target;
+      // Use find to get first selector
+      const node = interaction.entries.find((e) => e.target)?.target;
       if (node) {
         const customTarget = opts.generateTarget?.(node) ?? getSelector(node);
         interactionTargetMap.set(interaction, customTarget);
+      } else {
+        // Fall back to targetSelector
+        const selector = interaction.entries.find(
+          (e) => e.targetSelector,
+        )?.targetSelector;
+        if (selector) {
+          interactionTargetMap.set(interaction, selector);
+        }
       }
     }
   };
@@ -174,7 +186,7 @@ export const onINP = (
         );
         // processedEventEntries can be quite large, so only include them if
         // the user explicitly requests them (default is to include).
-        if (opts.includeProcessedEventEntries !== false) {
+        if (opts.includeProcessedEventEntries) {
           group.entries.push(entry);
         }
 
@@ -191,14 +203,14 @@ export const onINP = (
         renderTime,
         // processedEventEntries can be quite large, so only include them if
         // the user explicitly requests them (default is to include).
-        entries: opts.includeProcessedEventEntries !== false ? [entry] : [],
+        entries: opts.includeProcessedEventEntries ? [entry] : [],
       };
 
       pendingEntriesGroups.push(group);
     }
 
     // Store the grouped render time for this entry for reference later.
-    if (entry.interactionId || entry.entryType === 'first-input') {
+    if (entry.interactionId) {
       entryToEntriesGroupMap.set(entry, group);
     }
 
@@ -208,8 +220,8 @@ export const onINP = (
   const queueCleanup = () => {
     // Queue cleanup of entries that are not part of any INP candidates.
     if (!cleanupPending) {
-      whenIdleOrHidden(cleanupEntries);
       cleanupPending = true;
+      whenIdleOrHidden(cleanupEntries);
     }
   };
 
@@ -249,11 +261,15 @@ export const onINP = (
     // Clean up the `pendingLoAFs` list so it doesn't grow endlessly.
     // Keep all LoAFs that either:
     // 1) Intersect with one of the above pending entries groups, OR
-    // 2) Occurred more recently than the most recently process event entry.
-    pendingLoAFs = pendingLoAFs.filter((loaf) => {
+    // 2) Occurred more recently than the most recently processed event entry
+    //    and are part of the most recent set of frames (which is
+    //    determined by checking if the index in the list is within
+    //    `MAX_PENDING_FRAMES` of the list's length).
+    const minLoAFIndexToKeep = pendingLoAFs.length - MAX_PENDING_FRAMES;
+    pendingLoAFs = pendingLoAFs.filter((loaf, i) => {
       return (
-        // Compare times first because it's faster.
-        loaf.startTime > latestProcessingEnd || intersectingLoAFs.has(loaf)
+        intersectingLoAFs.has(loaf) ||
+        (i >= minLoAFIndexToKeep && loaf.startTime > latestProcessingEnd)
       );
     });
 
@@ -282,6 +298,7 @@ export const onINP = (
       rating: 'good',
       value: entry.duration,
       delta: entry.duration,
+      navigationId: (entry as any).navigationId,
       navigationType: 'navigate',
       id: 'N/A',
     });
@@ -317,12 +334,18 @@ export const onINP = (
   };
 
   const attributeLoAFDetails = (attribution: INPAttribution) => {
-    // If there is no LoAF data then nothing further to attribute
-    if (!attribution.longAnimationFrameEntries?.length) {
+    const interactionTime = attribution.interactionTime;
+    const nextPaintTime = attribution.nextPaintTime;
+
+    // If there is no LoAF data, interactionTime or paintTime
+    // then nothing further to attribute here.
+    if (
+      !attribution.longAnimationFrameEntries?.length ||
+      !interactionTime ||
+      !nextPaintTime
+    ) {
       return;
     }
-
-    const interactionTime = attribution.interactionTime;
     const inputDelay = attribution.inputDelay;
     const processingDuration = attribution.processingDuration;
 
@@ -385,7 +408,7 @@ export const onINP = (
       ? lastLoAF.startTime + lastLoAF.duration
       : 0;
     if (lastLoAFEndTime >= interactionTime + inputDelay + processingDuration) {
-      totalPaintDuration = attribution.nextPaintTime - lastLoAFEndTime;
+      totalPaintDuration = nextPaintTime - lastLoAFEndTime;
     }
 
     if (longestScriptEntry && longestScriptSubpart) {
@@ -399,7 +422,7 @@ export const onINP = (
     attribution.totalStyleAndLayoutDuration = totalStyleAndLayoutDuration;
     attribution.totalPaintDuration = totalPaintDuration;
     attribution.totalUnattributedDuration =
-      attribution.nextPaintTime -
+      nextPaintTime -
       interactionTime -
       totalScriptDuration -
       totalStyleAndLayoutDuration -
@@ -407,10 +430,36 @@ export const onINP = (
   };
 
   const attributeINP = (metric: INPMetric): INPMetricWithAttribution => {
+    // Soft navs and bfcache can have a dummy INP as no first-input entry to
+    // fall back on so we report dummy values when the interactionCount has
+    // gone up, even if no entry was emitted.
+    // See https://github.com/GoogleChrome/web-vitals/issues/724
+    // All other INPs should have at least one entry, but we'll do same dummy
+    // processing if they don't for some reason.
+    if (metric.entries.length === 0) {
+      const navStartTime = metric.navigationStartTime || 0;
+      const attribution: INPAttribution = {
+        processedEventEntries: [],
+        longAnimationFrameEntries: [],
+        inputDelay: 0,
+        processingDuration: 0,
+        presentationDelay: metric.value,
+        loadState: getLoadState(navStartTime),
+      };
+      return Object.assign(metric, {attribution});
+    }
+
     const firstEntry = metric.entries[0];
     const group = entryToEntriesGroupMap.get(firstEntry)!;
 
-    const processingStart = firstEntry.processingStart;
+    // `group.processingStart` is the earliest processing start across *all*
+    // events presented in this frame, which can predate this interaction's
+    // `startTime` (e.g. a long `pointerover` handler that was still running
+    // when the user clicked). Clamp so `inputDelay` is never negative.
+    const processingStart = Math.max(
+      group.processingStart,
+      firstEntry.startTime,
+    );
 
     // Due to the fact that durations can be rounded down to the nearest 8ms,
     // we have to clamp `nextPaintTime` so it doesn't appear to occur before
@@ -420,7 +469,6 @@ export const onINP = (
       firstEntry.startTime + firstEntry.duration,
       processingStart,
     );
-
     // For the purposes of attribution, clamp `processingEnd` to `nextPaintTime`,
     // so processing is never reported as taking longer than INP (which can
     // happen via the web APIs in the case of sync modals, e.g. `alert()`).
@@ -469,7 +517,7 @@ export const onINP = (
   };
 
   // Start observing LoAF entries for attribution.
-  observe('long-animation-frame', handleLoAFEntries);
+  observe(['long-animation-frame'], handleLoAFEntries, opts);
 
   unattributedOnINP((metric: INPMetric) => {
     onReport(attributeINP(metric));

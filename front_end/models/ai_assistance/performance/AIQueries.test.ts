@@ -4,12 +4,13 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightSetOrError} from '../../../testing/InsightHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import {AIQueries} from '../ai_assistance.js';
 
-describeWithEnvironment('AIQueries', () => {
+describe('AIQueries', () => {
+  setupLocaleHooks();
   it('can query for the longest tasks', async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
     assert.isOk(parsedTrace.insights);

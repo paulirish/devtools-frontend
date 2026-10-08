@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import {findMenuItemWithLabel} from '../../testing/ContextMenuHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import type {TreeElement} from '../../ui/legacy/Treeoutline.js';
 
 import * as Application from './application.js';
-import type {ResourcesPanel} from './ResourcesPanel.js';
 
-describeWithMockConnection('DeviceBoundSessionsTreeElement', () => {
+type ResourcesPanel = Application.ResourcesPanel.ResourcesPanel;
+
+describeWithEnvironment('DeviceBoundSessionsTreeElement', () => {
   let model: Application.DeviceBoundSessionsModel.DeviceBoundSessionsModel;
   let target: SDK.Target.Target;
   let mockPanel: ResourcesPanel;
@@ -334,7 +334,7 @@ describeWithMockConnection('DeviceBoundSessionsTreeElement', () => {
 
     // Session 1 should now be terminated. Session 2 remains unterminated.
     assert.isTrue(session1Node.listItemElement.classList.contains('device-bound-session-terminated'));
-    assert.strictEqual(session1Node.listItemElement.getAttribute('aria-label'), 'session_1, Session terminated');
+    assert.strictEqual(session1Node.listItemElement.getAttribute('aria-label'), 'session_1, session terminated');
     assert.isFalse(session2Node.listItemElement.classList.contains('device-bound-session-terminated'));
     assert.strictEqual(session2Node.listItemElement.getAttribute('aria-label'), 'session_2');
 
@@ -367,7 +367,7 @@ describeWithMockConnection('DeviceBoundSessionsTreeElement', () => {
     const sessionNode = siteNode.children()[0];
     const sessionNode2 = siteNode.children()[1];
 
-    function checkIcon(node: TreeElement, expectedIcon: string) {
+    function checkIcon(node: UI.TreeOutline.TreeElement, expectedIcon: string) {
       const icon = node.listItemElement.querySelector('devtools-icon');
       assert.exists(icon);
       assert.strictEqual(icon.getAttribute('name'), expectedIcon);
@@ -385,7 +385,7 @@ describeWithMockConnection('DeviceBoundSessionsTreeElement', () => {
     model.dispatchEventToListeners(
         Application.DeviceBoundSessionsModel.DeviceBoundSessionModelEvents.EVENT_OCCURRED, {site, sessionId});
     checkIcon(sessionNode, 'warning');
-    assert.strictEqual(sessionNode.listItemElement.getAttribute('aria-label'), 'session_1, Session has errors');
+    assert.strictEqual(sessionNode.listItemElement.getAttribute('aria-label'), 'session_1, session has errors');
     checkIcon(sessionNode2, 'database');
     assert.strictEqual(sessionNode2.listItemElement.getAttribute('aria-label'), 'session_2');
 

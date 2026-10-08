@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as PlatformApi from '../../core/platform/api/api.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 
 import {type HeapSnapshotHeader, HeapSnapshotProgress, JSHeapSnapshot, type Profile} from './HeapSnapshot.js';
 import type {HeapSnapshotWorkerDispatcher} from './HeapSnapshotWorkerDispatcher.js';
@@ -28,6 +27,8 @@ export class HeapSnapshotLoader {
     this.#dataCallback = null;
     this.#done = false;
     this.parsingComplete = this.#parseInput();
+    // Catch unhandled rejection so the error is preserved until buildSnapshot awaits it.
+    this.parsingComplete.catch(() => {});
   }
 
   dispose(): void {
@@ -43,10 +44,11 @@ export class HeapSnapshotLoader {
     this.#done = true;
     if (this.#dataCallback) {
       this.#dataCallback('');
+      this.#dataCallback = null;
     }
   }
 
-  async buildSnapshot(secondWorker: PlatformApi.HostRuntime.WorkerMessagePort): Promise<JSHeapSnapshot> {
+  async buildSnapshot(secondWorker: Platform.HostRuntime.WorkerMessagePort): Promise<JSHeapSnapshot> {
     await this.parsingComplete;
 
     this.#snapshot = this.#snapshot || {};
@@ -58,16 +60,22 @@ export class HeapSnapshotLoader {
     return result;
   }
 
-  #parseUintArray(): boolean {
+  /**
+   * Parses (possibly negative) integers from `#json` into `#array`. Assumes
+   * valid input. Returns true if more input is needed and false once the
+   * closing bracket was reached.
+   */
+  #parseIntArray(): boolean {
     let index = 0;
     const char0 = '0'.charCodeAt(0);
     const char9 = '9'.charCodeAt(0);
+    const minus = '-'.charCodeAt(0);
     const closingBracket = ']'.charCodeAt(0);
     const length = this.#json.length;
     while (true) {
       while (index < length) {
         const code = this.#json.charCodeAt(index);
-        if (char0 <= code && code <= char9) {
+        if ((char0 <= code && code <= char9) || code === minus) {
           break;
         } else if (code === closingBracket) {
           this.#json = this.#json.slice(index + 1);
@@ -79,8 +87,13 @@ export class HeapSnapshotLoader {
         this.#json = '';
         return true;
       }
-      let nextNumber = 0;
       const startIndex = index;
+      let negative = false;
+      if (this.#json.charCodeAt(index) === minus) {
+        negative = true;
+        ++index;
+      }
+      let nextNumber = 0;
       while (index < length) {
         const code = this.#json.charCodeAt(index);
         if (char0 > code || code > char9) {
@@ -97,7 +110,7 @@ export class HeapSnapshotLoader {
       if (!this.#array) {
         throw new Error('Array not instantiated');
       }
-      this.#array.setValue(this.#arrayIndex++, nextNumber);
+      this.#array.setValue(this.#arrayIndex++, negative ? -nextNumber : nextNumber);
     }
   }
 
@@ -116,6 +129,10 @@ export class HeapSnapshotLoader {
   }
 
   write(chunk: string): void {
+    // Do not push empty chunks into the buffer because this is the EOF marker returned from fetchChunk().
+    if (!chunk) {
+      return;
+    }
     this.#buffer.push(chunk);
     if (!this.#dataCallback) {
       return;
@@ -131,6 +148,10 @@ export class HeapSnapshotLoader {
     if (this.#buffer.length > 0) {
       return Promise.resolve(this.#buffer.shift() as string);
     }
+    if (this.#done) {
+      // The empty string signals EOF.
+      return Promise.resolve('');
+    }
 
     const {promise, resolve} = Promise.withResolvers<string>();
     this.#dataCallback = resolve;
@@ -144,7 +165,11 @@ export class HeapSnapshotLoader {
         return pos;
       }
       startIndex = this.#json.length - token.length + 1;
-      this.#json += await this.#fetchChunk();
+      const chunk = await this.#fetchChunk();
+      if (!chunk) {
+        throw new Error(`Token ${token} not found (unexpected end of input)`);
+      }
+      this.#json += chunk;
     }
   }
 
@@ -156,13 +181,17 @@ export class HeapSnapshotLoader {
     this.#array = length === undefined ? Platform.TypedArrayUtilities.createExpandableBigUint32Array() :
                                          Platform.TypedArrayUtilities.createFixedBigUint32Array(length);
     this.#arrayIndex = 0;
-    while (this.#parseUintArray()) {
+    while (this.#parseIntArray()) {
       if (length) {
         this.#progress.updateProgress(title, this.#arrayIndex, this.#array.length);
       } else {
         this.#progress.updateStatus(title);
       }
-      this.#json += await this.#fetchChunk();
+      const chunk = await this.#fetchChunk();
+      if (!chunk) {
+        throw new Error(`Unexpected end of input while ${title}`);
+      }
+      this.#json += chunk;
     }
     const result = this.#array;
     this.#array = null;
@@ -188,7 +217,11 @@ export class HeapSnapshotLoader {
     });
     jsonTokenizer.write(json);
     while (!jsonTokenizerDone) {
-      jsonTokenizer.write(await this.#fetchChunk());
+      const chunk = await this.#fetchChunk();
+      if (!chunk) {
+        throw new Error('Unexpected end of input while loading snapshot info');
+      }
+      jsonTokenizer.write(chunk);
     }
 
     this.#snapshot = this.#snapshot || {};
@@ -227,6 +260,21 @@ export class HeapSnapshotLoader {
       this.#snapshot.locations = locations.asArrayOrFail();
     } else {
       this.#snapshot.locations = [];
+    }
+
+    if (this.#snapshot.snapshot.meta.scope_fields) {
+      const scopes = await this.#parseArray('"scopes"', 'Loading scopes…');
+      this.#snapshot.scopes = scopes.asArrayOrFail();
+    }
+
+    if (this.#snapshot.snapshot.meta.scope_context_var_fields) {
+      const scopeContextVars = await this.#parseArray('"scope_context_vars"', 'Loading scope context vars…');
+      this.#snapshot.scope_context_vars = scopeContextVars.asArrayOrFail();
+    }
+
+    if (this.#snapshot.snapshot.meta.scope_use_fields) {
+      const scopeUses = await this.#parseArray('"scope_uses"', 'Loading scope uses…');
+      this.#snapshot.scope_uses = scopeUses.asArrayOrFail();
     }
 
     this.#progress.updateStatus('Loading strings…');

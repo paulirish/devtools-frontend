@@ -24,38 +24,38 @@ import syncSectionStyles from './syncSection.css.js';
 
 const UIStrings = {
   /**
-   * @description Text shown to the user in the Settings UI. 'This setting' refers
+   * @description Text shown to the user in Settings. ‘This setting' refers
    * to a checkbox that is disabled.
    */
-  syncDisabled: 'To turn this setting on, you must enable Chrome sync.',
+  syncDisabled: 'To turn this setting on, you must enable Chrome sync',
   /**
-   * @description Text shown to the user in the Settings UI. Explains why the checkbox
+   * @description Text shown to the user in Settings. Explains why the checkbox
    * for saving DevTools settings to the user's Google account is inactive.
    */
-  preferencesSyncDisabled: 'You need to first enable saving `Chrome` settings in your `Google` account.',
+  preferencesSyncDisabled: 'You need to first enable saving `Chrome` settings in your `Google` account',
   /**
-   * @description Label for the account email address. Shown in the DevTools Settings UI in
+   * @description Label for the account email address. Shown in DevTools Settings in
    * front of the email address currently used for Chrome Sync.
    */
-  signedIn: 'Signed into Chrome as:',
+  signedIn: 'Signed in to Chrome as:',
   /**
-   * @description Label for the account settings. Shown in the DevTools Settings UI in
-   * case the user is not logged in to Chrome.
+   * @description Label for the account settings. Shown in DevTools Settings when
+   * the user is not logged in to Chrome.
    */
-  notSignedIn: 'You\'re not signed into Chrome.',
+  notSignedIn: 'You’re not signed in to Chrome',
   /**
    * @description Label for the Google Developer Program profile status that corresponds to
-   * standard plan (No subscription).
+   * the standard plan (no subscription).
    */
   gdpStandardPlan: 'Standard plan',
   /**
    * @description Label for the Google Developer Program subscription status that corresponds to
-   * `PREMIUM_ANNUAL` plan.
+   * the `PREMIUM_ANNUAL` plan.
    */
   gdpPremiumSubscription: 'Premium',
   /**
    * @description Label for the Google Developer Program subscription status that corresponds to
-   * `PRO_ANNUAL` plan.
+   * the `PRO_ANNUAL` plan.
    */
   gdpProSubscription: 'Pro',
   /**
@@ -64,7 +64,7 @@ const UIStrings = {
    */
   gdpUnknownSubscription: 'Unknown plan',
   /**
-   * @description Label for Sign-Up button for the Google Developer Program profiles.
+   * @description Label for sign-up button for Google Developer Program profiles.
    */
   signUp: 'Sign up',
   /**
@@ -72,7 +72,7 @@ const UIStrings = {
    */
   viewProfile: 'View profile',
   /**
-   * @description Text for tooltip shown on hovering over "Relevant Data" in the disclaimer text for AI code completion.
+   * @description Text for tooltip shown on hovering over “Relevant data” in the disclaimer text for GDP badges.
    */
   tooltipDisclaimerText:
       'When you qualify for a badge, the badge’s identifier and the type of activity you did to earn it are sent to Google',
@@ -121,7 +121,7 @@ const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLElement)
     return html`
       <div class="setting-checkbox-container">
         <setting-checkbox class="setting-checkbox"
-          .data=${{ setting: input.syncSetting } as SettingsComponents.SettingCheckbox.SettingCheckboxData}>
+          .data=${{ setting: input.syncSetting, disabled: input.checkboxDisabled } as SettingsComponents.SettingCheckbox.SettingCheckboxData}>
         </setting-checkbox>
         ${input.warningType ? html`
           <devtools-button
@@ -251,6 +251,7 @@ export interface SyncSectionData {
 export interface ViewInput {
   syncInfo: Host.InspectorFrontendHostAPI.SyncInformation;
   syncSetting: Common.Settings.Setting<boolean>;
+  checkboxDisabled: boolean;
   receiveBadgesSetting?: Common.Settings.Setting<boolean>;
   isEligibleToCreateGdpProfile: boolean;
   gdpProfile?: Host.GdpClient.Profile;
@@ -275,8 +276,9 @@ export class SyncSection extends UI.Widget.Widget {
   constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
-    this.#receiveBadgesSetting = Common.Settings.Settings.instance().moduleSetting('receive-gdp-badges');
-    this.#syncSetting = Common.Settings.moduleSetting('sync-preferences') as Common.Settings.Setting<boolean>;
+    this.#receiveBadgesSetting = Common.Settings.Settings.instance().resolve(Badges.receiveGdpBadgesSettingDescriptor);
+    this.#syncSetting =
+        Common.Settings.Settings.instance().moduleSetting('sync-preferences') as Common.Settings.Setting<boolean>;
   }
 
   override wasShown(): void {
@@ -301,10 +303,7 @@ export class SyncSection extends UI.Widget.Widget {
   }
 
   override performUpdate(): void {
-    // TODO: this should not probably happen in render, instead, the setting
-    // should be disabled.
     const checkboxDisabled = !this.#syncInfo.isSyncActive || !this.#syncInfo.arePreferencesSynced;
-    this.#syncSetting?.setDisabled(checkboxDisabled);
 
     let warningType: WarningType|undefined;
     if (!this.#syncInfo.isSyncActive) {
@@ -316,6 +315,7 @@ export class SyncSection extends UI.Widget.Widget {
     const viewInput: ViewInput = {
       syncInfo: this.#syncInfo,
       syncSetting: this.#syncSetting,
+      checkboxDisabled,
       receiveBadgesSetting: this.#receiveBadgesSetting,
       gdpProfile: this.#gdpProfile,
       isEligibleToCreateGdpProfile: Host.GdpClient.isGdpProfilesAvailable() && this.#isEligibleToCreateGdpProfile,
@@ -346,7 +346,7 @@ export class SyncSection extends UI.Widget.Widget {
     // TODO: investigate if /advance link is alive
     const warningLink =
         this.#syncInfo.isSyncActive ? 'chrome://settings/syncSetup/advanced' : 'chrome://settings/syncSetup';
-    UIHelpers.openInNewTab(warningLink);
+    UIHelpers.openInNewTab(warningLink, /* allowPrivileged=*/ true);
     event.consume();
   }
 

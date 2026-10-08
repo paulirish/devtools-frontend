@@ -14,13 +14,13 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
 import * as AiAssistanceModels from '../../../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
+import * as Dialogs from '../../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as UIHelpers from '../../../../ui/helpers/helpers.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../../../ui/legacy/theme_support/theme_support.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
-import * as PanelCommon from '../../../common/common.js';
 
 import entryLabelOverlayStyles from './entryLabelOverlay.css.js';
 
@@ -28,27 +28,27 @@ const {html, Directives} = Lit;
 
 const UIStrings = {
   /**
-   * @description Accessible label used to explain to a user that they are viewing an entry label.
+   * @description Accessible label for the entry label overlay in the Performance panel.
    */
   entryLabel: 'Entry label',
   /**
-   * @description Accessible label used to prompt the user to input text into the field.
+   * @description Accessible label prompting the user to enter text in an empty entry label field in the Performance panel.
    */
   inputTextPrompt: 'Enter an annotation label',
   /**
-   * @description Text displayed on a button that generates an AI label.
+   * @description Button label for generating an AI-powered entry label in the Performance panel.
    */
   generateLabelButton: 'Generate label',
   /**
-   * @description Label used for screenreaders on the FRE dialog
+   * @description Accessible label for the first-run consent dialog for AI annotation suggestions in the Performance panel.
    */
   freDialog: 'Get AI-powered annotation suggestions dialog',
   /**
-   * @description Screen-reader text for a tooltip link for navigating to "AI innovations" settings where the user can learn more about auto-annotations.
+   * @description Accessible label for the tooltip link that opens AI settings in the Performance panel.
    */
   learnMoreAriaLabel: 'Learn more about auto annotations in settings',
   /**
-   * @description Screen-reader text for a tooltip icon.
+   * @description Tooltip text and accessible label for the information button of the AI entry label feature in the Performance panel.
    */
   moreInfoAriaLabel: 'More information about this feature',
 } as const;
@@ -65,20 +65,21 @@ const UIStringsNotTranslate = {
    * @description Security disclaimer text displayed when the information icon on a button that generates an AI label is hovered.
    */
   generateLabelSecurityDisclaimer:
-      'The selected call stack is sent to Google. This data may be seen by human reviewers to improve this feature. This is an experimental AI feature and won\'t always get it right.',
+      'The selected call stack is sent to Google. This data may be seen by human reviewers to improve this feature. This is an experimental AI feature and won’t always get it right.',
   /**
    * @description Enterprise users with logging off - Security disclaimer text displayed when the information icon on a button that generates an AI label is hovered.
    */
   generateLabelSecurityDisclaimerLoggingOff:
-      'The selected call stack is sent to Google. This data will not be used to improve Google\'s AI models. Your organization may change these settings at any time. This is an experimental AI feature and won\'t always get it right.',
+      'The selected call stack is sent to Google. This data won’t be used to improve Google’s AI models. Your organization may change these settings at any time. This is an experimental AI feature and won’t always get it right.',
   /**
    * @description The `Generate AI label button` tooltip disclaimer for when the feature is not available and the reason can be checked in settings.
    */
-  autoAnnotationNotAvailableDisclaimer: 'Auto annotations are not available.',
+  // eslint-disable-next-line @devtools/l10n-uistrings-sentence-punctuation -- Concatenated with learnMore in the UI to form a multi-sentence message.
+  autoAnnotationNotAvailableDisclaimer: 'Auto annotations aren’t available.',
   /**
    * @description The `Generate AI label button` tooltip disclaimer for when the feature is not available because the user is offline.
    */
-  autoAnnotationNotAvailableOfflineDisclaimer: 'Auto annotations are not available because you are offline.',
+  autoAnnotationNotAvailableOfflineDisclaimer: 'Auto annotations aren’t available because you are offline',
   /**
    * @description Header text for the AI-powered annotations suggestions disclaimer dialog.
    */
@@ -104,7 +105,7 @@ const UIStringsNotTranslate = {
    * @description Second disclaimer item text for the fre dialog - trace data is sent to Google.
    */
   freDisclaimerPrivacyDataSentToGoogleNoLogging:
-      'To generate annotation suggestions, your performance trace is sent to Google. This data will not be used to improve Google’s AI models. Your organization may change these settings at any time.',
+      'To generate annotation suggestions, your performance trace is sent to Google. This data won’t be used to improve Google’s AI models. Your organization may change these settings at any time.',
   /**
    * @description Text for the 'learn more' button displayed in fre.
    */
@@ -194,7 +195,7 @@ export class EntryLabelOverlay extends HTMLElement {
   #callTree: AiAssistanceModels.AICallTree.AICallTree|null = null;
   // Creates or gets the setting if it exists.
   #aiAnnotationsEnabledSetting = Common.Settings.Settings.instance().createSetting('ai-annotations-enabled', false);
-  #agent = new AiAssistanceModels.PerformanceAnnotationsAgent.PerformanceAnnotationsAgent({
+  #performanceAnnotations = new AiAssistanceModels.PerformanceAnnotations.PerformanceAnnotations({
     aidaClient: new Host.AidaClient.AidaClient(),
     serverSideLoggingEnabled: isAiAssistanceServerSideLoggingEnabled(),
   });
@@ -254,8 +255,9 @@ export class EntryLabelOverlay extends HTMLElement {
   /**
    * So we can provide a mocked agent in tests. Do not call this method outside of a test!
    */
-  overrideAIAgentForTest(agent: AiAssistanceModels.PerformanceAnnotationsAgent.PerformanceAnnotationsAgent): void {
-    this.#agent = agent;
+  overridePerformanceAnnotationsForTest(performanceAnnotations:
+                                            AiAssistanceModels.PerformanceAnnotations.PerformanceAnnotations): void {
+    this.#performanceAnnotations = performanceAnnotations;
   }
 
   entryHighlightWrapper(): HTMLElement|null {
@@ -534,7 +536,7 @@ export class EntryLabelOverlay extends HTMLElement {
         this.#focusInputBox();
         void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
 
-        this.#label = await this.#agent.generateAIEntryLabel(this.#callTree);
+        this.#label = await this.#performanceAnnotations.generateAIEntryLabel(this.#callTree);
         this.dispatchEvent(new EntryLabelChangeEvent(this.#label));
         this.#inputField.innerText = this.#label;
         this.#placeCursorAtInputEnd();
@@ -567,7 +569,7 @@ export class EntryLabelOverlay extends HTMLElement {
    */
   async #showUserAiFirstRunDialog(): Promise<boolean> {
     this.dispatchEvent(new LabelAnnotationsConsentDialogVisibilityChange(true));
-    const userConsented = await PanelCommon.FreDialog.show({
+    const userConsented = await Dialogs.FreDialog.FreDialog.show({
       ariaLabel: i18nString(UIStrings.freDialog),
       header: {iconName: 'pen-spark', text: lockedString(UIStringsNotTranslate.freDisclaimerHeader)},
       reminderItems: [

@@ -14,19 +14,17 @@ generate_css("css_files") {
 
 devtools_ui_module("text_prompt") {
   sources = [ "TextPrompt.ts" ]
-  deps = [
+  ts_deps = [
     "../../../core/platform:bundle",
-    "../../../ui/lit:bundle",
+    "../../lit:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "text_prompt.ts"
 
-  deps = [
-    ":css_files",
-    ":text_prompt",
-  ]
+  ts_deps = [ ":text_prompt" ]
 
   visibility = [ "../../legacy/components/quick_open/*" ]
 
@@ -38,7 +36,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "TextPrompt.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
   ]

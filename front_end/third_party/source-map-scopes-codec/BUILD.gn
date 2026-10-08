@@ -23,7 +23,7 @@ devtools_foundation_module("source-map-scopes-codec") {
 devtools_entrypoint("bundle") {
   entrypoint = "source-map-scopes-codec.ts"
 
-  deps = [ ":source-map-scopes-codec" ]
+  ts_deps = [ ":source-map-scopes-codec" ]
 
   visibility = [ "*" ]
 }

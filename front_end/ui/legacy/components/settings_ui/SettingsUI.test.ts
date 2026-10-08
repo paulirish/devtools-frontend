@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -30,6 +31,7 @@ describeWithEnvironment('SettingsUI', () => {
       title: () => i18n.i18n.lockedString('Test Setting'),
       ...registrationOverrides,
     };
+    Common.Settings.registerSettingExtension(registration);
     const settings = createSettingsForTest([registration]);
     return settings.moduleSetting('test-setting');
   }
@@ -52,6 +54,19 @@ describeWithEnvironment('SettingsUI', () => {
     const label = container.querySelector('label');
     assert.isNotNull(label);
     assert.include(label.textContent || '', 'Test Setting');
+  });
+
+  it('disables the select element when disabled is true', () => {
+    const setting = setup();
+
+    const template = SettingsUI.SettingsUI.renderSettingSelect(setting, undefined, true);
+    const container = document.createElement('div');
+    Lit.render(template, container);
+    renderElementIntoDOM(container);
+
+    const select = container.querySelector('select');
+    assert.isNotNull(select);
+    assert.isTrue(select.disabled);
   });
 
   it('updates the setting when the select changes', () => {
@@ -108,26 +123,6 @@ describeWithEnvironment('SettingsUI', () => {
     assert.isTrue(container.firstElementChild?.classList.contains('chrome-select-label'));
   });
 
-  it('renders a deprecation warning if provided', () => {
-    const deprecationNotice = {
-      disabled: true,
-      warning: () => i18n.i18n.lockedString('Test Deprecation Warning'),
-    };
-    const setting = setup(undefined, {deprecationNotice});
-
-    const template = SettingsUI.SettingsUI.renderSettingSelect(setting);
-    const container = document.createElement('div');
-    Lit.render(template, container);
-    renderElementIntoDOM(container);
-
-    const warning = container.querySelector('devtools-setting-deprecation-warning');
-    assert.isNotNull(warning);
-    assert.isNotNull(warning.shadowRoot);
-    const icon = warning.shadowRoot.querySelector('devtools-icon');
-    assert.isNotNull(icon);
-    assert.strictEqual(icon.getAttribute('title'), 'Test Deprecation Warning');
-  });
-
   describe('renderControlForSetting', () => {
     it('renders a checkbox for a boolean setting', () => {
       const setting = createSettingsForTest([{
@@ -148,14 +143,16 @@ describeWithEnvironment('SettingsUI', () => {
     });
 
     it('renders a select for an enum setting', () => {
-      const setting = createSettingsForTest([{
-                        settingName: 'test-enum-setting',
-                        settingType: Common.Settings.SettingType.ENUM,
-                        defaultValue: 'a',
-                        options: [
-                          {value: 'a', text: 'A', title: () => i18n.i18n.lockedString('A'), raw: true},
-                        ],
-                      }]).moduleSetting('test-enum-setting');
+      const registration: Common.Settings.SettingRegistration = {
+        settingName: 'test-enum-setting',
+        settingType: Common.Settings.SettingType.ENUM,
+        defaultValue: 'a',
+        options: [
+          {value: 'a', text: 'A', title: () => i18n.i18n.lockedString('A'), raw: true},
+        ],
+      };
+      Common.Settings.registerSettingExtension(registration);
+      const setting = createSettingsForTest([registration]).moduleSetting('test-enum-setting');
 
       const template = SettingsUI.SettingsUI.renderControlForSetting(setting);
       assert.notStrictEqual(template, Lit.nothing);

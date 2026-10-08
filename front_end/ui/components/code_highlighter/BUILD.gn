@@ -15,16 +15,15 @@ generate_css("css_files") {
 devtools_ui_module("code_highlighter") {
   sources = [ "CodeHighlighter.ts" ]
 
-  deps = [ "../../../third_party/codemirror.next:bundle" ]
+  ts_deps = [ "../../../third_party/codemirror.next:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "code_highlighter.ts"
 
-  deps = [
-    ":code_highlighter",
-    ":css_files",
-  ]
+  deps = [ ":css_files" ]
+
+  ts_deps = [ ":code_highlighter" ]
 
   visibility = [ "../../../legacy_test_runner/*" ]
   visibility += default_components_visibility
@@ -35,5 +34,5 @@ devtools_ui_module("unittests") {
 
   sources = [ "CodeHighlighter.test.ts" ]
 
-  deps = [ ":bundle" ]
+  ts_deps = [ ":bundle" ]
 }

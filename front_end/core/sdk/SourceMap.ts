@@ -2,17 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as ScopesCodec from '../../third_party/source-map-scopes-codec/source-map-scopes-codec.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
-import * as Root from '../root/root.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
-import type {CallFrame, ScopeChainEntry} from './DebuggerModel.js';
+import type {CallFrame, Location, ScopeChainEntry} from './DebuggerModel.js';
 import {scopeTreeForScript} from './ScopeTreeCache.js';
 import type {Script} from './Script.js';
 import {buildOriginalScopes, decodePastaRanges, type NamedFunctionRange} from './SourceMapFunctionRanges.js';
-import {SourceMapScopesInfo, type TranslatedFrame} from './SourceMapScopesInfo.js';
+import {decodeRangeMappings} from './SourceMapRangeMappings.js';
+import {
+  type PositionRange,
+  type RawFrameTranslation,
+  scriptRelativePosition,
+  SourceMapScopesInfo,
+} from './SourceMapScopesInfo.js';
 
 /**
  * Type of the base source map JSON object, which contains the sources and the mappings at the very least, plus
@@ -33,7 +38,9 @@ export interface SourceMapV3Object {
 
   names?: string[];
   ignoreList?: number[];
-  scopes?: string;
+  scopes?: Array<string|null>;
+  ranges?: string[];
+  rangeMappings?: string;
   debugId?: string;
   x_google_linecount?: number;
   x_google_ignoreList?: number[];
@@ -93,10 +100,17 @@ export class SourceMapEntry {
   readonly sourceLineNumber: number;
   readonly sourceColumnNumber: number;
   readonly name?: string;
+  /**
+   * Whether this entry covers everything up to the following entry, mapping the generated
+   * code character by character (including newlines) onto the original code.
+   *
+   * @see https://github.com/tc39/source-map/blob/main/proposals/range-mappings.md
+   */
+  readonly isRangeMapping: boolean;
 
-  constructor(
-      lineNumber: number, columnNumber: number, sourceIndex?: number, sourceURL?: Platform.DevToolsPath.UrlString,
-      sourceLineNumber?: number, sourceColumnNumber?: number, name?: string) {
+  constructor(lineNumber: number, columnNumber: number, sourceIndex?: number,
+              sourceURL?: Platform.DevToolsPath.UrlString, sourceLineNumber?: number, sourceColumnNumber?: number,
+              name?: string, isRangeMapping = false) {
     this.lineNumber = lineNumber;
     this.columnNumber = columnNumber;
     this.sourceIndex = sourceIndex;
@@ -104,6 +118,7 @@ export class SourceMapEntry {
     this.sourceLineNumber = (sourceLineNumber as number);
     this.sourceColumnNumber = (sourceColumnNumber as number);
     this.name = name;
+    this.isRangeMapping = isRangeMapping;
   }
 
   static compare(entry1: SourceMapEntry, entry2: SourceMapEntry): number {
@@ -119,6 +134,12 @@ interface SourceInfo {
   content: string|null;
   ignoreListHint: boolean;
   reverseMappings: number[]|null;
+}
+
+export const enum SourceMapProvenance {
+  CDP = 'cdp',
+  EXTENSION = 'extension',
+  USER = 'user',
 }
 
 export class SourceMap {
@@ -139,28 +160,35 @@ export class SourceMap {
   readonly #debugId?: DebugId;
 
   #scopesFallbackPromise?: Promise<void>;
+  readonly #console: Common.Console.Console;
+  readonly #provenance: SourceMapProvenance;
 
   /**
    * Implements Source Map V3 model. See https://github.com/google/closure-compiler/wiki/Source-Maps
    * for format description.
    */
-  constructor(
-      compiledURL: Platform.DevToolsPath.UrlString, sourceMappingURL: Platform.DevToolsPath.UrlString,
-      payload: SourceMapV3, script?: Script) {
+  constructor(compiledURL: Platform.DevToolsPath.UrlString, sourceMappingURL: Platform.DevToolsPath.UrlString,
+              payload: SourceMapV3, console: Common.Console.Console, script?: Script,
+              provenance: SourceMapProvenance = SourceMapProvenance.CDP) {
     this.#json = payload;
     this.#script = script;
     this.#compiledURL = compiledURL;
     this.#sourceMappingURL = sourceMappingURL;
     this.#baseURL = (Common.ParsedURL.schemeIs(sourceMappingURL, 'data:')) ? compiledURL : sourceMappingURL;
     this.#debugId = 'debugId' in payload ? (payload.debugId as DebugId | undefined) : undefined;
+    this.#console = console;
+    this.#provenance = provenance;
 
     if ('sections' in this.#json) {
       if (this.#json.sections.find(section => 'url' in section)) {
-        Common.Console.Console.instance().warn(
-            `SourceMap "${sourceMappingURL}" contains unsupported "URL" field in one of its sections.`);
+        this.#console.warn(`SourceMap "${sourceMappingURL}" contains unsupported "URL" field in one of its sections.`);
       }
     }
     this.eachSection(this.parseSources.bind(this));
+  }
+
+  provenance(): SourceMapProvenance {
+    return this.#provenance;
   }
 
   json(): SourceMapV3|null {
@@ -227,31 +255,23 @@ export class SourceMap {
     return this.#scopesInfo !== null && !this.#scopesInfo.isEmpty();
   }
 
+  /**
+   * True iff the scopes come from the source map itself (encoded `scopes`), not from the AST fallback or from an
+   * extension.
+   */
+  hasEncodedScopeInfo(): boolean {
+    this.#ensureSourceMapProcessed();
+    return this.#scopesInfo !== null && this.#scopesFallbackPromise === undefined &&
+        this.#scopesInfo.hasGeneratedRanges();
+  }
+
   waitForScopeInfo(): Promise<void> {
     this.#ensureSourceMapProcessed();
     return this.#scopesFallbackPromise ?? Promise.resolve();
   }
 
-  findEntry(lineNumber: number, columnNumber: number, inlineFrameIndex?: number): SourceMapEntry|null {
+  findEntry(lineNumber: number, columnNumber: number): SourceMapEntry|null {
     this.#ensureSourceMapProcessed();
-    if (inlineFrameIndex && this.#scopesInfo !== null) {
-      // For inlineFrameIndex != 0 we use the callsite info for the corresponding inlining site.
-      // Note that the callsite for "inlineFrameIndex" is actually in the previous frame.
-      const {inlinedFunctions} = this.#scopesInfo.findInlinedFunctions(lineNumber, columnNumber);
-      const {callsite} = inlinedFunctions[inlineFrameIndex - 1];
-      if (!callsite) {
-        console.error('Malformed source map. Expected to have a callsite info for index', inlineFrameIndex);
-        return null;
-      }
-      return {
-        lineNumber,
-        columnNumber,
-        sourceIndex: callsite.sourceIndex,
-        sourceURL: this.sourceURLs()[callsite.sourceIndex],
-        sourceLineNumber: callsite.line,
-        sourceColumnNumber: callsite.column,
-      };
-    }
     const mappings = this.mappings();
     const index = Platform.ArrayUtilities.upperBound(
         mappings, undefined, (_, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
@@ -545,6 +565,22 @@ export class SourceMap {
     const tokenIter = new TokenIterator(map.mappings);
     let sourceURL: Platform.DevToolsPath.UrlString|undefined = this.#sourceInfos[sourceIndex]?.sourceURL;
 
+    // For every line of this section, the index of its first entry in `mappings` and the
+    // number of entries on that line. The `rangeMappings` field addresses entries by their
+    // index within a line, so this is what resolves those indices below.
+    const lineStarts: number[] = [];
+    const lineCounts: number[] = [];
+    const mappings = this.mappings();
+    const pushEntry = (entry: SourceMapEntry): void => {
+      const line = entry.lineNumber - baseLineNumber;
+      if (lineCounts[line] === undefined) {
+        lineStarts[line] = mappings.length;
+        lineCounts[line] = 0;
+      }
+      lineCounts[line]++;
+      mappings.push(entry);
+    };
+
     while (true) {
       if (tokenIter.peek() === ',') {
         tokenIter.next();
@@ -561,7 +597,7 @@ export class SourceMap {
 
       columnNumber += tokenIter.nextVLQ();
       if (!tokenIter.hasNext() || this.isSeparator(tokenIter.peek())) {
-        this.mappings().push(new SourceMapEntry(lineNumber, columnNumber));
+        pushEntry(new SourceMapEntry(lineNumber, columnNumber));
         continue;
       }
 
@@ -574,37 +610,75 @@ export class SourceMap {
       sourceColumnNumber += tokenIter.nextVLQ();
 
       if (!tokenIter.hasNext() || this.isSeparator(tokenIter.peek())) {
-        this.mappings().push(
+        pushEntry(
             new SourceMapEntry(lineNumber, columnNumber, sourceIndex, sourceURL, sourceLineNumber, sourceColumnNumber));
         continue;
       }
 
       nameIndex += tokenIter.nextVLQ();
-      this.mappings().push(new SourceMapEntry(
-          lineNumber, columnNumber, sourceIndex, sourceURL, sourceLineNumber, sourceColumnNumber, names[nameIndex]));
+      pushEntry(new SourceMapEntry(lineNumber, columnNumber, sourceIndex, sourceURL, sourceLineNumber,
+                                   sourceColumnNumber, names[nameIndex]));
     }
 
-    if (Root.Runtime.experiments.isEnabled(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES)) {
-      if (!this.#scopesInfo) {
-        this.#scopesInfo = new SourceMapScopesInfo(this, {scopes: [], ranges: []});
-      }
-      if (map.scopes) {
-        const {scopes, ranges} = ScopesCodec.decode(
-            map as ScopesCodec.SourceMapJson,
-            {mode: ScopesCodec.DecodeMode.LAX, generatedOffset: {line: baseLineNumber, column: baseColumnNumber}});
-        this.#scopesInfo.addOriginalScopes(scopes);
-        this.#scopesInfo.addGeneratedRanges(ranges);
-      } else if (map.x_com_bloomberg_sourcesFunctionMappings) {
-        const originalScopes = this.parseBloombergScopes(map);
-        this.#scopesInfo.addOriginalScopes(originalScopes);
-      } else {
-        // Keep the OriginalScope[] tree array consistent with sources.
-        this.#scopesInfo.addOriginalScopes(new Array(map.sources.length).fill(null));
+    this.#markRangeMappings(map, lineStarts, lineCounts);
+
+    if (!this.#scopesInfo) {
+      this.#scopesInfo = new SourceMapScopesInfo(this, {scopes: [], ranges: []});
+    }
+    if (map.scopes || map.ranges) {
+      const {scopes, ranges} = ScopesCodec.decode(
+          map as ScopesCodec.SourceMapJson,
+          {mode: ScopesCodec.DecodeMode.LAX, generatedOffset: {line: baseLineNumber, column: baseColumnNumber}});
+      this.#scopesInfo.addOriginalScopes(scopes.length ? scopes : new Array(map.sources.length).fill(null));
+      this.#scopesInfo.addGeneratedRanges(ranges);
+    } else if (map.x_com_bloomberg_sourcesFunctionMappings) {
+      const originalScopes = this.parseBloombergScopes(map);
+      this.#scopesInfo.addOriginalScopes(originalScopes);
+    } else {
+      // Keep the OriginalScope[] tree array consistent with sources.
+      this.#scopesInfo.addOriginalScopes(new Array(map.sources.length).fill(null));
+    }
+  }
+
+  /**
+   * Marks the entries of the section that was just parsed which the `rangeMappings` field of
+   * that section points at.
+   *
+   * A malformed field never invalidates the SourceMap: a field that can't be decoded is
+   * ignored altogether, and indices that don't point at a mapping with an original position
+   * are skipped.
+   *
+   * @param lineStarts index in `mappings` of the first entry of each line of the section.
+   * @param lineCounts number of entries on each line of the section.
+   */
+  #markRangeMappings(map: SourceMapV3Object, lineStarts: number[], lineCounts: number[]): void {
+    if (typeof map.rangeMappings !== 'string') {
+      return;
+    }
+    let rangeMappings: number[][];
+    try {
+      rangeMappings = decodeRangeMappings(map.rangeMappings);
+    } catch {
+      return;
+    }
+
+    const mappings = this.mappings();
+    for (let line = 0; line < rangeMappings.length; ++line) {
+      for (const index of rangeMappings[line]) {
+        if (index >= (lineCounts[line] ?? 0)) {
+          // The indices are sorted, so the rest of the line is out of bounds as well.
+          break;
+        }
+        const mappingIndex = lineStarts[line] + index;
+        if (mappings[mappingIndex].sourceURL === undefined) {
+          continue;
+        }
+        mappings[mappingIndex] = asRangeMapping(mappings[mappingIndex]);
       }
     }
   }
 
-  private parseBloombergScopes(map: SourceMapV3Object): Array<ScopesCodec.OriginalScope|null> {
+  private parseBloombergScopes(map: SourceMapV3Object): Array<ScopesCodec.OriginalScope[]|null> {
     const scopeList = map.x_com_bloomberg_sourcesFunctionMappings;
     if (!scopeList) {
       throw new Error('Cant decode pasta scopes without x_com_bloomberg_sourcesFunctionMappings field');
@@ -778,11 +852,23 @@ export class SourceMap {
 
   resolveScopeChain(frame: CallFrame): ScopeChainEntry[]|null {
     this.#ensureSourceMapProcessed();
-    if (this.#scopesInfo === null) {
+    if (this.#provenance === SourceMapProvenance.USER || !this.#scopesInfo?.hasVariablesAndBindings()) {
       return null;
     }
 
     return this.#scopesInfo.resolveMappedScopeChain(frame);
+  }
+
+  resolveMappedVariablesAtPosition(location: Location,
+                                   ignoreInnerBlockScopes = false): Array<Map<string, string|null>>|null {
+    this.#ensureSourceMapProcessed();
+    if (this.#provenance === SourceMapProvenance.USER || !this.#scopesInfo?.hasVariablesAndBindings()) {
+      return null;
+    }
+
+    const {line, column} = scriptRelativePosition(location);
+    return this.#scopesInfo.resolveMappedVariablesAtPosition(line, column, ignoreInnerBlockScopes,
+                                                             location.inlineFrameIndex);
   }
 
   findOriginalFunctionName(position: ScopesCodec.Position): string|null {
@@ -796,25 +882,47 @@ export class SourceMap {
     return this.#scopesInfo?.findOriginalFunctionScope(position) ?? null;
   }
 
-  isOutlinedFrame(generatedLine: number, generatedColumn: number): boolean {
+  /** See {@link SourceMapScopesInfo.translateRawFrame}. `null` if no scopes information is available. */
+  translateRawFrame(generatedLine: number, generatedColumn: number): RawFrameTranslation|null {
     this.#ensureSourceMapProcessed();
-    return this.#scopesInfo?.isOutlinedFrame(generatedLine, generatedColumn) ?? false;
+    return this.#scopesInfo?.translateRawFrame(generatedLine, generatedColumn) ?? null;
   }
 
-  hasInlinedFrames(generatedLine: number, generatedColumn: number): boolean {
-    this.#ensureSourceMapProcessed();
-    return this.#scopesInfo?.hasInlinedFrames(generatedLine, generatedColumn) ?? false;
+  /** See {@link SourceMapScopesInfo.inlinedFunctionRange}. `null` without encoded scopes. */
+  inlinedFunctionRange(generatedLine: number, generatedColumn: number): PositionRange|null {
+    return this.hasEncodedScopeInfo() ? this.#scopesInfo?.inlinedFunctionRange(generatedLine, generatedColumn) ?? null :
+                                        null;
   }
 
-  translateCallSite(generatedLine: number, generatedColumn: number): TranslatedFrame[] {
-    this.#ensureSourceMapProcessed();
-    return this.#scopesInfo?.translateCallSite(generatedLine, generatedColumn) ?? [];
+  /** See {@link SourceMapScopesInfo.inlinedCalleeRanges}. Empty without encoded scopes. */
+  inlinedCalleeRanges(generatedLine: number, generatedColumn: number): PositionRange[] {
+    return this.hasEncodedScopeInfo() ? this.#scopesInfo?.inlinedCalleeRanges(generatedLine, generatedColumn) ?? [] :
+                                        [];
   }
+
+  /** See {@link SourceMapScopesInfo.outlinedFunctionRanges}. Empty without encoded scopes. */
+  outlinedFunctionRanges(generatedLine: number, generatedColumn: number): PositionRange[] {
+    return this.hasEncodedScopeInfo() ? this.#scopesInfo?.outlinedFunctionRanges(generatedLine, generatedColumn) ?? [] :
+                                        [];
+  }
+
+  /** See {@link SourceMapScopesInfo.artificialFunctionRanges}. Empty without encoded scopes. */
+  artificialFunctionRanges(): PositionRange[] {
+    return this.hasEncodedScopeInfo() ? this.#scopesInfo?.artificialFunctionRanges() ?? [] : [];
+  }
+}
+
+/** @returns a copy of the {@link entry} that is marked as a range mapping. */
+function asRangeMapping(entry: SourceMapEntry): SourceMapEntry {
+  return new SourceMapEntry(entry.lineNumber, entry.columnNumber, entry.sourceIndex, entry.sourceURL,
+                            entry.sourceLineNumber, entry.sourceColumnNumber, entry.name, true);
 }
 
 const VLQ_BASE_SHIFT = 5;
 const VLQ_BASE_MASK = (1 << 5) - 1;
 const VLQ_CONTINUATION_MASK = 1 << 5;
+/** The largest shift an unsigned VLQ digit may contribute at while still fitting into 32 bits. */
+const VLQ_UNSIGNED_MAX_SHIFT = 30;
 
 export class TokenIterator {
   readonly #string: string;
@@ -844,26 +952,50 @@ export class TokenIterator {
 
   nextVLQ(): number {
     // Read unsigned value.
+    let result = this.#decodeVLQ(false);
+
+    // Fix the sign.
+    const negative = result & 1;
+    result >>= 1;
+    return negative ? -result : result;
+  }
+
+  /**
+   * Decodes an unsigned Base64 VLQ number, as used by the `rangeMappings` field of the
+   * "range mappings" proposal. In contrast to {@link nextVLQ} the least significant bit
+   * carries a value rather than a sign, so the full 32 bit range is available. Numbers
+   * that don't fit into 32 bits are rejected.
+   *
+   * @see https://github.com/tc39/source-map/blob/main/proposals/range-mappings.md
+   */
+  nextUnsignedVLQ(): number {
+    return this.#decodeVLQ(true);
+  }
+
+  #decodeVLQ(unsigned: boolean): number {
     let result = 0;
     let shift = 0;
     let digit: number = VLQ_CONTINUATION_MASK;
     while (digit & VLQ_CONTINUATION_MASK) {
       if (!this.hasNext()) {
-        throw new Error('Unexpected end of input while decodling VLQ number!');
+        throw new Error('Unexpected end of input while decoding VLQ number!');
+      }
+      if (unsigned && shift > VLQ_UNSIGNED_MAX_SHIFT) {
+        throw new Error('Unsigned VLQ number does not fit into 32 bits!');
       }
       const charCode = this.nextCharCode();
       digit = Common.Base64.BASE64_CODES[charCode];
       if (charCode !== 65 /* 'A' */ && digit === 0) {
         throw new Error(`Unexpected char '${String.fromCharCode(charCode)}' encountered while decoding`);
       }
-      result += (digit & VLQ_BASE_MASK) << shift;
+      // Unsigned numbers may use the full 32 bits, where `<<` would sign extend.
+      result += unsigned ? (digit & VLQ_BASE_MASK) * 2 ** shift : (digit & VLQ_BASE_MASK) << shift;
       shift += VLQ_BASE_SHIFT;
     }
-
-    // Fix the sign.
-    const negative = result & 1;
-    result >>= 1;
-    return negative ? -result : result;
+    if (unsigned && result > 0xFFFFFFFF) {
+      throw new Error('Unsigned VLQ number does not fit into 32 bits!');
+    }
+    return result;
   }
 
   /**

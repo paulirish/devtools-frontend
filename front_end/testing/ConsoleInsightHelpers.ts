@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import sinon from 'sinon';
+
 import * as Host from '../core/host/host.js';
+import * as Root from '../core/root/root.js';
 import * as Console from '../panels/console/console.js';
 import * as Explain from '../panels/explain/explain.js';
 import * as Lit from '../ui/lit/lit.js';
 
-import {createViewFunctionStub} from './ViewFunctionHelpers.js';
+import {updateHostConfig} from './EnvironmentHelpers.js';
+import {createViewFunctionStub, type ViewFunctionStub} from './ViewFunctionHelpers.js';
 
 function getTestAidaClient() {
   return {
@@ -47,12 +51,31 @@ export async function createConsoleInsightWidget(options?: Partial<Explain.ViewO
   aidaAvailability?: Host.AidaClient.AidaAccessPreconditions,
   promptBuilder?: Explain.PublicPromptBuilder,
   aidaClient?: Explain.PublicAidaClient,
-}) {
+}): Promise<{
+  component: Explain.ConsoleInsight,
+  view: ViewFunctionStub<typeof Explain.ConsoleInsight>,
+  output: Explain.ViewOutput,
+  stubAidaCheckAccessPreconditions: (aidaAvailability: Host.AidaClient.AidaAccessPreconditions) => sinon.SinonStub,
+  testPromptBuilder: Explain.PublicPromptBuilder,
+  testAidaClient: Explain.PublicAidaClient & {
+    registerClientEvent: sinon.SinonSpy,
+  },
+}> {
   const output = {
     headerRef: options?.headerRef ?? Lit.Directives.createRef<HTMLHeadingElement>(),
     citationLinks: options?.citationLinks ?? [],
   };
 
+  updateHostConfig({
+    aidaAvailability: {
+      enabled: true,
+      ...Root.Runtime.hostConfig.aidaAvailability,
+    },
+    devToolsConsoleInsights: {
+      enabled: true,
+      ...Root.Runtime.hostConfig.devToolsConsoleInsights,
+    },
+  });
   const view = createViewFunctionStub(Explain.ConsoleInsight, output);
 
   let aidaAvailabilityForStub = options?.aidaAvailability ?? Host.AidaClient.AidaAccessPreconditions.AVAILABLE;

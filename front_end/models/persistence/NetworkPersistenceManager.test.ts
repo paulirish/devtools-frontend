@@ -3,21 +3,22 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {
-  createTarget,
-  deinitializeGlobalVars,
-  initializeGlobalVars,
-} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {createWorkspaceProject, setUpEnvironment} from '../../testing/OverridesHelpers.js';
-import {setMockResourceTree} from '../../testing/ResourceTreeHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {createTarget} from '../../testing/TargetHelpers.js';
 import {createFileSystemUISourceCode} from '../../testing/UISourceCodeHelpers.js';
+import * as Bindings from '../bindings/bindings.js';
+import * as Formatter from '../formatter/formatter.js';
 import * as Persistence from '../persistence/persistence.js';
 import * as Workspace from '../workspace/workspace.js';
 
@@ -27,7 +28,13 @@ const setUpEnvironmentWithUISourceCode =
       const {workspace, networkPersistenceManager} = setUpEnvironment();
 
       if (!project) {
-        project = {id: () => url, type: () => Workspace.Workspace.projectTypes.Network} as Workspace.Workspace.Project;
+        project = {
+          id: () => url,
+          type: () => Workspace.Workspace.projectTypes.Network,
+          workspace: () => workspace,
+          canSetFileContent: () => false,
+          mimeType: () => 'text/javascript',
+        } as unknown as Workspace.Workspace.Project;
       }
 
       const uiSourceCode = new Workspace.UISourceCode.UISourceCode(project, urlString`${url}`, resourceType);
@@ -39,7 +46,27 @@ const setUpEnvironmentWithUISourceCode =
       return {workspace, project, uiSourceCode, networkPersistenceManager};
     };
 
-describeWithMockConnection('NetworkPersistenceManager', () => {
+function setupEnvironmentHooks() {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  afterEach(() => {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
+      target.dispose('afterEach');
+    }
+    SDK.TargetManager.TargetManager.removeInstance();
+    Workspace.Workspace.WorkspaceImpl.removeInstance();
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.removeInstance();
+    Root.DevToolsContext.setGlobalInstance(null);
+    Formatter.FormatterWorkerPool.FormatterWorkerPool.removeInstance();
+  });
+}
+
+describe('NetworkPersistenceManager', () => {
+  setupEnvironmentHooks();
+
   beforeEach(async () => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
     const target = createTarget();
@@ -63,7 +90,10 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
   });
 
   it('can create an overridden file with Local Overrides folder set up but disabled', async () => {
-    Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(false);
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    Common.Settings.Settings.instance()
+        .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+        .set(false);
 
     const url = 'http://www.example.com/list-xhr.json';
     const resourceType = Common.ResourceType.resourceTypes.Document;
@@ -79,9 +109,109 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     assert.isTrue(saveSpy.calledOnce, 'should override content once');
     assert.isTrue(actual, 'should complete override successfully');
   });
+
+  it('does not allow overrides for data URLs with path traversal', async () => {
+    const url = 'data:/../victim.com/script.js';
+    const resourceType = Common.ResourceType.resourceTypes.Script;
+
+    const {uiSourceCode} = setUpEnvironmentWithUISourceCode(url, resourceType);
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+
+    assert.isFalse(networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode));
+
+    const saveSpy = sinon.spy(networkPersistenceManager, 'saveUISourceCodeForOverrides');
+    const actual = await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
+
+    saveSpy.restore();
+
+    assert.isFalse(actual, 'should not allow override');
+    assert.isTrue(saveSpy.notCalled, 'should not attempt to save override');
+  });
+
+  it('does not persist sources that come from a source map', async () => {
+    const url = 'http://www.example.com/src/script.ts';
+    const resourceType = Common.ResourceType.resourceTypes.SourceMapScript;
+
+    const {uiSourceCode} = setUpEnvironmentWithUISourceCode(url, resourceType);
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+    const overridesProject = networkPersistenceManager.project();
+    assert.exists(overridesProject);
+    const createFileSpy = sinon.spy(overridesProject, 'createFile');
+
+    // The context menu still offers "Override content" for source mapped files, but it
+    // redirects to the deployed file instead of persisting the source mapped one.
+    assert.isTrue(networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode));
+
+    const actual = await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
+    await networkPersistenceManager.saveUISourceCodeForOverrides(uiSourceCode);
+
+    createFileSpy.restore();
+
+    assert.isFalse(actual, 'should not allow override');
+    assert.isTrue(createFileSpy.notCalled, 'should not write an override file');
+  });
+
+  it('does not allow overrides for sources synthesized from a `//# sourceURL` annotation', async () => {
+    const url = 'http://www.example.com/script.js';
+    const resourceType = Common.ResourceType.resourceTypes.Script;
+
+    const {uiSourceCode} = setUpEnvironmentWithUISourceCode(url, resourceType);
+    Bindings.NetworkProject.NetworkProject.setSourceURLSynthesized(uiSourceCode);
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+
+    assert.isFalse(networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode));
+
+    const saveSpy = sinon.spy(networkPersistenceManager, 'saveUISourceCodeForOverrides');
+    const actual = await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
+
+    saveSpy.restore();
+
+    assert.isFalse(actual, 'should not allow override');
+    assert.isTrue(saveSpy.notCalled, 'should not attempt to save override');
+  });
+
+  it('does not save override on working copy committed for data URLs', async () => {
+    const url = 'data:/../victim.com/script.js';
+    const resourceType = Common.ResourceType.resourceTypes.Script;
+
+    const {uiSourceCode} = setUpEnvironmentWithUISourceCode(url, resourceType);
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+
+    const project = networkPersistenceManager.project();
+    assert.isNotNull(project);
+    const createFileSpy = sinon.spy(project, 'createFile');
+
+    uiSourceCode.setWorkingCopy('console.log("attacker payload");');
+    uiSourceCode.commitWorkingCopy();
+
+    assert.isTrue(createFileSpy.notCalled, 'should not create file in overrides');
+  });
+
+  it('does not bind data URLs to existing filesystem overrides', async () => {
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, [
+      {name: 'script.js', path: 'victim.com/', content: 'console.log("original");'},
+    ]);
+    const {workspace} = setUpEnvironment();
+    const networkProject = {
+      id: () => 'networkProject',
+      type: () => Workspace.Workspace.projectTypes.Network,
+    } as Workspace.Workspace.Project;
+
+    const uiSourceCode = new Workspace.UISourceCode.UISourceCode(
+        networkProject, urlString`data:/../victim.com/script.js`, Common.ResourceType.resourceTypes.Script);
+    networkProject.uiSourceCodes = () => [uiSourceCode];
+
+    workspace.dispatchEventToListeners(Workspace.Workspace.Events.UISourceCodeAdded, uiSourceCode);
+
+    assert.strictEqual(networkPersistenceManager.fileUrlFromNetworkUrl(uiSourceCode.url()),
+                       Platform.DevToolsPath.EmptyUrlString);
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    assert.isNull(Persistence.Persistence.PersistenceImpl.instance().fileSystem(uiSourceCode));
+  });
 });
 
-describeWithMockConnection('NetworkPersistenceManager', () => {
+describe('NetworkPersistenceManager', () => {
+  setupEnvironmentHooks();
   it('does not create interception patterns for forbidden URLs', async () => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
     const target = createTarget();
@@ -118,17 +248,109 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
         urlString`https://chromewebstore.google.com/index.html`));
     assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
         urlString`https://chrome.google.com/script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`data:/../victim.com/script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`data:text/javascript,console.log(1)`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`blob:https://example.com/uuid`));
+    assert.isTrue(
+        Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(urlString`about:blank`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`javascript:void(0)`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`mailto:test@example.com`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`vbscript:alert(1)`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`https://./.headers`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`http://./script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`https://../.headers`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`https:///.headers`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`http:///victim.com/script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`../../escape-attempt/app.js`));
+    assert.isTrue(
+        Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(urlString`./script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`/path/script.js`));
+    assert.isTrue(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`www.example.com/script.js`));
     assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
         urlString`https://www.example.com/script.js`));
+    assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`http://www.example.com/script.js`));
+    assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`file:///path/to/script.js`));
+  });
+
+  it('returns empty path for forbidden data URLs', async () => {
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+    const dataUrl = urlString`data:/../victim.com/script.js`;
+    assert.strictEqual(networkPersistenceManager.rawPathFromUrl(dataUrl), Platform.DevToolsPath.EmptyRawPathString);
+    assert.strictEqual(networkPersistenceManager.encodedPathFromUrl(dataUrl),
+                       Platform.DevToolsPath.EmptyEncodedPathString);
+    assert.strictEqual(networkPersistenceManager.fileUrlFromNetworkUrl(dataUrl), Platform.DevToolsPath.EmptyUrlString);
+    assert.isNull(networkPersistenceManager.getHeadersUISourceCodeFromUrl(dataUrl));
+
+    const invalidUrl = urlString`vbscript:alert(1)`;
+    assert.strictEqual(networkPersistenceManager.rawPathFromUrl(invalidUrl), Platform.DevToolsPath.EmptyRawPathString);
+    assert.strictEqual(networkPersistenceManager.encodedPathFromUrl(invalidUrl),
+                       Platform.DevToolsPath.EmptyEncodedPathString);
+    assert.strictEqual(networkPersistenceManager.fileUrlFromNetworkUrl(invalidUrl),
+                       Platform.DevToolsPath.EmptyUrlString);
+    assert.isNull(networkPersistenceManager.getHeadersUISourceCodeFromUrl(invalidUrl));
+
+    const dotHostUrl = urlString`https://./.headers`;
+    assert.strictEqual(networkPersistenceManager.rawPathFromUrl(dotHostUrl), Platform.DevToolsPath.EmptyRawPathString);
+    assert.strictEqual(networkPersistenceManager.encodedPathFromUrl(dotHostUrl),
+                       Platform.DevToolsPath.EmptyEncodedPathString);
+    assert.strictEqual(networkPersistenceManager.fileUrlFromNetworkUrl(dotHostUrl),
+                       Platform.DevToolsPath.EmptyUrlString);
+    assert.isNull(networkPersistenceManager.getHeadersUISourceCodeFromUrl(dotHostUrl));
+  });
+
+  it('encodes path traversal components in local path parts', () => {
+    const parts = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.encodeEncodedPathToLocalPathParts(
+        'data:/../victim.com/script.js' as Platform.DevToolsPath.EncodedPathString);
+    assert.isFalse(parts.includes('..'));
+    assert.isTrue(parts.includes('%2E%2E'));
+
+    const singleDotParts =
+        Persistence.NetworkPersistenceManager.NetworkPersistenceManager.encodeEncodedPathToLocalPathParts(
+            './.headers' as Platform.DevToolsPath.EncodedPathString);
+    assert.isFalse(singleDotParts.includes('.'));
+    assert.deepEqual(singleDotParts, ['%2E', '.headers']);
+  });
+
+  it('does not allow overrides for dot-host URLs or plant .headers via content overrides', async () => {
+    for (const url of ['https://./.headers', 'https://./victim.com/.headers', 'https:///.headers',
+                       'https://www.example.com/.headers']) {
+      const {uiSourceCode} = setUpEnvironmentWithUISourceCode(url, Common.ResourceType.resourceTypes.Script);
+      const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, []);
+      const overridesProject = networkPersistenceManager.project();
+      assert.exists(overridesProject);
+      const createFileSpy = sinon.spy(overridesProject, 'createFile');
+
+      await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
+      await networkPersistenceManager.saveUISourceCodeForOverrides(uiSourceCode);
+
+      createFileSpy.restore();
+      assert.isTrue(createFileSpy.notCalled, `should not write an override file for ${url}`);
+    }
   });
 });
 
-describeWithMockConnection('NetworkPersistenceManager', () => {
+describe('NetworkPersistenceManager', () => {
+  setupEnvironmentHooks();
   let networkPersistenceManager: Persistence.NetworkPersistenceManager.NetworkPersistenceManager;
 
   beforeEach(async () => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
-    setMockResourceTree(false);
     const target = createTarget();
     networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, [
       {
@@ -190,7 +412,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     await networkPersistenceManager.updateInterceptionPatternsForTests();
   });
 
-  it('merges request headers with override without overlap', async () => {
+  it('merges request headers with override without overlap', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/',
@@ -205,11 +427,11 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'index-only', value: 'only added to index.html'},
       {name: 'server', value: 'DevTools mock server'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges request headers with override with overlap', async () => {
+  it('merges request headers with override with overlap', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/index.html',
@@ -225,11 +447,11 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'index-only', value: 'only added to index.html'},
       {name: 'server', value: 'DevTools mock server'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges request headers with override with file type wildcard', async () => {
+  it('merges request headers with override with file type wildcard', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/styles.css',
@@ -245,11 +467,11 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'css-only', value: 'only added to css files'},
       {name: 'server', value: 'DevTools mock server'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges request headers with override with specific path', async () => {
+  it('merges request headers with override with specific path', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/path/to/script.js',
@@ -265,11 +487,11 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'another-header', value: 'only added to specific path'},
       {name: 'server', value: 'DevTools mock server'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges request headers only when domain matches', async () => {
+  it('merges request headers only when domain matches', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.web.dev/index.html',
@@ -283,11 +505,26 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'age', value: 'overridden'},
       {name: 'server', value: 'DevTools mock server'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges headers while leaving muliple headers with the same name unchanged', async () => {
+  it('does not merge global header overrides for requests to forbidden URLs', () => {
+    for (const url of ['https://chromewebstore.google.com/index.html', 'https://chrome.google.com/index.html',
+                       'chrome://version']) {
+      const interceptedRequest = {
+        request: {url},
+        responseHeaders: [
+          {name: 'server', value: 'DevTools mock server'},
+        ],
+      } as SDK.NetworkManager.InterceptedRequest;
+
+      const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+      assert.lengthOf(actual, 0);
+    }
+  });
+
+  it('merges headers while leaving multiple headers with the same name unchanged', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/index.html',
@@ -306,11 +543,11 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'repeated', value: 'second'},
       {name: 'repeated', value: 'third'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges headers and can override muliple headers with the same name', async () => {
+  it('merges headers and can override muliple headers with the same name', () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/repeated.html',
@@ -327,7 +564,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       {name: 'repeated', value: 'first override'},
       {name: 'repeated', value: 'second override'},
     ];
-    const actual = await networkPersistenceManager.handleHeaderInterception(interceptedRequest);
+    const actual = networkPersistenceManager.handleHeaderInterception(interceptedRequest);
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
@@ -335,53 +572,53 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     let toTest = [
       // Simple tests.
       {
-        url: 'www.example.com/',
+        url: 'http://www.example.com/',
         raw: 'www.example.com/index.html',
         encoded: 'www.example.com/index.html',
       },
       {
-        url: 'www.example.com/simple',
+        url: 'http://www.example.com/simple',
         raw: 'www.example.com/simple',
         encoded: 'www.example.com/simple',
       },
       {
-        url: 'www.example.com/hello/foo/bar',
+        url: 'http://www.example.com/hello/foo/bar',
         raw: 'www.example.com/hello/foo/bar',
         encoded: 'www.example.com/hello/foo/bar',
       },
       {
-        url: 'www.example.com/.',
-        raw: 'www.example.com/.',
-        encoded: 'www.example.com/',
+        url: 'http://www.example.com/.',
+        raw: 'www.example.com/%2E',
+        encoded: 'www.example.com/%252E',
       },
       {
-        url: 'localhost:8090/endswith.',
+        url: 'http://localhost:8090/endswith.',
         raw: 'localhost:8090/endswith.',
         encoded: 'localhost:8090/endswith.',
       },
       // Query parameters.
       {
-        url: 'example.com/fo?o/bar',
+        url: 'http://example.com/fo?o/bar',
         raw: 'example.com/fo?o%2Fbar',
         encoded: 'example.com/fo%3Fo%252Fbar',
       },
       {
-        url: 'example.com/foo?/bar',
+        url: 'http://example.com/foo?/bar',
         raw: 'example.com/foo?%2Fbar',
         encoded: 'example.com/foo%3F%252Fbar',
       },
       {
-        url: 'example.com/foo/?bar',
+        url: 'http://example.com/foo/?bar',
         raw: 'example.com/foo/?bar',
         encoded: 'example.com/foo/%3Fbar',
       },
       {
-        url: 'example.com/?foo/bar/3',
+        url: 'http://example.com/?foo/bar/3',
         raw: 'example.com/?foo%2Fbar%2F3',
         encoded: 'example.com/%3Ffoo%252Fbar%252F3',
       },
       {
-        url: 'example.com/foo/bar/?3hello/bar',
+        url: 'http://example.com/foo/bar/?3hello/bar',
         raw: 'example.com/foo/bar/?3hello%2Fbar',
         encoded: 'example.com/foo/bar/%3F3hello%252Fbar',
       },
@@ -398,22 +635,22 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       },
       // Hash parameters.
       {
-        url: 'example.com/?foo/bar/3#hello/bar',
+        url: 'http://example.com/?foo/bar/3#hello/bar',
         raw: 'example.com/?foo%2Fbar%2F3',
         encoded: 'example.com/%3Ffoo%252Fbar%252F3',
       },
       {
-        url: 'example.com/#foo/bar/3hello/bar',
+        url: 'http://example.com/#foo/bar/3hello/bar',
         raw: 'example.com/index.html',
         encoded: 'example.com/index.html',
       },
       {
-        url: 'example.com/foo/bar/#?3hello/bar',
+        url: 'http://example.com/foo/bar/#?3hello/bar',
         raw: 'example.com/foo/bar/index.html',
         encoded: 'example.com/foo/bar/index.html',
       },
       {
-        url: 'example.com/foo.js#',
+        url: 'http://example.com/foo.js#',
         raw: 'example.com/foo.js',
         encoded: 'example.com/foo.js',
       },
@@ -428,35 +665,35 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
         encoded: 'www.example.com/file&$%252A%3F.html',
       },
       {
-        url: 'localhost:8090/',
+        url: 'http://localhost:8090/',
         raw: 'localhost:8090/index.html',
         encoded: 'localhost:8090/index.html',
       },
-      {url: 'localhost:8090/lpt1', raw: 'localhost:8090/lpt1', encoded: 'localhost:8090/lpt1'},
+      {url: 'http://localhost:8090/lpt1', raw: 'localhost:8090/lpt1', encoded: 'localhost:8090/lpt1'},
       {
-        url: 'example.com/foo .js',
+        url: 'http://example.com/foo .js',
         raw: 'example.com/foo%20.js',
         encoded: 'example.com/foo%2520.js',
       },
       {
-        url: 'example.com///foo.js',
+        url: 'http://example.com///foo.js',
         raw: 'example.com/foo.js',
         encoded: 'example.com/foo.js',
       },
       {
-        url: 'example.com///',
+        url: 'http://example.com///',
         raw: 'example.com/index.html',
         encoded: 'example.com/index.html',
       },
       // Very long file names.
       {
-        url: 'example.com' +
+        url: 'http://example.com' +
             '/THIS/PATH/IS_MORE_THAN/200/Chars'.repeat(8),
         raw: 'example.com/longurls/Chars-141a715a',
         encoded: 'example.com/longurls/Chars-141a715a',
       },
       {
-        url: ('example.com' +
+        url: ('http://example.com' +
               '/THIS/PATH/IS_LESS_THAN/200/Chars'.repeat(5))
                  .slice(0, -1),
         raw:
@@ -493,149 +730,149 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
           encoded: 'www.example.com/file&$%252A%253F.html',
         },
         {
-          url: 'localhost:8090/',
+          url: 'http://localhost:8090/',
           raw: 'localhost%3A8090/index.html',
           encoded: 'localhost%253A8090/index.html',
         },
         // Windows cannot end with . (period) and space.
         {
-          url: 'example.com/foo.js.',
+          url: 'http://example.com/foo.js.',
           raw: 'example.com/foo.js%2E',
           encoded: 'example.com/foo.js%252E',
         },
         {
-          url: 'localhost:8090/endswith.',
+          url: 'http://localhost:8090/endswith.',
           raw: 'localhost%3A8090/endswith%2E',
           encoded: 'localhost%253A8090/endswith%252E',
         },
         {
-          url: 'example.com/foo.js ',
+          url: 'http://example.com/foo.js ',
           raw: 'example.com/foo.js%20',
           encoded: 'example.com/foo.js%2520',
         },
         // Reserved filenames on Windows.
         {
-          url: 'example.com/CON',
+          url: 'http://example.com/CON',
           raw: 'example.com/%43%4F%4E',
           encoded: 'example.com/%2543%254F%254E',
         },
         {
-          url: 'example.com/cOn',
+          url: 'http://example.com/cOn',
           raw: 'example.com/%63%4F%6E',
           encoded: 'example.com/%2563%254F%256E',
         },
         {
-          url: 'example.com/cOn/hello',
+          url: 'http://example.com/cOn/hello',
           raw: 'example.com/%63%4F%6E/hello',
           encoded: 'example.com/%2563%254F%256E/hello',
         },
         {
-          url: 'example.com/PRN',
+          url: 'http://example.com/PRN',
           raw: 'example.com/%50%52%4E',
           encoded: 'example.com/%2550%2552%254E',
         },
         {
-          url: 'example.com/AUX',
+          url: 'http://example.com/AUX',
           raw: 'example.com/%41%55%58',
           encoded: 'example.com/%2541%2555%2558',
         },
         {
-          url: 'example.com/NUL',
+          url: 'http://example.com/NUL',
           raw: 'example.com/%4E%55%4C',
           encoded: 'example.com/%254E%2555%254C',
         },
         {
-          url: 'example.com/COM1',
+          url: 'http://example.com/COM1',
           raw: 'example.com/%43%4F%4D%31',
           encoded: 'example.com/%2543%254F%254D%2531',
         },
         {
-          url: 'example.com/COM2',
+          url: 'http://example.com/COM2',
           raw: 'example.com/%43%4F%4D%32',
           encoded: 'example.com/%2543%254F%254D%2532',
         },
         {
-          url: 'example.com/COM3',
+          url: 'http://example.com/COM3',
           raw: 'example.com/%43%4F%4D%33',
           encoded: 'example.com/%2543%254F%254D%2533',
         },
         {
-          url: 'example.com/COM4',
+          url: 'http://example.com/COM4',
           raw: 'example.com/%43%4F%4D%34',
           encoded: 'example.com/%2543%254F%254D%2534',
         },
         {
-          url: 'example.com/COM5',
+          url: 'http://example.com/COM5',
           raw: 'example.com/%43%4F%4D%35',
           encoded: 'example.com/%2543%254F%254D%2535',
         },
         {
-          url: 'example.com/COM6',
+          url: 'http://example.com/COM6',
           raw: 'example.com/%43%4F%4D%36',
           encoded: 'example.com/%2543%254F%254D%2536',
         },
         {
-          url: 'example.com/COM7',
+          url: 'http://example.com/COM7',
           raw: 'example.com/%43%4F%4D%37',
           encoded: 'example.com/%2543%254F%254D%2537',
         },
         {
-          url: 'example.com/COM8',
+          url: 'http://example.com/COM8',
           raw: 'example.com/%43%4F%4D%38',
           encoded: 'example.com/%2543%254F%254D%2538',
         },
         {
-          url: 'example.com/COM9',
+          url: 'http://example.com/COM9',
           raw: 'example.com/%43%4F%4D%39',
           encoded: 'example.com/%2543%254F%254D%2539',
         },
         {
-          url: 'localhost:8090/lpt1',
+          url: 'http://localhost:8090/lpt1',
           raw: 'localhost%3A8090/%6C%70%74%31',
           encoded: 'localhost%253A8090/%256C%2570%2574%2531',
         },
         {
-          url: 'example.com/LPT1',
+          url: 'http://example.com/LPT1',
           raw: 'example.com/%4C%50%54%31',
           encoded: 'example.com/%254C%2550%2554%2531',
         },
         {
-          url: 'example.com/LPT2',
+          url: 'http://example.com/LPT2',
           raw: 'example.com/%4C%50%54%32',
           encoded: 'example.com/%254C%2550%2554%2532',
         },
         {
-          url: 'example.com/LPT3',
+          url: 'http://example.com/LPT3',
           raw: 'example.com/%4C%50%54%33',
           encoded: 'example.com/%254C%2550%2554%2533',
         },
         {
-          url: 'example.com/LPT4',
+          url: 'http://example.com/LPT4',
           raw: 'example.com/%4C%50%54%34',
           encoded: 'example.com/%254C%2550%2554%2534',
         },
         {
-          url: 'example.com/LPT5',
+          url: 'http://example.com/LPT5',
           raw: 'example.com/%4C%50%54%35',
           encoded: 'example.com/%254C%2550%2554%2535',
         },
         {
-          url: 'example.com/LPT6',
+          url: 'http://example.com/LPT6',
           raw: 'example.com/%4C%50%54%36',
           encoded: 'example.com/%254C%2550%2554%2536',
         },
         {
-          url: 'example.com/LPT7',
+          url: 'http://example.com/LPT7',
           raw: 'example.com/%4C%50%54%37',
           encoded: 'example.com/%254C%2550%2554%2537',
         },
         {
-          url: 'example.com/LPT8',
+          url: 'http://example.com/LPT8',
           raw: 'example.com/%4C%50%54%38',
           encoded: 'example.com/%254C%2550%2554%2538',
         },
         {
-          url: 'example.com/LPT9',
+          url: 'http://example.com/LPT9',
           raw: 'example.com/%4C%50%54%39',
           encoded: 'example.com/%254C%2550%2554%2539',
         },
@@ -650,6 +887,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
   });
 
   it('is aware of which \'.headers\' files are currently active', done => {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const project = {
       type: () => Workspace.Workspace.projectTypes.Network,
@@ -704,7 +942,8 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
   });
 });
 
-describeWithMockConnection('NetworkPersistenceManager', () => {
+describe('NetworkPersistenceManager', () => {
+  setupEnvironmentHooks();
   beforeEach(() => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
   });
@@ -713,6 +952,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     const {networkPersistenceManager} = setUpEnvironment();
     const {project} = createFileSystemUISourceCode({url: urlString`file:///tmp`, mimeType: 'text/plain'});
     await networkPersistenceManager.setProject(project);
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
     const targetManager = SDK.TargetManager.TargetManager.instance();
     assert.isNull(targetManager.rootTarget());
     assert.isFalse(networkPersistenceManager.active());
@@ -728,12 +968,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
 });
 
 describe('NetworkPersistenceManager', () => {
-  before(async () => {
-    await initializeGlobalVars();
-  });
-  after(async () => {
-    await deinitializeGlobalVars();
-  });
+  setupEnvironmentHooks();
 
   it('escapes patterns to be used in RegExes', () => {
     assert.strictEqual(Persistence.NetworkPersistenceManager.escapeRegex('www.example.com/'), 'www\\.example\\.com/');

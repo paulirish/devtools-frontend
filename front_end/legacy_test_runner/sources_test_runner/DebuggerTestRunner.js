@@ -8,9 +8,9 @@
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Main from '../../entrypoints/main/main.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import * as BrowserDebugger from '../../panels/browser_debugger/browser_debugger.js';
 import * as Sources from '../../panels/sources/sources.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {TestRunner} from '../test_runner/test_runner.js';
@@ -40,7 +40,7 @@ export const startDebuggerTestPromise = function(quiet) {
 };
 
 export const completeDebuggerTest = function() {
-  Common.Settings.moduleSetting('breakpoints-active').set(true);
+  Common.Settings.Settings.instance().resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(true);
   resumeExecution(TestRunner.completeTest.bind(TestRunner));
 };
 
@@ -369,8 +369,11 @@ export const pausedScript = function(callFrames, reason, auxData, breakpointIds,
 
   const debuggerModel = this.target().model(SDK.DebuggerModel.DebuggerModel);
   pausedScriptArguments = [
-    SDK.DebuggerModel.CallFrame.fromPayloadArray(debuggerModel, callFrames), reason, breakpointIds, asyncStackTrace,
-    auxData
+    SDK.DebuggerModel.CallFrame.fromPayloadArray(debuggerModel, callFrames),
+    reason,
+    breakpointIds,
+    asyncStackTrace,
+    auxData,
   ];
 
   if (waitUntilPausedCallback) {
@@ -394,9 +397,9 @@ export const resumedScript = function() {
   }
 };
 
-export const showUISourceCode = function(uiSourceCode, callback) {
+export const showUISourceCode = async function(uiSourceCode, callback) {
   const panel = Sources.SourcesPanel.SourcesPanel.instance();
-  panel.showUISourceCode(uiSourceCode);
+  await panel.showUISourceCode(uiSourceCode);
   const sourceFrame = panel.visibleView;
 
   if (sourceFrame.loaded) {
@@ -512,7 +515,11 @@ export const dumpSectionsWithIndent = function(treeElements, depth) {
 };
 
 export const scopeChainSections = function() {
-  return Sources.ScopeChainSidebarPane.ScopeChainSidebarPane.instance().treeOutline.rootElement().children();
+  return Sources.ScopeChainSidebarPane.ScopeChainSidebarPane.instance()
+      .contentElement.querySelector('devtools-tree')
+      ?.getInternalTreeOutlineForTest()
+      .rootElement()
+      .children();
 };
 
 export const expandScopeVariablesSidebarPane = function(callback) {
@@ -538,13 +545,13 @@ export const expandProperties = function(properties, callback) {
 
     const parentTreeElement = properties[index++];
     const path = properties[index++];
-    expandProperty(parentTreeElement, path, 0, expandNextPath);
+    void expandProperty(parentTreeElement, path, 0, expandNextPath);
   }
 
   TestRunner.deprecatedRunAfterPendingDispatches(expandNextPath);
 };
 
-export const expandProperty = function(parentTreeElement, path, pathIndex, callback) {
+export const expandProperty = async function(parentTreeElement, path, pathIndex, callback) {
   if (pathIndex === path.length) {
     TestRunner.addResult('Expanded property: ' + path.join('.'));
     callback();
@@ -552,7 +559,16 @@ export const expandProperty = function(parentTreeElement, path, pathIndex, callb
   }
 
   const name = path[pathIndex++];
-  const propertyTreeElement = findChildPropertyTreeElement(parentTreeElement, name);
+  let propertyTreeElement = findChildPropertyTreeElement(parentTreeElement, name);
+  // Objects with more than InitialVisibleChildrenLimit (200) properties render a '...'
+  // button as the last child to show the remaining properties (including [[Prototype]]).
+  if (!propertyTreeElement &&
+      parentTreeElement.lastChild()?.titleElement?.querySelector('.object-value-calculate-value-button')) {
+    parentTreeElement.lastChild().select();
+    await UI.Widget.Widget.allUpdatesComplete;
+    await new Promise(requestAnimationFrame);
+    propertyTreeElement = findChildPropertyTreeElement(parentTreeElement, name);
+  }
 
   if (!propertyTreeElement) {
     TestRunner.addResult('Failed to expand property: ' + path.slice(0, pathIndex).join('.'));
@@ -561,6 +577,8 @@ export const expandProperty = function(parentTreeElement, path, pathIndex, callb
   }
 
   propertyTreeElement.expand();
+  await UI.Widget.Widget.allUpdatesComplete;
+  await new Promise(requestAnimationFrame);
   TestRunner.deprecatedRunAfterPendingDispatches(
       expandProperty.bind(undefined, propertyTreeElement, path, pathIndex, callback));
 };
@@ -570,9 +588,7 @@ export const findChildPropertyTreeElement = function(parent, childName) {
 
   for (let i = 0; i < children.length; i++) {
     const treeElement = children[i];
-    const property = treeElement.property;
-
-    if (property.name === childName) {
+    if (treeElement.listItemElement.dataset.objectPropertyNameForTest === childName) {
       return treeElement;
     }
   }
@@ -637,8 +653,6 @@ export const debuggerPlugin = function(sourceFrame) {
 };
 
 export const setEventListenerBreakpoint = function(id, enabled, targetName) {
-  const pane = BrowserDebugger.EventListenerBreakpointsSidebarPane.EventListenerBreakpointsSidebarPane.instance();
-
   const auxData = {eventName: id};
 
   if (targetName) {
@@ -647,12 +661,11 @@ export const setEventListenerBreakpoint = function(id, enabled, targetName) {
 
   let breakpoint = SDK.DOMDebuggerModel.DOMDebuggerManager.instance().resolveEventListenerBreakpoint(auxData);
   if (!breakpoint) {
-    breakpoint = SDK.EventBreakpointsModel.EventBreakpointsManager.instance().resolveEventListenerBreakpoint(auxData);
+    breakpoint = Main.MainImpl.MainImpl.universeForTest.eventBreakpointsManager.resolveEventListenerBreakpoint(auxData);
   }
 
   if (breakpoint.enabled() !== enabled) {
     breakpoint.setEnabled(enabled);
-    pane.update();
   }
 };
 

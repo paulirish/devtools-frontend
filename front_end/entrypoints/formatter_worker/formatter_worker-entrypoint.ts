@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../core/platform/platform.js';
+import {FormatterActions, type ScopeVariableMapping} from '../formatter_actions/formatter_actions.js';
 
 import * as FormatterWorker from './formatter_worker.js';
-import {FormatterActions} from './FormatterActions.js';
 
 Platform.HostRuntime.HOST_RUNTIME.workerScope.onmessage = function(event): void {
   const method: FormatterActions = event.data.method;
@@ -13,7 +13,7 @@ Platform.HostRuntime.HOST_RUNTIME.workerScope.onmessage = function(event): void 
     indentString: string,
     content: string,
     mimeType: string,
-    mapping: Map<string, string|null>,
+    mapping: ScopeVariableMapping[],
     sourceType: 'module'|'script',
   } = event.data.params;
   if (!method) {
@@ -29,8 +29,13 @@ Platform.HostRuntime.HOST_RUNTIME.workerScope.onmessage = function(event): void 
       FormatterWorker.CSSRuleParser.parseCSS(params.content, self.postMessage);
       break;
     case FormatterActions.JAVASCRIPT_SUBSTITUTE: {
-      Platform.HostRuntime.HOST_RUNTIME.workerScope.postMessage(
-          FormatterWorker.Substitute.substituteExpression(params.content, params.mapping));
+      let result: string|{error: string};
+      try {
+        result = FormatterWorker.Substitute.substituteExpression(params.content, params.mapping);
+      } catch (error) {
+        result = {error: error instanceof Error ? error.message : String(error)};
+      }
+      Platform.HostRuntime.HOST_RUNTIME.workerScope.postMessage(result);
       break;
     }
     case FormatterActions.JAVASCRIPT_SCOPE_TREE: {

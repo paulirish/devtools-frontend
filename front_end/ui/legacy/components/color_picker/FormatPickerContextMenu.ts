@@ -8,7 +8,7 @@ import * as UI from '../../legacy.js';
 
 const UIStrings = {
   /**
-   * @description Menu warning that some color will be clipped after conversion to match the target gamut
+   * @description Warning item in the color format picker context menu indicating that converting to a narrower gamut will cause color shifts.
    */
   colorShiftWarning: '⚠️ Conversion to a narrow gamut will cause color shifts',
 } as const;
@@ -46,6 +46,7 @@ export class FormatPickerContextMenu {
       Common.Color.Format.SRGB,
       Common.Color.Format.SRGB_LINEAR,
       Common.Color.Format.DISPLAY_P3,
+      Common.Color.Format.DISPLAY_P3_LINEAR,
       Common.Color.Format.A98_RGB,
       Common.Color.Format.PROPHOTO_RGB,
       Common.Color.Format.REC_2020,

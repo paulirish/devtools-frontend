@@ -7,7 +7,7 @@ import * as Platform from '../../../core/platform/platform.js';
 import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Lantern from '../lantern/lantern.js';
-import type * as Types from '../types/types.js';
+import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
@@ -24,7 +24,7 @@ export const UIStrings = {
    */
   title: 'Modern HTTP',
   /**
-   * @description Description of an insight that recommends recommends using HTTP/2 over HTTP/1.1 because of the performance benefits. "HTTP" should not be translated.
+   * @description Description of an insight that recommends using HTTP/2 over HTTP/1.1 because of the performance benefits. "HTTP" should not be translated.
    */
   description:
       'HTTP/2 and HTTP/3 offer many benefits over HTTP/1.1, such as multiplexing. [Learn more about using modern HTTP](https://developer.chrome.com/docs/performance/insights/modern-http).',
@@ -37,14 +37,14 @@ export const UIStrings = {
    */
   protocol: 'Protocol',
   /**
-   * @description Text explaining that there were not requests that were slowed down by using HTTP/1.1. "HTTP/1.1" should not be translated.
+   * @description Text explaining that there were no requests that were slowed down by using HTTP/1.1. "HTTP/1.1" should not be translated.
    */
   noOldProtocolRequests:
-      'No requests used HTTP/1.1, or its current use of HTTP/1.1 does not present a significant optimization opportunity. HTTP/1.1 requests are only flagged if six or more static assets originate from the same origin, and they are not served from a local development environment or a third-party source.'
+      'No requests used HTTP/1.1, or its current use of HTTP/1.1 doesn’t present a significant optimization opportunity. HTTP/1.1 requests are only flagged if six or more static assets originate from the same origin, and they aren’t served from a local development environment or a third-party source.',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/ModernHTTP.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type ModernHTTPInsightModel = InsightModel<typeof UIStrings, {
   http1Requests: Types.Events.SyntheticNetworkRequest[],
@@ -199,7 +199,7 @@ function computeWasteWithGraph(
 
 function computeMetricSavings(
     http1Requests: Types.Events.SyntheticNetworkRequest[], context: InsightSetContext): MetricSavings|undefined {
-  if (!context.navigation || !context.lantern) {
+  if (!context.navigation || !('lantern' in context) || !context.lantern) {
     return;
   }
 
@@ -234,7 +234,11 @@ export function generateInsight(data: Handlers.Types.HandlerData, context: Insig
   const contextRequests = data.NetworkRequests.byTime.filter(isWithinContext);
 
   const entityMappings = data.NetworkRequests.entityMappings;
-  const firstPartyUrl = context.navigation?.args.data?.documentLoaderURL ?? data.Meta.mainFrameURL;
+  let firstPartyUrl = data.Meta.mainFrameURL;
+  if (context.navigation && !Types.Events.isSoftNavigationStart(context.navigation)) {
+    firstPartyUrl = context.navigation.args.data?.documentLoaderURL ?? firstPartyUrl;
+  }
+
   const firstPartyEntity = Handlers.Helpers.getEntityForUrl(firstPartyUrl, entityMappings);
   const http1Requests = determineHttp1Requests(contextRequests, entityMappings, firstPartyEntity ?? null);
 

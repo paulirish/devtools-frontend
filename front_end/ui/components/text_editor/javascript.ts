@@ -5,6 +5,7 @@
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
+import * as Formatter from '../../../models/formatter/formatter.js';
 import * as JavaScriptMetaData from '../../../models/javascript_metadata/javascript_metadata.js';
 import * as SourceMapScopes from '../../../models/source_map_scopes/source_map_scopes.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
@@ -12,9 +13,43 @@ import * as UI from '../../legacy/legacy.js';
 
 import {type ArgumentHintsTooltip, closeTooltip, cursorTooltip} from './cursor_tooltip.js';
 
-export function completion(): CodeMirror.Extension {
+export interface CompletionOptions {
+  location?: () => Promise<SDK.DebuggerModel.Location|null>;
+}
+
+interface EvaluationTarget {
+  callFrame?: SDK.DebuggerModel.CallFrame;
+  location?: SDK.DebuggerModel.Location;
+}
+
+async function resolveEvaluationTarget(options?: CompletionOptions): Promise<EvaluationTarget> {
+  const selectedCallFrame = getExecutionContext()?.debuggerModel.selectedCallFrame() ?? undefined;
+  if (!options?.location) {
+    return {callFrame: selectedCallFrame, location: selectedCallFrame?.location()};
+  }
+  const location = await options.location() ?? undefined;
+  if (selectedCallFrame && location && selectedCallFrame.script.scriptId === location.scriptId &&
+      selectedCallFrame.location().lineNumber === location.lineNumber &&
+      selectedCallFrame.location().columnNumber === location.columnNumber) {
+    return {callFrame: selectedCallFrame, location};
+  }
+  return {location};
+}
+
+/**
+ * Whether we can complete properties of expressions on behalf of `target`.
+ *
+ * If we are not paused at the target location, there is no call frame in which the local variables at that location
+ * exist. Evaluating in the global scope instead would silently resolve them to unrelated globals, so we only offer
+ * the (statically known) variable names in that case.
+ */
+function canCompleteProperties(target: EvaluationTarget): boolean {
+  return Boolean(target.callFrame) || !target.location;
+}
+
+export function completion(options?: CompletionOptions): CodeMirror.Extension {
   return CodeMirror.javascript.javascriptLanguage.data.of({
-    autocomplete: javascriptCompletionSource,
+    autocomplete: (cx: CodeMirror.CompletionContext) => javascriptCompletionSource(cx, options),
   });
 }
 
@@ -169,14 +204,15 @@ export function getQueryType(tree: CodeMirror.Tree, pos: number, doc: CodeMirror
   return {type: QueryType.EXPRESSION};
 }
 
-export async function javascriptCompletionSource(cx: CodeMirror.CompletionContext):
-    Promise<CodeMirror.CompletionResult|null> {
+export async function javascriptCompletionSource(
+    cx: CodeMirror.CompletionContext, options?: CompletionOptions): Promise<CodeMirror.CompletionResult|null> {
   const query = getQueryType(CodeMirror.syntaxTree(cx.state), cx.pos, cx.state.doc);
   if (!query || query.from === undefined && !cx.explicit && query.type === QueryType.EXPRESSION) {
     return null;
   }
 
-  const script = getExecutionContext()?.debuggerModel.selectedCallFrame()?.script;
+  const target = await resolveEvaluationTarget(options);
+  const script = target.callFrame?.script ?? target.location?.script() ?? null;
   if (script &&
       Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().pluginManager.hasPluginForScript(script)) {
     return null;
@@ -186,7 +222,7 @@ export async function javascriptCompletionSource(cx: CodeMirror.CompletionContex
   let quote: string|undefined = undefined;
   if (query.type === QueryType.EXPRESSION) {
     const [scope, global] = await Promise.all([
-      completeExpressionInScope(),
+      completeExpressionInScope(target),
       completeExpressionGlobal(),
     ]);
     if (scope.completions.length) {
@@ -198,6 +234,9 @@ export async function javascriptCompletionSource(cx: CodeMirror.CompletionContex
       result = global;
     }
   } else if (query.type === QueryType.PROPERTY_NAME || query.type === QueryType.PROPERTY_EXPRESSION) {
+    if (!canCompleteProperties(target)) {
+      return null;
+    }
     const objectExpr = (query.relatedNode as CodeMirror.SyntaxNode).getChild('Expression');
     if (query.type === QueryType.PROPERTY_EXPRESSION) {
       quote = query.from === undefined ? '\'' : cx.state.sliceDoc(query.from, query.from + 1);
@@ -205,14 +244,14 @@ export async function javascriptCompletionSource(cx: CodeMirror.CompletionContex
     if (!objectExpr) {
       return null;
     }
-    result = await completeProperties(
-        cx.state.sliceDoc(objectExpr.from, objectExpr.to), quote, cx.state.sliceDoc(cx.pos, cx.pos + 1) === ']');
+    result = await completeProperties(cx.state.sliceDoc(objectExpr.from, objectExpr.to), quote,
+                                      cx.state.sliceDoc(cx.pos, cx.pos + 1) === ']', target);
   } else if (query.type === QueryType.POTENTIALLY_RETRIEVING_FROM_MAP) {
     const potentialMapObject = query.relatedNode;
-    if (!potentialMapObject) {
+    if (!potentialMapObject || !canCompleteProperties(target)) {
       return null;
     }
-    result = await maybeCompleteKeysFromMap(cx.state.sliceDoc(potentialMapObject.from, potentialMapObject.to));
+    result = await maybeCompleteKeysFromMap(cx.state.sliceDoc(potentialMapObject.from, potentialMapObject.to), target);
   } else {
     return null;
   }
@@ -236,20 +275,31 @@ async function evaluateExpression(
     context: SDK.RuntimeModel.ExecutionContext,
     expression: string,
     group: string,
+    substituteNames = true,
+    target?: EvaluationTarget,
     ): Promise<SDK.RemoteObject.RemoteObject|null> {
-  const result = await context.evaluate(
-      {
-        expression,
-        objectGroup: group,
-        includeCommandLineAPI: true,
-        silent: true,
-        returnByValue: false,
-        generatePreview: false,
-        throwOnSideEffect: true,
-        timeout: 500,
-        replMode: true,
-      },
-      false, false);
+  const callFrame = target ? target.callFrame : context.debuggerModel.selectedCallFrame();
+  if (substituteNames && callFrame?.script.isJavaScript()) {
+    const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(
+        callFrame, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance());
+    try {
+      expression = await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(expression, nameMap);
+    } catch {
+    }
+  }
+  const evaluationOptions = {
+    expression,
+    objectGroup: group,
+    includeCommandLineAPI: true,
+    silent: true,
+    returnByValue: false,
+    generatePreview: false,
+    throwOnSideEffect: true,
+    timeout: 500,
+    replMode: true,
+  };
+  const result =
+      callFrame ? await callFrame.evaluate(evaluationOptions) : await context.evaluate(evaluationOptions, false, false);
   if ('error' in result || result.exceptionDetails || !result.object) {
     return null;
   }
@@ -266,7 +316,7 @@ const primitivePrototypes = new Map<string, string>([
 
 const maxCacheAge = 30_000;
 
-let cacheInstance: PropertyCache|null = null;
+const cacheByTargetManager = new WeakMap<SDK.TargetManager.TargetManager, PropertyCache>();
 
 /**
  * Store recent collections of property completions. The empty string
@@ -275,15 +325,13 @@ let cacheInstance: PropertyCache|null = null;
 class PropertyCache {
   readonly #cache = new Map<string, Promise<CompletionSet>>();
 
-  constructor() {
+  constructor(targetManager: SDK.TargetManager.TargetManager) {
     const clear = (): void => this.#cache.clear();
-    SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.CommandEvaluated, clear);
+    targetManager.addModelListener(SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.CommandEvaluated, clear);
     UI.Context.Context.instance().addFlavorChangeListener(SDK.RuntimeModel.ExecutionContext, clear);
-    SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebuggerResumed, clear);
-    SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebuggerPaused, clear);
+    targetManager.addModelListener(SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebuggerResumed, clear);
+    targetManager.addModelListener(SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebuggerPaused, clear);
+    targetManager.addModelListener(SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.CallFrameSelected, clear);
   }
 
   get(expression: string): Promise<CompletionSet>|undefined {
@@ -300,21 +348,24 @@ class PropertyCache {
   }
 
   static instance(): PropertyCache {
-    if (!cacheInstance) {
-      cacheInstance = new PropertyCache();
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    let cache = cacheByTargetManager.get(targetManager);
+    if (!cache) {
+      cache = new PropertyCache(targetManager);
+      cacheByTargetManager.set(targetManager, cache);
     }
-    return cacheInstance;
+    return cache;
   }
 }
 
-async function maybeCompleteKeysFromMap(objectVariable: string): Promise<CompletionSet> {
+async function maybeCompleteKeysFromMap(objectVariable: string, target?: EvaluationTarget): Promise<CompletionSet> {
   const result = new CompletionSet();
   const context = getExecutionContext();
   if (!context) {
     return result;
   }
-  const maybeRetrieveKeys =
-      await evaluateExpression(context, `[...Map.prototype.keys.call(${objectVariable})]`, 'completion');
+  const maybeRetrieveKeys = await evaluateExpression(context, `[...Map.prototype.keys.call(${objectVariable})]`,
+                                                     'completion', /* substituteNames */ true, target);
   if (!maybeRetrieveKeys) {
     return result;
   }
@@ -334,6 +385,7 @@ async function completeProperties(
     expression: string,
     quoted?: string,
     hasBracket = false,
+    target?: EvaluationTarget,
     ): Promise<CompletionSet> {
   const cache = PropertyCache.instance();
   if (!quoted) {
@@ -346,7 +398,7 @@ async function completeProperties(
   if (!context) {
     return new CompletionSet();
   }
-  const result = completePropertiesInner(expression, context, quoted, hasBracket);
+  const result = completePropertiesInner(expression, context, quoted, hasBracket, target);
   if (!quoted) {
     cache.set(expression, result);
   }
@@ -358,12 +410,13 @@ async function completePropertiesInner(
     context: SDK.RuntimeModel.ExecutionContext,
     quoted?: string,
     hasBracket = false,
+    target?: EvaluationTarget,
     ): Promise<CompletionSet> {
   const result = new CompletionSet();
   if (!context) {
     return result;
   }
-  let object = await evaluateExpression(context, expression, 'completion');
+  let object = await evaluateExpression(context, expression, 'completion', expression !== 'globalThis', target);
   if (!object) {
     return result;
   }
@@ -379,7 +432,7 @@ async function completePropertiesInner(
 
   const toPrototype = primitivePrototypes.get(object.type);
   if (toPrototype) {
-    object = await evaluateExpression(context, toPrototype + '.prototype', 'completion');
+    object = await evaluateExpression(context, toPrototype + '.prototype', 'completion', /* substituteNames */ false);
   }
 
   const functionType = expression === 'globalThis' ? 'function' : 'method';
@@ -404,21 +457,43 @@ async function completePropertiesInner(
   return result;
 }
 
-async function completeExpressionInScope(): Promise<CompletionSet> {
+async function completeExpressionInScope(target: EvaluationTarget): Promise<CompletionSet> {
   const result = new CompletionSet();
-  const selectedFrame = getExecutionContext()?.debuggerModel.selectedCallFrame();
-  if (!selectedFrame) {
+  if (target.callFrame) {
+    const scopeChain =
+        await SourceMapScopes.ScopeChainResolver.ScopeChainResolver.instance().resolveScopeChain(target.callFrame);
+    const scopes = await Promise.all(scopeChain.map(scope => scope.object().getAllProperties(false, false)));
+    for (const scope of scopes) {
+      for (const property of scope.properties || []) {
+        if (!property.value && !property.getter) {
+          continue;
+        }
+        result.add({
+          label: property.name,
+          type: property.value?.type === 'function' ? 'function' : 'variable',
+        });
+      }
+    }
     return result;
   }
 
-  const scopes = await Promise.all(selectedFrame.scopeChain().map(
-      scope => SourceMapScopes.NamesResolver.resolveScopeInObject(scope).getAllProperties(false, false)));
-  for (const scope of scopes) {
-    for (const property of scope.properties || []) {
-      result.add({
-        label: property.name,
-        type: property.value?.type === 'function' ? 'function' : 'variable',
-      });
+  if (!target.location) {
+    return result;
+  }
+
+  const mappings = await SourceMapScopes.NamesResolver.allVariablesAtPosition(
+      target.location, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance());
+  for (const scope of mappings) {
+    const mappedGeneratedNames = new Set(scope.bindings.values());
+    for (const [origName, genName] of scope.bindings) {
+      if (genName !== null) {
+        result.add({label: origName, type: 'variable'});
+      }
+    }
+    for (const genName of scope.generatedNames) {
+      if (!mappedGeneratedNames.has(genName)) {
+        result.add({label: genName, type: 'variable'});
+      }
     }
   }
   return result;
@@ -470,8 +545,8 @@ export async function isExpressionComplete(expression: string): Promise<boolean>
   return false;
 }
 
-export function argumentHints(): ArgumentHintsTooltip {
-  return cursorTooltip(getArgumentHints);
+export function argumentHints(options?: CompletionOptions): ArgumentHintsTooltip {
+  return cursorTooltip((state, pos) => getArgumentHints(state, pos, options));
 }
 
 export function closeArgumentsHintsTooltip(
@@ -485,8 +560,8 @@ export function closeArgumentsHintsTooltip(
   return true;
 }
 
-async function getArgumentHints(
-    state: CodeMirror.EditorState, pos: number): Promise<(() => CodeMirror.TooltipView)|null> {
+async function getArgumentHints(state: CodeMirror.EditorState, pos: number,
+                                options?: CompletionOptions): Promise<(() => CodeMirror.TooltipView)|null> {
   const node = CodeMirror.syntaxTree(state).resolveInner(pos).enterUnfinishedNodesBefore(pos);
 
   if (node.name !== 'ArgList') {
@@ -496,7 +571,7 @@ async function getArgumentHints(
   if (!callee) {
     return null;
   }
-  const argumentList = await getArgumentsForExpression(callee, state.doc);
+  const argumentList = await getArgumentsForExpression(callee, state.doc, options);
   if (!argumentList) {
     return null;
   }
@@ -515,14 +590,15 @@ async function getArgumentHints(
   return () => tooltipBuilder(argumentList, argumentIndex);
 }
 
-async function getArgumentsForExpression(
-    callee: CodeMirror.SyntaxNode, doc: CodeMirror.Text): Promise<string[][]|null> {
+async function getArgumentsForExpression(callee: CodeMirror.SyntaxNode, doc: CodeMirror.Text,
+                                         options?: CompletionOptions): Promise<string[][]|null> {
   const context = getExecutionContext();
   if (!context) {
     return null;
   }
+  const target = await resolveEvaluationTarget(options);
   const expression = doc.sliceString(callee.from, callee.to);
-  const result = await evaluateExpression(context, expression, 'argumentsHint');
+  const result = await evaluateExpression(context, expression, 'argumentsHint', /* substituteNames */ true, target);
   if (result?.type !== 'function') {
     return null;
   }
@@ -531,7 +607,8 @@ async function getArgumentsForExpression(
     if (!first || callee.name !== 'MemberExpression') {
       return null;
     }
-    return await evaluateExpression(context, doc.sliceString(first.from, first.to), 'argumentsHint');
+    return await evaluateExpression(context, doc.sliceString(first.from, first.to), 'argumentsHint',
+                                    /* substituteNames */ true, target);
   };
   return await getArgumentsForFunctionValue(result, objGetter, expression)
       .finally(() => context.runtimeModel.releaseObjectGroup('argumentsHint'));

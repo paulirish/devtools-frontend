@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
+
 import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
 import {createEmbindPool} from '../src/DWARFSymbols.js';
 
@@ -25,7 +27,9 @@ class LLDBEvalDebugger implements LLDBEvalTests.Debugger {
     return new LLDBEvalDebugger(dbg, plugin);
   }
 
-  private async stringify(result: Chrome.DevTools.RemoteObject|Chrome.DevTools.ForeignObject): Promise<string> {
+  private async stringify(
+      result: Chrome.DevTools.RemoteObject|Chrome.DevTools.ForeignObject,
+      ): Promise<string> {
     if (!this.#plugin.getProperties) {
       throw new Error('getProperties not implemented');
     }
@@ -63,13 +67,16 @@ class LLDBEvalDebugger implements LLDBEvalTests.Debugger {
       throw new Error('Not implemented');
     }
     try {
-      const resultObject = await this.#plugin.evaluate(expr, rawLocation, this.#debugger.stopIdForCallFrame(callFrame));
+      const resultObject = await this.#plugin.evaluate(
+          expr,
+          rawLocation,
+          this.#debugger.stopIdForCallFrame(callFrame),
+      );
       if (!resultObject) {
         return {error: `Could not evaluate expression '${expr}'`};
       }
       const result = await this.stringify(resultObject);
       return {result};
-
     } catch (e) {
       return {error: `${e}`};
     }
@@ -100,11 +107,18 @@ class LLDBEvalDebugger implements LLDBEvalTests.Debugger {
       throw new Error('test_binary.cc source not found');
     }
 
-    const breakpoint =
-        await this.#debugger.setBreakpointOnSourceLine(line, new URL(sourceFileURL), this.#plugin, rawModuleId);
+    const breakpoint = await this.#debugger.setBreakpointOnSourceLine(
+        line,
+        new URL(sourceFileURL),
+        this.#plugin,
+        rawModuleId,
+    );
 
     const goPromise = page.go();
-    const pauseOrExitcode = await Promise.race([goPromise, this.#debugger.waitForPause()]);
+    const pauseOrExitcode = await Promise.race([
+      goPromise,
+      this.#debugger.waitForPause(),
+    ]);
     if (typeof pauseOrExitcode === 'number') {
       throw new Error('Program terminated before all breakpoints were hit.');
     }
@@ -113,7 +127,8 @@ class LLDBEvalDebugger implements LLDBEvalTests.Debugger {
     const [sourceLocation] = await this.#plugin.rawLocationToSourceLocation(rawLocation);
     if (sourceLocation?.lineNumber !== breakpoint.lineNumber) {
       throw new Error(
-          `Paused on unexpected line ${sourceLocation?.lineNumber}. Breakpoint was set on ${breakpoint.lineNumber}.`);
+          `Paused on unexpected line ${sourceLocation?.lineNumber}. Breakpoint was set on ${breakpoint.lineNumber}.`,
+      );
     }
   }
 
@@ -166,10 +181,17 @@ describe('Interpreter', () => {
     }
 
     const {lineNumber} = await debug.setBreakpointOnSourceLine(
-        '// BREAK(ArrayMembersTest)', new URL(sourceFileURL), plugin, rawModuleId);
+        '// BREAK(ArrayMembersTest)',
+        new URL(sourceFileURL),
+        plugin,
+        rawModuleId,
+    );
 
     const goPromise = page.go();
-    const pauseOrExitcode = await Promise.race([debug.waitForPause(), goPromise]);
+    const pauseOrExitcode = await Promise.race([
+      debug.waitForPause(),
+      goPromise,
+    ]);
     if (typeof pauseOrExitcode === 'number') {
       throw new Error('Program terminated before all breakpoints were hit.');
     }
@@ -178,39 +200,67 @@ describe('Interpreter', () => {
 
     const [sourceLocation] = await plugin.rawLocationToSourceLocation(rawLocation);
     if (sourceLocation?.lineNumber !== lineNumber) {
-      throw new Error('Paused at an unexpected location. Have not set a breakpoint here.');
+      throw new Error(
+          'Paused at an unexpected location. Have not set a breakpoint here.',
+      );
     }
 
     const variables = await plugin.listVariablesInScope(rawLocation);
-    expect(variables.map(v => v.name).sort()).to.deep.equal(['n', 'sum', 'x']);
+    assert.deepEqual(variables.map(v => v.name).sort(), ['n', 'sum', 'x']);
 
     if (!plugin.evaluate) {
       throw new Error('evaluate is undefined');
     }
 
     {
-      const {value} = remoteObject(await plugin.evaluate('n + sum', rawLocation, debug.stopIdForCallFrame(callFrame)));
-      expect(value).to.eql(55);
+      const {value} = remoteObject(
+          await plugin.evaluate(
+              'n + sum',
+              rawLocation,
+              debug.stopIdForCallFrame(callFrame),
+              ),
+      );
+      assert.deepEqual(value, 55);
     }
     {
-      const {value} =
-          remoteObject(await plugin.evaluate('(wchar_t)0x41414141', rawLocation, debug.stopIdForCallFrame(callFrame)));
-      expect(value).to.eql('U+41414141');
+      const {value} = remoteObject(
+          await plugin.evaluate(
+              '(wchar_t)0x41414141',
+              rawLocation,
+              debug.stopIdForCallFrame(callFrame),
+              ),
+      );
+      assert.deepEqual(value, 'U+41414141');
     }
     {
-      const {value} =
-          remoteObject(await plugin.evaluate('(char16_t)0x4141', rawLocation, debug.stopIdForCallFrame(callFrame)));
-      expect(value).to.eql('䅁');
+      const {value} = remoteObject(
+          await plugin.evaluate(
+              '(char16_t)0x4141',
+              rawLocation,
+              debug.stopIdForCallFrame(callFrame),
+              ),
+      );
+      assert.deepEqual(value, '䅁');
     }
     {
-      const {value} =
-          remoteObject(await plugin.evaluate('(char32_t)0x41414141', rawLocation, debug.stopIdForCallFrame(callFrame)));
-      expect(value).to.eql('U+41414141');
+      const {value} = remoteObject(
+          await plugin.evaluate(
+              '(char32_t)0x41414141',
+              rawLocation,
+              debug.stopIdForCallFrame(callFrame),
+              ),
+      );
+      assert.deepEqual(value, 'U+41414141');
     }
     {
-      const {value} =
-          remoteObject(await plugin.evaluate('(char32_t)0x4141', rawLocation, debug.stopIdForCallFrame(callFrame)));
-      expect(value).to.eql('䅁');
+      const {value} = remoteObject(
+          await plugin.evaluate(
+              '(char32_t)0x4141',
+              rawLocation,
+              debug.stopIdForCallFrame(callFrame),
+              ),
+      );
+      assert.deepEqual(value, '䅁');
     }
 
     await debug.resume();

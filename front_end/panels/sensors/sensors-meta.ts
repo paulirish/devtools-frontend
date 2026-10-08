@@ -2,63 +2,54 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import type * as Sensors from './sensors.js';
 
 const UIStrings = {
   /**
-   * @description Title of the Sensors tool. The sensors tool contains GPS, orientation sensors, touch
-   * settings, etc.
+   * @description Text for the CPU Pressure type to simulate on a device.
    */
-  sensors: 'Sensors',
+  cpuPressure: 'CPU Pressure',
   /**
-   * @description A tag of Sensors tool that can be searched in the command menu
+   * @description Title of an option in Sensors tab cpu pressure emulation drop-down. Turns off emulation of cpu pressure state.
    */
-  geolocation: 'geolocation',
+  noPressureEmulation: 'No override',
   /**
-   * @description A tag of Sensors tool that can be searched in the command menu
+   * @description An option that appears in a drop-down that represents the nominal state.
    */
-  timezones: 'timezones',
+  nominal: 'Nominal',
   /**
-   * @description Text in Sensors View of the Device Toolbar
+   * @description An option that appears in a drop-down that represents the fair state.
    */
-  locale: 'locale',
+  fair: 'Fair',
   /**
-   * @description A tag of Sensors tool that can be searched in the command menu
+   * @description An option that appears in a drop-down that represents the serious state.
    */
-  locales: 'locales',
+  serious: 'Serious',
   /**
-   * @description A tag of Sensors tool that can be searched in the command menu
+   * @description An option that appears in a drop-down that represents the critical state.
    */
-  accelerometer: 'accelerometer',
-  /**
-   * @description A tag of Sensors tool that can be searched in the command menu. Refers to the
-   * orientation of a device (e.g. phone) in 3D space, e.g. tilted right/left.
-   */
-  deviceOrientation: 'device orientation',
-  /**
-   * @description Title of Locations settings. Refers to geographic locations for GPS.
-   */
-  locations: 'Locations',
+  critical: 'Critical',
   /**
    * @description Text for the touch type to simulate on a device. Refers to touch input as opposed to
    * mouse input.
    */
   touch: 'Touch',
   /**
+   * @description Text in Sensors View of the Device Toolbar. Means that touch input will be forced
+   *on, even if the device type e.g. desktop computer does not normally have touch input.
+   */
+  forceEnabled: 'Force enabled',
+  /**
    * @description Text in Sensors View of the Device Toolbar. Refers to device-based touch input,
    *which means the input type will be 'touch' only if the device normally has touch input e.g. a
    *phone or tablet.
    */
   devicebased: 'Device-based',
-  /**
-   * @description Text in Sensors View of the Device Toolbar. Means that touch input will be forced
-   *on, even if the device type e.g. desktop computer does not normally have touch input.
-   */
-  forceEnabled: 'Force enabled',
   /**
    * @description Title of a section option in Sensors tab for idle emulation. This is a command, to
    *emulate the state of the 'Idle Detector'.
@@ -85,38 +76,76 @@ const UIStrings = {
    */
   userIdleScreenLocked: 'User idle, screen locked',
   /**
-   * @description Command that opens the Sensors view/tool. The sensors tool contains GPS,
-   * orientation sensors, touch settings, etc.
+   * @description Title of the Sensors view. The Sensors view contains GPS, orientation sensors, touch
+   * settings, and more.
+   */
+  sensors: 'Sensors',
+  /**
+   * @description A tag of the Sensors view that can be searched in the command menu.
+   */
+  geolocation: 'geolocation',
+  /**
+   * @description A tag of the Sensors view that can be searched in the command menu.
+   */
+  timezones: 'timezones',
+  /**
+   * @description Text in the Sensors view of the Device toolbar.
+   */
+  locale: 'locale',
+  /**
+   * @description A tag of the Sensors view that can be searched in the command menu.
+   */
+  locales: 'locales',
+  /**
+   * @description A tag of the Sensors view that can be searched in the command menu.
+   */
+  accelerometer: 'accelerometer',
+  /**
+   * @description A tag of the Sensors view that can be searched in the command menu. Refers to the
+   * orientation of a device (for example, a phone) in 3D space, tilted right or left.
+   */
+  deviceOrientation: 'device orientation',
+  /**
+   * @description Title of the Locations settings tab. Refers to geographic locations for GPS.
+   */
+  locations: 'Locations',
+  /**
+   * @description Command that opens the Sensors view. The Sensors view contains GPS,
+   * orientation sensors, touch settings, and more.
    */
   showSensors: 'Show Sensors',
   /**
-   * @description Command that shows geographic locations.
+   * @description Command that shows the Locations settings tab.
    */
   showLocations: 'Show Locations',
   /**
-   * @description Text for the CPU Pressure type to simulate on a device.
+   * @description Text for the CPU Performance Tier type to simulate on a device.
    */
-  cpuPressure: 'CPU Pressure',
+  cpuPerformance: 'CPU Performance Tier',
   /**
-   * @description Title of an option in Sensors tab cpu pressure emulation drop-down. Turns off emulation of cpu pressure state.
+   * @description Option value for no CPU Performance override
    */
-  noPressureEmulation: 'No override',
+  cpuPerformanceNoOverride: 'No override',
   /**
-   * @description An option that appears in a drop-down that represents the nominal state.
+   * @description Label for Unknown CPU Performance tier
    */
-  nominal: 'Nominal',
+  cpuPerformanceTierUnknown: 'Tier 0: UNKNOWN',
   /**
-   * @description An option that appears in a drop-down that represents the fair state.
+   * @description Label for Low CPU Performance tier
    */
-  fair: 'Fair',
+  cpuPerformanceTierLow: 'Tier 1: LOW',
   /**
-   * @description An option that appears in a drop-down that represents the serious state.
+   * @description Label for Mid CPU Performance tier
    */
-  serious: 'Serious',
+  cpuPerformanceTierMid: 'Tier 2: MID',
   /**
-   * @description An option that appears in a drop-down that represents the critical state.
+   * @description Label for High CPU Performance tier
    */
-  critical: 'Critical',
+  cpuPerformanceTierHigh: 'Tier 3: HIGH',
+  /**
+   * @description Label for Ultra CPU Performance tier
+   */
+  cpuPerformanceTierUltra: 'Tier 4: ULTRA',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sensors/sensors-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -138,7 +167,11 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   order: 100,
   async loadView() {
-    const Sensors = await loadEmulationModule();
+    const [Sensors] = await Promise.all([
+      loadEmulationModule(),
+      // Ensure that this is available when the sensors panel is constructed.
+      SDK.CPUThrottlingManager.CPUThrottlingManager.instance().updateHostDefaultCPUPerformanceTier(),
+    ]);
     return new Sensors.SensorsView.SensorsView();
   },
   tags: [
@@ -167,94 +200,9 @@ UI.ViewManager.registerViewExtension({
   iconName: 'location-on',
 });
 
-Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'emulation.locations',
-  settingType: Common.Settings.SettingType.ARRAY,
-  // TODO(crbug.com/1136655): http://crrev.com/c/2666426 regressed localization of city titles.
-  // These titles should be localized since they are displayed to users.
-  defaultValue: [
-    {
-      title: 'Berlin',
-      lat: 52.520007,
-      long: 13.404954,
-      timezoneId: 'Europe/Berlin',
-      locale: 'de-DE',
-      accuracy: 150,
-    },
-    {
-      title: 'London',
-      lat: 51.507351,
-      long: -0.127758,
-      timezoneId: 'Europe/London',
-      locale: 'en-GB',
-      accuracy: 150,
-    },
-    {
-      title: 'Moscow',
-      lat: 55.755826,
-      long: 37.6173,
-      timezoneId: 'Europe/Moscow',
-      locale: 'ru-RU',
-      accuracy: 150,
-    },
-    {
-      title: 'Mountain View',
-      lat: 37.386052,
-      long: -122.083851,
-      timezoneId: 'America/Los_Angeles',
-      locale: 'en-US',
-      accuracy: 150,
-    },
-    {
-      title: 'Mumbai',
-      lat: 19.075984,
-      long: 72.877656,
-      timezoneId: 'Asia/Kolkata',
-      locale: 'mr-IN',
-      accuracy: 150,
-    },
-    {
-      title: 'San Francisco',
-      lat: 37.774929,
-      long: -122.419416,
-      timezoneId: 'America/Los_Angeles',
-      locale: 'en-US',
-      accuracy: 150,
-    },
-    {
-      title: 'Shanghai',
-      lat: 31.230416,
-      long: 121.473701,
-      timezoneId: 'Asia/Shanghai',
-      locale: 'zh-Hans-CN',
-      accuracy: 150,
-    },
-    {
-      title: 'São Paulo',
-      lat: -23.55052,
-      long: -46.633309,
-      timezoneId: 'America/Sao_Paulo',
-      locale: 'pt-BR',
-      accuracy: 150,
-    },
-    {
-      title: 'Tokyo',
-      lat: 35.689487,
-      long: 139.691706,
-      timezoneId: 'Asia/Tokyo',
-      locale: 'ja-JP',
-      accuracy: 150,
-    },
-  ],
-});
-
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.cpuPressureSettingDescriptor, {
   title: i18nLazyString(UIStrings.cpuPressure),
   reloadRequired: true,
-  settingName: 'emulation.cpu-pressure',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'none',
   options: [
     {
       value: 'none',
@@ -284,12 +232,9 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.touchSettingDescriptor, {
   title: i18nLazyString(UIStrings.touch),
   reloadRequired: true,
-  settingName: 'emulation.touch',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'none',
   options: [
     {
       value: 'none',
@@ -304,11 +249,8 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.idleDetectionSettingDescriptor, {
   title: i18nLazyString(UIStrings.emulateIdleDetectorState),
-  settingName: 'emulation.idle-detection',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'none',
   options: [
     {
       value: 'none',
@@ -316,24 +258,60 @@ Common.Settings.registerSettingExtension({
       text: i18nLazyString(UIStrings.noIdleEmulation),
     },
     {
-      value: '{\"isUserActive\":true,\"isScreenUnlocked\":true}',
+      value: '{"isUserActive":true,"isScreenUnlocked":true}',
       title: i18nLazyString(UIStrings.userActiveScreenUnlocked),
       text: i18nLazyString(UIStrings.userActiveScreenUnlocked),
     },
     {
-      value: '{\"isUserActive\":true,\"isScreenUnlocked\":false}',
+      value: '{"isUserActive":true,"isScreenUnlocked":false}',
       title: i18nLazyString(UIStrings.userActiveScreenLocked),
       text: i18nLazyString(UIStrings.userActiveScreenLocked),
     },
     {
-      value: '{\"isUserActive\":false,\"isScreenUnlocked\":true}',
+      value: '{"isUserActive":false,"isScreenUnlocked":true}',
       title: i18nLazyString(UIStrings.userIdleScreenUnlocked),
       text: i18nLazyString(UIStrings.userIdleScreenUnlocked),
     },
     {
-      value: '{\"isUserActive\":false,\"isScreenUnlocked\":false}',
+      value: '{"isUserActive":false,"isScreenUnlocked":false}',
       title: i18nLazyString(UIStrings.userIdleScreenLocked),
       text: i18nLazyString(UIStrings.userIdleScreenLocked),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.cpuPerformanceSettingDescriptor, {
+  title: i18nLazyString(UIStrings.cpuPerformance),
+  options: [
+    {
+      value: 'no-override',
+      title: i18nLazyString(UIStrings.cpuPerformanceNoOverride),
+      text: i18nLazyString(UIStrings.cpuPerformanceNoOverride),
+    },
+    {
+      value: 'unknown',
+      title: i18nLazyString(UIStrings.cpuPerformanceTierUnknown),
+      text: i18nLazyString(UIStrings.cpuPerformanceTierUnknown),
+    },
+    {
+      value: 'low',
+      title: i18nLazyString(UIStrings.cpuPerformanceTierLow),
+      text: i18nLazyString(UIStrings.cpuPerformanceTierLow),
+    },
+    {
+      value: 'mid',
+      title: i18nLazyString(UIStrings.cpuPerformanceTierMid),
+      text: i18nLazyString(UIStrings.cpuPerformanceTierMid),
+    },
+    {
+      value: 'high',
+      title: i18nLazyString(UIStrings.cpuPerformanceTierHigh),
+      text: i18nLazyString(UIStrings.cpuPerformanceTierHigh),
+    },
+    {
+      value: 'ultra',
+      title: i18nLazyString(UIStrings.cpuPerformanceTierUltra),
+      text: i18nLazyString(UIStrings.cpuPerformanceTierUltra),
     },
   ],
 });

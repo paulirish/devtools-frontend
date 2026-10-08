@@ -6,14 +6,10 @@ import {assert} from 'chai';
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as SDK from '../../core/sdk/sdk.js';
-import * as Bindings from '../../models/bindings/bindings.js';
 import * as Trace from '../../models/trace/trace.js';
-import * as Workspace from '../../models/workspace/workspace.js';
 import {
   describeWithEnvironment,
   registerActions,
-  stubNoopSettings,
 } from '../../testing/EnvironmentHelpers.js';
 import {allThreadEntriesInTrace, setupIgnoreListManagerEnvironment} from '../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
@@ -26,23 +22,7 @@ const {urlString} = Platform.DevToolsPath;
 
 describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   beforeEach(() => {
-    const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
-    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-    const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
-    Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
-      forceNew: true,
-      resourceMapping,
-      targetManager,
-      ignoreListManager,
-      workspace,
-    });
-  });
-  afterEach(() => {
-    SDK.TargetManager.TargetManager.removeInstance();
-    Workspace.Workspace.WorkspaceImpl.removeInstance();
-    Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();
-    Workspace.IgnoreListManager.IgnoreListManager.removeInstance();
+    setupIgnoreListManagerEnvironment();
   });
 
   it('shows initiator arrows when an event that has them is selected', async function() {
@@ -143,7 +123,6 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   });
 
   it('can provide the index for an event and the event for a given index', async function() {
-    setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
     const parsedTrace = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
     const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
@@ -154,24 +133,31 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     assert.isOk(event);
     assert.strictEqual(dataProvider.indexForEvent(event), 100);
   });
-  it('renders track in the correct order by default', async function() {
-    setupIgnoreListManagerEnvironment();
+  it('renders tracks in the correct order by default', async function() {
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
     const parsedTrace = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
     const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
     dataProvider.setModel(parsedTrace, entityMapper);
     const groupNames = dataProvider.timelineData().groups.map(g => [g.name, g.subtitle]);
     assert.deepEqual(groupNames, [
-      ['Frames', undefined], ['Timings', undefined], ['Interactions', undefined], ['A track group', '— Custom'],
-      ['Another Extension Track', undefined], ['An Extension Track', '— Custom'], ['TimeStamp track', '— Custom'],
-      ['Main — http://localhost:3000/', undefined], ['Thread pool', undefined], ['Thread pool worker 1', undefined],
-      ['Thread pool worker 2', undefined], ['Thread pool worker 3', undefined], ['StackSamplingProfiler', undefined],
-      ['GPU', undefined]
+      ['Frames', undefined],
+      ['Timings', undefined],
+      ['Interactions', undefined],
+      ['A track group', '— Custom'],
+      ['Another Extension Track', undefined],
+      ['An Extension Track', '— Custom'],
+      ['TimeStamp track', '— Custom'],
+      ['Main — http://localhost:3000/', undefined],
+      ['Thread pool', undefined],
+      ['Thread pool worker 1', undefined],
+      ['Thread pool worker 2', undefined],
+      ['Thread pool worker 3', undefined],
+      ['StackSamplingProfiler', undefined],
+      ['GPU', undefined],
     ]);
   });
 
   it('can return the FlameChart group for a given event', async function() {
-    setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
     const parsedTrace = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
     const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
@@ -188,7 +174,6 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   });
 
   it('adds candy stripe and triangle decorations to long tasks in the main thread', async function() {
-    setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
     const parsedTrace = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
     const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
@@ -234,7 +219,7 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     }
     const framesLevel = framesTrack.startLevel;
     const screenshotsLevel = framesLevel + 1;
-    // The frames track first shows the frames, and then shows screenhots just below it.
+    // The frames track first shows the frames, and then shows screenshots just below it.
     assert.strictEqual(
         dataProvider.getEntryTypeForLevel(framesLevel), Timeline.TimelineFlameChartDataProvider.EntryType.FRAME);
     assert.strictEqual(
@@ -278,7 +263,6 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   });
 
   it('shows Debug with AI submenu items', async function() {
-    stubNoopSettings();
     registerActions([{
       actionId: 'drjones.performance-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
@@ -368,7 +352,7 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
         originalIndex: 2,
         visualIndex: 1,
         trackName: 'Animations',
-      }
+      },
     ]);
   });
 });

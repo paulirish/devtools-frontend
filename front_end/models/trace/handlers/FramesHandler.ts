@@ -6,7 +6,6 @@ import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {type AuctionWorkletsData, data as auctionWorkletsData} from './AuctionWorkletsHandler.js';
 import {data as layerTreeHandlerData, type LayerTreeData} from './LayerTreeHandler.js';
 import {data as metaHandlerData, type MetaHandlerData} from './MetaHandler.js';
 import {data as rendererHandlerData, type RendererHandlerData} from './RendererHandler.js';
@@ -81,7 +80,6 @@ export async function finalize(): Promise<void> {
   const modelForTrace = new TimelineFrameModel(
       relevantFrameEvents,
       rendererHandlerData(),
-      auctionWorkletsData(),
       metaHandlerData(),
       layerTreeHandlerData(),
   );
@@ -101,7 +99,7 @@ export function data(): FramesData {
 }
 
 export function deps(): HandlerName[] {
-  return ['Meta', 'Renderer', 'AuctionWorklets', 'LayerTree'];
+  return ['Meta', 'Renderer', 'LayerTree'];
 }
 
 export class TimelineFrameModel {
@@ -122,13 +120,12 @@ export class TimelineFrameModel {
   #activeThreadId: Types.Events.ThreadID|null = null;
   #layerTreeData: LayerTreeData;
 
-  constructor(
-      allEvents: readonly Types.Events.Event[], rendererData: RendererHandlerData,
-      auctionWorkletsData: AuctionWorkletsData, metaData: MetaHandlerData, layerTreeData: LayerTreeData) {
+  constructor(allEvents: readonly Types.Events.Event[], rendererData: RendererHandlerData, metaData: MetaHandlerData,
+              layerTreeData: LayerTreeData) {
     // We only care about getting threads from the Renderer, not Samples,
     // because Frames don't exist in a CPU Profile (which won't have Renderer
     // threads.)
-    const mainThreads = Threads.threadsInRenderer(rendererData, auctionWorkletsData).filter(thread => {
+    const mainThreads = Threads.threadsInRenderer(rendererData).filter(thread => {
       return thread.type === Threads.ThreadType.MAIN_THREAD && thread.processIsOnMainFrame;
     });
     const threadData = mainThreads.map(thread => {
@@ -393,10 +390,10 @@ class TimelineFrame implements Types.Events.LegacyTimelineFrame {
   // Types.Events.Event.
   cat = 'devtools.legacy_frame';
   name = 'frame';
-  ph = Types.Events.Phase.COMPLETE;
+  ph: Types.Events.Phase = Types.Events.Phase.COMPLETE;
   ts: Types.Timing.Micro;
-  pid = Types.Events.ProcessID(-1);
-  tid = Types.Events.ThreadID(-1);
+  pid: Types.Events.ProcessID = Types.Events.ProcessID(-1);
+  tid: Types.Events.ThreadID = Types.Events.ThreadID(-1);
 
   index = -1;
   startTime: Types.Timing.Micro;

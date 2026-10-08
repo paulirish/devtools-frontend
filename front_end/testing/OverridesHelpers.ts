@@ -5,15 +5,15 @@
 import * as Common from '../core/common/common.js';
 import * as Platform from '../core/platform/platform.js';
 import * as SDK from '../core/sdk/sdk.js';
+import * as TextUtils from '../core/text_utils/text_utils.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as Breakpoints from '../models/breakpoints/breakpoints.js';
 import * as Persistence from '../models/persistence/persistence.js';
-import * as TextUtils from '../models/text_utils/text_utils.js';
 import * as Workspace from '../models/workspace/workspace.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-export function setUpEnvironment() {
+export function setUpEnvironment(): { networkPersistenceManager: Persistence.NetworkPersistenceManager.NetworkPersistenceManager, workspace: Workspace.Workspace.WorkspaceImpl, debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding } {
   const workspace = Workspace.Workspace.WorkspaceImpl.instance();
   const targetManager = SDK.TargetManager.TargetManager.instance();
   const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
@@ -29,7 +29,7 @@ export function setUpEnvironment() {
     targetManager,
     workspace,
     debuggerWorkspaceBinding,
-    settings: Common.Settings.Settings.instance()
+    settings: Common.Settings.Settings.instance(),
   });
   Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
   const networkPersistenceManager =
@@ -38,7 +38,7 @@ export function setUpEnvironment() {
 }
 
 export async function createWorkspaceProject(
-    baseUrl: Platform.DevToolsPath.UrlString, files: Array<{path: string, content: string, name: string}>) {
+    baseUrl: Platform.DevToolsPath.UrlString, files: Array<{path: string, content: string, name: string}>): Promise<Persistence.NetworkPersistenceManager.NetworkPersistenceManager> {
   const {networkPersistenceManager} = setUpEnvironment();
   const fileSystem: Partial<Persistence.FileSystemWorkspaceBinding.FileSystem> = {
     fileSystemPath: () => baseUrl,
@@ -69,8 +69,13 @@ export async function createWorkspaceProject(
   await networkPersistenceManager.setProject(mockProject as Workspace.Workspace.Project);
 
   for (const file of files) {
-    const url = urlString`${file.path.concat(file.name)}`;
-    const fileUrl = networkPersistenceManager.fileUrlFromNetworkUrl(url, true);
+    const initialEncodedPath = file.path.concat(file.name) as Platform.DevToolsPath.EncodedPathString;
+    const encodedPathParts =
+        Persistence.NetworkPersistenceManager.NetworkPersistenceManager.encodeEncodedPathToLocalPathParts(
+            initialEncodedPath);
+    const rawPath = Common.ParsedURL.ParsedURL.join(encodedPathParts as Platform.DevToolsPath.RawPathString[], '/');
+    const encodedPath = Common.ParsedURL.ParsedURL.rawPathToEncodedPathString(rawPath);
+    const fileUrl = Common.ParsedURL.ParsedURL.concatenate(baseUrl, '/', encodedPath);
 
     uiSourceCodes.set(fileUrl, {
       requestContentData: () =>

@@ -10,7 +10,6 @@ import * as CrUXManager from '../../models/crux-manager/crux-manager.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
-import * as PanelsCommon from '../common/common.js';
 
 import {ThrottlingManager} from './ThrottlingManager.js';
 import type {NetworkThrottlingConditionsGroup} from './ThrottlingPresets.js';
@@ -19,38 +18,38 @@ const {render, html, Directives} = Lit;
 
 const UIStrings = {
   /**
-   * @description Text to indicate something is not enabled
+   * @description Text to indicate something is not enabled.
    */
   disabled: 'Disabled',
   /**
-   * @description Title for a group of configuration options
+   * @description Title for a group of configuration options.
    */
   presets: 'Presets',
   /**
-   * @description Text in Network Throttling Selector of the Network panel
+   * @description Text in network throttling selector of the Network panel.
    */
   custom: 'Custom',
   /**
-   * @description  Title for a network throttling group containing the request blocking option
+   * @description Title for a network throttling group containing the request blocking option.
    */
   blockingGroup: 'Blocking',
   /**
-   *@description Text with two placeholders separated by a colon
-   *@example {Node removed} PH1
-   *@example {div#id1} PH2
+   * @description Text with two placeholders separated by a colon.
+   * @example {Node removed} PH1
+   * @example {div#id1} PH2
    */
   sS: '{PH1}: {PH2}',
   /**
-   *@description Accessibility label for custom add network throttling option
-   *@example {Custom} PH1
+   * @description Accessibility label for custom add network throttling option.
+   * @example {Custom} PH1
    */
   addS: 'Add {PH1}',
   /**
-   *@description Text in Throttling Manager of the Network panel
+   * @description Text in throttling manager of the Network panel.
    */
   add: 'Add…',
   /**
-   * @description Text label for a selection box showing that a specific option is recommended for CPU or Network throttling.
+   * @description Text label for a selection box showing that a specific option is recommended for CPU or network throttling.
    * @example {Fast 4G} PH1
    * @example {4x slowdown} PH1
    */
@@ -72,6 +71,8 @@ interface ViewInput {
 }
 export type ViewFunction = (input: ViewInput, output: object, target: HTMLSelectElement) => void;
 
+const optionsMap = new WeakMap<HTMLOptionElement, SDK.NetworkManager.ThrottlingConditions>();
+
 export const DEFAULT_VIEW: ViewFunction = (input, output, target) => {
   // The title is usually an i18nLazyString except for custom values that are stored in the local storage in the form of a string.
   const title = (conditions: SDK.NetworkManager.ThrottlingConditions): string =>
@@ -82,7 +83,6 @@ export const DEFAULT_VIEW: ViewFunction = (input, output, target) => {
               .item(Platform.StringUtilities.toKebabCase(
                   ('i18nTitleKey' in condition && condition.i18nTitleKey) || title(condition)))
               .track({click: true})}`;
-  const optionsMap = new WeakMap<HTMLOptionElement, SDK.NetworkManager.ThrottlingConditions>();
   let selectedConditions = input.selectedConditions;
   function onSelect(event: Event): void {
     const element = (event.target as HTMLSelectElement | null);
@@ -93,17 +93,15 @@ export const DEFAULT_VIEW: ViewFunction = (input, output, target) => {
     if (!option) {
       return;
     }
-    if (option === element.options[element.options.length - 1]) {
+    const conditions = optionsMap.get(option);
+    if (conditions) {
+      selectedConditions = conditions;
+      input.onSelect(conditions);
+    } else {
       input.onAddCustomConditions();
       event.consume(true);
       if (selectedConditions) {
         element.value = title(selectedConditions);
-      }
-    } else {
-      const conditions = optionsMap.get(option);
-      if (conditions) {
-        selectedConditions = conditions;
-        input.onSelect(conditions);
       }
     }
   }
@@ -151,9 +149,9 @@ export const DEFAULT_VIEW: ViewFunction = (input, output, target) => {
           attributes: {
             disabled: input.disabled,
             'aria-label': input.title,
-            jslog: `${VisualLogging.dropDown(input.jslogContext).track({change: true})}`
-          }
-        }
+            jslog: `${VisualLogging.dropDown(input.jslogContext).track({change: true})}`,
+          },
+        },
       });
 };
 
@@ -165,8 +163,26 @@ export interface EventTypes {
   [Events.CONDITIONS_CHANGED]: SDK.NetworkManager.ThrottlingConditions;
 }
 
-export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.Widget>(
-    UI.Widget.Widget) {
+/**
+ * Computes the recommended network throttling preset based on CrUX RTT field
+ * metric data. Returns null if no RTT data is available or no preset matches.
+ */
+export function getRecommendedNetworkConditions(roundTripTimeMetricData?: CrUXManager.MetricResponse):
+    SDK.NetworkManager.Conditions|null {
+  if (roundTripTimeMetricData?.percentiles) {
+    const rtt = Number(roundTripTimeMetricData.percentiles.p75);
+    return SDK.NetworkManager.getRecommendedNetworkPreset(rtt);
+  }
+  return null;
+}
+
+const NetworkThrottlingSelectBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.Widget> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.Widget,
+    );
+
+export class NetworkThrottlingSelect extends NetworkThrottlingSelectBase {
+  readonly #settings: Common.Settings.Settings;
   #recommendedConditions: SDK.NetworkManager.Conditions|null = null;
   #jslogContext?: string;
   #currentConditions: SDK.NetworkManager.ThrottlingConditions|undefined;
@@ -185,16 +201,17 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
     return select;
   }
 
-  constructor(
-      element?: HTMLElement, options: {
-        title?: string,
-        jslogContext?: string,
-        currentConditions?: SDK.NetworkManager.Conditions,
-        includeBlocking?: true,
-      } = {},
-      view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, options: {
+    title?: string,
+    jslogContext?: string,
+    currentConditions?: SDK.NetworkManager.Conditions,
+    includeBlocking?: true,
+  } = {},
+              settings: Common.Settings.Settings = Common.Settings.Settings.instance(),
+              view: ViewFunction = DEFAULT_VIEW) {
     super(element);
-    SDK.NetworkManager.customUserNetworkConditionsSetting().addChangeListener(this.requestUpdate, this);
+    this.#settings = settings;
+    SDK.NetworkManager.customUserNetworkConditionsSetting(settings).addChangeListener(this.requestUpdate, this);
     this.#jslogContext = options.jslogContext;
     this.#currentConditions = options.currentConditions;
     this.#title = options.title;
@@ -250,7 +267,9 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
   #updateRecommendation = (): void => {
     const cruxManager = CrUXManager.CrUXManager.instance();
     const roundTripTimeMetricData = cruxManager.getSelectedFieldMetricData('round_trip_time');
-    this.recommendedConditions = PanelsCommon.ThrottlingUtils.getRecommendedNetworkConditions(roundTripTimeMetricData);
+    this.recommendedConditions = getRecommendedNetworkConditions(
+        roundTripTimeMetricData,
+    );
   };
 
   set bindToGlobalConditions(bind: boolean) {
@@ -258,7 +277,7 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
     const multitargetNetworkManager = SDK.NetworkManager.MultitargetNetworkManager.instance();
 
     if (bind) {
-      this.#jslogContext = SDK.NetworkManager.activeNetworkThrottlingKeySetting().name;
+      this.#jslogContext = SDK.NetworkManager.activeNetworkThrottlingKeySetting(this.#settings).name;
       ThrottlingManager.instance();  // Instantiate the throttling manager to connect network manager with the setting
       this.#currentConditions = multitargetNetworkManager.networkConditions();
 
@@ -298,10 +317,10 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
   }
 
   override performUpdate(): void {
-    const customNetworkConditionsSetting = SDK.NetworkManager.customUserNetworkConditionsSetting();
+    const customNetworkConditionsSetting = SDK.NetworkManager.customUserNetworkConditionsSetting(this.#settings);
     const customNetworkConditions = customNetworkConditionsSetting.get();
     const onAddCustomConditions = (): void => {
-      void Common.Revealer.reveal(SDK.NetworkManager.customUserNetworkConditionsSetting());
+      void Common.Revealer.reveal(customNetworkConditionsSetting);
     };
 
     const onSelect = (conditions: SDK.NetworkManager.ThrottlingConditions): void => {
@@ -320,7 +339,7 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
                 SDK.NetworkManager.Slow4GConditions,
                 SDK.NetworkManager.Slow3GConditions,
                 SDK.NetworkManager.OfflineConditions,
-              ]
+              ],
             });
         break;
       case NetworkThrottlingSelect.Variant.INDIVIDUAL_REQUEST_CONDITIONS:
@@ -332,7 +351,7 @@ export class NetworkThrottlingSelect extends Common.ObjectWrapper.eventMixin<Eve
                 SDK.NetworkManager.Fast4GConditions,
                 SDK.NetworkManager.Slow4GConditions,
                 SDK.NetworkManager.Slow3GConditions,
-              ]
+              ],
             },
         );
         break;

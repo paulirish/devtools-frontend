@@ -124,6 +124,11 @@ export declare interface AddScreenParams {
 }
 
 /**
+ * @public
+ */
+export declare const asyncDisposeSymbol: typeof Symbol.asyncDispose;
+
+/**
  * Supported autofill address field names.
  *
  * @public
@@ -346,6 +351,7 @@ export declare interface BoxModel {
  * @public
  */
 export declare abstract class Browser extends EventEmitter<BrowserEvents> {
+  
   /**
    * Gets the associated
    * {@link https://nodejs.org/api/child_process.html#class-childprocess | ChildProcess}.
@@ -557,17 +563,65 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
     }>
   ): Promise<void>;
   /**
-   * Installs an extension and returns the ID. In Chrome, this is only
-   * available if the browser was created using `pipe: true` and the
-   * `--enable-unsafe-extension-debugging` flag is set.
+   * Installs an extension and returns the ID.
    */
-  abstract installExtension(path: string): Promise<string>;
+  abstract installExtension(
+    path: string,
+    options?: ExtensionInstallOptions,
+  ): Promise<string>;
   /**
-   * Uninstalls an extension. In Chrome, this is only available if the browser
-   * was created using `pipe: true` and the
-   * `--enable-unsafe-extension-debugging` flag is set.
+   * Uninstalls an extension.
    */
   abstract uninstallExtension(id: string): Promise<void>;
+  /**
+   * Installs a Progressive Web App (PWA) and returns its manifest id.
+   *
+   * @remarks
+   *
+   * Only available when connected to the browser over a pipe connection. Set
+   * `pipe: true` in {@link PuppeteerNode.launch | puppeteer.launch}; the launch
+   * option defaults to `false`. The underlying `PWA` CDP domain is not exposed
+   * over a WebSocket connection.
+   *
+   * The returned manifest id echoes {@link InstallPWAOptions.manifestId}, so it
+   * can be passed directly to {@link Browser.launchPWA},
+   * {@link Browser.getPWAState}, or {@link Browser.uninstallPWA}.
+   */
+  abstract installPWA(options: InstallPWAOptions): Promise<string>;
+  /**
+   * Uninstalls a previously installed Progressive Web App (PWA).
+   *
+   * @remarks
+   *
+   * Only available over a pipe connection. See {@link Browser.installPWA}.
+   */
+  abstract uninstallPWA(options: UninstallPWAOptions): Promise<void>;
+  /**
+   * Launches an installed Progressive Web App (PWA) and resolves with the
+   * {@link Page | page} backing the app window.
+   *
+   * @remarks
+   *
+   * Only available over a pipe connection. See {@link Browser.installPWA}.
+   *
+   * `PWA.launch` resolves with the id of the launched _tab_ target. Puppeteer
+   * does not expose tab targets through {@link Browser.targets}; this method
+   * instead resolves with the tab's child page target (the app's web contents).
+   * If Chromium focuses an existing app window, this returns that window's
+   * existing page.
+   */
+  abstract launchPWA(options: LaunchPWAOptions): Promise<Page>;
+  /**
+   * Returns the OS-integration state of an installed Progressive Web App (PWA),
+   * such as its badge count and registered file handlers.
+   *
+   * @remarks
+   *
+   * Only available over a pipe connection. See {@link Browser.installPWA}.
+   * Meaningful only for an app that is currently installed; querying an
+   * unknown manifest id rejects.
+   */
+  abstract getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
   /**
    * Gets a list of {@link ScreenInfo | screen information objects}.
    */
@@ -592,6 +646,8 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
    * Whether Puppeteer is connected to this {@link Browser | browser}.
    */
   abstract get connected(): boolean;
+  [disposeSymbol](): void;
+  [asyncDisposeSymbol](): Promise<void>;
   /**
    * Get debug information from Puppeteer.
    *
@@ -789,6 +845,8 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
    * Identifier for this {@link BrowserContext | browser context}.
    */
   get id(): string | undefined;
+  [disposeSymbol](): void;
+  [asyncDisposeSymbol](): Promise<void>;
 }
 
 /**
@@ -923,7 +981,9 @@ export declare abstract class BrowserLauncher {
  * @public
  */
 export declare type CDPEvents = {
-  [Property in keyof ProtocolMapping.Events]: ProtocolMapping.Events[Property][0];
+  [
+    Property in keyof ProtocolMapping.Events
+  ]: ProtocolMapping.Events[Property][0];
 };
 
 /**
@@ -1046,10 +1106,7 @@ export declare interface ChromeHeadlessShellSettings {
  * @public
  */
 export declare type ChromeReleaseChannel =
-  | 'chrome'
-  | 'chrome-beta'
-  | 'chrome-canary'
-  | 'chrome-dev';
+  'chrome' | 'chrome-beta' | 'chrome-canary' | 'chrome-dev';
 
 /**
  * @public
@@ -1179,9 +1236,11 @@ export declare interface Configuration {
    */
   temporaryDirectory?: string;
   /**
-   * Tells Puppeteer to not download during installation.
+   * Tells Puppeteer to not download any of the browsers during installation.
    *
-   * Can be overridden by `PUPPETEER_SKIP_DOWNLOAD`.
+   * Can be overridden by `PUPPETEER_SKIP_DOWNLOAD` or by specifying either
+   * `skipDownload` property in each browser specific config or by providing
+   * `PUPPETEER_FIREFOX_SKIP_DOWNLOAD` and `PUPPETEER_CHROME_SKIP_DOWNLOAD`.
    */
   skipDownload?: boolean;
   /**
@@ -1217,14 +1276,6 @@ export declare const /**
  */
 export declare class Connection extends EventEmitter<CDPSessionEvents> {
   
-  constructor(
-    url: string,
-    transport: ConnectionTransport,
-    delay?: number,
-    timeout?: number,
-    rawErrors?: boolean,
-    idGenerator?: () => number,
-  );
   static fromSession(session: CDPSession): Connection | undefined;
   get timeout(): number;
   /**
@@ -1350,6 +1401,14 @@ export declare interface ConnectOptions {
    * @defaultValue `180_000`
    */
   protocolTimeout?: number;
+  /**
+   * Options for the WebSocket connection to the browser.
+   *
+   * @remarks
+   * Only used in the Node.js environment. The browser build has no ping frame
+   * API, so the keep-alive options are ignored there.
+   */
+  wsOptions?: WsOptions;
   browserWSEndpoint?: string;
   browserURL?: string;
   transport?: ConnectionTransport;
@@ -1357,6 +1416,10 @@ export declare interface ConnectOptions {
    * Headers to use for the web socket connection.
    * @remarks
    * Only works in the Node.js environment.
+   *
+   * @deprecated Use {@link WsOptions.headers} via
+   * {@link ConnectOptions.wsOptions} instead. When both are set,
+   * `wsOptions.headers` wins.
    */
   headers?: Record<string, string>;
   /**
@@ -1369,26 +1432,32 @@ export declare interface ConnectOptions {
   /**
    * A list of URL patterns to block.
    *
-   * This option allows you to restrict the browser from accessing specific
-   * URLs or origins. It uses the standard [URLPattern](https://urlpattern.spec.whatwg.org/) API to match URLs.
+   * This option allows you to restrict the browser from accessing specific URLs
+   * or origins. It uses the standard
+   * [URLPattern](https://urlpattern.spec.whatwg.org/) API to match URLs.
    *
-   * When connecting to an existing browser, Puppeteer will silently detach from any
-   * already open targets that violate the patterns.
+   * When connecting to an existing browser, Puppeteer will silently detach from
+   * any already open targets that violate the patterns.
    *
    * For any network requests made by the browser (including navigations and
    * subresources like images or scripts), the request will fail with an error
    * if the URL matches a blocked pattern.
    *
-   * @example Pattern to block a specific domain:
-   * `*://example.com/*`
+   * @example Pattern to block a specific domain: `*://example.com/*`
    *
-   * @example Pattern to block all subdomains:
-   * `*://*.evil.com/*`
+   * @example Pattern to block all subdomains: `*://*.evil.com/*`
    *
    * @remarks
-   * Currently only supported for CDP connections.
+   * Currently only supported for Chrome.
    *
-   * Inner `<iframe>` content loading is currently not blocked.
+   * The feature works while Puppeteer is attached to the CDP targets.
+   * It intercepts requests in the network service in Chrome.
+   * Chrome may perform some network access in other ways or
+   * some web features may omit the network service.
+   * The feature is meant as an additional guardrails to LLM-based
+   * usage under Puppeteer control and not a complete network sandbox.
+   * For complete network sandboxing, we recommend using
+   * container/OS-level sandbox mechanism.
    *
    * Cannot be used along with {@link ConnectOptions.allowlist}.
    *
@@ -1418,15 +1487,41 @@ export declare interface ConnectOptions {
    * `*://*.example.com/*`
    *
    * @remarks
-   * Currently only supported for CDP connections.
+   * Currently only supported for Chrome.
    *
-   * Inner `<iframe>` content loading is currently not blocked.
+   * The feature works while Puppeteer is attached to the CDP targets.
+   * It intercepts requests in the network service in Chrome.
+   * Chrome may perform some network access in other ways or
+   * some web features may omit the network service.
+   * The feature is meant as an additional guardrails to LLM-based
+   * usage under Puppeteer control and not a complete network sandbox.
+   * For complete network sandboxing, we recommend using
+   * container/OS-level sandbox mechanism.
    *
    * Cannot be used along with {@link ConnectOptions.blocklist}.
    *
    * @experimental
    */
   allowlist?: string[];
+  /**
+   * When provided, Puppeteer calls the logger with a debug channel prefix
+   * {@link DebugPrefix}. If the logger returns a
+   * {@link LoggerFunction}, Puppeteer uses it to log details for that channel.
+   *
+   * @example
+   *
+   * ```ts
+   * const browser = await puppeteer.connect({
+   *   browserWSEndpoint,
+   *   logger: prefix => {
+   *     return (...args) => console.log(`[${prefix}]`, ...args);
+   *   },
+   * });
+   * ```
+   *
+   * @experimental The API may change in future releases.
+   */
+  logger?: Logger;
 }
 
 /**
@@ -1850,7 +1945,7 @@ export declare interface Credentials {
  */
 export declare class CSSCoverage {
   
-  constructor(client: CDPSession);
+  constructor(client: CDPSession, logger?: Logger);
   start(options?: {resetOnNavigation?: boolean}): Promise<void>;
   stop(): Promise<CoverageEntry[]>;
 }
@@ -1909,9 +2004,29 @@ declare namespace CustomQuerySelectors {
  * @public
  * @experimental
  */
+export declare const DEBUG_PREFIXES: {
+  readonly cdpSend: 'puppeteer:protocol:SEND ►';
+  readonly cdpReceive: 'puppeteer:protocol:RECV ◀';
+  readonly bidiSend: 'puppeteer:webDriverBiDi:SEND ►';
+  readonly bidiReceive: 'puppeteer:webDriverBiDi:RECV ◀';
+  readonly error: 'puppeteer:error';
+  readonly ffmpeg: 'puppeteer:ffmpeg';
+};
+
+/**
+ * @public
+ * @experimental
+ */
 export declare interface DebugInfo {
   pendingProtocolErrors: Error[];
 }
+
+/**
+ * @public
+ * @experimental
+ */
+export declare type DebugPrefix =
+  (typeof DEBUG_PREFIXES)[keyof typeof DEBUG_PREFIXES];
 
 /**
  * The default cooperative request interception resolution priority
@@ -2055,6 +2170,11 @@ export declare interface DeviceRequestPromptDevice {
 export declare abstract class Dialog {
   
   /**
+   * A boolean value indicating whether the dialog has been handled.
+   */
+  get handled(): boolean;
+  protected set handled(handled: boolean);
+  /**
    * The type of the dialog.
    */
   type(): Protocol.Page.DialogType;
@@ -2080,6 +2200,11 @@ export declare abstract class Dialog {
    */
   dismiss(): Promise<void>;
 }
+
+/**
+ * @public
+ */
+export declare const disposeSymbol: typeof Symbol.dispose;
 
 /**
  * @public
@@ -2111,10 +2236,7 @@ export declare interface DownloadBehavior {
  * @public
  */
 export declare type DownloadPolicy =
-  | 'deny'
-  | 'allow'
-  | 'allowAndName'
-  | 'default';
+  'deny' | 'allow' | 'allowAndName' | 'default';
 
 /**
  * @public
@@ -2784,6 +2906,8 @@ export declare class EventEmitter<
    * @returns `this` to enable you to chain method calls.
    */
   removeAllListeners(type?: keyof EventsWithWildcard<Events>): this;
+  [disposeSymbol](): void;
+  [asyncDisposeSymbol](): Promise<void>;
 }
 
 /**
@@ -2897,6 +3021,16 @@ export declare abstract class Extension {
    * @public
    */
   abstract triggerAction(page: Page): Promise<void>;
+}
+
+/**
+ * @public
+ */
+export declare interface ExtensionInstallOptions {
+  /**
+   * Whether to enable the extension in Incognito or OTR profiles in Chrome.
+   */
+  enabledInIncognito: boolean;
 }
 
 /**
@@ -3712,6 +3846,18 @@ export declare interface GeolocationOptions {
 }
 
 /**
+ * Options for {@link Browser.getPWAState}.
+ *
+ * @public
+ */
+export declare interface GetPWAStateOptions {
+  /**
+   * The id from the web app's manifest file.
+   */
+  manifestId: string;
+}
+
+/**
  * @public
  */
 export declare interface GoToOptions extends WaitForOptions {
@@ -4058,8 +4204,9 @@ export declare abstract class HTTPResponse {
    */
   abstract statusText(): string;
   /**
-   * An object with HTTP headers associated with the response. All
-   * header names are lower-case.
+   * An object with HTTP headers associated with the response. All header names
+   * are lower-case. Duplicate header values are combined into a single
+   * comma-separated list except for `Set-Cookie` that is separated by `\n`.
    */
   abstract headers(): Record<string, string>;
   /**
@@ -4137,6 +4284,37 @@ export declare type InnerParams<T extends unknown[]> = {
 };
 
 /**
+ * Options for {@link Browser.installPWA}.
+ *
+ * @public
+ */
+export declare interface InstallPWAOptions {
+  /**
+   * The id from the web app's manifest file, commonly the URL of the site
+   * installing the web app. See
+   * {@link https://web.dev/learn/pwa/web-app-manifest | Web app manifest}.
+   */
+  manifestId: string;
+  /**
+   * The URL used to install the app, or the URL of its signed web bundle.
+   *
+   * This is required because the browser-scoped CDP session has no associated
+   * page from which Chromium could derive an install URL.
+   */
+  installUrlOrBundleUrl: string;
+  /**
+   * Whether the app should open in a standalone window or a browser tab.
+   *
+   * @remarks
+   *
+   * `PWA.install` alone leaves the app at Chromium's default display mode
+   * (`browser`); setting this chains a `PWA.changeAppUserSettings` call to apply
+   * the preference.
+   */
+  displayMode?: PWADisplayMode;
+}
+
+/**
  * @public
  */
 export declare enum InterceptResolutionAction {
@@ -4211,6 +4389,12 @@ export declare interface JSCoverageEntry extends CoverageEntry {
 export declare interface JSCoverageOptions {
   /**
    * Whether to reset coverage on every navigation.
+   *
+   * Setting this to `false` does not guarantee that coverage survives a
+   * navigation. Chrome may discard the previous page's JavaScript execution
+   * environment, including its coverage data, when navigating.
+   * To preserve coverage, call {@link Coverage.stopJSCoverage} before navigating
+   * away, then start a new collection for the next page and merge the reports.
    */
   resetOnNavigation?: boolean;
   /**
@@ -4251,6 +4435,7 @@ export declare interface JSCoverageOptions {
  * @public
  */
 export declare abstract class JSHandle<T = unknown> {
+  
   move: () => this;
   /**
    * Used for nominally typing {@link JSHandle}.
@@ -4334,6 +4519,8 @@ export declare abstract class JSHandle<T = unknown> {
    * backing this handle.
    */
   abstract remoteObject(): Protocol.Runtime.RemoteObject;
+  [disposeSymbol](): void;
+  [asyncDisposeSymbol](): Promise<void>;
 }
 
 /**
@@ -4785,7 +4972,7 @@ export declare type KeyPressOptions = KeyDownOptions & KeyboardTypeOptions;
  *
  * ```ts
  * import {KnownDevices} from 'puppeteer';
- * const iPhone = KnownDevices['iPhone 15 Pro'];
+ * const iPhone = KnownDevices['iPhone 17 Pro'];
  *
  * const browser = await puppeteer.launch();
  * const page = await browser.newPage();
@@ -4847,6 +5034,8 @@ export declare const KnownDevices: Readonly<
     | 'iPhone 8 Plus landscape'
     | 'iPhone SE'
     | 'iPhone SE landscape'
+    | 'iPhone SE (3rd gen)'
+    | 'iPhone SE (3rd gen) landscape'
     | 'iPhone X'
     | 'iPhone X landscape'
     | 'iPhone XR'
@@ -4889,6 +5078,26 @@ export declare const KnownDevices: Readonly<
     | 'iPhone 15 Pro landscape'
     | 'iPhone 15 Pro Max'
     | 'iPhone 15 Pro Max landscape'
+    | 'iPhone 16'
+    | 'iPhone 16 landscape'
+    | 'iPhone 16 Plus'
+    | 'iPhone 16 Plus landscape'
+    | 'iPhone 16 Pro'
+    | 'iPhone 16 Pro landscape'
+    | 'iPhone 16 Pro Max'
+    | 'iPhone 16 Pro Max landscape'
+    | 'iPhone 16e'
+    | 'iPhone 16e landscape'
+    | 'iPhone 17'
+    | 'iPhone 17 landscape'
+    | 'iPhone Air'
+    | 'iPhone Air landscape'
+    | 'iPhone 17 Pro'
+    | 'iPhone 17 Pro landscape'
+    | 'iPhone 17 Pro Max'
+    | 'iPhone 17 Pro Max landscape'
+    | 'iPhone 17e'
+    | 'iPhone 17e landscape'
     | 'JioPhone 2'
     | 'JioPhone 2 landscape'
     | 'Kindle Fire HDX'
@@ -4978,6 +5187,11 @@ export declare interface LaunchOptions extends ConnectOptions {
    * load the provided paths as unpacked extensions.
    */
   enableExtensions?: boolean | string[];
+  /**
+   * List of extensions that will be enable in Incognito and off-the-record
+   * profiles.
+   */
+  extensionsEnabledInIncognito?: string[];
   /**
    * Close the browser process on `Ctrl+C`.
    * @defaultValue `true`
@@ -5072,6 +5286,28 @@ export declare interface LaunchOptions extends ConnectOptions {
    * If provided, the browser will be closed when the signal is aborted.
    */
   signal?: AbortSignal;
+}
+
+/**
+ * Options for {@link Browser.launchPWA}.
+ *
+ * @public
+ */
+export declare interface LaunchPWAOptions {
+  /**
+   * The id from the web app's manifest file.
+   */
+  manifestId: string;
+  /**
+   * An optional URL within the app's scope to launch. Defaults to the app's
+   * start URL.
+   */
+  url?: string;
+  /**
+   * Maximum time in milliseconds to wait for the app's page target to appear.
+   * Defaults to 30 seconds. Pass `0` to disable the timeout.
+   */
+  timeout?: number;
 }
 
 /**
@@ -5263,6 +5499,42 @@ export declare interface LocatorScrollOptions extends ActionOptions {
 }
 
 /**
+ * A logger factory function that receives a debug channel prefix and returns
+ * a {@link LoggerFunction} to emit logs for that channel, or `undefined` if
+ * logging is disabled for that channel.
+ *
+ * @example
+ *
+ * ```ts
+ * const customLogger: Logger = (prefix: string) => {
+ *   if (prefix.includes('protocol')) {
+ *     return (...args: unknown[]) =>
+ *       console.log(`[DEBUG: ${prefix}]`, ...args);
+ *   }
+ *   return undefined;
+ * };
+ * ```
+ *
+ * @param prefix - A debug channel prefix, one of {@link DebugPrefix}.
+ * @returns A {@link LoggerFunction} to log messages for the channel,
+ * or `undefined` if logging is disabled.
+ *
+ * @public
+ * @experimental
+ */
+export declare type Logger = (prefix: string) => LoggerFunction | undefined;
+
+/**
+ * A function called by Puppeteer to output debug messages.
+ *
+ * @param args - Arbitrary values to log for a debug event.
+ *
+ * @public
+ * @experimental
+ */
+export declare type LoggerFunction = (...args: unknown[]) => void;
+
+/**
  * @public
  */
 export declare type LowerCasePaperFormat =
@@ -5303,18 +5575,58 @@ export declare interface MediaFeature {
  * @public
  */
 export declare interface Metrics {
+  /**
+   * The timestamp when the metrics sample was taken, in monotonic time
+   * (seconds since an arbitrary point in the past).
+   */
   Timestamp?: number;
+  /**
+   * Number of documents in the page.
+   */
   Documents?: number;
+  /**
+   * Number of frames in the page.
+   */
   Frames?: number;
+  /**
+   * Number of events in the page.
+   */
   JSEventListeners?: number;
+  /**
+   * Number of DOM nodes in the page.
+   */
   Nodes?: number;
+  /**
+   * Total number of full or partial page layouts.
+   */
   LayoutCount?: number;
+  /**
+   * Total number of page style recalculations.
+   */
   RecalcStyleCount?: number;
+  /**
+   * Combined duration of all page layouts, in seconds.
+   */
   LayoutDuration?: number;
+  /**
+   * Combined duration of all page style recalculations, in seconds.
+   */
   RecalcStyleDuration?: number;
+  /**
+   * Combined duration of JavaScript execution, in seconds.
+   */
   ScriptDuration?: number;
+  /**
+   * Combined duration of all tasks performed by the browser, in seconds.
+   */
   TaskDuration?: number;
+  /**
+   * Used JavaScript heap size, in bytes.
+   */
   JSHeapUsedSize?: number;
+  /**
+   * Total JavaScript heap size, in bytes.
+   */
   JSHeapTotalSize?: number;
 }
 
@@ -5753,7 +6065,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
   /**
    * A target this page was created from.
    *
-   * @deprecated Use {@link Page.createCDPSession} directly.
+   * @deprecated To create CDP session use {@link Page.createCDPSession} directly. To
+   * identify pages spawned by this one, use {@link PageEvent.Popup} event instead.
    */
   abstract target(): Target;
   /**
@@ -5789,9 +6102,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    */
   abstract get tracing(): Tracing;
   /**
-   * Experimental API for {@link https://github.com/webmachinelearning/webmcp
-   * | WebMCP}. Requires Chrome 149+ with the
-   * `--enable-features=WebMCPTesting,DevToolsWebMCPSupport` flags enabled.
+   * Experimental API for {@link https://github.com/webmachinelearning/webmcp| WebMCP}.
+   * Requires Chrome 151+ with the `--enable-features=WebMCP` flag enabled.
    *
    * @experimental
    */
@@ -6479,7 +6791,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    *
    * @returns
    *
-   * - `Timestamp` : The timestamp when the metrics sample was taken.
+   * - `Timestamp` : The timestamp when the metrics sample was taken, in
+   *   monotonic time (seconds).
    *
    * - `Documents` : Number of documents in the page.
    *
@@ -6493,18 +6806,20 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    *
    * - `RecalcStyleCount` : Total number of page style recalculations.
    *
-   * - `LayoutDuration` : Combined durations of all page layouts.
+   * - `LayoutDuration` : Combined durations of all page layouts, in seconds.
    *
    * - `RecalcStyleDuration` : Combined duration of all page style
-   *   recalculations.
+   *   recalculations, in seconds.
    *
-   * - `ScriptDuration` : Combined duration of JavaScript execution.
+   * - `ScriptDuration` : Combined duration of JavaScript execution, in
+   *   seconds.
    *
-   * - `TaskDuration` : Combined duration of all tasks performed by the browser.
+   * - `TaskDuration` : Combined duration of all tasks performed by the
+   *   browser, in seconds.
    *
-   * - `JSHeapUsedSize` : Used JavaScript heap size.
+   * - `JSHeapUsedSize` : Used JavaScript heap size, in bytes.
    *
-   * - `JSHeapTotalSize` : Total JavaScript heap size.
+   * - `JSHeapTotalSize` : Total JavaScript heap size, in bytes.
    *
    * @remarks
    * All timestamps are in monotonic time: monotonically increasing time
@@ -6709,7 +7024,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    *
    * ```ts
    * import {KnownDevices} from 'puppeteer';
-   * const iPhone = KnownDevices['iPhone 15 Pro'];
+   * const iPhone = KnownDevices['iPhone 17 Pro'];
    *
    * const browser = await puppeteer.launch();
    * const page = await browser.newPage();
@@ -6829,6 +7144,11 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    * ```
    */
   abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
+  /**
+   * @param locale - Locale to emulate on the page. Passing no locale disables
+   * locale emulation.
+   */
+  abstract emulateLocale(locale?: string): Promise<void>;
   /**
    * @param timezoneId - Changes the timezone of the page. See
    * {@link https://source.chromium.org/chromium/chromium/deps/icu.git/+/faee8bc70570192d82d2978a71e2a615788597d1:source/data/misc/metaZones.txt | ICU’s metaZones.txt}
@@ -7037,7 +7357,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    */
   abstract setCacheEnabled(enabled?: boolean): Promise<void>;
   /**
-   * Captures a screencast of this {@link Page | page}.
+   * Captures a screencast of this {@link Page | page}. Works in Chrome 153+.
    *
    * @example
    * Recording a {@link Page | page}:
@@ -7067,7 +7387,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param options - Configures screencast behavior.
    *
-   * @experimental
+   * @deprecated Use {@link Page.record} instead.
    *
    * @remarks
    *
@@ -7077,6 +7397,44 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
    */
   screencast(options?: Readonly<ScreencastOptions>): Promise<ScreenRecorder>;
+  /**
+   * Records this {@link Page | page} using the Chrome DevTools Protocol
+   * {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-startScreenRecording | Page.startScreenRecording}
+   * API.
+   *
+   * Outputs mp4 video stream.
+   *
+   * @example
+   * Recording a {@link Page | page}:
+   *
+   * ```ts
+   * import puppeteer from 'puppeteer';
+   *
+   * // Launch a browser
+   * const browser = await puppeteer.launch();
+   *
+   * // Create a new page
+   * const page = await browser.newPage();
+   *
+   * // Go to your site.
+   * await page.goto('https://www.example.com');
+   *
+   * // Start recording.
+   * const recorder = await page.record({path: 'recording.mp4'});
+   *
+   * // Do something.
+   *
+   * // Stop recording.
+   * await recorder.stop();
+   *
+   * await browser.close();
+   * ```
+   *
+   * @param options - Configures recording behavior.
+   *
+   * @experimental
+   */
+  record(options?: Readonly<RecordOptions>): Promise<ScreenRecording>;
   /**
    * Captures a screenshot of this {@link Page | page}.
    *
@@ -7529,6 +7887,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
    * @experimental
    */
   abstract windowId(): Promise<WindowId>;
+  [disposeSymbol](): void;
+  [asyncDisposeSymbol](): Promise<void>;
   /**
    * Opens DevTools for the this page if not already open and returns the DevTools page.
    * This method is only available in Chrome.
@@ -8030,8 +8390,12 @@ export declare const PredefinedNetworkConditions: Readonly<{
  * @public
  */
 export declare type Predicate<From, To extends From = From> =
-  | ((value: From) => value is To)
-  | ((value: From) => Awaitable<boolean>);
+  ((value: From) => value is To) | ((value: From) => Awaitable<boolean>);
+
+declare interface ProcessExitEmitter {
+  once(event: 'exit', listener: () => void): void;
+  off(event: 'exit', listener: () => void): void;
+}
 
 export {Protocol};
 
@@ -8060,10 +8424,7 @@ export declare class ProtocolError extends PuppeteerError {
  * @public
  */
 export declare type ProtocolLifeCycleEvent =
-  | 'load'
-  | 'DOMContentLoaded'
-  | 'networkIdle'
-  | 'networkAlmostIdle';
+  'load' | 'DOMContentLoaded' | 'networkIdle' | 'networkAlmostIdle';
 
 /**
  * @public
@@ -8160,6 +8521,13 @@ declare namespace Puppeteer_2 {
     ScreenInfo,
     WorkAreaInsets,
     AddScreenParams,
+    ExtensionInstallOptions,
+    PWADisplayMode,
+    InstallPWAOptions,
+    UninstallPWAOptions,
+    LaunchPWAOptions,
+    GetPWAStateOptions,
+    PWAState,
     BrowserContextEvents,
     CDPEvents,
     CDPSessionEvents,
@@ -8208,11 +8576,13 @@ declare namespace Puppeteer_2 {
     VideoFormat,
     ScreenshotOptions,
     ScreencastOptions,
+    RecordOptions,
     QueryOptions,
     PageEvents,
     NewDocumentScriptEvaluation,
     ReloadOptions,
     HeapSnapshotOptions,
+    WritableDestination,
     WebWorkerEvents,
     VisibilityOption,
     ActionOptions,
@@ -8234,8 +8604,7 @@ declare namespace Puppeteer_2 {
     NetworkConditions,
     InternalNetworkConditions,
     TracingOptions,
-    WebMCPAnnotation,
-    WebMCPInvocationStatus,
+    WebMCPToolExecuteOptions,
     WebMCPToolsAddedEvent,
     WebMCPToolsRemovedEvent,
     WebMCPToolCallResult,
@@ -8249,6 +8618,7 @@ declare namespace Puppeteer_2 {
     SupportedWebDriverCapability,
     SupportedWebDriverCapabilities,
     ChromeReleaseChannel,
+    WsOptions,
     ConnectOptions,
     ConsoleMessageLocation,
     ConsoleMessageType,
@@ -8261,6 +8631,9 @@ declare namespace Puppeteer_2 {
     CookieData,
     DeleteCookiesRequest,
     CustomQueryHandler,
+    DebugPrefix,
+    LoggerFunction,
+    Logger,
     Device,
     EventType,
     Handler,
@@ -8316,6 +8689,7 @@ declare namespace Puppeteer_2 {
     PageEvent,
     Page,
     Realm,
+    ScreenRecording,
     TargetType,
     Target,
     WebWorkerEvent,
@@ -8334,6 +8708,7 @@ declare namespace Puppeteer_2 {
     WebMCPToolCall,
     WebMCP,
     ConsoleMessage,
+    DEBUG_PREFIXES,
     KnownDevices,
     PuppeteerError,
     TimeoutError,
@@ -8345,6 +8720,8 @@ declare namespace Puppeteer_2 {
     FileChooser,
     Puppeteer,
     SecurityDetails,
+    disposeSymbol,
+    asyncDisposeSymbol,
     BrowserLauncher,
     PuppeteerNode,
     ScreenRecorder,
@@ -8509,6 +8886,39 @@ export declare class PuppeteerNode extends Puppeteer {
    * @public
    */
   trimCache(): Promise<void>;
+  /**
+   * Defines whether Puppeteer should follow symlinks for file operations.
+   *
+   * @param followSymlinks - Whether Puppeteer should follow symlinks.
+   *
+   * @public
+   */
+  setFollowSymlinks(followSymlinks: boolean): void;
+}
+
+/**
+ * If the user prefers opening an installed web app in a standalone window or in
+ * a browser tab.
+ *
+ * @public
+ */
+export declare type PWADisplayMode = 'standalone' | 'browser';
+
+/**
+ * The OS-integration state of an installed web app, returned by
+ * {@link Browser.getPWAState}.
+ *
+ * @public
+ */
+export declare interface PWAState {
+  /**
+   * The current badge count shown on the app icon.
+   */
+  badgeCount: number;
+  /**
+   * The file handlers registered by the app with the OS.
+   */
+  fileHandlers: Protocol.PWA.FileHandler[];
 }
 
 /**
@@ -8656,6 +9066,47 @@ export declare abstract class Realm {
     },
     ...args: Params
   ): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
+  [disposeSymbol](): void;
+}
+
+/**
+ * @public
+ * @experimental
+ */
+export declare interface RecordOptions {
+  /**
+   * File path to save the recording to.
+   */
+  path?: string;
+  /**
+   * Specifies whether to overwrite output file,
+   * or exit immediately if it already exists.
+   *
+   * @defaultValue `true`
+   */
+  overwrite?: boolean;
+  /**
+   * Whether to record audio.
+   *
+   * @defaultValue `false`
+   */
+  audio?: boolean;
+  /**
+   * Maximum frame width in pixels.
+   */
+  maxWidth?: number;
+  /**
+   * Maximum frame height in pixels.
+   */
+  maxHeight?: number;
+  /**
+   * Maximum frame rate in frames per second.
+   */
+  frameRate?: number;
+  /**
+   * Frame rate in frames per second (alias for frameRate).
+   */
+  fps?: number;
 }
 
 /**
@@ -8839,6 +9290,27 @@ export declare class ScreenRecorder extends PassThrough {
    * @public
    */
   stop(): Promise<void>;
+  [asyncDisposeSymbol](): Promise<void>;
+}
+
+/**
+ * @public
+ */
+export declare abstract class ScreenRecording extends ReadableStream<Uint8Array> {
+  /**
+   * Pipes the recorded stream to a destination stream.
+   *
+   * @public
+   */
+  pipe<T extends WritableStream<Uint8Array>>(destination: T): Promise<void>;
+  pipe<T extends WritableDestination>(destination: T): T;
+  /**
+   * Stops the screen recording.
+   *
+   * @public
+   */
+  abstract stop(): Promise<void>;
+  [asyncDisposeSymbol](): Promise<void>;
 }
 
 /**
@@ -9132,11 +9604,12 @@ export declare type SupportedWebDriverCapability = Exclude<
 /**
  * Target represents a
  * {@link https://chromedevtools.github.io/devtools-protocol/tot/Target/ | CDP target}.
- * In CDP a target is something that can be debugged such a frame, a page or a
+ * In CDP a target is something that can be debugged, such as a frame, a page or a
  * worker.
  * @public
  */
 export declare abstract class Target {
+  protected logger: Logger;
   /**
    * If the target is not of type `"service_worker"` or `"shared_worker"`, returns `null`.
    */
@@ -9307,9 +9780,44 @@ export declare class Tracing {
  * @public
  */
 export declare interface TracingOptions {
+  /**
+   * The file path to write the trace to.
+   * If no path is specified, the trace will not be written to disk, but can
+   * still be retrieved as a `Uint8Array` from `tracing.stop()`.
+   */
   path?: string;
+  /**
+   * Whether to capture screenshots in the trace.
+   *
+   * @defaultValue `false`
+   */
   screenshots?: boolean;
+  /**
+   * The tracing categories to include/exclude.
+   *
+   * To exclude a category, prefix it with `-` (e.g., `-toplevel`).
+   *
+   * @defaultValue Default categories listed in the implementation.
+   */
   categories?: string[];
+  /**
+   * Size of the trace buffer in kilobytes.
+   * If not specified or zero is passed, the default value of 200 MB
+   * (200,000 KB) is used by Chromium.
+   */
+  bufferSize?: number;
+}
+
+/**
+ * Options for {@link Browser.uninstallPWA}.
+ *
+ * @public
+ */
+export declare interface UninstallPWAOptions {
+  /**
+   * The id from the web app's manifest file.
+   */
+  manifestId: string;
 }
 
 /**
@@ -9536,34 +10044,6 @@ export declare class WebMCP extends EventEmitter<{
 }
 
 /**
- * Tool annotations
- *
- * @public
- */
-export declare interface WebMCPAnnotation {
-  /**
-   * A hint indicating that the tool does not modify any state.
-   */
-  readOnly?: boolean;
-  /**
-   * A hint indicating that the tool output may contain untrusted content, ex: UGC, 3rd
-   * party data.
-   */
-  untrustedContent?: boolean;
-  /**
-   * If the declarative tool was declared with the autosubmit attribute.
-   */
-  autosubmit?: boolean;
-}
-
-/**
- * Represents the status of a tool invocation.
- *
- * @public
- */
-export declare type WebMCPInvocationStatus = 'Completed' | 'Canceled' | 'Error';
-
-/**
  * Represents a registered WebMCP tool available on the page.
  *
  * @public
@@ -9588,7 +10068,7 @@ export declare class WebMCPTool extends EventEmitter<{
   /**
    * Optional annotations for the tool.
    */
-  annotations?: WebMCPAnnotation;
+  annotations?: Protocol.WebMCP.Annotation;
   /**
    * Frame the tool was defined for.
    */
@@ -9604,13 +10084,17 @@ export declare class WebMCPTool extends EventEmitter<{
   /**
    * Executes tool with input parameters, matching tool's `inputSchema`.
    */
-  execute(input?: object): Promise<WebMCPToolCallResult>;
+  execute(
+    input?: object,
+    options?: WebMCPToolExecuteOptions,
+  ): Promise<WebMCPToolCallResult>;
 }
 
 /**
  * @public
  */
 export declare class WebMCPToolCall {
+  
   /**
    * Tool invocation identifier.
    */
@@ -9640,7 +10124,7 @@ export declare interface WebMCPToolCallResult {
   /**
    * Status of the invocation.
    */
-  status: WebMCPInvocationStatus;
+  status: Protocol.WebMCP.InvocationStatus;
   /**
    * Output or error delivered as delivered to the agent. Missing if `status` is anything
    * other than Completed.
@@ -9654,6 +10138,16 @@ export declare interface WebMCPToolCallResult {
    * The exception object, if the javascript tool threw an error.
    */
   exception?: Protocol.Runtime.RemoteObject;
+}
+
+/**
+ * @public
+ */
+export declare interface WebMCPToolExecuteOptions {
+  /**
+   * A signal object that allows you to cancel the tool execution.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -9762,6 +10256,26 @@ export declare abstract class WebWorker extends EventEmitter<WebWorkerEvents> {
     func: Func | string,
     ...args: Params
   ): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
+  /**
+   * Waits for the provided function, `workerFunction`, to return a truthy value when
+   * evaluated in the page's context.
+   *
+   * @param workerFunction - Function to be evaluated in browser context until it
+   * returns a truthy value.
+   * @param options - Options for configuring waiting behavior.
+   */
+  waitForFunction<
+    Params extends unknown[],
+    Func extends EvaluateFunc<Params> = EvaluateFunc<Params>,
+  >(
+    workerFunction: Func | string,
+    options?: {
+      polling?: number;
+      timeout?: number;
+      signal?: AbortSignal;
+    },
+    ...args: Params
+  ): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
   close(): Promise<void>;
 }
 
@@ -9807,10 +10321,7 @@ export declare type WindowId = string;
  * @public
  */
 export declare type WindowState =
-  | 'normal'
-  | 'minimized'
-  | 'maximized'
-  | 'fullscreen';
+  'normal' | 'minimized' | 'maximized' | 'fullscreen';
 
 /**
  * @public
@@ -9820,6 +10331,49 @@ export declare interface WorkAreaInsets {
   left?: number;
   bottom?: number;
   right?: number;
+}
+
+/**
+ * @public
+ */
+export declare interface WritableDestination {
+  write(chunk: Uint8Array): boolean;
+  end(): unknown;
+  writableFinished?: boolean;
+  closed?: boolean;
+  destroyed?: boolean;
+  once?(event: string, cb: (arg?: unknown) => void): unknown;
+}
+
+/**
+ * Options for the WebSocket connection to the browser.
+ *
+ * @remarks
+ * Only used in the Node.js environment.
+ *
+ * @public
+ */
+export declare interface WsOptions {
+  /**
+   * Headers to use for the web socket connection.
+   */
+  headers?: Record<string, string>;
+  /**
+   * Whether to send WebSocket pings and drop the connection when a pong does
+   * not come back within the same interval. Detects a connection that died
+   * without a close frame, which otherwise leaves calls hanging until
+   * `protocolTimeout`.
+   *
+   * @defaultValue `false`
+   */
+  keepAlive?: boolean;
+  /**
+   * Ping period in milliseconds. Only used when {@link WsOptions.keepAlive} is
+   * set.
+   *
+   * @defaultValue `30_000`
+   */
+  keepAliveIntervalMs?: number;
 }
 
 export {};

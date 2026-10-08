@@ -12,10 +12,9 @@ devtools_module("tracing") {
     "TracingManager.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../../models/trace:bundle",
   ]
 }
@@ -23,7 +22,7 @@ devtools_module("tracing") {
 devtools_entrypoint("bundle") {
   entrypoint = "tracing.ts"
 
-  deps = [ ":tracing" ]
+  ts_deps = [ ":tracing" ]
 
   visibility = [ "*" ]
 }
@@ -36,8 +35,9 @@ ts_library("unittests") {
     "TracingManager.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../generated",
     "../../models/trace:bundle",
     "../../testing",
   ]

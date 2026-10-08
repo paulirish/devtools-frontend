@@ -7,10 +7,75 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import * as Elements from './elements.js';
 
 const UIStrings = {
+  /**
+   * @description Text of a setting that turn on the measuring rulers when hover over a target.
+   */
+  rulersOnHover: 'Rulers on hover',
+  /**
+   * @description Text of an option that turn on the measuring rulers when hover over a target through the Command Menu.
+   */
+  showRulersOnHover: 'Show rulers on hover',
+  /**
+   * @description Text of a setting that do turn off the measuring rulers when hover over a target.
+   */
+  doNotShowRulersOnHover: 'Don’t show rulers on hover',
+  /**
+   * @description Title of a setting under the Elements category in Settings.
+   */
+  apca: 'Advanced Perceptual Contrast Algorithm (APCA) replacing previous contrast ratio and AA/AAA guidelines',
+  /**
+   * @description Title of a setting that turns on grid area name labels.
+   */
+  showAreaNames: 'Show area names',
+  /**
+   * @description Title of a setting under the Grid category that turns CSS Grid Area highlighting on.
+   */
+  showGridNamedAreas: 'Show grid named areas',
+  /**
+   * @description Title of a setting under the Grid category that turns CSS Grid Area highlighting off.
+   */
+  doNotShowGridNamedAreas: 'Don’t show grid named areas',
+  /**
+   * @description Title of a setting that turns on grid track size labels.
+   */
+  showTrackSizes: 'Show track sizes',
+  /**
+   * @description Title for CSS Grid tooling option.
+   */
+  showGridTrackSizes: 'Show grid track sizes',
+  /**
+   * @description Title for CSS Grid tooling option.
+   */
+  doNotShowGridTrackSizes: 'Don’t show grid track sizes',
+  /**
+   * @description Title of a setting that turns on grid extension lines.
+   */
+  extendGridLines: 'Extend grid lines',
+  /**
+   * @description Title of a setting that turns off the grid extension lines.
+   */
+  doNotExtendGridLines: 'Don’t extend grid lines',
+  /**
+   * @description Title of a setting that turns on grid line labels.
+   */
+  showLineLabels: 'Show line labels',
+  /**
+   * @description Title of a setting that turns off the grid line labels.
+   */
+  hideLineLabels: 'Hide line labels',
+  /**
+   * @description Title of a setting that turns on grid line number labels.
+   */
+  showLineNumbers: 'Show line numbers',
+  /**
+   * @description Title of a setting that turns on grid line name labels.
+   */
+  showLineNames: 'Show line names',
   /**
    * @description Command for showing the 'Elements' panel. Elements refers to HTML elements.
    */
@@ -77,11 +142,11 @@ const UIStrings = {
    */
   selectAnElementInThePageTo: 'Select an element in the page to inspect it',
   /**
-   * @description Title/tooltip of an action in the elements panel to add a new style rule.
+   * @description Title/tooltip of an action in the Elements panel to add a new style rule.
    */
-  newStyleRule: 'New Style Rule',
+  newStyleRule: 'New style rule',
   /**
-   * @description Title/tooltip of an action in the elements panel to refresh the event listeners.
+   * @description Title/tooltip of an action in the Elements panel to refresh the event listeners.
    */
   refreshEventListeners: 'Refresh event listeners',
   /**
@@ -101,11 +166,11 @@ const UIStrings = {
    */
   htmlComments: 'HTML comments',
   /**
-   * @description Title of an option under the Elements category that can be invoked through the Command Menu
+   * @description Title of an option under the Elements category that can be invoked through the Command Menu.
    */
   showHtmlComments: 'Show `HTML` comments',
   /**
-   * @description Title of an option under the Elements category that can be invoked through the Command Menu
+   * @description Title of an option under the Elements category that can be invoked through the Command Menu.
    */
   hideHtmlComments: 'Hide `HTML` comments',
   /**
@@ -122,12 +187,12 @@ const UIStrings = {
   detailedInspectTooltip: 'Detailed inspect tooltip',
   /**
    * @description Title of a setting under the Elements category in Settings. Turns on a mode where
-   * hovering over CSS properties in the Styles pane will display a popover with documentation.
+   * hovering over CSS properties in the Styles tab will display a popover with documentation.
    */
   CSSDocumentationTooltip: 'CSS documentation tooltip',
   /**
-   * @description A context menu item (command) in the Elements panel that copy the styles of
-   * the HTML element.
+   * @description A context menu item (command) in the Elements panel that copies the styles of
+   * an HTML element.
    */
   copyStyles: 'Copy styles',
   /**
@@ -136,20 +201,20 @@ const UIStrings = {
    */
   toggleA11yTree: 'Toggle accessibility tree',
   /**
-   * @description Title of a setting under the Elements category. Whether to show/hide hide
+   * @description Title of a setting under the Elements category. Whether to show or hide
    * the shadow DOM nodes of HTML elements that are built into the browser (e.g. the <input> element).
    */
   userAgentShadowDOM: 'User agent shadow `DOM`',
   /**
    * @description Command for showing the 'Computed' tool. Displays computed CSS styles in Elements sidebar.
    */
-  showComputedStyles: 'Show Computed Styles',
+  showComputedStyles: 'Show Computed styles',
   /**
    * @description Command for showing the 'Styles' tool. Displays CSS styles in Elements sidebar.
    */
   showStyles: 'Show Styles',
   /**
-   * @description Command for toggling the eye dropper when the color picker is open
+   * @description Command for toggling the eye dropper when the color picker is open.
    */
   toggleEyeDropper: 'Toggle eye dropper',
   /**
@@ -157,9 +222,17 @@ const UIStrings = {
    */
   cssAnimationsOnlyWhenAnimationsTabOpen: 'Show animation styles only when the Animations tab is open',
   /**
-   * @description Whether CSS rules that do not apply active styles in the Styles pane are collapsed by default.
+   * @description Whether CSS rules that do not apply active styles in the Styles tab are collapsed by default.
    */
   collapseNonContributingCSSRules: 'Collapse non-contributing CSS rules',
+  /**
+   * @description Title of a setting under the Elements category in Settings.
+   */
+  showInactiveCSSRules: 'Show inactive CSS rules',
+  /**
+   * @description Title of a setting in the Event listeners tab.
+   */
+  frameworkListeners: 'Framework listeners',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/elements-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -186,9 +259,10 @@ UI.ViewManager.registerViewExtension({
   order: 10,
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   hasToolbar: false,
-  async loadView() {
+  async loadView(universe) {
     const Elements = await loadElementsModule();
-    return Elements.ElementsPanel.ElementsPanel.instance();
+    const {targetManager, settings} = universe;
+    return Elements.ElementsPanel.ElementsPanel.instance({forceNew: null, targetManager, settings});
   },
 });
 
@@ -473,24 +547,16 @@ UI.ActionRegistration.registerActionExtension({
   },
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.showUAShadowDOMSettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 1,
   title: i18nLazyString(UIStrings.userAgentShadowDOM),
-  settingName: 'show-ua-shadow-dom',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.domWordWrapSettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 2,
   title: i18nLazyString(UIStrings.wordWrap),
-  settingName: 'dom-word-wrap',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
 });
 
 UI.ActionRegistration.registerActionExtension({
@@ -512,14 +578,10 @@ UI.ActionRegistration.registerActionExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.showHTMLCommentsSettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 3,
   title: i18nLazyString(UIStrings.htmlComments),
-  settingName: 'show-html-comments',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
   options: [
     {
       value: true,
@@ -532,68 +594,43 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.highlightNodeOnHoverInOverlaySettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 4,
   title: i18nLazyString(UIStrings.revealDomNodeOnHover),
-  settingName: 'highlight-node-on-hover-in-overlay',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.showDetailedInspectTooltipSettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   order: 5,
   title: i18nLazyString(UIStrings.detailedInspectTooltip),
-  settingName: 'show-detailed-inspect-tooltip',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(
+    SettingsUI.ElementsSettings.cssAnimationsOnlyWhenAnimationsTabOpenSettingDescriptor, {
+      category: Common.Settings.SettingCategory.ELEMENTS,
+      order: 6,
+      title: i18nLazyString(UIStrings.cssAnimationsOnlyWhenAnimationsTabOpen),
+    });
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor,
+                                          {
+                                            category: Common.Settings.SettingCategory.ELEMENTS,
+                                            order: 7,
+                                            title: i18nLazyString(UIStrings.collapseNonContributingCSSRules),
+                                          });
+
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor, {
   category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  order: 6,
-  title: i18nLazyString(UIStrings.cssAnimationsOnlyWhenAnimationsTabOpen),
-  settingName: 'css-animations-only-when-animations-tab-open',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
+  order: 8,
+  title: i18nLazyString(UIStrings.showInactiveCSSRules),
 });
 
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  order: 7,
-  title: i18nLazyString(UIStrings.collapseNonContributingCSSRules),
-  settingName: 'collapse-non-contributing-css-rules',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
-});
-
-Common.Settings.registerSettingExtension({
-  settingName: 'show-event-listeners-for-ancestors',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.ADORNER,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  settingName: 'adorner-settings',
-  settingType: Common.Settings.SettingType.ARRAY,
-  defaultValue: [],
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.ELEMENTS,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  title: i18nLazyString(UIStrings.CSSDocumentationTooltip),
-  settingName: 'show-css-property-documentation-on-hover',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: true,
-});
+SettingsUI.SettingUIRegistration.register(
+    SettingsUI.ElementsSettings.showCSSPropertyDocumentationOnHoverSettingDescriptor, {
+      category: Common.Settings.SettingCategory.ELEMENTS,
+      title: i18nLazyString(UIStrings.CSSDocumentationTooltip),
+    });
 
 UI.ContextMenu.registerProvider({
   contextTypes() {
@@ -622,8 +659,11 @@ UI.ViewManager.registerLocationResolver({
 Common.Revealer.registerRevealer({
   contextTypes() {
     return [
-      SDK.DOMModel.DOMNode, SDK.DOMModel.DeferredDOMNode, SDK.RemoteObject.RemoteObject, SDK.DOMModel.AdoptedStyleSheet,
-      Elements.ElementsPanel.NodeComputedStyles
+      SDK.DOMModel.DOMNode,
+      SDK.DOMModel.DeferredDOMNode,
+      SDK.RemoteObject.RemoteObject,
+      SDK.DOMModel.AdoptedStyleSheet,
+      Elements.ElementsPanel.NodeComputedStyles,
     ];
   },
   destination: Common.Revealer.RevealerDestination.ELEMENTS_PANEL,
@@ -688,12 +728,94 @@ UI.Toolbar.registerToolbarItem({
   order: 0,
 });
 
-UI.UIUtils.registerRenderer({
-  contextTypes() {
-    return [SDK.DOMModel.DOMNode, SDK.DOMModel.DeferredDOMNode];
-  },
-  async loadRenderer() {
-    const Elements = await loadElementsModule();
-    return Elements.ElementsTreeOutlineRenderer.Renderer.instance();
-  },
+SettingsUI.SettingUIRegistration.register(SettingsUI.ElementsSettings.showFrameworkListenersSettingDescriptor, {
+  category: Common.Settings.SettingCategory.NONE,
+  title: i18nLazyString(UIStrings.frameworkListeners),
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.showMetricsRulersSettingDescriptor, {
+  category: Common.Settings.SettingCategory.ELEMENTS,
+  title: i18nLazyString(UIStrings.rulersOnHover),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showRulersOnHover),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotShowRulersOnHover),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.apcaSettingDescriptor, {
+  category: Common.Settings.SettingCategory.ELEMENTS,
+  title: i18nLazyString(UIStrings.apca),
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.showGridAreasSettingDescriptor, {
+  category: Common.Settings.SettingCategory.GRID,
+  title: i18nLazyString(UIStrings.showAreaNames),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showGridNamedAreas),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotShowGridNamedAreas),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.showGridTrackSizesSettingDescriptor, {
+  category: Common.Settings.SettingCategory.GRID,
+  title: i18nLazyString(UIStrings.showTrackSizes),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.showGridTrackSizes),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotShowGridTrackSizes),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.extendGridLinesSettingDescriptor, {
+  category: Common.Settings.SettingCategory.GRID,
+  title: i18nLazyString(UIStrings.extendGridLines),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.extendGridLines),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotExtendGridLines),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.showGridLineLabelsSettingDescriptor, {
+  category: Common.Settings.SettingCategory.GRID,
+  title: i18nLazyString(UIStrings.showLineLabels),
+  options: [
+    {
+      title: i18nLazyString(UIStrings.hideLineLabels),
+      text: i18nLazyString(UIStrings.hideLineLabels),
+      value: 'none',
+    },
+    {
+      title: i18nLazyString(UIStrings.showLineNumbers),
+      text: i18nLazyString(UIStrings.showLineNumbers),
+      value: 'lineNumbers',
+    },
+    {
+      title: i18nLazyString(UIStrings.showLineNames),
+      text: i18nLazyString(UIStrings.showLineNames),
+      value: 'lineNames',
+    },
+  ],
 });

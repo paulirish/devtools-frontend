@@ -7,7 +7,7 @@ import("../../../../../scripts/build/ninja/devtools_module.gni")
 import("../../../../../scripts/build/typescript/typescript.gni")
 import("../../../visibility.gni")
 
-devtools_module("graph") {
+devtools_foundation_module("graph") {
   sources = [
     "BaseNode.ts",
     "CPUNode.ts",
@@ -15,7 +15,7 @@ devtools_module("graph") {
     "PageDependencyGraph.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../core:bundle",
     "../types:bundle",
   ]
@@ -23,7 +23,7 @@ devtools_module("graph") {
 
 devtools_entrypoint("bundle") {
   entrypoint = "graph.ts"
-  deps = [ ":graph" ]
+  ts_deps = [ ":graph" ]
   visibility = [
     ":*",
     "../*",
@@ -32,7 +32,7 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
@@ -40,5 +40,5 @@ ts_library("unittests") {
     "PageDependencyGraph.test.ts",
   ]
 
-  deps = [ "../:bundle" ]
+  ts_deps = [ "../:bundle" ]
 }

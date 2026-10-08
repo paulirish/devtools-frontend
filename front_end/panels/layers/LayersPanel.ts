@@ -14,11 +14,11 @@ import {Events, LayerTreeModel} from './LayerTreeModel.js';
 
 const UIStrings = {
   /**
-   * @description Text for the details of something
+   * @description Title of the details tab in the Layers panel.
    */
   details: 'Details',
   /**
-   * @description Title of the Profiler tool
+   * @description Title of the profiler tab in the Layers panel.
    */
   profiler: 'Profiler',
 } as const;
@@ -47,7 +47,7 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
     this.layerTreeOutline = new LayerViewer.LayerTreeOutline.LayerTreeOutline(this.layerViewHost);
     this.layerTreeOutline.addEventListener(
         LayerViewer.LayerTreeOutline.Events.PAINT_PROFILER_REQUESTED, this.onPaintProfileRequested, this);
-    this.panelSidebarElement().appendChild(this.layerTreeOutline.element);
+    this.layerTreeOutline.show(this.panelSidebarElement());
     this.setDefaultFocusedElement(this.layerTreeOutline.element);
 
     this.rightSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'layer-details-split-view-state');

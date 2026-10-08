@@ -28,9 +28,8 @@ export const UIStrings = {
   /**
    * @description Text to describe that there are requests blocking rendering, which may affect LCP.
    */
-  description: 'Requests are blocking the page\'s initial render, which may delay LCP. ' +
-      '[Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) ' +
-      'can move these network requests out of the critical path.',
+  description:
+      `Requests are blocking the page’s initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.`,
   /**
    * @description Label to describe a network request (that happens to be render-blocking).
    */
@@ -40,13 +39,13 @@ export const UIStrings = {
    */
   duration: 'Duration',
   /**
-   * @description Text status indicating that no requests blocked the initial render of a navigation
+   * @description Text status indicating that no requests blocked the initial render of a navigation.
    */
   noRenderBlocking: 'No render-blocking requests for this navigation',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/RenderBlocking.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export function isRenderBlockingInsight(insight: InsightModel): insight is RenderBlockingInsightModel {
   return insight.insightKey === 'RenderBlocking';
@@ -178,7 +177,7 @@ function finalize(partialModel: PartialInsightModel<RenderBlockingInsightModel>)
 
 export function generateInsight(
     data: Handlers.Types.HandlerData, context: InsightSetContext): RenderBlockingInsightModel {
-  if (!context.navigation) {
+  if (!context.navigation || !('navigationId' in context)) {
     return finalize({
       renderBlockingRequests: [],
     });

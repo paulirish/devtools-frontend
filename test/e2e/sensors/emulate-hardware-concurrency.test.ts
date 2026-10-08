@@ -6,8 +6,8 @@ import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 async function waitForChangedConcurrency(
     lastConcurrency: number|undefined, devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
@@ -22,7 +22,7 @@ async function waitForChangedConcurrency(
 
 describe('hardwareConcurrency emulation on Sensors panel', () => {
   it('can emulate navigator.hardwareConcurrency', async ({devToolsPage, inspectedPage}) => {
-    await openPanelViaMoreTools('Sensors', devToolsPage);
+    await openPanelViaMoreTools(devToolsPage, 'Sensors');
     let concurrency = await waitForChangedConcurrency(undefined, devToolsPage, inspectedPage);
 
     // Wait for the checkbox to load
@@ -51,7 +51,7 @@ describe('hardwareConcurrency emulation on Sensors panel', () => {
     assert.deepEqual(concurrency, initialValue + 1);
 
     // Check that the warning is shown when exceeding the default value:
-    const warning = await devToolsPage.waitForAria('Exceeding the default value may degrade system performance.') as
+    const warning = await devToolsPage.waitForAria('Exceeding the default value may degrade system performance') as
         puppeteer.ElementHandle<HTMLElement>;
     await devToolsPage.waitForFunction(
         async () => await warning.evaluate(e => getComputedStyle(e).visibility) === 'visible');

@@ -1,50 +1,51 @@
 // Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import {html, type LitTemplate} from '../../ui/lit/lit.js';
 import * as Coverage from '../coverage/coverage.js';
 
-import {Plugin} from './Plugin.js';
+import {Events, Plugin} from './Plugin.js';
 
 // Plugin that shows a gutter with coverage information when available.
 
 const UIStrings = {
   /**
-   * @description Text for Coverage Status Bar Item in Sources Panel
+   * @description Text for coverage status bar item in Sources panel.
    */
-  clickToShowCoveragePanel: 'Click to show Coverage Panel',
+  clickToShowCoveragePanel: 'Click to show Coverage panel',
   /**
-   * @description Text for Coverage Status Bar Item in Sources Panel
+   * @description Text for coverage status bar item in Sources panel.
    */
-  showDetails: 'Show Details',
+  showDetails: 'Show details',
   /**
-   * @description Text to show in the status bar if coverage data is available
+   * @description Text to show in the status bar if coverage data is available.
    * @example {12.3} PH1
    */
   coverageS: 'Coverage: {PH1}',
   /**
-   * @description Text to be shown in the status bar if no coverage data is available
+   * @description Text to be shown in the status bar if no coverage data is available.
    */
-  coverageNa: 'Coverage: n/a',
+  coverageNa: 'Coverage: N/A',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/CoveragePlugin.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CoveragePlugin extends Plugin {
   private originalSourceCode: Workspace.UISourceCode.UISourceCode;
-  private infoInToolbar: UI.Toolbar.ToolbarButton;
   private model: Coverage.CoverageModel.CoverageModel|null|undefined;
   private coverage: Coverage.CoverageModel.URLCoverageInfo|null|undefined;
+  #lastToolbarLabel: string;
 
   readonly #transformer: SourceFrame.SourceFrame.Transformer;
 
@@ -52,12 +53,6 @@ export class CoveragePlugin extends Plugin {
     super(uiSourceCode);
     this.originalSourceCode = this.uiSourceCode;
     this.#transformer = transformer;
-    this.infoInToolbar = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.clickToShowCoveragePanel), undefined, undefined, 'debugger.show-coverage');
-    this.infoInToolbar.setSecondary();
-    this.infoInToolbar.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-      void UI.ViewManager.ViewManager.instance().showView('coverage');
-    });
 
     const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (mainTarget) {
@@ -73,7 +68,7 @@ export class CoveragePlugin extends Plugin {
       }
     }
 
-    this.updateStats();
+    this.#lastToolbarLabel = this.#toolbarLabel();
   }
 
   override dispose(): void {
@@ -100,22 +95,38 @@ export class CoveragePlugin extends Plugin {
   }
 
   private updateStats(): void {
-    if (this.coverage) {
-      this.infoInToolbar.setTitle(i18nString(UIStrings.showDetails));
-      const formatter = new Intl.NumberFormat(i18n.DevToolsLocale.DevToolsLocale.instance().locale, {
-        style: 'percent',
-        maximumFractionDigits: 1,
-      });
-      this.infoInToolbar.setText(
-          i18nString(UIStrings.coverageS, {PH1: formatter.format(this.coverage.usedPercentage())}));
-    } else {
-      this.infoInToolbar.setTitle(i18nString(UIStrings.clickToShowCoveragePanel));
-      this.infoInToolbar.setText(i18nString(UIStrings.coverageNa));
+    const label = this.#toolbarLabel();
+    if (label === this.#lastToolbarLabel) {
+      return;
     }
+    this.#lastToolbarLabel = label;
+    this.dispatchEventToListeners(Events.TOOLBAR_ITEMS_CHANGED);
   }
 
-  override rightToolbarItems(): UI.Toolbar.ToolbarItem[] {
-    return [this.infoInToolbar];
+  #toolbarLabel(): string {
+    if (!this.coverage) {
+      return i18nString(UIStrings.coverageNa);
+    }
+    const formatter = new Intl.NumberFormat(i18n.DevToolsLocale.DevToolsLocale.instance().locale, {
+      style: 'percent',
+      maximumFractionDigits: 1,
+    });
+    return i18nString(UIStrings.coverageS, {PH1: formatter.format(this.coverage.usedPercentage())});
+  }
+
+  override rightToolbarItems(): LitTemplate[] {
+    const title = this.coverage ? i18nString(UIStrings.showDetails) : i18nString(UIStrings.clickToShowCoveragePanel);
+    // clang-format off
+    return [html`<devtools-button
+        class="toolbar-button toolbar-button-secondary"
+        title=${title}
+        aria-label=${title}
+        .variant=${Buttons.Button.Variant.TEXT}
+        .reducedFocusRing=${true}
+        .jslogContext=${'debugger.show-coverage'}
+        @click=${() => void UI.ViewManager.ViewManager.instance().showView('coverage')}
+      >${this.#toolbarLabel()}</devtools-button>`];
+    // clang-format on
   }
 
   override editorExtension(): CodeMirror.Extension {

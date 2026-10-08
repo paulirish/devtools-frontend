@@ -6,20 +6,20 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Persistence from '../../models/persistence/persistence.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description Default snippet name when a new snippet is created in the Sources panel
+   * @description Default snippet name when a new snippet is created in the Sources panel.
    * @example {1} PH1
    */
   scriptSnippet: 'Script snippet #{PH1}',
   /**
-   * @description Text to show something is linked to another
+   * @description Text to show something is linked to another.
    * @example {example.url} PH1
    */
   linkedTo: 'Linked to {PH1}',
@@ -163,17 +163,16 @@ export async function evaluateScriptSnippet(uiSourceCode: Workspace.UISourceCode
 
   const url = uiSourceCode.url();
 
-  const result = await executionContext.evaluate(
-      {
-        expression: `${expression}\n//# sourceURL=${url}`,
-        objectGroup: 'console',
-        silent: false,
-        includeCommandLineAPI: true,
-        returnByValue: false,
-        generatePreview: true,
-        replMode: true,
-      } as SDK.RuntimeModel.EvaluationOptions,
-      true, true);
+  const result = await executionContext.evaluateWithSelectedFrameFallback({
+    expression: `${expression}\n//# sourceURL=${url}`,
+    objectGroup: 'console',
+    silent: false,
+    includeCommandLineAPI: true,
+    returnByValue: false,
+    generatePreview: true,
+    replMode: true,
+  } as SDK.RuntimeModel.EvaluationOptions,
+                                                                          true, true);
 
   if ('exceptionDetails' in result && result.exceptionDetails) {
     consoleModel?.addMessage(SDK.ConsoleModel.ConsoleMessage.fromException(

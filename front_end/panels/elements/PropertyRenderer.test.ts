@@ -3,14 +3,19 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {Printer} from '../../testing/PropertyParser.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import {type LitTemplate, render} from '../../ui/lit/lit.js';
 
 import * as Elements from './elements.js';
+
+const {urlString} = Platform.DevToolsPath;
 
 describeWithEnvironment('PropertyRenderer', () => {
   function renderValueElement(name: string, value: string) {
@@ -19,25 +24,25 @@ describeWithEnvironment('PropertyRenderer', () => {
   }
 
   describe('Renderer', () => {
-    function textFragments(nodes: Node[]): Array<string|null> {
-      return nodes.map(n => n.textContent);
+    function textFragments(nodes: Node|LitTemplate): Array<string|null> {
+      if (nodes instanceof Node) {
+        return nodes.childTextNodes().map(n => n.textContent).filter(Boolean);
+      }
+      const span = document.createElement('span');
+      render(nodes, span);
+      return textFragments(span);
     }
 
     it('parses text', () => {
       // Prevent normalization to get an accurate representation of the parser result.
       sinon.stub(Element.prototype, 'normalize');
-      assert.deepEqual(
-          textFragments(Array.from(renderValueElement('--p', 'var(--v)').valueElement.childNodes)),
-          ['var', '(', '--v', ')']);
+      assert.deepEqual(textFragments(renderValueElement('--p', 'var(--v)').valueElement), ['var', '(', '--v', ')']);
 
+      assert.deepEqual(textFragments(renderValueElement('--p', '/* comments are text */ 1px solid 4').valueElement),
+                       ['/* comments are text */', ' ', '1px', ' ', 'solid', ' ', '4']);
       assert.deepEqual(
-          textFragments(
-              Array.from(renderValueElement('--p', '/* comments are text */ 1px solid 4').valueElement.childNodes)),
-          ['/* comments are text */', ' ', '1px', ' ', 'solid', ' ', '4']);
-      assert.deepEqual(
-          textFragments(Array.from(
-              renderValueElement('--p', '2px var(--double, var(--fallback, black)) #32a1ce rgb(124 125 21 0)')
-                  .valueElement.childNodes)),
+          textFragments(renderValueElement('--p', '2px var(--double, var(--fallback, black)) #32a1ce rgb(124 125 21 0)')
+                            .valueElement),
           [
             '2px', ' ', 'var',     '(', '--double', ',', ' ',   'var', '(',   '--fallback', ',',  ' ', 'black', ')',
             ')',   ' ', '#32a1ce', ' ', 'rgb',      '(', '124', ' ',   '125', ' ',          '21', ' ', '0',     ')',
@@ -52,9 +57,8 @@ describeWithEnvironment('PropertyRenderer', () => {
       const ast = new SDK.CSSPropertyParser.SyntaxTree(property, rule, tree);
       const matchedResult = SDK.CSSPropertyParser.BottomUpTreeMatching.walk(ast, []);
       const context = new Elements.PropertyRenderer.RenderingContext(ast, null, new Map(), matchedResult);
-      assert.deepEqual(
-          textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''), rule,
-          Printer.walk(ast).get());
+      assert.deepEqual(textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''), rule,
+                       Printer.walk(ast).get());
     });
 
     it('nicely formats binary expressions', () => {
@@ -67,9 +71,8 @@ describeWithEnvironment('PropertyRenderer', () => {
       const renderer = new Elements.PropertyRenderer.BinOpRenderer();
       const context = new Elements.PropertyRenderer.RenderingContext(
           ast, null, new Map([[renderer.matchType, renderer]]), matchedResult);
-      assert.deepEqual(
-          textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''),
-          '*{--property: calc((50 - (0 * 4)) * 1vmin);}', Printer.walk(ast).get());
+      assert.deepEqual(textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''),
+                       '*{--property: calc((50 - (0 * 4)) * 1vmin);}', Printer.walk(ast).get());
     });
 
     it('correctly renders subtrees', () => {
@@ -80,21 +83,127 @@ describeWithEnvironment('PropertyRenderer', () => {
       const ast = new SDK.CSSPropertyParser.SyntaxTree(property, rule, tree);
       const matchedResult = SDK.CSSPropertyParser.BottomUpTreeMatching.walk(ast, []);
       const context = new Elements.PropertyRenderer.RenderingContext(ast, null, new Map(), matchedResult);
-      assert.deepEqual(
-          textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''), property,
-          Printer.walk(ast).get());
+      assert.deepEqual(textFragments(Elements.PropertyRenderer.Renderer.render(tree, context).nodes).join(''), property,
+                       Printer.walk(ast).get());
     });
 
     it('renders trailing comments', () => {
       const property = '/* color: red */ blue /* color: red */';
-      assert.strictEqual(
-          textFragments(Array.from(renderValueElement('--p', property).valueElement.childNodes)).join(''), property);
+      assert.strictEqual(textFragments(renderValueElement('--p', property).valueElement).join(''), property);
+
+      const withoutSpaces = '/* color: red */blue/* color: red */';
+      assert.strictEqual(textFragments(renderValueElement('--p', withoutSpaces).valueElement).join(''), withoutSpaces);
     });
 
     it('renders malformed comments', () => {
       const property = 'red /* foo: bar';
-      assert.strictEqual(
-          textFragments(Array.from(renderValueElement('--p', property).valueElement.childNodes)).join(''), property);
+      assert.strictEqual(textFragments(renderValueElement('--p', property).valueElement).join(''), property);
+    });
+
+    it('computes preceding space from the AST', () => {
+      const property = '/* c1 */1px  /* c2 */ solid\tvar( --v , 2px )/* c3 */';
+      const ast = SDK.CSSPropertyParser.tokenizeDeclaration('--p', property);
+      assert.exists(ast);
+      const nodes: Array<[string, string]> = [];
+      SDK.CSSPropertyParser.TreeSearch.findAll(ast, node => {
+        if ((!node.firstChild && node.parent?.name !== 'NumberLiteral') || node.name === 'NumberLiteral') {
+          nodes.push([ast.text(node), Elements.PropertyRenderer.precedingSpace(node, ast)]);
+        }
+        return false;
+      });
+      for (const trailing of ast.trailingNodes) {
+        nodes.push([ast.text(trailing), Elements.PropertyRenderer.precedingSpace(trailing, ast)]);
+      }
+      assert.strictEqual(Elements.PropertyRenderer.precedingSpace(ast.tree, ast), '');
+      assert.deepEqual(nodes, [
+        ['/* c1 */', ' '],
+        ['1px', ''],
+        ['/* c2 */', '  '],
+        ['solid', ' '],
+        ['var', '\t'],
+        ['(', ''],
+        ['--v', ' '],
+        [',', ' '],
+        ['2px', ' '],
+        [')', ' '],
+        ['/* c3 */', ''],
+      ]);
+    });
+  });
+
+  describe('URLRenderer', () => {
+    it('linkifies package relative URLs completed against the stylesheet URL', () => {
+      const mockRule = {
+        resourceURL() {
+          return urlString`http://example.com/styles/styles-url-linkify.css`;
+        },
+      } as SDK.CSSRule.CSSRule;
+
+      const renderer = new Elements.PropertyRenderer.URLRenderer(mockRule, null);
+      const name = 'background-image';
+      const value = 'url(fromcss.png)';
+      const matchers = [new SDK.CSSPropertyParserMatchers.URLMatcher()];
+      const matchedResult = SDK.CSSPropertyParser.matchDeclaration(name, value, matchers);
+      assert.exists(matchedResult);
+
+      const {valueElement} =
+          Elements.PropertyRenderer.Renderer.renderValueElement({name, value}, matchedResult, [renderer]);
+
+      const link = valueElement.querySelector('.devtools-link');
+      assert.exists(link);
+      assert.strictEqual((link as HTMLElement & {href?: string}).href, 'http://example.com/styles/fromcss.png');
+      assert.strictEqual(link.textContent, 'fromcss.png');
+      assert.isTrue(link.classList.contains('devtools-link'));
+    });
+
+    it('linkifies package relative URLs resolved against the node context', () => {
+      const mockNode = {
+        resolveURL(url: string) {
+          return urlString`http://example.com/styles/resources/${url}`;
+        },
+      } as SDK.DOMModel.DOMNode;
+
+      const renderer = new Elements.PropertyRenderer.URLRenderer(null, mockNode);
+      const name = 'background-image';
+      const value = 'url(iframed.png)';
+      const matchers = [new SDK.CSSPropertyParserMatchers.URLMatcher()];
+      const matchedResult = SDK.CSSPropertyParser.matchDeclaration(name, value, matchers);
+      assert.exists(matchedResult);
+
+      const {valueElement} =
+          Elements.PropertyRenderer.Renderer.renderValueElement({name, value}, matchedResult, [renderer]);
+
+      const link = valueElement.querySelector('.devtools-link');
+      assert.exists(link);
+      assert.strictEqual((link as HTMLElement & {href?: string}).href,
+                         'http://example.com/styles/resources/iframed.png');
+      assert.strictEqual(link.textContent, 'iframed.png');
+    });
+
+    it('preserves multiple URLs inside -webkit-image-set without collapsing them into one', () => {
+      const mockRule = {
+        resourceURL() {
+          return urlString`http://example.com/styles/main.css`;
+        },
+      } as SDK.CSSRule.CSSRule;
+
+      const renderer = new Elements.PropertyRenderer.URLRenderer(mockRule, null);
+      const name = 'background-image';
+      const value = '-webkit-image-set(url("test-1x.png") 1x, url("test-2x.png") 2x)';
+      const matchers = [new SDK.CSSPropertyParserMatchers.URLMatcher()];
+      const matchedResult = SDK.CSSPropertyParser.matchDeclaration(name, value, matchers);
+      assert.exists(matchedResult);
+
+      const {valueElement} =
+          Elements.PropertyRenderer.Renderer.renderValueElement({name, value}, matchedResult, [renderer]);
+
+      const links = Array.from(valueElement.querySelectorAll('.devtools-link')) as Array<HTMLElement&{href?: string}>;
+      assert.lengthOf(links, 2);
+      assert.strictEqual(links[0].textContent, 'test-1x.png');
+      assert.strictEqual(links[0].href, 'http://example.com/styles/test-1x.png');
+      assert.strictEqual(links[1].textContent, 'test-2x.png');
+      assert.strictEqual(links[1].href, 'http://example.com/styles/test-2x.png');
+      assert.strictEqual(valueElement.textContent, '-webkit-image-set(url(test-1x.png) 1x, url(test-2x.png) 2x)');
     });
   });
 });
@@ -103,13 +212,13 @@ describe('TracingContext', () => {
   it('assumes no substitutions by default', () => {
     const matchedResult = SDK.CSSPropertyParser.matchDeclaration('prop', 'value', []);
     assert.exists(matchedResult);
-    const context = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const context = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false, 0,
+                                                                 matchedResult);
     assert.isFalse(context.nextSubstitution());
 
     sinon.stub(matchedResult, 'hasMatches').returns(true);
-    const context2 = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const context2 = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false,
+                                                                  0, matchedResult);
     assert.isTrue(context2.nextSubstitution());
 
     const context3 = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false);
@@ -120,8 +229,8 @@ describe('TracingContext', () => {
     const matchedResult = SDK.CSSPropertyParser.matchDeclaration('prop', 'value', []);
     assert.exists(matchedResult);
     sinon.stub(matchedResult, 'hasMatches').returns(true);
-    const context = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const context = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false, 0,
+                                                                 matchedResult);
 
     assert.isTrue(context.nextSubstitution());
     assert.exists(context.substitution());
@@ -148,8 +257,8 @@ describe('TracingContext', () => {
     const matchedResult = SDK.CSSPropertyParser.matchDeclaration('prop', 'value', []);
     assert.exists(matchedResult);
     sinon.stub(matchedResult, 'hasMatches').returns(true);
-    const context = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const context = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false, 0,
+                                                                 matchedResult);
 
     assert.throw(() => context.nextEvaluation());
     context.nextSubstitution();
@@ -159,8 +268,8 @@ describe('TracingContext', () => {
   it('controls evaluations creating nested context', () => {
     const matchedResult = SDK.CSSPropertyParser.matchDeclaration('prop', 'value', []);
     assert.exists(matchedResult);
-    const context = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const context = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(), false, 0,
+                                                                 matchedResult);
 
     const evaluation = () => ({placeholder: []});
     // Evaluations are applied bottom up
@@ -238,8 +347,8 @@ describe('TracingContext', () => {
         'animation', 'a b var(--c)',
         [new SDK.CSSPropertyParserMatchers.BaseVariableMatcher(match => match.name === '--c' ? 'ddd' : null)]);
     assert.exists(matchedResult);
-    const tracingContext = new Elements.PropertyRenderer.TracingContext(
-        new Elements.PropertyRenderer.Highlighting(), false, 0, matchedResult);
+    const tracingContext = new Elements.PropertyRenderer.TracingContext(new Elements.PropertyRenderer.Highlighting(),
+                                                                        false, 0, matchedResult);
 
     // The initial offset is 0.
     assert.strictEqual(tracingContext.longhandOffset, 0);
@@ -250,7 +359,7 @@ describe('TracingContext', () => {
     assert.isTrue(tracingContext.nextSubstitution());
     const childTracingContext = tracingContext.substitution({
       match,
-      context: new Elements.PropertyRenderer.RenderingContext(matchedResult.ast, null, new Map(), matchedResult)
+      context: new Elements.PropertyRenderer.RenderingContext(matchedResult.ast, null, new Map(), matchedResult),
     });
     assert.exists(childTracingContext);
     // The var(--c) appears in the longhand position #2.
@@ -284,8 +393,8 @@ describe('Highlighting', () => {
 
   beforeEach(() => {
     const highlighting = new Elements.PropertyRenderer.Highlighting();
-    const match1 = sinon.createStubInstance(SDK.CSSPropertyParserMatchers.TextMatch);
-    const match2 = sinon.createStubInstance(SDK.CSSPropertyParserMatchers.TextMatch);
+    const match1 = new SDK.CSSPropertyParserMatchers.TextMatch('match1', {} as CodeMirror.SyntaxNode);
+    const match2 = new SDK.CSSPropertyParserMatchers.TextMatch('match2', {} as CodeMirror.SyntaxNode);
     highlighting.addMatch(match1, [node('1'), node('2'), node('3')]);
     highlighting.addMatch(match1, [node('4'), node('5'), node('6'), node('7')]);
     highlighting.addMatch(match1, [node('8')]);
@@ -297,8 +406,8 @@ describe('Highlighting', () => {
     assert.exists(registry);
 
     document.querySelector('#node-6')?.dispatchEvent(new MouseEvent('mouseenter'));
-    assert.deepEqual(
-        Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['123', '4567', '8']);
+    assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)),
+                     ['123', '4567', '8']);
   });
 
   it('removes highlights on mouseexit', () => {
@@ -306,8 +415,8 @@ describe('Highlighting', () => {
     assert.exists(registry);
 
     document.querySelector('#node-6')?.dispatchEvent(new MouseEvent('mouseenter'));
-    assert.deepEqual(
-        Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['123', '4567', '8']);
+    assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)),
+                     ['123', '4567', '8']);
     document.querySelector('#node-6')?.dispatchEvent(new MouseEvent('mouseleave'));
     assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), []);
   });
@@ -317,8 +426,8 @@ describe('Highlighting', () => {
     assert.exists(registry);
 
     document.querySelector('#node-6')?.dispatchEvent(new MouseEvent('mouseenter'));
-    assert.deepEqual(
-        Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['123', '4567', '8']);
+    assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)),
+                     ['123', '4567', '8']);
 
     document.querySelector('#node-a')?.dispatchEvent(new MouseEvent('mouseenter'));
     assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['abc']);
@@ -329,14 +438,14 @@ describe('Highlighting', () => {
     assert.exists(registry);
 
     document.querySelector('#node-6')?.dispatchEvent(new MouseEvent('mouseenter'));
-    assert.deepEqual(
-        Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['123', '4567', '8']);
+    assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)),
+                     ['123', '4567', '8']);
 
     document.querySelector('#node-a')?.dispatchEvent(new MouseEvent('mouseenter'));
     assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['abc']);
 
     document.querySelector('#node-a')?.dispatchEvent(new MouseEvent('mouseleave'));
-    assert.deepEqual(
-        Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)), ['123', '4567', '8']);
+    assert.deepEqual(Array.from(registry.keys().map(value => (value as Range).cloneContents().textContent)),
+                     ['123', '4567', '8']);
   });
 });

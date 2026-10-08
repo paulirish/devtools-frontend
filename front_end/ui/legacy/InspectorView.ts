@@ -10,6 +10,8 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import {createIcon, type Icon} from '../kit/kit.js';
+import * as Lit from '../lit/lit.js';
+import * as SettingsUI from '../settings/settings.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import type {ActionDelegate as ActionDelegateInterface} from './ActionRegistration.js';
@@ -25,93 +27,89 @@ import {InspectorDrawerView} from './InspectorDrawerView.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
 import type {Panel} from './Panel.js';
 import {type ShowMode, SplitWidget} from './SplitWidget.js';
+import {StatusBarWidget} from './StatusBar.js';
 import {type EventData, Events as TabbedPaneEvents, type TabbedPane, type TabbedPaneTabDelegate} from './TabbedPane.js';
 import {Tooltip} from './Tooltip.js';
 import {UIUserMetrics} from './UIUserMetrics.js';
 import type {TabbedViewLocation, View, ViewLocation, ViewLocationResolver} from './View.js';
 import {ViewManager} from './ViewManager.js';
-import {VBox, type Widget, WidgetFocusRestorer} from './Widget.js';
+import {VBox, type Widget, widget, WidgetFocusRestorer} from './Widget.js';
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
-   * @description The aria label for the drawer minimized.
+   * @description Announcement text for screen readers when the drawer is minimized.
    */
   drawerMinimized: 'Drawer minimized',
   /**
-   * @description The aria label for the drawer expanded.
+   * @description Announcement text for screen readers when the drawer is expanded.
    */
   drawerExpanded: 'Drawer expanded',
   /**
-   * @description The ARIA label for the main tab bar that contains the DevTools panels
+   * @description Accessible label for the main tab bar that contains panels.
    */
   panels: 'Panels',
   /**
-   * @description Title of an action that reloads the tab currently being debugged by DevTools
+   * @description Button text in an infobar to reload the inspected page.
    */
   reloadDebuggedTab: 'Reload page',
   /**
-   * @description Title of an action that reloads the DevTools
+   * @description Button text in an infobar to reload DevTools.
    */
   reloadDevtools: 'Reload DevTools',
   /**
-   * @description Title of an action that restarts Chrome
+   * @description Button text in an infobar to restart Chrome.
    */
   restartChrome: 'Restart Chrome',
   /**
-   * @description Confirmation dialog text for restarting Chrome
+   * @description Confirmation prompt text when restarting Chrome.
    */
   areYouSureYouWantToRestartChrome: 'Are you sure you want to restart Chrome?',
   /**
-   * @description Text for context menu action to move a tab to the main tab bar
+   * @description Context menu item to move a tab to the main tab bar.
    */
   moveToMainTabBar: 'Move to main tab bar',
   /**
-   * @description Text for context menu action to move a tab to the drawer
+   * @description Context menu item to move a tab to the drawer.
    */
   moveToDrawer: 'Move to drawer',
   /**
-   * @description Text shown in a prompt to the user when DevTools is started and the
-   * currently selected DevTools locale does not match Chrome's locale.
-   * The placeholder is the current Chrome language.
+   * @description Infobar message shown when the DevTools language does not match the browser language.
    * @example {German} PH1
    */
   devToolsLanguageMissmatch: 'DevTools is now available in {PH1}',
   /**
-   * @description An option the user can select when we notice that DevTools
-   * is configured with a different locale than Chrome. This option means DevTools will
-   * always try and display the DevTools UI in the same language as Chrome.
+   * @description Button text in an infobar to configure DevTools to match the browser language.
    */
-  setToBrowserLanguage: 'Always match Chrome\'s language',
+  setToBrowserLanguage: 'Always match Chrome’s language',
   /**
-   * @description An option the user can select when DevTools notices that DevTools
-   * is configured with a different locale than Chrome. This option means DevTools UI
-   * will be switched to the language specified in the placeholder.
+   * @description Button text in an infobar to switch DevTools to a specific language.
    * @example {German} PH1
    */
   setToSpecificLanguage: 'Switch DevTools to {PH1}',
   /**
-   * @description The aria label for main toolbar
+   * @description Accessible label for the main toolbar.
    */
   mainToolbar: 'Main toolbar',
   /**
-   * @description The aria label for the drawer.
+   * @description Accessible label for the drawer.
    */
-  drawer: 'Tool drawer',
+  drawer: 'Drawer',
   /**
-   * @description The aria label for the drawer shown.
+   * @description Announcement text for screen readers when the drawer is shown.
    */
   drawerShown: 'Drawer shown',
   /**
-   * @description The aria label for the drawer hidden.
+   * @description Announcement text for screen readers when the drawer is hidden.
    */
   drawerHidden: 'Drawer hidden',
   /**
-   * @description Request for the user to select a local file system folder for DevTools
-   * to store local overrides in.
+   * @description Infobar message prompting the user to select a folder for local overrides.
    */
   selectOverrideFolder: 'Select a folder to store override files in',
   /**
-   * @description Label for a button which opens a file picker.
+   * @description Button text in an infobar to open a folder picker for local overrides.
    */
   selectFolder: 'Select folder',
 } as const;
@@ -172,6 +170,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
   #resizeObserver: ResizeObserver;
   #drawerShowModeBeforeDockSideChange: ShowMode|null = null;
   #drawerMinimizedBeforeDockSideChange: boolean|null = null;
+  #statusBarContainer?: HTMLDivElement;
 
   constructor() {
     super();
@@ -228,7 +227,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.tabbedLocation = ViewManager.instance().createTabbedLocation(
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.bringToFront.bind(
             Host.InspectorFrontendHost.InspectorFrontendHostInstance),
-        'panel', true, true, {defaultTab: Root.Runtime.Runtime.queryParam('panel')});
+        'panel', true, true, {
+          defaultTab: Root.Runtime.Runtime.queryParam('panel'),
+          plusButton: {jslogContext: 'plus-button-panel'},
+        });
 
     this.tabbedPane = this.tabbedLocation.tabbedPane();
     this.tabbedPane.setMinimumSize(MIN_MAIN_PANEL_WIDTH, 0);
@@ -313,10 +315,6 @@ export class InspectorView extends VBox implements ViewLocationResolver {
   }
 
   #applyDrawerOrientationForDockSide(): void {
-    if (!this.drawerVisible()) {
-      this.applyDrawerOrientationForDockSideForTest();
-      return;
-    }
     const newOrientation = this.#getOrientationForDockMode();
     this.#applyDrawerOrientation(newOrientation);
     this.applyDrawerOrientationForDockSideForTest();
@@ -362,12 +360,17 @@ export class InspectorView extends VBox implements ViewLocationResolver {
 
   #observedResize(): void {
     const rect = this.element.getBoundingClientRect();
-    this.element.style.setProperty('--devtools-window-left', `${rect.left}px`);
-    this.element.style.setProperty('--devtools-window-right', `${window.innerWidth - rect.right}px`);
-    this.element.style.setProperty('--devtools-window-width', `${rect.width}px`);
-    this.element.style.setProperty('--devtools-window-top', `${rect.top}px`);
-    this.element.style.setProperty('--devtools-window-bottom', `${window.innerHeight - rect.bottom}px`);
-    this.element.style.setProperty('--devtools-window-height', `${rect.height}px`);
+    // Set custom properties on the root element so top-layer elements
+    // (such as native popovers inside Shadow DOM) can inherit them.
+    // Top-layer popovers inside Shadow DOM roots inherit CSS custom properties
+    // from documentElement rather than local parent elements or shadow hosts.
+    const root = this.element.ownerDocument.documentElement;
+    root.style.setProperty('--devtools-window-left', `${rect.left}px`);
+    root.style.setProperty('--devtools-window-right', `${window.innerWidth - rect.right}px`);
+    root.style.setProperty('--devtools-window-width', `${rect.width}px`);
+    root.style.setProperty('--devtools-window-top', `${rect.top}px`);
+    root.style.setProperty('--devtools-window-bottom', `${window.innerHeight - rect.bottom}px`);
+    root.style.setProperty('--devtools-window-height', `${rect.height}px`);
   }
 
   override wasShown(): void {
@@ -496,6 +499,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       }
       return;
     }
+    this.#applyDrawerOrientationForDockSide();
     this.#drawerView.show(hasTargetDrawer);
     if (focus) {
       this.focusRestorer = new WidgetFocusRestorer(this.drawerTabbedPane);
@@ -504,7 +508,6 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       this.focusRestorer = null;
       this.#mainPanelAtDrawerFocus = null;
     }
-    this.#applyDrawerOrientationForDockSide();
     ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.drawerShown));
   }
 
@@ -676,7 +679,8 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     }
 
     // Ctrl/Cmd + 1-9 should show corresponding panel.
-    const panelShortcutEnabled = Common.Settings.moduleSetting('shortcut-panel-switch').get();
+    const panelShortcutEnabled =
+        Common.Settings.Settings.instance().resolve(SettingsUI.MainSettings.shortcutPanelSwitchSettingDescriptor).get();
     if (panelShortcutEnabled) {
       let panelIndex = -1;
       if (event.keyCode > 0x30 && event.keyCode < 0x3A) {
@@ -847,6 +851,18 @@ export class InspectorView extends VBox implements ViewLocationResolver {
         this.#selectOverrideFolderInfobar = undefined;
       });
     }
+  }
+
+  renderStatusBar(visible = true): void {
+    if (!this.#statusBarContainer) {
+      this.#statusBarContainer = document.createElement('div');
+      this.#statusBarContainer.style.display = 'contents';
+      this.element.appendChild(this.#statusBarContainer);
+    }
+    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+    Lit.render(
+        visible ? html`<devtools-widget class="flex-none" ${widget(StatusBarWidget)}></devtools-widget>` : Lit.nothing,
+        this.#statusBarContainer);
   }
 
   private createInfoBarDiv(): void {

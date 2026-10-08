@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as ComputedStyle from '../../models/computed_style/computed_style.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {stubNoopSettings} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {createStubbedDomNodeWithModels} from '../../testing/StyleHelpers.js';
+import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -32,8 +34,10 @@ async function waitForTraceElement(treeOutline: TreeOutline.TreeOutline.TreeOutl
 
 function createWidgetWithMultipleProperties(
     properties: Map<string, string>,
+    group = false,
+    view?: ViewFunctionStub<typeof Elements.ComputedStyleWidget.ComputedStyleWidget>,
     ): Elements.ComputedStyleWidget.ComputedStyleWidget {
-  Common.Settings.Settings.instance().createSetting('group-computed-styles', false).set(false);
+  Common.Settings.Settings.instance().createSetting('group-computed-styles', false).set(group);
 
   const {node} = createStubbedDomNodeWithModels({nodeId: 1});
 
@@ -51,17 +55,24 @@ function createWidgetWithMultipleProperties(
     return sinon.createStubInstance(
         SDK.CSSModel.CSSModel, {cachedMatchedCascadeForNode: Promise.resolve(cssMatchedStyles)});
   });
-  const widget = new Elements.ComputedStyleWidget.ComputedStyleWidget();
+  const widget = new Elements.ComputedStyleWidget.ComputedStyleWidget(undefined, view);
   widget.nodeStyle = {node, computedStyle: properties};
   widget.matchedStyles = cssMatchedStyles;
-  renderElementIntoDOM(widget);
+  if (!view) {
+    renderElementIntoDOM(widget);
+  }
   return widget;
 }
 
-async function getDisplayedProperties(computedStyleWidget: Elements.ComputedStyleWidget.ComputedStyleWidget):
-    Promise<string[]> {
-  const treeOutline = computedStyleWidget.contentElement.querySelector('devtools-tree-outline') as
-      TreeOutline.TreeOutline.TreeOutline<unknown>;
+type ComputedStylesTree =
+    ViewFunctionStub<typeof Elements.ComputedStyleWidget.ComputedStyleWidget>['input']['computedStylesTree'];
+
+async function getDisplayedProperties(widgetOrTree: Elements.ComputedStyleWidget.ComputedStyleWidget|
+                                      ComputedStylesTree): Promise<string[]> {
+  const treeOutline = widgetOrTree instanceof Elements.ComputedStyleWidget.ComputedStyleWidget ?
+      widgetOrTree.contentElement.querySelector('devtools-tree-outline') :
+      widgetOrTree;
+  assert.exists(treeOutline, 'Tree outline not found');
   type TreeNodeData = {tag: 'property', propertyName: string}|{tag: 'category'};
   const matchedPropertyNames: string[] = [];
   for (const node of treeOutline.data.tree) {
@@ -83,12 +94,8 @@ async function getDisplayedProperties(computedStyleWidget: Elements.ComputedStyl
   return matchedPropertyNames;
 }
 
-describeWithMockConnection('ComputedStyleWidget', () => {
+describeWithEnvironment('ComputedStyleWidget', () => {
   let computedStyleWidget: Elements.ComputedStyleWidget.ComputedStyleWidget;
-
-  beforeEach(() => {
-    stubNoopSettings();
-  });
 
   afterEach(() => {
     computedStyleWidget.detach();
@@ -118,10 +125,9 @@ describeWithMockConnection('ComputedStyleWidget', () => {
         node,
         propertyState: SDK.CSSMatchedStyles.PropertyState.ACTIVE,
         nodeStyles: [
-          new SDK.CSSStyleDeclaration.CSSStyleDeclaration(
-              {} as SDK.CSSModel.CSSModel, parentRule ?? null, stubCSSStyle, cssStyleDeclarationType,
-              cssStyleDeclarationName),
-        ]
+          new SDK.CSSStyleDeclaration.CSSStyleDeclaration({} as SDK.CSSModel.CSSModel, parentRule ?? null, stubCSSStyle,
+                                                          cssStyleDeclarationType, cssStyleDeclarationName),
+        ],
       });
 
       const computedStyleModel = new ComputedStyle.ComputedStyleModel.ComputedStyleModel(node);
@@ -270,6 +276,36 @@ describeWithMockConnection('ComputedStyleWidget', () => {
       assert.isTrue(computedStyleWidget.filterIsRegex);
     });
 
+    function regexButtonOf(widget: Elements.ComputedStyleWidget.ComputedStyleWidget): Buttons.Button.Button {
+      // The clear button is also a devtools-button, so match on the jslog context.
+      const buttons = [...widget.contentElement.querySelectorAll('devtools-button')];
+      const button = buttons.find(candidate => candidate.jslogContext === 'regular-expression');
+      assert.instanceOf(button, Buttons.Button.Button);
+      return button;
+    }
+
+    it('turns the regex toggle off when a plain-text filter is assigned', async () => {
+      // This is the path 'View computed value' takes: it applies a regex filter and then
+      // assigns a plain string to filterText, which switches filtering back to plain text.
+      const properties = new Map([
+        ['display', 'block'],
+        ['height', '100px'],
+      ]);
+      computedStyleWidget = createWidgetWithMultipleProperties(properties);
+      computedStyleWidget.filterText = new RegExp('display|height');
+      computedStyleWidget.requestUpdate();
+      await computedStyleWidget.updateComplete;
+      await UI.Widget.Widget.allUpdatesComplete;
+      assert.isTrue(regexButtonOf(computedStyleWidget).toggled);
+
+      computedStyleWidget.filterText = 'display';
+      await computedStyleWidget.updateComplete;
+      await UI.Widget.Widget.allUpdatesComplete;
+
+      assert.isFalse(computedStyleWidget.filterIsRegex);
+      assert.isFalse(regexButtonOf(computedStyleWidget).toggled);
+    });
+
     it('renders a regex toggle button that is off by default', async () => {
       const properties = new Map([
         ['display', 'block'],
@@ -316,6 +352,28 @@ describeWithMockConnection('ComputedStyleWidget', () => {
       await computedStyleWidget.filterComputedStyles(new RegExp('display|width', 'i'));
       const matchedPropertyNames = await getDisplayedProperties(computedStyleWidget);
       assert.sameMembers(matchedPropertyNames, ['display', 'width']);
+    });
+  });
+
+  describe('grouping', () => {
+    it('renders a property in every category it belongs to', async () => {
+      Common.Settings.Settings.instance().createSetting('show-inherited-computed-style-properties', false).set(true);
+      const view = createViewFunctionStub(Elements.ComputedStyleWidget.ComputedStyleWidget);
+      computedStyleWidget = createWidgetWithMultipleProperties(new Map([['order', '1']]), true, view);
+      computedStyleWidget.requestUpdate();
+      await computedStyleWidget.updateComplete;
+
+      const propertyNames = await getDisplayedProperties(view.input.computedStylesTree);
+      assert.deepEqual(propertyNames, ['order', 'order', 'order']);
+
+      const propertyNodeIds: string[] = [];
+      for (const category of view.input.computedStylesTree.data.tree) {
+        const children = await category.children?.() ?? [];
+        for (const child of children) {
+          propertyNodeIds.push(child.id);
+        }
+      }
+      assert.deepEqual(propertyNodeIds, ['Layout:order', 'Grid:order', 'Flex:order']);
     });
   });
 

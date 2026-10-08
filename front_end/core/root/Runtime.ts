@@ -173,19 +173,14 @@ export interface Option {
 }
 
 export class ExperimentsSupport {
-  #experiments: Experiment[] = [];
-  #hostExperiments = new Map<ExperimentName, HostExperiment>();
-  readonly #experimentNames = new Set<ExperimentName>();
+  #experiments = new Map<ExperimentName, Experiment>();
   readonly #enabledForTests = new Set<ExperimentName>();
-  readonly #enabledByDefault = new Set<ExperimentName>();
-  readonly #serverEnabled = new Set<ExperimentName>();
-  readonly #storage = new ExperimentStorage();
 
-  allConfigurableExperiments(): Array<Experiment|HostExperiment> {
-    return [...this.#experiments, ...this.#hostExperiments.values()];
+  allConfigurableExperiments(): Experiment[] {
+    return [...this.#experiments.values()];
   }
 
-  registerHostExperiment(params: {
+  register(params: {
     name: ExperimentName,
     title: string,
     aboutFlag: string,
@@ -193,94 +188,39 @@ export class ExperimentsSupport {
     requiresChromeRestart: boolean,
     docLink?: Platform.DevToolsPath.UrlString,
     readonly feedbackLink?: Platform.DevToolsPath.UrlString,
-  }): HostExperiment {
-    if (this.#isHostExperiment(params.name) || this.#isExperiment(params.name)) {
+  }): Experiment {
+    if (this.#isExperiment(params.name)) {
       throw new Error(`Duplicate registration of experiment '${params.name}'`);
     }
-    const hostExperiment = new HostExperiment({...params, experiments: this});
-    this.#hostExperiments.set(params.name, hostExperiment);
-    return hostExperiment;
-  }
-
-  register(experimentName: ExperimentName, experimentTitle: string, docLink?: string, feedbackLink?: string): void {
-    if (this.#isHostExperiment(experimentName) || this.#isExperiment(experimentName)) {
-      throw new Error(`Duplicate registration of experiment '${experimentName}'`);
-    }
-    this.#experimentNames.add(experimentName);
-    this.#experiments.push(new Experiment(
-        this, experimentName, experimentTitle,
-        docLink as Platform.DevToolsPath.UrlString ?? Platform.DevToolsPath.EmptyUrlString,
-        feedbackLink as Platform.DevToolsPath.UrlString ?? Platform.DevToolsPath.EmptyUrlString));
+    const experiment = new Experiment({...params, experiments: this});
+    this.#experiments.set(params.name, experiment);
+    return experiment;
   }
 
   isEnabled(experimentName: ExperimentName): boolean {
-    if (this.#isHostExperiment(experimentName)) {
-      return this.#enabledForTests.has(experimentName) ||
-          (this.#hostExperiments.get(experimentName)?.isEnabled() ?? false);
-    }
     if (this.#isExperiment(experimentName)) {
-      // Check for explicitly disabled #experiments first - the code could call setEnable(false)
-      // on the experiment enabled by default and we should respect that.
-      if (this.#storage.get(experimentName) === false) {
-        return false;
-      }
-      if (this.#enabledForTests.has(experimentName) || this.#enabledByDefault.has(experimentName)) {
-        return true;
-      }
-      if (this.#serverEnabled.has(experimentName)) {
-        return true;
-      }
-      return Boolean(this.#storage.get(experimentName));
+      return this.#enabledForTests.has(experimentName) || (this.#experiments.get(experimentName)?.isEnabled() ?? false);
     }
     throw new Error(`Unknown experiment '${experimentName}'`);
-  }
-
-  getValueFromStorage(experimentName: ExperimentName): boolean|undefined {
-    return this.#storage.get(experimentName);
   }
 
   setEnabled(experimentName: ExperimentName, enabled: boolean): void {
-    if (this.#isHostExperiment(experimentName)) {
-      this.#hostExperiments.get(experimentName)?.setEnabled(enabled);
-      return;
-    }
     if (this.#isExperiment(experimentName)) {
-      this.#storage.set(experimentName, enabled);
+      this.#experiments.get(experimentName)?.setEnabled(enabled);
       return;
     }
     throw new Error(`Unknown experiment '${experimentName}'`);
   }
 
-  // Only applicable to legacy experiments.
-  enableExperimentsByDefault(experimentNames: ExperimentName[]): void {
-    for (const experimentName of experimentNames) {
-      if (!this.#isExperiment(experimentName)) {
-        throw new Error(`Unknown (legacy) experiment '${experimentName}'`);
-      }
-      this.#enabledByDefault.add(experimentName);
-    }
-  }
-
-  // Only applicable to legacy experiments.
-  setServerEnabledExperiments(experiments: string[]): void {
-    for (const experiment of experiments) {
-      const experimentName = experiment as ExperimentName;
-      if (!this.#isExperiment(experimentName)) {
-        throw new Error(`Unknown (legacy) experiment '${experimentName}'`);
-      }
-      this.#serverEnabled.add(experimentName);
-    }
-  }
-
   enableForTest(experimentName: ExperimentName): void {
-    if (!this.#isHostExperiment(experimentName) && !this.#isExperiment(experimentName)) {
+    if (!this.#isExperiment(experimentName)) {
       throw new Error(`Unknown experiment '${experimentName}'`);
     }
     this.#enabledForTests.add(experimentName);
   }
 
   disableForTest(experimentName: ExperimentName): void {
-    if (!this.#isHostExperiment(experimentName) && !this.#isExperiment(experimentName)) {
+    if (!this.#isExperiment(experimentName)) {
       throw new Error(`Unknown experiment '${experimentName}'`);
     }
     this.#enabledForTests.delete(experimentName);
@@ -291,101 +231,16 @@ export class ExperimentsSupport {
   }
 
   clearForTest(): void {
-    this.#experiments = [];
-    this.#hostExperiments.clear();
-    this.#experimentNames.clear();
+    this.#experiments.clear();
     this.#enabledForTests.clear();
-    this.#enabledByDefault.clear();
-    this.#serverEnabled.clear();
-  }
-
-  cleanUpStaleExperiments(): void {
-    this.#storage.cleanUpStaleExperiments(this.#experimentNames);
-  }
-
-  #isHostExperiment(experimentName: ExperimentName): boolean {
-    return this.#hostExperiments.has(experimentName);
   }
 
   #isExperiment(experimentName: ExperimentName): boolean {
-    return this.#experimentNames.has(experimentName);
+    return this.#experiments.has(experimentName);
   }
 }
 
-/** Manages the 'experiments' dictionary in globalThis.localStorage */
-class ExperimentStorage {
-  readonly #experiments: Record<string, boolean|undefined> = {};
-
-  constructor() {
-    try {
-      const storedExperiments = Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.getItem('experiments');
-      if (storedExperiments) {
-        this.#experiments = JSON.parse(storedExperiments);
-      }
-    } catch (err) {
-      console.error('Failed to parse localStorage[\'experiments\']: ' + err.message);
-    }
-  }
-
-  /**
-   * Experiments are stored with a tri-state:
-   *   - true: Explicitly enabled.
-   *   - false: Explicitly disabled.
-   *   - undefined: Disabled.
-   */
-  get(experimentName: ExperimentName): boolean|undefined {
-    return this.#experiments[experimentName];
-  }
-
-  set(experimentName: ExperimentName, enabled: boolean): void {
-    this.#experiments[experimentName] = enabled;
-    this.#syncToLocalStorage();
-  }
-
-  cleanUpStaleExperiments(validExperiments: Set<string>): void {
-    for (const [key] of Object.entries(this.#experiments)) {
-      if (!validExperiments.has(key)) {
-        delete this.#experiments[key];
-      }
-    }
-    this.#syncToLocalStorage();
-  }
-
-  #syncToLocalStorage(): void {
-    Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.setItem('experiments', JSON.stringify(this.#experiments));
-  }
-}
-
-/**
- * @deprecated Experiments should not be used anymore, instead use base::Feature.
- * See docs/contributing/settings-experiments-features.md
- */
 export class Experiment {
-  name: ExperimentName;
-  title: string;
-  docLink?: Platform.DevToolsPath.UrlString;
-  readonly feedbackLink?: Platform.DevToolsPath.UrlString;
-  readonly #experiments: ExperimentsSupport;
-  constructor(
-      experiments: ExperimentsSupport, name: ExperimentName, title: string, docLink: Platform.DevToolsPath.UrlString,
-      feedbackLink: Platform.DevToolsPath.UrlString) {
-    this.name = name;
-    this.title = title;
-    this.docLink = docLink;
-    this.feedbackLink = feedbackLink;
-    this.#experiments = experiments;
-  }
-
-  isEnabled(): boolean {
-    return this.#experiments.isEnabled(this.name);
-  }
-
-  setEnabled(enabled: boolean): void {
-    this.#experiments.setEnabled(this.name, enabled);
-  }
-}
-
-export class HostExperiment {
   name: ExperimentName;
   title: string;
   readonly #experiments: ExperimentsSupport;
@@ -427,7 +282,7 @@ export class HostExperiment {
 }
 
 /** This must be constructed after the query parameters have been parsed. **/
-export const experiments = new ExperimentsSupport();
+export const experiments: ExperimentsSupport = new ExperimentsSupport();
 
 export enum GenAiEnterprisePolicyValue {
   ALLOW = 0,
@@ -464,7 +319,6 @@ export interface HostConfigFreestyler {
   enabled: boolean;
   userTier: string;
   executionMode?: HostConfigFreestylerExecutionMode;
-  patching?: boolean;
   multimodal?: boolean;
   multimodalUploadInput?: boolean;
   functionCalling?: boolean;
@@ -537,13 +391,6 @@ export interface HostConfigVeLogging {
   testing: boolean;
 }
 
-/**
- * @see https://goo.gle/devtools-json-design
- */
-export interface HostConfigWellKnown {
-  enabled: boolean;
-}
-
 export interface HostConfigPrivacyUI {
   enabled: boolean;
 }
@@ -561,7 +408,7 @@ export interface HostConfigJpegXlImageFormat {
   enabled: boolean;
 }
 
-export interface HostConfigAiAssistanceV2 {
+export interface HostConfigSourceMapScopesInSourcesPanel {
   enabled: boolean;
 }
 
@@ -569,7 +416,7 @@ interface AiGeneratedTimelineLabels {
   enabled: boolean;
 }
 
-interface AllowPopoverForcing {
+interface AllowInterestForcing {
   enabled: boolean;
 }
 
@@ -596,7 +443,7 @@ interface GdpProfilesAvailability {
   enterprisePolicyValue: GdpProfilesEnterprisePolicyValue;
 }
 
-interface LiveEdit {
+interface ExtensionsOnChromeUrls {
   enabled: boolean;
 }
 
@@ -627,17 +474,41 @@ interface UseGcaApi {
 
 interface DevToolsAiV2Architecture {
   enabled: boolean;
+  userTier?: string;
 }
 
 interface DevToolsProtocolMonitor {
   enabled: boolean;
 }
 
-interface DevToolsWebMCPSupport {
+interface DevToolsAdsPanel {
   enabled: boolean;
 }
 
 interface DevToolsPlusButton {
+  enabled: boolean;
+}
+
+interface DevToolsInstrumentationBreakpoints {
+  enabled: boolean;
+}
+interface HostConfigDevToolsComments {
+  enabled: boolean;
+}
+
+interface DevToolsAriaLiveRecording {
+  enabled: boolean;
+}
+
+interface DevToolsMobileSafeAreaEmulation {
+  enabled: boolean;
+}
+
+interface DevToolsNetworkBackendLinking {
+  enabled: boolean;
+}
+
+interface DevToolsAiNaturalLanguageInterface {
   enabled: boolean;
 }
 
@@ -666,13 +537,12 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsAiAssistancePerformanceAgent: HostConfigAiAssistancePerformanceAgent,
   devToolsAiAssistanceAccessibilityAgent: HostConfigAiAssistanceAccessibilityAgent,
   devToolsAiAssistanceStorageAgent: HostConfigAiAssistanceStorageAgent,
-  devToolsAiAssistanceV2: HostConfigAiAssistanceV2,
   devToolsAiV2Architecture: DevToolsAiV2Architecture,
   devToolsAiCodeCompletion: HostConfigAiCodeCompletion,
   devToolsAiCodeGeneration: HostConfigAiCodeGeneration,
   devToolsAiCodeCompletionStyles: HostConfigAiCodeCompletionStyles,
   devToolsVeLogging: HostConfigVeLogging,
-  devToolsWellKnown: HostConfigWellKnown,
+  devToolsAiNaturalLanguageInterface: DevToolsAiNaturalLanguageInterface,
   /**
    * OffTheRecord here indicates that the user's profile is either incognito,
    * or guest mode, rather than a "normal" profile.
@@ -681,12 +551,12 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsEnableOriginBoundCookies: HostConfigEnableOriginBoundCookies,
   devToolsAnimationStylesInStylesTab: HostConfigAnimationStylesInStylesTab,
   devToolsJpegXlImageFormat: HostConfigJpegXlImageFormat,
+  devToolsSourceMapScopesInSourcesPanel: HostConfigSourceMapScopesInSourcesPanel,
   devToolsAiGeneratedTimelineLabels: AiGeneratedTimelineLabels,
-  devToolsAllowPopoverForcing: AllowPopoverForcing,
+  devToolsAllowInterestForcing: AllowInterestForcing,
   devToolsGlobalAiButton: GlobalAiButton,
   devToolsGdpProfiles: GdpProfiles,
   devToolsGdpProfilesAvailability: GdpProfilesAvailability,
-  devToolsLiveEdit: LiveEdit,
   devToolsFlexibleLayout: DevToolsFlexibleLayout,
   deviceBoundSessionsDebugging: DeviceBoundSessionsDebugging,
   devToolsEnableDurableMessages: DevToolsEnableDurableMessages,
@@ -694,9 +564,15 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsConsoleInsightsTeasers: ConsoleInsightsTeasers,
   devToolsGeminiRebranding: HostConfigGeminiRebranding,
   devToolsProtocolMonitor: DevToolsProtocolMonitor,
-  devToolsWebMCPSupport: DevToolsWebMCPSupport,
+  devToolsAdsPanel: DevToolsAdsPanel,
   devToolsUseGcaApi: UseGcaApi,
   devToolsPlusButton: DevToolsPlusButton,
+  devToolsAriaLiveRecording: DevToolsAriaLiveRecording,
+  devToolsInstrumentationBreakpoints: DevToolsInstrumentationBreakpoints,
+  devToolsMobileSafeAreaEmulation: DevToolsMobileSafeAreaEmulation,
+  devToolsNetworkBackendLinking: DevToolsNetworkBackendLinking,
+  extensionsOnChromeUrls: ExtensionsOnChromeUrls,
+  devToolsComments: HostConfigDevToolsComments,
 }>;
 
 /**
@@ -721,6 +597,8 @@ export const hostConfig: Platform.TypeScriptUtilities.RecursiveReadonly<HostConf
  */
 export type Condition = (config?: HostConfig) => boolean;
 
-export const conditions = {
+export const conditions: {
+  canDock: Condition,
+} = {
   canDock: () => Boolean(Runtime.queryParam('can_dock')),
 };

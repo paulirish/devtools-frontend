@@ -12,6 +12,7 @@ import * as MobileThrottling from '../../panels/mobile_throttling/mobile_throttl
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import nodeIconStyles from './nodeIcon.css.js';
 
@@ -39,7 +40,7 @@ const UIStrings = {
    */
   javascriptIsDisabled: 'JavaScript is disabled',
   /**
-   * @description A message that prompts the user to open devtools for a specific environment (Node.js)
+   * @description Tooltip for the Node.js indicator prompting the user to open dedicated DevTools for Node.js.
    */
   openDedicatedTools: 'Open dedicated DevTools for `Node.js`',
 } as const;
@@ -107,7 +108,7 @@ export class InspectorMainImpl implements Common.Runnable.Runnable {
 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
         Host.InspectorFrontendHostAPI.Events.ReloadInspectedPage, ({data: hard}) => {
-          SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(hard);
+          SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(SDK.TargetManager.TargetManager.instance(), hard);
         });
   }
 }
@@ -118,10 +119,10 @@ export class ReloadActionDelegate implements UI.ActionRegistration.ActionDelegat
   handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'inspector-main.reload':
-        SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(false);
+        SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(SDK.TargetManager.TargetManager.instance(), false);
         return true;
       case 'inspector-main.hard-reload':
-        SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(true);
+        SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(SDK.TargetManager.TargetManager.instance(), true);
         return true;
     }
     return false;
@@ -172,7 +173,7 @@ export class NodeIndicator extends UI.Widget.Widget {
   #targetInfos: Protocol.Target.TargetInfo[] = [];
   #wasShown = false;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.#view = view;
 
@@ -207,12 +208,11 @@ export class NodeIndicator extends UI.Widget.Widget {
   }
 }
 
-let nodeIndicatorProviderInstance: NodeIndicatorProvider;
 export class NodeIndicatorProvider implements UI.Toolbar.Provider {
   #toolbarItem: UI.Toolbar.ToolbarItem;
   #widgetElement: UI.Widget.WidgetElement<NodeIndicator>;
 
-  private constructor() {
+  constructor() {
     this.#widgetElement = document.createElement('devtools-widget') as UI.Widget.WidgetElement<NodeIndicator>;
     new NodeIndicator(this.#widgetElement);
 
@@ -223,27 +223,18 @@ export class NodeIndicatorProvider implements UI.Toolbar.Provider {
   item(): UI.Toolbar.ToolbarItem|null {
     return this.#toolbarItem;
   }
-
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): NodeIndicatorProvider {
-    const {forceNew} = opts;
-    if (!nodeIndicatorProviderInstance || forceNew) {
-      nodeIndicatorProviderInstance = new NodeIndicatorProvider();
-    }
-
-    return nodeIndicatorProviderInstance;
-  }
 }
 
 export class SourcesPanelIndicator {
   constructor() {
-    Common.Settings.Settings.instance()
-        .moduleSetting('java-script-disabled')
-        .addChangeListener(javaScriptDisabledChanged);
+    const disableJavascriptSetting =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.javaScriptDisabledSettingDescriptor);
+    disableJavascriptSetting.addChangeListener(javaScriptDisabledChanged);
     javaScriptDisabledChanged();
 
     function javaScriptDisabledChanged(): void {
       const warnings = [];
-      if (Common.Settings.Settings.instance().moduleSetting('java-script-disabled').get()) {
+      if (disableJavascriptSetting.get()) {
         warnings.push(i18nString(UIStrings.javascriptIsDisabled));
       }
       UI.InspectorView.InspectorView.instance().setPanelWarnings('sources', warnings);
@@ -257,14 +248,17 @@ export class BackendSettingsSync implements SDK.TargetManager.Observer {
   readonly #emulatePageFocusSetting: Common.Settings.Setting<boolean>;
 
   constructor() {
-    this.#autoAttachSetting = Common.Settings.Settings.instance().moduleSetting('auto-attach-to-created-pages');
+    this.#autoAttachSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.InspectorMainSettings.autoAttachToCreatedPagesSettingDescriptor);
     this.#autoAttachSetting.addChangeListener(this.#updateAutoAttach, this);
     this.#updateAutoAttach();
 
-    this.#adBlockEnabledSetting = Common.Settings.Settings.instance().moduleSetting('network.ad-blocking-enabled');
+    this.#adBlockEnabledSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.InspectorMainSettings.adBlockingEnabledSettingDescriptor);
     this.#adBlockEnabledSetting.addChangeListener(this.#update, this);
 
-    this.#emulatePageFocusSetting = Common.Settings.Settings.instance().moduleSetting('emulate-page-focus');
+    this.#emulatePageFocusSetting =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.emulatePageFocusSettingDescriptor);
     this.#emulatePageFocusSetting.addChangeListener(this.#update, this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.ChildTargetManager.ChildTargetManager, SDK.ChildTargetManager.Events.TARGET_INFO_CHANGED,

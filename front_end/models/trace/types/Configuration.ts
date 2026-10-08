@@ -42,6 +42,10 @@ export interface Configuration {
    * from the model, but the contents will be empty.
    */
   enableAnimationsFrameHandler: boolean;
+  /**
+   * Whether soft-navs are used in the model/insights.
+   */
+  enableSoftNavigation: boolean;
 }
 
 export const defaults = (): Configuration => ({
@@ -49,6 +53,7 @@ export const defaults = (): Configuration => ({
   debugMode: false,
   maxInvalidationEventsPerEvent: 20,
   enableAnimationsFrameHandler: false,
+  enableSoftNavigation: true,
 });
 
 /**
@@ -68,6 +73,13 @@ export interface ParseOptions {
    * @default false
    */
   isFreshRecording?: boolean;
+  /**
+   * Whether the processor should yield to the main thread during parsing to keep the UI responsive.
+   * This should always remain enabled in production to prevent blocking the UI, but can be disabled
+   * in unit tests to speed up test execution.
+   * @default true
+   */
+  yieldToMain?: boolean;
   /**
    * If the trace is a CPU Profile rather than a Chrome tracing trace.
    * @default false

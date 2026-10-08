@@ -127,8 +127,8 @@ export function getFormat(formatText: string): Format|null {
 }
 
 // Returns the `ColorSpace` equivalent from the color space text
-type ColorSpace = Format.SRGB|Format.SRGB_LINEAR|Format.DISPLAY_P3|Format.A98_RGB|Format.PROPHOTO_RGB|
-                  Format.REC_2020|Format.XYZ|Format.XYZ_D50|Format.XYZ_D65;
+type ColorSpace = Format.SRGB|Format.SRGB_LINEAR|Format.DISPLAY_P3|Format.DISPLAY_P3_LINEAR|Format.A98_RGB|
+                  Format.PROPHOTO_RGB|Format.REC_2020|Format.XYZ|Format.XYZ_D50|Format.XYZ_D65;
 function getColorSpace(colorSpaceText: string): ColorSpace|null {
   switch (colorSpaceText) {
     case Format.SRGB:
@@ -137,6 +137,8 @@ function getColorSpace(colorSpaceText: string): ColorSpace|null {
       return Format.SRGB_LINEAR;
     case Format.DISPLAY_P3:
       return Format.DISPLAY_P3;
+    case Format.DISPLAY_P3_LINEAR:
+      return Format.DISPLAY_P3_LINEAR;
     case Format.A98_RGB:
       return Format.A98_RGB;
     case Format.PROPHOTO_RGB:
@@ -611,12 +613,15 @@ export function findFgColorForContrastAPCA(fgColor: Legacy, bgColor: Legacy, req
   const fgIsLighter = fgLuminance >= bgLuminance;
   const desiredLuminance = desiredLuminanceAPCA(bgLuminance, requiredContrast, fgIsLighter);
 
+  const meetsRequiredContrast = (candidate: Legacy): boolean =>
+      Math.round(Math.abs(contrastRatioAPCA(candidate.rgba(), bgColor.rgba()))) >= requiredContrast;
+
   const saturationComponentIndex = 1;
   const valueComponentIndex = 2;
 
   if (approachColorValue(candidateHSVA, valueComponentIndex, desiredLuminance, candidateLuminance)) {
     const candidate = Legacy.fromHSVA(candidateHSVA);
-    if (Math.abs(contrastRatioAPCA(bgColor.rgba(), candidate.rgba())) >= requiredContrast) {
+    if (meetsRequiredContrast(candidate)) {
       return candidate;
     }
   }
@@ -624,7 +629,7 @@ export function findFgColorForContrastAPCA(fgColor: Legacy, bgColor: Legacy, req
   candidateHSVA[valueComponentIndex] = 1;
   if (approachColorValue(candidateHSVA, saturationComponentIndex, desiredLuminance, candidateLuminance)) {
     const candidate = Legacy.fromHSVA(candidateHSVA);
-    if (Math.abs(contrastRatioAPCA(bgColor.rgba(), candidate.rgba())) >= requiredContrast) {
+    if (meetsRequiredContrast(candidate)) {
       return candidate;
     }
   }
@@ -651,6 +656,7 @@ interface ColorConversions<T = void> {
   [Format.SRGB](self: T): ColorFunction;
   [Format.SRGB_LINEAR](self: T): ColorFunction;
   [Format.DISPLAY_P3](self: T): ColorFunction;
+  [Format.DISPLAY_P3_LINEAR](self: T): ColorFunction;
   [Format.A98_RGB](self: T): ColorFunction;
   [Format.PROPHOTO_RGB](self: T): ColorFunction;
   [Format.REC_2020](self: T): ColorFunction;
@@ -727,6 +733,7 @@ export const enum Format {
   SRGB = 'srgb',
   SRGB_LINEAR = 'srgb-linear',
   DISPLAY_P3 = 'display-p3',
+  DISPLAY_P3_LINEAR = 'display-p3-linear',
   A98_RGB = 'a98-rgb',
   PROPHOTO_RGB = 'prophoto-rgb',
   REC_2020 = 'rec2020',
@@ -766,6 +773,8 @@ export class Lab implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: Lab) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: Lab) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: Lab) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: Lab) =>
@@ -905,6 +914,8 @@ export class LCH implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: LCH) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: LCH) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: LCH) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: LCH) =>
@@ -1047,6 +1058,8 @@ export class Oklab implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: Oklab) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: Oklab) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: Oklab) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: Oklab) =>
@@ -1186,6 +1199,8 @@ export class Oklch implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: Oklch) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: Oklch) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: Oklch) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: Oklch) =>
@@ -1329,6 +1344,8 @@ export class ColorFunction implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: ColorFunction) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: ColorFunction) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: ColorFunction) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: ColorFunction) =>
@@ -1352,6 +1369,8 @@ export class ColorFunction implements Color {
         return ColorConverter.srgbLinearToXyzd50(p0, p1, p2);
       case Format.DISPLAY_P3:
         return ColorConverter.displayP3ToXyzd50(p0, p1, p2);
+      case Format.DISPLAY_P3_LINEAR:
+        return ColorConverter.displayP3LinearToXyzd50(p0, p1, p2);
       case Format.A98_RGB:
         return ColorConverter.adobeRGBToXyzd50(p0, p1, p2);
       case Format.PROPHOTO_RGB:
@@ -1560,6 +1579,8 @@ export class HSL implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: HSL) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: HSL) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: HSL) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: HSL) =>
@@ -1714,6 +1735,8 @@ export class HWB implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: HWB) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: HWB) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: HWB) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: HWB) =>
@@ -1983,6 +2006,8 @@ export class Legacy implements Color {
         new ColorFunction(Format.SRGB_LINEAR, ...ColorConverter.xyzd50TosRGBLinear(...self.#toXyzd50()), self.alpha),
     [Format.DISPLAY_P3]: (self: Legacy) =>
         new ColorFunction(Format.DISPLAY_P3, ...ColorConverter.xyzd50ToDisplayP3(...self.#toXyzd50()), self.alpha),
+    [Format.DISPLAY_P3_LINEAR]: (self: Legacy) => new ColorFunction(
+        Format.DISPLAY_P3_LINEAR, ...ColorConverter.xyzd50ToDisplayP3Linear(...self.#toXyzd50()), self.alpha),
     [Format.A98_RGB]: (self: Legacy) =>
         new ColorFunction(Format.A98_RGB, ...ColorConverter.xyzd50ToAdobeRGB(...self.#toXyzd50()), self.alpha),
     [Format.PROPHOTO_RGB]: (self: Legacy) =>
@@ -2403,7 +2428,7 @@ console.assert(
     COLOR_TO_RGBA_ENTRIES.every(([nickname]) => nickname.toLowerCase() === nickname),
     'All color nicknames must be lowercase.');
 
-export const Nicknames = new Map(COLOR_TO_RGBA_ENTRIES);
+export const Nicknames: Map<string, number[]> = new Map(COLOR_TO_RGBA_ENTRIES);
 
 const RGBAToNickname = new Map(
     // Default opacity to 1 if the color only specified 3 channels
@@ -2414,7 +2439,7 @@ const RGBAToNickname = new Map(
 
 const LAYOUT_LINES_HIGHLIGHT_COLOR = [127, 32, 210];
 
-export const PageHighlight = {
+export const PageHighlight: Record<string, Legacy> = {
   Content: Legacy.fromRGBA([111, 168, 220, .66]),
   ContentLight: Legacy.fromRGBA([111, 168, 220, .5]),
   ContentOutline: Legacy.fromRGBA([9, 83, 148]),
@@ -2433,14 +2458,20 @@ export const PageHighlight = {
   GapBackground: Legacy.fromRGBA([...LAYOUT_LINES_HIGHLIGHT_COLOR, .3]),
   GapHatch: Legacy.fromRGBA([...LAYOUT_LINES_HIGHLIGHT_COLOR, .8]),
   GridAreaBorder: Legacy.fromRGBA([26, 115, 232, 1]),
+  AnchorIMCB: Legacy.fromRGBA([127, 32, 210, 1]),
+  AnchorIMCBBackground: Legacy.fromRGBA([127, 32, 210, 0.15]),
+  AnchorInsetsBackground: Legacy.fromRGBA([246, 178, 107, 0.25]),
+  AnchorInsetsHatch: Legacy.fromRGBA([246, 178, 107, 0.8]),
+  AnchorTarget: Legacy.fromRGBA([26, 115, 232, 1]),
+  AnchorTargetBackground: Legacy.fromRGBA([26, 115, 232, 0.15]),
 };
 
-export const SourceOrderHighlight = {
+export const SourceOrderHighlight: Record<string, Legacy> = {
   ParentOutline: Legacy.fromRGBA([224, 90, 183, 1]),
   ChildOutline: Legacy.fromRGBA([0, 120, 212, 1]),
 };
 
-export const IsolationModeHighlight = {
+export const IsolationModeHighlight: Record<string, Legacy> = {
   Resizer: Legacy.fromRGBA([222, 225, 230, 1]),  // --color-background-elevation-2
   ResizerHandle: Legacy.fromRGBA([166, 166, 166, 1]),
   Mask: Legacy.fromRGBA([248, 249, 249, 1]),

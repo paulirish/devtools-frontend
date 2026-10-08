@@ -26,20 +26,20 @@ export const UIStrings = {
    * @description Description of an insight that recommends ways to reduce the size of images downloaded and used on the page.
    */
   description:
-      'Reducing the download time of images can improve the perceived load time of the page and LCP. [Learn more about optimizing image size](https://developer.chrome.com/docs/performance/insights/image-delivery)',
+      'Reducing the download time of images can improve the perceived load time of the page and LCP. [Learn more about optimizing image size](https://developer.chrome.com/docs/performance/insights/image-delivery).',
   /**
    * @description Message displayed in a chip explaining that an image file size is large for the # of pixels it has and recommends possible adjustments to improve the image size.
    */
-  useCompression: 'Increasing the image compression factor could improve this image\'s download size.',
+  useCompression: 'Increasing the image compression factor could improve this image’s download size',
   /**
    * @description Message displayed in a chip explaining that an image file size is large for the # of pixels it has and recommends possible adjustments to improve the image size.
    */
   useModernFormat:
-      'Using a modern image format (WebP, AVIF) or increasing the image compression could improve this image\'s download size.',
+      'Using a modern image format (WebP, AVIF) or increasing the image compression could improve this image’s download size',
   /**
    * @description Message displayed in a chip advising the user to use video formats instead of GIFs because videos generally have smaller file sizes.
    */
-  useVideoFormat: 'Using video formats instead of GIFs can improve the download size of animated content.',
+  useVideoFormat: 'Using video formats instead of GIFs can improve the download size of animated content',
   /**
    * @description Message displayed in a chip explaining that an image was displayed on the page with dimensions much smaller than the image file dimensions.
    * @example {1000x500} PH1
@@ -57,7 +57,7 @@ export const UIStrings = {
    */
   others: '{PH1} others',
   /**
-   * @description Text status indicating that no potential optimizations were found for any image file
+   * @description Text status indicating that no potential optimizations were found for any image file.
    */
   noOptimizableImages: 'No optimizable images',
   /**
@@ -69,7 +69,7 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/ImageDelivery.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 /**
  * Even JPEGs with lots of detail can usually be compressed down to <1 byte per pixel

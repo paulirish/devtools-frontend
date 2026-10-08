@@ -38,13 +38,11 @@ DEFAULT_FEATURE_SET.enable('DevToolsFreestyler', {
   user_tier: 'TESTERS',
   function_calling: true,
 });
-DEFAULT_FEATURE_SET.enable('DevToolsWellKnown');
 DEFAULT_FEATURE_SET.enable('DevToolsVerticalDrawer');
 DEFAULT_FEATURE_SET.enable('DevToolsAiPromptApi');
 DEFAULT_FEATURE_SET.enable('DevToolsAiAssistanceContextSelectionAgent');
 DEFAULT_FEATURE_SET.enable('DevToolsAiAssistanceAccessibilityAgent');
 DEFAULT_FEATURE_SET.enable('DevToolsAiAssistanceStorageAgent');
-DEFAULT_FEATURE_SET.enable('DevToolsAiAssistanceV2');
 DEFAULT_FEATURE_SET.enable('DevToolsUseGcaApi');
 
 // The unstable feature set (can be enabled via `--enable-unstable-features`).
@@ -76,7 +74,7 @@ const argv = yargs(hideBin(process.argv))
     alias: 'w',
     type: 'boolean',
     default: true,
-    description: 'Enable watch mode to auto rebuild'
+    description: 'Enable watch mode to auto rebuild',
   })
   .option('unstable-features', {
     alias: 'u',

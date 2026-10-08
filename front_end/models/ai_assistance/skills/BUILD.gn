@@ -10,17 +10,30 @@ import("../../../../scripts/build/ninja/vars.gni")
 # gen/front_end/models/ai_assistance/skills/
 # so they can be imported relatively by files in this directory.
 
-action_foreach("generate_skills") {
+_skill_sources = [
+  "accessibility.md",
+  "lighthouse.md",
+  "network.md",
+  "performance.md",
+  "sources.md",
+  "storage.md",
+  "styling.md",
+]
+
+action_foreach("_generate_skills") {
   script = "//third_party/node/node.py"
 
-  sources = [ "styling.md" ]
+  sources = _skill_sources
 
   inputs = [
     "../../../../scripts/build/build_ai_skills.mjs",
     "../../../../scripts/build/ninja/write-if-changed.js",
   ]
 
-  outputs = [ "$target_gen_dir/{{source_name_part}}.skill.js" ]
+  outputs = [
+    "$target_gen_dir/{{source_name_part}}.skill.js",
+    "$target_gen_dir/{{source_name_part}}.skill.d.ts",
+  ]
 
   args = [
     rebase_path("../../../../scripts/build/build_ai_skills.mjs",
@@ -31,13 +44,23 @@ action_foreach("generate_skills") {
                 root_build_dir),
   ]
 
-  # if (!devtools_bundle) {
-  #   metadata = {
-  #     grd_files = []
-  #     foreach(src, sources) {
-  #       grd_files +=
-  #           [ "$target_gen_dir/" + get_path_info(src, "name") + ".skill.js" ]
-  #     }
-  #   }
-  # }
+  if (!devtools_bundle) {
+    metadata = {
+      grd_files = []
+      foreach(src, sources) {
+        grd_files +=
+            [ "$target_gen_dir/" + get_path_info(src, "name") + ".skill.js" ]
+      }
+    }
+  }
+}
+
+group("generate_skills") {
+  public_deps = [ ":_generate_skills" ]
+  public_inputs =
+      process_file_template(_skill_sources,
+                            [
+                              "$target_gen_dir/{{source_name_part}}.skill.js",
+                              "$target_gen_dir/{{source_name_part}}.skill.d.ts",
+                            ])
 }

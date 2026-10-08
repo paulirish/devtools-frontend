@@ -1,6 +1,8 @@
-import { launch } from '@puppeteer/browsers';
+import { Browser as InstalledBrowser, launch } from '@puppeteer/browsers';
 import type { Browser, BrowserCloseCallback } from '../api/Browser.js';
 import { Connection } from '../cdp/Connection.js';
+import type { WsOptions } from '../common/ConnectOptions.js';
+import { type Logger } from '../common/Debug.js';
 import type { SupportedBrowser } from '../common/SupportedBrowser.js';
 import type { Viewport } from '../common/Viewport.js';
 import { type GetIdFn } from '../util/incremental-id-generator.js';
@@ -16,6 +18,10 @@ export interface ResolvedLaunchArgs {
     args: string[];
 }
 /**
+ * @internal
+ */
+export declare function getBrowserTypeDisplayName(browserType: InstalledBrowser): string;
+/**
  * Describes a launcher - a class that is able to create and launch a browser instance.
  *
  * @public
@@ -25,11 +31,18 @@ export declare abstract class BrowserLauncher {
     /**
      * @internal
      */
+    /**
+     * @internal
+     */
     puppeteer: PuppeteerNode;
     /**
      * @internal
      */
-    constructor(puppeteer: PuppeteerNode, browser: SupportedBrowser);
+    constructor(puppeteer: PuppeteerNode, browser: SupportedBrowser, logger: Logger);
+    /**
+     * @internal
+     */
+    protected get logger(): Logger;
     get browser(): SupportedBrowser;
     launch(options?: LaunchOptions): Promise<Browser>;
     abstract executablePath(channel?: ChromeReleaseChannel, validatePath?: boolean): Promise<string>;
@@ -60,6 +73,8 @@ export declare abstract class BrowserLauncher {
         protocolTimeout: number | undefined;
         slowMo: number;
         idGenerator: GetIdFn;
+        logger: Logger;
+        wsOptions?: WsOptions;
     }): Promise<Connection>;
     /**
      * @internal
@@ -69,6 +84,8 @@ export declare abstract class BrowserLauncher {
         protocolTimeout: number | undefined;
         slowMo: number;
         idGenerator: GetIdFn;
+        logger: Logger;
+        wsOptions?: WsOptions;
     }): Promise<Connection>;
     /**
      * @internal
@@ -78,6 +95,7 @@ export declare abstract class BrowserLauncher {
         acceptInsecureCerts?: boolean;
         networkEnabled: boolean;
         issuesEnabled: boolean;
+        logger: Logger;
     }): Promise<Browser>;
     /**
      * @internal
@@ -91,6 +109,8 @@ export declare abstract class BrowserLauncher {
         acceptInsecureCerts?: boolean;
         networkEnabled?: boolean;
         issuesEnabled?: boolean;
+        logger: Logger;
+        wsOptions?: WsOptions;
     }): Promise<Browser>;
     /**
      * @internal
@@ -101,4 +121,16 @@ export declare abstract class BrowserLauncher {
      */
     resolveExecutablePath(headless?: boolean | 'shell', validatePath?: boolean): Promise<string>;
 }
+interface ProcessExitEmitter {
+    once(event: 'exit', listener: () => void): void;
+    off(event: 'exit', listener: () => void): void;
+}
+/**
+ * Registers a synchronous fallback for removing a temporary profile when the
+ * host process exits before the browser process can run its async cleanup.
+ *
+ * @internal
+ */
+export declare function registerProcessExitCleanup(userDataDir: string, logger: Logger, processEmitter?: ProcessExitEmitter): () => void;
+export {};
 //# sourceMappingURL=BrowserLauncher.d.ts.map

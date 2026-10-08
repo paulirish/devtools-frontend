@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../core/sdk/sdk.js';
 import * as Protocol from '../generated/protocol.js';
 
 import type {MockCDPConnection} from './MockCDPConnection.js';
-import {
-  clearMockConnectionResponseHandler,
-  setMockConnectionResponseHandler,
-} from './MockConnection.js';
 import {
   FRAME,
   getEffectivePayload,
@@ -38,25 +35,12 @@ const MAIN_FRAME = {
   id: MAIN_FRAME_ID,
 };
 
-export function setMockResourceTree(shouldMock: boolean) {
-  if (shouldMock) {
-    setMockConnectionResponseHandler('Page.getResourceTree', () => ({
-                                                               frameTree: {
-                                                                 frame: MAIN_FRAME,
-                                                                 resources: [],
-                                                               },
-                                                             }));
-  } else {
-    clearMockConnectionResponseHandler('Page.getResourceTree');
-  }
-}
-
-export function mockResourceTree(connection: MockCDPConnection) {
+export function mockResourceTree(connection: MockCDPConnection): void {
   connection.setSuccessHandler('Page.getResourceTree', () => ({
                                                          frameTree: {
                                                            frame: MAIN_FRAME,
                                                            resources: [],
-                                                         }
+                                                         },
                                                        }));
 }
 
@@ -83,7 +67,7 @@ export async function addChildFrame(target: SDK.Target.Target, framePayload?: Pa
 
 export function navigate(
     frame: SDK.ResourceTreeModel.ResourceTreeFrame, framePayload?: Partial<Protocol.Page.Frame>,
-    type: Protocol.Page.NavigationType = Protocol.Page.NavigationType.Navigation) {
+    type: Protocol.Page.NavigationType = Protocol.Page.NavigationType.Navigation): void {
   const effectivePayload = getEffectivePayload(frame.id, FRAME, framePayload);
   frame.resourceTreeModel().frameNavigated(effectivePayload, type);
 }

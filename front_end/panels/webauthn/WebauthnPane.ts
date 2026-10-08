@@ -28,7 +28,7 @@ const UIStrings = {
    */
   export: 'Export',
   /**
-   * @description Label for an item to remove something
+   * @description Label for a button that removes a virtual authenticator or a registered credential from the WebAuthn panel.
    */
   remove: 'Remove',
   /**
@@ -47,7 +47,7 @@ const UIStrings = {
   /**
    * @description Label for field that describes whether a credential is a resident credential.
    */
-  isResident: 'Is Resident',
+  isResident: 'Is resident',
   /**
    * @description Label for credential field that represents the Relying Party ID that the credential is scoped to.
    */
@@ -55,18 +55,18 @@ const UIStrings = {
   /**
    * @description Label for a column in a table. A field/unique ID that represents the user a credential is mapped to.
    */
-  userHandle: 'User Handle',
+  userHandle: 'User handle',
   /**
    * @description Label for signature counter field for credentials which represents the number of successful assertions.
    * See https://w3c.github.io/webauthn/#signature-counter.
    */
-  signCount: 'Signature Count',
+  signCount: 'Signature count',
   /**
    * @description Label for column with actions for credentials.
    */
   actions: 'Actions',
   /**
-   * @description Title for the table that holds the credentials that a authenticator has registered.
+   * @description Title for the table that holds the credentials that an authenticator has registered.
    */
   credentials: 'Credentials',
   /**
@@ -74,15 +74,15 @@ const UIStrings = {
    */
   noAuthenticator: 'No authenticator set up',
   /**
-   * @description That that shows before virtual environment is enabled explaining the panel.
+   * @description Text that shows before the virtual environment is enabled explaining the panel.
    */
-  useWebauthnForPhishingresistant: 'Use WebAuthn for phishing-resistant authentication.',
+  useWebauthnForPhishingresistant: 'Use WebAuthn for phishing-resistant authentication',
   /**
    * @description Title for section of interface that allows user to add a new virtual authenticator.
    */
   newAuthenticator: 'New authenticator',
   /**
-   * @description Text for security or network protocol
+   * @description Text for security or network protocol.
    */
   protocol: 'Protocol',
   /**
@@ -112,7 +112,7 @@ const UIStrings = {
    */
   supportsHmacSecretMc: 'Supports hmac-secret-mc',
   /**
-   * @description Text to add something
+   * @description Label for a button that creates and adds a new virtual authenticator with the selected options in the WebAuthn panel.
    */
   add: 'Add',
   /**
@@ -149,11 +149,11 @@ const UIStrings = {
    */
   supportsUserVerification: 'Supports user verification',
   /**
-   * @description Text in Timeline indicating that input has happened recently
+   * @description Text indicating that a virtual authenticator supports a specific feature.
    */
   yes: 'Yes',
   /**
-   * @description Text in Timeline indicating that input has not happened recently
+   * @description Text indicating that a virtual authenticator does not support a specific feature.
    */
   no: 'No',
   /**
@@ -189,7 +189,7 @@ function renderCredentialsDataGrid(
         </thead>
         <tbody>
         ${credentials.length ? repeat(credentials, c => c.credentialId, credential => html`
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('credential')}>
             <td>${credential.credentialId}</td>
             <td>${credential.isResidentCredential}</td>
             <td>${credential.rpId}</td>
@@ -240,19 +240,13 @@ const PROTOCOL_AUTHENTICATOR_VALUES: Protocol.EnumerableEnum<typeof Protocol.Web
   U2f: Protocol.WebAuthn.AuthenticatorProtocol.U2f,
 };
 
-interface Authenticator {
+export interface Authenticator {
   name: string;
   options: Protocol.WebAuthn.VirtualAuthenticatorOptions;
   credentials: Protocol.WebAuthn.Credential[];
 }
 
-interface Authenticator {
-  name: string;
-  options: Protocol.WebAuthn.VirtualAuthenticatorOptions;
-  credentials: Protocol.WebAuthn.Credential[];
-}
-
-interface ViewInput {
+export interface ViewInput {
   enabled: boolean;
   onToggleEnabled: () => void;
   authenticators: Map<Protocol.WebAuthn.AuthenticatorId, Authenticator>;
@@ -270,11 +264,11 @@ interface ViewInput {
   onRemoveCredential: (id: Protocol.WebAuthn.AuthenticatorId, credentialId: string) => void;
 }
 
-interface ViewOutput {
+export interface ViewOutput {
   revealSection: Map<string, () => void>;
 }
 
-type ViewFunction = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+export type ViewFunction = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
 
 function renderToolbar(enabled: boolean, onToggle: () => void): Lit.TemplateResult {
   const enableCheckboxTitle = i18nString(UIStrings.enableVirtualAuthenticator);
@@ -341,7 +335,7 @@ function renderNewAuthenticatorSection(
               Protocol.WebAuthn.AuthenticatorTransport.Usb,
               Protocol.WebAuthn.AuthenticatorTransport.Ble,
               Protocol.WebAuthn.AuthenticatorTransport.Nfc,
-                ...(isCtap2 ? [Protocol.WebAuthn.AuthenticatorTransport.Internal] : [])
+                ...(isCtap2 ? [Protocol.WebAuthn.AuthenticatorTransport.Internal] : []),
             ].map(option => html`
                 <option value=${option} jslog=${VisualLogging.item(option).track({click: true})}
                         .selected=${options.transport === option}
@@ -492,19 +486,19 @@ function renderAuthenticatorFields(
   // clang-format off
   return html`
     <div class="authenticator-fields">
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">${i18nString(UIStrings.uuid)}</label>
         <div class="authenticator-field-value">${authenticatorId}</div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">${i18nString(UIStrings.protocol)}</label>
         <div class="authenticator-field-value">${options.protocol}</div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">${i18nString(UIStrings.transport)}</label>
         <div class="authenticator-field-value">${options.transport}</div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">
           ${i18nString(UIStrings.supportsResidentKeys)}
         </label>
@@ -512,7 +506,7 @@ function renderAuthenticatorFields(
           ${options.hasResidentKey ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
         </div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">
           ${i18nString(UIStrings.supportsLargeBlob)}
         </label>
@@ -520,7 +514,7 @@ function renderAuthenticatorFields(
           ${options.hasLargeBlob ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
         </div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">
           ${i18nString(UIStrings.supportsUserVerification)}
         </label>
@@ -528,7 +522,7 @@ function renderAuthenticatorFields(
           ${options.hasUserVerification ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
         </div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">
           ${i18nString(UIStrings.supportsHmacSecret)}
         </label>
@@ -536,7 +530,7 @@ function renderAuthenticatorFields(
           ${options.hasHmacSecret ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
         </div>
       </div>
-      <div class="authenticator-field">
+      <div class="authenticator-field" jslog=${VisualLogging.item('authenticator-field')}>
         <label class="authenticator-option-label">
           ${i18nString(UIStrings.supportsHmacSecretMc)}
         </label>
@@ -629,7 +623,7 @@ export class WebauthnPaneImpl extends UI.Panel.Panel implements
     revealSection: new Map(),
   };
 
-  constructor(view = DEFAULT_VIEW) {
+  constructor(view: ViewFunction = DEFAULT_VIEW) {
     super('webauthn');
 
     this.#view = view;

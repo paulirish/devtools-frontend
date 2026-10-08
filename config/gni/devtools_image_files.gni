@@ -11,11 +11,6 @@ devtools_image_files = [
   "chromeMiddle.avif",
   "chromeRight.avif",
   "cssoverview_icons_2x.avif",
-  "navigationControls_2x.png",
-  "navigationControls.png",
-  "nodeIcon.avif",
-  "popoverArrows.png",
-  "toolbarResizerVertical.png",
   "touchCursor_2x.png",
   "geminiInDevTools.png",
   "geminiInDevTools_2x.png",
@@ -32,6 +27,7 @@ devtools_svg_sources = [
   "accelerometer-front.svg",
   "account-tree.svg",
   "add-photo.svg",
+  "ads.svg",
   "ai-explorer-badge.svg",
   "align-content-center.svg",
   "align-content-end.svg",
@@ -102,6 +98,8 @@ devtools_svg_sources = [
   "colon.svg",
   "color-picker-filled.svg",
   "color-picker.svg",
+  "comment-mode-cursor.svg",
+  "comment-mode.svg",
   "compress.svg",
   "console-conditional-breakpoint.svg",
   "console-logpoint.svg",
@@ -235,6 +233,7 @@ devtools_svg_sources = [
   "mouse.svg",
   "network-settings.svg",
   "node-stack-icon.svg",
+  "nodejsHex.svg",
   "open-externally.svg",
   "override.svg",
   "palette.svg",
@@ -319,9 +318,3 @@ devtools_svg_sources = [
   "width.svg",
   "zoom-in.svg",
 ]
-
-devtools_src_svg_files = []
-
-foreach(svg_image, devtools_svg_sources) {
-  devtools_src_svg_files += [ "src/$svg_image" ]
-}

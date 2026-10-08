@@ -13,8 +13,8 @@ import type {SetContentWaitForOptions, WaitForOptions} from '../api/Frame.js';
 import {Frame, FrameEvent, throwIfDetached} from '../api/Frame.js';
 import type {HTTPResponse} from '../api/HTTPResponse.js';
 import type {WaitTimeoutOptions} from '../api/Page.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {UnsupportedOperation} from '../common/Errors.js';
-import {debugError} from '../common/util.js';
 import type {Realm} from '../puppeteer-core.js';
 import {Deferred} from '../util/Deferred.js';
 import {disposeSymbol} from '../util/disposable.js';
@@ -54,20 +54,23 @@ export class CdpFrame extends Frame {
 
   worlds: IsolatedWorldChart;
   extensionWorlds: Record<string, IsolatedWorld> = {};
+  #logger: Logger;
 
   constructor(
     frameManager: FrameManager,
     frameId: string,
     parentFrameId: string | undefined,
     client: CDPSession,
+    logger: Logger,
   ) {
-    super();
+    super(logger);
     this._frameManager = frameManager;
     this.#url = '';
     this._id = frameId;
     this._parentId = parentFrameId;
     this.#detached = false;
     this.#client = client;
+    this.#logger = logger;
 
     this._loaderId = '';
     this.worlds = {
@@ -75,15 +78,21 @@ export class CdpFrame extends Frame {
         this,
         this._frameManager.timeoutSettings,
         MAIN_WORLD,
+        logger,
       ),
       [PUPPETEER_WORLD]: new IsolatedWorld(
         this,
         this._frameManager.timeoutSettings,
         PUPPETEER_WORLD,
+        logger,
       ),
     };
 
-    this.accessibility = new Accessibility(this.worlds[MAIN_WORLD], frameId);
+    this.accessibility = new Accessibility(
+      this.worlds[MAIN_WORLD],
+      frameId,
+      logger,
+    );
 
     this.on(FrameEvent.FrameSwappedByActivation, () => {
       // Emulate loading process for swapped frames.
@@ -286,8 +295,9 @@ export class CdpFrame extends Frame {
       timeout = this._frameManager.timeoutSettings.navigationTimeout(),
     } = options;
 
-    // We rely upon the fact that document.open() will reset frame lifecycle with "init"
-    // lifecycle event. @see https://crrev.com/608658
+    // We rely upon the fact that the document is reopened, which resets the
+    // frame lifecycle with an "init" lifecycle event.
+    // @see https://crrev.com/608658
     await this.setFrameContent(html);
 
     const watcher = new LifecycleWatcher(
@@ -304,6 +314,19 @@ export class CdpFrame extends Frame {
     if (error) {
       throw error;
     }
+  }
+
+  /**
+   * @internal
+   */
+  override async setFrameContent(content: string): Promise<void> {
+    // Writing the content from the page would go through document.write, which
+    // makes Chrome treat parser-blocking cross-site scripts in it as an
+    // intervention candidate and may block them outright.
+    await this.#client.send('Page.setDocumentContent', {
+      frameId: this._id,
+      html: content,
+    });
   }
 
   override url(): string {
@@ -351,7 +374,9 @@ export class CdpFrame extends Frame {
       this.#client.send('Runtime.addBinding', {
         name: CDP_BINDING_PREFIX + binding.name,
       }),
-      this.evaluate(binding.initSource).catch(debugError),
+      this.evaluate(binding.initSource).catch(error => {
+        this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+      }),
     ]);
   }
 
@@ -370,7 +395,9 @@ export class CdpFrame extends Frame {
         // Removes the dangling Puppeteer binding wrapper.
         // @ts-expect-error: In a different context.
         globalThis[name] = undefined;
-      }, binding.name).catch(debugError),
+      }, binding.name).catch(error => {
+        this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+      }),
     ]);
   }
 
@@ -459,7 +486,7 @@ export function referrerPolicyToProtocol(
 ): Protocol.Page.ReferrerPolicy {
   // See
   // https://chromedevtools.github.io/devtools-protocol/tot/Page/#type-ReferrerPolicy
-  // We need to conver from Web-facing phase to CDP's camelCase.
+  // We need to convert from Web-facing phase to CDP's camelCase.
   return referrerPolicy.replaceAll(/-./g, match => {
     return match[1]!.toUpperCase();
   }) as Protocol.Page.ReferrerPolicy;

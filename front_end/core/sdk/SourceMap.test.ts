@@ -3,14 +3,17 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Formatter from '../../models/formatter/formatter.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
 import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
 import * as ScopesCodec from '../../third_party/source-map-scopes-codec/source-map-scopes-codec.js';
+import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
-import * as Root from '../root/root.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import * as SDK from './sdk.js';
 
@@ -53,7 +56,10 @@ describe('SourceMapEntry', () => {
   });
 });
 
-describeWithEnvironment('SourceMap', () => {
+describe('SourceMap', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
   const compiledUrl = urlString`compiled.js`;
   const sourceMapJsonUrl = urlString`source-map.json`;
   const sourceUrlExample = urlString`example.js`;
@@ -100,6 +106,51 @@ describeWithEnvironment('SourceMap', () => {
         assert.strictEqual(iter.peekVLQ(), expectedOutput, `'${input}' must result in '${expectedOutput}'`);
         assert.strictEqual(iter.peekVLQ(), expectedOutput, `'${input}' must result in '${expectedOutput}'`);
       }
+    });
+
+    it('decodes unsigned VLQ numbers without interpreting a sign bit', () => {
+      const cases: Array<[string, number]> = [
+        ['A', 0],
+        ['B', 1],
+        ['C', 2],
+        ['f', 31],
+      ];
+
+      for (const [input, expectedOutput] of cases) {
+        const iter = new SDK.SourceMap.TokenIterator(input);
+        assert.strictEqual(iter.nextUnsignedVLQ(), expectedOutput, `'${input}' must result in '${expectedOutput}'`);
+      }
+    });
+
+    it('decodes unsigned VLQ numbers that use the continuation bit', () => {
+      const cases: Array<[string, number]> = [
+        ['gB', 32],
+        ['gC', 64],
+        ['ggggggB', 1 << 30],
+      ];
+
+      for (const [input, expectedOutput] of cases) {
+        const iter = new SDK.SourceMap.TokenIterator(input);
+        assert.strictEqual(iter.nextUnsignedVLQ(), expectedOutput, `'${input}' must result in '${expectedOutput}'`);
+      }
+    });
+
+    it('decodes consecutive unsigned VLQ numbers', () => {
+      const iter = new SDK.SourceMap.TokenIterator('AgCF');
+      assert.strictEqual(iter.nextUnsignedVLQ(), 0);
+      assert.strictEqual(iter.nextUnsignedVLQ(), 64);
+      assert.strictEqual(iter.nextUnsignedVLQ(), 5);
+      assert.isFalse(iter.hasNext());
+    });
+
+    it('throws when an unsigned VLQ number does not fit into 32 bits', () => {
+      const iter = new SDK.SourceMap.TokenIterator('gggggggB');
+      assert.throws(() => iter.nextUnsignedVLQ(), /32 bits/);
+    });
+
+    it('throws when an unsigned VLQ number is truncated', () => {
+      const iter = new SDK.SourceMap.TokenIterator('g');
+      assert.throws(() => iter.nextUnsignedVLQ(), /end of input/);
     });
   });
 
@@ -167,7 +218,8 @@ describeWithEnvironment('SourceMap', () => {
       // clang-format on
     ]);
 
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assertMapping(sourceMap.findEntry(0, 9), 0, 'example.js', 0, 9);
     assertMapping(sourceMap.findEntry(0, 13), 0, 'example.js', 0, 13);
@@ -197,7 +249,8 @@ describeWithEnvironment('SourceMap', () => {
       // clang-format on
     ]);
 
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     // Exact match for source location.
     assert.deepEqual(sourceMap.findReverseRanges(sourceUrlExample, 3, 0).map(r => r.serializeToObject()), [
@@ -253,7 +306,8 @@ describeWithEnvironment('SourceMap', () => {
       // clang-format on
     ]);
 
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assert.deepEqual(sourceMap.findReverseRanges(sourceUrlExample, 1, 0).map(r => r.serializeToObject()), [
       {startLine: 0, startColumn: 0, endLine: 1, endColumn: 0},
@@ -279,7 +333,8 @@ describeWithEnvironment('SourceMap', () => {
       // clang-format on
     ]);
 
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     // Without filtering, we should get all entries.
     assert.deepEqual(sourceMap.findReverseEntries(sourceUrlExample, 1, 0).map(e => e.lineNumber), [0, 1, 2, 4, 5]);
@@ -296,7 +351,8 @@ describeWithEnvironment('SourceMap', () => {
       sources: [sourceUrlExample],
       version: 3,
     };
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assertMapping(sourceMap.findEntry(0, 0), 0, 'example.js', 0, 0);
     assertMapping(sourceMap.findEntry(0, 2), 0, 'example.js', 0, 2);
@@ -314,7 +370,8 @@ describeWithEnvironment('SourceMap', () => {
       sources: [sourceUrlExample],
       version: 3,
     };
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assertMapping(sourceMap.findEntry(0, 0), 0, 'example.js', 0, 0);
     assertReverseMapping(sourceMap.sourceLineMapping(sourceUrlExample, 1, 0), 3, 1);
@@ -333,7 +390,8 @@ describeWithEnvironment('SourceMap', () => {
       mappings: 'GAAA,DAAC,DAAC,DAAC',
       sources: ['example.js'],
       version: 3,
-    });
+    },
+                                                  new Common.Console.Console());
 
     assertMapping(sourceMap.findEntry(0, 0), 0, 'example.js', 0, 3);
     assertMapping(sourceMap.findEntry(0, 1), 0, 'example.js', 0, 2);
@@ -363,7 +421,8 @@ describeWithEnvironment('SourceMap', () => {
       ],
       version: 3,
     };
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assert.lengthOf(sourceMap.sourceURLs(), 3, 'unexpected number of original source URLs');
     assertMapping(sourceMap.findEntry(0, 0), 0, 'source1.js', 0, 0);
@@ -406,7 +465,8 @@ describeWithEnvironment('SourceMap', () => {
       sources: ['chrome_issue_611738.cljs'],
       mappings: ';AAAA;;AAGA,kBAAA,dAAMA;AAAN,AACE,IAAAC,uBAAA;AAAA,AAAA',
       names: ['name1', 'generated31465'],
-    });
+    },
+                                                  new Common.Console.Console());
 
     assert.propertyVal(sourceMap.findEntry(1, 0), 'name', undefined);
     assert.propertyVal(sourceMap.findEntry(3, 0), 'name', undefined);
@@ -434,7 +494,8 @@ describeWithEnvironment('SourceMap', () => {
         'wp:///' /* sourceRoot */);
 
     const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
     assertMapping(sourceMap.findEntry(0, 0), 0, 'wp:///example.js', 1, 0);
     assertMapping(sourceMap.findEntry(1, 0), 1, 'wp:///example.js', 3, 0);
@@ -455,8 +516,10 @@ describeWithEnvironment('SourceMap', () => {
         sourcesContent: ['function foo() {\n  console.log("Hello world!");\n}'],
         version: 3,
       };
-      const sourceMap1 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload);
-      const sourceMap2 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload);
+      const sourceMap1 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload, new Common.Console.Console());
+      const sourceMap2 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload, new Common.Console.Console());
       assert.isTrue(sourceMap1.compatibleForURL(sourceURL, sourceMap2));
       assert.isTrue(sourceMap2.compatibleForURL(sourceURL, sourceMap1));
     });
@@ -468,8 +531,10 @@ describeWithEnvironment('SourceMap', () => {
         sources: ['foo.ts'],
         version: 3,
       };
-      const sourceMap1 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload);
-      const sourceMap2 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload);
+      const sourceMap1 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload, new Common.Console.Console());
+      const sourceMap2 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload, new Common.Console.Console());
       assert.isTrue(sourceMap1.compatibleForURL(sourceURL, sourceMap2));
       assert.isTrue(sourceMap2.compatibleForURL(sourceURL, sourceMap1));
     });
@@ -481,14 +546,16 @@ describeWithEnvironment('SourceMap', () => {
         sources: ['foo.ts'],
         sourcesContent: ['function foo() {\n  console.log("Hello from first!");\n}'],
         version: 3,
-      });
+      },
+                                                     new Common.Console.Console());
       const sourceMap2 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, {
         mappings: '',
         sourceRoot,
         sources: ['foo.ts'],
         sourcesContent: ['function foo() {\n  console.log("Hello from second!");\n}'],
         version: 3,
-      });
+      },
+                                                     new Common.Console.Console());
       assert.isFalse(sourceMap1.compatibleForURL(sourceURL, sourceMap2));
       assert.isFalse(sourceMap2.compatibleForURL(sourceURL, sourceMap1));
     });
@@ -505,8 +572,10 @@ describeWithEnvironment('SourceMap', () => {
         ...payload1,
         ignoreList: [0],
       };
-      const sourceMap1 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload1);
-      const sourceMap2 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload2);
+      const sourceMap1 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload1, new Common.Console.Console());
+      const sourceMap2 =
+          new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload2, new Common.Console.Console());
       assert.isFalse(sourceMap1.compatibleForURL(sourceURL, sourceMap2));
       assert.isFalse(sourceMap2.compatibleForURL(sourceURL, sourceMap1));
     });
@@ -812,13 +881,14 @@ describeWithEnvironment('SourceMap', () => {
 
     for (const {sourceRoot, sourceURL, sourceMapURL, expected} of cases) {
       it(`can resolve sourceURL "${sourceURL}" with sourceRoot "${sourceRoot}" and sourceMapURL "${sourceMapURL}"`,
-         () => {
-           const mappingPayload = {mappings: 'AAAA;;;CACA', sourceRoot, sources: [sourceURL], version: 3};
-           const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, urlString`${sourceMapURL}`, mappingPayload);
-           const sourceURLs = sourceMap.sourceURLs();
-           assert.lengthOf(sourceURLs, 1, 'unexpected number of original source URLs');
-           assert.strictEqual(sourceURLs[0], expected);
-         });
+          () => {
+            const mappingPayload = {mappings: 'AAAA;;;CACA', sourceRoot, sources: [sourceURL], version: 3};
+            const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, urlString`${sourceMapURL}`, mappingPayload,
+                                                          new Common.Console.Console());
+            const sourceURLs = sourceMap.sourceURLs();
+            assert.lengthOf(sourceURLs, 1, 'unexpected number of original source URLs');
+            assert.strictEqual(sourceURLs[0], expected);
+          });
     }
 
     it('does not touch sourceURLs that conflict with the compiled URL', () => {
@@ -829,7 +899,8 @@ describeWithEnvironment('SourceMap', () => {
         sources: [sourceURL],
         sourcesContent: ['console.log(42)'],
         mappings: '',
-      });
+      },
+                                                    new Common.Console.Console());
       const sourceURLs = sourceMap.sourceURLs();
       assert.lengthOf(sourceURLs, 1);
       assert.strictEqual(sourceURLs[0], sourceURL);
@@ -852,7 +923,8 @@ describeWithEnvironment('SourceMap', () => {
       mappingPayload.ignoreList = [0 /* vendor.js */, 3 /* other.js */];
 
       const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+      const sourceMap =
+          new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
       assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor.js`));
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///main.js`));
@@ -876,7 +948,8 @@ describeWithEnvironment('SourceMap', () => {
          mappingPayload.x_google_ignoreList = [0 /* vendor.js */, 3 /* other.js */];
 
          const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-         const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+         const sourceMap =
+             new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
          assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor.js`));
          assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///main.js`));
@@ -901,7 +974,8 @@ describeWithEnvironment('SourceMap', () => {
          mappingPayload.x_google_ignoreList = [1 /* main.js */, 2 /* example.js */];
 
          const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-         const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+         const sourceMap =
+             new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
          assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor.js`));
          assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///main.js`));
@@ -924,7 +998,8 @@ describeWithEnvironment('SourceMap', () => {
       mappingPayload.ignoreList = [0 /* vendor1.js */, 1 /* vendor2.js */, 2 /* vendor3.js */];
 
       const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+      const sourceMap =
+          new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///foo.js`));
       assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor1.js`));
@@ -962,7 +1037,8 @@ describeWithEnvironment('SourceMap', () => {
       mappingPayload.ignoreList = [1 /* vendor1.js */, 3 /* vendor2.js */, 5 /* vendor3.js */];
 
       const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+      const sourceMap =
+          new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///foo.js`));
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///bar.js`));
@@ -1008,7 +1084,8 @@ describeWithEnvironment('SourceMap', () => {
       mappingPayload.ignoreList = [0 /* vendor1.js */, 1 /* vendor2.js */, 2 /* vendor3.js */];
 
       const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+      const sourceMap =
+          new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///foo.js`));
       assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor1.js`));
@@ -1050,7 +1127,8 @@ describeWithEnvironment('SourceMap', () => {
       mappingPayload.ignoreList = [1 /* vendor1.js */, 2 /* vendor2.js */, 3 /* vendor3.js */];
 
       const sourceMapJsonUrl = urlString`wp://test/source-map.json`;
-      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload);
+      const sourceMap =
+          new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, mappingPayload, new Common.Console.Console());
 
       assert.isFalse(sourceMap.hasIgnoreListHint(urlString`wp:///foo.js`));
       assert.isTrue(sourceMap.hasIgnoreListHint(urlString`wp:///vendor1.js`));
@@ -1103,7 +1181,8 @@ describeWithEnvironment('SourceMap', () => {
     const {TextRange} = TextUtils.TextRange;
 
     it('yields an empty array for unknown source URLs', () => {
-      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap(['0:0 => example.js:0:0']));
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap(['0:0 => example.js:0:0']),
+                                      new Common.Console.Console());
       assert.isEmpty(sourceMap.reverseMapTextRanges(sourceUrlOther, new TextRange(0, 0, 1, 1)));
     });
 
@@ -1113,7 +1192,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '0:5 => example.js:0:6',
                                         '1:0 => other.js:0:0',
                                         '1:8 => other.js:0:9',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 0, 6));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1132,7 +1212,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '5:0 => other.js:1:1',
                                         '5:1 => other.js:1:4',
                                         '5:8 => other.js:1:8',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 1, 0, 6));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1148,7 +1229,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '0:0 => example.js:0:0',
                                         '2:5 => example.js:1:5',
                                         '9:9 => example.js:1:9',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 1, 6));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1163,7 +1245,8 @@ describeWithEnvironment('SourceMap', () => {
       const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
                                         '0:0 => example.js:0:0',
                                         '0:1 => example.js:0:3',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 0, 3));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1174,7 +1257,8 @@ describeWithEnvironment('SourceMap', () => {
       const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
                                         '1:2 => example.js:4:0',
                                         '3:4 => example.js:4:5',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 4, 1));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1185,7 +1269,8 @@ describeWithEnvironment('SourceMap', () => {
       const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
                                         '1:2 => example.js:4:0',
                                         '3:4 => example.js:4:5',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 0, 10, 0));
       assert.lengthOf(exampleRanges, 1, 'expected a single range');
@@ -1212,7 +1297,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '1:5 => example.js:4:8',
                                         '1:6 => example.js:1:0',
                                         '1:7 => example.js:4:9',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 1, 4, 6));
       assert.lengthOf(exampleRanges, 2, 'expected two distinct ranges');
@@ -1237,7 +1323,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '1:5 => example.js:1:8',
                                         '2:6 => example.js:1:1',
                                         '2:7 => example.js:1:9',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(1, 2, 1, 7));
       assert.lengthOf(exampleRanges, 2, 'expected two distinct ranges');
@@ -1254,7 +1341,8 @@ describeWithEnvironment('SourceMap', () => {
                                         '1:5 => example.js:1:8',
                                         '2:6 => example.js:1:1',
                                         '2:7 => example.js:1:9',
-                                      ]));
+                                      ]),
+                                      new Common.Console.Console());
 
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(1, 0, 1, 9));
       assert.lengthOf(exampleRanges, 1, 'expected a single maximally merged range');
@@ -1262,56 +1350,14 @@ describeWithEnvironment('SourceMap', () => {
     });
   });
 
-  describe('findEntry', () => {
-    it('can resolve generated positions with inlineFrameIndex', () => {
-      Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES);
-      // 'foo' calls 'bar', 'bar' calls 'baz'. 'bar' and 'baz' are inlined into 'foo'.
-      const builder = new ScopesCodec.ScopeInfoBuilder();
-      builder.startScope(0, 0, {kind: 'global', key: 'global'})
-          .startScope(10, 0, {kind: 'function', key: 'foo', name: 'foo'})
-          .endScope(20, 0)
-          .startScope(30, 0, {kind: 'function', key: 'bar', name: 'bar'})
-          .endScope(40, 0)
-          .startScope(50, 0, {kind: 'function', key: 'baz', name: 'baz'})
-          .endScope(60, 0)
-          .endScope(70, 0);
-
-      builder.startRange(0, 0, {scopeKey: 'global'})
-          .startRange(0, 0, {scopeKey: 'foo', isStackFrame: true})
-          .startRange(0, 5, {scopeKey: 'bar', callSite: {sourceIndex: 0, line: 15, column: 0}})
-          .startRange(0, 5, {scopeKey: 'baz', callSite: {sourceIndex: 0, line: 35, column: 0}})
-          .endRange(0, 10)
-          .endRange(0, 10)
-          .endRange(0, 10)
-          .endRange(0, 10);
-
-      const sourceMap = new SDK.SourceMap.SourceMap(
-          compiledUrl, sourceMapJsonUrl,
-          ScopesCodec.encode(builder.build(), {version: 3, sources: ['foo.ts'], mappings: ''}) as
-              SDK.SourceMap.SourceMapV3Object);
-
-      assert.isNull(
-          sourceMap.findEntry(0, 7, 0));  // We don't have mappings, so inlineFrameIndex = 0 ('baz') has no entry.
-
-      const barEntry = sourceMap.findEntry(0, 7, 1);
-      assert.isNotNull(barEntry);
-      assert.strictEqual(barEntry.sourceLineNumber, 35);
-      assert.strictEqual(barEntry.sourceColumnNumber, 0);
-
-      const fooEntry = sourceMap.findEntry(0, 7, 2);
-      assert.isNotNull(fooEntry);
-      assert.strictEqual(fooEntry.sourceLineNumber, 15);
-      assert.strictEqual(fooEntry.sourceColumnNumber, 0);
-    });
-  });
-
   it('combines "scopes" proposal scopes appropriately for index maps', () => {
-    Root.Runtime.experiments.enableForTest(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES);
     const info1 = new ScopesCodec.ScopeInfoBuilder()
+                      .startSource()
                       .startScope(0, 0, {kind: 'global', key: 'global'})
                       .startScope(10, 0, {name: 'foo', key: 'foo', kind: 'function', isStackFrame: true})
                       .endScope(20, 0)
                       .endScope(30, 0)
+                      .endSource()
                       .startRange(0, 0, {scopeKey: 'global'})
                       .startRange(0, 7, {scopeKey: 'foo', isStackFrame: true})
                       .endRange(0, 14)
@@ -1324,10 +1370,12 @@ describeWithEnvironment('SourceMap', () => {
     });
 
     const info2 = new ScopesCodec.ScopeInfoBuilder()
+                      .startSource()
                       .startScope(0, 0, {kind: 'global', key: 'global'})
                       .startScope(10, 0, {name: 'bar', key: 'bar', kind: 'function', isStackFrame: true})
                       .endScope(20, 0)
                       .endScope(30, 0)
+                      .endSource()
                       .startRange(0, 0, {scopeKey: 'global'})
                       .startRange(0, 7, {scopeKey: 'bar', isStackFrame: true})
                       .endRange(0, 14)
@@ -1346,10 +1394,39 @@ describeWithEnvironment('SourceMap', () => {
       ],
     };
 
-    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, indexMap);
+    const sourceMap =
+        new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, indexMap, new Common.Console.Console());
 
     assert.strictEqual(sourceMap.findOriginalFunctionName({line: 0, column: 10}), 'foo');
     assert.strictEqual(sourceMap.findOriginalFunctionName({line: 1, column: 110}), 'bar');
+  });
+
+  it('translates raw frames using "scopes" proposal information', () => {
+    const info = new ScopesCodec.ScopeInfoBuilder()
+                     .startSource()
+                     .startScope(0, 0, {kind: 'global', key: 'global'})
+                     .startScope(10, 0, {name: 'foo', key: 'foo', kind: 'function', isStackFrame: true})
+                     .endScope(20, 0)
+                     .endScope(30, 0)
+                     .endSource()
+                     .startRange(0, 0, {scopeKey: 'global'})
+                     .startRange(0, 7, {scopeKey: 'foo', isStackFrame: true, isHidden: true})
+                     .endRange(0, 14)
+                     .endRange(0, 21)
+                     .build();
+    const map = ScopesCodec.encode(info, {version: 3, sources: ['foo.ts'], mappings: ''});
+    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, map as SDK.SourceMap.SourceMapV3Object,
+                                                  new Common.Console.Console());
+
+    assert.strictEqual(sourceMap.translateRawFrame(0, 10)?.kind, SDK.SourceMapScopesInfo.GeneratedFrameKind.OUTLINED);
+    assert.strictEqual(sourceMap.translateRawFrame(0, 17)?.kind, SDK.SourceMapScopesInfo.GeneratedFrameKind.VISIBLE);
+  });
+
+  it('translates raw frames of source maps without "scopes" proposal information as VISIBLE', () => {
+    const sourceMap = new SDK.SourceMap.SourceMap(
+        compiledUrl, sourceMapJsonUrl, encodeSourceMap(['0:0 => example.js:0:0']), new Common.Console.Console());
+
+    assert.strictEqual(sourceMap.translateRawFrame(0, 0)?.kind, SDK.SourceMapScopesInfo.GeneratedFrameKind.VISIBLE);
   });
 
   it('handles source maps with empty sources list (https://crbug.com/395822775)', () => {
@@ -1358,7 +1435,8 @@ describeWithEnvironment('SourceMap', () => {
       mappings: 'A',
       sources: [],
       names: [],
-    });
+    },
+                                                  new Common.Console.Console());
 
     assert.doesNotThrow(() => sourceMap.mappings());
   });
@@ -1369,44 +1447,199 @@ describeWithEnvironment('SourceMap', () => {
       mappings: 'ACAA',  // [0, 1, 0, 0]
       sources: [],
       names: [],
-    });
+    },
+                                                  new Common.Console.Console());
 
     assert.doesNotThrow(() => sourceMap.mappings());
   });
 
   it('builds scopes fallback when the source map does not have any scope information', async () => {
-    // TODO: this test fails when this experiment is on, because "hasScopeInfo"
-    // returns true, because addOriginalScopes is called in parseMap. Explicitly
-    // disable the experiment for now because otherwise it will be enabled incidentally
-    // from previous tests in this file, which results in different results when
-    // running this test directly vs all together.
-    //
-    // This should be resolved: presently it seems that when this experiment is on,
-    // the "fallback" scopes are never generated (only blank ones are).
-    Root.Runtime.experiments.disableForTest(Root.ExperimentNames.ExperimentName.USE_SOURCE_MAP_SCOPES);
-
     const scopeTreeStub = sinon.stub(Formatter.FormatterWorkerPool.formatterWorkerPool(), 'javaScriptScopeTree')
                               .returns(Promise.resolve({start: 0, end: 38, variables: [], kind: 1, children: []}));
     const script = sinon.createStubInstance(SDK.Script.Script, {
       requestContentData: Promise.resolve(
-          new TextUtils.ContentData.ContentData('function f() { console.log("hello"); }', false, 'text/javascript'))
+          new TextUtils.ContentData.ContentData('function f() { console.log("hello"); }', false, 'text/javascript')),
     });
-    const sourceMap = new SDK.SourceMap.SourceMap(
-        compiledUrl, sourceMapJsonUrl, {
-          version: 3,
-          // [ 0, 1, 0, 0]
-          // [37, 0, 0, 0]
-          mappings: 'ACAA,qCAAA',
-          sources: ['module1.js', 'module2.js'],
-          names: [],
-        },
-        script);
+    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, {
+      version: 3,
+      // [ 0, 1, 0, 0]
+      // [37, 0, 0, 0]
+      mappings: 'ACAA,qCAAA',
+      sources: ['module1.js', 'module2.js'],
+      names: [],
+    },
+                                                  new Common.Console.Console(), script);
 
     sinon.assert.notCalled(scopeTreeStub);
 
     await sourceMap.waitForScopeInfo();
 
     assert.isTrue(sourceMap.hasScopeInfo());
+    assert.isFalse(sourceMap.hasEncodedScopeInfo());
     sinon.assert.calledOnceWithExactly(scopeTreeStub, 'function f() { console.log("hello"); }', 'script');
+  });
+
+  describe('hasEncodedScopeInfo', () => {
+    it('is true for source maps with "scopes" proposal information', () => {
+      const info = new ScopesCodec.ScopeInfoBuilder()
+                       .startSource()
+                       .startScope(0, 0, {kind: 'global', key: 'global'})
+                       .endScope(30, 0)
+                       .endSource()
+                       .startRange(0, 0, {scopeKey: 'global'})
+                       .endRange(0, 21)
+                       .build();
+      const map = ScopesCodec.encode(info, {version: 3, sources: ['foo.ts'], mappings: ''});
+      const sourceMap = new SDK.SourceMap.SourceMap(
+          compiledUrl, sourceMapJsonUrl, map as SDK.SourceMap.SourceMapV3Object, new Common.Console.Console());
+
+      assert.isTrue(sourceMap.hasEncodedScopeInfo());
+    });
+
+    it('is false for source maps without "scopes" proposal information', () => {
+      const sourceMap = new SDK.SourceMap.SourceMap(
+          compiledUrl, sourceMapJsonUrl, encodeSourceMap(['0:0 => example.js:0:0']), new Common.Console.Console());
+
+      assert.isFalse(sourceMap.hasEncodedScopeInfo());
+    });
+  });
+
+  describe('rangeMappings', () => {
+    function createSourceMap(payload: SDK.SourceMap.SourceMapV3, console = new Common.Console.Console()) {
+      return new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, payload, console);
+    }
+
+    describe('decoding', () => {
+      it('does not mark any entry as a range mapping without the field', () => {
+        const sourceMap = createSourceMap(encodeSourceMap(['0:0 => example.js:0:0', '0:5 => example.js:0:5']));
+
+        assert.deepEqual(sourceMap.mappings().map(entry => entry.isRangeMapping), [false, false]);
+      });
+
+      it('marks the entries referenced by the field', () => {
+        const sourceMap = createSourceMap(encodeSourceMap([
+          '0:0 => example.js:0:0 (range)',
+          '0:5 => example.js:0:5',
+          '1:0 => example.js:1:0 (range)',
+        ]));
+
+        assert.deepEqual(sourceMap.mappings().map(entry => entry.isRangeMapping), [true, false, true]);
+      });
+
+      it('keeps the remaining entry data intact', () => {
+        const sourceMap = createSourceMap(encodeSourceMap(['0:4 => example.js:2:7@foo (range)']));
+
+        const [entry] = sourceMap.mappings();
+        assert.strictEqual(entry.lineNumber, 0);
+        assert.strictEqual(entry.columnNumber, 4);
+        assert.strictEqual(entry.sourceURL, sourceUrlExample);
+        assert.strictEqual(entry.sourceLineNumber, 2);
+        assert.strictEqual(entry.sourceColumnNumber, 7);
+        assert.strictEqual(entry.name, 'foo');
+        assert.isTrue(entry.isRangeMapping);
+      });
+
+      it('marks the right entry when the mappings are not sorted', () => {
+        // The spec doesn't require `mappings` to be sorted, and `rangeMappings` addresses
+        // entries in the order they are encoded, not in the order they end up in. Here the
+        // second mapping on line 0 starts at a *lower* column than the first, so the marked
+        // entry moves to the back once the mappings are sorted.
+        //   [4, 0, 0, 0]  => 0:4 => example.js:0:0
+        //   [-1, 0, 1, 0] => 0:3 => example.js:1:0
+        const sourceMap = createSourceMap({
+          version: 3,
+          sources: ['example.js'],
+          names: [],
+          mappings: 'IAAA,DACA',
+          rangeMappings: 'A',
+        });
+
+        assert.deepEqual(sourceMap.mappings().map(entry => [entry.columnNumber, entry.isRangeMapping]),
+                         [[3, false], [4, true]]);
+      });
+
+      it('marks entries of every section of an index map', () => {
+        const sourceMap = createSourceMap({
+          version: 3,
+          sections: [
+            {offset: {line: 0, column: 0}, map: encodeSourceMap(['0:0 => example.js:0:0 (range)'])},
+            {offset: {line: 2, column: 0}, map: encodeSourceMap(['0:0 => other.js:0:0 (range)'])},
+          ],
+        });
+
+        assert.deepEqual(sourceMap.mappings().map(entry => [entry.lineNumber, entry.sourceURL, entry.isRangeMapping]),
+                         [[0, sourceUrlExample, true], [2, sourceUrlOther, true]]);
+      });
+    });
+
+    describe('malformed input', () => {
+      /**
+       * A malformed field never takes the source map with it, so this parses the
+       * {@link payload} and asserts that it didn't fail.
+       *
+       * @returns which of the parsed entries are marked as range mappings.
+       */
+      function rangeMappingsOfValidSourceMap(payload: SDK.SourceMap.SourceMapV3Object): boolean[] {
+        const error = sinon.stub(console, 'error');
+
+        const sourceMap = createSourceMap(payload);
+
+        sinon.assert.notCalled(error);
+        return sourceMap.mappings().map(entry => entry.isRangeMapping);
+      }
+
+      it('skips an index that is past the end of its line', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0', '1:0 => example.js:1:0']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'B;A'}), [false, true]);
+      });
+
+      it('keeps the valid indices of a line with more range mappings than mappings', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0', '0:5 => example.js:0:5']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'BB'}), [false, true]);
+      });
+
+      it('skips indices on lines without any mappings', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'A;A;A'}), [true]);
+      });
+
+      it('skips an index that points at a mapping without an original position', () => {
+        const payload = encodeSourceMap(['0:0', '0:5 => example.js:0:5']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'AB'}), [false, true]);
+      });
+
+      it('tolerates a relative index of zero', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0', '0:5 => example.js:0:5']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'AAB'}), [true, true]);
+      });
+
+      it('ignores the field when an index does not fit into 32 bits', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: 'gggggggB'}), [false]);
+      });
+
+      it('ignores the field when it is not a string', () => {
+        const payload = encodeSourceMap(['0:0 => example.js:0:0']);
+
+        assert.deepEqual(rangeMappingsOfValidSourceMap({...payload, rangeMappings: {x: 'foo'} as unknown as string}),
+                         [false]);
+      });
+
+      it('accepts trailing empty lines beyond the mappings', () => {
+        const error = sinon.stub(console, 'error');
+        const payload = encodeSourceMap(['1:0 => example.js:0:0']);
+
+        const sourceMap = createSourceMap({...payload, rangeMappings: ';A;;;'});
+
+        assert.deepEqual(sourceMap.mappings().map(entry => entry.isRangeMapping), [true]);
+        sinon.assert.notCalled(error);
+      });
+    });
   });
 });

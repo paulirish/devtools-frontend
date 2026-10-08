@@ -34,18 +34,19 @@ devtools_ui_module("elements") {
     "AdoptedStyleSheetTreeElement.ts",
     "CSSRuleValidator.ts",
     "CSSRuleValidatorHelper.ts",
+    "CSSSpecificityBreakdown.ts",
     "CSSValueTraceView.ts",
     "ClassesPaneWidget.ts",
     "ColorSwatchPopoverIcon.ts",
     "ComputedStyleWidget.ts",
     "DOMPath.ts",
+    "DOMTreeContextMenu.ts",
+    "DOMTreeWidget.ts",
     "ElementIssueUtils.ts",
     "ElementStatePaneWidget.ts",
     "ElementsPanel.ts",
     "ElementsSidebarPane.ts",
     "ElementsTreeElement.ts",
-    "ElementsTreeOutline.ts",
-    "ElementsTreeOutlineRenderer.ts",
     "EventListenersWidget.ts",
     "ImagePreviewPopover.ts",
     "InspectElementModeController.ts",
@@ -71,23 +72,23 @@ devtools_ui_module("elements") {
     "WebCustomData.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/ai_assistance:bundle",
     "../../models/ai_code_completion:bundle",
-    "../../models/annotations:bundle",
     "../../models/badges:bundle",
     "../../models/bindings:bundle",
+    "../../models/change_tracker:bundle",
     "../../models/computed_style:bundle",
     "../../models/elements:bundle",
     "../../models/issues_manager:bundle",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../panels/common:bundle",
     "../../panels/emulation:bundle",
@@ -113,27 +114,27 @@ devtools_ui_module("elements") {
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../../ui/visual_logging:bundle",
     "../common:bundle",
     "./components:bundle",
   ]
 
   visibility = [ "../../component_docs/*" ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "elements.ts"
 
-  deps = [
-    ":css_files",
-    ":elements",
-  ]
+  ts_deps = [ ":elements" ]
 
   visibility = [
     ":*",
     "../../entrypoints/*",
     "../../models/ai_assistance/*",
     "../../panels/ai_assistance/*",
+    "../../panels/console/*",
     "../../panels/profiler/*",
     "../../panels/recorder/*",
     "../../ui/components/docs/computed_style_property/*",
@@ -151,14 +152,14 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "elements-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../ui/legacy:bundle",
-    "./components:bundle",
+    "../../ui/settings:bundle",
   ]
 
   visibility = [
@@ -174,10 +175,13 @@ devtools_ui_module("unittests") {
     "AccessibilityTreeView.test.ts",
     "AdoptedStyleSheetTreeElement.test.ts",
     "CSSRuleValidator.test.ts",
+    "CSSSpecificityBreakdown.test.ts",
     "CSSValueTraceView.test.ts",
     "ClassesPaneWidget.test.ts",
     "ColorSwatchPopoverIcon.test.ts",
     "ComputedStyleWidget.test.ts",
+    "DOMPath.test.ts",
+    "DOMTreeContextMenu.test.ts",
     "DOMTreeWidget.test.ts",
     "ElementStatePaneWidget.test.ts",
     "ElementsPanel.test.ts",
@@ -187,6 +191,7 @@ devtools_ui_module("unittests") {
     "ImagePreviewPopover.test.ts",
     "InspectElementModeController.test.ts",
     "LayoutPane.test.ts",
+    "MetricsSidebarPane.test.ts",
     "PlatformFontsWidget.test.ts",
     "PropertiesWidget.test.ts",
     "PropertyRenderer.test.ts",
@@ -200,22 +205,28 @@ devtools_ui_module("unittests") {
     "WebCustomData.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/platform:bundle",
+    "../../core/protocol_client:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/ai_code_completion:bundle",
+    "../../models/badges:bundle",
     "../../models/bindings:bundle",
+    "../../models/change_tracker:bundle",
     "../../models/computed_style:bundle",
     "../../models/issues_manager:bundle",
-    "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../testing",
     "../../third_party/codemirror.next:bundle",
+    "../../ui/components/adorners:bundle",
+    "../../ui/components/buttons:bundle",
+    "../../ui/components/highlighting:bundle",
     "../../ui/components/text_editor:bundle",
     "../../ui/components/tooltips:bundle",
     "../../ui/components/tree_outline:bundle",
@@ -226,6 +237,7 @@ devtools_ui_module("unittests") {
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../common:bundle",
     "../utils:bundle",
     "components:bundle",

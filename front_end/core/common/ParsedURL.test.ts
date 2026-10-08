@@ -180,6 +180,17 @@ describe('Parsed URL', () => {
     assert.strictEqual(convertedUrl, 'file://usr/lib', 'URL was not converted correctly');
   });
 
+  it('drops trailing path separators when converting platform paths to URLs', () => {
+    assert.strictEqual(ParsedURL.rawPathToUrlString('/usr/lib/' as Platform.DevToolsPath.RawPathString),
+                       'file:///usr/lib');
+    assert.strictEqual(ParsedURL.rawPathToUrlString('/usr/lib///' as Platform.DevToolsPath.RawPathString),
+                       'file:///usr/lib');
+    assert.strictEqual(ParsedURL.rawPathToUrlString('C:\\proj\\' as Platform.DevToolsPath.RawPathString),
+                       'file:///C:/proj');
+    assert.strictEqual(ParsedURL.rawPathToUrlString('C:\\' as Platform.DevToolsPath.RawPathString), 'file:///C:');
+    assert.strictEqual(ParsedURL.rawPathToUrlString('/' as Platform.DevToolsPath.RawPathString), 'file:///');
+  });
+
   it('converts path that starts with "file://" to a platform path', () => {
     const pathTest = urlString`file://usr/lib`;
     const convertedPath = ParsedURL.urlToRawPathString(pathTest);
@@ -619,6 +630,16 @@ describe('Parsed URL', () => {
     assert.strictEqual(parsedUrl.securityOrigin(), 'http://www.example.com', 'security origin returned was incorrect');
   });
 
+  it('returns empty string as security origin for invalid or empty URL', () => {
+    const parsedUrl = new ParsedURL('');
+    assert.strictEqual(parsedUrl.securityOrigin(), '', 'security origin returned was incorrect');
+  });
+
+  it('returns empty string as security origin for malformed URL without scheme and domain', () => {
+    const parsedUrl = new ParsedURL('malformed');
+    assert.strictEqual(parsedUrl.securityOrigin(), '', 'security origin returned was incorrect');
+  });
+
   it('returns the url without scheme for a URL that has a scheme', () => {
     const parsedUrl = new ParsedURL('http://www.example.com');
     assert.strictEqual(parsedUrl.urlWithoutScheme(), 'www.example.com', 'URL without scheme returned was incorrect');
@@ -755,5 +776,80 @@ describe('Parsed URL', () => {
         urlString`file:///home/a:b@c(d,%20e+f)=&g%3B%23h\$`;  // URL in Chrome address bar if you open that file
     assert.strictEqual(ParsedURL.rawPathToUrlString(platformPathTest), urlTest);
     assert.strictEqual(ParsedURL.urlToRawPathString(urlTest), platformPathTest);
+  });
+
+  describe('hasWebSafeScheme', () => {
+    it('returns true for standard web schemes and blob URLs wrapping web schemes', () => {
+      const safeUrls = [
+        urlString`http://example.com/script.js`,
+        urlString`https://example.com/script.js`,
+        urlString`ws://example.com/socket`,
+        urlString`wss://example.com/socket`,
+        urlString`data:text/javascript,console.log(1)`,
+        urlString`blob:https://example.com/550e8400-e29b-41d4-a716-446655440000`,
+        urlString`blob:http://example.com/550e8400-e29b-41d4-a716-446655440000`,
+        urlString`filesystem:https://example.com/persistent/file.txt`,
+        urlString`blob:filesystem:https://example.com/persistent/file.txt`,
+      ];
+      for (const url of safeUrls) {
+        assert.isTrue(Common.ParsedURL.hasWebSafeScheme(url), `Expected ${url} to have a web-safe scheme`);
+      }
+    });
+
+    it('returns false for privileged, internal, or non-web schemes and blob URLs wrapping them', () => {
+      const unsafeUrls = [
+        urlString`chrome://settings`,
+        urlString`chrome-error://crash`,
+        urlString`chrome-extension://abcdefghijklmnop/page.html`,
+        urlString`chrome-search://local-ntp/local-ntp.html`,
+        urlString`chrome-untrusted://terminal/html/terminal.html`,
+        urlString`devtools://devtools/bundled/inspector.html`,
+        urlString`file:///etc/passwd`,
+        urlString`javascript:alert(1)`,
+        urlString`isolated-app://abcdefghijklmnop/index.html`,
+        urlString`blob:chrome-extension://abcdefghijklmnop/550e8400-e29b-41d4-a716-446655440000`,
+        urlString`filesystem:chrome-extension://abcdefghijklmnop/persistent/file.txt`,
+        urlString`blob:filesystem:chrome-extension://abcdefghijklmnop/persistent/file.txt`,
+        urlString``,
+      ];
+      for (const url of unsafeUrls) {
+        assert.isFalse(Common.ParsedURL.hasWebSafeScheme(url));
+      }
+    });
+  });
+
+  describe('isPrivilegedScheme', () => {
+    it('returns true for privileged browser and local schemes and blob URLs wrapping them', () => {
+      const privilegedUrls = [
+        urlString`chrome://settings`,
+        urlString`chrome-error://crash`,
+        urlString`chrome-extension://abcdefghijklmnop/page.html`,
+        urlString`chrome-search://local-ntp/local-ntp.html`,
+        urlString`chrome-untrusted://terminal/html/terminal.html`,
+        urlString`devtools://devtools/bundled/inspector.html`,
+        urlString`file:///etc/passwd`,
+        urlString`isolated-app://abcdefghijklmnop/index.html`,
+        urlString`blob:chrome-extension://abcdefghijklmnop/550e8400-e29b-41d4-a716-446655440000`,
+        urlString`filesystem:chrome-extension://abcdefghijklmnop/persistent/file.txt`,
+        urlString`blob:filesystem:chrome-extension://abcdefghijklmnop/persistent/file.txt`,
+      ];
+      for (const url of privilegedUrls) {
+        assert.isTrue(Common.ParsedURL.isPrivilegedScheme(url));
+      }
+    });
+
+    it('returns false for web schemes, relative paths, and unprivileged schemes', () => {
+      const unprivilegedUrls = [
+        urlString`https://example.com/script.js`,
+        urlString`blob:https://example.com/550e8400-e29b-41d4-a716-446655440000`,
+        urlString`filesystem:https://example.com/persistent/file.txt`,
+        urlString`bar.js`,
+        urlString`<anonymous>`,
+        urlString`unknown-scheme://foo`,
+      ];
+      for (const url of unprivilegedUrls) {
+        assert.isFalse(Common.ParsedURL.isPrivilegedScheme(url));
+      }
+    });
   });
 });

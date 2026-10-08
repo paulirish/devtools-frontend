@@ -41,6 +41,8 @@ import type {
   CookieParam,
   DeleteCookiesRequest,
 } from '../common/Cookie.js';
+import type {Logger} from '../common/Debug.js';
+import {DEBUG_PREFIXES} from '../common/Debug.js';
 import type {Device} from '../common/Device.js';
 import {TargetCloseError} from '../common/Errors.js';
 import {
@@ -61,7 +63,6 @@ import type {
   NodeFor,
 } from '../common/types.js';
 import {
-  debugError,
   fromEmitterEvent,
   filterAsync,
   isString,
@@ -118,6 +119,7 @@ import {
   type AwaitedLocator,
 } from './locators/locators.js';
 import type {Realm} from './Realm.js';
+import type {ScreenRecording} from './ScreenRecording.js';
 import type {Target} from './Target.js';
 import type {WebWorker} from './WebWorker.js';
 
@@ -125,18 +127,58 @@ import type {WebWorker} from './WebWorker.js';
  * @public
  */
 export interface Metrics {
+  /**
+   * The timestamp when the metrics sample was taken, in monotonic time
+   * (seconds since an arbitrary point in the past).
+   */
   Timestamp?: number;
+  /**
+   * Number of documents in the page.
+   */
   Documents?: number;
+  /**
+   * Number of frames in the page.
+   */
   Frames?: number;
+  /**
+   * Number of events in the page.
+   */
   JSEventListeners?: number;
+  /**
+   * Number of DOM nodes in the page.
+   */
   Nodes?: number;
+  /**
+   * Total number of full or partial page layouts.
+   */
   LayoutCount?: number;
+  /**
+   * Total number of page style recalculations.
+   */
   RecalcStyleCount?: number;
+  /**
+   * Combined duration of all page layouts, in seconds.
+   */
   LayoutDuration?: number;
+  /**
+   * Combined duration of all page style recalculations, in seconds.
+   */
   RecalcStyleDuration?: number;
+  /**
+   * Combined duration of JavaScript execution, in seconds.
+   */
   ScriptDuration?: number;
+  /**
+   * Combined duration of all tasks performed by the browser, in seconds.
+   */
   TaskDuration?: number;
+  /**
+   * Used JavaScript heap size, in bytes.
+   */
   JSHeapUsedSize?: number;
+  /**
+   * Total JavaScript heap size, in bytes.
+   */
   JSHeapTotalSize?: number;
 }
 
@@ -420,6 +462,46 @@ export interface ScreencastOptions {
    * @defaultValue `'ffmpeg'`
    */
   ffmpegPath?: string;
+}
+
+/**
+ * @public
+ * @experimental
+ */
+export interface RecordOptions {
+  /**
+   * File path to save the recording to.
+   */
+  path?: string;
+  /**
+   * Specifies whether to overwrite output file,
+   * or exit immediately if it already exists.
+   *
+   * @defaultValue `true`
+   */
+  overwrite?: boolean;
+  /**
+   * Whether to record audio.
+   *
+   * @defaultValue `false`
+   */
+  audio?: boolean;
+  /**
+   * Maximum frame width in pixels.
+   */
+  maxWidth?: number;
+  /**
+   * Maximum frame height in pixels.
+   */
+  maxHeight?: number;
+  /**
+   * Maximum frame rate in frames per second.
+   */
+  frameRate?: number;
+  /**
+   * Frame rate in frames per second (alias for frameRate).
+   */
+  fps?: number;
 }
 
 /**
@@ -743,9 +825,14 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * @internal
    */
-  constructor() {
-    super();
+  logger: Logger;
 
+  /**
+   * @internal
+   */
+  constructor(logger: Logger) {
+    super(undefined, logger);
+    this.logger = logger;
     fromEmitterEvent(this, PageEvent.Request)
       .pipe(
         mergeMap(originalRequest => {
@@ -910,7 +997,8 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * A target this page was created from.
    *
-   * @deprecated Use {@link Page.createCDPSession} directly.
+   * @deprecated To create CDP session use {@link Page.createCDPSession} directly. To
+   * identify pages spawned by this one, use {@link PageEvent.Popup} event instead.
    */
   abstract target(): Target;
 
@@ -955,9 +1043,8 @@ export abstract class Page extends EventEmitter<PageEvents> {
   abstract get tracing(): Tracing;
 
   /**
-   * Experimental API for {@link https://github.com/webmachinelearning/webmcp
-   * | WebMCP}. Requires Chrome 149+ with the
-   * `--enable-features=WebMCPTesting,DevToolsWebMCPSupport` flags enabled.
+   * Experimental API for {@link https://github.com/webmachinelearning/webmcp| WebMCP}.
+   * Requires Chrome 151+ with the `--enable-features=WebMCP` flag enabled.
    *
    * @experimental
    */
@@ -1720,7 +1807,8 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @returns
    *
-   * - `Timestamp` : The timestamp when the metrics sample was taken.
+   * - `Timestamp` : The timestamp when the metrics sample was taken, in
+   *   monotonic time (seconds).
    *
    * - `Documents` : Number of documents in the page.
    *
@@ -1734,18 +1822,20 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * - `RecalcStyleCount` : Total number of page style recalculations.
    *
-   * - `LayoutDuration` : Combined durations of all page layouts.
+   * - `LayoutDuration` : Combined durations of all page layouts, in seconds.
    *
    * - `RecalcStyleDuration` : Combined duration of all page style
-   *   recalculations.
+   *   recalculations, in seconds.
    *
-   * - `ScriptDuration` : Combined duration of JavaScript execution.
+   * - `ScriptDuration` : Combined duration of JavaScript execution, in
+   *   seconds.
    *
-   * - `TaskDuration` : Combined duration of all tasks performed by the browser.
+   * - `TaskDuration` : Combined duration of all tasks performed by the
+   *   browser, in seconds.
    *
-   * - `JSHeapUsedSize` : Used JavaScript heap size.
+   * - `JSHeapUsedSize` : Used JavaScript heap size, in bytes.
    *
-   * - `JSHeapTotalSize` : Total JavaScript heap size.
+   * - `JSHeapTotalSize` : Total JavaScript heap size, in bytes.
    *
    * @remarks
    * All timestamps are in monotonic time: monotonically increasing time
@@ -2089,7 +2179,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * ```ts
    * import {KnownDevices} from 'puppeteer';
-   * const iPhone = KnownDevices['iPhone 15 Pro'];
+   * const iPhone = KnownDevices['iPhone 17 Pro'];
    *
    * const browser = await puppeteer.launch();
    * const page = await browser.newPage();
@@ -2219,6 +2309,12 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * ```
    */
   abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
+
+  /**
+   * @param locale - Locale to emulate on the page. Passing no locale disables
+   * locale emulation.
+   */
+  abstract emulateLocale(locale?: string): Promise<void>;
 
   /**
    * @param timezoneId - Changes the timezone of the page. See
@@ -2453,11 +2549,11 @@ export abstract class Page extends EventEmitter<PageEvents> {
       return;
     }
 
-    await environment.value.fs.promises.writeFile(path, typedArray);
+    await environment.value.writeFile(path, typedArray);
   }
 
   /**
-   * Captures a screencast of this {@link Page | page}.
+   * Captures a screencast of this {@link Page | page}. Works in Chrome 153+.
    *
    * @example
    * Recording a {@link Page | page}:
@@ -2487,7 +2583,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param options - Configures screencast behavior.
    *
-   * @experimental
+   * @deprecated Use {@link Page.record} instead.
    *
    * @remarks
    *
@@ -2548,22 +2644,129 @@ export abstract class Page extends EventEmitter<PageEvents> {
       throw new Error(`\`scale\` must be greater than 0.`);
     }
 
-    const recorder = new ScreenRecorder(this, width, height, {
-      ...options,
-      crop,
-    });
+    if (options.path && environment.value.path) {
+      await environment.value.mkdir(
+        environment.value.path.dirname(options.path),
+        {recursive: options.overwrite ?? true},
+      );
+    }
+
+    const stream = options.path
+      ? environment.value.createWriteStream(options.path, {
+          encoding: 'binary',
+          overwrite: options.overwrite,
+        })
+      : undefined;
+    const recorder = new ScreenRecorder(
+      this,
+      width,
+      height,
+      {
+        ...options,
+        crop,
+      },
+      this.logger,
+    );
     try {
       await this._startScreencast();
     } catch (error) {
       void recorder.stop();
       throw error;
     }
-    if (options.path) {
-      const {createWriteStream} = environment.value.fs;
-      const stream = createWriteStream(options.path, 'binary');
+    if (stream) {
       recorder.pipe(stream);
     }
     return recorder;
+  }
+
+  /**
+   * @internal
+   */
+  protected abstract createScreenRecording(
+    options: Readonly<RecordOptions>,
+  ): ScreenRecording;
+
+  /**
+   * Records this {@link Page | page} using the Chrome DevTools Protocol
+   * {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-startScreenRecording | Page.startScreenRecording}
+   * API.
+   *
+   * Outputs mp4 video stream.
+   *
+   * @example
+   * Recording a {@link Page | page}:
+   *
+   * ```ts
+   * import puppeteer from 'puppeteer';
+   *
+   * // Launch a browser
+   * const browser = await puppeteer.launch();
+   *
+   * // Create a new page
+   * const page = await browser.newPage();
+   *
+   * // Go to your site.
+   * await page.goto('https://www.example.com');
+   *
+   * // Start recording.
+   * const recorder = await page.record({path: 'recording.mp4'});
+   *
+   * // Do something.
+   *
+   * // Stop recording.
+   * await recorder.stop();
+   *
+   * await browser.close();
+   * ```
+   *
+   * @param options - Configures recording behavior.
+   *
+   * @experimental
+   */
+  async record(
+    options: Readonly<RecordOptions> = {},
+  ): Promise<ScreenRecording> {
+    if (options.maxWidth !== undefined && options.maxWidth <= 0) {
+      throw new Error('`maxWidth` must be greater than 0.');
+    }
+    if (options.maxHeight !== undefined && options.maxHeight <= 0) {
+      throw new Error('`maxHeight` must be greater than 0.');
+    }
+    if (options.frameRate !== undefined && options.frameRate <= 0) {
+      throw new Error('`frameRate` must be greater than 0.');
+    }
+    if (options.fps !== undefined && options.fps <= 0) {
+      throw new Error('`fps` must be greater than 0.');
+    }
+
+    if (options.path && environment.value.path) {
+      await environment.value.mkdir(
+        environment.value.path.dirname(options.path),
+        {recursive: options.overwrite ?? true},
+      );
+    }
+
+    const stream = options.path
+      ? environment.value.createWriteStream(options.path, {
+          encoding: 'binary',
+          overwrite: options.overwrite,
+        })
+      : undefined;
+
+    const recording = this.createScreenRecording(options);
+
+    try {
+      await recording._start();
+    } catch (error) {
+      void recording.stop();
+      throw error;
+    }
+
+    if (stream) {
+      recording.pipe(stream);
+    }
+
+    return recording;
   }
 
   #screencastSessionCount = 0;
@@ -2575,15 +2778,16 @@ export abstract class Page extends EventEmitter<PageEvents> {
   async _startScreencast(): Promise<void> {
     ++this.#screencastSessionCount;
     if (!this.#startScreencastPromise) {
-      this.#startScreencastPromise = this.mainFrame()
-        .client.send('Page.startScreencast', {format: 'png'})
+      const client = this.mainFrame().client;
+      const firstFrame = new Promise<void>(resolve => {
+        return client.once('Page.screencastFrame', () => {
+          return resolve();
+        });
+      });
+      this.#startScreencastPromise = client
+        .send('Page.startScreencast', {format: 'png'})
         .then(() => {
-          // Wait for the first frame.
-          return new Promise(resolve => {
-            return this.mainFrame().client.once('Page.screencastFrame', () => {
-              return resolve();
-            });
-          });
+          return firstFrame;
         });
     }
     await this.#startScreencastPromise;
@@ -2614,7 +2818,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
     if (viewport && viewport.deviceScaleFactor !== 0) {
       await this.setViewport({...viewport, deviceScaleFactor: 0});
       stack.defer(() => {
-        void this.setViewport(viewport).catch(debugError);
+        void this.setViewport(viewport).catch(error => {
+          this.logger?.(DEBUG_PREFIXES.error)?.(error);
+        });
       });
     }
     return await this.mainFrame()
@@ -2738,7 +2944,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
             ...scrollDimensions,
           });
           stack.defer(async () => {
-            await this.setViewport(viewport).catch(debugError);
+            await this.setViewport(viewport).catch(error => {
+              this.logger?.(DEBUG_PREFIXES.error)?.(error);
+            });
           });
         }
       } else {
@@ -3226,12 +3434,12 @@ export abstract class Page extends EventEmitter<PageEvents> {
    */
   abstract windowId(): Promise<WindowId>;
 
-  /** @internal */
   override [disposeSymbol](): void {
-    return void this[asyncDisposeSymbol]().catch(debugError);
+    return void this[asyncDisposeSymbol]().catch(error => {
+      this.logger?.(DEBUG_PREFIXES.error)?.(error);
+    });
   }
 
-  /** @internal */
   override async [asyncDisposeSymbol](): Promise<void> {
     await this.close();
     await super[asyncDisposeSymbol]();

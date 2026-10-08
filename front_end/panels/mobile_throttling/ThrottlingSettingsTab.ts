@@ -12,113 +12,127 @@ import * as Buttons from '../../ui/components/buttons/buttons.js';
 import {type Card, createIcon} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as PanelsCommon from '../common/common.js';
 
 import {CalibrationController} from './CalibrationController.js';
+import {ThrottlingPresets} from './ThrottlingPresets.js';
 import throttlingSettingsTabStyles from './throttlingSettingsTab.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in Throttling Settings Tab of the Network panel
+   * @description Title for default network throttling profiles card.
    */
-  networkThrottlingProfiles: 'Network throttling profiles',
+  defaultProfiles: 'Default profiles',
   /**
-   * @description Text of add conditions button in Throttling Settings Tab of the Network panel
+   * @description Title for custom network throttling profiles card.
+   */
+  customProfiles: 'Custom profiles',
+  /**
+   * @description Text of add conditions button in throttling settings tab of the Network panel.
    */
   addCustomProfile: 'Add profile',
   /**
-   * @description A value in milliseconds
+   * @description A value in milliseconds.
    * @example {3} PH1
    */
   dms: '{PH1} `ms`',
   /**
-   * @description Text in Throttling Settings Tab of the Network panel
+   * @description Text in throttling settings tab of the Network panel.
    */
-  profileName: 'Profile Name',
+  profileName: 'Profile name',
   /**
-   * @description Label for a textbox that sets the download speed in the Throttling Settings Tab.
+   * @description Label for a textbox that sets the download speed in the throttling settings tab.
    * Noun, short for 'download speed'.
    */
   download: 'Download',
   /**
-   * @description Label for a textbox that sets the upload speed in the Throttling Settings Tab.
+   * @description Label for a textbox that sets the upload speed in the throttling settings tab.
    * Noun, short for 'upload speed'.
    */
   upload: 'Upload',
   /**
-   * @description Label for a textbox that sets the latency in the Throttling Settings Tab.
+   * @description Label for a textbox that sets the latency in the throttling settings tab.
    */
   latency: 'Latency',
   /**
-   * @description Label for a textbox that sets the packet loss percentage for real-time networks in the Throttling Settings Tab.
+   * @description Label for a textbox that sets the packet loss percentage for real-time networks in the throttling settings tab.
    */
   packetLoss: 'Packet Loss',
   /**
-   * @description Label for a textbox that sets the maximum packet queue length for real-time networks in the Throttling Settings Tab.
+   * @description Label for a textbox that sets the low-tier mobile device CPU throttling in the throttling settings tab.
+   */
+  calibratedLowTierMobile: 'Low-tier mobile device',
+  /**
+   * @description Label for a textbox that sets the mid-tier mobile device CPU throttling in the throttling settings tab.
+   */
+  calibratedMidTierMobile: 'Mid-tier mobile device',
+  /**
+   * @description Label for a textbox that sets the maximum packet queue length for real-time networks in the throttling settings tab.
    */
   packetQueueLength: 'Packet Queue Length',
   /**
-   * @description Label for a checkbox that allows packet reordering in the Throttling Settings Tab.
+   * @description Label for a checkbox that allows packet reordering in the throttling settings tab.
    */
   packetReordering: 'Packet Reordering',
   /**
-   * @description Label for a textbox serving as a unit in the Throttling Settings Tab for the field Packet Queue Length column.
+   * @description Label for a textbox serving as a unit in the throttling settings tab for the field packet queue length column.
    */
   packet: 'packet',
   /**
-   * @description Text in Throttling Settings Tab of the Network panel
+   * @description Text in throttling settings tab of the Network panel.
    */
   optional: 'optional',
   /**
-   * @description Error message for Profile Name input in Throtting pane of the Settings
+   * @description Error message for profile name input in throttling pane of the Settings panel.
    * @example {49} PH1
    */
-  profileNameCharactersLengthMust: 'Profile Name characters length must be between 1 to {PH1} inclusive',
+  profileNameCharactersLengthMust: 'Profile name length must be between 1 and {PH1} characters',
   /**
-   * @description Error message for Download and Upload inputs in Throttling pane of the Settings
+   * @description Error message for download and upload inputs in throttling pane of the Settings panel.
    * @example {Download} PH1
    * @example {0} PH2
    * @example {10000000} PH3
    */
   sMustBeANumberBetweenSkbsToSkbs: '{PH1} must be a number between {PH2} `kbit/s` to {PH3} `kbit/s` inclusive',
   /**
-   * @description Error message for Latency input in Throttling pane of the Settings
+   * @description Error message for latency input in throttling pane of the Settings panel.
    * @example {0} PH1
    * @example {1000000} PH2
    */
   latencyMustBeAnIntegerBetweenSms: 'Latency must be an integer between {PH1} `ms` to {PH2} `ms` inclusive',
   /**
-   * @description Error message for Packet Loss input in Throttling pane of the Settings
+   * @description Error message for packet loss input in throttling pane of the Settings panel.
    * @example {0} PH1
    * @example {100} PH2
    */
   packetLossMustBeAnIntegerBetweenSpct: 'Packet Loss must be a number between {PH1} `%` to {PH2} `%` inclusive',
   /**
-   * @description Error message for Packet Queue Length input in Throttling pane of the Settings
+   * @description Error message for packet queue length input in throttling pane of the Settings panel.
    */
-  packetQueueLengthMustBeAnIntegerGreaterOrEqualToZero: 'Packet Queue Length must be greater or equal to 0',
+  packetQueueLengthMustBeAnIntegerGreaterOrEqualToZero: 'Packet queue length must be greater than or equal to 0',
   /**
-   * @description Text in Throttling Settings Tab of the Network panel, indicating the download or
+   * @description Text in throttling settings tab of the Network panel, indicating the download or
    * upload speed that will be applied in kilobits per second.
    * @example {25} PH1
    */
   dskbits: '{PH1} `kbit/s`',
   /**
-   * @description Text in Throttling Settings Tab of the Network panel, indicating the download or
+   * @description Text in throttling settings tab of the Network panel, indicating the download or
    * upload speed that will be applied in megabits per second.
    * @example {25.4} PH1
    */
   fsmbits: '{PH1} `Mbit/s`',
   /**
-   * @description Label for the column Packet Reordering to indicate it is enabled in the Throttling Settings Tab.
+   * @description Label for the column packet reordering to indicate it is enabled in the throttling settings tab.
    */
   on: 'On',
   /**
-   * @description Label for the column Packet Reordering to indicate it is disabled in the Throttling Settings Tab.
+   * @description Label for the column packet reordering to indicate it is disabled in the throttling settings tab.
    */
   off: 'Off',
 
   /**
-   * @description Text in Throttling Settings Tab of the Settings panel
+   * @description Text in throttling settings tab of the Settings panel.
    */
   cpuThrottlingPresets: 'CPU throttling presets',
   /**
@@ -145,12 +159,12 @@ const UIStrings = {
    * @description Text to explain why the user should run the CPU calibration process.
    */
   calibrationCTA:
-      'To use the CPU throttling presets, run the calibration process to determine the ideal throttling rate for your device.',
+      'To use the CPU throttling presets, run the calibration process to determine the ideal throttling rate for your device',
   /**
    * @description Text to explain what CPU throttling presets are.
    */
   cpuCalibrationDescription:
-      'These presets throttle your CPU to approximate the performance of typical low or mid-tier mobile devices.',
+      'These presets throttle your CPU to approximate the performance of typical low or mid-tier mobile devices',
   /**
    * @description Text to explain how the CPU calibration process will work.
    */
@@ -163,11 +177,11 @@ const UIStrings = {
   /**
    * @description Text to explain an issue that may impact the CPU calibration process.
    */
-  calibrationWarningRunningOnBattery: 'Device is running on battery, please plug in charger for best results',
+  calibrationWarningRunningOnBattery: 'Device is running on battery. Plug in charger for best results.',
   /**
    * @description Text to explain an issue that may impact the CPU calibration process.
    */
-  calibrationWarningLowBattery: 'Device battery is low (<20%), results may be impacted by CPU throttling',
+  calibrationWarningLowBattery: 'Device battery is low (<20%). Results may be impacted by CPU throttling.',
   /**
    * @description Text label for a menu item indicating that a specific slowdown multiplier is applied.
    * @example {2} PH1
@@ -180,9 +194,19 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 /**
  * This promise resolves after the first compute pressure record is observed.
  * The object it returns is always up-to-date with the most recent record observed.
+ *
+ * Note: The returned value measures the host machine's compute pressure. When
+ * debugging a remote device, this may trigger irrelevant high-pressure warnings.
  */
 function createComputePressurePromise(): Promise<{state: string}> {
   const result = {state: ''};
+
+  // @ts-expect-error typescript/lib version needs to be updated.
+  if (typeof PressureObserver === 'undefined') {
+    // The Compute Pressure API is used only for showing warnings to the user.
+    // If it's unavailable, resolve immediately to proceed without warnings.
+    return Promise.resolve(result);
+  }
 
   return new Promise(resolve => {
     // @ts-expect-error typescript/lib version needs to be updated.
@@ -199,7 +223,7 @@ function createComputePressurePromise(): Promise<{state: string}> {
 export class CPUThrottlingCard {
   element: Card;
 
-  private readonly setting: Common.Settings.Setting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>;
+  private readonly setting: Common.Settings.Setting<PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling>;
   private computePressurePromise?: ReturnType<typeof createComputePressurePromise>;
   private controller?: CalibrationController;
 
@@ -214,8 +238,8 @@ export class CPUThrottlingCard {
   private state: 'cta'|'prompting'|'calibrating' = 'cta';
   private warnings: string[] = [];
 
-  constructor() {
-    this.setting = Common.Settings.Settings.instance().createSetting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>(
+  constructor(settings: Common.Settings.Settings) {
+    this.setting = settings.createSetting<PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling>(
         'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
 
     this.element = document.createElement('devtools-card');
@@ -225,11 +249,11 @@ export class CPUThrottlingCard {
     descriptionEl.textContent = i18nString(UIStrings.cpuCalibrationDescription);
 
     this.lowTierMobileDeviceEl = this.element.createChild('div', 'cpu-preset-section');
-    this.lowTierMobileDeviceEl.append('Low-tier mobile device');
+    this.lowTierMobileDeviceEl.append(i18nString(UIStrings.calibratedLowTierMobile));
     this.lowTierMobileDeviceEl.createChild('div', 'cpu-preset-result');
 
     this.midTierMobileDeviceEl = this.element.createChild('div', 'cpu-preset-section');
-    this.midTierMobileDeviceEl.append('Mid-tier mobile device');
+    this.midTierMobileDeviceEl.append(i18nString(UIStrings.calibratedMidTierMobile));
     this.midTierMobileDeviceEl.createChild('div', 'cpu-preset-result');
 
     this.calibrateEl = this.element.createChild('div', 'cpu-preset-section cpu-preset-calibrate');
@@ -316,13 +340,13 @@ export class CPUThrottlingCard {
       this.progress.style.display = '';
     }
 
-    const resultToString = (result: number|SDK.CPUThrottlingManager.CalibrationError|undefined): string => {
+    const resultToString = (result: number|PanelsCommon.CPUThrottlingOption.CalibrationError|undefined): string => {
       if (result === undefined) {
         return i18nString(UIStrings.needsCalibration);
       }
 
       if (typeof result === 'string') {
-        return SDK.CPUThrottlingManager.calibrationErrorToString(result);
+        return PanelsCommon.CPUThrottlingOption.calibrationErrorToString(result);
       }
 
       // Shouldn't happen, but let's not throw an error (.toFixed) if the setting
@@ -334,15 +358,15 @@ export class CPUThrottlingCard {
       return i18nString(UIStrings.dSlowdown, {PH1: result.toFixed(1)});
     };
 
-    const setPresetResult =
-        (element: HTMLElement|null, result: number|SDK.CPUThrottlingManager.CalibrationError|undefined): void => {
-          if (!element) {
-            throw new Error('expected HTMLElement');
-          }
+    const setPresetResult = (element: HTMLElement|null,
+                             result: number|PanelsCommon.CPUThrottlingOption.CalibrationError|undefined): void => {
+      if (!element) {
+        throw new Error('expected HTMLElement');
+      }
 
-          element.textContent = resultToString(result);
-          element.classList.toggle('not-calibrated', result === undefined);
-        };
+      element.textContent = resultToString(result);
+      element.classList.toggle('not-calibrated', result === undefined);
+    };
 
     setPresetResult(this.lowTierMobileDeviceEl.querySelector('.cpu-preset-result'), result.low);
     setPresetResult(this.midTierMobileDeviceEl.querySelector('.cpu-preset-result'), result.mid);
@@ -442,7 +466,10 @@ function extractCustomSettingIndex(key: SDK.NetworkManager.UserDefinedThrottling
 
 export class ThrottlingSettingsTab extends UI.Widget.VBox implements
     UI.ListWidget.Delegate<SDK.NetworkManager.Conditions> {
-  private readonly list: UI.ListWidget.ListWidget<SDK.NetworkManager.Conditions>;
+  /** List of default network throttling presets (read-only in UI) */
+  private readonly presetsList: UI.ListWidget.ListWidget<SDK.NetworkManager.Conditions>;
+  /** List of custom user-defined network throttling profiles */
+  private readonly customList: UI.ListWidget.ListWidget<SDK.NetworkManager.Conditions>;
   private readonly customUserConditions: Common.Settings.Setting<SDK.NetworkManager.Conditions[]>;
   private editor?: UI.ListWidget.Editor<SDK.NetworkManager.Conditions>;
   private cpuThrottlingCard: CPUThrottlingCard;
@@ -455,7 +482,7 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
    */
   #customUserConditionsCount: number;
 
-  constructor() {
+  constructor(settings: Common.Settings.Settings) {
     super({
       jslog: `${VisualLogging.pane('throttling-conditions')}`,
       useShadowDom: true,
@@ -466,7 +493,7 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
         this.contentElement.createChild('div', 'settings-card-container-wrapper').createChild('div');
     settingsContent.classList.add('settings-card-container', 'throttling-conditions-settings');
 
-    this.cpuThrottlingCard = new CPUThrottlingCard();
+    this.cpuThrottlingCard = new CPUThrottlingCard(settings);
     settingsContent.append(this.cpuThrottlingCard.element);
 
     const addButton = new Buttons.Button.Button();
@@ -479,17 +506,20 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
     addButton.textContent = i18nString(UIStrings.addCustomProfile);
     addButton.addEventListener('click', () => this.addButtonClicked());
 
-    const card = settingsContent.createChild('devtools-card');
-    card.heading = i18nString(UIStrings.networkThrottlingProfiles);
-    const container = card.createChild('div');
+    this.presetsList = new UI.ListWidget.ListWidget(this);
+    this.presetsList.setHeader(createHeaderRow());
+    createProfilesCard(i18nString(UIStrings.defaultProfiles), this.presetsList, settingsContent);
+    const presets = ThrottlingPresets.networkPresets;
+    for (let i = 0; i < presets.length; ++i) {
+      this.presetsList.appendItem(presets[i], false);
+    }
 
-    this.list = new UI.ListWidget.ListWidget(this);
-    this.list.element.classList.add('conditions-list');
-    this.list.registerRequiredCSS(throttlingSettingsTabStyles);
-    this.list.show(container);
-    container.appendChild(addButton);
+    this.customList = new UI.ListWidget.ListWidget(this);
+    this.customList.setHeader(createHeaderRow());
+    const customContainer = createProfilesCard(i18nString(UIStrings.customProfiles), this.customList, settingsContent);
+    customContainer.appendChild(addButton);
 
-    this.customUserConditions = SDK.NetworkManager.customUserNetworkConditionsSetting();
+    this.customUserConditions = SDK.NetworkManager.customUserNetworkConditionsSetting(settings);
     this.customUserConditions.addChangeListener(this.conditionsUpdated, this);
 
     const customConditions = this.customUserConditions.get();
@@ -523,26 +553,24 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
   }
 
   private conditionsUpdated(): void {
-    this.list.clear();
+    this.customList.clear();
 
     const conditions = this.customUserConditions.get();
     for (let i = 0; i < conditions.length; ++i) {
-      this.list.appendItem(conditions[i], true);
+      this.customList.appendItem(conditions[i], true);
     }
-
-    this.list.appendSeparator();
   }
 
   private addButtonClicked(): void {
     this.#customUserConditionsCount++;
-    this.list.addNewItem(this.customUserConditions.get().length, {
+    this.customList.addNewItem(this.customList.items.length, {
       key: `USER_CUSTOM_SETTING_${this.#customUserConditionsCount}`,
       title: () => '',
       download: -1,
       upload: -1,
       latency: 0,
       packetLoss: 0,
-      packetReordering: false
+      packetReordering: false,
     });
   }
 
@@ -553,7 +581,7 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
     const titleText = title.createChild('div', 'conditions-list-title-text');
     const castedTitle = this.retrieveOptionsTitle(conditions);
     titleText.textContent = castedTitle;
-    UI.Tooltip.Tooltip.install(titleText, castedTitle);
+    UI.Tooltip.Tooltip.install(title, castedTitle);
     element.createChild('div', 'conditions-list-separator');
     element.createChild('div', 'conditions-list-text').textContent = throughputText(conditions.download);
     element.createChild('div', 'conditions-list-separator');
@@ -842,4 +870,42 @@ function percentText(percent: number): string {
     return '';
   }
   return String(percent) + '%';
+}
+
+function createProfilesCard(heading: string, list: UI.ListWidget.ListWidget<SDK.NetworkManager.Conditions>,
+                            parent: Element): HTMLElement {
+  const card = parent.createChild('devtools-card');
+  card.heading = heading;
+  const container = card.createChild('div');
+  list.element.classList.add('conditions-list');
+  list.registerRequiredCSS(throttlingSettingsTabStyles);
+  list.show(container);
+  return container;
+}
+
+function appendHeaderColumn(element: Element, text: string): void {
+  element.createChild('div', 'conditions-list-separator');
+  const column = element.createChild('div', 'conditions-list-text');
+  column.textContent = text;
+  UI.Tooltip.Tooltip.install(column, text);
+}
+
+function createHeaderRow(): Element {
+  const element = document.createElement('div');
+  element.classList.add('conditions-list-item', 'conditions-list-header');
+
+  const title = element.createChild('div', 'conditions-list-text conditions-list-title');
+  const titleText = title.createChild('div', 'conditions-list-title-text');
+  const profileName = i18nString(UIStrings.profileName);
+  titleText.textContent = profileName;
+  UI.Tooltip.Tooltip.install(title, profileName);
+
+  appendHeaderColumn(element, i18nString(UIStrings.download));
+  appendHeaderColumn(element, i18nString(UIStrings.upload));
+  appendHeaderColumn(element, i18nString(UIStrings.latency));
+  appendHeaderColumn(element, i18nString(UIStrings.packetLoss));
+  appendHeaderColumn(element, i18nString(UIStrings.packetQueueLength));
+  appendHeaderColumn(element, i18nString(UIStrings.packetReordering));
+
+  return element;
 }

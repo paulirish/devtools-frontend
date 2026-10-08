@@ -3,21 +3,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/kit/kit.js';
+
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
 import * as uiI18n from '../../../ui/i18n/i18n.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import {html, type LitTemplate, render} from '../../../ui/lit/lit.js';
-import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import disabledWidgetStyles from './disabledWidget.css.js';
 
 const UIStrings = {
   /**
-   * @description The error message when the user is not logged in into Chrome.
+   * @description The error message when the user is not signed in to Chrome.
    */
-  notLoggedIn: 'This feature is only available when you are signed into Chrome with your Google account',
+  notLoggedIn: 'This feature is only available when you are signed in to Chrome with your Google account',
   /**
    * @description Message shown when the user is offline.
    */
@@ -50,7 +51,7 @@ const UIStrings = {
   /**
    * @description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
    */
-  notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
+  notAvailableInIncognitoMode: 'AI assistance isn’t available in Incognito mode or Guest mode',
 
 } as const;
 
@@ -85,14 +86,14 @@ function renderConsentViewContents(
   }
 
   // eslint-disable-next-line @devtools/no-imperative-dom-api
-  const settingsLink = document.createElement('span');
+  const settingsLink = document.createElement('devtools-link');
   settingsLink.textContent = i18nString(UIStrings.settingsLink);
   settingsLink.classList.add('link');
   UI.ARIAUtils.markAsLink(settingsLink);
   settingsLink.addEventListener('click', () => {
     void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
   });
-  settingsLink.setAttribute('jslog', `${VisualLogging.action('open-ai-settings').track({click: true})}`);
+  settingsLink.jslogContext = 'open-ai-settings';
 
   let consentViewContents: HTMLSpanElement;
   if (hostConfig.devToolsAiAssistancePerformanceAgent?.enabled) {
@@ -134,7 +135,7 @@ export const DEFAULT_VIEW = (
         </div>
       </div>
     `,
-    target
+    target,
   );
   // clang-format on
 };
@@ -145,7 +146,7 @@ export class DisabledWidget extends UI.Widget.Widget {
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions = Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL;
 
   #view: View;
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
   }

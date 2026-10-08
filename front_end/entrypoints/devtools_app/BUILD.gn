@@ -7,18 +7,19 @@ import("../visibility.gni")
 devtools_entrypoint("entrypoint") {
   entrypoint = "devtools_app.ts"
 
-  deps = [
+  ts_deps = [
+    "../../core/root:bundle",
     "../../entrypoints/inspector_main:meta",
     "../../panels/accessibility:meta",
     "../../panels/animation:meta",
     "../../panels/application:meta",
     "../../panels/autofill:meta",
     "../../panels/browser_debugger:meta",
+    "../../panels/comments:meta",
     "../../panels/css_overview:meta",
     "../../panels/developer_resources:meta",
     "../../panels/elements:meta",
     "../../panels/emulation:meta",
-    "../../panels/greendev:meta",
     "../../panels/issues:meta",
     "../../panels/layer_viewer:meta",
     "../../panels/layers:meta",

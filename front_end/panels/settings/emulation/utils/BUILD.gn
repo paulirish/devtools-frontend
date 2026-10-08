@@ -13,7 +13,7 @@ devtools_ui_module("ui_utils") {
     "UserAgentMetadata.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../generated",
     "../../../../ui/legacy:bundle",
   ]
@@ -22,7 +22,7 @@ devtools_ui_module("ui_utils") {
 devtools_entrypoint("bundle") {
   entrypoint = "utils.ts"
 
-  deps = [ ":ui_utils" ]
+  ts_deps = [ ":ui_utils" ]
 
   visibility = [
     ":*",
@@ -41,7 +41,7 @@ devtools_ui_module("unittests") {
     "UserAgentMetadata.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../../generated",
   ]

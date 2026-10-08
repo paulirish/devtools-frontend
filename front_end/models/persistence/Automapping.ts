@@ -6,8 +6,8 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Bindings from '../bindings/bindings.js';
-import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {type FileSystem, FileSystemWorkspaceBinding} from './FileSystemWorkspaceBinding.js';
@@ -194,7 +194,13 @@ export class Automapping {
       if (this.#sourceCodeToProcessingPromiseMap.get(networkSourceCode) !== createBindingPromise) {
         return null;
       }
-      if (status.network.contentType().isFromSourceMap() || !status.fileSystem.contentType().isTextType()) {
+      const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(status.network);
+      const isNodeTarget = target?.type() === SDK.Target.Type.NODE;
+      // Source-map-derived URLs and contents are controlled by the inspected page.
+      // Only trust them without content validation when debugging Node.js.
+      const skipContentValidation = !status.fileSystem.contentType().isTextType() ||
+          (status.network.contentType().isFromSourceMap() && isNodeTarget);
+      if (skipContentValidation) {
         return status;
       }
 
@@ -231,10 +237,9 @@ export class Automapping {
         return null;
       }
 
-      const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(status.network);
       let isValid = false;
       const fileContent = fileSystemContent.content;
-      if (target && target.type() === SDK.Target.Type.NODE) {
+      if (isNodeTarget) {
         if (networkContent.content) {
           const rewrappedNetworkContent =
               PersistenceImpl.rewrapNodeJSContent(status.fileSystem, fileContent, networkContent.content);

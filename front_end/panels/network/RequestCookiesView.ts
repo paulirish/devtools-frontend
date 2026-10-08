@@ -20,12 +20,12 @@ const UIStrings = {
   /**
    * @description Text in Request Cookies View of the Network panel
    */
-  thisRequestHasNoCookies: 'This request has no cookies.',
+  thisRequestHasNoCookies: 'This request has no cookies',
   /**
    * @description Title for a table which shows all of the cookies associated with a selected network
    * request, in the Network panel. Noun phrase.
    */
-  requestCookies: 'Request Cookies',
+  requestCookies: 'Request cookies',
   /**
    * @description Tooltip to explain what request cookies are
    */
@@ -33,15 +33,15 @@ const UIStrings = {
   /**
    * @description Label for showing request cookies that were not actually sent
    */
-  showFilteredOutRequestCookies: 'show filtered out request cookies',
+  showFilteredOutRequestCookies: 'Show filtered-out request cookies',
   /**
    * @description Text in Request Headers View of the Network Panel
    */
-  noRequestCookiesWereSent: 'No request cookies were sent.',
+  noRequestCookiesWereSent: 'No request cookies were sent',
   /**
    * @description Text in Request Cookies View of the Network panel
    */
-  responseCookies: 'Response Cookies',
+  responseCookies: 'Response cookies',
   /**
    * @description Tooltip to explain what response cookies are
    */
@@ -50,7 +50,7 @@ const UIStrings = {
   /**
    * @description Label for response cookies with invalid syntax
    */
-  malformedResponseCookies: 'Malformed Response Cookies',
+  malformedResponseCookies: 'Malformed response cookies',
   /**
    * @description Tooltip to explain what malformed response cookies are. Malformed cookies are
    * cookies that did not match the expected format and could not be interpreted, and are invalid.
@@ -65,7 +65,7 @@ const UIStrings = {
    *
    */
   siteHasCookieInOtherPartition:
-      'This site has cookies in another partition, that were not sent with this request. {PH1}',
+      'This site has cookies in another partition, that weren’t sent with this request. {PH1}',
   /**
    * @description Title of a link to the developer documentation.
    */
@@ -115,13 +115,13 @@ export const DEFAULT_VIEW: ViewFunction = (input, _output, target) => {
       ${input.requestCookies.cookies.length > 0 ? html`
         <devtools-widget ${widget(CookieTable.CookiesTable.CookiesTable, {
           cookiesData: input.requestCookies,
-          inline: true
+          inline: true,
         })} class="cookie-table cookies-panel-item"></devtools-widget>
       ` : Lit.nothing}
 
       <div class="cookies-panel-item site-has-cookies-in-other-partition ${input.siteHasCookieInOtherPartition ? '' : 'hidden'}">
         ${uiI18n.getFormatLocalizedStringTemplate(str_, UIStrings.siteHasCookieInOtherPartition, {
-          PH1: html`<devtools-link href="https://developer.chrome.com/en/docs/privacy-sandbox/chips/" .jslogContext=${'learn-more'}>${i18nString(UIStrings.learnMore)}</devtools-link>`
+          PH1: html`<devtools-link href="https://developer.chrome.com/en/docs/privacy-sandbox/chips/" .jslogContext=${'learn-more'}>${i18nString(UIStrings.learnMore)}</devtools-link>`,
 })}
       </div>
 

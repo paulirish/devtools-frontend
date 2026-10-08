@@ -50,22 +50,10 @@ all options.
 
 ### Running a subset of unit tests
 
-If you want to run a specific (set of) unit test(s) and you don't want
-to pass the name of the `.test.ts` file to `npm run test`, you can use
-`it.only` or `describe.only` for those tests that you want to run.
+If you want to run a specific unit test, you can use the exact test ID printed in the console output when a test fails or when you run the tests. You can pass this test ID to `npm run test` to run only that specific test without modifying the code.
 
-```ts
-// Run only the tests within this `describe` block.
-describe.only('The test suite that you want to run', () => {
-  it('A test that would run', () => {});
-  it('Another test that would run', () => {});
-});
-
-describe('The test suite that you want to run', () => {
-  // Run only a single test.
-  it.only('A test that would run', () => {});
-  it('A test that would not run', () => {});
-});
+```bash
+npm run test front_end/panels/sources/SourcesView.test.ts:the_test_suite_that_you_want_to_run:a_test_that_would_run
 ```
 
 ## Writing unit tests
@@ -104,52 +92,6 @@ in VS Code debugger" from the dropdown, and click the start button or
 press F5.
 
 ![Debugging unit tests with VSCode](../../docs/images/debugging-unit-tests-with-vscode.png 'Debugging unit tests with VSCode')
-
-## Dealing with flaky unit tests
-
-To skip a flaky unit test, create a new bug on [crbug.com](https://crbug.com) in the
-`Chromium > Platform > DevTools` component, and modify the `it` or `describe`
-block accordingly by adding `.skip` to it, adding a preceeding comment
-why the test is skipp and adding the `crbug.com` reference to the test
-block string. For example
-
-```ts
-describe('Foo', () => {
-  it('can return bar', () => {
-    assert.strictEqual(new Foo().bar(), 'bar');
-  });
-
-  // ...
-});
-```
-
-would be changed to look like this
-
-```ts
-describe('Foo', () => {
-  // Flaking on multiple bots on CQ after recent CL xyz.
-  it.skip('[crbug.com/12345678] can return bar', () => {
-    assert.strictEqual(new Foo().bar(), 'bar');
-  });
-
-  // ...
-});
-```
-
-if only the one test case should be skipped, or like this
-
-```ts
-// Flaking on multiple bots on CQ after recent CL xyz.
-describe.skip('[crbug.com/12345678] Foo', () => {
-  it('can return bar', () => {
-    assert.strictEqual(new Foo().bar(), 'bar');
-  });
-
-  // ...
-});
-```
-
-if all the tests for `Foo` should be skipped.
 
 ## Screenshot tests
 

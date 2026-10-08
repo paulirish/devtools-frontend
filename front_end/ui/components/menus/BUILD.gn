@@ -22,23 +22,21 @@ devtools_ui_module("menus") {
     "Menu.ts",
     "SelectMenu.ts",
   ]
-  deps = [
-    "../../../../front_end/core/platform:bundle",
-    "../../../../front_end/ui/components/helpers:bundle",
-    "../../../../front_end/ui/components/render_coordinator:bundle",
+  ts_deps = [
+    "../../../core/platform:bundle",
     "../../lit:bundle",
     "../../visual_logging:bundle",
     "../dialogs:bundle",
+    "../helpers:bundle",
+    "../render_coordinator:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "menus.ts"
 
-  deps = [
-    ":css_files",
-    ":menus",
-  ]
+  ts_deps = [ ":menus" ]
 
   visibility = [ "*" ]
 }
@@ -48,7 +46,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "SelectMenu.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../lit:bundle",

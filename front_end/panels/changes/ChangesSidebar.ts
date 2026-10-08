@@ -17,7 +17,7 @@ import changesSidebarStyles from './changesSidebar.css.js';
 
 const UIStrings = {
   /**
-   * @description Name of an item from source map
+   * @description Tooltip title for a file item in the Changes sidebar when the file is generated from a source map.
    * @example {compile.html} PH1
    */
   sFromSourceMap: '{PH1} (from source map)',
@@ -63,27 +63,39 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
       target, {container: {attributes: {jslog: `${VisualLogging.pane('sidebar').track({resize: true})}`}}});
 };
 
-export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.Widget>(
-    UI.Widget.Widget) {
+const ChangesSidebarBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.Widget> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.Widget,
+    );
+
+export class ChangesSidebar extends ChangesSidebarBase {
   #workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl|null = null;
   readonly #view: View;
   readonly #sourceCodes = new Set<Workspace.UISourceCode.UISourceCode>();
   #selectedUISourceCode: Workspace.UISourceCode.UISourceCode|null = null;
-  constructor(target?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(target?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(target);
     this.#view = view;
   }
 
-  set workspaceDiff(workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl) {
+  set workspaceDiff(
+      workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl,
+  ) {
     if (this.#workspaceDiff) {
       this.#workspaceDiff.modifiedUISourceCodes().forEach(this.#removeUISourceCode.bind(this));
       this.#workspaceDiff.removeEventListener(
-          WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED, this.uiSourceCodeModifiedStatusChanged, this);
+          WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED,
+          this.uiSourceCodeModifiedStatusChanged,
+          this,
+      );
     }
     this.#workspaceDiff = workspaceDiff;
     this.#workspaceDiff.modifiedUISourceCodes().forEach(this.#addUISourceCode.bind(this));
     this.#workspaceDiff.addEventListener(
-        WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED, this.uiSourceCodeModifiedStatusChanged, this);
+        WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED,
+        this.uiSourceCodeModifiedStatusChanged,
+        this,
+    );
     this.requestUpdate();
   }
 
@@ -95,12 +107,14 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
     const input: ViewInput = {
       onSelect: uiSourceCode => this.#selectionChanged(uiSourceCode),
       sourceCodes: this.#sourceCodes,
-      selectedSourceCode: this.#selectedUISourceCode
+      selectedSourceCode: this.#selectedUISourceCode,
     };
     this.#view(input, {}, this.contentElement);
   }
 
-  #selectionChanged(selectedUISourceCode: Workspace.UISourceCode.UISourceCode|null): void {
+  #selectionChanged(
+      selectedUISourceCode: Workspace.UISourceCode.UISourceCode|null,
+      ): void {
     this.#selectedUISourceCode = selectedUISourceCode;
     this.dispatchEventToListeners(Events.SELECTED_UI_SOURCE_CODE_CHANGED);
     this.requestUpdate();
@@ -108,16 +122,40 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
   #addUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
     this.#sourceCodes.add(uiSourceCode);
-    uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, this.requestUpdate, this);
-    uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyChanged, this.requestUpdate, this);
-    uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted, this.requestUpdate, this);
+    uiSourceCode.addEventListener(
+        Workspace.UISourceCode.Events.TitleChanged,
+        this.requestUpdate,
+        this,
+    );
+    uiSourceCode.addEventListener(
+        Workspace.UISourceCode.Events.WorkingCopyChanged,
+        this.requestUpdate,
+        this,
+    );
+    uiSourceCode.addEventListener(
+        Workspace.UISourceCode.Events.WorkingCopyCommitted,
+        this.requestUpdate,
+        this,
+    );
     this.requestUpdate();
   }
 
   #removeUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    uiSourceCode.removeEventListener(Workspace.UISourceCode.Events.TitleChanged, this.requestUpdate, this);
-    uiSourceCode.removeEventListener(Workspace.UISourceCode.Events.WorkingCopyChanged, this.requestUpdate, this);
-    uiSourceCode.removeEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted, this.requestUpdate, this);
+    uiSourceCode.removeEventListener(
+        Workspace.UISourceCode.Events.TitleChanged,
+        this.requestUpdate,
+        this,
+    );
+    uiSourceCode.removeEventListener(
+        Workspace.UISourceCode.Events.WorkingCopyChanged,
+        this.requestUpdate,
+        this,
+    );
+    uiSourceCode.removeEventListener(
+        Workspace.UISourceCode.Events.WorkingCopyCommitted,
+        this.requestUpdate,
+        this,
+    );
     if (uiSourceCode === this.#selectedUISourceCode) {
       let newSelection;
       for (const sourceCode of this.#sourceCodes.values()) {
@@ -127,7 +165,9 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
         newSelection = sourceCode;
       }
       this.#sourceCodes.delete(uiSourceCode);
-      this.#selectionChanged(newSelection ?? this.#sourceCodes.values().next().value ?? null);
+      this.#selectionChanged(
+          newSelection ?? this.#sourceCodes.values().next().value ?? null,
+      );
     } else {
       this.#sourceCodes.delete(uiSourceCode);
     }
@@ -135,7 +175,8 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   private uiSourceCodeModifiedStatusChanged(
-      event: Common.EventTarget.EventTargetEvent<WorkspaceDiff.WorkspaceDiff.ModifiedStatusChangedEvent>): void {
+      event: Common.EventTarget.EventTargetEvent<WorkspaceDiff.WorkspaceDiff.ModifiedStatusChangedEvent>,
+      ): void {
     const {isModified, uiSourceCode} = event.data;
     if (isModified) {
       this.#addUISourceCode(uiSourceCode);

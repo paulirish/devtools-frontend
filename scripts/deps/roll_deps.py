@@ -35,6 +35,7 @@ FILES = [
     'v8/include/js_protocol.pdl',
     'third_party/blink/renderer/core/css/css_properties.json5',
     'third_party/blink/renderer/core/html/aria_properties.json5',
+    'third_party/blink/renderer/platform/runtime_enabled_features.json5',
     'third_party/blink/public/devtools_protocol/domains',
     'third_party/blink/public/devtools_protocol/browser_protocol.pdl',
     'third_party/blink/renderer/core/frame/deprecation/deprecation.json5',
@@ -208,7 +209,7 @@ def run_eslint(options):
             generated_source_files.append(line)
     subprocess.check_call([
         node_path(options),
-        os.path.join(options.devtools_dir, 'scripts', 'test',
+        os.path.join(options.devtools_dir, 'scripts', 'lint',
                      'run_lint_check.mjs')
     ] + generated_source_files,
                           cwd=options.devtools_dir)

@@ -13,7 +13,7 @@ import {AffectedResourcesView} from './AffectedResourcesView.js';
 
 const UIStrings = {
   /**
-   * @description Singular or Plural label for number of affected sources (consisting of (source) file name + line number) in issue view
+   * @description Label in the Issues panel for the number of affected source code locations.
    */
   nSources: '{n, plural, =1 {# source} other {# sources}}',
 } as const;
@@ -39,7 +39,7 @@ export class AffectedSourcesView extends AffectedResourcesView {
     const cellElement = document.createElement('td');
     // TODO(chromium:1072331): Check feasibility of plumping through scriptId for `linkifyScriptLocation`
     //                         to support source maps and formatted scripts.
-    const linkifierURLOptions = {columnNumber, lineNumber, tabStop: true, showColumnNumber: false, inlineFrameIndex: 0};
+    const linkifierURLOptions = {columnNumber, lineNumber, tabStop: true, showColumnNumber: false};
     // An element created with linkifyURL can subscribe to the events
     // 'click' neither 'keydown' if that key is the 'Enter' key.
     // Also, this element has a context menu, so we should be able to

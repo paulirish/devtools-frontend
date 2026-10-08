@@ -9,13 +9,15 @@ import("./visibility.gni")
 
 devtools_ui_module("lit") {
   sources = [
+    "Directives.ts",
     "i18n-template.ts",
     "render.ts",
     "strip-whitespace.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/i18n:bundle",
+    "../../core/platform:bundle",
     "../../third_party/i18n:bundle",
     "../../third_party/lit:bundle",
   ]
@@ -24,14 +26,17 @@ devtools_ui_module("lit") {
 devtools_entrypoint("bundle") {
   entrypoint = "lit.ts"
 
-  deps = [ ":lit" ]
+  ts_deps = [
+    ":lit",
+    "../../third_party/lit:bundle",
+  ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/lit,
     # as the Lit module should only be used in UI code, and business logic
     # should never depend on the Lit module.
-    ":unittests",
-    "../../entrypoints/inspector_main",
+    ":*",
+    "../../entrypoints/inspector_main/*",
     "../../entrypoints/main/*",
     "../../panels/*",
     "../../testing/*",
@@ -48,15 +53,17 @@ devtools_ui_module("unittests") {
   testonly = true
 
   sources = [
+    "Directives.test.ts",
     "i18n-template.test.ts",
     "render.test.ts",
     "strip-whitespace.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/i18n:bundle",
     "../../testing",
     "../../third_party/i18n:bundle",
+    "../../third_party/lit:bundle",
   ]
 }

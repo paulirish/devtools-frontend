@@ -61,7 +61,7 @@ describe('Navigation', function() {
     devToolsPage.page.on('console', consoleListener);
     try {
       expectErrors();
-      await navigateToLighthouseTab('lighthouse/hello.html', devToolsPage, inspectedPage);
+      await navigateToLighthouseTab(devToolsPage, inspectedPage, 'lighthouse/hello.html');
       await registerServiceWorker(inspectedPage);
 
       await devToolsPage.waitFor('.lighthouse-start-view');
@@ -86,7 +86,7 @@ describe('Navigation', function() {
       // 1 refresh after auditing to reset state
       assert.strictEqual(numNavigations, 5);
 
-      assert.strictEqual(lhr.lighthouseVersion, '13.3.0');
+      assert.strictEqual(lhr.lighthouseVersion, '13.5.0');
       assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
       assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -136,7 +136,7 @@ describe('Navigation', function() {
       });
       assert.strictEqual(selectedTabText, 'Performance');
 
-      await navigateToLighthouseTab(undefined, devToolsPage, inspectedPage);
+      await navigateToLighthouseTab(devToolsPage, inspectedPage, undefined);
 
       // Test .lh-node is linkified to Elements panel.
       const lcpBreakdownAudit = await devToolsPage.waitForElementWithTextContent('LCP breakdown', reportEl);
@@ -166,7 +166,7 @@ describe('Navigation', function() {
           'a[data-action="save-html"]:not(.hidden)', saveHtmlEl => (saveHtmlEl as HTMLElement).click());
 
       const htmlContent = await waitForHtml();
-      const iframeHandle = await renderHtmlInIframe(htmlContent, inspectedPage);
+      const iframeHandle = await renderHtmlInIframe(inspectedPage, htmlContent);
       const iframeAuditDivs = await iframeHandle.$$('.lh-audit');
       const frontendAuditDivs = await reportEl.$$('.lh-audit');
       assert.strictEqual(frontendAuditDivs.length, iframeAuditDivs.length);
@@ -186,9 +186,9 @@ describe('Navigation', function() {
     try {
       expectErrors();
 
-      await navigateToLighthouseTab('lighthouse/hello.html', devToolsPage, inspectedPage);
+      await navigateToLighthouseTab(devToolsPage, inspectedPage, 'lighthouse/hello.html');
 
-      await setThrottlingMethod('devtools', devToolsPage);
+      await setThrottlingMethod(devToolsPage, 'devtools');
 
       await clickStartButton(devToolsPage);
 
@@ -230,13 +230,13 @@ describe('Navigation', function() {
     try {
       expectErrors();
 
-      await navigateToLighthouseTab('lighthouse/busy-worker.html', devToolsPage, inspectedPage);
+      await navigateToLighthouseTab(devToolsPage, inspectedPage, 'lighthouse/busy-worker.html');
 
       await clickStartButton(devToolsPage);
 
       const {lhr} = await waitForResult(devToolsPage, inspectedPage);
 
-      assert.strictEqual(lhr.lighthouseVersion, '13.3.0');
+      assert.strictEqual(lhr.lighthouseVersion, '13.5.0');
     } catch (e) {
       console.error(consoleLog.join('\n'));
       throw e;
@@ -244,10 +244,53 @@ describe('Navigation', function() {
       devToolsPage.page.off('console', consoleListener);
     }
   });
+
+  // protocol-error.html is designed to get Lighthouse to send a `DOM.resolveNode` command
+  // that will fail to find a node. This should generate a specific error message that gets
+  // passed through from Puppeteer's connection abstraction into Lighthouse's.
+  //
+  // The link-text and crawlable-anchors audits use the AnchorElements gatherer, so these
+  // audits would error unless we handle protocol errors in a way Puppeteer expects. If we
+  // do handle them, Lighthouse sees the error message and decides to ignore "No node found"
+  // as an expected error case.
+  //
+  // See:
+  //   https://crbug.com/519314068
+  //   https://github.com/GoogleChrome/lighthouse/blob/main/core/gather/driver/dom.js
+  it('successfully returns a Lighthouse report even with expected protocol errors',
+     async ({devToolsPage, inspectedPage}) => {
+       devToolsPage.page.on('console', consoleListener);
+       try {
+         expectErrors();
+
+         await navigateToLighthouseTab(devToolsPage, inspectedPage, 'lighthouse/protocol-error.html');
+
+         await selectCategories(devToolsPage, ['seo']);
+
+         await clickStartButton(devToolsPage);
+
+         const {lhr} = await waitForResult(devToolsPage, inspectedPage);
+
+         const {erroredAudits} = getAuditsBreakdown(lhr);
+         assert.deepEqual(erroredAudits, []);
+
+         assert.strictEqual(lhr.lighthouseVersion, '13.5.0');
+       } catch (e) {
+         console.error(consoleLog.join('\n'));
+         throw e;
+       } finally {
+         devToolsPage.page.off('console', consoleListener);
+       }
+     });
 });
 
 describe('with changed settings', function() {
   setup({devToolsSettings: {language: 'es'}});
+
+  // The tests in this suite are particularly slow
+  if (this.timeout() !== 0) {
+    this.timeout(60_000);
+  }
 
   const consoleLog: string[] = [];
   const consoleListener = (e: puppeteer.ConsoleMessage) => {
@@ -258,12 +301,12 @@ describe('with changed settings', function() {
     devToolsPage.page.on('console', consoleListener);
     try {
       expectErrors();
-      await navigateToLighthouseTab('lighthouse/hello.html', devToolsPage, inspectedPage);
+      await navigateToLighthouseTab(devToolsPage, inspectedPage, 'lighthouse/hello.html');
       await registerServiceWorker(inspectedPage);
-      await setToolbarCheckboxWithText(true, 'Habilitar muestreo de JS', devToolsPage);
-      await setToolbarCheckboxWithText(false, 'Borrar almacenamiento', devToolsPage);
-      await selectCategories(['performance', 'best-practices'], devToolsPage);
-      await selectDevice('desktop', devToolsPage);
+      await setToolbarCheckboxWithText(devToolsPage, true, 'Habilitar muestreo de JS');
+      await setToolbarCheckboxWithText(devToolsPage, false, 'Borrar almacenamiento');
+      await selectCategories(devToolsPage, ['performance', 'best-practices']);
+      await selectDevice(devToolsPage, 'desktop');
 
       await clickStartButton(devToolsPage);
 

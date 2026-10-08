@@ -5,20 +5,20 @@
 import {assert} from 'chai';
 
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
+import type * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
-import {getComputationDataFromFixture, toLanternTrace} from '../testing/testing.js';
+import {getComputationDataFromFixture} from '../testing/testing.js';
 
 const {FirstContentfulPaint, LargestContentfulPaint} = Lantern.Metrics;
 
 describe('Metrics: Lantern LCP', function() {
-  TraceLoader.setTestTimeout(this);
-  let trace: Lantern.Types.Trace;
+  let parsedTrace: Trace.TraceModel.ParsedTrace;
   before(async function() {
-    trace = toLanternTrace(await TraceLoader.rawEvents(this, 'lantern/paul/trace.json.gz'));
+    parsedTrace = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
   });
 
   it('should compute predicted value', async () => {
-    const data = await getComputationDataFromFixture(this, {trace});
+    const data = await getComputationDataFromFixture(this, {parsedTrace});
     const result = LargestContentfulPaint.compute(data, {
       fcpResult: FirstContentfulPaint.compute(data),
     });

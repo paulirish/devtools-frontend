@@ -119,10 +119,15 @@ export type EventMixinBase = {
   dispatchDOMEvent ? (event: Event) : void,
 }&object;
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export function eventMixin<Events, Base extends Platform.Constructor.Constructor<EventMixinBase>>(base: Base) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  console.assert(base as any !== HTMLElement);
+export type EventMixin<
+  Events,
+  Base extends Platform.Constructor.Constructor<EventMixinBase>,
+> = Base & Platform.Constructor.Constructor<EventTarget<Events>>;
+
+export function eventMixin<
+  Events,
+  Base extends Platform.Constructor.Constructor<EventMixinBase>,
+>(base: Base): EventMixin<Events, Base> {
   return class EventHandling extends base implements EventTarget<Events> {
     // Note that the weird name is due to TSC disallowing private/protected fields in
     // anonmous exported classes. We use a `__` prefix to prevent clashes with `base`.

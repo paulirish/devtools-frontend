@@ -6,7 +6,6 @@ import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {data as auctionWorkletsData} from './AuctionWorkletsHandler.js';
 import * as HandlerHelpers from './helpers.js';
 import {data as metaHandlerData, type FrameProcessData} from './MetaHandler.js';
 import {data as networkRequestHandlerData} from './NetworkRequestsHandler.js';
@@ -248,7 +247,6 @@ export function assignThreadName(
  *  - Deletes processes with an unknown origin.
  */
 export function sanitizeProcesses(processes: Map<Types.Events.ProcessID, RendererProcess>): void {
-  const auctionWorklets = auctionWorkletsData().worklets;
   const metaData = metaHandlerData();
   if (metaData.traceIsGeneric) {
     return;
@@ -258,19 +256,8 @@ export function sanitizeProcesses(processes: Map<Types.Events.ProcessID, Rendere
     // parsed for some reason, or if it's an "about:" origin, delete it.
     // This is done because we don't really care about processes for which we
     // can't provide actionable insights to the user (e.g. about:blank pages).
-    //
-    // There is one exception; AuctionWorklet processes get parsed in a
-    // separate handler, so at this point we check to see if the process has
-    // been found by the AuctionWorkletsHandler, and if so we update the URL.
-    // This ensures that we keep this process around and do not drop it due to
-    // the lack of a URL.
     if (process.url === null) {
-      const maybeWorklet = auctionWorklets.get(pid);
-      if (maybeWorklet) {
-        process.url = maybeWorklet.host;
-      } else {
-        processes.delete(pid);
-      }
+      processes.delete(pid);
       continue;
     }
   }
@@ -318,13 +305,23 @@ export function sanitizeThreads(processes: Map<Types.Events.ProcessID, RendererP
 export function buildHierarchy(
     processes: Map<Types.Events.ProcessID, RendererProcess>,
     options?: {filter: {has: (name: Types.Events.Name) => boolean}}): void {
+  // Ensure threads that only contain V8 CPU profiler samples (such as WebAssembly
+  // background execution threads) are registered in their process before we iterate.
+  // These threads do not receive standard renderer trace events, so their RendererThread
+  // objects must be initialized here so SamplesIntegrator can inject profile calls.
   const samplesData = samplesHandlerData();
+  for (const [pid, profilesByThread] of samplesData.profilesInProcess) {
+    const process = processes.get(pid);
+    if (!process) {
+      continue;
+    }
+    for (const [tid] of profilesByThread) {
+      getOrCreateRendererThread(process, tid);
+    }
+  }
+
   for (const [pid, process] of processes) {
     for (const [tid, thread] of process.threads) {
-      if (!thread.entries.length) {
-        thread.tree = Helpers.TreeHelpers.makeEmptyTraceEntryTree();
-        continue;
-      }
       // Step 1. Massage the data.
       Helpers.Trace.sortTraceEventsInPlace(thread.entries);
       // Step 2. Inject profile calls from samples
@@ -346,6 +343,12 @@ export function buildHierarchy(
           }
         }
       }
+
+      if (!thread.entries.length) {
+        thread.tree = Helpers.TreeHelpers.makeEmptyTraceEntryTree();
+        continue;
+      }
+
       // Step 3. Build the tree.
       const treeData = Helpers.TreeHelpers.treify(thread.entries, options);
       thread.tree = treeData.tree;
@@ -392,7 +395,7 @@ export function makeCompleteEvent(event: Types.Events.Begin|Types.Events.End): T
 }
 
 export function deps(): HandlerName[] {
-  return ['Meta', 'Samples', 'AuctionWorklets', 'NetworkRequests'];
+  return ['Meta', 'Samples', 'NetworkRequests'];
 }
 
 export interface RendererHandlerData {

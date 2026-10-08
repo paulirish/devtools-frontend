@@ -8,21 +8,23 @@ import("../../visibility.gni")
 
 devtools_ui_module("forward") {
   sources = [
+    "BackendLinking.ts",
     "NetworkRequestId.ts",
     "UIFilter.ts",
     "UIRequestLocation.ts",
   ]
 
-  deps = [
+  ts_deps = [
+    "../../../core/common:bundle",
     "../../../core/sdk:bundle",
-    "../../../models/text_utils:bundle",
+    "../../../core/text_utils:bundle",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "forward.ts"
 
-  deps = [ ":forward" ]
+  ts_deps = [ ":forward" ]
 
   visibility = [
     "../../../models/*",

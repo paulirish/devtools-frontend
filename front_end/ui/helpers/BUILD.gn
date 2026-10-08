@@ -10,7 +10,7 @@ import("../../visibility.gni")
 devtools_ui_module("helpers") {
   sources = [ "OpenInNewTab.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/platform:bundle",
@@ -22,7 +22,7 @@ devtools_ui_module("helpers") {
 devtools_entrypoint("bundle") {
   entrypoint = "helpers.ts"
 
-  deps = [ ":helpers" ]
+  ts_deps = [ ":helpers" ]
 
   visibility = [
     ":*",
@@ -45,7 +45,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "OpenInNewTab.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/host:bundle",
     "../../core/platform:bundle",

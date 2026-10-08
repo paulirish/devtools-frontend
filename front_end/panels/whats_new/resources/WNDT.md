@@ -1,14 +1,11 @@
-### [DevTools for agents](devtools-for-agents)
+### [DevTools for agents](mcp)
 
-DevTools for agents is now stable at version 1.0, bringing support for third-party developer tools
-provided by the inspected page, WebMCP debugging, and an improved CLI experience.
+Configure `--no-javascript-evaluation` or disable execution tools to inspect pages safely without running scripts. Agents can also inspect heap snapshots directly with `query_heapsnapshot` and analyze memory retained by execution contexts.
 
-### [AI assistance](ai-assistance)
+### [CPU performance tier overrides and modernized device presets](performance)
 
-The AI assistance panel now integrates with Lighthouse data and offers interactive, widget-based agent walkthroughs.
-Supported by an upgrade to Gemini 3 and other optimizations, responses are now more concise and actionable.
+Configure and dispatch calibrated CPU performance tier overrides over CDP in the Performance panel to test device performance reproducibly. Emulated device presets are now grouped by form factor and updated with modern hardware.
 
-### [CSS code completion](css-code-completion)
+### [Edit and resend as fetch in Console](edit-and-resend-as-fetch-in-co)
 
-The Styles tab in the Elements panel now features enhanced, Gemini-powered code completion.
-Experience smarter, real-time CSS suggestions that adapt dynamically as you type.
+Copy any network request as an editable `fetch()` expression directly into the Console to modify parameters before resending.

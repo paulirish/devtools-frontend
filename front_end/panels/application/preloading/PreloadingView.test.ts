@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Protocol from '../../../generated/protocol.js';
@@ -12,16 +13,12 @@ import {
   dispatchClickEvent,
   dispatchInputEvent,
   getCleanTextContentFromElements,
-  getElementWithinComponent,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {createTarget, describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-  dispatchEvent,
-} from '../../../testing/MockConnection.js';
+import {dispatchEvent} from '../../../testing/MockConnection.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
-import * as ReportView from '../../../ui/components/report_view/report_view.js';
+import type * as ReportView from '../../../ui/components/report_view/report_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Resources from '../application.js';
 
@@ -324,7 +321,7 @@ function clickClearButton(view: Resources.PreloadingView.PreloadingAttemptView):
   dispatchClickEvent(button);
 }
 
-describeWithMockConnection('PreloadingRuleSetView', () => {
+describeWithEnvironment('PreloadingRuleSetView', () => {
   beforeEach(() => {
     SDK.ChildTargetManager.ChildTargetManager.install();
   });
@@ -343,9 +340,8 @@ describeWithMockConnection('PreloadingRuleSetView', () => {
     const description = placeholder.querySelector('.empty-state-description > span')?.textContent;
 
     assert.deepEqual(header, 'No rules detected');
-    assert.deepEqual(
-        description,
-        'On this page you will see the speculation rules used to prefetch and prerender page navigations.');
+    assert.deepEqual(description,
+                     'On this page you will see the speculation rules used to prefetch and prerender page navigations');
 
     const rules = view.contentElement.querySelector('devtools-split-view');
     assert.exists(rules);
@@ -563,7 +559,7 @@ describeWithMockConnection('PreloadingRuleSetView', () => {
   });
 });
 
-describeWithMockConnection('PreloadingAttemptView', () => {
+describeWithEnvironment('PreloadingAttemptView', () => {
   beforeEach(() => {
     SDK.ChildTargetManager.ChildTargetManager.install();
   });
@@ -582,7 +578,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
     const description = placeholder.querySelector('.empty-state-description > span')?.textContent;
 
     assert.deepEqual(header, 'No speculation detected');
-    assert.deepEqual(description, 'On this page you will see details on speculative loads.');
+    assert.deepEqual(description, 'On this page you will see details on speculative loads');
 
     const rules = view.contentElement.querySelector('devtools-split-view');
     assert.exists(rules);
@@ -634,13 +630,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 }
 `);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     assert.isNotNull(preloadingGridComponent.contentElement);
     const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assert.isNotNull(preloadingDetailsComponent.shadowRoot);
+    assert.isNotNull(preloadingDetailsComponent.contentElement);
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
         ['URL', 'Action', 'Rule set', 'Status'],
@@ -710,9 +705,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       requestId,
     } as Protocol.Preload.PrefetchStatusUpdatedEvent);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
 
     assertGridWidgetContents(
@@ -723,7 +717,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
             '/prefetch.html',
             'Prefetch',
             'example.com/',
-            'Failure - The prefetch failed because of a non-2xx HTTP response status code (404).',
+            'Failure - The prefetch failed because of a non-2xx HTTP response status code (404)',
           ],
         ],
     );
@@ -769,9 +763,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       prerenderStatus: Protocol.Preload.PrerenderFinalStatus.NavigationBadHttpStatus,
     } as Protocol.Preload.PrerenderStatusUpdatedEvent);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
 
     assertGridWidgetContents(
@@ -782,7 +775,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
             '/prerendered.html',
             'Prerender',
             '',
-            'Failure - The prerendering navigation failed because of a non-2xx HTTP response status code (404).',
+            'Failure - The prerendering navigation failed because of a non-2xx HTTP response status code (404)',
           ],
         ],
     );
@@ -828,9 +821,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       prerenderStatus: Protocol.Preload.PrerenderFinalStatus.NavigationBadHttpStatus,
     } as Protocol.Preload.PrerenderStatusUpdatedEvent);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
 
     assertGridWidgetContents(
@@ -841,7 +833,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
             '/prerendered.html',
             'Prerender',
             '',
-            'Failure - The prerendering navigation failed because of a non-2xx HTTP response status code.',
+            'Failure - The prerendering navigation failed because of a non-2xx HTTP response status code',
           ],
         ],
     );
@@ -884,12 +876,11 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       waitingForDebugger: false,
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
     const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assert.isNotNull(preloadingDetailsComponent.shadowRoot);
+    assert.isNotNull(preloadingDetailsComponent.contentElement);
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -904,10 +895,10 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const placeholderHeader = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-header');
+    const placeholderHeader = preloadingDetailsComponent.contentElement.querySelector('.empty-state-header');
     assert.strictEqual(placeholderHeader?.textContent?.trim(), 'No element selected');
 
-    const placeholderDescription = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-description');
+    const placeholderDescription = preloadingDetailsComponent.contentElement.querySelector('.empty-state-description');
     assert.strictEqual(placeholderDescription?.textContent, 'Select an element for more details');
   });
 
@@ -962,10 +953,9 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const ruleSetSelectorToolbarItem = view.getRuleSetSelectorToolbarItemForTest();
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
 
     assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All speculative loads');
@@ -992,7 +982,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
     // Turn on filtering.
     view.selectRuleSetOnFilterForTest('ruleSetId:0.2' as Protocol.Preload.RuleSetId);
 
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'example.com/');
 
@@ -1012,7 +1002,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
     // Turn off filtering.
     view.selectRuleSetOnFilterForTest(null);
 
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All speculative loads');
 
@@ -1053,12 +1043,11 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 }
 `);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
     const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assert.isNotNull(preloadingDetailsComponent.shadowRoot);
+    assert.isNotNull(preloadingDetailsComponent.contentElement);
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1075,17 +1064,17 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     preloadingGridComponent.contentElement.querySelectorAll('tr')[1].dispatchEvent(new Event('select'));
 
-    await RenderCoordinator.done();
+    await preloadingDetailsComponent.updateComplete;
 
     const report =
-        getElementWithinComponent(preloadingDetailsComponent, 'devtools-report', ReportView.ReportView.Report);
+        preloadingDetailsComponent.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
       ['Action', 'Prerender Inspect'],
-      ['Status', 'Speculative load is running.'],
+      ['Status', 'Speculative load is running'],
     ]);
 
     const buttons = report.querySelectorAll('devtools-report-value:nth-of-type(2) devtools-button');
@@ -1122,9 +1111,9 @@ describeWithMockConnection('PreloadingAttemptView', () => {
     const preloadingGridComponent = view.getPreloadingGridForTest();
     assert.isNotNull(preloadingGridComponent.contentElement);
     const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assert.isNotNull(preloadingDetailsComponent.shadowRoot);
+    assert.isNotNull(preloadingDetailsComponent.contentElement);
 
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1141,17 +1130,17 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     preloadingGridComponent.contentElement.querySelectorAll('tr')[1].dispatchEvent(new Event('select'));
 
-    await RenderCoordinator.done();
+    await preloadingDetailsComponent.updateComplete;
 
     const report =
-        getElementWithinComponent(preloadingDetailsComponent, 'devtools-report', ReportView.ReportView.Report);
+        preloadingDetailsComponent.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
       ['Action', 'Prerender Inspect'],
-      ['Status', 'Speculative load finished and the result is ready for the next navigation.'],
+      ['Status', 'Speculative load finished and the result is ready for the next navigation'],
     ]);
 
     const buttons = report.querySelectorAll('devtools-report-value:nth-of-type(2) devtools-button');
@@ -1196,9 +1185,9 @@ describeWithMockConnection('PreloadingAttemptView', () => {
     const preloadingGridComponent = view.getPreloadingGridForTest();
     assert.isNotNull(preloadingGridComponent.contentElement);
     const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assert.isNotNull(preloadingDetailsComponent.shadowRoot);
+    assert.isNotNull(preloadingDetailsComponent.contentElement);
 
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1208,27 +1197,27 @@ describeWithMockConnection('PreloadingAttemptView', () => {
             '/prerendered.html',
             'Prerender',
             '',
-            'Failure - The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
+            'Failure - The prerendered page used a forbidden JavaScript API that isn’t currently supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
           ],
         ],
     );
 
     preloadingGridComponent.contentElement.querySelectorAll('tr')[1].dispatchEvent(new Event('select'));
 
-    await RenderCoordinator.done();
+    await preloadingDetailsComponent.updateComplete;
 
     const report =
-        getElementWithinComponent(preloadingDetailsComponent, 'devtools-report', ReportView.ReportView.Report);
+        preloadingDetailsComponent.contentElement.querySelector('devtools-report') as ReportView.ReportView.Report;
 
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
       ['Action', 'Prerender Inspect'],
-      ['Status', 'Speculative load failed.'],
+      ['Status', 'Speculative load failed'],
       [
         'Failure reason',
-        'The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
+        'The prerendered page used a forbidden JavaScript API that isn’t currently supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
       ],
     ]);
 
@@ -1287,9 +1276,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
     assert.isNotNull(preloadingGridComponent.contentElement);
 
     // Initially shows both
@@ -1304,7 +1292,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Filter by URL
     setTextFilter(view, 'url:subresource');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1316,7 +1304,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Clear filter
     setTextFilter(view, '');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1378,13 +1366,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Filter by action (case-insensitive)
     setTextFilter(view, 'action:prefetch');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1396,7 +1383,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Filter by prerender action
     setTextFilter(view, 'action:Prerender');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1457,13 +1444,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Upper-case key "Action:" should work the same as "action:"
     setTextFilter(view, 'Action:prefetch');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1475,7 +1461,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Mixed case key "URL:" should work
     setTextFilter(view, 'URL:prerendered');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1487,7 +1473,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Upper-case "Status:" should work
     setTextFilter(view, 'Status:running');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1561,13 +1547,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       requestId: 'requestId:1' as Protocol.Network.RequestId,
     } as Protocol.Preload.PrefetchStatusUpdatedEvent);
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Filter by Ready status
     setTextFilter(view, 'status:Ready');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1579,7 +1564,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Filter by Running status
     setTextFilter(view, 'status:running');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1640,13 +1625,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Search for "prefetch" without key - should match action column
     setTextFilter(view, 'prefetch');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1658,7 +1642,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Search for ".html" - should match URL column
     setTextFilter(view, '.html');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1719,13 +1703,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Type just "action:" - should show all results
     setTextFilter(view, 'action:');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1787,13 +1770,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Set a text filter first
     setTextFilter(view, 'url:subresource');
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     assertGridWidgetContents(
         preloadingGridComponent.contentElement,
@@ -1806,7 +1788,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
 
     // Click clear button
     clickClearButton(view);
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     // Text filter should be cleared
     assert.strictEqual(getTextFilter(view), '');
@@ -1850,13 +1832,12 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
-
     const preloadingGridComponent = view.getPreloadingGridForTest();
+    await preloadingGridComponent.updateComplete;
 
     // Click clear button
     clickClearButton(view);
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     // Grid should be empty after reset
     assertGridWidgetContents(
@@ -1888,7 +1869,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
       ],
     });
 
-    await RenderCoordinator.done();
+    await preloadingGridComponent.updateComplete;
 
     // New attempt should be visible
     assertGridWidgetContents(
@@ -1901,7 +1882,7 @@ describeWithMockConnection('PreloadingAttemptView', () => {
   });
 });
 
-describeWithMockConnection('PreloadingSummaryView', () => {
+describeWithEnvironment('PreloadingSummaryView', () => {
   beforeEach(() => {
     SDK.ChildTargetManager.ChildTargetManager.install();
   });
@@ -1924,12 +1905,10 @@ describeWithMockConnection('PreloadingSummaryView', () => {
 `);
     await emulator.activateAndDispatchEvents('prerendered.html');
 
-    await RenderCoordinator.done();
-
     const usedPreloadingComponent = view.getUsedPreloadingForTest();
     await usedPreloadingComponent.updateComplete;
 
-    assert.include(usedPreloadingComponent.contentElement.textContent, 'This page was successfully prerendered.');
+    assert.include(usedPreloadingComponent.contentElement.textContent, 'This page was successfully prerendered');
   });
 });
 

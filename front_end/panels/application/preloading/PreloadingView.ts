@@ -12,17 +12,15 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import * as Protocol from '../../../generated/protocol.js';
-import * as TextUtils from '../../../models/text_utils/text_utils.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-// eslint-disable-next-line @devtools/es-modules-import
 import emptyWidgetStyles from '../../../ui/legacy/emptyWidget.css.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import {Directives, html, render} from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as PreloadingComponents from './components/components.js';
-import {capitalizedAction, ruleSetTagOrLocationShort} from './components/PreloadingString.js';
 import * as PreloadingHelper from './helper/helper.js';
 import preloadingViewStyles from './preloadingView.css.js';
 import preloadingViewDropDownStyles from './preloadingViewDropDown.css.js';
@@ -32,76 +30,75 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description DropDown title for filtering preloading attempts by rule set
+   * @description Tooltip for the filter by rule set dropdown in the speculative loads view.
    */
   filterFilterByRuleSet: 'Filter by rule set',
   /**
-   * @description DropDown text for filtering preloading attempts by rule set: No filter
+   * @description Dropdown text for filtering preloading attempts by rule set when no filter is applied.
    */
   filterAllPreloads: 'All speculative loads',
   /**
-   * @description Dropdown subtitle for filtering preloading attempts by rule set
-   *             when there are no rule sets in the page.
+   * @description Dropdown subtitle for filtering preloading attempts by rule set when there are no rule sets on the page.
    */
   noRuleSets: 'no rule sets',
   /**
-   * @description Text in grid: Rule set is valid
+   * @description Status text in the rule sets table indicating the rule set is valid.
    */
   validityValid: 'Valid',
   /**
-   * @description Text in grid: Rule set must be a valid JSON object
+   * @description Status text in the rule sets table indicating the rule set is invalid.
    */
   validityInvalid: 'Invalid',
   /**
-   * @description Text in grid: Rule set contains invalid rules and they are ignored
+   * @description Status text in the rule sets table indicating some rules in the rule set are invalid and ignored.
    */
   validitySomeRulesInvalid: 'Some rules invalid',
   /**
-   * @description Text in grid and details: Preloading attempt is not yet triggered.
+   * @description Status text in the speculative loads table and details report indicating the preloading attempt is not yet triggered.
    */
   statusNotTriggered: 'Not triggered',
   /**
-   * @description Text in grid and details: Preloading attempt is eligible but pending.
+   * @description Status text in the speculative loads table and details report indicating the preloading attempt is eligible but pending.
    */
   statusPending: 'Pending',
   /**
-   * @description Text in grid and details: Preloading is running.
+   * @description Status text in the speculative loads table and details report indicating preloading is running.
    */
   statusRunning: 'Running',
   /**
-   * @description Text in grid and details: Preloading finished and the result is ready for the next navigation.
+   * @description Status text in the speculative loads table and details report indicating preloading finished and is ready for the next navigation.
    */
   statusReady: 'Ready',
   /**
-   * @description Text in grid and details: Ready, then used.
+   * @description Status text in the speculative loads table and details report indicating preloading was ready, then used.
    */
   statusSuccess: 'Success',
   /**
-   * @description Text in grid and details: Preloading failed.
+   * @description Status text in the speculative loads table and details report indicating preloading failed.
    */
   statusFailure: 'Failure',
   /**
-   * @description Text to pretty print a file
+   * @description Tooltip text for the button to pretty print the rule set source.
    */
   prettyPrint: 'Pretty print',
   /**
-   * @description Placeholder text if there are no rules to show. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state header in the speculation rules view when no rules are detected.
    */
   noRulesDetected: 'No rules detected',
   /**
-   * @description Placeholder text if there are no rules to show. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state description in the speculation rules view when no rules are detected.
    */
-  rulesDescription: 'On this page you will see the speculation rules used to prefetch and prerender page navigations.',
+  rulesDescription: 'On this page you will see the speculation rules used to prefetch and prerender page navigations',
   /**
-   * @description Placeholder text if there are no speculation attempts for prefetching or prerendering urls. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state header in the speculative loads view when no speculation is detected.
    */
   noPrefetchAttempts: 'No speculation detected',
   /**
-   * @description Placeholder text if there are no speculation attempts for prefetching or prerendering urls. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   * @description Empty state description in the speculative loads view when no speculation is detected.
    */
-  prefetchDescription: 'On this page you will see details on speculative loads.',
+  prefetchDescription: 'On this page you will see details on speculative loads',
   /**
-   * @description Text for a learn more link
+   * @description Link text to learn more about speculation rules.
    */
   learnMore: 'Learn more',
 } as const;
@@ -404,7 +401,11 @@ export function applyFilterText(filterText: string, rows: PreloadingComponents.P
   return rows.filter(row => {
     const attempt = row.pipeline.getOriginallyTriggered();
     const url = attempt.key.url.toLowerCase();
-    const action = capitalizedAction(attempt.action).toLowerCase();
+    const action = PreloadingComponents.PreloadingString
+                       .capitalizedAction(
+                           attempt.action,
+                           )
+                       .toLowerCase();
     const status = PreloadingUIUtils.status(attempt.status).toLowerCase();
 
     // Each term must match (AND logic between terms)
@@ -445,8 +446,8 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
   private readonly warningsContainer: HTMLDivElement;
   private readonly warningsView = new PreloadingComponents.PreloadingDisabledInfobar.PreloadingDisabledInfobar();
   private readonly preloadingGrid = new PreloadingComponents.PreloadingGrid.PreloadingGrid();
-  private readonly preloadingDetails =
-      new PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportView();
+  private readonly preloadingGridContainer: HTMLDivElement;
+  private readonly renderContainer: HTMLElement;
   private readonly ruleSetSelector: PreloadingRuleSetSelector;
   private readonly textFilterUI: UI.Toolbar.ToolbarFilter;
   private hsplit?: UI.SplitWidget.SplitWidget;
@@ -525,38 +526,12 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
 
     this.preloadingGrid.onSelect = this.onPreloadingGridCellFocused.bind(this);
 
-    const preloadingGridContainer = document.createElement('div');
-    preloadingGridContainer.className = 'preloading-grid-widget-container';
-    preloadingGridContainer.style = 'height: 100%';
-    this.preloadingGrid.show(preloadingGridContainer, null, true);
+    this.preloadingGridContainer = document.createElement('div');
+    this.preloadingGridContainer.className = 'preloading-grid-widget-container';
+    this.preloadingGridContainer.style.height = '100%';
+    this.preloadingGrid.show(this.preloadingGridContainer, null, true);
 
-    render(
-        html`
-        <div class="empty-state">
-          <span class="empty-state-header">${i18nString(UIStrings.noPrefetchAttempts)}</span>
-          <div class="empty-state-description">
-            <span>${i18nString(UIStrings.prefetchDescription)}</span>
-            <devtools-link
-              class="devtools-link"
-              href=${SPECULATION_EXPLANATION_URL}
-              jslogcontext="learn-more"
-            >${i18nString(UIStrings.learnMore)}</devtools-link>
-          </div>
-        </div>
-        <devtools-split-view sidebar-position="second" ${
-            UI.Widget.widgetRef(
-                UI.SplitWidget.SplitWidget,
-                w => {
-                  this.hsplit = w;
-                })}>
-          <div slot="main" class="overflow-auto" style="height: 100%">
-            ${preloadingGridContainer}
-          </div>
-          <div slot="sidebar" class="overflow-auto" style="height: 100%">
-            ${this.preloadingDetails}
-          </div>
-        </devtools-split-view>`,
-        vbox.contentElement, {host: this});
+    this.renderContainer = vbox.contentElement;
 
     vbox.show(this.contentElement);
   }
@@ -593,20 +568,20 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
     this.render();
   }
 
-  private updatePreloadingDetails(): void {
+  private getPreloadingDetailsData(): PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData {
     const id = this.focusedPreloadingAttemptId;
     const preloadingAttempt = id === null ? null : this.model.getPreloadingAttemptById(id);
     if (preloadingAttempt === null) {
-      this.preloadingDetails.data = null;
-    } else {
-      const pipeline = this.model.getPipeline(preloadingAttempt);
-      const ruleSets = preloadingAttempt.ruleSetIds.map(id => this.model.getRuleSetById(id)).filter(x => x !== null);
-      this.preloadingDetails.data = {
-        pipeline,
-        ruleSets,
-        pageURL: pageURL(),
-      };
+      return null;
     }
+
+    const pipeline = this.model.getPipeline(preloadingAttempt);
+    const ruleSets = preloadingAttempt.ruleSetIds.map(id => this.model.getRuleSetById(id)).filter(x => x !== null);
+    return {
+      pipeline,
+      ruleSets,
+      pageURL: pageURL(),
+    };
   }
 
   render(): void {
@@ -647,7 +622,36 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
       this.hsplit?.doLayout();
     }
 
-    this.updatePreloadingDetails();
+    // clang-format off
+    render(html`
+      <div class="empty-state">
+        <span class="empty-state-header">${i18nString(UIStrings.noPrefetchAttempts)}</span>
+        <div class="empty-state-description">
+          <span>${i18nString(UIStrings.prefetchDescription)}</span>
+          <devtools-link
+            class="devtools-link"
+            href=${SPECULATION_EXPLANATION_URL}
+            jslogcontext="learn-more"
+          >${i18nString(UIStrings.learnMore)}</devtools-link>
+        </div>
+      </div>
+      <devtools-split-view sidebar-position="second" ${
+          UI.Widget.widgetRef(
+              UI.SplitWidget.SplitWidget,
+              w => {
+                this.hsplit = w;
+              })}>
+        <div slot="main" class="overflow-auto" style="height: 100%">
+          ${this.preloadingGridContainer}
+        </div>
+        <div slot="sidebar" class="overflow-auto" style="height: 100%">
+          ${widget(PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportView, {
+            data: this.getPreloadingDetailsData(),
+          })}
+        </div>
+      </devtools-split-view>
+      `, this.renderContainer, {host: this});
+    // clang-format on
   }
 
   private onPreloadingGridCellFocused({rowId}: {rowId: string}): void {
@@ -664,7 +668,12 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
   }
 
   getPreloadingDetailsForTest(): PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportView {
-    return this.preloadingDetails;
+    const widgetElement = this.renderContainer.querySelector('div[slot="sidebar"] devtools-widget') as
+            UI.Widget.WidgetElement<PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportView>|
+        null;
+    const widget = widgetElement?.getWidget();
+    assertNotNullOrUndefined(widget);
+    return widget;
   }
 
   selectRuleSetOnFilterForTest(id: Protocol.Preload.RuleSetId|null): void {
@@ -837,7 +846,10 @@ class PreloadingRuleSetSelector implements
       return i18n.i18n.lockedString('Internal error');
     }
 
-    return ruleSetTagOrLocationShort(ruleSet, pageURL());
+    return PreloadingComponents.PreloadingString.ruleSetTagOrLocationShort(
+        ruleSet,
+        pageURL(),
+    );
   }
 
   subtitleFor(id: Protocol.Preload.RuleSetId|typeof AllRuleSetRootId): string {

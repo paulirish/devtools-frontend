@@ -15,7 +15,7 @@ devtools_ui_module("helpers") {
     "scheduled-render.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../ui/legacy/theme_support:bundle",
     "../render_coordinator:bundle",
@@ -25,7 +25,7 @@ devtools_ui_module("helpers") {
 devtools_entrypoint("bundle") {
   entrypoint = "helpers.ts"
 
-  deps = [ ":helpers" ]
+  ts_deps = [ ":helpers" ]
 
   visibility = [
     "../../../testing/*",
@@ -41,7 +41,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "helpers.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../render_coordinator:bundle",
   ]

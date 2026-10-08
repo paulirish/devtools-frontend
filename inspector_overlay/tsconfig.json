@@ -1,7 +1,6 @@
 {
   "extends": "../config/typescript/tsconfig.base.json",
   "compilerOptions": {
-    "allowUmdGlobalAccess": true,
     "lib": [
       "esnext",
       "dom",
@@ -9,6 +8,6 @@
       "webworker",
       "webworker.iterable"
     ],
-    "outDir": "ignored-for-vscode",
-  },
+    "noEmit": true
+  }
 }

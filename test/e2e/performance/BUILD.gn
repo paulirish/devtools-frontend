@@ -17,7 +17,8 @@ ts_e2e_library("performance") {
     "trace-app.test.ts",
     "wasm/performance_profiling.test.ts",
   ]
-  deps = [
+  ts_deps = [
+    "../../conductor:implementation",
     "../helpers",
     "../shared",
   ]

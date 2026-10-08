@@ -33,6 +33,8 @@ npm-debug.log
 /scripts/ai_assistance/agent_preambles.md
 # This folder is populated from the GCP bucket and managed by gclient sync.
 /scripts/ai_assistance/suite/outputs
+# This folder is populated from CIPD and managed by gclient sync.
+/test/ai_evals/eval_data
 
 /build
 /buildtools
@@ -45,7 +47,6 @@ npm-debug.log
 !/third_party/i18n
 !/third_party/image_diff
 !/third_party/pyjson5
-!/third_party/typescript
 
 test/screenshots/.generated
 test/perf/.generated
@@ -62,10 +63,11 @@ test/perf/.generated
 # Linters caches
 .eslintcache
 .stylelintcache
+.litanalyzercache
 **/tsconfig.tsbuildinfo
 
 # test runner copies dumps into the source tree.
 artifacts/*
 
-# cipd rollup binaries synced from third_party/
-node_modules/@rollup/rollup*/
+# some siso file
+siso_result.json

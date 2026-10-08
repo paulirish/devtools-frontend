@@ -4,48 +4,49 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as PanelsCommon from '../common/common.js';
 
 const UIStrings = {
   /**
-   * @description Text for no network throttling
+   * @description Text for no network throttling.
    */
   noThrottling: 'No CPU and no network throttling',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   noInternetConnectivity: 'No internet connectivity',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   lowTierMobile: 'Low-tier mobile',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   slowGXCpuSlowdown: 'Slow 3G & 6x CPU slowdown',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    * @example {2.2} PH1
    */
   slowGXCpuSlowdownCalibrated: 'Slow 3G & {PH1}x CPU slowdown',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   midtierMobile: 'Mid-tier mobile',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   fastGXCpuSlowdown: 'Fast 3G & 4x CPU slowdown',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    * @example {2.2} PH1
    */
   fastGXCpuSlowdownCalibrated: 'Fast 3G & {PH1}x CPU slowdown',
   /**
-   * @description Text in Network Throttling Selector of the Network panel
+   * @description Text in network throttling selector of the Network panel.
    */
   custom: 'Custom',
   /**
-   * @description Text in Throttling Presets of the Network panel
+   * @description Text in throttling presets of the Network panel.
    */
   checkNetworkAndPerformancePanels: 'Check Network and Performance panels',
 } as const;
@@ -61,7 +62,7 @@ export class ThrottlingPresets {
       title,
       description: i18nString(UIStrings.noThrottling),
       network: SDK.NetworkManager.NoThrottlingConditions,
-      cpuThrottlingOption: SDK.CPUThrottlingManager.NoThrottlingOption,
+      cpuThrottlingOption: PanelsCommon.CPUThrottlingOption.NoThrottlingOption,
       jslogContext: 'no-throttling',
     };
   }
@@ -74,15 +75,16 @@ export class ThrottlingPresets {
       title,
       description: i18nString(UIStrings.noInternetConnectivity),
       network: SDK.NetworkManager.OfflineConditions,
-      cpuThrottlingOption: SDK.CPUThrottlingManager.NoThrottlingOption,
+      cpuThrottlingOption: PanelsCommon.CPUThrottlingOption.NoThrottlingOption,
       jslogContext: 'offline',
     };
   }
 
   static getLowEndMobileConditions(): Conditions {
-    const useCalibrated = SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption.rate() !== 0;
-    const cpuThrottlingOption = useCalibrated ? SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption :
-                                                SDK.CPUThrottlingManager.LowTierThrottlingOption;
+    const useCalibrated = PanelsCommon.CPUThrottlingOption.CalibratedLowTierMobileThrottlingOption.rate() !== 0;
+    const cpuThrottlingOption = useCalibrated ?
+        PanelsCommon.CPUThrottlingOption.CalibratedLowTierMobileThrottlingOption :
+        PanelsCommon.CPUThrottlingOption.LowTierThrottlingOption;
     const description = useCalibrated ?
         i18nString(UIStrings.slowGXCpuSlowdownCalibrated, {PH1: cpuThrottlingOption.rate()}) :
         i18nString(UIStrings.slowGXCpuSlowdown);
@@ -97,9 +99,10 @@ export class ThrottlingPresets {
   }
 
   static getMidTierMobileConditions(): Conditions {
-    const useCalibrated = SDK.CPUThrottlingManager.CalibratedMidTierMobileThrottlingOption.rate() !== 0;
-    const cpuThrottlingOption = useCalibrated ? SDK.CPUThrottlingManager.CalibratedMidTierMobileThrottlingOption :
-                                                SDK.CPUThrottlingManager.MidTierThrottlingOption;
+    const useCalibrated = PanelsCommon.CPUThrottlingOption.CalibratedMidTierMobileThrottlingOption.rate() !== 0;
+    const cpuThrottlingOption = useCalibrated ?
+        PanelsCommon.CPUThrottlingOption.CalibratedMidTierMobileThrottlingOption :
+        PanelsCommon.CPUThrottlingOption.MidTierThrottlingOption;
     const description = useCalibrated ?
         i18nString(UIStrings.fastGXCpuSlowdownCalibrated, {PH1: cpuThrottlingOption.rate()}) :
         i18nString(UIStrings.fastGXCpuSlowdown);
@@ -142,14 +145,8 @@ export class ThrottlingPresets {
     SDK.NetworkManager.OfflineConditions,
   ];
 
-  static cpuThrottlingPresets: SDK.CPUThrottlingManager.CPUThrottlingOption[] = [
-    SDK.CPUThrottlingManager.NoThrottlingOption,
-    SDK.CPUThrottlingManager.MidTierThrottlingOption,
-    SDK.CPUThrottlingManager.LowTierThrottlingOption,
-    SDK.CPUThrottlingManager.ExtraSlowThrottlingOption,
-    SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption,
-    SDK.CPUThrottlingManager.CalibratedMidTierMobileThrottlingOption,
-  ];
+  static cpuThrottlingPresets: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption[] =
+      PanelsCommon.CPUThrottlingOption.cpuThrottlingPresets;
 }
 
 // @ts-expect-error exported for Tests.js
@@ -161,7 +158,7 @@ export interface Conditions {
   title: string;
   description: string;
   network: SDK.NetworkManager.Conditions;
-  cpuThrottlingOption: SDK.CPUThrottlingManager.CPUThrottlingOption;
+  cpuThrottlingOption: PanelsCommon.CPUThrottlingOption.CPUThrottlingOption;
   jslogContext?: string;
 }
 

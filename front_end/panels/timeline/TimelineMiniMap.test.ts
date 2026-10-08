@@ -7,7 +7,9 @@ import {assert} from 'chai';
 import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import {assertScreenshot, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {
+  describeWithEnvironment,
+} from '../../testing/EnvironmentHelpers.js';
 import {getMainThread} from '../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -73,7 +75,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
     assert.isNull(container.querySelector('#timeline-overview-memory'));
   });
 
-  it('shows memory and screenshots also if they are set to be visible', async function() {
+  it('shows memory and screenshots when configured to be visible', async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
     await renderMiniMapForScreenshot(parsedTrace);
     await assertScreenshot('timeline/minimap_with_memory_and_screenshots.png');
@@ -86,7 +88,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
   });
 
   it('creates the first breadcrumb', async function() {
-    const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz', {withModificationsManager: true});
 
     const container = document.createElement('div');
     renderElementIntoDOM(container);
@@ -114,7 +116,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
   });
 
   it('stores breadcrumbs to be serialized', async function() {
-    const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev.json.gz', {withModificationsManager: true});
     const minimap = new Timeline.TimelineMiniMap.TimelineMiniMap();
     minimap.setData({
       parsedTrace,

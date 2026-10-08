@@ -40,89 +40,95 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as Tooltips from '../../ui/components/tooltips/tooltips.js';
 import {createIcon, type Icon} from '../../ui/kit/kit.js';
-import type * as Components from '../../ui/legacy/components/utils/utils.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as PanelsCommon from '../common/common.js';
 
 import * as ElementsComponents from './components/components.js';
+import {formatSpecificitySummary, getSpecificityBreakdownLines} from './CSSSpecificityBreakdown.js';
 import {ElementsPanel} from './ElementsPanel.js';
 import stylePropertiesTreeOutlineStyles from './stylePropertiesTreeOutline.css.js';
-import {type Context, GhostStylePropertyTreeElement, StylePropertyTreeElement} from './StylePropertyTreeElement.js';
+import {
+  type Context,
+  GhostStylePropertyTreeElement,
+  handleVarDefinitionActivate,
+  StylePropertyTreeElement,
+} from './StylePropertyTreeElement.js';
 import type {StylesContainer} from './StylesContainer.js';
 
 const UIStrings = {
   /**
-   * @description Tooltip text that appears when hovering over the largeicon add button in the Styles Sidebar Pane of the Elements panel
+   * @description Tooltip text that appears when hovering over the add button in the Styles tab of the Elements panel.
    */
   insertStyleRuleBelow: 'Insert style rule below',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    */
   constructedStylesheet: 'constructed stylesheet',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    */
   userAgentStylesheet: 'user agent stylesheet',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    */
   injectedStylesheet: 'injected stylesheet',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    */
   viaInspector: 'via inspector',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    */
   styleAttribute: '`style` attribute',
   /**
-   * @description Text in Styles Sidebar Pane of the Elements panel
+   * @description Text in the Styles tab of the Elements panel.
    * @example {html} PH1
    */
   sattributesStyle: '{PH1}[Attributes Style]',
   /**
-   * @description Show all button text content in Styles Sidebar Pane of the Elements panel
+   * @description Show all button text content in the Styles tab of the Elements panel.
    * @example {3} PH1
    */
   showAllPropertiesSMore: 'Show all properties ({PH1} more)',
   /**
-   * @description Text in Elements Tree Element of the Elements panel, copy should be used as a verb
+   * @description Text in the DOM tree of the Elements panel, copy should be used as a verb.
    */
   copySelector: 'Copy `selector`',
   /**
-   * @description A context menu item in Styles panel to copy CSS rule
+   * @description A context menu item in the Styles tab of the Elements panel to copy CSS rule.
    */
   copyRule: 'Copy rule',
   /**
-   * @description A context menu item in Styles panel to copy all CSS declarations
+   * @description A context menu item in the Styles tab of the Elements panel to copy all CSS declarations.
    */
   copyAllDeclarations: 'Copy all declarations',
   /**
-   * @description Text that is announced by the screen reader when the user focuses on an input field for editing the name of a CSS selector in the Styles panel
+   * @description Text that is announced by the screen reader when the user focuses on an input field for editing the name of a CSS selector in the Styles tab of the Elements panel.
    */
   cssSelector: '`CSS` selector',
   /**
-   * @description Text displayed in tooltip that shows specificity information.
-   * @example {(0,0,1)} PH1
-   */
-  specificity: 'Specificity: {PH1}',
-  /**
-   * @description Accessibility label for the button that expands a collapsed CSS rule in the Styles pane.
+   * @description Accessibility label for the button that expands a collapsed CSS rule in the Styles tab.
    */
   expandCollapsedRule: 'Expand collapsed rule',
   /**
-   * @description Accessibility label for the button that collapses an expanded CSS rule in the Styles pane.
+   * @description Accessibility label for the button that collapses an expanded CSS rule in the Styles tab.
    */
   collapseExpandedRule: 'Collapse expanded rule',
+  /**
+   * @description Text displayed next to a CSS rule that was previously matched but no longer is.
+   */
+  notMatching: 'This rule doesn’t currently match the selected element',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/elements/StylePropertiesSection.ts', UIStrings);
@@ -148,12 +154,12 @@ export interface ActiveAiSuggestion {
 export class StylePropertiesSection {
   protected stylesContainer: StylesContainer;
   styleInternal: SDK.CSSStyleDeclaration.CSSStyleDeclaration;
-  readonly matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
+  matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles;
   private computedStyles: Map<string, string>|null;
   private parentsComputedStyles: Map<string, string>|null;
   private computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null;
   editable: boolean;
-  private hoverTimer: number|null = null;
+  private hoverTimer: ReturnType<typeof setTimeout>|null = null;
   private willCauseCancelEditing = false;
   private forceShowAll = false;
   private readonly originalPropertiesCount: number;
@@ -186,21 +192,25 @@ export class StylePropertiesSection {
   readonly #specificityTooltips: HTMLSpanElement;
   static #nextSpecificityTooltipId = 0;
   static #nextSectionTooltipIdPrefix = 0;
-  readonly sectionTooltipIdPrefix = StylePropertiesSection.#nextSectionTooltipIdPrefix++;
+  readonly sectionTooltipIdPrefix: number = StylePropertiesSection.#nextSectionTooltipIdPrefix++;
 
   private ghostStyleTreeElements: GhostStylePropertyTreeElement[] = [];
   #activeAiSuggestion?: ActiveAiSuggestion;
+  #isInactive = false;
+  #manuallyCollapsed = false;
+  #statusElement: Icon|undefined;
+  #lastInheritedNode: SDK.DOMModel.DOMNode|null = null;
 
-  constructor(
-      stylesContainer: StylesContainer, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, computedStyles: Map<string, string>|null,
-      parentsComputedStyles: Map<string, string>|null,
-      computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null, customHeaderText?: string) {
+  constructor(stylesContainer: StylesContainer, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+              style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number,
+              computedStyles: Map<string, string>|null, parentsComputedStyles: Map<string, string>|null,
+              computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null, customHeaderText?: string) {
     this.#customHeaderText = customHeaderText;
     this.stylesContainer = stylesContainer;
     this.sectionIdx = sectionIdx;
     this.styleInternal = style;
     this.matchedStyles = matchedStyles;
+    this.#lastInheritedNode = matchedStyles.isInherited(style) ? matchedStyles.nodeForStyle(style) : null;
     this.computedStyles = computedStyles;
     this.parentsComputedStyles = parentsComputedStyles;
     this.computedStyleExtraFields = computedStyleExtraFields;
@@ -274,9 +284,16 @@ export class StylePropertiesSection {
     this.selectorElement.classList.add('selector');
     this.selectorElement.textContent = headerText;
     selectorContainer.appendChild(this.selectorElement);
-    this.selectorElement.addEventListener('mouseenter', this.onMouseEnterSelector.bind(this), false);
+    this.selectorElement.addEventListener('mouseenter', () => {
+      if (this.styleInternal.parentRule instanceof SDK.CSSRule.CSSStyleRule) {
+        this.onMouseEnterSelector(this.styleInternal.parentRule);
+      }
+    }, false);
     this.selectorElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
     this.#specificityTooltips = selectorContainer.createChild('span');
+
+    this.#statusElement = createIcon('warning', 'styles-section-status hidden medium');
+    selectorContainer.appendChild(this.#statusElement);
 
     // We only add braces for style rules with selectors and non-style rules, which create their own sections.
     if (headerText.length > 0 || !(rule instanceof SDK.CSSRule.CSSStyleRule)) {
@@ -288,6 +305,7 @@ export class StylePropertiesSection {
       closeBrace.createChild('span').textContent = '}';
     } else {
       this.titleElement.classList.add('hidden');
+      this.updateAncestorRuleList();
     }
 
     if (rule) {
@@ -377,6 +395,51 @@ export class StylePropertiesSection {
 
   getSectionIdx(): number {
     return this.sectionIdx;
+  }
+
+  setInactive(inactive: boolean): void {
+    const wasInactive = this.#isInactive;
+    this.#isInactive = inactive;
+    this.element.classList.toggle('styles-section-inactive', inactive);
+    this.propertiesTreeOutline.element.classList.toggle('styles-section-inactive', inactive);
+    if (this.#statusElement) {
+      this.#statusElement.classList.toggle('hidden', !inactive);
+      this.#statusElement.title = inactive ? i18nString(UIStrings.notMatching) : '';
+    }
+    this.markSelectorMatches();
+    if (wasInactive !== inactive) {
+      this.updateCollapsedState();
+    }
+  }
+
+  isInactive(): boolean {
+    return this.#isInactive;
+  }
+
+  rebuildWithPayload(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+                     style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, computedStyles: Map<string, string>|null,
+                     parentsComputedStyles: Map<string, string>|null,
+                     computedStyleExtraFields: Protocol.CSS.ComputedStyleExtraFields|null): void {
+    this.matchedStyles = matchedStyles;
+    this.styleInternal = style;
+    this.computedStyles = computedStyles;
+    this.parentsComputedStyles = parentsComputedStyles;
+    this.computedStyleExtraFields = computedStyleExtraFields;
+    this.#lastInheritedNode = matchedStyles.isInherited(style) ? matchedStyles.nodeForStyle(style) : null;
+    this.update(true);
+    this.updateCollapsedState();
+  }
+
+  inheritedNode(): SDK.DOMModel.DOMNode|null {
+    return this.#lastInheritedNode;
+  }
+
+  treeScopeDistance(): number {
+    const treeScope = this.styleInternal.parentRule?.treeScope;
+    if (!treeScope) {
+      return -1;
+    }
+    return SDK.CSSMatchedStyles.distanceToTreeScope(this.matchedStyles.node(), treeScope);
   }
 
   static createRuleOriginNode(
@@ -667,26 +730,34 @@ export class StylePropertiesSection {
     if (this.hoverTimer) {
       clearTimeout(this.hoverTimer);
     }
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
   }
 
-  private onMouseEnterSelector(): void {
+  private onMouseEnterSelector(rule: SDK.CSSRule.CSSStyleRule, nestingIndex?: number): void {
     if (this.hoverTimer) {
       clearTimeout(this.hoverTimer);
     }
-    this.hoverTimer = window.setTimeout(this.highlight.bind(this), 300);
+    const selectorList = rule.constructResolvedSelector(nestingIndex);
+    if (!selectorList) {
+      return;
+    }
+    this.hoverTimer = setTimeout(this.highlight.bind(this, undefined, selectorList), 300);
   }
 
-  highlight(mode: string|undefined = 'all'): void {
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+  /**
+   * Highlights the DOM node associated with this style section in the page overlay.
+   * Use `selectorList` to highlight elements matching a specific parent/ancestor
+   * rule or selector.
+   *
+   * @param mode Highlight mode (defaults to `'all'`).
+   * @param selectorList Parent selector string to highlight.
+   */
+  highlight(mode: string|undefined = 'all', selectorList: string): void {
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     const node = this.stylesContainer.node();
     if (!node) {
       return;
     }
-    const selectorList =
-        this.styleInternal.parentRule && this.styleInternal.parentRule instanceof SDK.CSSRule.CSSStyleRule ?
-        this.styleInternal.parentRule.selectorText() :
-        undefined;
     node.domModel().overlayModel().highlightInOverlay({node, selectorList}, mode);
   }
 
@@ -890,7 +961,7 @@ export class StylePropertiesSection {
           ancestorRuleElement = this.createMediaElement(rule.media[mediaIndex++]);
           break;
         case Protocol.CSS.CSSRuleType.ContainerRule:
-          ancestorRuleElement = this.createContainerQueryElement(rule.containerQueries[containerIndex++]);
+          ancestorRuleElement = this.createContainerQueryElement(rule.containerQueries[containerIndex++], rule.style);
           break;
         case Protocol.CSS.CSSRuleType.ScopeRule:
           ancestorRuleElement = this.createScopeElement(rule.scopes[scopeIndex++]);
@@ -899,7 +970,7 @@ export class StylePropertiesSection {
           ancestorRuleElement = this.createSupportsElement(rule.supports[supportsIndex++]);
           break;
         case Protocol.CSS.CSSRuleType.StyleRule:
-          ancestorRuleElement = this.createNestingElement(rule.nestingSelectors?.[nestingIndex++]);
+          ancestorRuleElement = this.createNestingElement(rule, nestingIndex++);
           break;
         case Protocol.CSS.CSSRuleType.StartingStyleRule:
           ancestorRuleElement = this.createStartingStyleElement();
@@ -1011,7 +1082,8 @@ export class StylePropertiesSection {
     return mediaQueryElement;
   }
 
-  protected createContainerQueryElement(containerQuery: SDK.CSSContainerQuery.CSSContainerQuery):
+  protected createContainerQueryElement(containerQuery: SDK.CSSContainerQuery.CSSContainerQuery,
+                                        style?: SDK.CSSStyleDeclaration.CSSStyleDeclaration):
       ElementsComponents.CSSQuery.CSSQuery|undefined {
     let onQueryTextClick;
     if (containerQuery.styleSheetId) {
@@ -1024,10 +1096,22 @@ export class StylePropertiesSection {
       queryName: containerQuery.textIsConditionText ? undefined : containerQuery.name,
       queryText: containerQuery.text,
       onQueryTextClick,
+      onLinkActivate: async(resolvedVariable: string|SDK.CSSMatchedStyles.CSSValueSource): Promise<void> => {
+        handleVarDefinitionActivate(resolvedVariable, this.stylesContainer);
+      },
+      getPopoverContents: (variableName: string, variableValue: string|null):
+                              ElementsComponents.CSSVariableValueView.CSSVariableValueView => {
+        return this.stylesContainer.getVariablePopoverContents(this.matchedStyles, variableName, variableValue);
+      },
       jslogContext: 'container-query',
     };
-    if (!/^style\(.*\)/.test(containerQuery.text)) {
-      // We only add container element for non-style queries.
+    if (style) {
+      const tooltipPrefix = `container-${this.sectionTooltipIdPrefix}-${this.nestingLevel}`;
+      void containerQuery.getContainerForNode(this.matchedStyles.node().id).then(container => {
+        if (container) {
+          containerQueryElement.parseStyleQueries(this.matchedStyles, style, container.containerNode, tooltipPrefix);
+        }
+      });
       void this.addContainerForContainerQuery(containerQuery);
     }
     return containerQueryElement;
@@ -1102,11 +1186,36 @@ export class StylePropertiesSection {
     return navigationElement;
   }
 
-  protected createNestingElement(nestingSelector?: string): HTMLElement|undefined {
+  protected createNestingElement(rule: SDK.CSSRule.CSSStyleRule, nestingIndex: number): HTMLElement|undefined {
+    const nestingSelector = rule.nestingSelectors?.[nestingIndex];
     if (!nestingSelector) {
       return;
     }
+
+    const parentRule = this.matchedStyles.findParentRule(rule, nestingIndex);
+    if (parentRule) {
+      const container = document.createElement('div');
+      const matchingSelectorIndexes = this.matchedStyles.getMatchingSelectors(parentRule);
+      const matchingSelectors = new Array(parentRule.selectors.length).fill(false) as boolean[];
+      for (const matchingIndex of matchingSelectorIndexes) {
+        matchingSelectors[matchingIndex] = true;
+      }
+
+      const selectorElement = container.createChild('span', 'selector');
+      selectorElement.addEventListener('mouseenter', () => this.onMouseEnterSelector(parentRule), false);
+      selectorElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
+      const specificityContainer = container.createChild('span');
+      this.renderSelectorsToElement(parentRule.selectors, matchingSelectors, this.elementToSelectorIndex,
+                                    selectorElement, specificityContainer);
+
+      const openBrace = container.createChild('span', 'sidebar-pane-open-brace');
+      openBrace.textContent = ' {';
+      return container;
+    }
+
     const nestingElement = document.createElement('div');
+    nestingElement.addEventListener('mouseenter', () => this.onMouseEnterSelector(rule, nestingIndex), false);
+    nestingElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
     nestingElement.textContent = `${nestingSelector} {`;
     return nestingElement;
   }
@@ -1144,6 +1253,14 @@ export class StylePropertiesSection {
     this.#ancestorClosingBracesElement.removeChildren();
     this.maybeCreateAncestorRules(this.styleInternal);
     this.#styleRuleElement.style.paddingLeft = `${this.nestingLevel}ch`;
+    if (this.headerText().length === 0 && (this.styleInternal.parentRule instanceof SDK.CSSRule.CSSStyleRule)) {
+      const lastAncestor = this.#ancestorRuleListElement.lastElementChild;
+      if (lastAncestor && this.#collapseIcon && this.#statusElement) {
+        this.#collapseIcon.slot = 'indent';
+        lastAncestor.append(this.#collapseIcon, this.#statusElement);
+      }
+      this.#ancestorClosingBracesElement.firstElementChild?.classList.add('sidebar-pane-closing-brace');
+    }
   }
 
   isPropertyInherited(propertyName: string): boolean {
@@ -1294,7 +1411,8 @@ export class StylePropertiesSection {
     }
 
     const regex = this.stylesContainer.filterRegex();
-    const hideRule = !hasMatchingChild && regex !== null && !regex.test(this.element.deepTextContent());
+    const hideRule = !hasMatchingChild && regex !== null &&
+        !regex.test(Components.Linkifier.Linkifier.untruncatedTextContent(this.element));
     this.#isHidden = hideRule;
     this.element.classList.toggle('hidden', hideRule);
     if (!hideRule && this.styleInternal.parentRule) {
@@ -1317,8 +1435,14 @@ export class StylePropertiesSection {
    * since the user intentionally toggled them off and they should remain visible.
    */
   #shouldCollapse(): boolean {
-    if (!Common.Settings.Settings.instance().moduleSetting('collapse-non-contributing-css-rules').get()) {
+    if (!Common.Settings.Settings.instance()
+             .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
+             .get()) {
       return false;
+    }
+
+    if (this.#isInactive) {
+      return true;
     }
 
     const style = this.styleInternal;
@@ -1348,10 +1472,15 @@ export class StylePropertiesSection {
   }
 
   updateCollapsedState(): void {
+    if (this.#manuallyCollapsed) {
+      // Preserve user action if they have manually toggled the collapse state.
+      return;
+    }
     const shouldCollapse = this.#shouldCollapse();
     // Mark as collapsible so the toggle icon is always shown for
     // sections that can be collapsed, even after manual expansion.
-    this.element.classList.toggle('collapsible', shouldCollapse);
+    // Always make it an option to collapse inactive styles.
+    this.element.classList.toggle('collapsible', shouldCollapse || this.#isInactive);
     this.#setCollapsed(shouldCollapse);
   }
 
@@ -1369,6 +1498,7 @@ export class StylePropertiesSection {
   }
 
   #toggleCollapsed(): void {
+    this.#manuallyCollapsed = true;
     this.#setCollapsed(!this.#isCollapsed);
   }
 
@@ -1416,30 +1546,50 @@ export class StylePropertiesSection {
       elementToSelectorIndex: WeakMap<Element, number>): void {
     this.selectorElement.removeChildren();
     this.#specificityTooltips.removeChildren();
+    this.renderSelectorsToElement(selectors, matchingSelectors, elementToSelectorIndex, this.selectorElement,
+                                  this.#specificityTooltips);
+  }
+
+  private renderSelectorsToElement(selectors: Array<{text: string, specificity?: Protocol.CSS.Specificity}>,
+                                   matchingSelectors: boolean[], elementToSelectorIndex: WeakMap<Element, number>,
+                                   targetElement: Element, tooltipContainer: Element): void {
     for (const [i, selector] of selectors.entries()) {
       if (i > 0) {
-        this.selectorElement.append(', ');
+        targetElement.append(', ');
       }
       const specificityTooltipId = selector.specificity ? StylePropertiesSection.getNextSpecificityTooltipId() : null;
-      const span = this.selectorElement.createChild('span', 'simple-selector');
+      const span = targetElement.createChild('span', 'simple-selector');
       span.classList.toggle('selector-matches', matchingSelectors[i]);
       elementToSelectorIndex.set(span, i);
       span.textContent = selectors[i].text;
       if (specificityTooltipId && selector.specificity) {
-        span.setAttribute('aria-describedby', specificityTooltipId);
-        const PH1 = `(${selector.specificity.a},${selector.specificity.b},${selector.specificity.c})`;
-        const tooltip = this.#specificityTooltips.appendChild(new Tooltips.Tooltip.Tooltip({
+        span.setAttribute('aria-details', specificityTooltipId);
+        const tooltip = tooltipContainer.appendChild(new Tooltips.Tooltip.Tooltip({
           id: specificityTooltipId,
           anchor: span,
+          variant: 'rich',
           jslogContext: 'elements.css-selector-specificity',
         }));
-        tooltip.textContent = i18nString(UIStrings.specificity, {PH1});
+        tooltip.hoverDelay = 500;
+
+        const specificitySummary = formatSpecificitySummary(selector.specificity);
+        const breakdownLines = getSpecificityBreakdownLines(selector.specificity);
+        const tooltipContent = breakdownLines.length > 0 ? html`
+          <details class="selector-specificity-tooltip-disclosure">
+            <summary>${specificitySummary}</summary>
+            <ul class="selector-specificity-tooltip-list">
+              ${breakdownLines.map(line => html`<li>${line}</li>`)}
+            </ul>
+          </details>` :
+                                                           html`
+          <div class="selector-specificity-tooltip-summary">${specificitySummary}</div>`;
+        render(tooltipContent, tooltip, {host: this});
       }
     }
   }
 
   markSelectorHighlights(): void {
-    const selectors = this.selectorElement.getElementsByClassName('simple-selector');
+    const selectors = this.element.getElementsByClassName('simple-selector');
     const regex = this.stylesContainer.filterRegex();
     for (let i = 0; i < selectors.length; ++i) {
       const selectorMatchesFilter = regex?.test(selectors[i].textContent || '');
@@ -1644,6 +1794,10 @@ export class StylePropertiesSection {
     if (this.element.hasSelection()) {
       return;
     }
+    if (this.styleInternal.parentRule && !this.isHeaderEditable()) {
+      event.consume(true);
+      return;
+    }
     this.startEditingAtFirstPosition();
     event.consume(true);
   }
@@ -1727,12 +1881,16 @@ export class StylePropertiesSection {
     }
   }
 
+  isHeaderEditable(): boolean {
+    return Boolean(this.styleInternal.parentRule);
+  }
+
   private startEditingAtFirstPosition(): void {
     if (!this.editable) {
       return;
     }
 
-    if (!this.styleInternal.parentRule) {
+    if (!this.isHeaderEditable()) {
       this.moveEditorFromSelector('forward');
       return;
     }
@@ -1741,6 +1899,9 @@ export class StylePropertiesSection {
   }
 
   startEditingSelector(): void {
+    if (!this.isHeaderEditable()) {
+      return;
+    }
     const element = this.selectorElement;
     if (UI.UIUtils.isBeingEdited(element) || this.titleElement.classList.contains('hidden')) {
       return;
@@ -2053,6 +2214,28 @@ export class FunctionRuleSection extends StylePropertiesSection {
     this.onpopulate();
   }
 
+  override isHeaderEditable(): boolean {
+    return false;
+  }
+
+  override moveEditorFromSelector(moveDirection: string): void {
+    if (moveDirection !== 'forward') {
+      super.moveEditorFromSelector(moveDirection);
+      return;
+    }
+    // The body may start with a condition block whose tree element is not a
+    // StylePropertyTreeElement, and the section's own style is a synthetic
+    // declaration spanning the whole body. Edit the first declaration, if
+    // there is one, instead of adding a blank property.
+    const root = this.propertiesTreeOutline.rootElement();
+    for (let child = root.firstChild(); child; child = child.traverseNextTreeElement(false, root, true)) {
+      if (child instanceof StylePropertyTreeElement) {
+        child.startEditingName();
+        return;
+      }
+    }
+  }
+
   createConditionElement(condition: SDK.CSSRule.CSSNestedStyleCondition): HTMLElement|undefined {
     if ('media' in condition) {
       return this.createMediaElement(condition.media);
@@ -2115,6 +2298,10 @@ export class AtRuleSection extends StylePropertiesSection {
       this.element.classList.add('hidden');
     }
   }
+
+  override isHeaderEditable(): boolean {
+    return false;
+  }
 }
 
 export class PositionTryRuleSection extends StylePropertiesSection {
@@ -2124,6 +2311,10 @@ export class PositionTryRuleSection extends StylePropertiesSection {
     super(stylesContainer, matchedStyles, style, sectionIdx, null, null, null);
     this.selectorElement.className = 'position-try-values-key';
     this.propertiesTreeOutline.element.classList.toggle('no-affect', !active);
+  }
+
+  override isHeaderEditable(): boolean {
+    return false;
   }
 }
 

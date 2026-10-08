@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 /* eslint-disable @devtools/no-imperative-dom-api */
 
-// @ts-expect-error tsc 6 can't find type declarations for this file.
 import '../../../Images/Images.js';
 
 import iconStyles from './icon.css.js';
@@ -68,7 +67,7 @@ export type IconData = IconWithName|{
  *              should not be used in newly written code.
  */
 export class Icon extends HTMLElement {
-  static readonly observedAttributes = ['name'];
+  static readonly observedAttributes: string[] = ['name'];
 
   readonly #shadowRoot;
   readonly #icon;

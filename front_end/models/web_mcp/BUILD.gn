@@ -4,17 +4,20 @@
 
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
+import("../../../scripts/build/ninja/vars.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("web_mcp") {
+devtools_foundation_module("web_mcp") {
   sources = [ "WebMCPModel.ts" ]
 
-  deps = [
+  inputs = [ devtools_location_prepend +
+             "node_modules/@types/json-schema/index.d.ts" ]
+
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../bindings:bundle",
     "../stack_trace:bundle",
   ]
@@ -23,7 +26,7 @@ devtools_module("web_mcp") {
 devtools_entrypoint("bundle") {
   entrypoint = "web_mcp.ts"
 
-  deps = [ ":web_mcp" ]
+  ts_deps = [ ":web_mcp" ]
 
   visibility = [
     ":*",
@@ -33,12 +36,12 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [ "WebMCPModel.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/sdk:bundle",
     "../../generated",

@@ -75,6 +75,14 @@ export type SetViewportOptions = Omit<
 /**
  * @internal
  */
+export type StartScreencastOptions = Omit<
+  Bidi.BrowsingContext.StartScreencastParameters,
+  'context'
+>;
+
+/**
+ * @internal
+ */
 export type GetCookiesOptions = Omit<
   Bidi.Storage.GetCookiesParameters,
   'partition'
@@ -394,6 +402,39 @@ export class BrowsingContext extends EventEmitter<{
     // SAFETY: Disposal implies this exists.
     return context.#reason!;
   })
+  async startScreencast(
+    options: StartScreencastOptions = {},
+  ): Promise<Bidi.BrowsingContext.StartScreencastResult> {
+    const {result} = await this.#session.send(
+      'browsingContext.startScreencast',
+      {
+        context: this.id,
+        ...options,
+      },
+    );
+    return result;
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
+  async stopScreencast(
+    screencast: Bidi.BrowsingContext.Screencast,
+  ): Promise<Bidi.BrowsingContext.StopScreencastResult> {
+    const {result} = await this.#session.send(
+      'browsingContext.stopScreencast',
+      {
+        screencast,
+      },
+    );
+    return result;
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
   async close(promptUnload?: boolean): Promise<void> {
     // The WebDriver BiDi specification only allows closing top-level browsing contexts.
     // Closing a top-level context automatically closes all its children, so there is
@@ -604,6 +645,17 @@ export class BrowsingContext extends EventEmitter<{
         contexts: [this.id],
       },
     );
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
+  async setLocaleOverride(locale?: string): Promise<void> {
+    await this.userContext.browser.session.send('emulation.setLocaleOverride', {
+      locale: locale ?? null,
+      contexts: [this.id],
+    });
   }
 
   @throwIfDisposed<BrowsingContext>(context => {

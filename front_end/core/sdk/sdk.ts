@@ -26,6 +26,7 @@ import * as CrashReportContextModel from './CrashReportContextModel.js';
 import * as CSSContainerQuery from './CSSContainerQuery.js';
 import * as CSSFontFace from './CSSFontFace.js';
 import * as CSSLayer from './CSSLayer.js';
+import * as CSSLocation from './CSSLocation.js';
 import * as CSSMatchedStyles from './CSSMatchedStyles.js';
 import * as CSSMedia from './CSSMedia.js';
 import * as CSSMetadata from './CSSMetadata.js';
@@ -58,6 +59,7 @@ import * as LayerTreeBase from './LayerTreeBase.js';
 import * as LogModel from './LogModel.js';
 import * as NetworkManager from './NetworkManager.js';
 import * as NetworkRequest from './NetworkRequest.js';
+import * as NetworkRequestAccess from './NetworkRequestAccess.js';
 import * as OverlayColorGenerator from './OverlayColorGenerator.js';
 import * as OverlayModel from './OverlayModel.js';
 import * as OverlayPersistentHighlighter from './OverlayPersistentHighlighter.js';
@@ -67,6 +69,7 @@ import * as PaintProfiler from './PaintProfiler.js';
 import * as PerformanceMetricsModel from './PerformanceMetricsModel.js';
 import * as PreloadingModel from './PreloadingModel.js';
 import * as RehydratingConnection from './RehydratingConnection.js';
+import * as RehydratingObject from './RehydratingObject.js';
 import * as RemoteObject from './RemoteObject.js';
 import * as Resource from './Resource.js';
 import * as ResourceTreeModel from './ResourceTreeModel.js';
@@ -75,6 +78,8 @@ import * as ScopeTreeCache from './ScopeTreeCache.js';
 import * as ScreenCaptureModel from './ScreenCaptureModel.js';
 import * as Script from './Script.js';
 import * as SDKModel from './SDKModel.js';
+import * as SDKSettings from './SDKSettings.js';
+import * as SecurityOrigin from './SecurityOrigin.js';
 import * as SecurityOriginManager from './SecurityOriginManager.js';
 import * as ServerSentEventProtocol from './ServerSentEventsProtocol.js';
 import * as ServerTiming from './ServerTiming.js';
@@ -84,6 +89,7 @@ import * as SourceMap from './SourceMap.js';
 import * as SourceMapCache from './SourceMapCache.js';
 import * as SourceMapFunctionRanges from './SourceMapFunctionRanges.js';
 import * as SourceMapManager from './SourceMapManager.js';
+import * as SourceMapRangeMappings from './SourceMapRangeMappings.js';
 import * as SourceMapScopeChainEntry from './SourceMapScopeChainEntry.js';
 import * as SourceMapScopesInfo from './SourceMapScopesInfo.js';
 import * as StorageBucketsModel from './StorageBucketsModel.js';
@@ -111,6 +117,7 @@ export {
   CSSContainerQuery,
   CSSFontFace,
   CSSLayer,
+  CSSLocation,
   CSSMatchedStyles,
   CSSMedia,
   CSSMetadata,
@@ -143,6 +150,7 @@ export {
   LogModel,
   NetworkManager,
   NetworkRequest,
+  NetworkRequestAccess,
   OverlayColorGenerator,
   OverlayModel,
   OverlayPersistentHighlighter,
@@ -152,6 +160,7 @@ export {
   PerformanceMetricsModel,
   PreloadingModel,
   RehydratingConnection,  // TODO(crbug.com/444191656): Exported for tests.
+  RehydratingObject,
   RemoteObject,
   Resource,
   ResourceTreeModel,
@@ -160,6 +169,8 @@ export {
   ScreenCaptureModel,
   Script,
   SDKModel,
+  SDKSettings,
+  SecurityOrigin,
   SecurityOriginManager,
   ServerSentEventProtocol,
   ServerTiming,
@@ -169,6 +180,7 @@ export {
   SourceMapCache,
   SourceMapFunctionRanges,
   SourceMapManager,
+  SourceMapRangeMappings,
   SourceMapScopeChainEntry,
   SourceMapScopesInfo,
   StorageBucketsModel,

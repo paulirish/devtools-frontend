@@ -3,25 +3,37 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import {mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
 import {
-  describeWithEnvironment,
   restoreUserAgentForTesting,
   setUserAgentForTesting,
   updateHostConfig,
 } from '../../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
+import {MockCDPConnection} from '../../../testing/MockCDPConnection.js';
+import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
 import {SnapshotTester} from '../../../testing/SnapshotTester.js';
 import {createStubbedDomNodeWithModels, getMatchedStyles, ruleMatch} from '../../../testing/StyleHelpers.js';
 import * as AiAssistance from '../ai_assistance.js';
 
 const {StylingAgent, AiAgent} = AiAssistance;
 
-describeWithEnvironment('StylingAgent', function() {
+describe('StylingAgent', function() {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
   const snapshotTester = new SnapshotTester(this, import.meta);
+  let connection: MockCDPConnection;
+  beforeEach(() => {
+    connection = new MockCDPConnection();
+  });
 
   function mockHostConfig(
       modelId?: string, temperature?: number, userTier?: string,
@@ -63,66 +75,7 @@ describeWithEnvironment('StylingAgent', function() {
     element = sinon.createStubInstance(SDK.DOMModel.DOMNode);
     element.domModel.returns(domModel);
     element.backendNodeId.returns(99 as unknown as ReturnType<SDK.DOMModel.DOMNode['backendNodeId']>);
-  });
-
-  describe('describeElement', () => {
-    it('should describe an element with no children, siblings, or parent', async function() {
-      element.simpleSelector.returns('div#myElement');
-      element.getChildNodesPromise.resolves(null);
-
-      const result = await StylingAgent.StylingAgent.describeElement(element);
-
-      snapshotTester.assert(this, result);
-    });
-
-    it('should describe an element with child element and text nodes', async function() {
-      const childNodes: Array<sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>> = [
-        sinon.createStubInstance(SDK.DOMModel.DOMNode),
-        sinon.createStubInstance(SDK.DOMModel.DOMNode),
-        sinon.createStubInstance(SDK.DOMModel.DOMNode),
-      ];
-      childNodes[0].nodeType.returns(Node.ELEMENT_NODE);
-      childNodes[0].simpleSelector.returns('span.child1');
-      childNodes[1].nodeType.returns(Node.TEXT_NODE);
-      childNodes[2].nodeType.returns(Node.ELEMENT_NODE);
-      childNodes[2].simpleSelector.returns('span.child2');
-
-      element.simpleSelector.returns('div#parentElement');
-      element.getChildNodesPromise.resolves(childNodes);
-      element.nextSibling = null;
-      element.previousSibling = null;
-      element.parentNode = null;
-
-      const result = await StylingAgent.StylingAgent.describeElement(element);
-      snapshotTester.assert(this, result);
-    });
-
-    it('should describe an element with siblings and a parent', async function() {
-      const nextSibling = sinon.createStubInstance(SDK.DOMModel.DOMNode);
-      nextSibling.nodeType.returns(Node.ELEMENT_NODE);
-      const previousSibling = sinon.createStubInstance(SDK.DOMModel.DOMNode);
-      previousSibling.nodeType.returns(Node.TEXT_NODE);
-
-      const parentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
-      parentNode.simpleSelector.returns('div#grandparentElement');
-      const parentChildNodes: Array<sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>> = [
-        sinon.createStubInstance(SDK.DOMModel.DOMNode),
-        sinon.createStubInstance(SDK.DOMModel.DOMNode),
-      ];
-      parentChildNodes[0].nodeType.returns(Node.ELEMENT_NODE);
-      parentChildNodes[0].simpleSelector.returns('span.sibling1');
-      parentChildNodes[1].nodeType.returns(Node.TEXT_NODE);
-      parentNode.getChildNodesPromise.resolves(parentChildNodes);
-
-      element.simpleSelector.returns('div#parentElement');
-      element.getChildNodesPromise.resolves(null);
-      element.nextSibling = nextSibling;
-      element.previousSibling = previousSibling;
-      element.parentNode = parentNode;
-
-      const result = await StylingAgent.StylingAgent.describeElement(element);
-      snapshotTester.assert(this, result);
-    });
+    element.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
   });
 
   describe('buildRequest', () => {
@@ -169,7 +122,7 @@ describeWithEnvironment('StylingAgent', function() {
         aidaClient: mockAidaClient([[{
           explanation: 'answer',
         }]]),
-        serverSideLoggingEnabled: true,
+        serverSideLoggingAllowed: true,
       });
       await Array.fromAsync(agent.run('question', {selected: null}));
 
@@ -199,21 +152,25 @@ describeWithEnvironment('StylingAgent', function() {
                 [{name: 'executeJavaScript', args: {title: 'title2', explanation: 'thought2', code: 'action2'}}],
             explanation: '',
           }],
-          [{explanation: 'answer2'}]
+          [{explanation: 'answer2'}],
         ]),
         createExtensionScope,
         execJs,
       });
-
-      sinon.stub(StylingAgent.StylingAgent, 'describeElement').resolves('element-description');
+      sinon.stub(AiAssistance.DOMNodeContext.DOMNodeContext.prototype, 'getPromptDetails')
+          .resolves('# Inspected element\n\nelement-description');
+      sinon.stub(AiAssistance.DOMNodeContext.DOMNodeContext.prototype, 'getUserFacingDetails').resolves([{
+        title: 'Data used',
+        text: 'element-description',
+      }]);
 
       const controller = new AbortController();
       controller.abort();
       await Array.fromAsync(agent.run('test', {
-        selected: new AiAssistance.StylingAgent.NodeContext(element),
+        selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element),
         signal: controller.signal,
       }));
-      await Array.fromAsync(agent.run('test2', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+      await Array.fromAsync(agent.run('test2', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
 
       const request = agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER);
       assert.deepEqual(request.current_message?.parts[0], {text: 'test input'});
@@ -224,7 +181,7 @@ describeWithEnvironment('StylingAgent', function() {
   describe('run', () => {
     describe('side effect handling', () => {
       it('calls confirmSideEffect when the code execution contains a side effect', async () => {
-        const promise = Promise.withResolvers();
+        const promise = Promise.withResolvers<AiAssistance.Tool.PermissionDecision>();
         const stub = sinon.stub().returns(promise);
         const execJs = sinon.mock().throws(
             new AiAssistance.EvaluateAction.SideEffectError('EvalError: Possible side-effect in debug-evaluate'));
@@ -236,7 +193,7 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             [{
               explanation: 'This is the answer',
-            }]
+            }],
           ]),
           createExtensionScope,
           confirmSideEffectForTest: stub,
@@ -244,14 +201,14 @@ describeWithEnvironment('StylingAgent', function() {
 
         });
 
-        promise.resolve(true);
-        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        promise.resolve(AiAssistance.Tool.PermissionDecision.ALLOW_ONCE);
+        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
 
         sinon.assert.match(execJs.getCall(0).args[1], sinon.match({throwOnSideEffect: true}));
       });
 
       it('calls execJs with allowing side effects when confirmSideEffect resolves to true', async () => {
-        const promise = Promise.withResolvers();
+        const promise = Promise.withResolvers<AiAssistance.Tool.PermissionDecision>();
         const stub = sinon.stub().returns(promise);
         const execJs = sinon.mock().twice();
         execJs.onCall(0).throws(
@@ -265,22 +222,22 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             [{
               explanation: 'This is the answer',
-            }]
+            }],
           ]),
           createExtensionScope,
           confirmSideEffectForTest: stub,
           execJs,
 
         });
-        promise.resolve(true);
-        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        promise.resolve(AiAssistance.Tool.PermissionDecision.ALLOW_ONCE);
+        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
 
         assert.lengthOf(execJs.getCalls(), 2);
         sinon.assert.match(execJs.getCall(1).args[1], sinon.match({throwOnSideEffect: false}));
       });
 
       it('returns side effect error when confirmSideEffect resolves to false', async () => {
-        const promise = Promise.withResolvers();
+        const promise = Promise.withResolvers<AiAssistance.Tool.PermissionDecision>();
         const stub = sinon.stub().returns(promise);
         const execJs = sinon.mock().once();
         execJs.onCall(0).throws(
@@ -293,16 +250,16 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             [{
               explanation: 'This is the answer',
-            }]
+            }],
           ]),
           createExtensionScope,
           confirmSideEffectForTest: stub,
           execJs,
 
         });
-        promise.resolve(false);
-        const responses =
-            await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        promise.resolve(AiAssistance.Tool.PermissionDecision.REJECT);
+        const responses = await Array.fromAsync(
+            agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
         const actionStep = responses.findLast(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
 
         assert.strictEqual(actionStep.output, 'Error: User denied code execution with side effects.');
@@ -310,10 +267,10 @@ describeWithEnvironment('StylingAgent', function() {
       });
 
       it('returns error when side effect is aborted', async () => {
-        const selected = new AiAssistance.StylingAgent.NodeContext(element);
+        const selected = new AiAssistance.DOMNodeContext.DOMNodeContext(element);
         const execJs = sinon.mock().once().throws(
             new AiAssistance.EvaluateAction.SideEffectError('EvalError: Possible side-effect in debug-evaluate'));
-        const sideEffectConfirmationPromise = Promise.withResolvers();
+        const sideEffectConfirmationPromise = Promise.withResolvers<AiAssistance.Tool.PermissionDecision>();
         const agent = new StylingAgent.StylingAgent({
           aidaClient: mockAidaClient([[{
             functionCalls: [{name: 'executeJavaScript', args: {code: '$0.style.backgroundColor = \'red\''}}],
@@ -340,7 +297,7 @@ describeWithEnvironment('StylingAgent', function() {
         const errorStep = responses.at(-1) as AiAssistance.AiAgent.ErrorResponse;
         assert.exists(errorStep);
         assert.strictEqual(errorStep.error, AiAgent.ErrorType.ABORT);
-        assert.isFalse(await sideEffectConfirmationPromise.promise);
+        assert.strictEqual(await sideEffectConfirmationPromise.promise, AiAssistance.Tool.PermissionDecision.REJECT);
       });
     });
 
@@ -358,14 +315,14 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             [{
               explanation: 'This is the answer',
-            }]
+            }],
           ]),
           createExtensionScope,
           execJs,
         });
 
-        const result =
-            await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        const result = await Array.fromAsync(
+            agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
         const actionSteps = result.filter(step => {
           return step.type === AiAssistance.AiAgent.ResponseType.ACTION;
         }) as AiAssistance.AiAgent.ActionResponse[];
@@ -383,7 +340,7 @@ describeWithEnvironment('StylingAgent', function() {
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
       sinon.assert.notCalled(execJs);
     });
@@ -395,7 +352,7 @@ describeWithEnvironment('StylingAgent', function() {
         execJs,
       });
 
-      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(
           this, JSON.stringify(agent.buildRequest({text: ''}, Host.AidaClient.Role.USER).historical_contexts, null, 2));
     });
@@ -413,7 +370,7 @@ describeWithEnvironment('StylingAgent', function() {
         }],
         [{
           explanation: 'this is the actual answer',
-        }]
+        }],
       ]);
       const agent = new StylingAgent.StylingAgent({
         aidaClient,
@@ -421,7 +378,7 @@ describeWithEnvironment('StylingAgent', function() {
         execJs,
       });
 
-      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
 
       const requests: Host.AidaClient.DoConversationRequest[] =
           (aidaClient.doConversation as sinon.SinonStub).args.map(arg => arg[0]);
@@ -438,17 +395,16 @@ describeWithEnvironment('StylingAgent', function() {
       snapshotTester.assert(this, JSON.stringify(snapshot, null, 2));
       assert.exists(requests[1].current_message);
       assert.lengthOf(requests[1].current_message.parts, 1);
-      assert.deepEqual(
-          requests[1].current_message.parts[0], {
-            functionResponse: {
-              name: 'executeJavaScript',
-              response: {
-                result: 'test data',
-                widgets: undefined,
-              }
-            }
+      assert.deepEqual(requests[1].current_message.parts[0], {
+        functionResponse: {
+          name: 'executeJavaScript',
+          response: {
+            result: 'test data',
+            widgets: undefined,
           },
-          'Unexpected input in the follow-up request');
+        },
+      },
+                       'Unexpected input in the follow-up request');
     });
 
     it('generates an rpcId for the answer', async function() {
@@ -463,7 +419,7 @@ describeWithEnvironment('StylingAgent', function() {
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
     });
 
@@ -481,13 +437,13 @@ describeWithEnvironment('StylingAgent', function() {
                 citations: [],
               },
             },
-          }
+          },
         ]]),
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
     });
 
@@ -508,7 +464,7 @@ describeWithEnvironment('StylingAgent', function() {
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
     });
 
@@ -519,7 +475,7 @@ describeWithEnvironment('StylingAgent', function() {
         execJs,
       });
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
       sinon.assert.notCalled(execJs);
       assert.isUndefined(agent.buildRequest({text: ''}, Host.AidaClient.Role.USER).historical_contexts);
@@ -540,14 +496,14 @@ describeWithEnvironment('StylingAgent', function() {
           [{
             explanation: 'this is the actual answer',
             metadata: {},
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs,
 
       });
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       snapshotTester.assert(this, JSON.stringify(responses, null, 2));
       sinon.assert.calledOnce(execJs);
     });
@@ -577,14 +533,14 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             explanation: '',
           }],
-          [{explanation: 'this is the answer'}]
+          [{explanation: 'this is the answer'}],
         ]),
         createExtensionScope,
         execJs,
 
       });
 
-      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+      await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
 
       snapshotTester.assert(
           this, JSON.stringify(agent.buildRequest({text: ''}, Host.AidaClient.Role.USER).historical_contexts, null, 2));
@@ -615,7 +571,7 @@ describeWithEnvironment('StylingAgent', function() {
             }],
             explanation: '',
           }],
-          [{explanation: 'this is the answer'}]
+          [{explanation: 'this is the answer'}],
         ]),
         createExtensionScope,
         execJs,
@@ -623,8 +579,8 @@ describeWithEnvironment('StylingAgent', function() {
 
       const controller = new AbortController();
       controller.abort();
-      await Array.fromAsync(
-          agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element), signal: controller.signal}));
+      await Array.fromAsync(agent.run(
+          'test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element), signal: controller.signal}));
 
       assert.isUndefined(agent.buildRequest({text: ''}, Host.AidaClient.Role.USER).historical_contexts);
     });
@@ -644,7 +600,7 @@ describeWithEnvironment('StylingAgent', function() {
     it('does not add multimodal input evaluation prompt when multimodal is disabled', async function() {
       mockHostConfig('test model');
       const enhancedQuery = await agent.enhanceQuery(
-          'test query', new AiAssistance.StylingAgent.NodeContext(element),
+          'test query', new AiAssistance.DOMNodeContext.DOMNodeContext(element),
           AiAssistance.AiAgent.MultimodalInputType.SCREENSHOT);
 
       snapshotTester.assert(this, enhancedQuery);
@@ -654,7 +610,7 @@ describeWithEnvironment('StylingAgent', function() {
        async function() {
          mockHostConfig('test model', 1, 'PUBLIC', Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS, true);
          const enhancedQuery =
-             await agent.enhanceQuery('test query', new AiAssistance.StylingAgent.NodeContext(element));
+             await agent.enhanceQuery('test query', new AiAssistance.DOMNodeContext.DOMNodeContext(element));
 
          snapshotTester.assert(this, enhancedQuery);
        });
@@ -663,7 +619,7 @@ describeWithEnvironment('StylingAgent', function() {
        async function() {
          mockHostConfig('test model', 1, 'PUBLIC', Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS, true);
          const enhancedQuery = await agent.enhanceQuery(
-             'test query', new AiAssistance.StylingAgent.NodeContext(element),
+             'test query', new AiAssistance.DOMNodeContext.DOMNodeContext(element),
              AiAssistance.AiAgent.MultimodalInputType.SCREENSHOT);
 
          snapshotTester.assert(this, enhancedQuery);
@@ -673,7 +629,7 @@ describeWithEnvironment('StylingAgent', function() {
        async function() {
          mockHostConfig('test model', 1, 'PUBLIC', Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS, true);
          const enhancedQuery = await agent.enhanceQuery(
-             'test query', new AiAssistance.StylingAgent.NodeContext(element),
+             'test query', new AiAssistance.DOMNodeContext.DOMNodeContext(element),
              AiAssistance.AiAgent.MultimodalInputType.UPLOADED_IMAGE);
 
          snapshotTester.assert(this, enhancedQuery);
@@ -689,7 +645,7 @@ describeWithEnvironment('StylingAgent', function() {
         }],
         [{
           explanation: 'This is the answer',
-        }]
+        }],
       ]);
     }
 
@@ -705,8 +661,8 @@ describeWithEnvironment('StylingAgent', function() {
           createExtensionScope,
           execJs,
         });
-        const responses =
-            await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        const responses = await Array.fromAsync(
+            agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
         const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
         assert.strictEqual(actionStep.output, 'Error: JavaScript execution is currently disabled.');
         assert.lengthOf(execJs.getCalls(), 0);
@@ -728,7 +684,7 @@ describeWithEnvironment('StylingAgent', function() {
           createExtensionScope,
           execJs,
         });
-        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+        await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
         assert.lengthOf(execJs.getCalls(), 1);
       });
     });
@@ -738,8 +694,9 @@ describeWithEnvironment('StylingAgent', function() {
     it('successfully returns computed and authored styles', async () => {
       const {node: resolvedNode, cssModel} = createStubbedDomNodeWithModels({nodeId: 42});
 
-      resolvedNode.ownerDocument = null;
-      element.ownerDocument = null;
+      resolvedNode.ownerDocument = {
+        documentURL: 'https://example.com',
+      } as unknown as SDK.DOMModel.DOMDocument;
 
       sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(resolvedNode);
 
@@ -747,7 +704,7 @@ describeWithEnvironment('StylingAgent', function() {
       (cssModel.getComputedStyle as sinon.SinonStub).resolves(computedStyleMap);
 
       const matchedPayload = [ruleMatch('div', {color: 'red'})];
-      const matchedStyles = getMatchedStyles({cssModel, node: resolvedNode, matchedPayload});
+      const matchedStyles = await getMatchedStyles({cssModel, node: resolvedNode, matchedPayload, connection});
       (cssModel.getMatchedStyles as sinon.SinonStub).resolves(matchedStyles);
 
       const agent = new StylingAgent.StylingAgent({
@@ -765,14 +722,14 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
       assert.exists(actionStep);
       assert.strictEqual(
@@ -790,13 +747,7 @@ describeWithEnvironment('StylingAgent', function() {
     it('returns error on origin mismatch', async () => {
       const {node: resolvedNode} = createStubbedDomNodeWithModels({nodeId: 42});
 
-      element.ownerDocument = {
-        documentURL: 'https://example.com',
-      } as unknown as SDK.DOMModel.DOMDocument;
-
-      resolvedNode.ownerDocument = {
-        documentURL: 'https://another.com',
-      } as unknown as SDK.DOMModel.DOMDocument;
+      resolvedNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://another.com'));
 
       sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(resolvedNode);
 
@@ -815,14 +766,14 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
       assert.exists(actionStep);
       assert.strictEqual(actionStep.output, 'Error: Node does not belong to the current origin.');
@@ -844,7 +795,7 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
@@ -857,8 +808,6 @@ describeWithEnvironment('StylingAgent', function() {
     });
 
     it('returns error when target node cannot be resolved', async () => {
-      element.ownerDocument = null;
-
       sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(null);
 
       const agent = new StylingAgent.StylingAgent({
@@ -876,14 +825,14 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
       assert.exists(actionStep);
       assert.strictEqual(actionStep.output, 'Error: Could not find the element with uid=42');
@@ -892,8 +841,9 @@ describeWithEnvironment('StylingAgent', function() {
     it('returns error when computed styles fail', async () => {
       const {node: resolvedNode, cssModel} = createStubbedDomNodeWithModels({nodeId: 42});
 
-      resolvedNode.ownerDocument = null;
-      element.ownerDocument = null;
+      resolvedNode.ownerDocument = {
+        documentURL: 'https://example.com',
+      } as unknown as SDK.DOMModel.DOMDocument;
 
       sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(resolvedNode);
       (cssModel.getComputedStyle as sinon.SinonStub).resolves(null);
@@ -913,14 +863,14 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
       assert.exists(actionStep);
       assert.strictEqual(actionStep.output, 'Error: Could not get computed styles.');
@@ -929,8 +879,9 @@ describeWithEnvironment('StylingAgent', function() {
     it('returns error when matched styles fail', async () => {
       const {node: resolvedNode, cssModel} = createStubbedDomNodeWithModels({nodeId: 42});
 
-      resolvedNode.ownerDocument = null;
-      element.ownerDocument = null;
+      resolvedNode.ownerDocument = {
+        documentURL: 'https://example.com',
+      } as unknown as SDK.DOMModel.DOMDocument;
 
       sinon.stub(SDK.DOMModel.DeferredDOMNode.prototype, 'resolvePromise').resolves(resolvedNode);
 
@@ -953,14 +904,14 @@ describeWithEnvironment('StylingAgent', function() {
           }],
           [{
             explanation: 'this is the actual answer',
-          }]
+          }],
         ]),
         createExtensionScope,
         execJs: sinon.spy(),
       });
 
       const responses =
-          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.StylingAgent.NodeContext(element)}));
+          await Array.fromAsync(agent.run('test', {selected: new AiAssistance.DOMNodeContext.DOMNodeContext(element)}));
       const actionStep = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION)!;
       assert.exists(actionStep);
       assert.strictEqual(actionStep.output, 'Error: Could not get authored styles.');

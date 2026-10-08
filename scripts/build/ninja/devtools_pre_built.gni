@@ -2,47 +2,158 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("./node.gni")
+import("./copy.gni")
+import("./vars.gni")
 
 template("devtools_pre_built") {
-  node_action(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "sources",
-                             "deps",
-                           ])
+  _gen_target_name = "${target_name}_gen"
+  _prebuilt_public_deps = []
+  if (defined(invoker.deps)) {
+    _prebuilt_public_deps += invoker.deps
+  }
 
-    script = "scripts/build/ninja/copy-files.js"
+  copy_to_gen(_gen_target_name) {
+    sources = invoker.sources
+    deps = _prebuilt_public_deps
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+  }
 
-    public_deps = invoker.deps
+  _gen_outputs = []
+  foreach(_source, invoker.sources) {
+    _gen_outputs += [ "$target_gen_dir/$_source" ]
+  }
 
-    _copy_src = rebase_path(get_path_info(target_name, "dir"), root_build_dir)
-    _copy_dest = rebase_path(target_gen_dir, root_build_dir)
+  _javascript_implementation_files = invoker.data + filter_include(_gen_outputs,
+                                                                   [
+                                                                     "*.js",
+                                                                     "*.mjs",
+                                                                   ])
+  _javascript_map_files = filter_include(_gen_outputs, [ "*.map" ])
 
-    args = [
-      _copy_src,
-      _copy_dest,
-      string_join(",", sources),
-    ]
+  _dts_sources = filter_include(invoker.sources,
+                                [
+                                  "*.d.ts",
+                                  "*.d.mts",
+                                  "*.d.cts",
+                                ])
 
-    outputs = []
-    foreach(_source, sources) {
-      outputs += [ "$target_gen_dir/$_source" ]
+  _has_dts = _dts_sources != []
+  if (_has_dts) {
+    _ts_references = []
+    if (defined(invoker.ts_deps)) {
+      foreach(dep, invoker.ts_deps) {
+        _dep_name = get_label_info(dep, "name")
+        _dep_gen_dir = get_label_info(dep, "target_gen_dir")
+        _ts_references += [
+          {
+            path = rebase_path("$_dep_gen_dir/$_dep_name-tsconfig.ref.json",
+                               target_gen_dir)
+          },
+        ]
+      }
     }
 
-    _javascript_implementation_files = invoker.data + filter_include(outputs,
-                                                                     [
-                                                                       "*.js",
-                                                                       "*.mjs",
-                                                                     ])
-    _javascript_map_files = filter_include(outputs, [ "*.map" ])
+    _tsconfig_ref_target = "${target_name}_tsconfig_ref"
+    _tsconfig_ref_file = "$target_gen_dir/${target_name}-tsconfig.ref.json"
+
+    generated_file(_tsconfig_ref_target) {
+      outputs = [ _tsconfig_ref_file ]
+      output_conversion = "json"
+      contents = {
+        compilerOptions = {
+          composite = true
+          declaration = true
+          skipLibCheck = true
+          rootDir = "."
+          outDir = "."
+        }
+        files = _dts_sources
+        references = _ts_references
+      }
+      if (defined(invoker.testonly)) {
+        testonly = invoker.testonly
+      }
+    }
+  }
+
+  group(target_name) {
+    public_deps = [ ":$_gen_target_name" ]
+    if (_has_dts) {
+      public_deps += [ ":$_tsconfig_ref_target" ]
+    }
+    if (defined(invoker.public_deps)) {
+      public_deps += invoker.public_deps
+    }
+    if (_has_dts && defined(invoker.ts_deps)) {
+      public_deps += invoker.ts_deps
+    }
+    public_deps += _prebuilt_public_deps
 
     data = _javascript_implementation_files + _javascript_map_files
 
-    if (invoker.sources_are_release || is_debug) {
+    if (invoker.sources_are_release || !devtools_bundle) {
       metadata = {
         grd_files = _javascript_implementation_files
       }
+    }
+
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+  }
+
+  # Expose ${target_name}-dts group alias so ts_deps and ts_library
+  # dependencies resolve seamlessly to this target.
+  group("${target_name}-dts") {
+    public_deps = [ ":$_gen_target_name" ]
+    if (_has_dts) {
+      public_deps += [ ":$_tsconfig_ref_target" ]
+    }
+    if (defined(invoker.public_deps)) {
+      public_deps += invoker.public_deps
+    }
+    if (_has_dts && defined(invoker.ts_deps)) {
+      public_deps += invoker.ts_deps
+    }
+    public_deps += _prebuilt_public_deps
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+  }
+
+  # Expose ${target_name}_sources group so ts_deps in devtools_entrypoint
+  # can resolve source dependencies for bundling.
+  _sources = []
+  if (!invoker.sources_are_release) {
+    _sources = invoker.sources
+  }
+
+  group("${target_name}_sources") {
+    public_inputs = _sources
+    if (defined(invoker.inputs)) {
+      public_inputs += invoker.inputs
+    }
+    public_deps = [ ":$_gen_target_name" ]
+    if (defined(invoker.public_deps)) {
+      public_deps += invoker.public_deps
+    }
+    if (_has_dts && defined(invoker.ts_deps)) {
+      public_deps += invoker.ts_deps
+    }
+    public_deps += _prebuilt_public_deps
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
     }
   }
 }

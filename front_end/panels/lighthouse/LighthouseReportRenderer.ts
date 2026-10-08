@@ -7,8 +7,8 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as LighthouseModel from '../../models/lighthouse/lighthouse.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as LighthouseReport from '../../third_party/lighthouse/report/report.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -114,6 +114,15 @@ export class LighthouseReportRenderer {
   /**
    * Renders only the score gauges component of the Lighthouse report, stripping out
    * topbar, categories, and footer. Used by the Lighthouse report walkthrough widget.
+   *
+   * The Lighthouse renderer places the gauges differently depending on the number of categories:
+   * - Multiple categories: a `.lh-scores-header` row at the top holds one gauge per category.
+   * - Single category: the renderer skips `.lh-scores-header`, so the only gauge is the one in the
+   *   category's own section heading (`.lh-category-header .lh-score__gauge`).
+   *
+   * Returns null if neither element exists. This happens for single-category performance reports in
+   * navigation mode, because the Lighthouse performance renderer replaces `.lh-score__gauge` in its
+   * section heading with a larger animated gauge, which this widget does not use.
    */
   static renderLighthouseScores(lhr: LighthouseModel.ReporterTypes.ReportJSON): HTMLElement|null {
     // Ideally, we would only render the scores header, but since it's imported from lighthouse
@@ -121,11 +130,12 @@ export class LighthouseReportRenderer {
     // and strip out the other components.
     const reportEl = LighthouseReportRenderer.renderLighthouseReport(lhr);
     const reportContainer = reportEl.querySelector('.lh-container');
-    const scoresHeader = reportEl.querySelector('.lh-scores-header');
-    if (!scoresHeader || !reportContainer) {
+    const scores =
+        reportEl.querySelector('.lh-scores-header') ?? reportEl.querySelector('.lh-category-header .lh-score__gauge');
+    if (!scores || !reportContainer) {
       return null;
     }
-    reportContainer.replaceChildren(scoresHeader);
+    reportContainer.replaceChildren(scores);
     const topbar = reportEl.querySelector('.lh-topbar');
     topbar?.remove();
     return reportEl;
@@ -198,7 +208,6 @@ export class LighthouseReportRenderer {
         lineNumber: line,
         columnNumber: column,
         showColumnNumber: false,
-        inlineFrameIndex: 0,
         maxLength: MaxLengthForLinks,
       });
       UI.Tooltip.Tooltip.install(origHTMLElement, '');

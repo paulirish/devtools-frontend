@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type {FormatMapping} from '../formatter_actions/formatter_actions.js';
+
 export class FormattedContentBuilder {
   #lastOriginalPosition = 0;
   #formattedContent: string[] = [];
@@ -15,7 +17,7 @@ export class FormattedContentBuilder {
   #cachedIndents = new Map<number, string>();
   #canBeIdentifierOrNumber = /[$\u200C\u200D\p{ID_Continue}]/u;
 
-  mapping = {original: [0], formatted: [0]};
+  mapping: FormatMapping = {original: [0], formatted: [0]};
 
   constructor(private indentString: string) {
   }
@@ -29,8 +31,11 @@ export class FormattedContentBuilder {
   addToken(token: string, offset: number): void {
     // Skip the regex check if `addSoftSpace` will be a no-op.
     if (this.#enforceSpaceBetweenWords && !this.#hardSpaces && !this.#softSpace) {
-      const lastCharOfLastToken = this.#formattedContent.at(-1)?.at(-1) ?? '';
-      if (this.#canBeIdentifierOrNumber.test(lastCharOfLastToken) && this.#canBeIdentifierOrNumber.test(token)) {
+      const lastToken = this.#formattedContent.at(-1) ?? '';
+      const lastCharOfLastToken = lastToken.at(-1) ?? '';
+      if ((this.#canBeIdentifierOrNumber.test(lastCharOfLastToken) ||
+           ['`', '}', ')', ']', '\'', '"', '/'].includes(lastCharOfLastToken)) &&
+          this.#canBeIdentifierOrNumber.test(token)) {
         this.addSoftSpace();
       }
     }

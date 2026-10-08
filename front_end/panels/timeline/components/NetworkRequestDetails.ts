@@ -4,6 +4,7 @@
 
 import '../../../ui/components/request_link_icon/request_link_icon.js';
 
+import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
@@ -12,6 +13,7 @@ import * as Trace from '../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import networkRequestDetailsStyles from './networkRequestDetails.css.js';
 import networkRequestTooltipStyles from './networkRequestTooltip.css.js';
@@ -24,99 +26,110 @@ const MAX_URL_LENGTH = 100;
 
 const UIStrings = {
   /**
-   * @description Text that refers to the network request method
+   * @description Label for the HTTP request method in the network request details view of the Performance panel.
    */
   requestMethod: 'Request method',
   /**
-   * @description Text that refers to the network request protocol
+   * @description Label for the network protocol in the network request details view of the Performance panel.
    */
   protocol: 'Protocol',
   /**
-   * @description Text to show the priority of an item
+   * @description Label for the network request priority in the network request details view of the Performance panel.
    */
   priority: 'Priority',
   /**
-   * @description Text used when referring to the data sent in a network request that is encoded as a particular file format.
+   * @description Label for the encoded data size in the network request details view of the Performance panel.
    */
   encodedData: 'Encoded data',
   /**
-   * @description Text used to refer to the data sent in a network request that has been decoded.
+   * @description Label for the decoded body size in the network request details view of the Performance panel.
    */
   decodedBody: 'Decoded body',
   /**
-   * @description Text in Timeline indicating that input has happened recently
+   * @description Value indicating yes in the network request details view of the Performance panel.
    */
   yes: 'Yes',
   /**
-   * @description Text in Timeline indicating that input has not happened recently
+   * @description Value indicating no in the network request details view of the Performance panel.
    */
   no: 'No',
   /**
-   * @description Text to indicate to the user they are viewing an event representing a network request.
+   * @description Header title for a network request in the network request details view of the Performance panel.
    */
   networkRequest: 'Network request',
   /**
-   * @description Text for the data source of a network request.
+   * @description Label indicating whether a network request was served from cache in the network request details view of the Performance panel.
    */
   fromCache: 'From cache',
   /**
-   * @description Text used to show the mime-type of the data transferred with a network request (e.g. "application/json").
+   * @description Label for the MIME type of a network request in the network request details view of the Performance panel.
    */
   mimeType: 'MIME type',
   /**
-   * @description Text used to show the user that a request was served from the browser's in-memory cache.
+   * @description Suffix indicating that a network request was served from memory cache in the Performance panel.
    */
   FromMemoryCache: ' (from memory cache)',
   /**
-   * @description Text used to show the user that a request was served from the browser's file cache.
+   * @description Suffix indicating that a network request was served from disk cache in the Performance panel.
    */
   FromCache: ' (from cache)',
   /**
-   * @description Label for a network request indicating that it was a HTTP2 server push instead of a regular network request, in the Performance panel
+   * @description Suffix indicating that a network request was served from server push in the Performance panel.
    */
   FromPush: ' (from push)',
   /**
-   * @description Text used to show a user that a request was served from an installed, active service worker.
+   * @description Suffix indicating that a network request was served from a service worker in the Performance panel.
    */
   FromServiceWorker: ' (from `service worker`)',
   /**
-   * @description Text for the event initiated by another one
+   * @description Label indicating what initiated the network request in the network request details view of the Performance panel.
    */
   initiatedBy: 'Initiated by',
   /**
-   * @description Text that refers to if the network request is blocking
+   * @description Label for the render-blocking status of a network request in the network request details view of the Performance panel.
    */
   blocking: 'Blocking',
   /**
-   * @description Text that refers to if the network request is in-body parser render-blocking
+   * @description Status value indicating that a network request is in-body parser blocking in the Performance panel.
    */
   inBodyParserBlocking: 'In-body parser blocking',
   /**
-   * @description Text that refers to if the network request is render-blocking
+   * @description Status value indicating that a network request is render-blocking in the Performance panel.
    */
   renderBlocking: 'Render-blocking',
   /**
-   * @description Text to refer to a 3rd Party entity.
+   * @description Label for the third-party entity of a network request in the network request details view of the Performance panel.
    */
   entity: '3rd party',
   /**
-   * @description Label for a column containing the names of timings (performance metric) taken in the server side application.
+   * @description Column header for server timing metric names in the network request details view of the Performance panel.
    */
   serverTiming: 'Server timing',
   /**
-   * @description Label for a column containing the values of timings (performance metric) taken in the server side application.
+   * @description Column header for server timing duration values in the network request details view of the Performance panel.
    */
   time: 'Time',
   /**
-   * @description Label for a column containing the description of timings (performance metric) taken in the server side application.
+   * @description Column header for server timing descriptions in the network request details view of the Performance panel.
    */
   description: 'Description',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/NetworkRequestDetails.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+export interface ViewInput {
+  request: Trace.Types.Events.SyntheticNetworkRequest|null;
+  target: SDK.Target.Target|null;
+  previewElementsCache: WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLElement>;
+  entityMapper: Trace.EntityMapper.EntityMapper|null;
+  serverTimings: SDK.ServerTiming.ServerTiming[]|null;
+  linkifier: LegacyComponents.Linkifier.Linkifier|null;
+  parsedTrace: Trace.TraceModel.ParsedTrace|null;
+}
+export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+
 export class NetworkRequestDetails extends UI.Widget.Widget {
-  #view: typeof DEFAULT_VIEW;
+  #view: View;
   #request: Trace.Types.Events.SyntheticNetworkRequest|null = null;
   #requestPreviewElements = new WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLElement>();
   #entityMapper: Trace.EntityMapper.EntityMapper|null = null;
@@ -125,7 +138,7 @@ export class NetworkRequestDetails extends UI.Widget.Widget {
   #serverTimings: SDK.ServerTiming.ServerTiming[]|null = null;
   #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
     this.requestUpdate();
@@ -157,7 +170,7 @@ export class NetworkRequestDetails extends UI.Widget.Widget {
       // while this feature is experimental, to enable easier trials.
       if (headerName === 'server-timing' || headerName === 'server-timing-test') {
         header.name = 'server-timing';
-        this.#serverTimings = SDK.ServerTiming.ServerTiming.parseHeaders([header]);
+        this.#serverTimings = SDK.ServerTiming.ServerTiming.parseHeaders([header], Common.Console.Console.instance());
         break;
       }
     }
@@ -184,32 +197,24 @@ export class NetworkRequestDetails extends UI.Widget.Widget {
   }
 }
 
-export interface ViewInput {
-  request: Trace.Types.Events.SyntheticNetworkRequest|null;
-  target: SDK.Target.Target|null;
-  previewElementsCache: WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLElement>;
-  entityMapper: Trace.EntityMapper.EntityMapper|null;
-  serverTimings: SDK.ServerTiming.ServerTiming[]|null;
-  linkifier: LegacyComponents.Linkifier.Linkifier|null;
-  parsedTrace: Trace.TraceModel.ParsedTrace|null;
-}
+export const DEFAULT_VIEW: View =
+    (input, _output, target) => {
+      if (!input.request) {
+        render(Lit.nothing, target);
+        return;
+      }
+      const {request} = input;
+      const {data} = request.args;
 
-export const DEFAULT_VIEW: (
-    input: ViewInput, output: object, target: HTMLElement) => void = (input, _output, target) => {
-  if (!input.request) {
-    render(Lit.nothing, target);
-    return;
-  }
-  const {request} = input;
-  const {data} = request.args;
-
-  const redirectsHtml = NetworkRequestTooltip.renderRedirects(request);
-  // clang-format off
+      const redirectsHtml = NetworkRequestTooltip.renderRedirects(request);
+      // clang-format off
       render(html`
         <style>${networkRequestDetailsStyles}</style>
         <style>${networkRequestTooltipStyles}</style>
 
-        <div class="network-request-details-content">
+        <div class="network-request-details-content"
+             data-network-request-id=${input.request.args.data.requestId}
+             jslog=${VisualLogging.section('timeline.network-request-details')}>
           ${renderTitle(input.request)}
           ${renderURL(input.request)}
           <div class="network-request-details-cols">
@@ -247,8 +252,8 @@ export const DEFAULT_VIEW: (
           </div>
         </div>
      `, target);
-  // clang-format on
-};
+      // clang-format on
+    };
 
 function renderTitle(request: Trace.Types.Events.SyntheticNetworkRequest): Lit.TemplateResult {
   const style = {
@@ -267,14 +272,14 @@ function renderURL(request: Trace.Types.Events.SyntheticNetworkRequest): Lit.Tem
   const options: LegacyComponents.Linkifier.LinkifyURLOptions = {
     tabStop: true,
     showColumnNumber: false,
-    inlineFrameIndex: 0,
     maxLength: MAX_URL_LENGTH,
   };
   const linkifiedURL = LegacyComponents.Linkifier.Linkifier.linkifyURL(
       request.args.data.url as Platform.DevToolsPath.UrlString, options);
 
   // Potentially link to request within Network Panel
-  const networkRequest = SDK.TraceObject.RevealableNetworkRequest.create(request);
+  const networkRequest =
+      SDK.TraceObject.RevealableNetworkRequest.create(SDK.TargetManager.TargetManager.instance(), request);
   if (networkRequest) {
     linkifiedURL.addEventListener('contextmenu', (event: MouseEvent) => {
       const contextMenu = new UI.ContextMenu.ContextMenu(event);
@@ -336,7 +341,7 @@ function renderRow(title: string, value?: string|Node|Lit.TemplateResult): Lit.L
   }
   // clang-format off
     return html`
-      <div class="network-request-details-row">
+      <div class="network-request-details-row" jslog=${VisualLogging.item('detail-row')}>
         <div class="title">${title}</div>
         <div class="value">${value}</div>
       </div>`;
@@ -439,7 +444,6 @@ function renderInitiatedBy(
   const options: LegacyComponents.Linkifier.LinkifyOptions = {
     tabStop: true,
     showColumnNumber: true,
-    inlineFrameIndex: 0,
   };
   // If we have a stack trace, that is the most reliable way to get the initiator data and display a link to the source.
   if (hasStackTrace) {

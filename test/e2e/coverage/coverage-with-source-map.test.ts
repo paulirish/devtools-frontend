@@ -11,8 +11,8 @@ import {
   MAIN_PANEL_SELECTOR,
   MOVE_TO_MAIN_TAB_BAR_SELECTOR,
 } from '../helpers/cross-tool-helper.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 const COVERAGE_TAB_ID = '#tab-coverage';
 
@@ -76,7 +76,7 @@ describe('Coverage Panel', function() {
         url: `${URL_PREFIX}/src/animal.ts`,
       },
     ];
-    await waitForCoverageData(expected, devToolsPage);
+    await waitForCoverageData(devToolsPage, expected);
   });
 
   it('Can update and sort the coverage information for sources', async ({devToolsPage, inspectedPage}) => {
@@ -115,6 +115,6 @@ describe('Coverage Panel', function() {
       },
     ];
     await devToolsPage.waitForElementWithTextContent(`${URL_PREFIX}/src/users.tsJS (per function)1202823.3%`);
-    await waitForCoverageData(expected, devToolsPage);
+    await waitForCoverageData(devToolsPage, expected);
   });
 });

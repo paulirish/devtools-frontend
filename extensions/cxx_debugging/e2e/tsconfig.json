@@ -2,8 +2,9 @@
   "extends": "../../../config/typescript/tsconfig.base.json",
   "compilerOptions": {
     "target": "esnext",
-    "module": "commonjs",
+    "module": "esnext",
     "composite": false,
+    "isolatedDeclarations": false,
     "allowUnreachableCode": false,
     "skipLibCheck": true,
     "rootDir": "../../..",
@@ -11,15 +12,16 @@
       "test/*": ["../../../test/*"],
       "puppeteer": ["../../../node_modules/puppeteer/lib/types.d.ts"],
       "*": ["../../../node_modules/@types/*/index.d.ts"]
-    }
+    },
+    "types": ["mocha"]
   },
   "files": [
-    "MochaRootHooks.ts",
     "TestDriver.ts",
     "StandaloneTestDriver.ts",
     "OptionsPageTests.ts",
     "cxx-debugging-extension-helpers.ts",
     "standalone/MemoryInspector.test.ts",
-    "../../../test/e2e/types.d.ts"
+    "../../../test/e2e/types.d.ts",
+    "../../../front_end/legacy/legacy-defs.d.ts"
   ]
 }

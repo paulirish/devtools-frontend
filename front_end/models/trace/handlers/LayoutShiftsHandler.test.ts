@@ -42,27 +42,181 @@ describe('LayoutShiftsHandler', function() {
     assert.strictEqual(layoutShifts.clusters[0].clusterCumulativeScore, 0.29522728495836237);
   });
 
-  it('creates a cluster after the maximum time gap between shifts', async function() {
-    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+  it('clusters soft navigations correctly', async function() {
+    Trace.Handlers.ModelHandlers.Meta.reset();
+    Trace.Handlers.ModelHandlers.LayoutShifts.reset();
+
+    const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    const layoutShiftEvents = await TraceLoader.rawEvents(this, 'cls-single-frame.json.gz');
+    const shiftEvent = layoutShiftEvents.find(e => e.name === 'LayoutShift');
+    if (!shiftEvent) {
+      throw new Error('No LayoutShift event found in cls-single-frame.json.gz');
+    }
+
+    // Find a soft navigation event.
+    const softNavEvent = events.find(e => e.name === 'SoftNavigationStart');
+    if (!softNavEvent) {
+      throw new Error('No soft navigation event found in soft-navs.json.gz');
+    }
+
+    // Clone the shift event to before and after the soft nav.
+    const shiftBefore = JSON.parse(JSON.stringify(shiftEvent));
+    shiftBefore.ts = softNavEvent.ts - 1000;
+    shiftBefore.args.data.had_recent_input = false;
+
+    const shiftAfter = JSON.parse(JSON.stringify(shiftEvent));
+    shiftAfter.ts = softNavEvent.ts + 1000;
+    shiftAfter.args.data.had_recent_input = false;
+
+    // Another shift after to ensure we don't just create clusters for single shifts
+    const shiftAfter2 = JSON.parse(JSON.stringify(shiftEvent));
+    shiftAfter2.ts = softNavEvent.ts + 2000;
+    shiftAfter2.args.data.had_recent_input = false;
+
+    const mutableEvents = [...events, shiftBefore, shiftAfter, shiftAfter2];
+    mutableEvents.sort((a, b) => a.ts - b.ts);
+
+    for (const event of mutableEvents) {
+      Trace.Handlers.ModelHandlers.Meta.handleEvent(event as Trace.Types.Events.Event);
+      Trace.Handlers.ModelHandlers.Screenshots.handleEvent(event as Trace.Types.Events.Event);
+      Trace.Handlers.ModelHandlers.LayoutShifts.handleEvent(event as Trace.Types.Events.Event);
+    }
+    await Trace.Handlers.ModelHandlers.Meta.finalize();
+    await Trace.Handlers.ModelHandlers.Screenshots.finalize();
+    await Trace.Handlers.ModelHandlers.LayoutShifts.finalize();
 
     const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
-    assert.lengthOf(layoutShifts.clusters, 3);
-    // The first cluster should end because the maximum time gap between
-    // shifts ends, and thus the time between the last shift and the window
-    // end should be exactly MAX_SHIFT_TIME_DELTA;
-    const firstCluster = layoutShifts.clusters[0];
-    const firstClusterEvents = layoutShifts.clusters[0].events;
+    assert.lengthOf(layoutShifts.clusters, 2);
+    assert.lengthOf(layoutShifts.clusters[0].events, 1);
+    assert.lengthOf(layoutShifts.clusters[1].events, 2);
+  });
 
-    assert.strictEqual(
-        firstCluster.clusterWindow.max - firstClusterEvents[firstClusterEvents.length - 1].ts,
-        Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA);
+  describe('with cls-cluster-max-timeout', () => {
+    let layoutShifts: Trace.Handlers.ModelHandlers.LayoutShifts.LayoutShiftsData;
 
-    // There are seven shifts in quick succession in the first cluster,
-    // only one shift in the second cluster and only one shift in the
-    // third cluster.
-    assert.lengthOf(layoutShifts.clusters[0].events, 7);
-    assert.lengthOf(layoutShifts.clusters[1].events, 1);
-    assert.lengthOf(layoutShifts.clusters[2].events, 1);
+    before(async function() {
+      await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+      layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
+    });
+
+    it('creates a cluster after the maximum time gap between shifts', () => {
+      assert.lengthOf(layoutShifts.clusters, 3);
+      // The first cluster should end because the maximum time gap between
+      // shifts ends, and thus the time between the last shift and the window
+      // end should be exactly MAX_SHIFT_TIME_DELTA;
+      const firstCluster = layoutShifts.clusters[0];
+      const firstClusterEvents = layoutShifts.clusters[0].events;
+
+      assert.strictEqual(firstCluster.clusterWindow.max - firstClusterEvents[firstClusterEvents.length - 1].ts,
+                         Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA);
+
+      // There are seven shifts in quick succession in the first cluster,
+      // only one shift in the second cluster and only one shift in the
+      // third cluster.
+      assert.lengthOf(layoutShifts.clusters[0].events, 7);
+      assert.lengthOf(layoutShifts.clusters[1].events, 1);
+      assert.lengthOf(layoutShifts.clusters[2].events, 1);
+    });
+
+    it('sets the end of the last session window to the max gap between duration correctly', () => {
+      const lastWindow = layoutShifts.clusters.at(-1)?.clusterWindow;
+      const lastShiftInWindow = layoutShifts.clusters.at(-1)?.events.at(-1);
+      assert.isOk(lastWindow, 'Session window not found.');
+
+      assert.isOk(lastShiftInWindow, 'Session window not found.');
+      assert.strictEqual(lastWindow.max,
+                         lastShiftInWindow.ts + Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA);
+      assert.isBelow(lastWindow.range, Trace.Handlers.ModelHandlers.LayoutShifts.MAX_CLUSTER_DURATION);
+    });
+
+    it('calculates Cumulative Layout Shift correctly for multiple session windows', () => {
+      assert.lengthOf(layoutShifts.clusters, 3);
+
+      let globalCLS = 0;
+      let clusterCount = 1;
+      let clusterWithCLS = 0;
+      for (const cluster of layoutShifts.clusters) {
+        let clusterCumulativeScore = 0;
+        for (const shift of cluster.events) {
+          clusterCumulativeScore += shift.args.data?.weighted_score_delta || 0;
+          // Test the cumulative score until this shift.
+          assert.strictEqual(shift.parsedData.cumulativeWeightedScoreInWindow, clusterCumulativeScore);
+          // Test the score of this shift's session window.
+          assert.strictEqual(shift.parsedData.sessionWindowData.cumulativeWindowScore, cluster.clusterCumulativeScore);
+          // Test the id of this shift's session window.
+          assert.strictEqual(shift.parsedData.sessionWindowData.id, clusterCount);
+        }
+        clusterCount++;
+        // Test the accumulated
+        assert.strictEqual(cluster.clusterCumulativeScore, clusterCumulativeScore);
+        if (cluster.clusterCumulativeScore > globalCLS) {
+          globalCLS = cluster.clusterCumulativeScore;
+          clusterWithCLS = clusterCount - 1;
+        }
+      }
+      // Test the calculated CLS.
+      assert.strictEqual(layoutShifts.sessionMaxScore, globalCLS);
+      assert.strictEqual(layoutShifts.clsWindowID, clusterWithCLS);
+    });
+
+    it('calculates worst shift correctly for clusters', () => {
+      const clusters = layoutShifts.clusters;
+      assert.isNotEmpty(clusters);
+
+      for (const cluster of clusters) {
+        // Get the max shift score from the list of layout shifts.
+        const maxShiftScore = Math.max(...cluster.events.map(s => s.args.data?.weighted_score_delta ?? 0));
+        const gotShift = cluster.worstShiftEvent as Trace.Types.Events.SyntheticLayoutShift;
+        assert.isNotNull(gotShift);
+        // Make sure the worstShiftEvent's data matches the maxShiftScore.
+        assert.strictEqual(gotShift.args.data?.weighted_score_delta ?? 0, maxShiftScore);
+      }
+    });
+
+    it('correctly calculates the duration and start time of the clusters', () => {
+      const clusters = layoutShifts.clusters;
+      assert.isNotEmpty(clusters);
+
+      for (const cluster of clusters) {
+        // Earliest and latest layout shifts should match.
+        const earliestLayoutShiftTs = Math.min(...cluster.events.map(s => s.ts));
+        assert.strictEqual(cluster.events[0].ts, earliestLayoutShiftTs);
+        const latestLayoutShiftTs = Math.max(...cluster.events.map(s => s.ts));
+        assert.strictEqual(cluster.events[cluster.events.length - 1].ts, latestLayoutShiftTs);
+        // earliest layout shift ts should be the cluster's ts.
+        assert.strictEqual(cluster.ts, earliestLayoutShiftTs);
+
+        const lastShiftTimings =
+            Trace.Helpers.Timing.eventTimingsMicroSeconds(cluster.events[cluster.events.length - 1]);
+        const wantEndTime = lastShiftTimings.endTime + Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA;
+        const dur = Trace.Types.Timing.Micro(wantEndTime - earliestLayoutShiftTs);
+        assert.strictEqual(cluster.dur || 0, dur);
+      }
+    });
+  });
+
+  describe('with cls-cluster-max-duration', () => {
+    let layoutShifts: Trace.Handlers.ModelHandlers.LayoutShifts.LayoutShiftsData;
+    let metaData: Trace.Handlers.ModelHandlers.Meta.MetaHandlerData;
+
+    before(async function() {
+      await processTrace(this, 'cls-cluster-max-duration.json.gz');
+      layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
+      metaData = Trace.Handlers.ModelHandlers.Meta.data();
+    });
+
+    it('creates a cluster after exceeding the continuous shift limit', () => {
+      assert.lengthOf(layoutShifts.clusters, 2);
+      // Cluster must be closed as soon as MAX_CLUSTER_DURATION is reached, even if
+      // there is a gap greater than MAX_SHIFT_TIME_DELTA right after the max window
+      // length happens.
+      assert.strictEqual(layoutShifts.clusters[0].clusterWindow.max - layoutShifts.clusters[0].clusterWindow.min,
+                         Trace.Handlers.ModelHandlers.LayoutShifts.MAX_CLUSTER_DURATION);
+    });
+
+    it('sets the end of the last session window to the trace end time correctly', () => {
+      assert.strictEqual(layoutShifts.clusters.at(-1)?.clusterWindow.max, metaData.traceBounds.max);
+    });
   });
 
   it('creates a cluster after a navigation', async function() {
@@ -94,39 +248,6 @@ describe('LayoutShiftsHandler', function() {
     assert.strictEqual(secondCluster.navigationId, navigations[0].args.data?.navigationId);
   });
 
-  it('creates a cluster after exceeding the continuous shift limit', async function() {
-    await processTrace(this, 'cls-cluster-max-duration.json.gz');
-
-    const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
-    assert.lengthOf(layoutShifts.clusters, 2);
-    // Cluster must be closed as soon as MAX_CLUSTER_DURATION is reached, even if
-    // there is a gap greater than MAX_SHIFT_TIME_DELTA right after the max window
-    // length happens.
-    assert.strictEqual(
-        layoutShifts.clusters[0].clusterWindow.max - layoutShifts.clusters[0].clusterWindow.min,
-        Trace.Handlers.ModelHandlers.LayoutShifts.MAX_CLUSTER_DURATION);
-  });
-  it('sets the end of the last session window to the trace end time correctly', async function() {
-    await processTrace(this, 'cls-cluster-max-duration.json.gz');
-
-    const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
-    assert.strictEqual(
-        layoutShifts.clusters.at(-1)?.clusterWindow.max, Trace.Handlers.ModelHandlers.Meta.data().traceBounds.max);
-  });
-
-  it('sets the end of the last session window to the max gap between duration correctly', async function() {
-    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
-
-    const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
-    const lastWindow = layoutShifts.clusters.at(-1)?.clusterWindow;
-    const lastShiftInWindow = layoutShifts.clusters.at(-1)?.events.at(-1);
-    assert.isOk(lastWindow, 'Session window not found.');
-
-    assert.isOk(lastShiftInWindow, 'Session window not found.');
-    assert.strictEqual(
-        lastWindow.max, lastShiftInWindow.ts + Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA);
-    assert.isBelow(lastWindow.range, Trace.Handlers.ModelHandlers.LayoutShifts.MAX_CLUSTER_DURATION);
-  });
   it('sets the end of the last session window to the max session duration correctly', async function() {
     await processTrace(this, 'cls-last-cluster-max-duration.json.gz');
     const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
@@ -178,74 +299,88 @@ describe('LayoutShiftsHandler', function() {
     }
   });
 
-  it('calculates Cumulative Layout Shift correctly for multiple session windows', async function() {
-    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+  it('does not split layout shift clusters on soft navigations when enableSoftNavigation is false', async function() {
+    Trace.Handlers.ModelHandlers.Meta.reset();
+    Trace.Handlers.ModelHandlers.LayoutShifts.reset();
+    const config = Trace.Types.Configuration.defaults();
+    config.enableSoftNavigation = false;
+    Trace.Handlers.ModelHandlers.Meta.handleUserConfig(config);
+    Trace.Handlers.ModelHandlers.LayoutShifts.handleUserConfig(config);
+
+    const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    const layoutShiftEvents = await TraceLoader.rawEvents(this, 'cls-single-frame.json.gz');
+    const shiftEvent = layoutShiftEvents.find(e => e.name === 'LayoutShift');
+    if (!shiftEvent) {
+      throw new Error('No LayoutShift event found in cls-single-frame.json.gz');
+    }
+    const softNavEvent = events.find(e => e.name === 'SoftNavigationStart');
+    if (!softNavEvent) {
+      throw new Error('No soft navigation event found in soft-navs.json.gz');
+    }
+
+    const shiftBefore = JSON.parse(JSON.stringify(shiftEvent));
+    shiftBefore.ts = softNavEvent.ts - 1000;
+    shiftBefore.args.data.had_recent_input = false;
+
+    const shiftAfter = JSON.parse(JSON.stringify(shiftEvent));
+    shiftAfter.ts = softNavEvent.ts + 1000;
+    shiftAfter.args.data.had_recent_input = false;
+
+    const mutableEvents = [...events, shiftBefore, shiftAfter];
+    mutableEvents.sort((a, b) => a.ts - b.ts);
+
+    for (const event of mutableEvents) {
+      Trace.Handlers.ModelHandlers.Meta.handleEvent(event as Trace.Types.Events.Event);
+      Trace.Handlers.ModelHandlers.LayoutShifts.handleEvent(event as Trace.Types.Events.Event);
+    }
+    await Trace.Handlers.ModelHandlers.Meta.finalize();
+    await Trace.Handlers.ModelHandlers.LayoutShifts.finalize();
 
     const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
-    assert.lengthOf(layoutShifts.clusters, 3);
-
-    let globalCLS = 0;
-    let clusterCount = 1;
-    let clusterWithCLS = 0;
-    for (const cluster of layoutShifts.clusters) {
-      let clusterCumulativeScore = 0;
-      for (const shift of cluster.events) {
-        clusterCumulativeScore += shift.args.data?.weighted_score_delta || 0;
-        // Test the cumulative score until this shift.
-        assert.strictEqual(shift.parsedData.cumulativeWeightedScoreInWindow, clusterCumulativeScore);
-        // Test the score of this shift's session window.
-        assert.strictEqual(shift.parsedData.sessionWindowData.cumulativeWindowScore, cluster.clusterCumulativeScore);
-        // Test the id of this shift's session window.
-        assert.strictEqual(shift.parsedData.sessionWindowData.id, clusterCount);
-      }
-      clusterCount++;
-      // Test the accumulated
-      assert.strictEqual(cluster.clusterCumulativeScore, clusterCumulativeScore);
-      if (cluster.clusterCumulativeScore > globalCLS) {
-        globalCLS = cluster.clusterCumulativeScore;
-        clusterWithCLS = clusterCount - 1;
-      }
-    }
-    // Test the calculated CLS.
-    assert.strictEqual(layoutShifts.sessionMaxScore, globalCLS);
-    assert.strictEqual(layoutShifts.clsWindowID, clusterWithCLS);
+    assert.lengthOf(layoutShifts.clusters, 1);
+    assert.lengthOf(layoutShifts.clusters[0].events, 2);
   });
 
-  it('calculates worst shift correctly for clusters', async function() {
-    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+  it('splits layout shift clusters on soft navigations when enableSoftNavigation is true', async function() {
+    Trace.Handlers.ModelHandlers.Meta.reset();
+    Trace.Handlers.ModelHandlers.LayoutShifts.reset();
+    const config = Trace.Types.Configuration.defaults();
+    config.enableSoftNavigation = true;
+    Trace.Handlers.ModelHandlers.Meta.handleUserConfig(config);
+    Trace.Handlers.ModelHandlers.LayoutShifts.handleUserConfig(config);
 
-    const clusters = Trace.Handlers.ModelHandlers.LayoutShifts.data().clusters;
-    assert.isNotEmpty(clusters);
-
-    for (const cluster of clusters) {
-      // Get the max shift score from the list of layout shifts.
-      const maxShiftScore = Math.max(...cluster.events.map(s => s.args.data?.weighted_score_delta ?? 0));
-      const gotShift = cluster.worstShiftEvent as Trace.Types.Events.SyntheticLayoutShift;
-      assert.isNotNull(gotShift);
-      // Make sure the worstShiftEvent's data matches the maxShiftScore.
-      assert.strictEqual(gotShift.args.data?.weighted_score_delta ?? 0, maxShiftScore);
+    const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    const layoutShiftEvents = await TraceLoader.rawEvents(this, 'cls-single-frame.json.gz');
+    const shiftEvent = layoutShiftEvents.find(e => e.name === 'LayoutShift');
+    if (!shiftEvent) {
+      throw new Error('No LayoutShift event found in cls-single-frame.json.gz');
     }
-  });
-
-  it('correctly calculates the duration and start time of the clusters', async function() {
-    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
-
-    const clusters = Trace.Handlers.ModelHandlers.LayoutShifts.data().clusters;
-    assert.isNotEmpty(clusters);
-
-    for (const cluster of clusters) {
-      // Earliest and latest layout shifts should match.
-      const earliestLayoutShiftTs = Math.min(...cluster.events.map(s => s.ts));
-      assert.strictEqual(cluster.events[0].ts, earliestLayoutShiftTs);
-      const latestLayoutShiftTs = Math.max(...cluster.events.map(s => s.ts));
-      assert.strictEqual(cluster.events[cluster.events.length - 1].ts, latestLayoutShiftTs);
-      // earliest layout shift ts should be the cluster's ts.
-      assert.strictEqual(cluster.ts, earliestLayoutShiftTs);
-
-      const lastShiftTimings = Trace.Helpers.Timing.eventTimingsMicroSeconds(cluster.events[cluster.events.length - 1]);
-      const wantEndTime = lastShiftTimings.endTime + Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA;
-      const dur = Trace.Types.Timing.Micro(wantEndTime - earliestLayoutShiftTs);
-      assert.strictEqual(cluster.dur || 0, dur);
+    const softNavEvent = events.find(e => e.name === 'SoftNavigationStart');
+    if (!softNavEvent) {
+      throw new Error('No soft navigation event found in soft-navs.json.gz');
     }
+
+    const shiftBefore = JSON.parse(JSON.stringify(shiftEvent));
+    shiftBefore.ts = softNavEvent.ts - 1000;
+    shiftBefore.args.data.had_recent_input = false;
+
+    const shiftAfter = JSON.parse(JSON.stringify(shiftEvent));
+    shiftAfter.ts = softNavEvent.ts + 1000;
+    shiftAfter.args.data.had_recent_input = false;
+
+    const mutableEvents = [...events, shiftBefore, shiftAfter];
+    mutableEvents.sort((a, b) => a.ts - b.ts);
+
+    for (const event of mutableEvents) {
+      Trace.Handlers.ModelHandlers.Meta.handleEvent(event as Trace.Types.Events.Event);
+      Trace.Handlers.ModelHandlers.LayoutShifts.handleEvent(event as Trace.Types.Events.Event);
+    }
+    await Trace.Handlers.ModelHandlers.Meta.finalize();
+    await Trace.Handlers.ModelHandlers.LayoutShifts.finalize();
+
+    const layoutShifts = Trace.Handlers.ModelHandlers.LayoutShifts.data();
+    assert.lengthOf(layoutShifts.clusters, 2);
+    assert.lengthOf(layoutShifts.clusters[0].events, 1);
+    assert.lengthOf(layoutShifts.clusters[1].events, 1);
   });
 });

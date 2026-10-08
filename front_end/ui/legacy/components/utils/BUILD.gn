@@ -24,19 +24,18 @@ devtools_ui_module("utils") {
     "TargetDetachedDialog.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/host:bundle",
     "../../../../core/i18n:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/root:bundle",
     "../../../../core/sdk:bundle",
+    "../../../../core/text_utils:bundle",
     "../../../../generated",
-    "../../../../generated:protocol",
     "../../../../models/bindings:bundle",
     "../../../../models/breakpoints:bundle",
     "../../../../models/stack_trace:bundle",
-    "../../../../models/text_utils:bundle",
     "../../../../models/trace:bundle",
     "../../../../models/workspace:bundle",
     "../../../../ui/legacy:bundle",
@@ -44,15 +43,13 @@ devtools_ui_module("utils") {
     "../../../lit:bundle",
     "../../../visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "utils.ts"
 
-  deps = [
-    ":css_files",
-    ":utils",
-  ]
+  ts_deps = [ ":utils" ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/legacy/*,
@@ -80,10 +77,9 @@ devtools_ui_module("unittests") {
     "Linkifier.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../..:bundle",
-    "../../../../core/common:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/sdk:bundle",
     "../../../../generated",
@@ -92,5 +88,6 @@ devtools_ui_module("unittests") {
     "../../../../models/stack_trace:bundle",
     "../../../../models/workspace:bundle",
     "../../../../testing",
+    "../../../components/render_coordinator:bundle",
   ]
 }

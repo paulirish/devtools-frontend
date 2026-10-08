@@ -4,17 +4,29 @@
 
 import type * as Api from './api/api.js';
 
+export type {
+  CacheEntry,
+  CacheStorageLike,
+  HostRuntime,
+  ScreenshotOptions,
+  Worker,
+  WorkerMessageEvent,
+  WorkerMessagePort,
+  WorkerScope,
+  WorkerTransferable,
+} from './api/HostRuntime.js';
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore 'process' is not available when type-checking against browser types.
-export const IS_NODE = typeof (process as unknown) !== 'undefined' && process.versions?.node !== null;
+export const IS_NODE: boolean = typeof (process as unknown) !== 'undefined' && process.versions?.node !== null;
 
-export const IS_BROWSER =
+export const IS_BROWSER: boolean =
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore 'window' is not available when type-checking against node.js types.
     typeof window !== 'undefined' || (typeof self !== 'undefined' && typeof self.postMessage === 'function');
 
 // Not needed for Lighthouse. Also breaks bundling.
-// export const HOST_RUNTIME = await (async(): Promise<Api.HostRuntime.HostRuntime> => {
+// export const HOST_RUNTIME: Api.HostRuntime.HostRuntime = await (async(): Promise<Api.HostRuntime.HostRuntime> => {
 //   // Check IS_BROWSER first: in some embedder environments, both IS_NODE
 //   // and IS_BROWSER can be true because `process` is available in renderer
 //   // contexts. The browser runtime is always correct when browser APIs

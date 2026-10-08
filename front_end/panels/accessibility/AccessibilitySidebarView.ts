@@ -1,22 +1,26 @@
 // Copyright 2015 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/components/switch/switch.js';
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
 
+import {
+  AccessibilityAnnouncementRecordingView,
+} from './AccessibilityAnnouncementRecordingView.js';
 import {AXNodeSubPane} from './AccessibilityNodeView.js';
 import accessibilitySidebarViewStyles from './accessibilitySidebarView.css.js';
 import {ARIAAttributesPane} from './ARIAAttributesView.js';
 import {SourceOrderPane} from './SourceOrderView.js';
 
-const {html, render} = Lit;
+const {html, nothing, render} = Lit;
+const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
@@ -27,50 +31,81 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/accessibility/AccessibilitySidebarView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+export interface ViewInput {
+  isToggled: boolean;
+  onToggleChange: (event: Event) => void;
+  node: SDK.DOMModel.DOMNode|null;
+  axNode: SDK.AccessibilityModel.AccessibilityNode|null;
+  showAriaSubPane: boolean;
+  showAnnouncementsRecordingSubPane: boolean;
+}
+
+export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  // clang-format off
+  render(
+      html`
+      <style>${accessibilitySidebarViewStyles}</style>
+      <div class="accessibility-toggle-container">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <devtools-switch
+            role="switch"
+            aria-label=${i18nString(UIStrings.showAccessibilityTree)}
+            .checked=${input.isToggled}
+            .label=${i18nString(UIStrings.showAccessibilityTree)}
+            .jslogContext=${'elements.toggle-a11y-tree'}
+            @switchchange=${input.onToggleChange}
+          ></devtools-switch>
+          <span style="color: var(--sys-color-on-surface);">${i18nString(UIStrings.showAccessibilityTree)}</span>
+        </div>
+      </div>
+      <devtools-stack-pane .isVisible=${input.isToggled}>
+        ${input.showAriaSubPane ? html`
+          <devtools-widget
+            ${widget(ARIAAttributesPane, {node: input.node})}></devtools-widget>` : nothing}
+        <devtools-widget
+          ${widget(AXNodeSubPane, {node: input.node, axNode: input.axNode})}></devtools-widget>
+        <devtools-widget
+          ${widget(SourceOrderPane, {node: input.node})}></devtools-widget>
+        ${input.showAnnouncementsRecordingSubPane
+          ? html`<devtools-widget ${widget(AccessibilityAnnouncementRecordingView)}></devtools-widget>`
+          : nothing}
+      </devtools-stack-pane>
+    `,
+      target,
+      {container: {classes: ['accessibility-sidebar-view']}},
+  );
+  // clang-format on
+};
+
 let accessibilitySidebarViewInstance: AccessibilitySidebarView;
 
 export class AccessibilitySidebarView extends UI.Widget.VBox {
+  readonly #view: View;
   #node: SDK.DOMModel.DOMNode|null;
   #axNode: SDK.AccessibilityModel.AccessibilityNode|null;
+  #showAriaSubPane = true;
   private skipNextPullNode: boolean;
-  private readonly sidebarPaneStack: UI.View.ViewLocation;
-  private readonly ariaSubPane: ARIAAttributesPane;
-  private readonly axNodeSubPane: AXNodeSubPane;
-  private readonly sourceOrderSubPane: SourceOrderPane;
-  private readonly toggleContainer: HTMLElement;
   private readonly toggleAction: UI.ActionRegistration.Action;
 
-  private constructor() {
+  constructor(view: View = DEFAULT_VIEW) {
     super();
-    this.registerRequiredCSS(accessibilitySidebarViewStyles);
-    this.element.classList.add('accessibility-sidebar-view');
+    this.#view = view;
     this.#node = null;
     this.#axNode = null;
     this.skipNextPullNode = false;
-    this.sidebarPaneStack = UI.ViewManager.ViewManager.instance().createStackLocation();
-
-    this.toggleContainer = document.createElement('div');
-    this.toggleContainer.classList.add('accessibility-toggle-container');
-    this.element.appendChild(this.toggleContainer);
 
     this.toggleAction = UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-a11y-tree');
-    this.toggleAction.addEventListener(UI.ActionRegistration.Events.TOGGLED, this.updateToggle, this);
-    this.updateToggle();
+    this.toggleAction.addEventListener(UI.ActionRegistration.Events.TOGGLED, this.requestUpdate, this);
 
-    this.ariaSubPane = new ARIAAttributesPane();
-    void this.sidebarPaneStack.showView(this.ariaSubPane);
-    this.axNodeSubPane = new AXNodeSubPane();
-    void this.sidebarPaneStack.showView(this.axNodeSubPane);
-    this.sourceOrderSubPane = new SourceOrderPane();
-    void this.sidebarPaneStack.showView(this.sourceOrderSubPane);
-    this.sidebarPaneStack.widget().show(this.element);
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.pullNode, this);
     this.pullNode();
   }
 
-  static instance(opts?: {forceNew: boolean}): AccessibilitySidebarView {
+  static instance(opts?: {forceNew: boolean, view?: View}): AccessibilitySidebarView {
     if (!accessibilitySidebarViewInstance || opts?.forceNew) {
-      accessibilitySidebarViewInstance = new AccessibilitySidebarView();
+      accessibilitySidebarViewInstance = new AccessibilitySidebarView(opts?.view);
     }
     return accessibilitySidebarViewInstance;
   }
@@ -94,22 +129,31 @@ export class AccessibilitySidebarView extends UI.Widget.VBox {
       return;
     }
 
-    this.#axNode = axNode;
-
-    if (axNode.isDOMNode()) {
-      void this.sidebarPaneStack.showView(this.ariaSubPane, this.axNodeSubPane);
-    } else {
-      this.sidebarPaneStack.removeView(this.ariaSubPane);
+    if (this.#axNode !== axNode) {
+      this.#axNode = axNode;
+      this.#showAriaSubPane = axNode.isDOMNode();
+      this.requestUpdate();
     }
-
-    this.axNodeSubPane.setAXNode(axNode);
   }
 
-  override async performUpdate(): Promise<void> {
-    const node = this.node();
-    this.axNodeSubPane.setNode(node);
-    this.ariaSubPane.setNode(node);
-    void this.sourceOrderSubPane.setNodeAsync(node);
+  override performUpdate(): void {
+    void this.#updateSubPanes(this.node());
+
+    this.#view(
+        {
+          isToggled: this.toggleAction.toggled(),
+          onToggleChange: this.onToggleChange,
+          node: this.node(),
+          axNode: this.#axNode,
+          showAriaSubPane: this.#showAriaSubPane,
+          showAnnouncementsRecordingSubPane: Boolean(Root.Runtime.hostConfig.devToolsAriaLiveRecording?.enabled),
+        },
+        undefined,
+        this.contentElement,
+    );
+  }
+
+  async #updateSubPanes(node: SDK.DOMModel.DOMNode|null): Promise<void> {
     if (!node) {
       return;
     }
@@ -124,8 +168,8 @@ export class AccessibilitySidebarView extends UI.Widget.VBox {
   override wasShown(): void {
     super.wasShown();
 
-    // Pull down the latest date for this node.
-    void this.performUpdate();
+    // Pull down the latest data for this node.
+    this.requestUpdate();
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.DOMModel.DOMModel, SDK.DOMModel.Events.AttrModified, this.onNodeChange, this, {scoped: true});
@@ -157,29 +201,9 @@ export class AccessibilitySidebarView extends UI.Widget.VBox {
     this.setNode(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode));
   }
 
-  private updateToggle(): void {
-    const isToggled = this.toggleAction.toggled();
-    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-    render(
-        html`
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <devtools-switch
-          role="switch"
-          aria-label=${i18nString(UIStrings.showAccessibilityTree)}
-          .checked=${isToggled}
-          .label=${i18nString(UIStrings.showAccessibilityTree)}
-          .jslogContext=${'elements.toggle-a11y-tree'}
-          @switchchange=${this.onToggleChange}
-        ></devtools-switch>
-        <span style="color: var(--sys-color-on-surface);">${i18nString(UIStrings.showAccessibilityTree)}</span>
-      </div>
-    `,
-        this.toggleContainer, {host: this});
-  }
-
-  private onToggleChange(_event: Event): void {
+  private onToggleChange = (_event: Event): void => {
     void this.toggleAction.execute();
-  }
+  };
 
   private onNodeChange(
       event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}|SDK.DOMModel.DOMNode>):

@@ -26,10 +26,14 @@ export const UIStrings = {
    * @description Description of an insight that identifies multiple copies of the same JavaScript sources, and recommends removing the duplication.
    */
   description:
-      'Remove large, [duplicate JavaScript modules](https://developer.chrome.com/docs/performance/insights/duplicated-javascript) from bundles to reduce unnecessary bytes consumed by network activity.',
-  /** Label for a column in a data table; entries will be the locations of JavaScript or CSS code, e.g. the name of a Javascript package or module. */
+      'Remove large, [duplicate JavaScript modules](https://developer.chrome.com/docs/performance/insights/duplicated-javascript) from bundles to reduce unnecessary bytes consumed by network activity',
+  /**
+   * @description Label for a column in a data table; entries will be the locations of JavaScript or CSS code, e.g. the name of a JavaScript package or module.
+   */
   columnSource: 'Source',
-  /** Label for a column in a data table; entries will be the number of wasted bytes due to duplication of a web resource. */
+  /**
+   * @description Label for a column in a data table; entries will be the number of wasted bytes due to duplication of a web resource.
+   */
   columnDuplicatedBytes: 'Duplicated bytes',
   /**
    * @description Message shown when no duplicated JavaScript is found.
@@ -38,7 +42,7 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DuplicatedJavaScript.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type DuplicatedJavaScriptInsightModel = InsightModel<typeof UIStrings, {
   duplication: Extras.ScriptDuplication.ScriptDuplication,

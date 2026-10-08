@@ -10,6 +10,7 @@ import("../visibility.gni")
 
 generate_css("css_files") {
   sources = [
+    "heapDetachedElementsDataGrid.css",
     "heapProfiler.css",
     "profileLauncherView.css",
     "profilesPanel.css",
@@ -36,12 +37,12 @@ devtools_ui_module("profiler") {
     "ProfileLauncherView.ts",
     "ProfileSidebarTreeElement.ts",
     "ProfileTypeRegistry.ts",
-    "ProfileView.ts",
     "ProfilesPanel.ts",
     "TopDownProfileDataGrid.ts",
+    "WritableProfileHeader.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
@@ -52,8 +53,10 @@ devtools_ui_module("profiler") {
     "../../models/cpu_profile:bundle",
     "../../models/heap_snapshot:bundle",
     "../../models/network_time_calculator:bundle",
+    "../../models/workspace:bundle",
     "../../panels/elements:bundle",
     "../../ui/components/buttons:bundle",
+    "../../ui/components/icon_button:bundle",
     "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/data_grid:bundle",
@@ -65,16 +68,16 @@ devtools_ui_module("profiler") {
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [
+    ":css_files",
+    "../../ui/legacy/components/object_ui:css_files",
+  ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "profiler.ts"
 
-  deps = [
-    ":css_files",
-    ":profiler",
-    "../../ui/legacy/components/object_ui:css_files",
-  ]
+  ts_deps = [ ":profiler" ]
 
   visibility = [
     ":*",
@@ -88,13 +91,32 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "profiler-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/i18n:bundle",
-    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../ui/legacy:bundle",
   ]
 
   visibility = [ "../../entrypoints/*" ]
+}
+
+devtools_ui_module("unittests") {
+  testonly = true
+
+  sources = [
+    "HeapDetachedElementsDataGrid.test.ts",
+    "HeapProfileView.test.ts",
+  ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../core/sdk:bundle",
+    "../../generated",
+    "../../models/bindings:bundle",
+    "../../models/issues_manager:bundle",
+    "../../testing",
+    "../../ui/lit:bundle",
+  ]
 }

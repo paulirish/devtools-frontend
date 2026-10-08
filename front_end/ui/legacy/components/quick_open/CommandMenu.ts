@@ -11,6 +11,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Diff from '../../../../third_party/diff/diff.js';
 import {html, nothing, type TemplateResult} from '../../../lit/lit.js';
+import * as SettingsUI from '../../../settings/settings.js';
 import * as UI from '../../legacy.js';
 
 import {FilteredListWidget, Provider, registerProvider} from './FilteredListWidget.js';
@@ -18,29 +19,25 @@ import {QuickOpenImpl} from './QuickOpen.js';
 
 const UIStrings = {
   /**
-   * @description Message to display if a setting change requires a reload of DevTools
+   * @description Warning message displayed when a setting change requires reloading DevTools.
    */
   settingsChangedReloadDevTools: 'Settings changed. To apply, reload DevTools.',
   /**
-   * @description Text in Command Menu of the Command Menu
+   * @description Message shown when no commands match the query in the command menu.
    */
   noCommandsFound: 'No commands found',
   /**
-   * @description Text for command prefix of run a command
+   * @description Prefix text for the prompt in the command menu.
    */
   run: 'Run',
   /**
-   * @description Text for command suggestion of run a command
+   * @description Suggestion placeholder text for the prompt in the command menu.
    */
   command: 'Command',
   /**
-   * @description Text for help title of run command menu
+   * @description Title for the command menu entry in the help menu.
    */
   runCommand: 'Run command',
-  /**
-   * @description Hint text to indicate that a selected command is deprecated
-   */
-  deprecated: '— deprecated',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/quick_open/CommandMenu.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -74,7 +71,6 @@ export class CommandMenu {
       executeHandler,
       availableHandler,
       userActionCode,
-      deprecationWarning,
       isPanelOrDrawer,
       featurePromotionId,
     } = options;
@@ -88,19 +84,19 @@ export class CommandMenu {
         // not here
       };
     }
-    return new Command(
-        category, title, keys, shortcut, jslogContext, handler, availableHandler, deprecationWarning, isPanelOrDrawer,
-        featurePromotionId);
+    return new Command(category, title, keys, shortcut, jslogContext, handler, availableHandler, isPanelOrDrawer,
+                       featurePromotionId);
   }
 
-  static createSettingCommand<V>(setting: Common.Settings.Setting<V>, title: Common.UIString.LocalizedString, value: V):
-      Command {
-    const category = setting.category();
-    if (!category) {
+  static createSettingCommand<V>(setting: Common.Settings.Setting<V>, title: Common.UIString.LocalizedString, value: V,
+                                 settingUI?: SettingsUI.SettingUIRegistration.SettingUI): Command {
+    const ui = settingUI ?? SettingsUI.SettingUIRegistration.maybeResolve(setting.descriptor());
+    const category = ui?.category;
+    if (!category || !ui) {
       throw new Error(`Creating '${title}' setting command failed. Setting has no category.`);
     }
-    const tags = setting.tags() || '';
-    const reloadRequired = Boolean(setting.reloadRequired());
+    const tags = ui.tags;
+    const reloadRequired = ui.reloadRequired;
 
     return CommandMenu.createCommand({
       category: Common.Settings.getLocalizedSettingsCategory(category),
@@ -109,11 +105,6 @@ export class CommandMenu {
       shortcut: '',
       jslogContext: Platform.StringUtilities.toKebabCase(`${setting.name}-${value}`),
       executeHandler: () => {
-        if (setting.deprecation?.disabled &&
-            (!setting.deprecation?.experiment || setting.deprecation.experiment.isEnabled())) {
-          void Common.Revealer.reveal(setting);
-          return;
-        }
         setting.set(value);
 
         if (setting.name === 'emulate-page-focus') {
@@ -125,13 +116,8 @@ export class CommandMenu {
               i18nString(UIStrings.settingsChangedReloadDevTools));
         }
       },
-      availableHandler,
-      deprecationWarning: setting.deprecation?.warning,
+      availableHandler: () => setting.get() !== value,
     });
-
-    function availableHandler(): boolean {
-      return setting.get() !== value;
-    }
   }
 
   static createActionCommand(options: ActionCommandOptions): Command {
@@ -220,15 +206,25 @@ export class CommandMenu {
       this.#commands.push(CommandMenu.createRevealViewCommand(options));
     }
     // Populate allowlisted settings.
-    const settingsRegistrations = Common.Settings.Settings.instance().getRegisteredSettings();
-    for (const settingRegistration of settingsRegistrations) {
-      const options = settingRegistration.options;
-      if (!options || !settingRegistration.category) {
+    const settingsRegistrations = SettingsUI.SettingUIRegistration.getRegisteredSettings();
+    for (const registeredSettingUI of settingsRegistrations) {
+      const settingUI = SettingsUI.SettingUIRegistration.resolve(registeredSettingUI.descriptor);
+      if (!settingUI.options.length || !settingUI.category) {
         continue;
       }
-      for (const pair of options) {
-        const setting = Common.Settings.Settings.instance().moduleSetting(settingRegistration.settingName);
-        this.#commands.push(CommandMenu.createSettingCommand(setting, pair.title(), pair.value));
+      let setting: Common.Settings.Setting<unknown>;
+      if ('isAvailable' in registeredSettingUI.descriptor) {
+        const settingResult = Common.Settings.Settings.instance().maybeResolve(
+            registeredSettingUI.descriptor as Common.Settings.ConditionalSettingDescriptor<unknown, unknown>);
+        if (!('setting' in settingResult)) {
+          continue;
+        }
+        setting = settingResult.setting;
+      } else {
+        setting = Common.Settings.Settings.instance().resolve(registeredSettingUI.descriptor);
+      }
+      for (const option of settingUI.options) {
+        this.#commands.push(CommandMenu.createSettingCommand(setting, option.title, option.value, settingUI));
       }
     }
   }
@@ -260,7 +256,6 @@ export interface CreateCommandOptions {
   executeHandler: () => void;
   availableHandler?: () => boolean;
   userActionCode?: number;
-  deprecationWarning?: Platform.UIString.LocalizedString;
   isPanelOrDrawer?: PanelOrDrawer;
   featurePromotionId?: string;
 }
@@ -344,7 +339,6 @@ export class CommandMenuProvider extends Provider {
   override renderItem(itemIndex: number, query: string): TemplateResult {
     const command = this.commands[itemIndex];
     const badge = command.featurePromotionId ? UI.UIUtils.maybeCreateNewBadge(command.featurePromotionId) : undefined;
-    const deprecationWarning = command.deprecationWarning;
     // clang-format off
     return html`
       <devtools-icon name=${categoryIcons[command.category]}></devtools-icon>
@@ -354,10 +348,6 @@ export class CommandMenuProvider extends Provider {
         </devtools-highlight>
         ${badge ?? nothing}
         <div>${command.shortcut}</div>
-        ${deprecationWarning ? html`
-          <span class="deprecated-tag" title=${deprecationWarning}>
-            ${i18nString(UIStrings.deprecated)}
-          </span>` : nothing}
       </div>
       <span class="tag">${command.category}</span>`;
     // clang-format on
@@ -409,18 +399,15 @@ export class Command {
   readonly key: string;
   readonly shortcut: string;
   readonly jslogContext: string;
-  readonly deprecationWarning?: Platform.UIString.LocalizedString;
   readonly isPanelOrDrawer?: PanelOrDrawer;
   readonly featurePromotionId?: string;
 
   readonly #executeHandler: () => unknown;
   readonly #availableHandler?: () => boolean;
 
-  constructor(
-      category: Common.UIString.LocalizedString, title: Common.UIString.LocalizedString, key: string, shortcut: string,
-      jslogContext: string, executeHandler: () => unknown, availableHandler?: () => boolean,
-      deprecationWarning?: Platform.UIString.LocalizedString, isPanelOrDrawer?: PanelOrDrawer,
-      featurePromotionId?: string) {
+  constructor(category: Common.UIString.LocalizedString, title: Common.UIString.LocalizedString, key: string,
+              shortcut: string, jslogContext: string, executeHandler: () => unknown, availableHandler?: () => boolean,
+              isPanelOrDrawer?: PanelOrDrawer, featurePromotionId?: string) {
     this.category = category;
     this.title = title;
     this.key = category + '\0' + title + '\0' + key;
@@ -428,7 +415,6 @@ export class Command {
     this.jslogContext = jslogContext;
     this.#executeHandler = executeHandler;
     this.#availableHandler = availableHandler;
-    this.deprecationWarning = deprecationWarning;
     this.isPanelOrDrawer = isPanelOrDrawer;
     this.featurePromotionId = featurePromotionId;
   }

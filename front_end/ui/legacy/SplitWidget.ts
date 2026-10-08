@@ -6,7 +6,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Geometry from '../../models/geometry/geometry.js';
+import * as Geometry from '../geometry/geometry.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -16,7 +16,11 @@ import {ToolbarButton} from './Toolbar.js';
 import {type AnyWidget, registerWidgetConfig, Widget, widgetConfig, WidgetElement} from './Widget.js';
 import {Events as ZoomManagerEvents, ZoomManager} from './ZoomManager.js';
 
-export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typeof Widget>(Widget) {
+const SplitWidgetBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof Widget> = Common.ObjectWrapper.eventMixin(
+    Widget,
+);
+
+export class SplitWidget extends SplitWidgetBase {
   #sidebarElement: HTMLElement;
   #mainElement: HTMLElement;
   #resizerElement: HTMLElement;
@@ -54,6 +58,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   #showMode: ShowMode = ShowMode.BOTH;
   #savedShowMode: ShowMode;
   #autoAdjustOrientation = false;
+  readonly #zoomManager = ZoomManager.instance();
 
   constructor(
       isVertical: boolean,
@@ -76,7 +81,14 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const mainSlot = this.#mainElement.createChild('slot');
     mainSlot.name = 'main';
     mainSlot.addEventListener('slotchange', (_: Event) => {
-      const assignedNode = mainSlot.assignedNodes()[0];
+      const assignedNode = mainSlot.assignedNodes().find(node => {
+        const widget = node instanceof HTMLElement ? Widget.get(node) : null;
+        if (widget) {
+          return widget === this.#mainWidget || widget.isShowing();
+        }
+        return node instanceof HTMLElement && !node.classList.contains('hidden');
+      }) ??
+          mainSlot.assignedNodes()[0];
       const widget = assignedNode instanceof HTMLElement ? Widget.getOrCreateWidget(assignedNode) : null;
       if (widget && widget !== this.#mainWidget) {
         this.setMainWidget(widget);
@@ -85,7 +97,14 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const sidebarSlot = this.#sidebarElement.createChild('slot');
     sidebarSlot.name = 'sidebar';
     sidebarSlot.addEventListener('slotchange', (_: Event) => {
-      const assignedNode = sidebarSlot.assignedNodes()[0];
+      const assignedNode = sidebarSlot.assignedNodes().find(node => {
+        const widget = node instanceof HTMLElement ? Widget.get(node) : null;
+        if (widget) {
+          return widget === this.#sidebarWidget || widget.isShowing();
+        }
+        return node instanceof HTMLElement && !node.classList.contains('hidden');
+      }) ??
+          sidebarSlot.assignedNodes()[0];
       const widget = assignedNode instanceof HTMLElement ? Widget.getOrCreateWidget(assignedNode) : null;
       if (widget && widget !== this.#sidebarWidget) {
         this.setSidebarWidget(widget);
@@ -401,7 +420,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   setSidebarSize(size: number): void {
-    const sizeDIP = ZoomManager.instance().cssToDIP(size);
+    const sizeDIP = this.#zoomManager.cssToDIP(size);
     this.#savedSidebarSizeDIP = sizeDIP;
     this.#saveSetting();
     this.#setSidebarSizeDIP(sizeDIP, false, true);
@@ -409,12 +428,12 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   sidebarSize(): number {
     const sizeDIP = Math.max(0, this.#sidebarSizeDIP);
-    return ZoomManager.instance().dipToCSS(sizeDIP);
+    return this.#zoomManager.dipToCSS(sizeDIP);
   }
 
   totalSize(): number {
     const sizeDIP = Math.max(0, this.#totalSizeDIP());
-    return ZoomManager.instance().dipToCSS(sizeDIP);
+    return this.#zoomManager.dipToCSS(sizeDIP);
   }
 
   /**
@@ -426,7 +445,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       this.#totalSizeCSS = this.#isVertical ? width : height;
       this.#totalSizeOtherDimensionCSS = this.#isVertical ? height : width;
     }
-    return ZoomManager.instance().cssToDIP(this.#totalSizeCSS);
+    return this.#zoomManager.cssToDIP(this.#totalSizeCSS);
   }
 
   #updateShowMode(showMode: ShowMode): void {
@@ -457,7 +476,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.#removeAllLayoutProperties();
 
     // this.#totalSizeDIP is available below since we successfully applied constraints.
-    const sizeCSS = ZoomManager.instance().dipToCSS(sizeDIP);
+    const sizeCSS = this.#zoomManager.dipToCSS(sizeDIP);
     const sidebarSizeValue = sizeCSS + 'px';
     const mainSizeValue = (this.#totalSizeCSS - sizeCSS) + 'px';
     // With `box-sizing: border-box` on the sidebar (set in splitWidget.css),
@@ -519,8 +538,8 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       animatedMarginPropertyName = this.#secondIsSidebar ? 'margin-bottom' : 'margin-top';
     }
 
-    const marginFrom = reverse ? '0' : '-' + ZoomManager.instance().dipToCSS(this.#sidebarSizeDIP) + 'px';
-    const marginTo = reverse ? '-' + ZoomManager.instance().dipToCSS(this.#sidebarSizeDIP) + 'px' : '0';
+    const marginFrom = reverse ? '0' : '-' + this.#zoomManager.dipToCSS(this.#sidebarSizeDIP) + 'px';
+    const marginTo = reverse ? '-' + this.#zoomManager.dipToCSS(this.#sidebarSizeDIP) + 'px' : '0';
 
     // This order of things is important.
     // 1. Resize main element early and force layout.
@@ -587,7 +606,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   #applyConstraints(sidebarSize: number, userAction?: boolean): number {
     const totalSize = this.#totalSizeDIP();
-    const zoomFactor = this.#constraintsInDip ? 1 : ZoomManager.instance().zoomFactor();
+    const zoomFactor = this.#constraintsInDip ? 1 : this.#zoomManager.zoomFactor();
 
     let constraints: Geometry.Constraints =
         this.#sidebarWidget ? this.#sidebarWidget.constraints() : new Geometry.Constraints();
@@ -653,12 +672,12 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   override wasShown(): void {
     super.wasShown();
     this.#forceUpdateLayout();
-    ZoomManager.instance().addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.onZoomChanged, this);
+    this.#zoomManager.addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.onZoomChanged, this);
   }
 
   override willHide(): void {
     super.willHide();
-    ZoomManager.instance().removeEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.onZoomChanged, this);
+    this.#zoomManager.removeEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.onZoomChanged, this);
   }
 
   override onResize(): void {
@@ -711,7 +730,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   #onResizeUpdate(event: Common.EventTarget.EventTargetEvent<ResizeUpdatePositionEvent>): void {
     const offset = event.data.currentPosition - event.data.startPosition;
-    const offsetDIP = ZoomManager.instance().cssToDIP(offset);
+    const offsetDIP = this.#zoomManager.cssToDIP(offset);
     const newSizeDIP =
         this.#secondIsSidebar ? this.#resizeStartSizeDIP - offsetDIP : this.#resizeStartSizeDIP + offsetDIP;
     const constrainedSizeDIP = this.#applyConstraints(newSizeDIP, true);
@@ -856,11 +875,15 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   toggleSidebar(): boolean {
     if (this.#showMode !== ShowMode.BOTH) {
       this.showBoth(true);
-      ARIAUtils.LiveAnnouncer.alert(this.#shownSidebarString);
+      if (this.#shownSidebarString) {
+        ARIAUtils.LiveAnnouncer.alert(this.#shownSidebarString);
+      }
       return true;
     }
     this.hideSidebar(true);
-    ARIAUtils.LiveAnnouncer.alert(this.#hiddenSidebarString);
+    if (this.#hiddenSidebarString) {
+      ARIAUtils.LiveAnnouncer.alert(this.#hiddenSidebarString);
+    }
     return false;
   }
 
@@ -883,7 +906,8 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 }
 
 export class SplitWidgetElement extends WidgetElement<SplitWidget> {
-  static readonly observedAttributes = ['direction', 'sidebar-position', 'sidebar-initial-size', 'sidebar-visibility'];
+  static readonly observedAttributes: string[] =
+      ['direction', 'sidebar-position', 'sidebar-initial-size', 'sidebar-visibility'];
 
   constructor() {
     super();

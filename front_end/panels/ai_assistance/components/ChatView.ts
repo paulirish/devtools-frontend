@@ -7,13 +7,11 @@ import '../../../ui/components/spinners/spinners.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
-import * as Root from '../../../core/root/root.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import type {MarkdownLitRenderer} from '../../../ui/components/markdown_view/MarkdownView.js';
+import type * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import {Directives, html, nothing, render} from '../../../ui/lit/lit.js';
-import {PatchWidget} from '../PatchWidget.js';
+import {Directives, html, render} from '../../../ui/lit/lit.js';
 
 import {ChatInput} from './ChatInput.js';
 import {ChatMessage, ChatMessageEntity, type Message, type ModelChatMessage} from './ChatMessage.js';
@@ -54,26 +52,6 @@ const SCROLL_ROUNDING_OFFSET = 1;
  * last completed model response. Otherwise, it's anchored to the latest model
  * message.
  */
-export function getCSSChangeSummaryMessage(messages: Message[], isLoading: boolean): Message|undefined {
-  const modelMessages = messages.filter(m => m.entity === ChatMessageEntity.MODEL);
-  const lastModelMessage = modelMessages.at(-1);
-
-  if (!lastModelMessage) {
-    return undefined;
-  }
-
-  // If we are loading and the last message in the list is the one being loaded,
-  // we anchor the summary to the previous model message.
-  // If the last message is NOT a model message (e.g. it's the user's follow-up),
-  // we keep the summary on the current last model message until the new response
-  // starts appearing.
-  if (isLoading && messages.at(-1) === lastModelMessage) {
-    return modelMessages.at(-2);
-  }
-
-  return lastModelMessage;
-}
-
 interface ViewOutput {
   mainElement?: HTMLElement;
   input?: UI.Widget.WidgetElement<ChatInput>;
@@ -81,11 +59,17 @@ interface ViewOutput {
 type View = (input: ChatWidgetInput, output: ViewOutput, target: HTMLElement|ShadowRoot) => void;
 
 export interface Props {
-  onTextSubmit:
-      (text: string, imageInput?: Host.AidaClient.Part,
-       multimodalInputType?: AiAssistanceModel.AiAgent.MultimodalInputType) => void;
+  onTextSubmit: (
+      text: string,
+      imageInput?: Host.AidaClient.Part,
+      multimodalInputType?: AiAssistanceModel.AiAgent.MultimodalInputType,
+      ) => void;
   onInspectElementClick: () => void;
-  onFeedbackSubmit: (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void;
+  onFeedbackSubmit: (
+      rpcId: Host.AidaClient.RpcGlobalId,
+      rate: Host.AidaClient.Rating,
+      feedback?: string,
+      ) => void;
   onCancelClick: () => void;
   onContextClick: () => void;
   onNewConversation: () => void;
@@ -94,7 +78,6 @@ export interface Props {
   onContextAdd: (() => void)|null;
   conversationMarkdown: string;
   onExportConversation: (() => void)|null;
-  changeManager: AiAssistanceModel.ChangeManager.ChangeManager;
   inspectElementToggled: boolean;
   messages: Message[];
   context: AiAssistanceModel.AiAgent.ConversationContext<unknown>|null;
@@ -104,14 +87,15 @@ export interface Props {
   conversationType: AiAssistanceModel.AiHistoryStorage.ConversationType;
   isReadOnly: boolean;
   blockedByCrossOrigin: boolean;
-  changeSummary?: string;
   multimodalInputEnabled?: boolean;
   isTextInputDisabled: boolean;
   emptyStateSuggestions: AiAssistanceModel.AiAgent.ConversationSuggestion[];
   inputPlaceholder: Platform.UIString.LocalizedString;
   disclaimerText: Platform.UIString.LocalizedString;
+  textInputValue: string;
+  onTextChange: (text: string) => void;
   uploadImageInputEnabled?: boolean;
-  markdownRenderer: MarkdownLitRenderer;
+  markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer;
   generateConversationSummary: (markdown: string) => Promise<string>;
   walkthrough: {
     onOpen: (message: ModelChatMessage) => void,
@@ -131,22 +115,15 @@ export interface ChatWidgetInput extends Props {
 }
 
 const DEFAULT_VIEW: View = (input, output, target) => {
-  const hasAiV2 = Boolean(Root.Runtime.hostConfig.devToolsAiAssistanceV2?.enabled);
-
   const chatUiClasses = classMap({
     'chat-ui': true,
     gemini: AiAssistanceModel.AiUtils.isGeminiBranding(),
-    'ai-v2': hasAiV2,
   });
 
   const inputWidgetClasses = classMap({
     'chat-input-widget': true,
     sticky: !input.isReadOnly,
   });
-
-  const shouldShowPatchWidget = !hasAiV2 && !input.isLoading;
-
-  const cssChangeSummaryMessage = getCSSChangeSummaryMessage(input.messages, input.isLoading);
 
   // clang-format off
     render(html`
@@ -169,21 +146,15 @@ const DEFAULT_VIEW: View = (input, output, target) => {
                   isLastMessage: index === input.messages.length - 1,
                   isFirstMessage: index === 0,
                   prompt,
-                  shouldShowCSSChangeSummary: message.id === cssChangeSummaryMessage?.id,
                   onSuggestionClick: input.handleSuggestionClick,
                   onFeedbackSubmit: input.onFeedbackSubmit,
                   onCopyResponseClick: input.onCopyResponseClick,
                   onExportClick: input.exportForAgentsClick,
-                  changeSummary: input.changeSummary,
                   walkthrough: {
                     ...input.walkthrough,
-                  }
+                  },
                 });
               })}
-              ${shouldShowPatchWidget ? widget(PatchWidget, {
-                changeSummary: input.changeSummary ?? '',
-                changeManager: input.changeManager,
-              }) : nothing}
             </div>
           ` : html`
             <div class="empty-state-container">
@@ -232,6 +203,8 @@ const DEFAULT_VIEW: View = (input, output, target) => {
             conversationType: input.conversationType,
             uploadImageInputEnabled: input.uploadImageInputEnabled ?? false,
             isReadOnly: input.isReadOnly,
+            textInputValue: input.textInputValue,
+            onTextChange: input.onTextChange,
             onContextClick: input.onContextClick,
             onInspectElementClick: input.onInspectElementClick,
             onTextSubmit: input.onTextSubmit,
@@ -285,7 +258,7 @@ export class ChatView extends HTMLElement {
   #view: View;
   #cachedSummary: {markdown: string, summary: string}|null = null;
 
-  constructor(props: Props, view = DEFAULT_VIEW) {
+  constructor(props: Props, view: View = DEFAULT_VIEW) {
     super();
     this.#props = props;
     this.#view = view;

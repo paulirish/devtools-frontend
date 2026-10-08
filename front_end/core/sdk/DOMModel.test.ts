@@ -3,18 +3,34 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as ProtocolModule from '../../generated/protocol.js';
 import type * as Protocol from '../../generated/protocol.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
+import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
 
-describeWithMockConnection('DOMModel', () => {
+const {urlString} = Platform.DevToolsPath;
+const {NodeType, cssEscape} = SDK.DOMModel;
+
+describe('DOMModel', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
   it('updates the document on an documentUpdate event if there already is a previous document', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
     assert.exists(domModel.agent);
@@ -30,8 +46,8 @@ describeWithMockConnection('DOMModel', () => {
   });
 
   it('does not request document if there is not a previous document', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
     assert.exists(domModel.agent);
@@ -46,9 +62,241 @@ describeWithMockConnection('DOMModel', () => {
     sinon.assert.notCalled(spy);
   });
 
+  describe('securityOrigin', () => {
+    it('returns a SecurityOrigin matching the document URL', () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const documentNode = new SDK.DOMModel.DOMDocument(domModel, {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        documentURL: 'https://example.com/page.html',
+      });
+
+      const origin = documentNode.securityOrigin();
+      assert.isTrue(origin.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')));
+      assert.isFalse(origin.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://other.com')));
+    });
+
+    it('returns the owner document securityOrigin for child nodes', () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const documentNode = new SDK.DOMModel.DOMDocument(domModel, {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        documentURL: 'https://example.com/page.html',
+      });
+      const childNode = SDK.DOMModel.DOMNode.create(domModel, documentNode, false, {
+        nodeId: 2 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.ELEMENT_NODE,
+        nodeName: 'DIV',
+        localName: 'div',
+        nodeValue: '',
+      });
+
+      assert.isTrue(childNode.securityOrigin()?.isSameOriginWith(documentNode.securityOrigin()));
+    });
+
+    it('returns null for detached nodes without ownerDocument', () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const detachedNode = SDK.DOMModel.DOMNode.create(domModel, null, false, {
+        nodeId: 2 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.ELEMENT_NODE,
+        nodeName: 'DIV',
+        localName: 'div',
+        nodeValue: '',
+      });
+
+      assert.isNull(detachedNode.securityOrigin());
+    });
+
+    it('updates securityOrigin when setDocumentURL is called on DOMDocument', () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const documentNode = new SDK.DOMModel.DOMDocument(domModel, {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        documentURL: 'https://example.com/page.html',
+      });
+
+      assert.isTrue(documentNode.securityOrigin().isSameOriginWith(
+          SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')));
+
+      documentNode.setDocumentURL(urlString`https://other.com/page.html`);
+
+      assert.isTrue(documentNode.securityOrigin().isSameOriginWith(
+          SDK.SecurityOrigin.SecurityOrigin.create('https://other.com')));
+      assert.isFalse(documentNode.securityOrigin().isSameOriginWith(
+          SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')));
+    });
+
+    it('preserves securityOrigin in DOMDocumentSnapshot and DOMNodeSnapshot', async () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const documentNode = new SDK.DOMModel.DOMDocument(domModel, {
+        nodeId: 1 as Protocol.DOM.NodeId,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        localName: '',
+        nodeValue: '',
+        documentURL: 'https://example.com/page.html',
+      });
+
+      const docSnapshot = await documentNode.takeSnapshot();
+      assert.isTrue(docSnapshot.securityOrigin()?.isSameOriginWith(documentNode.securityOrigin()));
+
+      const childNode = SDK.DOMModel.DOMNode.create(domModel, documentNode, false, {
+        nodeId: 2 as Protocol.DOM.NodeId,
+        backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.ELEMENT_NODE,
+        nodeName: 'DIV',
+        localName: 'div',
+        nodeValue: '',
+      });
+
+      const nodeSnapshot = await childNode.takeSnapshot(docSnapshot as SDK.DOMModel.DOMDocument);
+      assert.isTrue(nodeSnapshot.securityOrigin()?.isSameOriginWith(documentNode.securityOrigin()));
+    });
+
+    it('returns the frameId for DOMDocument when provided, and null when omitted', () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const docWithFrame = new SDK.DOMModel.DOMDocument(
+          domModel,
+          {
+            nodeId: 1 as Protocol.DOM.NodeId,
+            backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.DOCUMENT_NODE,
+            nodeName: '#document',
+            localName: '',
+            nodeValue: '',
+            documentURL: 'https://example.com/page.html',
+          },
+          'frame-1' as Protocol.Page.FrameId,
+      );
+      assert.strictEqual(docWithFrame.frameId(), 'frame-1');
+
+      const docWithoutFrame = new SDK.DOMModel.DOMDocument(
+          domModel,
+          {
+            nodeId: 2 as Protocol.DOM.NodeId,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.DOCUMENT_NODE,
+            nodeName: '#document',
+            localName: '',
+            nodeValue: '',
+            documentURL: 'https://example.com/page.html',
+          },
+      );
+      assert.isNull(docWithoutFrame.frameId());
+    });
+
+    it('does not assign mainFrameId to detached root documents', () => {
+      const dataUrl = Platform.DevToolsPath.urlString`data:text/html,<h1>Hello</h1>`;
+      const target = universe.createTarget({url: dataUrl});
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assert.exists(resourceTreeModel);
+      const mainFrame = resourceTreeModel.frameAttached('main' as Protocol.Page.FrameId, null);
+      assert.exists(mainFrame);
+
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      // Trigger setDetachedRoot by passing a parentId of 0.
+      domModel.setChildNodes(0 as Protocol.DOM.NodeId, [{
+                               nodeId: 10 as Protocol.DOM.NodeId,
+                               backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+                               nodeType: NodeType.DOCUMENT_NODE,
+                               nodeName: '#document',
+                               localName: '',
+                               nodeValue: '',
+                               documentURL: 'about:blank',
+                             }]);
+
+      const detachedDoc = domModel.nodeForId(10 as Protocol.DOM.NodeId);
+      assert.exists(detachedDoc);
+      assert.instanceOf(detachedDoc, SDK.DOMModel.DOMDocument);
+      assert.isNull((detachedDoc as SDK.DOMModel.DOMDocument).frameId());
+    });
+
+    it('detached root documents receive an opaque security origin and do not use documentURL or mainFrame origin',
+       () => {
+         const mainFrameUrl = Platform.DevToolsPath.urlString`https://example.com`;
+         const target = universe.createTarget({url: mainFrameUrl});
+         const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+         assert.exists(resourceTreeModel);
+
+         const mainFrame = resourceTreeModel.frameAttached('main' as Protocol.Page.FrameId, null);
+         assert.exists(mainFrame);
+         mainFrame.navigate({
+           id: 'main' as Protocol.Page.FrameId,
+           loaderId: 'loaderId' as Protocol.Network.LoaderId,
+           url: mainFrameUrl,
+           domainAndRegistry: 'example.com',
+           securityOrigin: 'https://example.com',
+           mimeType: 'text/html',
+           secureContextType: ProtocolModule.Page.SecureContextType.Secure,
+           crossOriginIsolatedContextType: ProtocolModule.Page.CrossOriginIsolatedContextType.NotIsolated,
+           gatedAPIFeatures: [],
+         });
+
+         const domModel = target.model(SDK.DOMModel.DOMModel);
+         assert.exists(domModel);
+
+         // Trigger setDetachedRoot by passing a parentId of 0 with a cross-origin documentURL.
+         domModel.setChildNodes(0 as Protocol.DOM.NodeId, [{
+                                  nodeId: 10 as Protocol.DOM.NodeId,
+                                  backendNodeId: 10 as Protocol.DOM.BackendNodeId,
+                                  nodeType: NodeType.DOCUMENT_NODE,
+                                  nodeName: '#document',
+                                  localName: '',
+                                  nodeValue: '',
+                                  documentURL: 'https://victim.example/page.html',
+                                }]);
+
+         const detachedDoc = domModel.nodeForId(10 as Protocol.DOM.NodeId);
+         assert.instanceOf(detachedDoc, SDK.DOMModel.DOMDocument);
+
+         const mainOrigin = mainFrame.securityOrigin();
+         const detachedOrigin = detachedDoc.securityOrigin();
+
+         assert.isFalse(detachedOrigin.isSameOriginWith(mainOrigin));
+         assert.isFalse(
+             detachedOrigin.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://victim.example')));
+         assert.isTrue(detachedOrigin.isOpaque());
+       });
+  });
+
   it('updates top layer elements correctly', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
 
@@ -59,14 +307,14 @@ describeWithMockConnection('DOMModel', () => {
     domModel.setDocumentForTest({
       nodeId: DOCUMENT_NODE_ID,
       backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-      nodeType: Node.DOCUMENT_NODE,
+      nodeType: NodeType.DOCUMENT_NODE,
       nodeName: '#document',
       childNodeCount: 2,
       children: [
         {
           nodeId: TOP_LAYER_NODE_ID,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'div',
           localName: 'div',
           nodeValue: '',
@@ -74,7 +322,7 @@ describeWithMockConnection('DOMModel', () => {
         {
           nodeId: NOT_TOP_LAYER_NODE_ID,
           backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'div',
           localName: 'div',
           nodeValue: '',
@@ -101,8 +349,8 @@ describeWithMockConnection('DOMModel', () => {
   });
 
   it('updates top layer elements correctly with backdrop', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
 
@@ -113,14 +361,14 @@ describeWithMockConnection('DOMModel', () => {
     domModel.setDocumentForTest({
       nodeId: DOCUMENT_NODE_ID,
       backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-      nodeType: Node.DOCUMENT_NODE,
+      nodeType: NodeType.DOCUMENT_NODE,
       nodeName: '#document',
       childNodeCount: 2,
       children: [
         {
           nodeId: BACKDROP_NODE_ID,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: '::backdrop',
           localName: '::backdrop',
           nodeValue: '',
@@ -128,7 +376,7 @@ describeWithMockConnection('DOMModel', () => {
         {
           nodeId: TOP_LAYER_NODE_ID,
           backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'div',
           localName: 'div',
           nodeValue: '',
@@ -151,13 +399,13 @@ describeWithMockConnection('DOMModel', () => {
     assert.lengthOf(topLayerShortcuts, 1);
     assert.strictEqual(topLayerShortcuts[0].deferredNode.backendNodeId(), 3 as Protocol.DOM.BackendNodeId);
     assert.lengthOf(topLayerShortcuts[0].childShortcuts, 1);
-    assert.strictEqual(
-        topLayerShortcuts[0].childShortcuts[0].deferredNode.backendNodeId(), 2 as Protocol.DOM.BackendNodeId);
+    assert.strictEqual(topLayerShortcuts[0].childShortcuts[0].deferredNode.backendNodeId(),
+                       2 as Protocol.DOM.BackendNodeId);
   });
 
   it('updates top layer elements correctly with multiple documents', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const domModel = target.model(SDK.DOMModel.DOMModel);
     assert.exists(domModel);
 
@@ -170,14 +418,14 @@ describeWithMockConnection('DOMModel', () => {
     domModel.setDocumentForTest({
       nodeId: DOCUMENT_NODE_ID,
       backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-      nodeType: Node.DOCUMENT_NODE,
+      nodeType: NodeType.DOCUMENT_NODE,
       nodeName: '#document',
       childNodeCount: 2,
       children: [
         {
           nodeId: TOP_LAYER_NODE_1_ID,
           backendNodeId: 4 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'div',
           localName: 'div',
           nodeValue: '',
@@ -185,21 +433,21 @@ describeWithMockConnection('DOMModel', () => {
         {
           nodeId: IFRAME_NODE_ID,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'iframe',
           localName: 'iframe',
           nodeValue: '',
           contentDocument: {
             nodeId: CONTENT_DOCUMENT_NODE_ID,
             backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.DOCUMENT_NODE,
+            nodeType: NodeType.DOCUMENT_NODE,
             nodeName: '#document',
             childNodeCount: 1,
             children: [
               {
                 nodeId: TOP_LAYER_NODE_2_ID,
                 backendNodeId: 5 as Protocol.DOM.BackendNodeId,
-                nodeType: Node.ELEMENT_NODE,
+                nodeType: NodeType.ELEMENT_NODE,
                 nodeName: 'div',
                 localName: 'div',
                 nodeValue: '',
@@ -247,12 +495,58 @@ describeWithMockConnection('DOMModel', () => {
     assert.strictEqual(events[1].documentShortcuts[0].deferredNode.backendNodeId(), 5 as Protocol.DOM.BackendNodeId);
   });
 
+  describe('cssEscape', () => {
+    it('escapes empty string', () => {
+      assert.strictEqual(cssEscape(''), '');
+    });
+
+    it('does not escape standard identifiers', () => {
+      assert.strictEqual(cssEscape('foo'), 'foo');
+      assert.strictEqual(cssEscape('foo-bar'), 'foo-bar');
+      assert.strictEqual(cssEscape('foo_bar'), 'foo_bar');
+      assert.strictEqual(cssEscape('fooBar123'), 'fooBar123');
+    });
+
+    it('escapes leading digit', () => {
+      assert.strictEqual(cssEscape('123foo'), '\\31 23foo');
+      assert.strictEqual(cssEscape('0'), '\\30 ');
+    });
+
+    it('escapes single hyphen and hyphen followed by digit', () => {
+      assert.strictEqual(cssEscape('-'), '\\-');
+      assert.strictEqual(cssEscape('-123'), '-\\31 23');
+      assert.strictEqual(cssEscape('--custom-property'), '--custom-property');
+      assert.strictEqual(cssEscape('-a'), '-a');
+    });
+
+    it('escapes special characters and punctuation', () => {
+      assert.strictEqual(cssEscape('#id'), '\\#id');
+      assert.strictEqual(cssEscape('.class'), '\\.class');
+      assert.strictEqual(cssEscape('hello world'), 'hello\\ world');
+      assert.strictEqual(cssEscape('foo:bar'), 'foo\\:bar');
+      assert.strictEqual(cssEscape('[type="text"]'), '\\[type\\=\\"text\\"\\]');
+      assert.strictEqual(cssEscape('(pseudo)'), '\\(pseudo\\)');
+    });
+
+    it('escapes null and control characters', () => {
+      assert.strictEqual(cssEscape('\0'), '\uFFFD');
+      assert.strictEqual(cssEscape('\x01'), '\\1 ');
+      assert.strictEqual(cssEscape('\x1f'), '\\1f ');
+      assert.strictEqual(cssEscape('\x7f'), '\\7f ');
+    });
+
+    it('preserves non-ASCII characters', () => {
+      assert.strictEqual(cssEscape('café'), 'café');
+      assert.strictEqual(cssEscape('🚀'), '🚀');
+    });
+  });
+
   describe('DOMNode', () => {
     describe('simpleSelector', () => {
       let target: SDK.Target.Target;
       let model: SDK.DOMModel.DOMModel;
       beforeEach(() => {
-        target = createTarget();
+        target = universe.createTarget();
 
         const modelBeforeAssertion = target.model(SDK.DOMModel.DOMModel);
         assert.exists(modelBeforeAssertion);
@@ -268,7 +562,7 @@ describeWithMockConnection('DOMModel', () => {
            const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
              nodeId: 1 as Protocol.DOM.NodeId,
              backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-             nodeType: Node.ELEMENT_NODE,
+             nodeType: NodeType.ELEMENT_NODE,
              nodeName: 'div',
              localName: 'div',
              nodeValue: '',
@@ -280,7 +574,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'input',
           attributes: [
             'type',
@@ -296,7 +590,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'input',
           attributes: [
             'type',
@@ -314,7 +608,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'input',
           attributes: [
             'type',
@@ -332,7 +626,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: 'div',
           attributes: [
             'type',
@@ -350,7 +644,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           nodeName: '::before',
           localName: '::before',
           nodeValue: '',
@@ -362,7 +656,7 @@ describeWithMockConnection('DOMModel', () => {
         const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
           nodeId: 1 as Protocol.DOM.NodeId,
           backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-          nodeType: Node.ELEMENT_NODE,
+          nodeType: NodeType.ELEMENT_NODE,
           pseudoIdentifier: 'root',
           nodeName: '::view-transition-new',
           localName: '::view-transition-new',
@@ -370,12 +664,284 @@ describeWithMockConnection('DOMModel', () => {
         });
         assert.strictEqual(domNode.simpleSelector(), '::view-transition-new(root)');
       });
+
+      it('should escape pseudo identifier in simpleSelector', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          pseudoIdentifier: '123.foo',
+          nodeName: '::view-transition-new',
+          localName: '::view-transition-new',
+          nodeValue: '',
+        });
+        assert.strictEqual(domNode.simpleSelector(), '::view-transition-new(\\31 23\\.foo)');
+      });
+    });
+
+    describe('isCustomElement', () => {
+      let target: SDK.Target.Target;
+      let model: SDK.DOMModel.DOMModel;
+      beforeEach(() => {
+        target = universe.createTarget();
+        const modelBeforeAssertion = target.model(SDK.DOMModel.DOMModel);
+        assert.exists(modelBeforeAssertion);
+        model = modelBeforeAssertion;
+      });
+
+      afterEach(() => {
+        target.dispose('NO_REASON');
+      });
+
+      it('should return true for a custom element with a hyphen in localName', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'my-widget',
+          localName: 'my-widget',
+          nodeValue: '',
+        });
+        assert.isTrue(domNode.isCustomElement());
+      });
+
+      it('should return true for an element with an is attribute', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'button',
+          localName: 'button',
+          attributes: ['is', 'my-button'],
+          nodeValue: '',
+        });
+        assert.isTrue(domNode.isCustomElement());
+      });
+
+      it('should return false for excluded built-in elements with hyphens like font-face-src', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'font-face-src',
+          localName: 'font-face-src',
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+
+      it('should return false for excluded built-in elements with hyphens like annotation-xml', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 3 as Protocol.DOM.NodeId,
+          backendNodeId: 4 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'annotation-xml',
+          localName: 'annotation-xml',
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+
+      it('should return false for XML elements with hyphens', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'custom-xml-tag',
+          localName: 'custom-xml-tag',
+          xmlVersion: '1.0',
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+
+      it('should return false for standard HTML tags without hyphens or is attribute', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'div',
+          localName: 'div',
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+
+      it('should return false for non-element nodes', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.TEXT_NODE,
+          nodeName: '#text',
+          localName: '',
+          nodeValue: 'some text',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+
+      it('should return false for pseudo-elements with hyphens', () => {
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: '::interest-button',
+          localName: '::interest-button',
+          pseudoType: ProtocolModule.DOM.PseudoType.InterestButton,
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isCustomElement());
+      });
+    });
+
+    describe('duplicate', () => {
+      it('calls copyTo on parent node with nextSibling as anchor', () => {
+        const target = universe.createTarget();
+        const model = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+        const parentNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'div',
+          localName: 'div',
+          nodeValue: '',
+        });
+        const childNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 2 as Protocol.DOM.NodeId,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'span',
+          localName: 'span',
+          nodeValue: '',
+        });
+        childNode.parentNode = parentNode;
+        const copyToSpy = sinon.spy(childNode, 'copyTo');
+        void childNode.duplicate();
+        sinon.assert.calledOnceWithMatch(copyToSpy, parentNode, null, sinon.match.func);
+      });
+    });
+
+    describe('toggleHideElement and isToggledToHidden', () => {
+      it('toggles hidden-marker on node', async () => {
+        const target = universe.createTarget();
+        const model = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+        const domNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'div',
+          localName: 'div',
+          nodeValue: '',
+        });
+        assert.isFalse(domNode.isToggledToHidden());
+
+        const mockResolveToObject = sinon.mock().twice().returns({callFunction: () => {}, release: () => {}});
+        domNode.resolveToObject = mockResolveToObject;
+
+        await domNode.toggleHideElement();
+        assert.isTrue(domNode.isToggledToHidden());
+
+        await domNode.toggleHideElement();
+        assert.isFalse(domNode.isToggledToHidden());
+      });
+
+      for (const [pseudoType, pseudoName] of [[ProtocolModule.DOM.PseudoType.Before, '::before'],
+                                              [ProtocolModule.DOM.PseudoType.After, '::after'],
+      ] as const) {
+        it(`hides the ${pseudoName} pseudo element through its parent element`, async () => {
+          // Mirrors legacy elements/hide-shortcut (testToggleHide{Before,After}PseudoShortcut{On,Off}).
+          const target = universe.createTarget();
+          const model = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+          const parentNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+            nodeId: 1 as Protocol.DOM.NodeId,
+            backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: 'DIV',
+            localName: 'div',
+            nodeValue: '',
+            attributes: ['id', 'parent-node'],
+            pseudoElements: [{
+              nodeId: 2 as Protocol.DOM.NodeId,
+              backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+              nodeType: NodeType.ELEMENT_NODE,
+              nodeName: pseudoName,
+              localName: '',
+              nodeValue: '',
+              pseudoType,
+            }],
+          });
+          const pseudoNode = pseudoType === ProtocolModule.DOM.PseudoType.Before ? parentNode.beforePseudoElement() :
+                                                                                   parentNode.afterPseudoElement();
+          assert.exists(pseudoNode);
+          assert.strictEqual(pseudoNode.parentNode, parentNode);
+
+          const callFunction = sinon.stub().resolves({});
+          const release = sinon.stub();
+          const parentResolve =
+              sinon.stub(parentNode, 'resolveToObject').resolves({callFunction,
+                                                                  release} as unknown as SDK.RemoteObject.RemoteObject);
+          const pseudoResolve = sinon.stub(pseudoNode, 'resolveToObject');
+
+          await pseudoNode.toggleHideElement();
+
+          // The pseudo element cannot be resolved to a JS object, so its parent element is used instead.
+          sinon.assert.calledOnce(parentResolve);
+          sinon.assert.notCalled(pseudoResolve);
+          sinon.assert.calledOnce(callFunction);
+          assert.deepEqual(callFunction.firstCall.args[1], [{value: pseudoName}, {value: true}]);
+          sinon.assert.calledOnce(release);
+          assert.isTrue(pseudoNode.isToggledToHidden());
+          assert.isFalse(parentNode.isToggledToHidden());
+
+          await pseudoNode.toggleHideElement();
+          sinon.assert.calledTwice(callFunction);
+          assert.deepEqual(callFunction.secondCall.args[1], [{value: pseudoName}, {value: false}]);
+          assert.isFalse(pseudoNode.isToggledToHidden());
+        });
+      }
+
+      it('escapes pseudo-element identifiers when hiding a pseudo element', async () => {
+        const target = universe.createTarget();
+        const model = target.model(SDK.DOMModel.DOMModel) as SDK.DOMModel.DOMModel;
+        const parentNode = SDK.DOMModel.DOMNode.create(model, null, false, {
+          nodeId: 1 as Protocol.DOM.NodeId,
+          backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'DIV',
+          localName: 'div',
+          nodeValue: '',
+          pseudoElements: [{
+            nodeId: 2 as Protocol.DOM.NodeId,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: '::view-transition-group',
+            localName: '::view-transition-group',
+            nodeValue: '',
+            pseudoType: ProtocolModule.DOM.PseudoType.ViewTransitionGroup,
+            pseudoIdentifier: '123.foo',
+          }],
+        });
+        const vtNodes = parentNode.pseudoElements().get(ProtocolModule.DOM.PseudoType.ViewTransitionGroup);
+        assert.exists(vtNodes);
+        assert.lengthOf(vtNodes, 1);
+        const pseudoNode = vtNodes[0];
+
+        const callFunction = sinon.stub().resolves({});
+        const release = sinon.stub();
+        sinon.stub(parentNode, 'resolveToObject').resolves({callFunction,
+                                                            release} as unknown as SDK.RemoteObject.RemoteObject);
+
+        await pseudoNode.toggleHideElement();
+
+        sinon.assert.calledOnce(callFunction);
+        assert.deepEqual(callFunction.firstCall.args[1],
+                         [{value: '::view-transition-group(\\31 23\\.foo)'}, {value: true}]);
+      });
     });
   });
 
   describe('document.open() URL update (crbug.com/370690261)', () => {
     it('updates iframe contentDocument URL and dispatches DocumentURLChanged event', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -387,7 +953,7 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         localName: '',
         nodeValue: '',
@@ -398,7 +964,7 @@ describeWithMockConnection('DOMModel', () => {
           {
             nodeId: IFRAME_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'IFRAME',
             localName: 'iframe',
             nodeValue: '',
@@ -406,7 +972,7 @@ describeWithMockConnection('DOMModel', () => {
             contentDocument: {
               nodeId: CONTENT_DOCUMENT_NODE_ID,
               backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-              nodeType: Node.DOCUMENT_NODE,
+              nodeType: NodeType.DOCUMENT_NODE,
               nodeName: '#document',
               localName: '',
               nodeValue: '',
@@ -448,7 +1014,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('does not dispatch event when URL has not changed', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -460,7 +1026,7 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         localName: '',
         nodeValue: '',
@@ -471,7 +1037,7 @@ describeWithMockConnection('DOMModel', () => {
           {
             nodeId: IFRAME_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'IFRAME',
             localName: 'iframe',
             nodeValue: '',
@@ -479,7 +1045,7 @@ describeWithMockConnection('DOMModel', () => {
             contentDocument: {
               nodeId: CONTENT_DOCUMENT_NODE_ID,
               backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-              nodeType: Node.DOCUMENT_NODE,
+              nodeType: NodeType.DOCUMENT_NODE,
               nodeName: '#document',
               localName: '',
               nodeValue: '',
@@ -518,7 +1084,7 @@ describeWithMockConnection('DOMModel', () => {
 
   describe('DOMNodeSnapshot', () => {
     it('snapshots a clean DOMNode with children and attributes', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -529,14 +1095,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: PARENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -546,7 +1112,7 @@ describeWithMockConnection('DOMModel', () => {
               {
                 nodeId: CHILD_NODE_ID,
                 backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-                nodeType: Node.ELEMENT_NODE,
+                nodeType: NodeType.ELEMENT_NODE,
                 nodeName: 'span',
                 localName: 'span',
                 nodeValue: '',
@@ -577,7 +1143,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots shadow roots', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -588,14 +1154,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: HOST_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -603,7 +1169,7 @@ describeWithMockConnection('DOMModel', () => {
               {
                 nodeId: SHADOW_ROOT_ID,
                 backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-                nodeType: Node.DOCUMENT_FRAGMENT_NODE,
+                nodeType: NodeType.DOCUMENT_FRAGMENT_NODE,
                 nodeName: '#shadow-root',
                 localName: '',
                 nodeValue: '',
@@ -628,7 +1194,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('takes snapshot with adoptedStyleSheets', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -639,14 +1205,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: ELEMENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -665,7 +1231,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots pseudo elements', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -676,14 +1242,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: ELEMENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -691,7 +1257,7 @@ describeWithMockConnection('DOMModel', () => {
               {
                 nodeId: PSEUDO_NODE_ID,
                 backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-                nodeType: Node.ELEMENT_NODE,
+                nodeType: NodeType.ELEMENT_NODE,
                 nodeName: '::before',
                 localName: '::before',
                 nodeValue: '',
@@ -715,7 +1281,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots template content', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -726,21 +1292,21 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: TEMPLATE_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'template',
             localName: 'template',
             nodeValue: '',
             templateContent: {
               nodeId: CONTENT_NODE_ID,
               backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-              nodeType: Node.DOCUMENT_FRAGMENT_NODE,
+              nodeType: NodeType.DOCUMENT_FRAGMENT_NODE,
               nodeName: '#document-fragment',
               localName: '',
               nodeValue: '',
@@ -762,7 +1328,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots iframe content document', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -773,21 +1339,21 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: IFRAME_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'iframe',
             localName: 'iframe',
             nodeValue: '',
             contentDocument: {
               nodeId: CONTENT_DOCUMENT_NODE_ID,
               backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-              nodeType: Node.DOCUMENT_NODE,
+              nodeType: NodeType.DOCUMENT_NODE,
               nodeName: '#document',
               localName: '',
               nodeValue: '',
@@ -809,7 +1375,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots DOMDocument properties', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -820,7 +1386,7 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         documentURL: 'https://example.com/',
         baseURL: 'https://example.com/',
@@ -829,7 +1395,7 @@ describeWithMockConnection('DOMModel', () => {
           {
             nodeId: HTML_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'HTML',
             localName: 'html',
             nodeValue: '',
@@ -838,7 +1404,7 @@ describeWithMockConnection('DOMModel', () => {
               {
                 nodeId: BODY_NODE_ID,
                 backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-                nodeType: Node.ELEMENT_NODE,
+                nodeType: NodeType.ELEMENT_NODE,
                 nodeName: 'BODY',
                 localName: 'body',
                 nodeValue: '',
@@ -865,7 +1431,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('snapshots assigned slot', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -876,20 +1442,20 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: ELEMENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
             assignedSlot: {
               backendNodeId: SLOT_ID,
-              nodeType: Node.ELEMENT_NODE,
+              nodeType: NodeType.ELEMENT_NODE,
               nodeName: 'slot',
             },
           },
@@ -906,7 +1472,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('is immutable', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -916,14 +1482,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: ELEMENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -952,7 +1518,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('does not reflect live DOM updates', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -962,14 +1528,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: ELEMENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -991,7 +1557,7 @@ describeWithMockConnection('DOMModel', () => {
     });
 
     it('does not reflect child insertion in live DOM', async () => {
-      const target = createTarget();
+      const target = universe.createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
 
@@ -1002,14 +1568,14 @@ describeWithMockConnection('DOMModel', () => {
       domModel.setDocumentForTest({
         nodeId: DOCUMENT_NODE_ID,
         backendNodeId: 1 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.DOCUMENT_NODE,
+        nodeType: NodeType.DOCUMENT_NODE,
         nodeName: '#document',
         childNodeCount: 1,
         children: [
           {
             nodeId: PARENT_NODE_ID,
             backendNodeId: 2 as Protocol.DOM.BackendNodeId,
-            nodeType: Node.ELEMENT_NODE,
+            nodeType: NodeType.ELEMENT_NODE,
             nodeName: 'div',
             localName: 'div',
             nodeValue: '',
@@ -1028,7 +1594,7 @@ describeWithMockConnection('DOMModel', () => {
       domModel.childNodeInserted(PARENT_NODE_ID, 0 as Protocol.DOM.NodeId, {
         nodeId: CHILD_NODE_ID,
         backendNodeId: 3 as Protocol.DOM.BackendNodeId,
-        nodeType: Node.ELEMENT_NODE,
+        nodeType: NodeType.ELEMENT_NODE,
         nodeName: 'span',
         localName: 'span',
         nodeValue: '',
@@ -1037,6 +1603,433 @@ describeWithMockConnection('DOMModel', () => {
       assert.lengthOf(parentNode.children() || [], 1);
 
       assert.lengthOf(snapshot.children() || [], 0);
+    });
+  });
+
+  describe('setAsInspectedNode', () => {
+    it('does not send setInspectedNode command for non-inspectable pseudo elements', async () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+      assert.exists(domModel.agent);
+
+      const DOCUMENT_NODE_ID = 1 as Protocol.DOM.NodeId;
+      const ELEMENT_NODE_ID = 2 as Protocol.DOM.NodeId;
+      const PSEUDO_NODE_ID = 3 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: DOCUMENT_NODE_ID,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: ELEMENT_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            nodeValue: '',
+            pseudoElements: [
+              {
+                nodeId: PSEUDO_NODE_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.ELEMENT_NODE,
+                nodeName: '::first-line',
+                localName: '::first-line',
+                nodeValue: '',
+                pseudoType: ProtocolModule.DOM.PseudoType.FirstLine,
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const spy = sinon.spy(domModel.agent, 'invoke_setInspectedNode');
+
+      const pseudoNode = domModel.nodeForId(PSEUDO_NODE_ID);
+      assert.exists(pseudoNode);
+      await pseudoNode.setAsInspectedNode();
+      sinon.assert.notCalled(spy);
+    });
+
+    it('sends setInspectedNode command for inspectable pseudo elements', async () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+      assert.exists(domModel.agent);
+
+      const DOCUMENT_NODE_ID = 1 as Protocol.DOM.NodeId;
+      const ELEMENT_NODE_ID = 2 as Protocol.DOM.NodeId;
+      const PSEUDO_NODE_ID = 3 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: DOCUMENT_NODE_ID,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: ELEMENT_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            nodeValue: '',
+            pseudoElements: [
+              {
+                nodeId: PSEUDO_NODE_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.ELEMENT_NODE,
+                nodeName: '::before',
+                localName: '::before',
+                nodeValue: '',
+                pseudoType: ProtocolModule.DOM.PseudoType.Before,
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const spy = sinon.spy(domModel.agent, 'invoke_setInspectedNode');
+
+      const pseudoNode = domModel.nodeForId(PSEUDO_NODE_ID);
+      assert.exists(pseudoNode);
+      await pseudoNode.setAsInspectedNode();
+      sinon.assert.calledOnceWithExactly(spy, {nodeId: PSEUDO_NODE_ID});
+    });
+
+    it('does not send setInspectedNode command for UA shadow roots and their children', async () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+      assert.exists(domModel.agent);
+
+      const DOCUMENT_NODE_ID = 1 as Protocol.DOM.NodeId;
+      const HOST_NODE_ID = 2 as Protocol.DOM.NodeId;
+      const UA_SHADOW_ROOT_ID = 3 as Protocol.DOM.NodeId;
+      const UA_SHADOW_CHILD_ID = 4 as Protocol.DOM.NodeId;
+
+      domModel.setDocumentForTest({
+        nodeId: DOCUMENT_NODE_ID,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: HOST_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            nodeValue: '',
+            shadowRoots: [
+              {
+                nodeId: UA_SHADOW_ROOT_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.DOCUMENT_FRAGMENT_NODE,
+                nodeName: '#shadow-root',
+                localName: '',
+                nodeValue: '',
+                shadowRootType: ProtocolModule.DOM.ShadowRootType.UserAgent,
+                children: [{
+                  nodeId: UA_SHADOW_CHILD_ID,
+                  backendNodeId: 4 as Protocol.DOM.BackendNodeId,
+                  nodeType: NodeType.ELEMENT_NODE,
+                  nodeName: 'span',
+                  localName: 'span',
+                  nodeValue: '',
+                }],
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+
+      const spy = sinon.spy(domModel.agent, 'invoke_setInspectedNode');
+
+      const uaShadowRoot = domModel.nodeForId(UA_SHADOW_ROOT_ID);
+      assert.exists(uaShadowRoot);
+      await uaShadowRoot.setAsInspectedNode();
+      sinon.assert.notCalled(spy);
+
+      const uaShadowChild = domModel.nodeForId(UA_SHADOW_CHILD_ID);
+      assert.exists(uaShadowChild);
+      await uaShadowChild.setAsInspectedNode();
+      sinon.assert.notCalled(spy);
+    });
+  });
+
+  describe('canInspectNode', () => {
+    let domModel: SDK.DOMModel.DOMModel;
+    const DOCUMENT_NODE_ID = 1 as Protocol.DOM.NodeId;
+    const ELEMENT_NODE_ID = 2 as Protocol.DOM.NodeId;
+    const PSEUDO_NODE_ID = 3 as Protocol.DOM.NodeId;
+    const NON_INSPECTABLE_PSEUDO_NODE_ID = 6 as Protocol.DOM.NodeId;
+    const UA_SHADOW_ROOT_ID = 4 as Protocol.DOM.NodeId;
+    const UA_SHADOW_CHILD_ID = 5 as Protocol.DOM.NodeId;
+
+    beforeEach(() => {
+      const target = universe.createTarget();
+      domModel = target.model(SDK.DOMModel.DOMModel)!;
+      domModel.setDocumentForTest({
+        nodeId: DOCUMENT_NODE_ID,
+        backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+        nodeType: NodeType.DOCUMENT_NODE,
+        nodeName: '#document',
+        childNodeCount: 1,
+        children: [
+          {
+            nodeId: ELEMENT_NODE_ID,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.ELEMENT_NODE,
+            nodeName: 'div',
+            localName: 'div',
+            nodeValue: '',
+            pseudoElements: [
+              {
+                nodeId: PSEUDO_NODE_ID,
+                backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.ELEMENT_NODE,
+                nodeName: '::before',
+                localName: '::before',
+                nodeValue: '',
+                pseudoType: ProtocolModule.DOM.PseudoType.Before,
+              },
+              {
+                nodeId: NON_INSPECTABLE_PSEUDO_NODE_ID,
+                backendNodeId: 6 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.ELEMENT_NODE,
+                nodeName: '::first-line',
+                localName: '::first-line',
+                nodeValue: '',
+                pseudoType: ProtocolModule.DOM.PseudoType.FirstLine,
+              },
+            ],
+            shadowRoots: [
+              {
+                nodeId: UA_SHADOW_ROOT_ID,
+                backendNodeId: 4 as Protocol.DOM.BackendNodeId,
+                nodeType: NodeType.DOCUMENT_FRAGMENT_NODE,
+                nodeName: '#shadow-root',
+                localName: '',
+                nodeValue: '',
+                shadowRootType: ProtocolModule.DOM.ShadowRootType.UserAgent,
+                children: [{
+                  nodeId: UA_SHADOW_CHILD_ID,
+                  backendNodeId: 5 as Protocol.DOM.BackendNodeId,
+                  nodeType: NodeType.ELEMENT_NODE,
+                  nodeName: 'span',
+                  localName: 'span',
+                  nodeValue: '',
+                }],
+              },
+            ],
+          },
+        ],
+      } as Protocol.DOM.Node);
+    });
+
+    it('returns true for normal elements', () => {
+      const elementNode = domModel.nodeForId(ELEMENT_NODE_ID);
+      assert.exists(elementNode);
+      assert.isTrue(elementNode.canInspectNode());
+    });
+
+    it('returns true for inspectable pseudo elements', () => {
+      const pseudoNode = domModel.nodeForId(PSEUDO_NODE_ID);
+      assert.exists(pseudoNode);
+      assert.isTrue(pseudoNode.canInspectNode());
+    });
+
+    it('returns false for non-inspectable pseudo elements', () => {
+      const pseudoNode = domModel.nodeForId(NON_INSPECTABLE_PSEUDO_NODE_ID);
+      assert.exists(pseudoNode);
+      assert.isFalse(pseudoNode.canInspectNode());
+    });
+
+    it('returns false for user agent shadow roots', () => {
+      const uaShadowRoot = domModel.nodeForId(UA_SHADOW_ROOT_ID);
+      assert.exists(uaShadowRoot);
+      assert.isFalse(uaShadowRoot.canInspectNode());
+    });
+
+    it('returns false for nodes inside user agent shadow roots', () => {
+      const uaShadowChild = domModel.nodeForId(UA_SHADOW_CHILD_ID);
+      assert.exists(uaShadowChild);
+      assert.isFalse(uaShadowChild.canInspectNode());
+    });
+
+    it('returns false for snapshots', async () => {
+      const elementNode = domModel.nodeForId(ELEMENT_NODE_ID);
+      assert.exists(elementNode);
+      const snapshot = await elementNode.takeSnapshot();
+      assert.isFalse(snapshot.canInspectNode());
+    });
+  });
+
+  it('correctly parses baseURL and documentURL for main document and iframes', () => {
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    const DOCUMENT_NODE_ID = 1 as Protocol.DOM.NodeId;
+    const IFRAME_NODE_ID = 2 as Protocol.DOM.NodeId;
+    const CONTENT_DOCUMENT_NODE_ID = 3 as Protocol.DOM.NodeId;
+
+    const mainBaseURL = urlString`http://127.0.0.1:8000/devtools/elements/`;
+    const mainDocumentURL = urlString`http://127.0.0.1:8000/devtools/resources/inspected-page.html`;
+    const iframeBaseURL = urlString`http://127.0.0.1:8000/devtools/elements/resources/elements-empty-iframe.html`;
+    const iframeDocumentURL = urlString`http://127.0.0.1:8000/devtools/elements/resources/elements-empty-iframe.html`;
+
+    domModel.setDocumentForTest({
+      nodeId: DOCUMENT_NODE_ID,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      nodeType: NodeType.DOCUMENT_NODE,
+      nodeName: '#document',
+      localName: '',
+      nodeValue: '',
+      baseURL: mainBaseURL,
+      documentURL: mainDocumentURL,
+      childNodeCount: 1,
+      children: [
+        {
+          nodeId: IFRAME_NODE_ID,
+          backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+          nodeType: NodeType.ELEMENT_NODE,
+          nodeName: 'iframe',
+          localName: 'iframe',
+          nodeValue: '',
+          contentDocument: {
+            nodeId: CONTENT_DOCUMENT_NODE_ID,
+            backendNodeId: 3 as Protocol.DOM.BackendNodeId,
+            nodeType: NodeType.DOCUMENT_NODE,
+            nodeName: '#document',
+            localName: '',
+            nodeValue: '',
+            baseURL: iframeBaseURL,
+            documentURL: iframeDocumentURL,
+            childNodeCount: 0,
+            children: [],
+          },
+        },
+      ],
+    } as Protocol.DOM.Node);
+
+    const mainDocument = domModel.existingDocument();
+    assert.exists(mainDocument);
+    assert.strictEqual(mainDocument.baseURL, mainBaseURL);
+    assert.strictEqual(mainDocument.documentURL, mainDocumentURL);
+    assert.isNull(mainDocument.parentNode);
+
+    const iframeNode = domModel.nodeForId(IFRAME_NODE_ID);
+    assert.exists(iframeNode);
+    const iframeDocument = iframeNode.contentDocument();
+    assert.exists(iframeDocument);
+    assert.strictEqual(iframeDocument.baseURL, iframeBaseURL);
+    assert.strictEqual(iframeDocument.documentURL, iframeDocumentURL);
+    assert.strictEqual(iframeDocument.parentNode, iframeNode);
+  });
+
+  it('resolves canonical SecurityOrigin from ResourceTreeModel mainFrame for opaque documents', () => {
+    const parentTarget = universe.createTarget();
+    const dataUrl = urlString`data:text/html,<h1>Hello</h1>`;
+    const target = universe.createTarget({parentTarget, url: dataUrl});
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const mainFrame = resourceTreeModel.frameAttached('main' as Protocol.Page.FrameId, null);
+    assert.exists(mainFrame);
+    mainFrame.navigate({
+      id: 'main' as Protocol.Page.FrameId,
+      loaderId: 'loaderId' as Protocol.Network.LoaderId,
+      url: dataUrl,
+      domainAndRegistry: '',
+      securityOrigin: 'null',
+      mimeType: 'text/html',
+      secureContextType: ProtocolModule.Page.SecureContextType.Secure,
+      crossOriginIsolatedContextType: ProtocolModule.Page.CrossOriginIsolatedContextType.NotIsolated,
+      gatedAPIFeatures: [],
+    });
+
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(domModel);
+
+    domModel.setDocumentForTest({
+      nodeId: 1 as Protocol.DOM.NodeId,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      nodeType: NodeType.DOCUMENT_NODE,
+      nodeName: '#document',
+      localName: '',
+      nodeValue: '',
+      baseURL: dataUrl,
+      documentURL: dataUrl,
+      childNodeCount: 0,
+      children: [],
+    } as Protocol.DOM.Node);
+
+    const document = domModel.existingDocument();
+    assert.exists(document);
+    assert.strictEqual(document.securityOrigin(), mainFrame.securityOrigin());
+  });
+
+  describe('DOMModelUndoStack', () => {
+    it('allows calling undo multiple times with non-empty history', async () => {
+      const parentTarget = universe.createTarget();
+      const target = universe.createTarget({parentTarget});
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const markUndoableSpy = sinon.stub(domModel.agent, 'invoke_markUndoableState').resolves({
+        getError: () => undefined,
+      });
+      const undoSpy = sinon.stub(domModel.agent, 'invoke_undo').resolves({
+        getError: () => undefined,
+      });
+
+      const undoStack = new SDK.DOMModel.DOMModelUndoStack();
+
+      await undoStack.markUndoableState(domModel, false);
+      sinon.assert.calledOnce(markUndoableSpy);
+
+      await undoStack.undo();
+      sinon.assert.calledOnce(undoSpy);
+
+      // Perform second undo when history stack is empty.
+      await undoStack.undo();
+      // Should not call invoke_undo again because stack index is 0.
+      sinon.assert.calledOnce(undoSpy);
+    });
+
+    it('supports undo and subsequent perform/redo of mergeable actions', async () => {
+      const target = universe.createTarget();
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+
+      const undoSpy = sinon.stub(domModel.agent, 'invoke_undo').resolves({getError: () => undefined});
+      const redoSpy = sinon.stub(domModel.agent, 'invoke_redo').resolves({getError: () => undefined});
+      const undoStack = new SDK.DOMModel.DOMModelUndoStack();
+
+      // Coalesce two minor (mergeable) actions into a single undoable entry.
+      await undoStack.markUndoableState(domModel, true);
+      await undoStack.markUndoableState(domModel, true);
+
+      await undoStack.undo();
+      sinon.assert.calledOnce(undoSpy);
+
+      await undoStack.redo();
+      sinon.assert.calledOnce(redoSpy);
+
+      // Undo again and perform a new mergeable action; it should not coalesce with the undone entry.
+      await undoStack.undo();
+      sinon.assert.calledTwice(undoSpy);
+
+      await undoStack.markUndoableState(domModel, true);
+      await undoStack.undo();
+      sinon.assert.calledThrice(undoSpy);
     });
   });
 });

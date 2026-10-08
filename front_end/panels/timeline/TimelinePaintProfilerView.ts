@@ -5,8 +5,8 @@
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Trace from '../../models/trace/trace.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
 import * as LayerViewer from '../layer_viewer/layer_viewer.js';
@@ -41,8 +41,8 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
     this.imageView = new TimelinePaintImageView();
     this.logAndImageSplitWidget.setMainWidget(this.imageView);
 
-    this.paintProfilerView =
-        new LayerViewer.PaintProfilerView.PaintProfilerView(this.imageView.showImage.bind(this.imageView));
+    this.paintProfilerView = new LayerViewer.PaintProfilerView.PaintProfilerView();
+    this.paintProfilerView.showImageCallback = this.imageView.showImage.bind(this.imageView);
     this.paintProfilerView.addEventListener(
         LayerViewer.PaintProfilerView.Events.WINDOW_CHANGED, this.onWindowChanged, this);
     this.setSidebarWidget(this.paintProfilerView);
@@ -142,7 +142,7 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
   }
 
   update(): void {
-    this.logTreeView.setCommandLog([]);
+    this.logTreeView.commandLog = [];
     void this.paintProfilerView.setSnapshotAndLog(null, [], null);
 
     let snapshotPromise: Promise<{
@@ -188,7 +188,7 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
     function onCommandLogDone(
         this: TimelinePaintProfilerView, snapshot: SDK.PaintProfiler.PaintProfilerSnapshot,
         clipRect: Protocol.DOM.Rect|null, log?: SDK.PaintProfiler.PaintProfilerLogItem[]): void {
-      this.logTreeView.setCommandLog(log || []);
+      this.logTreeView.commandLog = log || [];
       void this.paintProfilerView.setSnapshotAndLog(snapshot, log || [], clipRect);
     }
   }
@@ -202,7 +202,7 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
   }
 
   private onWindowChanged(): void {
-    this.logTreeView.updateWindow(this.paintProfilerView.selectionWindow());
+    this.logTreeView.selectionWindow = this.paintProfilerView.selectionWindow();
   }
 }
 
@@ -221,7 +221,11 @@ export interface TimelinePaintImageViewInput {
   };
 }
 
-export const DEFAULT_VIEW = (input: TimelinePaintImageViewInput, output: undefined, target: HTMLElement): {
+export type View = (input: TimelinePaintImageViewInput, output: undefined, target: HTMLElement) => {
+  imageElementNaturalHeight: number, imageElementNaturalWidth: number,
+};
+
+export const DEFAULT_VIEW: View = (input: TimelinePaintImageViewInput, _output: undefined, target: HTMLElement): {
   imageElementNaturalHeight: number,
   imageElementNaturalWidth: number,
 } => {
@@ -233,7 +237,7 @@ export const DEFAULT_VIEW = (input: TimelinePaintImageViewInput, output: undefin
       <img src=${input.imageURL} display=${input.imageContainerHidden ? 'none' : 'block'} ${ref(imageElementRef)}>
       <div style=${Lit.Directives.styleMap({
         display: input.maskElementHidden ? 'none' : 'block',
-        ...input.maskElementStyle,})}>
+        ...input.maskElementStyle})}>
       </div>
     </div>
   </div>`,
@@ -262,13 +266,13 @@ export class TimelinePaintImageView extends UI.Widget.Widget {
     maskElementStyle: {},
   };
 
-  #view: typeof DEFAULT_VIEW;
+  #view: View;
   #imageElementDimensions?: {
     naturalHeight: number,
     naturalWidth: number,
   };
 
-  constructor(view = DEFAULT_VIEW) {
+  constructor(view: View = DEFAULT_VIEW) {
     super();
     this.registerRequiredCSS(timelinePaintProfilerStyles);
     this.#view = view;

@@ -1,11 +1,10 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import type {Platform} from '../conductor/platform.js';
 
-import type {BrowserSettings, BrowserWrapper} from './shared/browser-helper.js';
-import type {DevToolsPage, DevtoolsSettings} from './shared/frontend-helper.js';
-import type {InspectedPage} from './shared/target-helper.js';
+import type {BrowserSettings, BrowserWrapper} from './shared/BrowserWrapper.js';
+import type {DevToolsPage, DevtoolsSettings} from './shared/DevToolsPage.js';
+import type {InspectedPage} from './shared/InspectedPage.js';
 
 declare global {
   interface Window {
@@ -22,7 +21,6 @@ declare global {
     export interface TestFunction {
       (title: string, fn: E2E.TestAsyncCallbackWithState): void;
 
-      skipOnPlatforms: (platforms: Platform[], title: string, fn: E2E.TestAsyncCallbackWithState) => void;
     }
 
     export interface ExclusiveTestFunction {

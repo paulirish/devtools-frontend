@@ -19,36 +19,32 @@ generate_css("css_files") {
 
 devtools_ui_module("security") {
   sources = [
-    "OriginTreeElement.ts",
     "SecurityModel.ts",
     "SecurityPanel.ts",
     "SecurityPanelSidebar.ts",
-    "SecurityPanelSidebarTreeElement.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../../panels/network/forward:bundle",
+    "../../ui/components/buttons:bundle",
     "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "security.ts"
 
-  deps = [
-    ":css_files",
-    ":security",
-  ]
+  ts_deps = [ ":security" ]
 
   visibility = [
     ":*",
@@ -61,11 +57,9 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "security-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../core/common:bundle",
     "../../core/i18n:bundle",
-    "../../core/root:bundle",
     "../../ui/legacy:bundle",
   ]
 
@@ -78,13 +72,17 @@ devtools_ui_module("unittests") {
   sources = [
     "SecurityModel.test.ts",
     "SecurityPanel.test.ts",
+    "SecurityPanelSidebar.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/common:bundle",
+    "../../core/host:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
+    "../../panels/network/forward:bundle",
     "../../testing",
   ]
 }

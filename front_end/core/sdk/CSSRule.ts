@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Platform from '../platform/platform.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import {CSSContainerQuery} from './CSSContainerQuery.js';
 import {CSSLayer} from './CSSLayer.js';
@@ -121,7 +121,7 @@ export class CSSStyleRule extends CSSRule {
       origin: payload.origin,
       style: payload.style,
       header: styleSheetHeaderForRule(cssModel, payload),
-      originTreeScopeNodeId: payload.originTreeScopeNodeId
+      originTreeScopeNodeId: payload.originTreeScopeNodeId,
     });
     this.reinitializeSelectors(payload.selectorList);
     this.nestingSelectors = payload.nestingSelectors;
@@ -230,6 +230,35 @@ export class CSSStyleRule extends CSSRule {
     this.navigations.forEach(navigation => navigation.rebase(edit));
 
     super.rebase(edit);
+  }
+
+  constructResolvedSelector(nestingIndex?: number): string|undefined {
+    const nestingSelectors = this.nestingSelectors;
+    if (!nestingSelectors) {
+      return nestingIndex === undefined ? this.selectorText() : undefined;
+    }
+
+    if (nestingIndex !== undefined && (nestingIndex < 0 || nestingIndex >= nestingSelectors.length)) {
+      return undefined;
+    }
+
+    const selectorText = nestingIndex !== undefined ? nestingSelectors[nestingIndex] : this.selectorText();
+
+    const parentIndex = nestingIndex !== undefined ? nestingIndex + 1 : 0;
+    const parentSelector = this.constructResolvedSelector(parentIndex);
+
+    if (!parentSelector) {
+      return selectorText;
+    }
+
+    // Strip pseudo-elements (e.g. ::before) because pseudo-elements are invalid inside CSS :is(...).
+    const sanitizedParent = parentSelector.replace(/::[a-zA-Z-]+/g, '').trim();
+
+    if (selectorText.includes('&')) {
+      return selectorText.replaceAll('&', `:is(${sanitizedParent})`);
+    }
+
+    return `:is(${sanitizedParent}) ${selectorText.trim()}`;
   }
 }
 
@@ -415,9 +444,10 @@ export class CSSFunctionRule extends CSSRule {
         cssProperties: [],
         shorthandEntries: [],
         range: CSSFunctionRule.mergeRanges(payload.children),
-        styleSheetId: payload.styleSheetId
+        styleSheetId: payload.styleSheetId,
       },
       header: styleSheetHeaderForRule(cssModel, payload),
+      originTreeScopeNodeId: payload.originTreeScopeNodeId,
     });
     this.#name = new CSSValue(payload.name);
     this.#parameters = payload.parameters.map(({name}) => name);

@@ -4,27 +4,26 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
+import * as SettingsUI from '../../../settings/settings.js';
 import * as UI from '../../legacy.js';
 
 import type * as PerfUI from './perf_ui.js';
 
 const UIStrings = {
   /**
-   * @description Title of a setting under the Performance category in Settings.
-   * Selected navigation allows switching between 2 different sets of shortcuts
-   * and actions (like zoom on scroll or crtl/cmd + scroll) for navigating the performance panel.
+   * @description Title of a setting under the Performance category in Settings to select the navigation style for the Performance panel.
    */
   flamechartSelectedNavigation: 'Flamechart navigation:',
   /**
-   * @description Modern navigation option in the Performance Panel.
+   * @description Setting option for modern flame chart navigation in the Performance panel.
    */
   modern: 'Modern',
   /**
-   * @description Classic navigation option in the Performance Panel.
+   * @description Setting option for classic flame chart navigation in the Performance panel.
    */
   classic: 'Classic',
   /**
-   * @description Title of an action in the components tool to collect garbage
+   * @description Action title to trigger garbage collection.
    */
   collectGarbage: 'Collect garbage',
 } as const;
@@ -52,13 +51,9 @@ UI.ActionRegistration.registerActionExtension({
   },
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.TimelineSettings.flamechartSelectedNavigationSettingDescriptor, {
   category: Common.Settings.SettingCategory.PERFORMANCE,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.flamechartSelectedNavigation),
-  settingName: 'flamechart-selected-navigation',
-  settingType: Common.Settings.SettingType.ENUM,
-  defaultValue: 'classic',
   options: [
     {
       title: i18nLazyString(UIStrings.modern),

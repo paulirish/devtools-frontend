@@ -14,13 +14,13 @@ devtools_ui_module("highlighting") {
     "HighlightManager.ts",
     "MarkupHighlight.ts",
   ]
-  deps = [ "../../../models/text_utils:bundle" ]
+  ts_deps = [ "../../../core/text_utils:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "highlighting.ts"
 
-  deps = [ ":highlighting" ]
+  ts_deps = [ ":highlighting" ]
 
   visibility = default_components_visibility
 }
@@ -34,9 +34,9 @@ devtools_ui_module("unittests") {
     "MarkupHighlight.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../../models/text_utils:bundle",
+    "../../../core/text_utils:bundle",
     "../../../testing",
   ]
 }

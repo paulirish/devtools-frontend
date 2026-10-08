@@ -9,7 +9,7 @@ import type * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description Text in Layer View Host of the Layers panel
+   * @description Text in layer view host of the Layers panel.
    */
   showInternalLayers: 'Show internal layers',
 } as const;
@@ -191,6 +191,6 @@ export class LayerViewHost {
       node.highlightForTwoSeconds();
       return;
     }
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
   }
 }

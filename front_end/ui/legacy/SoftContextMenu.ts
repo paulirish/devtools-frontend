@@ -18,28 +18,28 @@ import {createTextChild, ElementFocusRestorer} from './UIUtils.js';
 
 const UIStrings = {
   /**
-   * @description Text exposed to screen readers on checked items.
+   * @description Accessible state text for checked items in a context menu.
    */
   checked: 'checked',
   /**
-   * @description Accessible text exposed to screen readers when the screen reader encounters an unchecked checkbox.
+   * @description Accessible state text for unchecked items in a context menu.
    */
   unchecked: 'unchecked',
   /**
-   * @description Accessibility label for checkable SoftContextMenuItems with shortcuts
-   * @example {Open File} PH1
+   * @description Accessible label pattern combining label, shortcut, and state in a context menu item.
+   * @example {Open file} PH1
    * @example {Ctrl + P} PH2
    * @example {checked} PH3
    */
   sSS: '{PH1}, {PH2}, {PH3}',
   /**
-   * @description Generic text with two placeholders separated by a comma
-   * @example {1 613 680} PH1
-   * @example {44 %} PH2
+   * @description Accessible label pattern combining two strings separated by a comma.
+   * @example {Console} PH1
+   * @example {Ctrl + R} PH2
    */
   sS: '{PH1}, {PH2}',
   /**
-   * @description Accessible text exposed to screen readers appended to menu items that have a new badge.
+   * @description Accessible text appended to menu items with a new feature badge.
    */
   newFeature: 'This is a new feature',
 } as const;
@@ -173,6 +173,7 @@ export class SoftContextMenu {
     if (this.subMenu) {
       this.subMenu.discard();
     }
+    this.highlightMenuItem(null, false);
     if (this.focusRestorer) {
       this.focusRestorer.restore();
     }
@@ -268,6 +269,7 @@ export class SoftContextMenu {
     menuItemElement.addEventListener('mouseleave', (this.menuItemMouseLeave.bind(this) as EventListener), false);
 
     detailsForElement.actionId = item.id;
+    detailsForElement.onHover = item.onHover;
 
     let accessibleName: Platform.UIString.LocalizedString|string = item.label || '';
 
@@ -463,6 +465,7 @@ export class SoftContextMenu {
         window.clearTimeout(detailsForElement.subMenuTimer);
         delete detailsForElement.subMenuTimer;
       }
+      detailsForElement?.onHover?.(false);
     }
 
     this.highlightedMenuItemElement = menuItemElement;
@@ -479,6 +482,7 @@ export class SoftContextMenu {
         detailsForElement.subMenuTimer =
             window.setTimeout(this.showSubMenu.bind(this, this.highlightedMenuItemElement), 150);
       }
+      detailsForElement?.onHover?.(true);
     }
 
     if (this.contextMenuElement) {
@@ -628,6 +632,7 @@ export interface SoftContextMenuDescriptor {
   jslogContext?: string;
   /** A no-op. For native context menus, feature name will request showing a new badge. */
   featureName?: string;
+  onHover?: (hovered: boolean) => void;
 }
 interface ElementMenuDetails {
   customElement?: HTMLElement;
@@ -635,4 +640,5 @@ interface ElementMenuDetails {
   subMenuTimer?: number;
   subItems?: SoftContextMenuDescriptor[];
   actionId?: number;
+  onHover?: (hovered: boolean) => void;
 }

@@ -4,12 +4,13 @@
 
 import * as Common from '../../core/common/common.js';
 import type * as SDK from '../../core/sdk/sdk.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as ComputedStyle from '../../models/computed_style/computed_style.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html, render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as ElementsComponents from './components/components.js';
@@ -26,18 +27,17 @@ interface ViewInput {
 type View = (input: ViewInput, output_: undefined, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
-  render(
-      html`
+  render(html`
     <style>${stylesSidebarPaneStyles}</style>
     <div class="style-panes-wrapper" jslog=${VisualLogging.section('standalone-styles').track({
-        resize: true
-      })}>
+           resize: true,
+         })}>
       <div class="styles-pane">
         ${input.sections.map(section => section.element)}
       </div>
     </div>
   `,
-      target);
+         target);
 };
 
 export const enum Events {
@@ -48,11 +48,15 @@ export interface EventTypes {
   [Events.STYLES_UPDATE_COMPLETED]: void;
 }
 
-export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements StylesContainer {
+const StandaloneStylesContainerBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class StandaloneStylesContainer extends StandaloneStylesContainerBase implements StylesContainer {
   activeCSSAngle: InlineEditor.CSSAngle.CSSAngle|null = null;
   isEditingStyle = false;
-  readonly sectionByElement = new WeakMap<Node, StylePropertiesSection>();
+  readonly sectionByElement: WeakMap<Node, StylePropertiesSection> = new WeakMap<Node, StylePropertiesSection>();
   // TODO: Reference the MAX_LINK_LENGTH from StylesSidebarPane at a later stage, when we have a reference to it.
   readonly linkifier: Components.Linkifier.Linkifier =
       new Components.Linkifier.Linkifier(23, /* useLinkDecorator */ true);
@@ -69,17 +73,8 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
   constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.#view = view;
-    this.#computedStyleModelInternal.addEventListener(
-        ComputedStyle.ComputedStyleModel.Events.CSS_MODEL_CHANGED, this.#onCSSModelChanged, this);
-    this.#computedStyleModelInternal.addEventListener(
-        ComputedStyle.ComputedStyleModel.Events.COMPUTED_STYLE_CHANGED, this.#onComputedStyleChanged, this);
-  }
-
-  #onComputedStyleChanged(): void {
-    if (this.isEditingStyle || this.userOperation) {
-      return;
-    }
-    this.#rebuildAndUpdate();
+    this.#computedStyleModelInternal.addEventListener(ComputedStyle.ComputedStyleModel.Events.CSS_MODEL_CHANGED,
+                                                      this.#onCSSModelChanged, this);
   }
 
   #rebuildAndUpdate(): void {
@@ -108,7 +103,9 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
 
   get webCustomData(): WebCustomData|undefined {
     if (!this.#webCustomData &&
-        Common.Settings.Settings.instance().moduleSetting('show-css-property-documentation-on-hover').get()) {
+        Common.Settings.Settings.instance()
+            .resolve(SettingsUI.ElementsSettings.showCSSPropertyDocumentationOnHoverSettingDescriptor)
+            .get()) {
       this.#webCustomData = WebCustomData.create();
     }
     return this.#webCustomData;
@@ -130,8 +127,9 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
     const parentNodeId = matchedStyles?.getParentLayoutNodeId();
 
     const [parentStyles, computedStyles, extraStyles] = await Promise.all([
-      parentNodeId ? cssModel.getComputedStyle(parentNodeId) : null, cssModel.getComputedStyle(node.id),
-      cssModel.getComputedStyleExtraFields(node.id)
+      parentNodeId ? cssModel.getComputedStyle(parentNodeId) : null,
+      cssModel.getComputedStyle(node.id),
+      cssModel.getComputedStyleExtraFields(node.id),
     ]);
 
     if (signal?.aborted) {
@@ -211,14 +209,15 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
   setActiveProperty(_treeElement: StylePropertyTreeElement|null): void {
   }
 
-  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement): void {
+  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement,
+                force = false): void {
     if (editedTreeElement) {
       for (const section of this.#sections) {
         section.updateVarFunctions(editedTreeElement);
       }
     }
 
-    if (this.isEditingStyle) {
+    if (this.isEditingStyle && !force) {
       this.#onUpdateFinished();
       return;
     }
@@ -236,6 +235,9 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
 
   setEditingStyle(editing: boolean): void {
     this.isEditingStyle = editing;
+  }
+
+  suppressResets(): void {
   }
 
   setUserOperation(userOperation: boolean): void {
@@ -276,7 +278,7 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
     return null;
   }
 
-  jumpToFunctionDefinition(_functionName: string): void {
+  jumpToFunctionDefinition(_functionName: string, _treeScopeDistance: number): void {
   }
 
   continueEditingElement(_sectionIndex: number, _propertyIndex: number): void {
@@ -326,5 +328,15 @@ export class StandaloneStylesContainer extends Common.ObjectWrapper.eventMixin<E
 
   removeStyleUpdateListener(listener: () => void): void {
     this.removeEventListener(Events.STYLES_UPDATE_COMPLETED, listener);
+  }
+
+  trackForLazyRendering(_element: Element, _callback: () => void): void {
+  }
+
+  shouldRenderLazily(): boolean {
+    return false;
+  }
+
+  untrackForLazyRendering(_element: Element): void {
   }
 }

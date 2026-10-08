@@ -8,7 +8,7 @@ import("../visibility.gni")
 devtools_entrypoint("bundle") {
   entrypoint = "csp_evaluator.ts"
 
-  deps = [ "./package:csp_evaluator" ]
+  ts_deps = [ "./package:csp_evaluator" ]
 
   visibility = [ "../../panels/application/*" ]
 

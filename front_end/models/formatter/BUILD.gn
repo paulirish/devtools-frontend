@@ -13,21 +13,17 @@ devtools_foundation_module("formatter") {
     "ScriptFormatter.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
-    "../../core/platform/api:bundle",
-    "../../entrypoints/formatter_worker:formatter_actions",
+    "../../entrypoints/formatter_actions:bundle",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "formatter.ts"
 
-  deps = [
-    ":formatter",
-    "../../entrypoints/formatter_worker:worker_entrypoint",
-  ]
+  ts_deps = [ ":formatter" ]
 
   visibility = [
     ":*",
@@ -37,23 +33,27 @@ devtools_entrypoint("bundle") {
     "../../models/ai_assistance/*",
     "../../models/bindings/*",
     "../../models/breakpoints/*",
+    "../../models/persistence/*",
     "../../models/source_map_scopes/*",
     "../../models/workspace_diff/*",
+    "../../panels/ai_assistance/*",
     "../../panels/application/*",
     "../../panels/console/*",
     "../../panels/coverage/*",
     "../../panels/sources/*",
+    "../../panels/timeline/utils:*",
     "../../panels/utils/*",
     "../../testing/*",
     "../../ui/components/text_editor/*",
     "../../ui/legacy/components/object_ui/*",
     "../../ui/legacy/components/source_frame/*",
+    "../trace_source_maps_resolver/*",
   ]
 
   visibility += devtools_models_visibility
 }
 
-devtools_foundation_module("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
@@ -61,7 +61,7 @@ devtools_foundation_module("unittests") {
     "ScriptFormatter.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
   ]

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as CrUXManager from '../../models/crux-manager/crux-manager.js';
@@ -31,7 +32,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
       {
         Disabled: [
           'No throttling',
-        ]
+        ],
       },
       {
         Presets: [
@@ -39,12 +40,12 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
           'Slow 4G',
           '3G',
           'Offline',
-        ]
+        ],
       },
       {
         Custom: [
           'Add…',
-        ]
+        ],
       },
     ]);
   });
@@ -62,19 +63,19 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
       {
         Blocking: [
           'Block',
-        ]
+        ],
       },
       {
         Presets: [
           'Fast 4G',
           'Slow 4G',
           '3G',
-        ]
+        ],
       },
       {
         Custom: [
           'Add…',
-        ]
+        ],
       },
     ]);
   });
@@ -172,5 +173,41 @@ describeWithEnvironment('createForGlobalConditions CrUX integration', () => {
     cruxManager.dispatchEventToListeners(CrUXManager.Events.FIELD_DATA_CHANGED, undefined);
 
     assert.isNull(select.recommendedConditions);
+  });
+});
+
+describe('NetworkThrottlingSelect getRecommendedNetworkConditions', () => {
+  it('returns null when RTT data is missing', () => {
+    const result = MobileThrottling.NetworkThrottlingSelector.getRecommendedNetworkConditions(
+        undefined,
+    );
+
+    assert.isNull(result);
+  });
+
+  it('returns a matching preset when RTT data is available', () => {
+    const result = MobileThrottling.NetworkThrottlingSelector.getRecommendedNetworkConditions(
+        {
+          percentiles: {p75: '150'},
+        },
+    );
+
+    assert.strictEqual(result, SDK.NetworkManager.Slow4GConditions);
+  });
+
+  it('returns null when RTT data is invalid or too low', () => {
+    const invalidResult = MobileThrottling.NetworkThrottlingSelector.getRecommendedNetworkConditions(
+        {
+          percentiles: {p75: 'not-a-number'},
+        },
+    );
+    assert.isNull(invalidResult);
+
+    const tooLowResult = MobileThrottling.NetworkThrottlingSelector.getRecommendedNetworkConditions(
+        {
+          percentiles: {p75: '10'},
+        },
+    );
+    assert.isNull(tooLowResult);
   });
 });

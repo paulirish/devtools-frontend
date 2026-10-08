@@ -4,18 +4,18 @@
 
 import {assert} from 'chai';
 
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
-export async function clickStylePropertyEditorButton(
-    title: string, editorElement: 'devtools-grid-editor'|'devtools-flexbox-editor'|'devtools-grid-lanes-editor',
-    devToolsPage: DevToolsPage) {
+export async function clickStylePropertyEditorButton(devToolsPage: DevToolsPage, title: string,
+                                                     editorElement: 'devtools-grid-editor'|'devtools-flexbox-editor'|
+                                                     'devtools-grid-lanes-editor'): Promise<void> {
   const gridEditorButtons = await devToolsPage.$$(`[title="${title}"]`);
   assert.lengthOf(gridEditorButtons, 1);
   await devToolsPage.click(`[title="${title}"]`);
   await devToolsPage.waitFor(editorElement);
 }
 
-export async function clickPropertyButton(selector: string, devToolsPage: DevToolsPage) {
+export async function clickPropertyButton(devToolsPage: DevToolsPage, selector: string): Promise<void> {
   await devToolsPage.waitFor(selector);
   const buttons = await devToolsPage.$$(selector);
   assert.lengthOf(buttons, 1);

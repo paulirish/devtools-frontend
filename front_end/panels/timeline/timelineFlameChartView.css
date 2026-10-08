@@ -38,10 +38,57 @@
 }
 
 
+.overlay-type-COMMENT_PIN {
+  z-index: 5;
+  pointer-events: none;
+  border: var(--sys-size-2) dashed var(--sys-color-primary);
+  background-color: color-mix(in srgb, var(--sys-color-primary), transparent 90%);
+  box-sizing: border-box;
+
+  .comment-pin {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.1s ease;
+    transform-origin: center center;
+    outline: none;
+
+    &:hover,
+    &:focus-visible {
+      transform: translate(50%, -50%) scale(1.15);
+    }
+
+    &:focus-visible .comment-cursor {
+      outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .comment-cursor {
+    display: flex;
+    width: var(--sys-size-9);
+    height: var(--sys-size-9);
+    box-sizing: border-box;
+    padding: 0;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+    box-shadow: var(--sys-elevation-level2);
+    border-radius: 100px 100px 100px var(--sys-shape-corner-extra-small, 4px);
+    background: var(--sys-color-primary);
+    color: var(--sys-color-on-primary);
+  }
+}
+
 .overlay-type-ENTRY_SELECTED,
 .overlay-type-ENTRY_OUTLINE {
   pointer-events: none;
-  border: 2px solid var(--sys-color-primary);
+  border: var(--sys-size-2) solid var(--sys-color-primary);
   background-color: var(--sys-color-state-ripple-primary);
 
   &.cut-off-top {
@@ -68,7 +115,7 @@
 
 .overlay-type-ENTRY_OUTLINE {
   background-color: transparent;
-  border-width: 1px;
+  border-width: var(--sys-size-1);
   /* Ensure ENTRY_SELECTED overlays are always displayed on top of ENTRY_OUTLINE overlays */
   z-index: 0;
 
@@ -82,7 +129,7 @@
 }
 
 .overlay-type-CANDY_STRIPED_TIME_RANGE {
-  --red-stripe-width: 2px;
+  --red-stripe-width: var(--sys-size-2);
   --white-stripe-width: 7px;
 
   background-image:
@@ -93,7 +140,7 @@
       transparent var(--red-stripe-width),
       transparent var(--white-stripe-width)
     );
-  border: 1px solid var(--sys-color-error-bright);
+  border: var(--sys-size-1) solid var(--sys-color-error-bright);
 
   &.cut-off-bottom {
     border-bottom: none;
@@ -133,7 +180,7 @@
 .overlay-type-TIMESTAMP_MARKER {
   top: 0;
   bottom: 0;
-  width: 2px;
+  width: var(--sys-size-2);
   background-color: var(--sys-color-primary);
   pointer-events: none;
 }
@@ -146,7 +193,8 @@
   pointer-events: none;
   padding: var(--sys-size-3) var(--sys-size-4);
   border-radius: var(--sys-shape-corner-extra-small);
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-all;
   max-width: 80%;
   box-shadow: var(--sys-elevation-level2);
 }
@@ -156,6 +204,11 @@
   top: unset;
   bottom: 0;
   height: 100px;
+
+  &.positioned-by-event {
+    top: 0;
+    bottom: unset;
+  }
 }
 
 .overlay-type-TIMINGS_MARKER {
@@ -170,7 +223,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 40px;
+  height: var(--sys-size-14);
   /* Unlike other overlays, the user can click + interact with this one */
   pointer-events: auto;
   /* Ensure this one is always on top of any others */
@@ -205,9 +258,9 @@
 }
 
 .timeline-flamechart-resizer {
-  flex: 8px 0 0;
+  flex: var(--sys-size-5) 0 0;
   background-color: var(--sys-color-surface2);
-  border: 1px var(--sys-color-divider);
+  border: var(--sys-size-1) var(--sys-color-divider);
   border-style: solid none;
   display: flex;
   flex-direction: row;
@@ -221,6 +274,6 @@
 
 .timeline-flamechart-resizer::after {
   content: "...";
-  font-size: 14px;
-  margin-bottom: -1px;
+  font-size: var(--sys-typescale-body2-size);
+  margin-bottom: calc(-1 * var(--sys-size-1));
 }

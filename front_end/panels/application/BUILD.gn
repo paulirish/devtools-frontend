@@ -5,6 +5,7 @@
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/ninja/generate_css.gni")
+import("../../../scripts/build/ninja/vars.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
@@ -16,7 +17,6 @@ generate_css("css_files") {
     "deviceBoundSessionsView.css",
     "frameDetailsReportView.css",
     "indexedDBViews.css",
-    "interestGroupStorageView.css",
     "openedWindowDetailsView.css",
     "originTrialTokenRows.css",
     "originTrialTreeView.css",
@@ -27,13 +27,15 @@ generate_css("css_files") {
     "serviceWorkerCacheViews.css",
     "serviceWorkerUpdateCycleView.css",
     "serviceWorkersView.css",
-    "sharedStorageEventsView.css",
     "storageView.css",
     "webMCPView.css",
   ]
 }
 
 devtools_ui_module("application") {
+  additional_type_definitions = [ devtools_location_prepend +
+                                  "node_modules/@types/json-schema/index.d.ts" ]
+
   sources = [
     "AppManifestView.ts",
     "ApplicationPanelSidebar.ts",
@@ -53,9 +55,6 @@ devtools_ui_module("application") {
     "FrameDetailsView.ts",
     "IndexedDBModel.ts",
     "IndexedDBViews.ts",
-    "InterestGroupStorageModel.ts",
-    "InterestGroupStorageView.ts",
-    "InterestGroupTreeElement.ts",
     "KeyValueStorageItemsView.ts",
     "OpenedWindowDetailsView.ts",
     "OriginTrialTreeView.ts",
@@ -67,11 +66,6 @@ devtools_ui_module("application") {
     "ServiceWorkerCacheViews.ts",
     "ServiceWorkerUpdateCycleView.ts",
     "ServiceWorkersView.ts",
-    "SharedStorageEventsView.ts",
-    "SharedStorageItemsView.ts",
-    "SharedStorageListTreeElement.ts",
-    "SharedStorageModel.ts",
-    "SharedStorageTreeElement.ts",
     "StorageBucketsTreeElement.ts",
     "StorageItemsToolbar.ts",
     "StorageView.ts",
@@ -81,23 +75,22 @@ devtools_ui_module("application") {
     "preloading/PreloadingView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../../models/ai_assistance:bundle",
     "../../models/bindings:bundle",
-    "../../models/geometry:bundle",
     "../../models/issues_manager:bundle",
     "../../models/stack_trace:bundle",
-    "../../models/text_utils:bundle",
     "../../models/web_mcp:bundle",
     "../../models/workspace:bundle",
+    "../../panels/console:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../panels/network:bundle",
     "../../panels/network/forward:bundle",
@@ -108,11 +101,14 @@ devtools_ui_module("application") {
     "../../ui/components/buttons:bundle",
     "../../ui/components/expandable_list:bundle",
     "../../ui/components/icon_button:bundle",
+    "../../ui/components/input:bundle",
     "../../ui/components/legacy_wrapper:bundle",
     "../../ui/components/lists:bundle",
     "../../ui/components/node_text:bundle",
     "../../ui/components/report_view:bundle",
     "../../ui/components/tree_outline:bundle",
+    "../../ui/geometry:bundle",
+    "../../ui/helpers:bundle",
     "../../ui/i18n:bundle",
     "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
@@ -131,20 +127,26 @@ devtools_ui_module("application") {
     "./preloading/components:bundle",
     "./preloading/helper:bundle",
   ]
+  deps = [
+    ":css_files",
+    "../../ui/legacy:css_files",
+    "../../ui/legacy/components/data_grid:css_files",
+    "../console:css_files",
+  ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "application.ts"
 
-  deps = [
+  ts_deps = [
     ":application",
-    ":css_files",
-    "../../ui/legacy:css_files",
+    "components:bundle",
   ]
 
   visibility = [
     ":*",
     "../../entrypoints/*",
+    "../../panels/ai_assistance/*",
   ]
 
   visibility += devtools_panels_visibility
@@ -153,7 +155,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "application-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
@@ -166,13 +168,17 @@ devtools_entrypoint("meta") {
 }
 
 devtools_ui_module("unittests") {
+  additional_type_definitions = [ devtools_location_prepend +
+                                  "node_modules/@types/json-schema/index.d.ts" ]
   testonly = true
 
   sources = [
     "AppManifestView.test.ts",
     "ApplicationPanelSidebar.test.ts",
     "BackgroundServiceView.test.ts",
+    "CookieItemsView.test.ts",
     "CrashReportContextView.test.ts",
+    "DOMStorageItemsView.test.ts",
     "DeviceBoundSessionsModel.test.ts",
     "DeviceBoundSessionsTreeElement.test.ts",
     "DeviceBoundSessionsView.test.ts",
@@ -181,46 +187,44 @@ devtools_ui_module("unittests") {
     "FrameDetailsView.test.ts",
     "IndexedDBModel.test.ts",
     "IndexedDBViews.test.ts",
-    "InterestGroupStorageView.test.ts",
-    "InterestGroupTreeElement.test.ts",
     "KeyValueStorageItemsView.test.ts",
     "OriginTrialTreeView.test.ts",
     "PreloadingTreeElement.test.ts",
     "ReportingApiTreeElement.test.ts",
     "ReportingApiView.test.ts",
+    "ServiceWorkerCacheTreeElement.test.ts",
     "ServiceWorkerCacheViews.test.ts",
     "ServiceWorkerUpdateCycleView.test.ts",
     "ServiceWorkersView.test.ts",
-    "SharedStorageEventsView.test.ts",
-    "SharedStorageItemsView.test.ts",
-    "SharedStorageListTreeElement.test.ts",
-    "SharedStorageModel.test.ts",
-    "SharedStorageTreeElement.test.ts",
     "StorageBucketsTreeElement.test.ts",
     "StorageView.test.ts",
     "WebMCPView.test.ts",
     "preloading/PreloadingView.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/host:bundle",
+    "../../core/i18n:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
+    "../../models/ai_assistance:bundle",
     "../../models/bindings:bundle",
     "../../models/logs:bundle",
+    "../../models/stack_trace:bundle",
     "../../models/web_mcp:bundle",
     "../../models/workspace:bundle",
     "../../testing",
+    "../../ui/components/buttons:bundle",
     "../../ui/components/render_coordinator:bundle",
     "../../ui/components/report_view:bundle",
     "../../ui/legacy:bundle",
-    "../../ui/legacy:ui",
-    "../../ui/legacy/components/object_ui:bundle",
+    "../../ui/lit:bundle",
     "../protocol_monitor:bundle",
     "preloading/components:bundle",
   ]
+  deps = [ ":css_files" ]
 }

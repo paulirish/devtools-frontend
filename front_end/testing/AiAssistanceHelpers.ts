@@ -3,29 +3,26 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../core/common/common.js';
 import * as Host from '../core/host/host.js';
 import * as Platform from '../core/platform/platform.js';
 import * as SDK from '../core/sdk/sdk.js';
-import type * as Protocol from '../generated/protocol.js';
+import * as AiAssistance from '../models/ai_assistance/ai_assistance.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as Breakpoints from '../models/breakpoints/breakpoints.js';
-import * as Logs from '../models/logs/logs.js';
 import * as Persistence from '../models/persistence/persistence.js';
 import * as ProjectSettings from '../models/project_settings/project_settings.js';
+import type * as Trace from '../models/trace/trace.js';
 import * as Workspace from '../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../models/workspace_diff/workspace_diff.js';
-import * as AiAssistancePanel from '../panels/ai_assistance/ai_assistance.js';
-import * as UI from '../ui/legacy/legacy.js';
+import type * as AiAssistancePanel from '../panels/ai_assistance/ai_assistance.js';
 
-import {findMenuItemWithLabel} from './ContextMenuHelpers.js';
-import {renderElementIntoDOM} from './DOMHelpers.js';
 import {
   createTarget,
 } from './EnvironmentHelpers.js';
 import {createContentProviderUISourceCodes, createFileSystemUISourceCode} from './UISourceCodeHelpers.js';
-import {createViewFunctionStub} from './ViewFunctionHelpers.js';
 
 function createMockAidaClient(doConversation: Host.AidaClient.AidaClient['doConversation']):
     sinon.SinonStubbedInstance<Host.AidaClient.AidaClient> {
@@ -42,8 +39,17 @@ export const MockAidaFetchError = {
   fetchError: true,
 } as const;
 
-export type MockAidaResponse = Omit<Host.AidaClient.DoConversationResponse, 'completed'|'metadata'>&
-    {metadata?: Host.AidaClient.ResponseMetadata}|typeof MockAidaAbortError|typeof MockAidaFetchError;
+export const MockAidaQuotaError = {
+  quotaError: true,
+} as const;
+
+export const MockAidaPayloadLimitError = {
+  payloadLimitError: true,
+} as const;
+
+export type MockAidaResponse =
+    Omit<Host.AidaClient.DoConversationResponse, 'completed'|'metadata'>&{metadata?: Host.AidaClient.ResponseMetadata}|
+    typeof MockAidaAbortError|typeof MockAidaFetchError|typeof MockAidaQuotaError|typeof MockAidaPayloadLimitError;
 
 /**
  * Creates a mock AIDA client that responds using `data`.
@@ -66,6 +72,12 @@ export function mockAidaClient(data: Array<[MockAidaResponse, ...MockAidaRespons
       }
       if ('fetchError' in chunk) {
         throw new Error('Fetch error');
+      }
+      if ('quotaError' in chunk) {
+        throw new Host.AidaClient.AidaQuotaError();
+      }
+      if ('payloadLimitError' in chunk) {
+        throw new Host.AidaClient.AidaPayloadTooLargeError('payload size exceeds the limit');
       }
       const metadata = chunk.metadata ?? {};
       if (metadata?.attributionMetadata?.attributionAction === Host.AidaClient.RecitationAction.BLOCK) {
@@ -124,103 +136,8 @@ export async function createUISourceCode(options?: {
   return uiSourceCode;
 }
 
-export function createNetworkRequest(opts?: {
-  url?: Platform.DevToolsPath.UrlString,
-  includeInitiators?: boolean,
-  documentURL?: Platform.DevToolsPath.UrlString,
-}): SDK.NetworkRequest.NetworkRequest {
-  const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
-      'requestId-0' as Protocol.Network.RequestId,
-      opts?.url ?? Platform.DevToolsPath.urlString`https://www.example.com/script.js`,
-      opts?.documentURL ?? Platform.DevToolsPath.urlString``, null, null, null);
-  networkRequest.statusCode = 200;
-  networkRequest.setRequestHeaders([{name: 'content-type', value: 'bar1'}]);
-  networkRequest.responseHeaders = [{name: 'content-type', value: 'bar2'}, {name: 'x-forwarded-for', value: 'bar3'}];
-
-  if (opts?.includeInitiators) {
-    const initiatorNetworkRequest = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId-1' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.initiator.com`,
-        Platform.DevToolsPath.urlString``, null, null, null);
-    const initiatedNetworkRequest1 = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId-2' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/1`,
-        Platform.DevToolsPath.urlString``, null, null, null);
-    const initiatedNetworkRequest2 = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId-3' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/2`,
-        Platform.DevToolsPath.urlString``, null, null, null);
-
-    sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'initiatorGraphForRequest')
-        .withArgs(networkRequest)
-        .returns({
-          initiators: new Set([networkRequest, initiatorNetworkRequest]),
-          initiated: new Map([
-            [networkRequest, initiatorNetworkRequest],
-            [initiatedNetworkRequest1, networkRequest],
-            [initiatedNetworkRequest2, networkRequest],
-          ]),
-        })
-        .withArgs(initiatedNetworkRequest1)
-        .returns({
-          initiators: new Set([]),
-          initiated: new Map([
-            [initiatedNetworkRequest1, networkRequest],
-          ]),
-        })
-        .withArgs(initiatedNetworkRequest2)
-        .returns({
-          initiators: new Set([]),
-          initiated: new Map([
-            [initiatedNetworkRequest2, networkRequest],
-          ]),
-        });
-  }
-
-  return networkRequest;
-}
-
-let panels: AiAssistancePanel.AiAssistancePanel[] = [];
-/**
- * Creates and shows an AiAssistancePanel instance returning the view
- * stubs and the initial view input caused by Widget.show().
- */
-export async function createAiAssistancePanel(options?: {
-  aidaClient?: Host.AidaClient.AidaClient,
-  aidaAvailability?: Host.AidaClient.AidaAccessPreconditions,
-  chatView?: AiAssistancePanel.ChatView,
-}) {
-  let aidaAvailabilityForStub = options?.aidaAvailability ?? Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
-
-  const view = createViewFunctionStub(AiAssistancePanel.AiAssistancePanel, {chatView: options?.chatView});
-  const aidaClient = options?.aidaClient ?? mockAidaClient();
-  const checkAccessPreconditionsStub =
-      sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions').callsFake(() => {
-        return Promise.resolve(aidaAvailabilityForStub);
-      });
-  const panel = new AiAssistancePanel.AiAssistancePanel(view, {
-    aidaClient,
-    aidaAvailability: aidaAvailabilityForStub,
-  });
-  panels.push(panel);
-
-  // In many of the tests we create other panels to allow the right contexts to
-  // be set for the AI Assistance panel.
-  renderElementIntoDOM(panel, {allowMultipleChildren: true});
-  await view.nextInput;
-
-  const stubAidaCheckAccessPreconditions = (aidaAvailability: Host.AidaClient.AidaAccessPreconditions) => {
-    aidaAvailabilityForStub = aidaAvailability;
-    return checkAccessPreconditionsStub;
-  };
-
-  return {
-    panel,
-    view,
-    aidaClient,
-    stubAidaCheckAccessPreconditions,
-  };
-}
-
 export const setupAutomaticFileSystem = (options: {hasFileSystem: boolean} = {
-  hasFileSystem: false
+  hasFileSystem: false,
 }): void => {
   const root = '/path/to/my-automatic-file-system';
   const uuid = '549bbf9b-48b2-4af7-aebd-d3ba68993094';
@@ -237,45 +154,6 @@ export const setupAutomaticFileSystem = (options: {hasFileSystem: boolean} = {
   });
   sinon.stub(manager, 'connectAutomaticFileSystem').resolves(true);
 };
-
-let patchWidgets: AiAssistancePanel.PatchWidget.PatchWidget[] = [];
-/**
- * Creates and shows an AiAssistancePanel instance returning the view
- * stubs and the initial view input caused by Widget.show().
- */
-export async function createPatchWidget(options?: {
-  aidaClient?: Host.AidaClient.AidaClient,
-}) {
-  const view = createViewFunctionStub(AiAssistancePanel.PatchWidget.PatchWidget);
-  const aidaClient = options?.aidaClient ?? mockAidaClient();
-  const widget = new AiAssistancePanel.PatchWidget.PatchWidget(undefined, view, {
-    aidaClient,
-  });
-  patchWidgets.push(widget);
-
-  widget.markAsRoot();
-  renderElementIntoDOM(widget);
-  await view.nextInput;
-
-  return {
-    widget,
-    view,
-    aidaClient,
-  };
-}
-
-export async function createPatchWidgetWithDiffView(options?: {
-  aidaClient?: Host.AidaClient.AidaClient,
-}) {
-  const aidaClient = options?.aidaClient ?? mockAidaClient([[{explanation: 'patch applied'}]]);
-  const {view, widget} = await createPatchWidget({aidaClient});
-  widget.changeSummary = 'body { background-color: red; }';
-  view.input.onApplyToWorkspace();
-  assert.strictEqual(
-      (await view.nextInput).patchSuggestionState, AiAssistancePanel.PatchWidget.PatchSuggestionState.SUCCESS);
-
-  return {widget, view, aidaClient};
-}
 
 export function initializePersistenceImplForTests(): void {
   const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
@@ -295,18 +173,8 @@ export function initializePersistenceImplForTests(): void {
     settings: Common.Settings.Settings.instance(),
   });
   Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
+  Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
   WorkspaceDiff.WorkspaceDiff.workspaceDiff({forceNew: true});
-}
-
-export function cleanup() {
-  for (const panel of panels) {
-    panel.detach();
-  }
-  panels = [];
-  for (const widget of patchWidgets) {
-    widget.detach();
-  }
-  patchWidgets = [];
 }
 
 /**
@@ -325,25 +193,13 @@ export function stripId<T extends {id: string}>(message: T): T extends AiAssista
   return rest as (T extends AiAssistancePanel.ChatMessage.Message ? Omit<T, 'id'>: never);
 }
 
-export function openHistoryContextMenu(
-    lastUpdate: AiAssistancePanel.ViewInput,
-    item: string,
-) {
-  const contextMenu = new UI.ContextMenu.ContextMenu(new MouseEvent('click'));
-  lastUpdate.populateHistoryMenu(contextMenu);
-
-  const entry = findMenuItemWithLabel(contextMenu.defaultSection(), item);
-  return {
-    contextMenu,
-    id: entry?.id(),
-    entry,
-  };
-}
-
 export function createTestFilesystem(fileSystemPath: string, files?: Array<{
                                        path: string,
                                        content: string,
-                                     }>) {
+                                     }>): {
+  project: Persistence.FileSystemWorkspaceBinding.FileSystem,
+  uiSourceCode: Workspace.UISourceCode.UISourceCode,
+} {
   const {project, uiSourceCode} = createFileSystemUISourceCode({
     url: Platform.DevToolsPath.urlString`${fileSystemPath}/index.html`,
     mimeType: 'text/html',
@@ -361,4 +217,124 @@ export function createTestFilesystem(fileSystemPath: string, files?: Array<{
   }
 
   return {project, uiSourceCode};
+}
+
+export function assertIsError<T>(
+    response: AiAssistance.Tool.DataHandlerResult<T>|AiAssistance.Tool.ContextHandlerResult<T>|
+    AiAssistance.AiAgent.ToolResult<T>,
+    expectedError?: string|RegExp,
+    ): asserts response is AiAssistance.Tool.ToolErrorResult {
+  if (!('error' in response)) {
+    assert.fail(`Expected error response, but got: ${JSON.stringify(response)}`);
+  }
+  if (typeof expectedError === 'string') {
+    assert.strictEqual(response.error, expectedError);
+  } else if (expectedError instanceof RegExp) {
+    assert.match(response.error, expectedError);
+  }
+}
+
+export function assertIsResult<T>(
+    response: AiAssistance.Tool.DataHandlerResult<T>|AiAssistance.Tool.ContextHandlerResult<T>|
+    AiAssistance.AiAgent.ToolResult<T>,
+    ): asserts response is AiAssistance.Tool.ToolDataResult<T> {
+  if (!('result' in response)) {
+    assert.fail(`Expected success result response, but got: ${JSON.stringify(response)}`);
+  }
+}
+
+export function assertRequiresApproval<T>(
+    response: AiAssistance.Tool.DataHandlerResult<T>|AiAssistance.Tool.ContextHandlerResult<T>|
+    AiAssistance.AiAgent.ToolResult<T>,
+    ): asserts response is AiAssistance.Tool.ToolApprovalResult {
+  if (!('requiresApproval' in response)) {
+    assert.fail(`Expected response requiring approval, but got: ${JSON.stringify(response)}`);
+  }
+}
+
+export function assertIsContext<T>(
+    response: AiAssistance.Tool.DataHandlerResult<T>|AiAssistance.Tool.ContextHandlerResult<T>|
+    AiAssistance.AiAgent.ToolResult<T>,
+    ): asserts response is AiAssistance.Tool.ToolContextResult<T> {
+  if (!('context' in response)) {
+    assert.fail(`Expected context response, but got: ${JSON.stringify(response)}`);
+  }
+}
+
+/**
+ * Creates a dummy File object containing a solid red image with the given dimensions.
+ *
+ * @param width Width of the dummy image in pixels (px).
+ * @param height Height of the dummy image in pixels (px).
+ */
+export async function createDummyImageFile(width: number, height: number): Promise<File> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, width, height);
+  }
+  const blob = await new Promise<Blob|null>(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+  if (!blob) {
+    throw new Error('Failed to create blob');
+  }
+  return new File([blob], 'dummy.jpg', {type: 'image/jpeg'});
+}
+
+export function makeFakeParsedTrace(options: {
+  min?: number,
+  max?: number,
+  mainFrameURL?: string,
+} = {}): Trace.TraceModel.ParsedTrace {
+  return {
+    insights: new Map(),
+    metadata: {},
+    data: {
+      Meta: {
+        mainFrameNavigations: [],
+        traceBounds: {min: options.min ?? 0, max: options.max ?? 100},
+        mainFrameURL: options.mainFrameURL ?? 'https://example.com',
+      },
+      Scripts: {
+        scripts: [],
+      },
+    },
+  } as unknown as Trace.TraceModel.ParsedTrace;
+}
+
+export function stubPerformanceTraceFormatter(
+    traceContext: AiAssistance.PerformanceTraceContext.PerformanceTraceContext,
+    methods: {
+      formatMainThreadTrackSummary?: sinon.SinonStub,
+      formatNetworkTrackSummary?: sinon.SinonStub,
+      formatCallTree?: sinon.SinonStub,
+      resolveFunctionCodeAtLocation?: sinon.SinonStub,
+      formatFunctionCode?: sinon.SinonStub,
+    },
+    ): sinon.SinonStub {
+  return sinon.stub(traceContext, 'createFormatter')
+      .returns(methods as unknown as AiAssistance.PerformanceTraceFormatter.PerformanceTraceFormatter);
+}
+const UNLOADED_SKILLS_MANIFEST_HEADER = 'Available skills that are not yet loaded:';
+
+/**
+ * Asserts that a skill is loaded/active by verifying that its full manifest entry
+ * (`- <name>: <description>`) is omitted from the prompt's unloaded skills manifest.
+ */
+export function assertSkillLoaded(prompt: string, skillName: AiAssistance.Skill.SkillName): void {
+  const expectedLine = `- ${skillName}: ${AiAssistance.SkillRegistry.SKILLS[skillName].description}`;
+  assert.notInclude(prompt, expectedLine,
+                    `Expected skill "${skillName}" to be loaded (omitted from unloaded manifest)`);
+}
+
+/**
+ * Asserts that a skill is not loaded by verifying that its full manifest entry
+ * (`- <name>: <description>`) is present in the prompt's unloaded skills manifest.
+ */
+export function assertSkillNotLoaded(prompt: string, skillName: AiAssistance.Skill.SkillName): void {
+  assert.include(prompt, UNLOADED_SKILLS_MANIFEST_HEADER);
+  const expectedLine = `- ${skillName}: ${AiAssistance.SkillRegistry.SKILLS[skillName].description}`;
+  assert.include(prompt, expectedLine, `Expected skill "${skillName}" to be in the unloaded skills manifest`);
 }

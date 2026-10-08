@@ -61,7 +61,7 @@ const DEFAULT_VIEW: View = (input, _output, target: HTMLElement) => {
     <span class="monospace">
       <button class="node-link text-button link-style ${classMap({
             'dynamic-link': Boolean(input.dynamic),
-            disabled: Boolean(input.disabled)
+            disabled: Boolean(input.disabled),
           })}"
           aria-description=${ifDefined(input.ariaDescription)}
           jslog=${VisualLogging.link('node').track({click: true, keydown: 'Enter'})}
@@ -91,7 +91,7 @@ export class DOMNodeLink extends UI.Widget.Widget {
   #options: Options|undefined = undefined;
   #view: View;
 
-  constructor(element?: HTMLElement, node?: SDK.DOMModel.DOMNode, options?: Options, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, node?: SDK.DOMModel.DOMNode, options?: Options, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.element.classList.remove('vbox');
     this.#node = node;
@@ -134,7 +134,7 @@ export class DOMNodeLink extends UI.Widget.Widget {
         this.#node?.highlight?.();
       },
       onMouseLeave: () => {
-        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
       },
       ariaDescription: options.ariaDescription,
     };

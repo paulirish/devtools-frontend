@@ -16,20 +16,18 @@ generate_css("css_files") {
 devtools_ui_module("tooltip") {
   sources = [ "Tooltip.ts" ]
 
-  deps = [
-    "../../../ui/legacy:bundle",
-    "../../../ui/visual_logging:bundle",
+  ts_deps = [
+    "../../legacy:bundle",
     "../../lit:bundle",
+    "../../visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "tooltips.ts"
 
-  deps = [
-    ":css_files",
-    ":tooltip",
-  ]
+  ts_deps = [ ":tooltip" ]
 
   visibility = default_components_visibility
 }
@@ -39,7 +37,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "Tooltip.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../legacy:bundle",
@@ -49,7 +47,7 @@ devtools_ui_module("unittests") {
 
 component_doc("docs") {
   sources = [ "Tooltip.docs.ts" ]
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../lit:bundle",
   ]

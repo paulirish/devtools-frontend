@@ -17,130 +17,148 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {IndexedDBModel} from './IndexedDBModel.js';
+import {ResourcesPanel} from './ResourcesPanel.js';
 import storageViewStyles from './storageView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in the Storage View that expresses the amount of used and available storage quota
+   * @description Text in the storage view that expresses the amount of used and available storage quota.
    * @example {1.5 MB} PH1
    * @example {123.1 MB} PH2
    */
   storageQuotaUsed: '{PH1} used out of {PH2} storage quota',
   /**
-   * @description Tooltip in the Storage View that expresses the precise amount of used and available storage quota
+   * @description Tooltip in the storage view that expresses the precise amount of used and available storage quota.
    * @example {200} PH1
    * @example {400} PH2
    */
   storageQuotaUsedWithBytes: '{PH1} bytes used out of {PH2} bytes storage quota',
   /**
-   * @description Fragment indicating that a certain data size has been custom configured
+   * @description Fragment indicating that a certain data size has been custom configured.
    * @example {1.5 MB} PH1
    */
   storageWithCustomMarker: '{PH1} (custom)',
   /**
-   * @description Text in Application Panel Sidebar and title text of the Storage View of the Application panel
+   * @description Title text of the storage view in the Application panel.
    */
   storageTitle: 'Storage',
   /**
-   * @description Title text in Storage View of the Application panel
+   * @description Section title in the storage view of the Application panel.
    */
   usage: 'Usage',
   /**
-   * @description Unit for data size in DevTools
+   * @description Unit for data size in DevTools.
    */
   mb: 'MB',
   /**
-   * @description Link to learn more about Progressive Web Apps
+   * @description Link text to learn more about Progressive Web Apps in the storage view of the Application panel.
    */
   learnMore: 'Learn more',
   /**
-   * @description Button text for the button in the Storage View of the Application panel for clearing site-specific storage
+   * @description Section title in the storage view of the Application panel for clearing site-specific storage.
    */
   clearSiteData: 'Clear site data',
   /**
-   * @description Announce message when the "clear site data" task is complete
+   * @description Button text in the storage view of the Application panel for clearing selected site-specific storage.
+   */
+  clearSelected: 'Clear selected',
+  /**
+   * @description Screen reader announcement when the clear site data task is complete.
    */
   SiteDataCleared: 'Site data cleared',
   /**
-   * @description Category description in the Clear Storage section of the Storage View of the Application panel
-   */
-  application: 'Application',
-  /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for unregistering service workers.
    */
   unregisterServiceWorker: 'Unregister service workers',
   /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for clearing local and session storage.
    */
   localAndSessionStorage: 'Local and session storage',
   /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for clearing IndexedDB storage.
    */
   indexDB: 'IndexedDB',
   /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for clearing cookies.
    */
   cookies: 'Cookies',
   /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for clearing cache storage.
    */
   cacheStorage: 'Cache storage',
   /**
-   * @description Checkbox label in the Clear Storage section of the Storage View of the Application panel
+   * @description Checkbox label in the storage view of the Application panel for including third-party cookies.
    */
-  includingThirdPartyCookies: 'including third-party cookies',
+  thirdPartyCookies: 'Third-party cookies',
   /**
-   * @description Text for error message in Application Quota Override
-   * @example {Image} PH1
+   * @description Text for error message in the storage view of the Application panel when an origin fails to load.
+   * @example {https://example.com} PH1
    */
   sFailedToLoad: '{PH1} (failed to load)',
   /**
-   * @description Text for error message in Application Quota Override
+   * @description Error message in the storage view of the Application panel when a quota override fails.
    */
   internalError: 'Internal error',
   /**
-   * @description Text for error message in Application Quota Override
+   * @description Error message in the storage view of the Application panel when custom quota is not a number.
    */
-  pleaseEnterANumber: 'Please enter a number',
+  pleaseEnterANumber: 'Enter a number',
   /**
-   * @description Text for error message in Application Quota Override
+   * @description Error message in the storage view of the Application panel when custom quota is negative.
    */
   numberMustBeNonNegative: 'Number must be non-negative',
   /**
-   * @description Text for error message in Application Quota Override
+   * @description Error message in the storage view of the Application panel when custom quota is too large.
    * @example {9000000000000} PH1
    */
   numberMustBeSmaller: 'Number must be smaller than {PH1}',
   /**
-   * @description Button text for the "Clear site data" button in the Storage View of the Application panel while the clearing action is pending
+   * @description Button text for the clear button in the storage view of the Application panel while clearing is in progress.
    */
   clearing: 'Clearing…',
   /**
-   * @description Quota row title in Clear Storage View of the Application panel
+   * @description Tooltip text in the storage view of the Application panel indicating storage quota is limited in Incognito mode.
    */
   storageQuotaIsLimitedIn: 'Storage quota is limited in Incognito mode',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Category name for file system storage in the storage view of the Application panel.
    */
-  fileSystem: 'File System',
+  fileSystem: 'File system',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Category name for other storage types in the storage view of the Application panel.
    */
   other: 'Other',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Chart title for the storage usage pie chart in the storage view of the Application panel.
    */
   storageUsage: 'Storage usage',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Category name for service worker storage in the storage view of the Application panel.
    */
   serviceWorkers: 'Service workers',
   /**
-   * @description Checkbox label in Application Panel Sidebar of the Application panel.
-   * Storage quota refers to the amount of disk available for the website or app.
+   * @description Checkbox label in the storage view of the Application panel to simulate custom storage quota.
    */
   simulateCustomStorage: 'Simulate custom storage quota',
+  /**
+   * @description Category name for local storage in the storage view of the Application panel.
+   */
+  localStorage: 'Local storage',
+  /**
+   * @description Category name for session storage in the storage view of the Application panel.
+   */
+  sessionStorage: 'Session storage',
 } as const;
+
+export const storagePieColors: Map<Protocol.Storage.StorageType, string> =
+    new Map<Protocol.Storage.StorageType, string>([
+      [Protocol.Storage.StorageType.Cache_storage, 'rgb(229, 113, 113)'],   // red
+      [Protocol.Storage.StorageType.Cookies, 'rgb(239, 196, 87)'],          // yellow
+      [Protocol.Storage.StorageType.Indexeddb, 'rgb(155, 127, 230)'],       // purple
+      [Protocol.Storage.StorageType.Local_storage, 'rgb(116, 178, 102)'],   // green
+      [Protocol.Storage.StorageType.Service_workers, 'rgb(255, 167, 36)'],  // orange
+    ]);
+
 const str_ = i18n.i18n.registerUIStrings('panels/application/StorageView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -155,8 +173,11 @@ export class StorageView extends UI.Widget.VBox {
   private storageKey: string|null;
   private settings: Map<Protocol.Storage.StorageType, Common.Settings.Setting<boolean>>;
   private includeThirdPartyCookiesSetting: Common.Settings.Setting<boolean>;
+  private includeThirdPartyCookiesCheckbox: UI.UIUtils.CheckboxLabel;
   private quotaRow: HTMLElement;
   private quotaUsage: number|null;
+  private quotaQuota: number|null;
+  private quotaOverrideActive: boolean|null;
   private pieChart: PerfUI.PieChart.PieChart;
   private previousOverrideFieldValue: string;
   private quotaOverrideCheckbox: UI.UIUtils.CheckboxLabel;
@@ -172,13 +193,7 @@ export class StorageView extends UI.Widget.VBox {
 
     this.contentElement.classList.add('clear-storage-container');
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane('clear-storage')}`);
-    this.pieColors = new Map([
-      [Protocol.Storage.StorageType.Cache_storage, 'rgb(229, 113, 113)'],   // red
-      [Protocol.Storage.StorageType.Cookies, 'rgb(239, 196, 87)'],          // yellow
-      [Protocol.Storage.StorageType.Indexeddb, 'rgb(155, 127, 230)'],       // purple
-      [Protocol.Storage.StorageType.Local_storage, 'rgb(116, 178, 102)'],   // green
-      [Protocol.Storage.StorageType.Service_workers, 'rgb(255, 167, 36)'],  // orange
-    ]);
+    this.pieColors = storagePieColors;
 
     // TODO(crbug.com/1156978): Replace UI.ReportView.ReportView with ReportView.ts web component.
     this.reportView = new UI.ReportView.ReportView(i18nString(UIStrings.storageTitle));
@@ -201,31 +216,80 @@ export class StorageView extends UI.Widget.VBox {
     this.includeThirdPartyCookiesSetting =
         Common.Settings.Settings.instance().createSetting('clear-storage-include-third-party-cookies', false);
 
-    const clearButtonSection = this.reportView.appendSection('', 'clear-storage-button').appendRow();
-    this.clearButton = UI.UIUtils.createTextButton(
-        i18nString(UIStrings.clearSiteData), this.clear.bind(this), {jslogContext: 'storage.clear-site-data'});
-    this.clearButton.id = 'storage-view-clear-button';
-    clearButtonSection.appendChild(this.clearButton);
+    const clearSiteData = this.reportView.appendSection(i18nString(UIStrings.clearSiteData));
+    clearSiteData.element.setAttribute('jslog', `${VisualLogging.section('clear-storage')}`);
 
-    const includeThirdPartyCookiesCheckbox = SettingsUI.SettingsUI.createSettingCheckbox(
-        i18nString(UIStrings.includingThirdPartyCookies), this.includeThirdPartyCookiesSetting);
-    includeThirdPartyCookiesCheckbox.classList.add('include-third-party-cookies');
-    clearButtonSection.appendChild(includeThirdPartyCookiesCheckbox);
+    const clearSiteDataCheckboxesRow = clearSiteData.appendRow();
+    clearSiteDataCheckboxesRow.classList.add('clear-site-data-checkboxes-row');
+    const leftColumn = clearSiteDataCheckboxesRow.createChild('div', 'clear-site-data-checkbox-column');
+    this.appendSettingCheckbox(leftColumn, i18nString(UIStrings.cacheStorage),
+                               Protocol.Storage.StorageType.Cache_storage, 'cache-storage-checkbox');
+    this.appendSettingCheckbox(leftColumn, i18nString(UIStrings.fileSystem), Protocol.Storage.StorageType.File_systems,
+                               'file-systems-checkbox');
+    this.appendSettingCheckbox(leftColumn, i18nString(UIStrings.indexDB), Protocol.Storage.StorageType.Indexeddb,
+                               'indexeddb-checkbox');
+    this.appendSettingCheckbox(leftColumn, i18nString(UIStrings.localAndSessionStorage),
+                               Protocol.Storage.StorageType.Local_storage, 'local-and-session-storage-checkbox');
+
+    const rightColumn = clearSiteDataCheckboxesRow.createChild('div', 'clear-site-data-checkbox-column');
+    this.appendSettingCheckbox(rightColumn, i18nString(UIStrings.unregisterServiceWorker),
+                               Protocol.Storage.StorageType.Service_workers, 'unregister-service-worker-checkbox');
+    const cookiesCheckbox = this.appendSettingCheckbox(rightColumn, i18nString(UIStrings.cookies),
+                                                       Protocol.Storage.StorageType.Cookies, 'cookies-checkbox');
+    cookiesCheckbox.classList.add('cookies-row');
+
+    const includeThirdPartyCookiesRow = rightColumn.createChild('div', 'include-third-party-cookies-row');
+    this.includeThirdPartyCookiesCheckbox = SettingsUI.SettingsUI.createSettingCheckbox(
+        i18nString(UIStrings.thirdPartyCookies), this.includeThirdPartyCookiesSetting);
+    this.includeThirdPartyCookiesCheckbox.classList.add('third-party-cookies-checkbox');
+    includeThirdPartyCookiesRow.appendChild(this.includeThirdPartyCookiesCheckbox);
+
+    const clearButtonRow = clearSiteData.appendRow();
+    clearButtonRow.classList.add('clear-selected-button-row');
+    this.clearButton = UI.UIUtils.createTextButton(i18nString(UIStrings.clearSelected), this.clear.bind(this),
+                                                   {jslogContext: 'storage.clear-site-data'});
+    this.clearButton.id = 'storage-view-clear-button';
+    clearButtonRow.appendChild(this.clearButton);
+
+    clearSiteData.markFieldListAsGroup();
+
+    const cookiesSetting = this.settings.get(Protocol.Storage.StorageType.Cookies);
+    if (cookiesSetting) {
+      cookiesSetting.addChangeListener(event => this.onCookiesSettingChanged(event.data));
+    }
+    this.includeThirdPartyCookiesSetting.addChangeListener(
+        event => this.onIncludeThirdPartyCookiesSettingChanged(event.data));
+    cookiesCheckbox.addEventListener('change', () => {
+      this.syncCheckboxAttributeState(cookiesCheckbox);
+      if (!cookiesCheckbox.checked && this.includeThirdPartyCookiesCheckbox.checked) {
+        this.includeThirdPartyCookiesCheckbox.click();
+      }
+      this.onCookiesSettingChanged(cookiesCheckbox.checked);
+    });
+    this.includeThirdPartyCookiesCheckbox.addEventListener('change', () => {
+      this.syncCheckboxAttributeState(this.includeThirdPartyCookiesCheckbox);
+      this.onIncludeThirdPartyCookiesSettingChanged(this.includeThirdPartyCookiesCheckbox.checked);
+    });
+    this.onCookiesSettingChanged(Boolean(cookiesSetting?.get()));
 
     const quota = this.reportView.appendSection(i18nString(UIStrings.usage));
     quota.element.setAttribute('jslog', `${VisualLogging.section('usage')}`);
     this.quotaRow = quota.appendSelectableRow();
     this.quotaRow.classList.add('quota-usage-row');
+    this.quotaRow.setAttribute('jslog', `${VisualLogging.item('storage-usage')}`);
     const learnMoreRow = quota.appendRow();
     const learnMore = Link.create(
         'https://developer.chrome.com/docs/devtools/progressive-web-apps#opaque-responses',
         i18nString(UIStrings.learnMore), undefined, 'learn-more');
     learnMoreRow.appendChild(learnMore);
     this.quotaUsage = null;
+    this.quotaQuota = null;
+    this.quotaOverrideActive = null;
     this.pieChart = new PerfUI.PieChart.PieChart();
     this.populatePieChart(0, []);
     const usageBreakdownRow = quota.appendRow();
     usageBreakdownRow.classList.add('usage-breakdown-row');
+    usageBreakdownRow.setAttribute('jslog', `${VisualLogging.item('usage-breakdown')}`);
     usageBreakdownRow.appendChild(this.pieChart);
 
     this.previousOverrideFieldValue = '';
@@ -257,31 +321,51 @@ export class StorageView extends UI.Widget.VBox {
     const errorMessageRow = quota.appendRow();
     this.quotaOverrideErrorMessage = errorMessageRow.createChild('div', 'quota-override-error');
 
-    const application = this.reportView.appendSection(i18nString(UIStrings.application));
-    application.element.setAttribute('jslog', `${VisualLogging.section('application')}`);
-    this.appendItem(
-        application, i18nString(UIStrings.unregisterServiceWorker), Protocol.Storage.StorageType.Service_workers);
-    application.markFieldListAsGroup();
-
-    const storage = this.reportView.appendSection(i18nString(UIStrings.storageTitle));
-    storage.element.setAttribute('jslog', `${VisualLogging.section('storage')}`);
-    this.appendItem(storage, i18nString(UIStrings.localAndSessionStorage), Protocol.Storage.StorageType.Local_storage);
-    this.appendItem(storage, i18nString(UIStrings.indexDB), Protocol.Storage.StorageType.Indexeddb);
-    this.appendItem(storage, i18nString(UIStrings.cookies), Protocol.Storage.StorageType.Cookies);
-    this.appendItem(storage, i18nString(UIStrings.cacheStorage), Protocol.Storage.StorageType.Cache_storage);
-    storage.markFieldListAsGroup();
-
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
   }
 
-  private appendItem(
-      section: UI.ReportView.Section, title: Platform.UIString.LocalizedString,
-      settingName: Protocol.Storage.StorageType): void {
-    const row = section.appendRow();
+  private appendSettingCheckbox(container: HTMLElement, title: Platform.UIString.LocalizedString,
+                                settingName: Protocol.Storage.StorageType,
+                                className?: string): UI.UIUtils.CheckboxLabel {
     const setting = this.settings.get(settingName);
-    if (setting) {
-      row.appendChild(SettingsUI.SettingsUI.createSettingCheckbox(title, setting));
+    if (!setting) {
+      throw new Error(`Missing setting for storage type: ${settingName}`);
     }
+    const checkbox = SettingsUI.SettingsUI.createSettingCheckbox(title, setting);
+    if (className) {
+      checkbox.classList.add(className);
+    }
+    container.appendChild(checkbox);
+    return checkbox;
+  }
+
+  private onCookiesSettingChanged(cookiesEnabled: boolean): void {
+    if (!cookiesEnabled) {
+      this.includeThirdPartyCookiesCheckbox.toggleAttribute('checked', true);
+      this.includeThirdPartyCookiesCheckbox.toggleAttribute('checked', false);
+      if (this.includeThirdPartyCookiesSetting.get()) {
+        this.includeThirdPartyCookiesSetting.set(false);
+      }
+    }
+    this.updateThirdPartyCookiesCheckboxState();
+  }
+
+  private onIncludeThirdPartyCookiesSettingChanged(includeThirdPartyCookiesEnabled: boolean): void {
+    const cookiesSetting = this.settings.get(Protocol.Storage.StorageType.Cookies);
+    if (includeThirdPartyCookiesEnabled && cookiesSetting && !cookiesSetting.get()) {
+      cookiesSetting.set(true);
+      return;
+    }
+    this.updateThirdPartyCookiesCheckboxState();
+  }
+
+  private syncCheckboxAttributeState(checkbox: UI.UIUtils.CheckboxLabel): void {
+    checkbox.toggleAttribute('checked', checkbox.checked);
+  }
+
+  private updateThirdPartyCookiesCheckboxState(): void {
+    const cookiesSetting = this.settings.get(Protocol.Storage.StorageType.Cookies);
+    this.includeThirdPartyCookiesCheckbox.disabled = !cookiesSetting?.get();
   }
 
   targetAdded(target: SDK.Target.Target): void {
@@ -342,6 +426,9 @@ export class StorageView extends UI.Widget.VBox {
       this.quotaOverrideControlRow.classList.add('hidden');
       this.quotaOverrideCheckbox.checked = false;
       this.quotaOverrideErrorMessage.textContent = '';
+      this.quotaUsage = null;
+      this.quotaQuota = null;
+      this.quotaOverrideActive = null;
     }
     void this.performUpdate();
   }
@@ -494,59 +581,75 @@ export class StorageView extends UI.Widget.VBox {
   override async performUpdate(): Promise<void> {
     if (!this.securityOrigin || !this.target) {
       this.quotaRow.textContent = '';
+      this.quotaUsage = null;
+      this.quotaQuota = null;
+      this.quotaOverrideActive = null;
       this.populatePieChart(0, []);
       return;
     }
 
     const securityOrigin = this.securityOrigin;
     const response = await this.target.storageAgent().invoke_getUsageAndQuota({origin: securityOrigin});
-    this.quotaRow.textContent = '';
     if (response.getError()) {
+      this.quotaRow.textContent = '';
+      this.quotaUsage = null;
+      this.quotaQuota = null;
+      this.quotaOverrideActive = null;
       this.populatePieChart(0, []);
       return;
     }
-    const quotaOverridden = response.overrideActive;
-    const quotaAsString = i18n.ByteUtilities.bytesToString(response.quota);
-    const usageAsString = i18n.ByteUtilities.bytesToString(response.usage);
-    const formattedQuotaAsString = i18nString(UIStrings.storageWithCustomMarker, {PH1: quotaAsString});
 
-    let quota: string|HTMLElement = quotaAsString;
-    if (quotaOverridden) {
-      const element = document.createElement('b');
-      element.textContent = formattedQuotaAsString;
-      quota = element;
-    }
+    const usageChanged = this.quotaUsage !== response.usage;
+    const quotaChanged = this.quotaQuota !== response.quota;
+    const overrideChanged = this.quotaOverrideActive !== response.overrideActive;
 
-    const element = uiI18n.getFormatLocalizedString(str_, UIStrings.storageQuotaUsed, {PH1: usageAsString, PH2: quota});
-    this.quotaRow.appendChild(element);
-    UI.Tooltip.Tooltip.install(
-        this.quotaRow,
-        i18nString(
-            UIStrings.storageQuotaUsedWithBytes,
-            {PH1: response.usage.toLocaleString(), PH2: response.quota.toLocaleString()}));
-
-    if (!response.overrideActive && response.quota < 125829120) {  // 120 MB
-      const icon = new Icon();
-      icon.name = 'info';
-      icon.style.color = 'var(--icon-info)';
-      icon.classList.add('small');
-      UI.Tooltip.Tooltip.install(this.quotaRow, i18nString(UIStrings.storageQuotaIsLimitedIn));
-      this.quotaRow.appendChild(icon);
-    }
-
-    if (this.quotaUsage === null || this.quotaUsage !== response.usage) {
+    if (usageChanged || quotaChanged || overrideChanged) {
       this.quotaUsage = response.usage;
-      const slices: PerfUI.PieChart.Slice[] = [];
-      for (const usageForType of response.usageBreakdown.sort((a, b) => b.usage - a.usage)) {
-        const value = usageForType.usage;
-        if (!value) {
-          continue;
-        }
-        const title = this.getStorageTypeName(usageForType.storageType);
-        const color = this.pieColors.get(usageForType.storageType) || '#ccc';
-        slices.push({value, color, title});
+      this.quotaQuota = response.quota;
+      this.quotaOverrideActive = response.overrideActive;
+
+      this.quotaRow.textContent = '';
+      const quotaAsString = i18n.ByteUtilities.bytesToString(response.quota);
+      const usageAsString = i18n.ByteUtilities.bytesToString(response.usage);
+      const formattedQuotaAsString = i18nString(UIStrings.storageWithCustomMarker, {PH1: quotaAsString});
+
+      let quota: string|HTMLElement = quotaAsString;
+      if (response.overrideActive) {
+        const element = document.createElement('b');
+        element.textContent = formattedQuotaAsString;
+        quota = element;
       }
-      this.populatePieChart(response.usage, slices);
+
+      const element =
+          uiI18n.getFormatLocalizedString(str_, UIStrings.storageQuotaUsed, {PH1: usageAsString, PH2: quota});
+      this.quotaRow.appendChild(element);
+      UI.Tooltip.Tooltip.install(
+          this.quotaRow,
+          i18nString(UIStrings.storageQuotaUsedWithBytes,
+                     {PH1: response.usage.toLocaleString(), PH2: response.quota.toLocaleString()}));
+
+      if (!response.overrideActive && response.quota < 125829120) {  // 120 MiB
+        const icon = new Icon();
+        icon.name = 'info';
+        icon.style.color = 'var(--icon-info)';
+        icon.classList.add('small');
+        UI.Tooltip.Tooltip.install(icon, i18nString(UIStrings.storageQuotaIsLimitedIn));
+        this.quotaRow.appendChild(icon);
+      }
+
+      if (usageChanged) {
+        const slices: PerfUI.PieChart.Slice[] = [];
+        for (const usageForType of response.usageBreakdown.sort((a, b) => b.usage - a.usage)) {
+          const value = usageForType.usage;
+          if (!value) {
+            continue;
+          }
+          const title = StorageView.getStorageTypeName(usageForType.storageType);
+          const color = this.pieColors.get(usageForType.storageType) || '#ccc';
+          slices.push({value, color, title});
+        }
+        this.populatePieChart(response.usage, slices);
+      }
     }
 
     void this.throttler.schedule(this.requestUpdate.bind(this));
@@ -563,7 +666,7 @@ export class StorageView extends UI.Widget.VBox {
     };
   }
 
-  private getStorageTypeName(type: Protocol.Storage.StorageType): string {
+  static getStorageTypeName(type: Protocol.Storage.StorageType): string {
     switch (type) {
       case Protocol.Storage.StorageType.File_systems:
         return i18nString(UIStrings.fileSystem);
@@ -577,11 +680,36 @@ export class StorageView extends UI.Widget.VBox {
         return i18nString(UIStrings.other);
     }
   }
+
+  /**
+   * Returns the user-facing title of a storage type for the storage breakdown widget in AI assistance.
+   * This method accepts arbitrary strings to accommodate custom storage types (like session_storage)
+   * that do not exist in the Protocol.Storage.StorageType enum.
+   */
+  static getStorageTypeNameForWidget(type: string): string {
+    switch (type) {
+      case 'session_storage':
+        return i18nString(UIStrings.sessionStorage);
+      case 'local_storage':
+        return i18nString(UIStrings.localStorage);
+      case 'cookies':
+        return i18nString(UIStrings.cookies);
+      case 'indexeddb':
+        return i18nString(UIStrings.indexDB);
+      case 'cache_storage':
+        return i18nString(UIStrings.cacheStorage);
+      case 'service_workers':
+        return i18nString(UIStrings.serviceWorkers);
+      default:
+        return StorageView.getStorageTypeName(type as Protocol.Storage.StorageType);
+    }
+  }
 }
 
-export const AllStorageTypes = [
+export const AllStorageTypes: Protocol.Storage.StorageType[] = [
   Protocol.Storage.StorageType.Cache_storage,
   Protocol.Storage.StorageType.Cookies,
+  Protocol.Storage.StorageType.File_systems,
   Protocol.Storage.StorageType.Indexeddb,
   Protocol.Storage.StorageType.Local_storage,
   Protocol.Storage.StorageType.Service_workers,
@@ -612,5 +740,17 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       StorageView.clear(target, storageKey, securityOrigin, AllStorageTypes, includeThirdPartyCookies);
     }, _ => {});
     return true;
+  }
+}
+
+export class StorageRevealable {
+  constructor(public target: SDK.Target.Target) {
+  }
+}
+
+export class StorageRevealer implements Common.Revealer.Revealer<StorageRevealable> {
+  async reveal(_revealable: StorageRevealable): Promise<void> {
+    const sidebar = await ResourcesPanel.showAndGetSidebar();
+    sidebar.showStorage();
   }
 }

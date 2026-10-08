@@ -12,6 +12,7 @@ import * as TraceBounds from '../../../services/trace_bounds/trace_bounds.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 import * as Lit from '../../../ui/lit/lit.js';
+import * as SettingsUI from '../../../ui/settings/settings.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {AnnotationHoverOut, HoverAnnotation, RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
@@ -27,62 +28,61 @@ const deleteAnnotationImageUrl =
 
 const UIStrings = {
   /**
-   * @description Title for entry label.
+   * @description Title for the annotations onboarding section in the Performance panel sidebar.
    */
   annotationGetStarted: 'Annotate a trace for yourself and others',
   /**
-   * @description Title for entry label.
+   * @description Header title for the item label tutorial in the Performance panel sidebar.
    */
   entryLabelTutorialTitle: 'Label an item',
   /**
-   * @description Text for how to create an entry label.
+   * @description Instructions for how to add an item label in the Performance panel.
    */
-  entryLabelTutorialDescription: 'Double-click or press Enter on an item and type to create an item label.',
+  entryLabelTutorialDescription: 'Double-click or press Enter on an item and type to add an item label',
   /**
-   * @description  Title for diagram.
+   * @description Header title for the item connection tutorial in the Performance panel sidebar.
    */
   entryLinkTutorialTitle: 'Connect two items',
   /**
-   * @description Text for how to create a diagram between entries.
+   * @description Instructions for how to connect two items in the flame chart of the Performance panel.
    */
   entryLinkTutorialDescription:
-      'Double-click on an item, click on the adjacent rightward arrow, then select the destination item.',
+      'Double-click on an item, click on the adjacent rightward arrow, then select the destination item',
   /**
-   * @description  Title for time range.
+   * @description Header title for the time range tutorial in the Performance panel sidebar.
    */
   timeRangeTutorialTitle: 'Define a time range',
   /**
-   * @description Text for how to create a time range selection and add note.
+   * @description Instructions for how to add a time range annotation in the flame chart of the Performance panel.
    */
-  timeRangeTutorialDescription: 'Shift-drag in the flamechart then type to create a time range annotation.',
+  timeRangeTutorialDescription: 'Shift-drag in the flame chart, then type to add a time range annotation',
   /**
-   * @description  Title for deleting annotations.
+   * @description Header title for the annotation deletion tutorial in the Performance panel sidebar.
    */
   deleteAnnotationTutorialTitle: 'Delete an annotation',
   /**
-   * @description Text for how to access an annotation delete function.
+   * @description Instructions for how to delete an annotation in the Performance panel sidebar.
    */
-  deleteAnnotationTutorialDescription:
-      'Hover over the list in the sidebar with Annotations tab selected to access the delete function.',
+  deleteAnnotationTutorialDescription: 'Hover over the list in the sidebar Annotations tab to delete an annotation',
   /**
-   * @description Text used to describe the delete button to screen readers.
-   * @example {"A paint event annotated with the text hello world"} PH1
-   **/
+   * @description Accessible label for the delete annotation button in the Performance panel sidebar.
+   * @example {A paint event annotated with the text hello world} PH1
+   */
   deleteButton: 'Delete annotation: {PH1}',
   /**
-   * @description label used to describe an annotation on an entry
+   * @description Accessible label describing an item annotation in the Performance panel sidebar.
    * @example {Paint} PH1
-   * @example {"Hello world"} PH2
+   * @example {Hello world} PH2
    */
   entryLabelDescriptionLabel: 'A "{PH1}" event annotated with the text "{PH2}"',
   /**
-   * @description label used to describe a time range annotation
+   * @description Accessible label describing a time range annotation in the Performance panel sidebar.
    * @example {2.5 milliseconds} PH1
    * @example {13.5 milliseconds} PH2
    */
   timeRangeDescriptionLabel: 'A time range starting at {PH1} and ending at {PH2}',
   /**
-   * @description label used to describe a link from one entry to another.
+   * @description Accessible label describing a link between two events in the Performance panel sidebar.
    * @example {Paint} PH1
    * @example {Recalculate styles} PH2
    */
@@ -101,6 +101,7 @@ export interface SidebarAnnotationsTabViewInput {
   onAnnotationHoverOut: () => void;
   onAnnotationDelete: (annotation: Trace.Types.File.Annotation) => void;
 }
+export type View = (input: SidebarAnnotationsTabViewInput, output: object, target: HTMLElement) => void;
 
 export class SidebarAnnotationsTab extends UI.Widget.Widget {
   #annotations: Trace.Types.File.Annotation[] = [];
@@ -109,12 +110,13 @@ export class SidebarAnnotationsTab extends UI.Widget.Widget {
   #annotationEntryToColorMap = new Map<Trace.Types.Events.Event|Trace.Types.Events.LegacyTimelineFrame, string>();
 
   readonly #annotationsHiddenSetting: Common.Settings.Setting<boolean>;
-  #view: typeof DEFAULT_VIEW;
+  #view: View;
 
-  constructor(view = DEFAULT_VIEW) {
+  constructor(view: View = DEFAULT_VIEW) {
     super();
     this.#view = view;
-    this.#annotationsHiddenSetting = Common.Settings.Settings.instance().moduleSetting('annotations-hidden');
+    this.#annotationsHiddenSetting =
+        Common.Settings.Settings.instance().resolve(SettingsUI.TimelineSettings.annotationsHiddenSettingDescriptor);
   }
 
   deduplicatedAnnotations(): readonly Trace.Types.File.Annotation[] {
@@ -407,7 +409,7 @@ function renderTutorial(): Lit.LitTemplate {
   // clang-format on
 }
 
-export const DEFAULT_VIEW: (input: SidebarAnnotationsTabViewInput, output: object, target: HTMLElement) => void =
+export const DEFAULT_VIEW: View =
     (input, _output, target) => {
       // clang-format off
       render(html`

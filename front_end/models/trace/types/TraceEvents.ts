@@ -737,6 +737,16 @@ export interface FirstContentfulPaint extends Mark {
   };
 }
 
+// Soft FCP is basically a copy of SoftNavigationStart but with a different name
+// and a different ts.
+export interface SyntheticSoftFirstContentfulPaint extends Omit<SoftNavigationStart, 'name'|'ph'>,
+                                                           Omit<SyntheticBased, 'name'|'ph'|'args'> {
+  name: Name.MARK_SOFT_FCP;
+  ph: Phase.MARK;
+}
+
+export type AnyFirstContentfulPaint = FirstContentfulPaint|SyntheticSoftFirstContentfulPaint;
+
 export interface FirstPaint extends Mark {
   name: Name.MARK_FIRST_PAINT;
   args: Args&{
@@ -747,14 +757,14 @@ export interface FirstPaint extends Mark {
   };
 }
 
-export type PageLoadEvent = FirstContentfulPaint|MarkDOMContent|InteractiveTime|AnyLargestContentfulPaintCandidate|
+export type PageLoadEvent = AnyFirstContentfulPaint|MarkDOMContent|InteractiveTime|AnyLargestContentfulPaintCandidate|
     LayoutShift|FirstPaint|MarkLoad|NavigationStart|SoftNavigationStart;
 
 const markerTypeGuards = [
   isMarkDOMContent,
   isMarkLoad,
   isFirstPaint,
-  isFirstContentfulPaint,
+  isAnyFirstContentfulPaint,
   isAnyLargestContentfulPaintCandidate,
   isNavigationStart,
   isSoftNavigationStart,
@@ -2270,6 +2280,14 @@ export function isFirstContentfulPaint(event: Event): event is FirstContentfulPa
   return event.name === Name.MARK_FCP;
 }
 
+export function isSoftFirstContentfulPaint(event: Event): event is SyntheticSoftFirstContentfulPaint {
+  return event.name === Name.MARK_SOFT_FCP;
+}
+
+export function isAnyFirstContentfulPaint(event: Event): event is AnyFirstContentfulPaint {
+  return event.name === Name.MARK_FCP || event.name === Name.MARK_SOFT_FCP;
+}
+
 export function isAnyLargestContentfulPaintCandidate(event: Event): event is AnyLargestContentfulPaintCandidate {
   return event.name === Name.MARK_LCP_CANDIDATE || event.name === Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
 }
@@ -2589,8 +2607,8 @@ export function isUpdateLayer(event: Event): event is UpdateLayer {
   return event.name === Name.UPDATE_LAYER;
 }
 
-export interface DisplayItemListSnapshot extends Event {
-  name: Name.DISPLAY_ITEM_LIST_SNAPSHOT;
+export interface LegacyDisplayItemListSnapshot extends Event {
+  name: Name.LEGACY_DISPLAY_ITEM_LIST_SNAPSHOT;
   ph: Phase.OBJECT_SNAPSHOT;
   id2: {
     local?: string,
@@ -2599,14 +2617,29 @@ export interface DisplayItemListSnapshot extends Event {
     snapshot: {
       skp64: string,
       params?: {
-
         layer_rect: [number, number, number, number],
       },
     },
   };
 }
+
+export interface InstantDisplayItemListSnapshot extends Instant {
+  name: Name.DISPLAY_ITEM_LIST_SNAPSHOT;
+  args: Args&{
+    snapshot: {
+      skp64: string,
+      params?: {
+        layer_rect: [number, number, number, number],
+      },
+    },
+  };
+}
+
+export type DisplayItemListSnapshot = LegacyDisplayItemListSnapshot|InstantDisplayItemListSnapshot;
+
 export function isDisplayListItemListSnapshot(event: Event): event is DisplayItemListSnapshot {
-  return event.name === Name.DISPLAY_ITEM_LIST_SNAPSHOT;
+  return (event.name === Name.LEGACY_DISPLAY_ITEM_LIST_SNAPSHOT && event.ph === Phase.OBJECT_SNAPSHOT) ||
+      (event.name === Name.DISPLAY_ITEM_LIST_SNAPSHOT && event.ph === Phase.INSTANT);
 }
 
 export interface LayerTreeHostImplSnapshot extends Event {
@@ -3153,6 +3186,7 @@ export enum Name {
   MARK_DOM_CONTENT = 'MarkDOMContent',
   MARK_FIRST_PAINT = 'firstPaint',
   MARK_FCP = 'firstContentfulPaint',
+  MARK_SOFT_FCP = 'SyntheticSoftFirstContentfulPaint',
   MARK_LCP_CANDIDATE = 'largestContentfulPaint::Candidate',
   MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION = 'largestContentfulPaint::CandidateForSoftNavigation',
   MARK_LCP_INVALIDATE = 'largestContentfulPaint::Invalidate',
@@ -3206,7 +3240,8 @@ export enum Name {
   LAZY_PIXEL_REF = 'LazyPixelRef',
   LAYER_TREE_HOST_IMPL_SNAPSHOT = 'cc::LayerTreeHostImpl',
   PICTURE_SNAPSHOT = 'cc::Picture',
-  DISPLAY_ITEM_LIST_SNAPSHOT = 'cc::DisplayItemList',
+  LEGACY_DISPLAY_ITEM_LIST_SNAPSHOT = 'cc::DisplayItemList',
+  DISPLAY_ITEM_LIST_SNAPSHOT = 'cc::DisplayItemList:snapshot',
   INPUT_LATENCY_MOUSE_MOVE = 'InputLatency::MouseMove',
   INPUT_LATENCY_MOUSE_WHEEL = 'InputLatency::MouseWheel',
   IMPL_SIDE_FLING = 'InputHandlerProxy::HandleGestureFling::started',
@@ -3232,19 +3267,25 @@ export enum Name {
   PRELOAD_RENDER_BLOCKING_STATUS_CHANGE = 'PreloadRenderBlockingStatusChange',
 }
 
-export const MarkerName = [
+export type MarkerEventName = Name.MARK_DOM_CONTENT|Name.MARK_LOAD|Name.MARK_FIRST_PAINT|Name.MARK_FCP|
+                              Name.MARK_SOFT_FCP|Name.MARK_LCP_CANDIDATE|
+                              Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION|Name.NAVIGATION_START|
+                              Name.SOFT_NAVIGATION_START;
+
+export const MarkerName: readonly MarkerEventName[] = [
   Name.MARK_DOM_CONTENT,
   Name.MARK_LOAD,
   Name.MARK_FIRST_PAINT,
   Name.MARK_FCP,
+  Name.MARK_SOFT_FCP,
   Name.MARK_LCP_CANDIDATE,
   Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION,
   Name.NAVIGATION_START,
   Name.SOFT_NAVIGATION_START,
-] as const;
+];
 
 export interface MarkerEvent extends Event {
-  name: typeof MarkerName[number];
+  name: MarkerEventName;
 }
 
 /**
@@ -3255,6 +3296,42 @@ export const Categories = {
   Console: 'blink.console',
   UserTiming: 'blink.user_timing',
   Loading: 'loading',
+} as const;
+
+export const DefaultCategories = [
+  'blink.console',
+  'blink.user_timing',
+  'loading',
+  'devtools.timeline',
+  'disabled-by-default-devtools.target-rundown',
+  'disabled-by-default-devtools.timeline.frame',
+  'disabled-by-default-devtools.timeline.stack',
+  'disabled-by-default-devtools.timeline',
+  'disabled-by-default-devtools.v8-source-rundown-sources',
+  'disabled-by-default-devtools.v8-source-rundown',
+  'disabled-by-default-layout_shift.debug',
+  'disabled-by-default-v8.inspector',
+  'disabled-by-default-v8.cpu_profiler.hires',
+  'disabled-by-default-lighthouse',
+  'v8.execute',
+  'v8',
+  'cppgc',
+  'navigation,rail',
+] as const;
+
+export const OptionalCategories = {
+  JsSampling: ['disabled-by-default-v8.cpu_profiler'],
+  InvalidationTracking: ['disabled-by-default-devtools.timeline.invalidationTracking'],
+  AdvancedPaint: [
+    'disabled-by-default-devtools.timeline.layers',
+    'disabled-by-default-devtools.timeline.picture',
+    'disabled-by-default-blink.graphics_context_annotations',
+  ],
+  Screenshot: ['disabled-by-default-devtools.screenshot'],
+  CssSelectorStats: [
+    'disabled-by-default-blink.debug',
+    'disabled-by-default-devtools.timeline.invalidationTracking',
+  ],
 } as const;
 
 /**

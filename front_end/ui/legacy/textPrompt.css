@@ -13,14 +13,25 @@
   box-shadow: var(--drop-shadow);
   background-color: var(--sys-color-cdt-base-container);
   text-overflow: clip !important; /* stylelint-disable-line declaration-no-important */
-  margin: 0 -2px -1px;
-  padding: 0 2px 1px;
+  margin: 0 calc(-1 * var(--sys-size-2)) calc(-1 * var(--sys-size-1));
+  padding: 0 var(--sys-size-2) var(--sys-size-1);
   opacity: 100% !important; /* stylelint-disable-line declaration-no-important */
 }
 
 .text-prompt {
   cursor: text;
   overflow-x: visible;
+  min-width: var(--devtools-text-prompt-min-width, auto);
+}
+
+:host([render-as-block]) .text-prompt-root,
+:host([render-as-block]) .text-prompt {
+  flex: auto;
+  width: 100%;
+}
+
+:host([render-as-block]) .text-prompt:focus {
+  outline: none;
 }
 
 .text-prompt::-webkit-scrollbar {

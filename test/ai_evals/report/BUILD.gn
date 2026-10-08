@@ -1,0 +1,14 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/typescript/typescript.gni")
+
+node_ts_library("report") {
+  sources = [
+    "eval-logger.ts",
+    "eval-task-recorder.ts",
+    "gcs-upload.ts",
+    "trajectory-builder.ts",
+  ]
+}

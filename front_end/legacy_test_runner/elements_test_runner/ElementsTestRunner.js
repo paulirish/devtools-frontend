@@ -114,14 +114,15 @@ ElementsTestRunner.findNodePromise = function(matchFunction) {
 /**
  * @param {!UI.TreeOutline.TreeElement} treeElement
  */
-function dumpObjectPropertyTreeElement(treeElement) {
+function dumpEventListenerTreeElement(treeElement) {
   const expandedSubstring = treeElement.expanded ? '[expanded]' : '[collapsed]';
   TestRunner.addResult(expandedSubstring + ' ' + treeElement.listItemElement.deepTextContent());
 
   for (const child of treeElement.children()) {
-    const property = /** @type {!ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement} */ (child).property;
-    const key = property.name;
-    const value = /** @type {!SDK.RemoteObject.RemoteObjectImpl} */ (property.value).description;
+    const key = child.listItemElement.querySelector('.name')?.textContent;
+    const valueElement = child.listItemElement.querySelector('.value');
+    const value = valueElement?.querySelector('.object-value-function')?.getAttribute('title') ||
+        valueElement?.getAttribute('title') || valueElement?.textContent;
     TestRunner.addResult('    ' + key + ': ' + value);
   }
 }
@@ -132,38 +133,54 @@ function dumpObjectPropertyTreeElement(treeElement) {
  * @param {boolean=} force
  */
 ElementsTestRunner.expandAndDumpEventListeners = function(eventListenersView, callback, force) {
-  function listenersArrived() {
-    const listenerTypes = eventListenersView.treeOutline.rootElement().children();
-    for (let i = 0; i < listenerTypes.length; ++i) {
-      listenerTypes[i].expand();
-      const listenerItems = listenerTypes[i].children();
-      for (let j = 0; j < listenerItems.length; ++j) {
-        listenerItems[j].expand();
-      }
-    }
-    TestRunner.deprecatedRunAfterPendingDispatches(objectsExpanded);
+  function getTreeOutline(view) {
+    return view.contentElement.querySelector('devtools-tree')?.getInternalTreeOutlineForTest();
   }
 
-  function objectsExpanded() {
-    const listenerTypes = eventListenersView.treeOutline.rootElement().children();
-    for (let i = 0; i < listenerTypes.length; ++i) {
-      if (!listenerTypes[i].children().length) {
-        continue;
+  function listenersArrived() {
+    const view = eventListenersView || this;
+    TestRunner.deprecatedRunAfterPendingDispatches(async () => {
+      await UI.Widget.Widget.allUpdatesComplete;
+      const treeOutline = getTreeOutline(view);
+      if (!treeOutline) {
+        callback();
+        return;
       }
-      const eventType = listenerTypes[i].title;
-      TestRunner.addResult('');
-      TestRunner.addResult('======== ' + eventType + ' ========');
-      const listenerItems = listenerTypes[i].children();
-      for (let j = 0; j < listenerItems.length; ++j) {
-        TestRunner.addResult('== ' + listenerItems[j].eventListener().origin());
-        dumpObjectPropertyTreeElement(listenerItems[j]);
+      for (const typeElement of treeOutline.rootElement().children()) {
+        typeElement.expand();
+        for (const item of typeElement.children()) {
+          item.expand();
+        }
+      }
+      TestRunner.deprecatedRunAfterPendingDispatches(async () => {
+        await UI.Widget.Widget.allUpdatesComplete;
+        objectsExpanded(view);
+      });
+    });
+  }
+
+  function objectsExpanded(view) {
+    const treeOutline = getTreeOutline(view);
+    if (treeOutline) {
+      for (const typeElement of treeOutline.rootElement().children()) {
+        if (!typeElement.children().length) {
+          continue;
+        }
+        const eventType = typeElement.titleElement.textContent.trim();
+        TestRunner.addResult('');
+        TestRunner.addResult('======== ' + eventType + ' ========');
+        for (const item of typeElement.children()) {
+          const origin = item.configElement.dataset.origin;
+          TestRunner.addResult('== ' + origin);
+          dumpEventListenerTreeElement(item);
+        }
       }
     }
     callback();
   }
 
   if (force) {
-    listenersArrived();
+    listenersArrived.call(eventListenersView);
   } else {
     TestRunner.addSniffer(
         EventListeners.EventListenersView.EventListenersView.prototype, 'eventListenersArrivedForTest',
@@ -398,9 +415,218 @@ ElementsTestRunner.selectNodeAndWaitForStylesWithComputed = function(idValue, ca
   }
 };
 
+const treeOutlineShimByWidget = new WeakMap();
+
 ElementsTestRunner.firstElementsTreeOutline = function() {
-  return Elements.ElementsPanel.ElementsPanel.instance().getTreeOutlineForTesting();
+  const panel = Elements.ElementsPanel.ElementsPanel.instance();
+  const domTreeWidget = panel.getDOMTreeWidgetForTesting();
+  let shim = treeOutlineShimByWidget.get(domTreeWidget);
+  if (shim) {
+    return shim;
+  }
+  function getInternalOutline() {
+    const treeView = domTreeWidget.contentElement.querySelector('devtools-tree');
+    return treeView ? treeView.getInternalTreeOutlineForTest() : null;
+  }
+  function getWidgetForTreeElement(treeElement) {
+    const widgetEl = treeElement.titleElement?.querySelector?.('devtools-widget');
+    return widgetEl ? UI.Widget.Widget.get(widgetEl) : null;
+  }
+  function decorateTreeElement(treeElement) {
+    if (!treeElement) {
+      return null;
+    }
+    if (typeof treeElement.isClosingTag !== 'function') {
+      treeElement.isClosingTag = function() {
+        return Boolean(getWidgetForTreeElement(this)?.isClosingTag);
+      };
+    }
+    if (typeof treeElement.node !== 'function') {
+      treeElement.node = function() {
+        return getWidgetForTreeElement(this)?.node ?? null;
+      };
+    }
+    if (!treeElement.title || typeof treeElement.title === 'string') {
+      treeElement.title = treeElement.titleElement;
+    }
+    if (!treeElement._selectDecorated) {
+      treeElement._selectDecorated = true;
+      const origSelect = treeElement.select?.bind(treeElement);
+      treeElement.select = function(omitFocus, selectedByUser) {
+        const node = getWidgetForTreeElement(this)?.node;
+        if (node && selectedByUser === undefined && !omitFocus) {
+          domTreeWidget.selectDOMNode(node, true);
+          return true;
+        }
+        return origSelect?.(omitFocus, selectedByUser);
+      };
+      const origRemove = (treeElement.removeFromTree ?? treeElement.remove)?.bind(treeElement);
+      treeElement.remove = function() {
+        const node = getWidgetForTreeElement(this)?.node;
+        if (node) {
+          return node.removeNode();
+        }
+        return origRemove?.();
+      };
+      Object.defineProperty(treeElement, 'expandedChildrenLimitInternal', {
+        configurable: true,
+        get() {
+          const node = getWidgetForTreeElement(this)?.node;
+          return node ? domTreeWidget.expandedChildrenLimit(node) : 500;
+        },
+        set(limit) {
+          const node = getWidgetForTreeElement(this)?.node;
+          if (node) {
+            domTreeWidget.setExpandedChildrenLimit(node, limit);
+          }
+        },
+      });
+      Object.defineProperty(treeElement, 'expandAllButtonElement', {
+        configurable: true,
+        get() {
+          const children = this.children?.() ?? [];
+          for (const child of children) {
+            const btn = child.listItemElement?.querySelector('devtools-button, button');
+            if (btn) {
+              return {button: btn};
+            }
+          }
+          return null;
+        },
+      });
+    }
+    return treeElement;
+  }
+  function findTreeElementRecursive(parent, targetNode) {
+    if (!parent) {
+      return null;
+    }
+    const children = parent.children();
+    for (let i = 0; children && i < children.length; ++i) {
+      const child = decorateTreeElement(children[i]);
+      const widget = getWidgetForTreeElement(child);
+      if (widget && widget.node === targetNode && !widget.isClosingTag) {
+        return child;
+      }
+      const found = findTreeElementRecursive(child, targetNode);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+  function flushUpdates() {
+    domTreeWidget.runPendingUpdates();
+    domTreeWidget.performUpdate();
+    const treeView = domTreeWidget.contentElement.querySelector('devtools-tree');
+    treeView?.flushPendingUpdatesForTesting();
+    const root = getInternalOutline()?.rootElement();
+    if (root) {
+      const stack = [...root.children()];
+      while (stack.length) {
+        const item = decorateTreeElement(stack.pop());
+        if (item?.children()) {
+          stack.push(...item.children());
+        }
+      }
+    }
+  }
+  const eventTarget = new Common.ObjectWrapper.ObjectWrapper();
+  const origOnSelectedNodeChanged = domTreeWidget.onSelectedNodeChanged;
+  domTreeWidget.onSelectedNodeChanged = event => {
+    origOnSelectedNodeChanged?.call(domTreeWidget, event);
+    eventTarget.dispatchEventToListeners(Elements.DOMTreeWidget.ElementsTreeOutline.Events.SelectedNodeChanged,
+                                         event.data);
+  };
+  const origOnElementsTreeUpdated = domTreeWidget.onElementsTreeUpdated;
+  domTreeWidget.onElementsTreeUpdated = event => {
+    origOnElementsTreeUpdated?.call(domTreeWidget, event);
+    eventTarget.dispatchEventToListeners(Elements.DOMTreeWidget.ElementsTreeOutline.Events.ElementsTreeUpdated,
+                                         event.data);
+    Elements.DOMTreeWidget.ElementsTreeOutline.prototype.updateModifiedNodes.call({});
+    Elements.DOMTreeWidget.ElementsTreeOutline.prototype.updateChildren.call({});
+  };
+  shim = {
+    runPendingUpdates() {
+      flushUpdates();
+    },
+    rootElement() {
+      flushUpdates();
+      return getInternalOutline()?.rootElement() ?? null;
+    },
+    findTreeElement(node) {
+      flushUpdates();
+      let found = findTreeElementRecursive(getInternalOutline()?.rootElement(), node);
+      if (!found && node) {
+        for (let current = node.parentNode; current; current = current.parentNode) {
+          domTreeWidget.setNodeExpanded(current, true);
+        }
+        flushUpdates();
+        found = findTreeElementRecursive(getInternalOutline()?.rootElement(), node);
+      }
+      if (!found && node?.nodeType() === Node.TEXT_NODE) {
+        found = findTreeElementRecursive(getInternalOutline()?.rootElement(), node.parentNode);
+      }
+      return found;
+    },
+    selectedDOMNode() {
+      return domTreeWidget.selectedDOMNode();
+    },
+    selectDOMNode(node, focus) {
+      return domTreeWidget.selectDOMNode(node, focus);
+    },
+    revealAndSelectNode(node, omitFocus) {
+      return domTreeWidget.selectDOMNode(node, !omitFocus);
+    },
+    setVisible(visible) {},
+    get selectedTreeElement() {
+      flushUpdates();
+      const selectedNode = domTreeWidget.selectedDOMNode();
+      if (selectedNode) {
+        const found = shim.findTreeElement(selectedNode);
+        if (found) {
+          return found;
+        }
+      }
+      return decorateTreeElement(getInternalOutline()?.selectedTreeElement ?? null);
+    },
+    get element() {
+      return domTreeWidget.contentElement;
+    },
+    toggleHideElement(node) {
+      return domTreeWidget.toggleHideElement(node);
+    },
+    addEventListener(eventType, listener, thisObject) {
+      return eventTarget.addEventListener(eventType, listener, thisObject);
+    },
+    removeEventListener(eventType, listener, thisObject) {
+      return eventTarget.removeEventListener(eventType, listener, thisObject);
+    },
+  };
+  treeOutlineShimByWidget.set(domTreeWidget, shim);
+  return shim;
 };
+
+(function() {
+const OutlineClass = Elements.DOMTreeWidget.ElementsTreeOutline;
+const OutlineProto = OutlineClass.prototype;
+const origUpdateModifiedNodes = OutlineProto.updateModifiedNodes;
+OutlineProto.updateModifiedNodes = function(...args) {
+  if (this instanceof OutlineClass) {
+    return origUpdateModifiedNodes.apply(this, args);
+  }
+};
+const origUpdateChildren = OutlineProto.updateChildren;
+OutlineProto.updateChildren = function(...args) {
+  if (this instanceof OutlineClass) {
+    return origUpdateChildren.apply(this, args);
+  }
+};
+const origForDOMModel = OutlineClass.forDOMModel;
+OutlineClass.forDOMModel = function(domModel) {
+  return origForDOMModel.call(this, domModel) || ElementsTestRunner.firstElementsTreeOutline();
+};
+})();
 
 ElementsTestRunner.filterMatchedStyles = function(text) {
   TestRunner.addResult('Filtering styles by: ' + text);
@@ -525,7 +751,10 @@ async function printStyleSection(section, omitLonghands, includeSelectorGroupMar
   const selector =
       section.titleElement.querySelector('.selector') || section.titleElement.querySelector('.keyframe-key');
   let selectorText = (includeSelectorGroupMarks ? buildMarkedSelectors(selector) : text(selector));
-  selectorText += text(selector.nextSibling.nextSibling);
+  const openBrace = section.element.querySelector('.sidebar-pane-open-brace');
+  if (openBrace) {
+    selectorText += text(openBrace);
+  }
   const anchor = section.element.querySelector('.styles-section-subtitle');
 
   if (anchor) {
@@ -593,6 +822,17 @@ ElementsTestRunner.toggleMatchedStyleProperty = function(propertyName, checked) 
 ElementsTestRunner.eventListenersWidget = function() {
   UI.ViewManager.ViewManager.instance().showView('elements.event-listeners');
   return Elements.EventListenersWidget.EventListenersWidget.instance();
+};
+
+ElementsTestRunner.removeAllEventListeners = function() {
+  const widget = ElementsTestRunner.eventListenersWidget();
+  const treeOutline = widget.contentElement.querySelector('devtools-tree')?.getInternalTreeOutlineForTest();
+  const buttons = treeOutline?.contentElement.querySelectorAll('devtools-button[title="Delete event listener"]') ?? [];
+  for (const button of buttons) {
+    if (!button.hidden) {
+      button.click();
+    }
+  }
 };
 
 ElementsTestRunner.showEventListenersWidget = function() {
@@ -851,6 +1091,7 @@ ElementsTestRunner.expandElementsTree = function(callback) {
 
       if (child.isExpandable() && !child.expanded) {
         child.expand();
+        ElementsTestRunner.firstElementsTreeOutline().runPendingUpdates();
         expandedSomething = true;
       }
 
@@ -1157,7 +1398,7 @@ ElementsTestRunner.addNewRuleInStyleSheet = function(styleSheetHeader, selector,
 
 ElementsTestRunner.addNewRule = function(selector, callback) {
   Elements.ElementsPanel.ElementsPanel.instance()
-      .stylesWidget.contentElement.querySelector('[aria-label="New Style Rule"]')
+      .stylesWidget.contentElement.querySelector('[aria-label="New style rule"]')
       .click();
   TestRunner.addSniffer(
       Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'addBlankSection',

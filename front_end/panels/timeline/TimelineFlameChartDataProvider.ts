@@ -31,71 +31,71 @@ import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
-   * @description Text for rendering frames
+   * @description Header for the frames track in the timeline flame chart.
    */
   frames: 'Frames',
   /**
-   * @description Text in Timeline Flame Chart Data Provider of the Performance panel
+   * @description Label for an idle frame in the frames track.
    */
   idleFrame: 'Idle frame',
   /**
-   * @description Text in Timeline Frame Chart Data Provider of the Performance panel
+   * @description Label for a dropped frame in the frames track.
    */
   droppedFrame: 'Dropped frame',
   /**
-   * @description Text in Timeline Frame Chart Data Provider of the Performance panel
+   * @description Label for a partially-presented frame in the frames track.
    */
   partiallyPresentedFrame: 'Partially-presented frame',
   /**
-   * @description Text for a rendering frame
+   * @description Label for a presented frame in the frames track.
    */
   frame: 'Frame',
   /**
-   * @description Text for Hiding a function from the Flame Chart
+   * @description Context menu item to hide a function in the timeline flame chart.
    */
   hideFunction: 'Hide function',
   /**
-   * @description Text for Hiding all children of a function from the Flame Chart
+   * @description Context menu item to hide child entries of a function in the timeline flame chart.
    */
   hideChildren: 'Hide children',
   /**
-   * @description Text for Hiding all child entries that are identical to the selected entry from the Flame Chart
+   * @description Context menu item to hide identical repeating child entries in the timeline flame chart.
    */
   hideRepeatingChildren: 'Hide repeating children',
   /**
-   * @description Text for remove script from ignore list from the Flame Chart
+   * @description Context menu item to remove a script from the ignore list in the timeline flame chart.
    */
   removeScriptFromIgnoreList: 'Remove script from ignore list',
   /**
-   * @description Text for add script to ignore list from the Flame Chart
+   * @description Context menu item to add a script to the ignore list in the timeline flame chart.
    */
   addScriptToIgnoreList: 'Add script to ignore list',
   /**
-   * @description Text for an action that shows all of the hidden children of an entry
+   * @description Context menu item to restore hidden child entries of an entry in the timeline flame chart.
    */
   resetChildren: 'Reset children',
   /**
-   * @description Text for an action that shows all of the hidden entries of the Flame Chart
+   * @description Context menu item to restore all hidden entries in the timeline flame chart.
    */
   resetTrace: 'Reset trace',
   /**
-   * @description Text of a context menu item to redirect to the AI assistance panel and to start a chat.
+   * @description Context menu item to start a chat in the AI assistance panel.
    */
   startAChat: 'Start a chat',
   /**
-   * @description Context menu item in Performance panel to label an entry.
+   * @description Context menu item to add a label annotation to an entry in the Performance panel.
    */
   labelEntry: 'Label entry',
   /**
-   * @description Context menu item in Performance panel to assess the purpose of an entry via AI.
+   * @description Context menu item to assess the purpose of an entry using AI assistance in the Performance panel.
    */
   assessThePurpose: 'Assess the purpose',
   /**
-   * @description Context menu item in Performance panel to identify time spent in a call tree via AI.
+   * @description Context menu item to identify time spent in a call tree using AI assistance in the Performance panel.
    */
   identifyTimeSpent: 'Identify time spent',
   /**
-   * @description Context menu item in Performance panel to find improvements for a call tree via AI.
+   * @description Context menu item to find performance improvements for a call tree using AI assistance in the Performance panel.
    */
   findImprovements: 'Find improvements',
 } as const;
@@ -156,7 +156,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       useFirstLineForOverview: true,
       nestingLevel: 1,
       collapsible: PerfUI.FlameChart.GroupCollapsibleState.NEVER,
-      itemsHeight: 150
+      itemsHeight: 150,
     });
 
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
@@ -174,19 +174,19 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         'screenshot-loaded', () => this.dispatchEventToListeners(Events.DATA_CHANGED));
 
     Common.Settings.Settings.instance()
-        .moduleSetting('skip-stack-frames-pattern')
+        .resolve(Workspace.IgnoreListManager.skipStackFramesPatternSettingDescriptor)
         .addChangeListener(this.#onIgnoreListChanged.bind(this));
     Common.Settings.Settings.instance()
-        .moduleSetting('skip-content-scripts')
+        .resolve(Workspace.IgnoreListManager.skipContentScriptsSettingDescriptor)
         .addChangeListener(this.#onIgnoreListChanged.bind(this));
     Common.Settings.Settings.instance()
-        .moduleSetting('automatically-ignore-list-known-third-party-scripts')
+        .resolve(Workspace.IgnoreListManager.automaticallyIgnoreListKnownThirdPartyScriptsSettingDescriptor)
         .addChangeListener(this.#onIgnoreListChanged.bind(this));
     Common.Settings.Settings.instance()
-        .moduleSetting('enable-ignore-listing')
+        .resolve(Workspace.IgnoreListManager.enableIgnoreListingSettingDescriptor)
         .addChangeListener(this.#onIgnoreListChanged.bind(this));
     Common.Settings.Settings.instance()
-        .moduleSetting('skip-anonymous-scripts')
+        .resolve(Workspace.IgnoreListManager.skipAnonymousScriptsSettingDescriptor)
         .addChangeListener(this.#onIgnoreListChanged.bind(this));
   }
 
@@ -339,7 +339,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return contextMenu;
     }
 
-    const url = SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(this.parsedTrace, entry);
+    const url = SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(this.parsedTrace, entry,
+                                                                          Workspace.Workspace.WorkspaceImpl.instance());
     if (!url) {
       return contextMenu;
     }
@@ -1403,12 +1404,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 }
 
-export const InstantEventVisibleDurationMs = Trace.Types.Timing.Milli(0.001);
+export const InstantEventVisibleDurationMs: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0.001);
 
 export const enum Events {
   DATA_CHANGED = 'DataChanged',
   FLAME_CHART_ITEM_HOVERED = 'FlameChartItemHovered',
-  ENTRY_LABEL_ANNOTATION_ADDED = 'EntryLabelAnnotationAdded'
+  ENTRY_LABEL_ANNOTATION_ADDED = 'EntryLabelAnnotationAdded',
 }
 
 export interface EventTypes {

@@ -8,19 +8,19 @@ import type {ElementHandle} from 'puppeteer-core';
 import {
   increaseTimeoutForPerfPanel,
   navigateToPerformanceTab,
-  openCaptureSettings
+  openCaptureSettings,
 } from '../helpers/performance-helpers.js';
 import {expectVeEvents, veChange} from '../helpers/visual-logging-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('The Performance panel', function() {
   setup({dockingMode: 'undocked'});
   increaseTimeoutForPerfPanel(this);
 
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-    await navigateToPerformanceTab('empty', devToolsPage, inspectedPage);
-    await openCaptureSettings('.timeline-settings-pane', devToolsPage);
+    await navigateToPerformanceTab(devToolsPage, inspectedPage, 'empty');
+    await openCaptureSettings(devToolsPage, '.timeline-settings-pane');
   }
 
   async function assertOption(select: ElementHandle<HTMLSelectElement>, expected: string) {
@@ -34,21 +34,20 @@ describe('The Performance panel', function() {
     const networkDropdownVeName = 'DropDown: active-network-condition-key';
 
     // Initial state: No throttling, then change to "3G"
-    const select = await devToolsPage.waitForAria<HTMLSelectElement>('Network conditions');
+    const select = await devToolsPage.waitForAria<HTMLSelectElement>('Network:');
     await assertOption(select, 'Disabled: No throttling');
     await select.select('3G');
     await assertOption(select, 'Presets: 3G');
-    await expectVeEvents([veChange(networkDropdownVeName)], veRoot, devToolsPage);
+    await expectVeEvents(devToolsPage, [veChange(networkDropdownVeName)], veRoot);
 
     // Change to "Slow 4G"
-    await assertOption(select, 'Presets: 3G');
     await select.select('Slow 4G');
     await assertOption(select, 'Presets: Slow 4G');
-    await expectVeEvents([veChange(networkDropdownVeName)], veRoot, devToolsPage);
+    await expectVeEvents(devToolsPage, [veChange(networkDropdownVeName)], veRoot);
 
     // Change back to "No throttling"
     await select.select('No throttling');
     await assertOption(select, 'Disabled: No throttling');
-    await expectVeEvents([veChange(networkDropdownVeName)], veRoot, devToolsPage);
+    await expectVeEvents(devToolsPage, [veChange(networkDropdownVeName)], veRoot);
   });
 });

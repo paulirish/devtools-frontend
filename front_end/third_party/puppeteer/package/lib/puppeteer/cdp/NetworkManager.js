@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { CDPSessionEvent } from '../api/CDPSession.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { NetworkManagerEvent, } from '../common/NetworkManagerEvents.js';
-import { debugError, isString } from '../common/util.js';
+import { isString } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { DisposableStack } from '../util/disposable.js';
 import { isErrorLike } from '../util/ErrorLike.js';
@@ -30,6 +31,8 @@ export class NetworkManager extends EventEmitter {
     #userAgent;
     #userAgentMetadata;
     #platform;
+    #acceptLanguage;
+    #userAgentOverrideApplied = false;
     #handlers = [
         ['Fetch.requestPaused', this.#onRequestPaused],
         ['Fetch.authRequired', this.#onAuthRequired],
@@ -43,11 +46,13 @@ export class NetworkManager extends EventEmitter {
         [CDPSessionEvent.Disconnected, this.#removeClient],
     ];
     #clients = new Map();
-    #networkEnabled = true;
-    constructor(frameManager, networkEnabled) {
-        super();
+    #networkEnabled;
+    #logger;
+    constructor(frameManager, networkEnabled = true, logger) {
+        super(undefined, logger);
         this.#frameManager = frameManager;
         this.#networkEnabled = networkEnabled ?? true;
+        this.#logger = logger;
     }
     #canIgnoreError(error) {
         return (isErrorLike(error) &&
@@ -192,16 +197,32 @@ export class NetworkManager extends EventEmitter {
         this.#platform = platform;
         await this.#applyToAllClients(this.#applyUserAgent.bind(this));
     }
+    async setAcceptLanguage(acceptLanguage) {
+        this.#acceptLanguage = acceptLanguage;
+        await this.#applyToAllClients(this.#applyUserAgent.bind(this));
+    }
     async #applyUserAgent(client) {
-        if (this.#userAgent === undefined) {
+        const nothingToEmulate = this.#userAgent === undefined &&
+            this.#userAgentMetadata === undefined &&
+            this.#acceptLanguage === undefined &&
+            this.#platform === undefined;
+        // Still need to send once to reset a previously-applied override.
+        if (nothingToEmulate && !this.#userAgentOverrideApplied) {
+            return;
+        }
+        const userAgent = this.#userAgent ??
+            (await this.#frameManager.page().browser().userAgent());
+        if (userAgent === undefined) {
             return;
         }
         try {
             await client.send('Network.setUserAgentOverride', {
-                userAgent: this.#userAgent,
+                userAgent,
+                acceptLanguage: this.#acceptLanguage,
                 userAgentMetadata: this.#userAgentMetadata,
                 platform: this.#platform,
             });
+            this.#userAgentOverrideApplied = !nothingToEmulate;
         }
         catch (error) {
             if (this.#canIgnoreError(error)) {
@@ -303,12 +324,14 @@ export class NetworkManager extends EventEmitter {
             username: undefined,
             password: undefined,
         };
-        client
+        void client
             .send('Fetch.continueWithAuth', {
             requestId: event.requestId,
             authChallengeResponse: { response, username, password },
         })
-            .catch(debugError);
+            .catch(err => {
+            this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+        });
     }
     /**
      * CDP may send a Fetch.requestPaused without or before a
@@ -320,11 +343,13 @@ export class NetworkManager extends EventEmitter {
     #onRequestPaused(client, event) {
         if (!this.#userRequestInterceptionEnabled &&
             this.#protocolRequestInterceptionEnabled) {
-            client
+            void client
                 .send('Fetch.continueRequest', {
                 requestId: event.requestId,
             })
-                .catch(debugError);
+                .catch(err => {
+                this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+            });
         }
         const { networkId: networkRequestId, requestId: fetchRequestId } = event;
         if (!networkRequestId) {
@@ -363,7 +388,7 @@ export class NetworkManager extends EventEmitter {
         const frame = event.frameId
             ? this.#frameManager.frame(event.frameId)
             : null;
-        const request = new CdpHTTPRequest(client, frame, event.requestId, this.#userRequestInterceptionEnabled, event, []);
+        const request = new CdpHTTPRequest(client, frame, event.requestId, this.#userRequestInterceptionEnabled, event, [], this.#logger);
         this.emit(NetworkManagerEvent.Request, request);
         void request.finalizeInterceptions();
     }
@@ -407,7 +432,7 @@ export class NetworkManager extends EventEmitter {
         const frame = event.frameId
             ? this.#frameManager.frame(event.frameId)
             : null;
-        const request = new CdpHTTPRequest(client, frame, fetchRequestId, this.#userRequestInterceptionEnabled, event, redirectChain);
+        const request = new CdpHTTPRequest(client, frame, fetchRequestId, this.#userRequestInterceptionEnabled, event, redirectChain, this.#logger);
         const extraInfo = this.#networkEventManager
             .requestExtraInfo(event.requestId)
             .shift();
@@ -442,7 +467,7 @@ export class NetworkManager extends EventEmitter {
             request = this.#networkEventManager.getRequest(event.requestId);
         }
         if (!request) {
-            debugError(new Error(`Request ${event.requestId} was served from cache but we could not find the corresponding request object`));
+            this.#logger?.(DEBUG_PREFIXES.error)?.(new Error(`Request ${event.requestId} was served from cache but we could not find the corresponding request object`));
             return;
         }
         this.emit(NetworkManagerEvent.RequestServedFromCache, request);
@@ -464,7 +489,7 @@ export class NetworkManager extends EventEmitter {
         }
         const extraInfos = this.#networkEventManager.responseExtraInfo(responseReceived.requestId);
         if (extraInfos.length) {
-            debugError(new Error('Unexpected extraInfo events for request ' +
+            this.#logger?.(DEBUG_PREFIXES.error)?.(new Error('Unexpected extraInfo events for request ' +
                 responseReceived.requestId));
         }
         // Chromium sends wrong extraInfo events for responses served from cache.

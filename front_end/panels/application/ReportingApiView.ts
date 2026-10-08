@@ -17,32 +17,24 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description Placeholder text that shows if no report or endpoint was detected.
-   *             A report contains information on issues or events that were encountered by a web browser.
-   *             An endpoint is a URL where the report is sent to.
-   *             (https://developer.chrome.com/docs/capabilities/web-apis/reporting-api)
+   * @description Header text in an empty state view when no report or endpoint has been detected in the reporting API view of the Application panel.
    */
   noReportOrEndpoint: 'No report or endpoint',
   /**
-   * @description Placeholder text that shows if no report or endpoint was detected.
-   *             A report contains information on issues or events that were encountered by a web browser.
-   *             An endpoint is a URL where the report is sent to.
-   *             (https://developer.chrome.com/docs/capabilities/web-apis/reporting-api)
+   * @description Explanatory text in an empty state view describing the reporting API view of the Application panel.
    */
-  reportingApiDescription: 'On this page you will be able to inspect `Reporting API` reports and endpoints.',
+  reportingApiDescription: 'Inspect `Reporting API` reports and endpoints',
   /**
-   * @description Placeholder text that shows if no report was selected for viewing
-   *report body (https://developers.google.com/web/updates/2018/09/reportingapi#sending).
+   * @description Header text in an empty state view when no report is selected in the reporting API view of the Application panel.
    */
   noReportSelected: 'No report selected',
   /**
-   * @description Placeholder text instructing the user how to display a Reporting API
-   *report body (https://developers.google.com/web/updates/2018/09/reportingapi#sending).
+   * @description Explanatory text instructing the user how to display a report body in the reporting API view of the Application panel.
    */
-  clickToDisplayBody: 'Click on any report to display its body',
+  clickToDisplayBody: 'Click any report to display its body',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ReportingApiView.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const REPORTING_API_EXPLANATION_URL =
     'https://developer.chrome.com/docs/capabilities/web-apis/reporting-api' as Platform.DevToolsPath.UrlString;
@@ -117,7 +109,7 @@ export class ReportingApiView extends UI.Widget.VBox implements
   #reports: Protocol.Network.ReportingApiReport[] = [];
   #focusedReport?: Protocol.Network.ReportingApiReport;
 
-  constructor(view = DEFAULT_VIEW) {
+  constructor(view: (input: ViewInput, output: undefined, target: HTMLElement) => void = DEFAULT_VIEW) {
     super();
     this.#view = view;
     this.#endpoints = new Map();

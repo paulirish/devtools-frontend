@@ -6,6 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as SettingsUI from '../settings/settings.js';
 
 import type {ActionDelegate} from './ActionRegistration.js';
 import {LiveAnnouncer} from './ARIAUtils.js';
@@ -14,15 +15,15 @@ import {type Provider, ToolbarButton, type ToolbarItem} from './Toolbar.js';
 
 const UIStrings = {
   /**
-   * @description Text to close something
+   * @description Tooltip text for the close DevTools button in the main toolbar.
    */
   close: 'Close',
   /**
-   * @description Text announced when the DevTools are undocked
+   * @description Announcement text for screen readers when DevTools is undocked.
    */
   devtoolsUndocked: 'DevTools is undocked',
   /**
-   * @description Text announced when the DevTools are docked to the left, right, or bottom of the browser tab
+   * @description Announcement text for screen readers when DevTools is docked to a side of the browser window.
    * @example {bottom} PH1
    */
   devToolsDockedTo: 'DevTools is docked to {PH1}',
@@ -50,7 +51,9 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.closeWindow.bind(
             Host.InspectorFrontendHost.InspectorFrontendHostInstance));
 
-    this.currentDockStateSetting = Common.Settings.Settings.instance().moduleSetting('currentDockState');
+    this.currentDockStateSetting =
+        Common.Settings.Settings.instance().resolve(SettingsUI.MainSettings.currentDockStateSettingDescriptor) as
+        Common.Settings.Setting<DockState>;
     this.lastDockStateSetting = Common.Settings.Settings.instance().createSetting('last-dock-state', DockState.BOTTOM);
 
     if (!canDock) {

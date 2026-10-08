@@ -6,17 +6,12 @@ import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 
 devtools_foundation_module("stack_trace") {
-  sources = [
-    "ErrorStackParser.ts",
-    "StackTrace.ts",
-  ]
+  sources = [ "StackTrace.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
-    "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../workspace:bundle",
   ]
 }
@@ -24,7 +19,7 @@ devtools_foundation_module("stack_trace") {
 devtools_entrypoint("bundle") {
   entrypoint = "stack_trace.ts"
 
-  deps = [ ":stack_trace" ]
+  ts_deps = [ ":stack_trace" ]
 
   visibility = [ "*" ]
 }
@@ -37,7 +32,7 @@ devtools_foundation_module("stack_trace_impl") {
     "Trie.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/platform:bundle",
@@ -50,31 +45,29 @@ devtools_foundation_module("stack_trace_impl") {
 devtools_entrypoint("impl") {
   entrypoint = "stack_trace_impl.ts"
 
-  deps = [ ":stack_trace_impl" ]
+  ts_deps = [ ":stack_trace_impl" ]
 
   # IMPORTANT: Besides tests and bindings, no other module is allowed access.
   #            If you have a use-case where you need access to stack trace internals,
   #            consult one of the OWNERS before drilling holes.
   visibility = [
     ":*",
-    "../bindings",
-    "../bindings:unittests",
+    "../bindings:*",
   ]
 }
 
-devtools_foundation_module("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
     "DetailedErrorStackParser.test.ts",
-    "ErrorStackParser.test.ts",
     "StackTrace.test.ts",
     "StackTraceImpl.test.ts",
     "StackTraceModel.test.ts",
     "Trie.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     ":impl",
     "../../core/platform:bundle",

@@ -9,24 +9,32 @@ devtools_module("mcp") {
 
   es_target = "es2023"
   es_libs = []
-  runs_in = "node_esm"
+  runs_in = "node"
 
-  deps = [
+  ts_deps = [
     "../front_end/core/common:bundle",
     "../front_end/core/host:bundle",
-    "../front_end/core/sdk:meta",
+    "../front_end/core/i18n:bundle",
+    "../front_end/core/platform:bundle",
+    "../front_end/core/protocol_client",
+    "../front_end/core/protocol_client:bundle",
+    "../front_end/core/protocol_client:puppeteer_devtools_connection",
+    "../front_end/core/sdk",
+    "../front_end/core/text_utils",
     "../front_end/foundation:bundle",
     "../front_end/generated",
     "../front_end/models/ai_assistance",
-    "../front_end/models/bindings:bundle",
-    "../front_end/models/crux-manager:bundle",
+    "../front_end/models/bindings",
+    "../front_end/models/comment_manager",
+    "../front_end/models/crux-manager",
     "../front_end/models/formatter:bundle",
     "../front_end/models/heap_snapshot:bundle",
-    "../front_end/models/issues_manager:bundle",
+    "../front_end/models/issues_manager",
     "../front_end/models/stack_trace:bundle",
     "../front_end/models/trace:bundle",
-    "../front_end/models/workspace:bundle",
-    "../front_end/models/workspace:meta",
+    "../front_end/models/trace/types",
+    "../front_end/models/workspace",
+    "../front_end/third_party/marked:bundle",
   ]
 }
 
@@ -35,10 +43,11 @@ ts_library("foundation_unittests") {
 
   sources = [ "mcp.test.ts" ]
 
-  deps = [ ":mcp" ]
+  ts_deps = [ ":mcp" ]
 }
 
 generated_file("test_inputs") {
+  testonly = true
   outputs = [ "$target_gen_dir/foundation_tests.txt" ]
   data_keys = [ "tests" ]
   rebase = target_gen_dir

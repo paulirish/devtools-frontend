@@ -32,8 +32,8 @@
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Platform from '../../../../core/platform/platform.js';
-import * as TextUtils from '../../../../models/text_utils/text_utils.js';
-import {Directives, html, render} from '../../../lit/lit.js';
+import * as TextUtils from '../../../../core/text_utils/text_utils.js';
+import {Directives, html, render, type TemplateResult} from '../../../lit/lit.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
@@ -41,11 +41,11 @@ import fontViewStyles from './fontView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text that appears on a button for the font resource type filter.
+   * @description Title of the font view tab in the Sources panel.
    */
   font: 'Font',
   /**
-   * @description Aria accessible name in Font View of the Sources panel
+   * @description Accessible name for the font preview in the font view of the Sources panel.
    * @example {https://example.com} PH1
    */
   previewOfFontFromS: 'Preview of font from {PH1}',
@@ -100,7 +100,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
 export class FontView extends UI.View.SimpleView {
   private readonly url: Platform.DevToolsPath.UrlString;
   private readonly contentProvider: TextUtils.ContentProvider.ContentProvider;
-  private readonly mimeTypeLabel: UI.Toolbar.ToolbarText;
+  readonly #mimeType: string;
   readonly #view: View;
   #fontFaceRule = '';
   #fontFamily = '';
@@ -117,11 +117,11 @@ export class FontView extends UI.View.SimpleView {
     this.#view = view;
     this.url = contentProvider.contentURL();
     this.contentProvider = contentProvider;
-    this.mimeTypeLabel = new UI.Toolbar.ToolbarText(mimeType);
+    this.#mimeType = mimeType;
   }
 
-  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
-    return [this.mimeTypeLabel];
+  override async toolbarItems(): Promise<TemplateResult> {
+    return html`<div class="toolbar-text">${this.#mimeType}</div>`;
   }
 
   #loadContentIfNeeded(): void {

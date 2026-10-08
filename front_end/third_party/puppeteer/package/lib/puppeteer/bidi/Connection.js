@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { CallbackRegistry } from '../common/CallbackRegistry.js';
-import { debug } from '../common/Debug.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { ConnectionClosedError } from '../common/Errors.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { debugError } from '../common/util.js';
 import { BidiCdpSession } from './CDPSession.js';
-const debugProtocolSend = debug('puppeteer:webDriverBiDi:SEND ►');
-const debugProtocolReceive = debug('puppeteer:webDriverBiDi:RECV ◀');
 /**
  * @internal
  */
@@ -20,14 +17,19 @@ export class BidiConnection extends EventEmitter {
     #delay;
     #timeout = 0;
     #closed = false;
+    #logger;
     #callbacks;
     #emitters = [];
-    constructor(url, transport, idGenerator, delay = 0, timeout) {
+    #debugProtocolSend;
+    #debugProtocolReceive;
+    constructor(url, transport, idGenerator, delay = 0, timeout = undefined, logger) {
         super();
         this.#url = url;
         this.#delay = delay;
         this.#timeout = timeout ?? 180_000;
-        this.#callbacks = new CallbackRegistry(idGenerator);
+        this.#callbacks = new CallbackRegistry(idGenerator, logger);
+        this.#debugProtocolSend = logger?.(DEBUG_PREFIXES.bidiSend);
+        this.#debugProtocolReceive = logger?.(DEBUG_PREFIXES.bidiReceive);
         this.#transport = transport;
         this.#transport.onmessage = this.onMessage.bind(this);
         this.#transport.onclose = this.unbind.bind(this);
@@ -73,7 +75,7 @@ export class BidiConnection extends EventEmitter {
                 method,
                 params,
             });
-            debugProtocolSend(stringifiedMessage);
+            this.#debugProtocolSend?.(stringifiedMessage);
             this.#transport.send(stringifiedMessage);
         });
     }
@@ -86,7 +88,7 @@ export class BidiConnection extends EventEmitter {
                 return setTimeout(f, this.#delay);
             });
         }
-        debugProtocolReceive(message);
+        this.#debugProtocolReceive?.(message);
         const object = JSON.parse(message);
         if ('type' in object) {
             switch (object.type) {
@@ -116,7 +118,7 @@ export class BidiConnection extends EventEmitter {
         if ('id' in object) {
             this.#callbacks.reject(object.id, `Protocol Error. Message is not in BiDi protocol format: '${message}'`, object.message);
         }
-        debugError(object);
+        this.#logger?.(DEBUG_PREFIXES.error)?.(object);
     }
     /**
      * Unbinds the connection, but keeps the transport open. Useful when the transport will

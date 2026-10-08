@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createFakeSetting} from '../../testing/EnvironmentHelpers.js';
@@ -132,9 +134,8 @@ describe('UIUtils', () => {
       const container = document.createElement('div');
       renderElementIntoDOM(container);
       const buttonRef = Lit.Directives.createRef<Buttons.Button.Button>();
-      Lit.render(
-          html`<devtools-button ${Lit.Directives.ref(buttonRef)} ${bindToAction(actionId)}></devtools-button>`,
-          container);
+      Lit.render(html`<devtools-button ${Lit.Directives.ref(buttonRef)} ${bindToAction(actionId)}></devtools-button>`,
+                 container);
 
       const button = buttonRef.value;
       assert.exists(button);
@@ -189,7 +190,7 @@ describe('UIUtils', () => {
         this.additions.push(...nodes);
       }
 
-      override removeNodes(nodes: NodeList): void {
+      override removeNodes(nodes: NodeList|Node[]): void {
         this.removals.push(...nodes);
       }
     }
@@ -197,13 +198,12 @@ describe('UIUtils', () => {
 
     it('renders its input into a template', async () => {
       const container = document.createElement('div');
-      Lit.render(
-          html`
+      Lit.render(html`
         <test-element
           .template=${html`
             <button id=button>button</button>
           `}></test-element>`,
-          container);
+                 container);
       const element = container.firstElementChild;
       assert.instanceOf(element, TestElement);
       assert.lengthOf(element.children, 1);
@@ -229,27 +229,24 @@ describe('UIUtils', () => {
       await raf();
       assert.deepEqual(nodeContents(container.additions), [{DIV: 'add'}]);
       assert.deepEqual(nodeContents(container.removals), []);
-      assert.deepEqual(
-          container.updates,
-          [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
+      assert.deepEqual(container.updates,
+                       [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
 
       container.clear();
       Lit.render(html`<div attribute>add</div>`, container);
       await raf();
       assert.deepEqual(nodeContents(container.additions), [{DIV: 'add'}]);
       assert.deepEqual(nodeContents(container.removals), [{DIV: 'add'}]);
-      assert.deepEqual(
-          container.updates,
-          [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
+      assert.deepEqual(container.updates,
+                       [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
 
       container.clear();
       Lit.render(html`<div attribute><p>inner</p></div>`, container);
       await raf();
       assert.deepEqual(nodeContents(container.additions), [{DIV: 'inner'}]);
       assert.deepEqual(nodeContents(container.removals), [{DIV: 'add'}]);
-      assert.deepEqual(
-          container.updates,
-          [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
+      assert.deepEqual(container.updates,
+                       [{node: 'TEST-ELEMENT', attributeName: null}, {node: 'TEST-ELEMENT', attributeName: null}]);
 
       container.clear();
       Lit.render(nothing, container);
@@ -263,11 +260,10 @@ describe('UIUtils', () => {
       const container = document.createElement('div');
       renderElementIntoDOM(container);
 
-      Lit.render(
-          html`
+      Lit.render(html`
         <test-element ?attribute=${false}>
         </test-element>`,
-          container);
+                 container);
 
       await raf();
       {
@@ -278,11 +274,10 @@ describe('UIUtils', () => {
         assert.deepEqual(element.updates, []);
       }
 
-      Lit.render(
-          html`
+      Lit.render(html`
         <test-element ?attribute=${true}>
         </test-element>`,
-          container);
+                 container);
 
       await raf();
       {
@@ -300,13 +295,12 @@ describe('UIUtils', () => {
 
       const onClick = () => {};
 
-      const interception = sinon.stub(UI.UIUtils.InterceptBindingDirective.prototype, 'render');
+      const interception = sinon.stub(Lit.CustomDirectives.InterceptBindingDirective.prototype, 'render');
 
-      Lit.render(
-          html`
+      Lit.render(html`
         <test-element
           .template=${html`<button @click=${onClick}>button</button>`}></test-element>`,
-          container);
+                 container);
 
       await raf();
 
@@ -415,68 +409,199 @@ describe('UIUtils', () => {
 
       assert.instanceOf(instantiatedWidget, MockWidget);
     });
-  });
 
-  describe('InterceptBindingDirective', () => {
-    const interceptBinding = Lit.Directive.directive(UI.UIUtils.InterceptBindingDirective);
-    it('attaches event handlers to clones', () => {
+    it('synchronizes widget config updates to cloned template', async () => {
+      class MockWidget extends UI.Widget.Widget {
+        payload = '';
+      }
+
+      class TestComponent2 extends UI.UIUtils.HTMLElementWithLightDOMTemplate {}
+      if (!customElements.get('test-component-reactivity')) {
+        customElements.define('test-component-reactivity', TestComponent2);
+      }
+
       const container = document.createElement('div');
-      const clickHandler = sinon.spy();
-      Lit.render(html`<button @click=${interceptBinding(clickHandler)}></button>`, container);
-      const templateButton = container.firstElementChild;
-      assert.instanceOf(templateButton, HTMLButtonElement);
-      templateButton.click();
-      sinon.assert.calledOnce(clickHandler);
+      renderElementIntoDOM(container);
 
-      const clonedButton = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
-      assert.instanceOf(clonedButton, HTMLButtonElement);
+      function renderMockWidget(payload: string) {
+        Lit.render(html`
+          <test-component-reactivity
+            .template=${
+                       html`<devtools-widget ${
+                           UI.Widget.widget(MockWidget, {payload})}></devtools-widget>`}></test-component-reactivity>`,
+                   container);
+      }
 
-      clonedButton.click();
-      sinon.assert.calledTwice(clickHandler);
+      renderMockWidget('initial');
+
+      await raf();
+
+      const el = container.querySelector('test-component-reactivity');
+      assert.exists(el);
+      const template = el.querySelector('template');
+      assert.exists(template);
+      const lightWidgetStr = template.content.querySelector('devtools-widget');
+      assert.exists(lightWidgetStr);
+
+      // Simulate DevTools cloning the template into a shadow root
+      const shadowRootMock = document.createElement('div');
+      container.appendChild(shadowRootMock);
+      const shadowWidgetStr = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(lightWidgetStr);
+      shadowRootMock.appendChild(shadowWidgetStr);
+
+      const widget = UI.Widget.Widget.get(shadowWidgetStr) as MockWidget;
+      assert.instanceOf(widget, MockWidget);
+      assert.strictEqual(widget.payload, 'initial');
+
+      // Re-render with new payload
+      renderMockWidget('updated');
+
+      await raf();
+
+      // The update is successfully synchronized to the clone!
+      assert.strictEqual(widget.payload, 'updated');
     });
 
-    it('attaches multiple event handlers to the same element', () => {
+    it('synchronizes widget config updates to cloned template for CHILD bindings and caches the DOM node', async () => {
+      class MockWidget extends UI.Widget.Widget {
+        payload = '';
+      }
+
+      class TestComponentCHILD extends UI.UIUtils.HTMLElementWithLightDOMTemplate {}
+      if (!customElements.get('test-component-reactivity-child')) {
+        customElements.define('test-component-reactivity-child', TestComponentCHILD);
+      }
+
       const container = document.createElement('div');
-      const clickHandler = sinon.spy();
-      const mousedownHandler = sinon.spy();
-      Lit.render(
-          html`<button @click=${interceptBinding(clickHandler)} @mousedown=${
-              interceptBinding(mousedownHandler)}></button>`,
-          container);
-      const templateButton = container.firstElementChild;
-      assert.instanceOf(templateButton, HTMLButtonElement);
+      renderElementIntoDOM(container);
 
-      const clonedButton = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
-      assert.instanceOf(clonedButton, HTMLButtonElement);
+      function renderMockWidget(payload: string) {
+        Lit.render(html`
+          <test-component-reactivity-child
+            .template=${html`${UI.Widget.widget(MockWidget, {payload})}`}></test-component-reactivity-child>`,
+                   container);
+      }
 
-      clonedButton.dispatchEvent(new MouseEvent('mousedown'));
-      sinon.assert.notCalled(clickHandler);
-      sinon.assert.calledOnce(mousedownHandler);
-      clonedButton.click();
-      sinon.assert.calledOnce(clickHandler);
-      sinon.assert.calledOnce(mousedownHandler);
+      renderMockWidget('initial');
+
+      await raf();
+
+      const el = container.querySelector('test-component-reactivity-child');
+      assert.exists(el);
+      const template = el.querySelector('template');
+      assert.exists(template);
+      const lightWidgetStr = template.content.querySelector('devtools-widget');
+      assert.exists(lightWidgetStr);
+
+      // Simulate DevTools cloning the template into a shadow root
+      const shadowRootMock = document.createElement('div');
+      container.appendChild(shadowRootMock);
+      const shadowWidgetStr = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(lightWidgetStr);
+      shadowRootMock.appendChild(shadowWidgetStr);
+
+      const widget = UI.Widget.Widget.get(shadowWidgetStr) as MockWidget;
+      assert.instanceOf(widget, MockWidget);
+      assert.strictEqual(widget.payload, 'initial');
+
+      // Re-render with new payload
+      renderMockWidget('updated');
+
+      await raf();
+
+      // The update is successfully synchronized to the clone!
+      assert.strictEqual(widget.payload, 'updated');
+
+      // Also ensure it is the same DOM node
+      const updatedLightWidgetStr = template.content.querySelector('devtools-widget');
+      assert.strictEqual(updatedLightWidgetStr, lightWidgetStr,
+                         'DOM node should be cached and reused for CHILD binding');
     });
 
-    it('attaches event handlers to nested elements', () => {
+    it('recreates the DOM node if widgetClass changes for CHILD bindings', async () => {
+      class MockWidgetA extends UI.Widget.Widget {
+        payload = '';
+      }
+
+      class MockWidgetB extends UI.Widget.Widget {
+        payload = '';
+      }
+
+      class TestComponentCHILDClass extends UI.UIUtils.HTMLElementWithLightDOMTemplate {}
+      if (!customElements.get('test-component-reactivity-child-class')) {
+        customElements.define('test-component-reactivity-child-class', TestComponentCHILDClass);
+      }
+
       const container = document.createElement('div');
-      const buttonClickHandler = sinon.spy();
-      const divClickHandler = sinon.spy();
-      Lit.render(
-          html`<div @click=${interceptBinding(divClickHandler)}><button @click=${
-              interceptBinding(buttonClickHandler)}></button></div>`,
-          container);
-      const templateDiv = container.firstElementChild;
-      assert.instanceOf(templateDiv, HTMLDivElement);
+      renderElementIntoDOM(container);
 
-      const clonedDiv = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateDiv);
-      assert.instanceOf(clonedDiv, HTMLDivElement);
+      type CommonMockWidget = MockWidgetA|MockWidgetB;
+      let currentClass: UI.Widget.WidgetFactory<CommonMockWidget> = MockWidgetA;
 
-      const clonedButton = clonedDiv.querySelector('button');
-      assert.instanceOf(clonedButton, HTMLButtonElement);
+      function renderMockWidget(payload: string) {
+        Lit.render(html`
+          <test-component-reactivity-child-class
+            .template=${html`${UI.Widget.widget(currentClass, {payload})}`}></test-component-reactivity-child-class>`,
+                   container);
+      }
 
-      clonedButton.click();
-      sinon.assert.calledOnce(buttonClickHandler);
-      sinon.assert.calledOnce(divClickHandler);
+      renderMockWidget('initial');
+      await raf();
+
+      const el = container.querySelector('test-component-reactivity-child-class');
+      assert.exists(el);
+      const template = el.querySelector('template');
+      assert.exists(template);
+
+      const lightWidgetStrA = template.content.querySelector('devtools-widget');
+      assert.exists(lightWidgetStrA);
+
+      // Re-render with new class
+      currentClass = MockWidgetB;
+      renderMockWidget('updated class');
+      await raf();
+
+      const lightWidgetStrB = template.content.querySelector('devtools-widget');
+      assert.exists(lightWidgetStrB);
+      assert.notStrictEqual(lightWidgetStrB, lightWidgetStrA, 'DOM node should be recreated when widgetClass changes');
+
+      // Test inline factory recreation tracking
+      currentClass = (elem: HTMLElement): MockWidgetB => new MockWidgetB(elem);
+      renderMockWidget('updated factory');
+      await raf();
+
+      const lightWidgetStrC = template.content.querySelector('devtools-widget');
+      assert.exists(lightWidgetStrC);
+      assert.notStrictEqual(lightWidgetStrC, lightWidgetStrB,
+                            'DOM node should be recreated for the initial inline factory array format');
+
+      const prevFactoryStrC = lightWidgetStrC;
+      currentClass = (elem: HTMLElement): MockWidgetB => new MockWidgetB(elem);
+      renderMockWidget('updated identical factory string');
+      await raf();
+
+      const lightWidgetStrD = template.content.querySelector('devtools-widget');
+      assert.strictEqual(
+          lightWidgetStrD, prevFactoryStrC,
+          'DOM node should NOT be recreated if the identical inline factory stringified representations match');
+    });
+
+    it('prunes discarded clones not attached to a Document or DocumentFragment', () => {
+      const original = document.createElement('div');
+      const clone1 = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(original);
+      const clone2 = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(original);
+
+      // clone1 is attached to a DocumentFragment (e.g. ShadowRoot)
+      const fragment = document.createDocumentFragment();
+      fragment.appendChild(clone1);
+
+      // clone2 is detached (root is itself), so only clone1 is returned
+      const clones = UI.UIUtils.HTMLElementWithLightDOMTemplate.getClones(original);
+      assert.deepEqual(clones, [clone1]);
+      assert.isFalse(clones.includes(clone2));
+
+      // clone1 is removed from fragment (now also detached)
+      fragment.removeChild(clone1);
+      assert.deepEqual(UI.UIUtils.HTMLElementWithLightDOMTemplate.getClones(original), []);
     });
   });
 
@@ -818,9 +943,9 @@ describe('bindCheckbox', () => {
   describe('asyncFragmentLabel', () => {
     setupLocaleHooks();
 
-    it('returns "Async Call" if description is missing', () => {
+    it('returns "Async call" if description is missing', () => {
       const stackTrace = StubStackTrace.create([], [{description: '', frames: []}]);
-      assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]), 'Async Call');
+      assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]), 'Async call');
     });
 
     it('returns the description as is for other descriptions', () => {
@@ -830,20 +955,20 @@ describe('bindCheckbox', () => {
 
     it('returns "Promise resolved (async)" if description is "Promise.resolve"', () => {
       const stackTrace = StubStackTrace.create([], [{description: 'Promise.resolve', frames: []}]);
-      assert.strictEqual(
-          UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]), 'Promise resolved (async)');
+      assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]),
+                         'Promise resolved (async)');
     });
 
     it('returns "Promise rejected (async)" if description is "Promise.reject"', () => {
       const stackTrace = StubStackTrace.create([], [{description: 'Promise.reject', frames: []}]);
-      assert.strictEqual(
-          UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]), 'Promise rejected (async)');
+      assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]),
+                         'Promise rejected (async)');
     });
 
     it('returns "await in <functionName>" if description is "await" and there is a previous frame', () => {
       const stackTrace = StubStackTrace.create(['url:1:functionName:10:1'], [{description: 'await', frames: []}]);
-      assert.strictEqual(
-          UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]), 'await in functionName');
+      assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[0]),
+                         'await in functionName');
     });
 
     it('returns "await" if description is "await" and there is no previous frame', () => {
@@ -854,10 +979,175 @@ describe('bindCheckbox', () => {
     it('returns "await in <functionName>" if description is "await" and the previous frame is another async fragment',
        () => {
          const stackTrace = StubStackTrace.create([], [
-           {description: 'someAsyncCall', frames: ['url:1:asyncFunction:10:1']}, {description: 'await', frames: []}
+           {description: 'someAsyncCall', frames: ['url:1:asyncFunction:10:1']},
+           {description: 'await', frames: []},
          ]);
-         assert.strictEqual(
-             UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[1]), 'await in asyncFunction');
+         assert.strictEqual(UI.UIUtils.asyncFragmentLabel(stackTrace, stackTrace.asyncFragments[1]),
+                            'await in asyncFunction');
        });
+  });
+
+  describe('createHistoryInput', () => {
+    it('navigates query history on ArrowUp and ArrowDown without dispatching redundant input events at boundaries',
+       () => {
+         const inputElement = UI.UIUtils.createHistoryInput('search');
+         const inputEventSpy = sinon.spy();
+         inputElement.addEventListener('input', inputEventSpy);
+
+         inputElement.value = 'first';
+         inputElement.dispatchEvent(
+             new KeyboardEvent('keydown', {key: 'Enter', keyCode: 13, bubbles: true, cancelable: true}));
+
+         inputElement.value = 'second';
+         inputElement.dispatchEvent(
+             new KeyboardEvent('keydown', {key: 'Enter', keyCode: 13, bubbles: true, cancelable: true}));
+
+         // Navigate up to the previous history entry ('first', historyPosition 0)
+         const arrowUpEvent = new KeyboardEvent(
+             'keydown', {key: 'ArrowUp', keyCode: 38, shiftKey: false, bubbles: true, cancelable: true});
+         inputElement.dispatchEvent(arrowUpEvent);
+         assert.strictEqual(inputElement.value, 'first');
+         sinon.assert.calledOnce(inputEventSpy);
+         inputEventSpy.resetHistory();
+
+         // Hitting the boundary (historyPosition 0), no input event should be dispatched
+         inputElement.dispatchEvent(arrowUpEvent);
+         assert.strictEqual(inputElement.value, 'first');
+         sinon.assert.notCalled(inputEventSpy);
+
+         // Navigate down to the next history entry ('second', historyPosition 1)
+         const arrowDownEvent = new KeyboardEvent(
+             'keydown', {key: 'ArrowDown', keyCode: 40, shiftKey: false, bubbles: true, cancelable: true});
+         inputElement.dispatchEvent(arrowDownEvent);
+         assert.strictEqual(inputElement.value, 'second');
+         sinon.assert.calledOnce(inputEventSpy);
+         inputEventSpy.resetHistory();
+
+         // Navigate down to the empty search string (historyPosition 2)
+         inputElement.dispatchEvent(arrowDownEvent);
+         assert.strictEqual(inputElement.value, '');
+         sinon.assert.calledOnce(inputEventSpy);
+         inputEventSpy.resetHistory();
+
+         // Hitting the boundary (historyPosition 2), no input event should be dispatched
+         inputElement.dispatchEvent(arrowDownEvent);
+         assert.strictEqual(inputElement.value, '');
+         sinon.assert.notCalled(inputEventSpy);
+       });
+  });
+});
+
+describe('element value modifications', () => {
+  function keyEvent(key: string,
+                    modifiers: {ctrlEquivalent?: boolean, shift?: boolean, alt?: boolean} = {}): KeyboardEvent {
+    const isMac = Host.Platform.isMac();
+    return new KeyboardEvent('keydown', {
+      key,
+      ctrlKey: Boolean(modifiers.ctrlEquivalent) && !isMac,
+      metaKey: Boolean(modifiers.ctrlEquivalent) && isMac,
+      shiftKey: Boolean(modifiers.shift),
+      altKey: Boolean(modifiers.alt),
+      bubbles: true,
+      cancelable: true,
+    });
+  }
+
+  describe('getValueModificationDirection', () => {
+    it('maps arrow and page keys to a direction', () => {
+      assert.strictEqual(UI.UIUtils.getValueModificationDirection(keyEvent('ArrowUp')), 'Up');
+      assert.strictEqual(UI.UIUtils.getValueModificationDirection(keyEvent('PageUp')), 'Up');
+      assert.strictEqual(UI.UIUtils.getValueModificationDirection(keyEvent('ArrowDown')), 'Down');
+      assert.strictEqual(UI.UIUtils.getValueModificationDirection(keyEvent('PageDown')), 'Down');
+      assert.isNull(UI.UIUtils.getValueModificationDirection(keyEvent('Enter')));
+    });
+  });
+
+  describe('createReplacementString', () => {
+    it('increments and decrements hex colors per channel with modifier keys', () => {
+      assert.strictEqual(UI.UIUtils.createReplacementString('#FF2', keyEvent('PageUp')), '#FF3');
+      // Ctrl/Cmd adds 1 to the red channel and Shift adds 1 to the green channel.
+      assert.strictEqual(
+          UI.UIUtils.createReplacementString('#FF3', keyEvent('ArrowDown', {ctrlEquivalent: true, shift: true})),
+          '#EE3');
+      assert.strictEqual(UI.UIUtils.createReplacementString('#FF3', keyEvent('ArrowDown', {alt: true})), '#FF2');
+      assert.strictEqual(UI.UIUtils.createReplacementString('#001100', keyEvent('PageUp', {shift: true})), '#001200');
+      // The result is clamped and keeps the original length.
+      assert.strictEqual(UI.UIUtils.createReplacementString('#FFF', keyEvent('ArrowUp')), '#FFF');
+      assert.strictEqual(UI.UIUtils.createReplacementString('#001', keyEvent('ArrowDown', {alt: true})), '#000');
+      // Hex values that are neither rgb nor rrggbb are left alone.
+      assert.isNull(UI.UIUtils.createReplacementString('#FFFF', keyEvent('ArrowUp')));
+    });
+
+    it('increments numbers by 0.1 with Alt, 1 without modifiers, 10 with Shift and 100 with Ctrl/Cmd', () => {
+      assert.strictEqual(UI.UIUtils.createReplacementString('.5', keyEvent('ArrowUp', {alt: true})), '0.6');
+      assert.strictEqual(UI.UIUtils.createReplacementString('0.6', keyEvent('ArrowUp')), '1.6');
+      assert.strictEqual(UI.UIUtils.createReplacementString('1.6', keyEvent('PageUp', {shift: true})), '11.6');
+      assert.strictEqual(UI.UIUtils.createReplacementString('11.6px', keyEvent('PageDown', {ctrlEquivalent: true})),
+                         '-88.4px');
+    });
+
+    it('leaves numbers that cannot be represented without an exponent unchanged', () => {
+      assert.isNull(UI.UIUtils.createReplacementString('1000000000000000065537deg', keyEvent('ArrowUp')));
+      assert.isNull(UI.UIUtils.createReplacementString('1000000000000000065537deg', keyEvent('PageUp')));
+    });
+  });
+
+  describe('modifiedFloatNumber', () => {
+    it('applies modifier deltas, multipliers and ranges', () => {
+      assert.strictEqual(UI.UIUtils.modifiedFloatNumber(0.5, keyEvent('ArrowUp', {alt: true})), 0.6);
+      assert.strictEqual(UI.UIUtils.modifiedFloatNumber(0.6, keyEvent('ArrowUp')), 1.6);
+      assert.strictEqual(UI.UIUtils.modifiedFloatNumber(1.6, keyEvent('PageUp', {shift: true})), 11.6);
+      assert.strictEqual(UI.UIUtils.modifiedFloatNumber(1, keyEvent('ArrowDown'), 0.5), 0.5);
+      assert.strictEqual(UI.UIUtils.modifiedFloatNumber(0.5, keyEvent('ArrowDown'), undefined, {min: 0}), 0);
+      assert.isNull(UI.UIUtils.modifiedFloatNumber(1e21, keyEvent('ArrowUp')));
+      assert.isNull(UI.UIUtils.modifiedFloatNumber(1, keyEvent('Enter')));
+    });
+  });
+
+  describe('handleElementValueModifications', () => {
+    function setup(text: string, caretOffset: number): {element: HTMLElement, press: (event: KeyboardEvent) => void} {
+      const element = document.createElement('span');
+      element.textContent = text;
+      renderElementIntoDOM(element);
+      const range = document.createRange();
+      range.setStart(element.firstChild as Text, caretOffset);
+      range.setEnd(element.firstChild as Text, caretOffset);
+      const selection = element.getComponentSelection();
+      assert.exists(selection);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      element.addEventListener('keydown', event => {
+        UI.UIUtils.handleElementValueModifications(event, element);
+      });
+      return {element, press: event => element.dispatchEvent(event)};
+    }
+
+    it('modifies a hex color in place', () => {
+      const {element, press} = setup('#FF2', 1);
+      press(keyEvent('PageUp'));
+      assert.strictEqual(element.textContent, '#FF3');
+      press(keyEvent('ArrowDown', {ctrlEquivalent: true, shift: true}));
+      assert.strictEqual(element.textContent, '#EE3');
+    });
+
+    it('modifies a number in place', () => {
+      const {element, press} = setup('.5', 1);
+      press(keyEvent('ArrowUp', {alt: true}));
+      assert.strictEqual(element.textContent, '0.6');
+      press(keyEvent('ArrowUp'));
+      assert.strictEqual(element.textContent, '1.6');
+      press(keyEvent('PageUp', {shift: true}));
+      assert.strictEqual(element.textContent, '11.6');
+    });
+
+    it('does not modify a huge number', () => {
+      const text = 'rotate(1000000000000000065537deg)';
+      const {element, press} = setup(text, 10);
+      const upEvent = keyEvent('ArrowUp');
+      press(upEvent);
+      press(keyEvent('PageUp'));
+      assert.strictEqual(element.textContent, text);
+      assert.isFalse(upEvent.defaultPrevented);
+    });
   });
 });

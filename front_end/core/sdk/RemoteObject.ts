@@ -4,10 +4,13 @@
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
-import type {DOMPinnedWebIDLProp, DOMPinnedWebIDLType} from '../common/JavaScriptMetaData.js';
+import type * as Common from '../common/common.js';
 
 import type {DebuggerModel, FunctionDetails} from './DebuggerModel.js';
 import type {RuntimeModel} from './RuntimeModel.js';
+
+type DOMPinnedWebIDLProp = Common.JavaScriptMetaData.DOMPinnedWebIDLProp;
+type DOMPinnedWebIDLType = Common.JavaScriptMetaData.DOMPinnedWebIDLType;
 
 /** This cannot be an interface due to "instanceof RemoteObject" checks in the code. **/
 export abstract class RemoteObject {
@@ -868,7 +871,7 @@ export class LocalJSONObject extends RemoteObject {
       Promise<GetPropertiesResult> {
     function isArrayIndex(name: string): boolean {
       const index = Number(name) >>> 0;
-      return String(index) === name;
+      return String(index) === name && index < 4294967295;
     }
 
     let properties = this.children();
@@ -953,7 +956,7 @@ export class RemoteArrayBuffer {
     return this.#object.arrayBufferByteLength();
   }
 
-  async bytes(start = 0, end = this.byteLength()): Promise<number[]|null> {
+  async bytes(start = 0, end: number = this.byteLength()): Promise<number[]|null> {
     if (start < 0 || start >= this.byteLength()) {
       throw new RangeError('start is out of range');
     }

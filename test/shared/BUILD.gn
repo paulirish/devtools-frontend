@@ -5,15 +5,18 @@
 import("../../scripts/build/typescript/typescript.gni")
 
 node_ts_library("shared") {
+  inputs = typescript_puppeteer_types_inputs
+
   sources = [
-    "debug-check.ts",
     "helper.ts",
     "mocha-resultsdb-reporter.ts",
-    "non_hosted_wrappers.ts",
+    "run-mocha.ts",
     "screenshots.ts",
   ]
 
-  deps = [
+  ts_deps = [
+    "../../front_end/testing:mocha_helpers",
+    "../../front_end/testing:test_id_generation",
     "../conductor:implementation",
     "../e2e/shared",
   ]

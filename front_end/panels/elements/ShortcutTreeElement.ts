@@ -40,14 +40,14 @@ import * as Lit from '../../ui/lit/lit.js';
 import * as VisualElements from '../../ui/visual_logging/visual_logging.js';
 
 import * as ElementsComponents from './components/components.js';
-import {adornerRef, ElementsTreeElement} from './ElementsTreeElement.js';
-import {ElementsTreeOutline} from './ElementsTreeOutline.js';
+import {ElementsTreeOutline} from './DOMTreeWidget.js';
+import {adornerRef, ElementsTreeElement, handleAdornerKeydown} from './ElementsTreeElement.js';
 
 const {html, render} = Lit;
 
 const UIStrings = {
   /**
-   * @description Link text content in Elements Tree Outline of the Elements panel
+   * @description Link text content in the DOM tree outline of the Elements panel.
    */
   reveal: 'reveal',
 } as const;
@@ -66,10 +66,13 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: undefined, target: HTMLE
     <span class="elements-tree-shortcut-title">\u21AA ${input.title}</span>
     <devtools-adorner
       .name=${ElementsComponents.AdornerManager.RegisteredAdorners.REVEAL}
-      class="adorner-reveal"
-      jslog=${VisualElements.adorner('reveal')}
+      class="adorner-reveal clickable"
+      role=button
+      tabindex=0
+      jslog=${VisualElements.adorner('reveal').track({click: true})}
       aria-label=${i18nString(UIStrings.reveal)}
       @click=${input.onRevealAdornerClick}
+      @keydown=${handleAdornerKeydown(input.onRevealAdornerClick)}
       @mousedown=${(e: Event) => e.consume()}
       ${adornerRef()}>
       <span class="adorner-with-icon">
@@ -86,7 +89,8 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
   #hovered?: boolean;
   #view: typeof DEFAULT_VIEW;
 
-  constructor(nodeShortcut: SDK.DOMModel.DOMNodeShortcut, view = DEFAULT_VIEW) {
+  constructor(nodeShortcut: SDK.DOMModel.DOMNodeShortcut,
+              view: (input: ViewInput, _output: undefined, target: HTMLElement) => void = DEFAULT_VIEW) {
     super('');
     this.nodeShortcut = nodeShortcut;
     this.#view = view;
@@ -125,6 +129,10 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
 
   override onattach(): void {
     this.setLeftIndentOverlay();
+  }
+
+  override ensureSelection(): void {
+    // Selection element is rendered in DEFAULT_VIEW.
   }
 
   override onselect(selectedByUser?: boolean): boolean {

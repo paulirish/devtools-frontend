@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {assertScreenshot, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget, describeWithEnvironment, stubNoopSettings} from '../../testing/EnvironmentHelpers.js';
-import {
-  describeWithMockConnection,
-  setMockConnectionResponseHandler,
-} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -22,15 +20,20 @@ import * as Elements from './elements.js';
 
 const NODE_ID = 1 as Protocol.DOM.NodeId;
 
-describeWithMockConnection('PropertiesWidget', () => {
+describeWithEnvironment('PropertiesWidget', () => {
   let target: SDK.Target.Target;
+  let connection: MockCDPConnection;
 
   beforeEach(() => {
-    stubNoopSettings();
-    target = createTarget();
-    setMockConnectionResponseHandler(
-        'DOM.getDocument', () => ({root: {nodeId: NODE_ID}} as Protocol.DOM.GetDocumentResponse));
-    setMockConnectionResponseHandler('DOM.getNodesForSubtreeByStyle', () => ({nodeIds: []}));
+    connection = new MockCDPConnection();
+    target = createTarget({connection});
+    connection.setSuccessHandler('DOM.getDocument',
+                                 () => ({root: {nodeId: NODE_ID}} as Protocol.DOM.GetDocumentResponse));
+    connection.setSuccessHandler('DOM.getNodesForSubtreeByStyle', () => ({nodeIds: []}));
+  });
+
+  afterEach(() => {
+    UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, null);
   });
 
   const updatesUiOnEvent = <T extends keyof SDK.DOMModel.EventTypes>(
@@ -85,22 +88,22 @@ describeWithMockConnection('PropertiesWidget', () => {
       objectId: '1' as Protocol.Runtime.RemoteObjectId,
     });
 
-    setMockConnectionResponseHandler('Runtime.getProperties', () => ({
-                                                                result: [
-                                                                  {
-                                                                    name: 'myGetter',
-                                                                    isOwn: true,
-                                                                    enumerable: true,
-                                                                    configurable: true,
-                                                                    get: {
-                                                                      type: Protocol.Runtime.RemoteObjectType.Function,
-                                                                      objectId: '2' as Protocol.Runtime.RemoteObjectId,
-                                                                      className: 'Function',
-                                                                      description: 'get myGetter()',
-                                                                    },
-                                                                  },
-                                                                ],
-                                                              }));
+    connection.setSuccessHandler('Runtime.getProperties', () => ({
+                                                            result: [
+                                                              {
+                                                                name: 'myGetter',
+                                                                isOwn: true,
+                                                                enumerable: true,
+                                                                configurable: true,
+                                                                get: {
+                                                                  type: Protocol.Runtime.RemoteObjectType.Function,
+                                                                  objectId: '2' as Protocol.Runtime.RemoteObjectId,
+                                                                  className: 'Function',
+                                                                  description: 'get myGetter()',
+                                                                },
+                                                              },
+                                                            ],
+                                                          }));
     const callFunctionOn = sinon.stub().resolves({
       result: {
         type: Protocol.Runtime.RemoteObjectType.Object,
@@ -108,41 +111,41 @@ describeWithMockConnection('PropertiesWidget', () => {
         value: null,
       },
     });
-    setMockConnectionResponseHandler('Runtime.callFunctionOn', callFunctionOn);
+    connection.setHandler('Runtime.callFunctionOn', callFunctionOn);
 
     sinon.stub(node, 'resolveToObject').withArgs('properties-sidebar-pane').resolves(object);
+    const widget = new Elements.PropertiesWidget.PropertiesWidget();
+    renderElementIntoDOM(widget);
+    UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node);
+
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    const tree = widget.contentElement.querySelector('devtools-tree');
+    const invokeButton = tree?.shadowRoot?.querySelector<HTMLElement>('.object-value-calculate-value-button');
+    assert.exists(invokeButton);
+    invokeButton.click();
+    sinon.assert.calledWith(callFunctionOn, sinon.match({
+      objectId: '1',
+      arguments: sinon.match([{objectId: '2'}]),
+    }));
+  });
+
+  it('creates a read-only object tree', async () => {
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+    const model = target.model(SDK.DOMModel.DOMModel);
+    assert.exists(model);
+
+    const node = new SDK.DOMModel.DOMNode(model);
+    const object = SDK.RemoteObject.RemoteObject.fromLocalObject({});
+    sinon.stub(node, 'resolveToObject').withArgs('properties-sidebar-pane').resolves(object);
+
     const viewFunction = createViewFunctionStub(Elements.PropertiesWidget.PropertiesWidget);
     new Elements.PropertiesWidget.PropertiesWidget(viewFunction);
     UI.Context.Context.instance().setFlavor(SDK.DOMModel.DOMNode, node);
 
     const {objectTree} = await viewFunction.nextInput;
     assert.exists(objectTree);
-    await objectTree.populateChildrenIfNeeded();
-
-    const nodes = Array.from(ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement.createPropertyNodes(
-        objectTree.children || {properties: [], internalProperties: [], accessors: []}, true, true));
-
-    // We need to attach the node to a TreeOutline so that its onattach() lifecycle hook
-    // is triggered and the DOM is fully constructed.
-    const dummyTree = new UI.TreeOutline.TreeOutlineInShadow();
-    for (const node of nodes) {
-      dummyTree.appendChild(node);
-    }
-    await UI.Widget.Widget.allUpdatesComplete;
-
-    // The second node should be the accessor
-    const accessorNode = nodes.find(
-        n =>
-            n instanceof ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement && n.property?.name === 'myGetter');
-    assert.instanceOf(accessorNode, ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement);
-
-    const invokeButton = accessorNode.listItemElement.querySelector('.object-value-calculate-value-button');
-    assert.instanceOf(invokeButton, HTMLElement);
-    invokeButton.click();
-    sinon.assert.calledWith(callFunctionOn, sinon.match({
-      objectId: '1',
-      arguments: sinon.match([{objectId: '2'}]),
-    }));
+    assert.isTrue(objectTree.readOnly);
   });
 
   describe('regex filter toggle', () => {
@@ -252,10 +255,6 @@ describeWithMockConnection('PropertiesWidget', () => {
 });
 
 describeWithEnvironment('PropertiesWidget DEFAULT_VIEW', () => {
-  beforeEach(() => {
-    stubNoopSettings();
-  });
-
   async function setUpView(filter?: string) {
     const container = document.createElement('div');
     renderElementIntoDOM(container, {includeCommonStyles: true});
@@ -268,6 +267,7 @@ describeWithEnvironment('PropertiesWidget DEFAULT_VIEW', () => {
       propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
       readOnly: true,
     });
+    objectTree.expanded = true;
 
     const viewFunction = createViewFunctionStub(Elements.PropertiesWidget.PropertiesWidget);
     new Elements.PropertiesWidget.PropertiesWidget(viewFunction);
@@ -281,61 +281,35 @@ describeWithEnvironment('PropertiesWidget DEFAULT_VIEW', () => {
     return {container, objectTree};
   }
 
-  it('creates a read-only tree outline', async () => {
-    const {container, objectTree} = await setUpView();
-
-    Elements.PropertiesWidget.DEFAULT_VIEW(
-        {
-          onFilterChanged: () => {},
-          objectTree,
-          allChildrenFiltered: false,
-          onRegexToggled: function(): void {
-            throw new Error('Function not implemented.');
-          },
-          isRegex: false
-        },
-        {}, container);
-
-    await UI.Widget.Widget.allUpdatesComplete;
-    const tree = container.querySelector('devtools-tree') as UI.TreeOutline.TreeViewElement;
-    assert.exists(tree);
-    const treeOutline = tree.getInternalTreeOutlineForTest();
-    const child = treeOutline.rootElement().childAt(0);
-    assert.instanceOf(child, ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement);
-    assert.isFalse(child.editable);
-  });
-
   it('renders the view without filter', async () => {
     const {container, objectTree} = await setUpView();
 
-    Elements.PropertiesWidget.DEFAULT_VIEW(
-        {
-          onFilterChanged: () => {},
-          objectTree,
-          allChildrenFiltered: false,
-          onRegexToggled: function(): void {
-            throw new Error('Function not implemented.');
-          },
-          isRegex: false
-        },
-        {}, container);
+    Elements.PropertiesWidget.DEFAULT_VIEW({
+      onFilterChanged: () => {},
+      objectTree,
+      allChildrenFiltered: false,
+      onRegexToggled: function(): void {
+        throw new Error('Function not implemented.');
+      },
+      isRegex: false,
+    },
+                                           {}, container);
     await assertScreenshot('elements/properties_widget_no_filter.png');
   });
 
   it('renders a selected element', async () => {
     const {container, objectTree} = await setUpView();
 
-    Elements.PropertiesWidget.DEFAULT_VIEW(
-        {
-          onFilterChanged: () => {},
-          objectTree,
-          allChildrenFiltered: false,
-          onRegexToggled: function(): void {
-            throw new Error('Function not implemented.');
-          },
-          isRegex: false
-        },
-        {}, container);
+    Elements.PropertiesWidget.DEFAULT_VIEW({
+      onFilterChanged: () => {},
+      objectTree,
+      allChildrenFiltered: false,
+      onRegexToggled: function(): void {
+        throw new Error('Function not implemented.');
+      },
+      isRegex: false,
+    },
+                                           {}, container);
     await UI.Widget.Widget.allUpdatesComplete;
 
     const tree = container.querySelector('devtools-tree') as UI.TreeOutline.TreeViewElement;
@@ -351,34 +325,32 @@ describeWithEnvironment('PropertiesWidget DEFAULT_VIEW', () => {
   it('renders the view with a partial filter match', async () => {
     const {container, objectTree} = await setUpView('first');
 
-    Elements.PropertiesWidget.DEFAULT_VIEW(
-        {
-          onFilterChanged: () => {},
-          objectTree,
-          allChildrenFiltered: false,
-          onRegexToggled: function(): void {
-            throw new Error('Function not implemented.');
-          },
-          isRegex: false
-        },
-        {}, container);
+    Elements.PropertiesWidget.DEFAULT_VIEW({
+      onFilterChanged: () => {},
+      objectTree,
+      allChildrenFiltered: false,
+      onRegexToggled: function(): void {
+        throw new Error('Function not implemented.');
+      },
+      isRegex: false,
+    },
+                                           {}, container);
     await assertScreenshot('elements/properties_widget_partial_filter.png');
   });
 
   it('renders the view with no filter matches', async () => {
     const {container, objectTree} = await setUpView('third');
 
-    Elements.PropertiesWidget.DEFAULT_VIEW(
-        {
-          onFilterChanged: () => {},
-          objectTree,
-          allChildrenFiltered: true,
-          onRegexToggled: function(): void {
-            throw new Error('Function not implemented.');
-          },
-          isRegex: false
-        },
-        {}, container);
+    Elements.PropertiesWidget.DEFAULT_VIEW({
+      onFilterChanged: () => {},
+      objectTree,
+      allChildrenFiltered: true,
+      onRegexToggled: function(): void {
+        throw new Error('Function not implemented.');
+      },
+      isRegex: false,
+    },
+                                           {}, container);
     await assertScreenshot('elements/properties_widget_no_matches.png');
   });
 });

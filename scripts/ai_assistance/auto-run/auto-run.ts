@@ -10,9 +10,24 @@ import puppeteer from 'puppeteer-core';
 import {hideBin} from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 
-import {convertRawOutputToEval, type RawOutput} from '../suite/to_eval_output.ts';
-import type {ExampleMetadata, ExecutedExample, IndividualPromptRequestResponse, Logs, RpcGlobalId} from '../types.js';
+import {convertRawOutputToEval, formatChatLog, type RawOutput, slug} from '../suite/to_eval_output.ts';
+import type {Trajectory} from '../suite/types.js';
+import type {
+  ExampleMetadata, ExecutedExample, IndividualPromptRequestResponse, Logs, RpcGlobalId, RunId, TaskId} from
+  '../types.js';
 
+import {
+  generateRunId,
+  PROJECT_ID,
+  TaskOutputFile,
+  type TaskStatus,
+  uploadEvalToGCS,
+  uploadRunCompleted,
+  uploadRunLog,
+  uploadRunStarted,
+  uploadTaskCompleted,
+  uploadTaskContent,
+} from './gcs-upload.ts';
 import {createTargetExecutor} from './targets/factory.ts';
 import type {TargetExecutor, TargetPreparationResult} from './targets/interface.ts';
 import {TraceDownloader} from './trace-downloader.ts';
@@ -22,66 +37,100 @@ const numberFormatter = new Intl.NumberFormat('en-EN', {
   maximumSignificantDigits: 3,
 });
 const acquiredDevToolsTargets = new WeakMap();
+
+/**
+ * Minimum weighted rubric score (on a 0.0 - 1.0 scale) required for a graded task to pass.
+ * Matches the rubric scale in `scripts/ai_assistance/suite/instructions/scoring.md`, where:
+ * - 0.0 - 0.3: Major flaws
+ * - 0.4 - 0.6: Functional but flawed
+ * - 0.7 - 0.9: High quality
+ * - 1.0:       Perfect
+ */
+export const PASS_SCORE_THRESHOLD = 0.7;
+
 function formatElapsedTime() {
   return `${numberFormatter.format((performance.now() - startTime) / 1000)}s`;
 }
 
-const userArgsBuilder = yargs(hideBin(process.argv))
-                            .option('example-urls', {
-                              string: true,
-                              type: 'array',
-                              demandOption: false,
-                            })
-                            .option('parallel', {
-                              boolean: true,
-                              default: true,
-                            })
-                            .option('times', {
-                              describe: 'How many times do you want to run an example?',
-                              number: true,
-                              default: 1,
-                            })
-                            .option('label', {string: true, default: 'run'})
-                            .option('include-follow-up', {
-                              boolean: true,
-                              default: false,
-                            })
-                            .option('randomize', {
-                              boolean: true,
-                              default: false,
-                            })
-                            .option('test-target', {
-                              describe: 'Which panel do you want to run the examples against?',
-                              choices: [
-                                'elements', 'performance-main-thread', 'performance', 'performance-insights',
-                                'elements-multimodal', 'patching', 'network'
-                              ] as const,
-                              demandOption: true,
-                            })
-                            .option('eval', {
-                              describe: 'Also output to the format required for the DevTools Eval framework',
-                              boolean: true,
-                              default: false,
-                            })
-                            .option('grade', {
-                              describe: 'Automatically grade the result',
-                              boolean: true,
-                              default: false,
-                            })
-                            .check(argv => {
-                              const rawArgs = hideBin(process.argv);
-                              const hasLabel = rawArgs.includes('--label');
-                              const hasExampleUrls = argv['example-urls'] && argv['example-urls'].length > 0;
-                              if (!hasExampleUrls && hasLabel) {
-                                throw new Error('Cannot provide --label when running without --example-urls');
-                              }
-                              return true;
-                            });
+const userArgsBuilder =
+    yargs(hideBin(process.argv))
+        .option('example-urls', {
+          string: true,
+          type: 'array',
+          demandOption: false,
+        })
+        .option('parallel', {
+          boolean: true,
+          default: true,
+        })
+        .option('times', {
+          describe: 'How many times do you want to run an example?',
+          number: true,
+          default: 1,
+        })
+        .option('label', {string: true, default: 'run'})
+        .option('include-follow-up', {
+          boolean: true,
+          default: false,
+        })
+        .option('randomize', {
+          describe: 'Append a random query ID suffix to prompts to bypass AIDA caching',
+          boolean: true,
+          default: false,
+        })
+        .option('test-target', {
+          describe: 'Which panel do you want to run the examples against?',
+          choices: [
+            'elements',
+            'performance-main-thread',
+            'performance',
+            'performance-insights',
+            'elements-multimodal',
+            'patching',
+            'network',
+          ] as const,
+          demandOption: true,
+        })
+        .option('eval', {
+          describe: 'Output to the format required for the DevTools Eval framework',
+          boolean: true,
+          default: true,
+        })
+        .option('grade', {
+          describe: 'Automatically grade the result',
+          boolean: true,
+          default: false,
+        })
+        .option('upload', {
+          describe:
+              'Upload resulting eval trajectory.json (and eval_result.json when --grade is specified) files to GCS',
+          boolean: true,
+          default: false,
+        })
+        .check(argv => {
+          const rawArgs = hideBin(process.argv);
+          const hasLabel = rawArgs.includes('--label');
+          const hasExampleUrls = argv['example-urls'] && argv['example-urls'].length > 0;
+          if (!hasExampleUrls && hasLabel) {
+            throw new Error('Cannot provide --label when running without --example-urls');
+          }
+          return true;
+        });
 type UserArgs = ReturnType<typeof userArgsBuilder.parseSync>;
 
+const ANSI_YELLOW = '\x1b[33m';
+const ANSI_RED = '\x1b[31m';
+const ANSI_RESET = '\x1b[0m';
+
 class Logger {
-  #logs: Logs = {};
+  #terminalLogs: Logs = {};
   #updateElapsedTimeInterval: NodeJS.Timeout|null = null;
+  // Suite-level run log entries uploaded per run to GCS as eval_run.log.
+  #runLogEntries: string[] = [];
+  // Granular per-task agent execution traces keyed by taskId, uploaded per trajectory to GCS as agent_logs/agent.log.
+  #taskLogEntries = new Map<string, string[]>();
+  // Granular per-task agent stderr traces keyed by taskId, uploaded per trajectory to GCS as agent_logs/agent_stderr.log.
+  #taskStderrEntries = new Map<string, string[]>();
 
   constructor() {
     this.#updateElapsedTimeInterval = setInterval(() => {
@@ -89,8 +138,54 @@ class Logger {
     }, 1000);
   }
 
+  #stripAnsi(text: string): string {
+    return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
+  }
+
+  #recordRunLog(text: string) {
+    const cleanText = this.#stripAnsi(text);
+    if (!cleanText) {
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    for (const line of cleanText.split('\n')) {
+      this.#runLogEntries.push(`[${timestamp}] ${line}`);
+    }
+  }
+
+  #recordTaskLog(taskId: TaskId, text: string, isError = false) {
+    const cleanText = this.#stripAnsi(text);
+    if (!cleanText) {
+      return;
+    }
+    let entries = this.#taskLogEntries.get(taskId);
+    if (!entries) {
+      entries = [];
+      this.#taskLogEntries.set(taskId, entries);
+    }
+    const prefix = isError ? '[ERROR] ' : '';
+    for (const line of cleanText.split('\n')) {
+      entries.push(`${prefix}${line}`);
+    }
+  }
+
+  #recordTaskStderr(taskId: TaskId, text: string) {
+    const cleanText = this.#stripAnsi(text);
+    if (!cleanText) {
+      return;
+    }
+    let entries = this.#taskStderrEntries.get(taskId);
+    if (!entries) {
+      entries = [];
+      this.#taskStderrEntries.set(taskId, entries);
+    }
+    for (const line of cleanText.split('\n')) {
+      entries.push(line);
+    }
+  }
+
   #updateElapsedTime() {
-    this.#logs['elapsedTime'] = {
+    this.#terminalLogs['elapsedTime'] = {
       index: 999,
       text: `\nElapsed time: ${formatElapsedTime()}`,
     };
@@ -99,7 +194,7 @@ class Logger {
 
   #flushLogs() {
     process.stdout.write('\x1Bc');
-    const values = Object.values(this.#logs);
+    const values = Object.values(this.#terminalLogs);
     const sortedValues = values.sort((val1, val2) => val1.index - val2.index);
     for (const {text} of sortedValues) {
       process.stdout.write(`${text}\n`);
@@ -125,13 +220,86 @@ class Logger {
    * @param text
    */
   log(id: string, index: number, text: string) {
+    if (id === 'head') {
+      this.#recordRunLog(text);
+    }
     this.#updateElapsedTime();
-    this.#logs[id] = {index, text};
+    this.#terminalLogs[id] = {index, text};
     this.#flushLogs();
   }
 
   error(id: string, index: number, text: string) {
     this.log(id, index, text);
+  }
+
+  taskLog(taskId: TaskId, index: number, total: number, text: string) {
+    this.#recordTaskLog(taskId, text);
+    const indexPrefix = total > 0 ? `[${index + 1}/${total}] ` : '';
+    this.log(taskId, index, `${ANSI_YELLOW}${indexPrefix}${taskId}:${ANSI_RESET} ${text}`);
+  }
+
+  taskError(taskId: TaskId, index: number, total: number, text: string) {
+    this.#recordTaskLog(taskId, text, /* isError= */ true);
+    this.#recordTaskStderr(taskId, text);
+    const indexPrefix = total > 0 ? `[${index + 1}/${total}] ` : '';
+    this.error(taskId, index, `${ANSI_YELLOW}${indexPrefix}${taskId}:${ANSI_RESET} ${ANSI_RED}${text}${ANSI_RESET}`);
+  }
+
+  append(text: string) {
+    this.#recordRunLog(text);
+  }
+
+  /**
+   * Execution log for a single run, uploaded once per run to GCS as `eval_run.log`.
+   * Example:
+   * [2026-09-11T11:45:00.000Z] Evaluation run started for 2026-09-11-114500-c0c1-8f25f69 at 1726055100000
+   * [2026-09-11T11:45:00.000Z] Target: elements, Agent: devtools-elements
+   * [2026-09-11T11:45:10.000Z] [Task life-with-charlie] Finished execution (10.25s)
+   * [2026-09-11T11:45:15.000Z] Total tasks: 1, Passed: 1, Failed: 0
+   * [2026-09-11T11:45:15.000Z] Run completed with status: COMPLETED
+   */
+  getRunLogContent(): string {
+    return this.#runLogEntries.join('\n') + '\n';
+  }
+
+  getLogContent(): string {
+    return this.getRunLogContent();
+  }
+
+  /**
+   * Returns the formatted log content for a specific task, uploaded per trajectory to GCS
+   * as `agent_logs/agent.log`. Captures the task lifecycle including harness setup, executor
+   * query execution, completion duration, and error traces.
+   *
+   * Example output:
+   * [2026-09-11T11:45:00.000Z] Creating a page
+   * [2026-09-11T11:45:01.000Z] Navigated to http://127.0.0.1:8000/life-with-charlie.html
+   * [2026-09-11T11:45:02.000Z] [Info]: Got devtools page
+   * [2026-09-11T11:45:03.000Z] [ElementsExecutor] Preparing example: life-with-charlie for target: elements
+   * [2026-09-11T11:45:04.000Z] [ElementsExecutor] Executing query: "inspect the image" for example: life-with-charlie
+   * [2026-09-11T11:45:05.000Z] [Info]: Running the user prompt "inspect the image" (This step might take a long time)
+   * [2026-09-11T11:45:10.000Z] [ElementsExecutor] Finished executing all queries for example: life-with-charlie
+   * [2026-09-11T11:45:10.000Z] Finished (10.25s)
+   */
+  getTaskLogContent(taskId: TaskId): string {
+    const entries = this.#taskLogEntries.get(taskId);
+    if (!entries || entries.length === 0) {
+      return '(No log entries recorded)\n';
+    }
+    return entries.join('\n') + '\n';
+  }
+
+  /**
+   * Returns the formatted stderr content for a specific task, uploaded per trajectory to GCS
+   * as `agent_logs/agent_stderr.log`. Captures errors, assertion failures, and stack traces.
+   * Returns an empty string if no errors occurred.
+   */
+  getTaskStderrContent(taskId: TaskId): string {
+    const entries = this.#taskStderrEntries.get(taskId);
+    if (!entries || entries.length === 0) {
+      return '';
+    }
+    return entries.join('\n') + '\n';
   }
 
   destroy() {
@@ -155,6 +323,7 @@ export class Example {
   #traceDownloader: TraceDownloader;
   #preparationResult: TargetPreparationResult|null = null;
   #exampleUrls: readonly string[];
+  #durationSeconds = 0;
 
   constructor(
       url: string, label: string, browser: Browser, userArgs: UserArgs, logger: Logger,
@@ -173,7 +342,17 @@ export class Example {
     return this.#url;
   }
 
-  id(): string {
+  /**
+   * Returns the canonical `TaskId` for this example (e.g. `'life-with-charlie'`),
+   * derived from the example URL filename without `.html`.
+   *
+   * This single identifier is used consistently as:
+   * - The GCS task directory (`runs/<runId>/tasks/<taskId>/output/`)
+   * - `task_id` in `eval_task_completed.json`
+   * - `taskId` on raw prompt turns (`IndividualPromptRequestResponse`) and `ExampleMetadata`
+   * - `metadata.task_id` on the exported `Trajectory` (`trajectory.json`)
+   */
+  taskId(): TaskId {
     return this.#url.split('/').pop()?.replace('.html', '') ?? 'unknown-id';
   }
 
@@ -232,7 +411,7 @@ export class Example {
       const results: IndividualPromptRequestResponse[] = await this.#executor.execute(
           this.#devtoolsPage,
           this.#preparationResult,
-          this.id(),
+          this.taskId(),
           this.#userArgs.randomize,
           (text: string) => this.log(text),
       );
@@ -275,42 +454,86 @@ export class Example {
 
       return {
         results: filteredResults,
-        metadata: {exampleId: this.id(), explanation: this.#preparationResult.explanation},
+        metadata: {taskId: this.taskId(), explanation: this.#preparationResult.explanation},
         label: this.#label,
       };
 
     } finally {
-      const elapsedTime = numberFormatter.format(
-          (performance.now() - executionStartTime) / 1000,
-      );
+      // Record task execution duration in seconds, rounded to two decimal places, for reporting in eval_task_completed.json.
+      this.#durationSeconds = Number(((performance.now() - executionStartTime) / 1000).toFixed(2));
+      const elapsedTime = numberFormatter.format(this.#durationSeconds);
       this.log(`Finished (${elapsedTime}s)`);
     }
   }
 
+  durationSeconds(): number {
+    return this.#durationSeconds;
+  }
+
   log(text: string) {
     const indexOfExample = this.#exampleUrls.indexOf(this.#url);
-    this.#logger.log(
-        this.id(),
-        indexOfExample,
-        `\x1b[33m[${indexOfExample + 1}/${this.#exampleUrls.length}] ${this.id()}:\x1b[0m ${text}`,
-    );
+    this.#logger.taskLog(this.taskId(), indexOfExample, this.#exampleUrls.length, text);
   }
 
   error(text: string) {
     const indexOfExample = this.#exampleUrls.indexOf(this.#url);
-    this.#logger.error(
-        this.id(),
-        indexOfExample,
-        `\x1b[33m[${indexOfExample + 1}/${this.#exampleUrls.length}] ${this.id()}: [0m  [31m${text} [0m`,
-    );
+    this.#logger.taskError(this.taskId(), indexOfExample, this.#exampleUrls.length, text);
   }
 }
 
-async function runInParallel(examples: Example[], logger: Logger):
-    Promise<Array<{results: IndividualPromptRequestResponse[], metadata: ExampleMetadata, label: string}>> {
+function recordTaskFailure(
+    taskId: TaskId,
+    runId: RunId,
+    durationSeconds: number,
+    taskStatuses: TaskStatus[],
+) {
+  uploadTaskCompleted({
+    taskId,
+    runId,
+    status: 'FAILED',
+    // Tasks that failed during preparation, execution, or grading receive null so
+    // infrastructure/execution failures do not skew model evaluation averages.
+    score: null,
+    durationSeconds,
+    tokens: {},
+  });
+  taskStatuses.push({taskId, status: 'FAILED', score: null});
+}
+
+function handleTaskFailure(
+    example: Example,
+    runId: RunId,
+    phase: 'Preparation'|'Execution',
+    logger: Logger,
+    taskStatuses: TaskStatus[],
+    taskDurations: Map<TaskId, number>,
+    userArgs: UserArgs,
+) {
+  const taskId = example.taskId();
+  const durationSeconds = example.durationSeconds();
+  taskDurations.set(taskId, durationSeconds);
+  logger.append(`[Task ${taskId}] ${phase} failed (${durationSeconds}s)`);
+  if (userArgs.upload) {
+    uploadTaskContent(runId, taskId, TaskOutputFile.AGENT_LOG, logger.getTaskLogContent(taskId));
+    uploadTaskContent(runId, taskId, TaskOutputFile.AGENT_STDERR, logger.getTaskStderrContent(taskId));
+    recordTaskFailure(taskId, runId, durationSeconds, taskStatuses);
+  }
+}
+
+async function runInParallel(
+    examples: Example[],
+    logger: Logger,
+    userArgs: UserArgs,
+    runId: RunId,
+    taskStatuses: TaskStatus[],
+    taskDurations: Map<TaskId, number>,
+    ): Promise<Array<{results: IndividualPromptRequestResponse[], metadata: ExampleMetadata, label: string}>> {
   logger.head('Preparing examples...');
   for (const example of examples) {
     await example.prepare();
+    if (!example.isReady()) {
+      handleTaskFailure(example, runId, 'Preparation', logger, taskStatuses, taskDurations, userArgs);
+    }
   }
 
   logger.head('Running examples...');
@@ -319,12 +542,16 @@ async function runInParallel(examples: Example[], logger: Logger):
       examples.filter(example => example.isReady()).map(async example => {
         try {
           const executedExample = await example.execute();
+          const durationSeconds = example.durationSeconds();
+          taskDurations.set(example.taskId(), durationSeconds);
+          logger.append(`[Task ${example.taskId()}] Finished execution (${durationSeconds}s)`);
           results.push(executedExample);
         } catch (err) {
           const errorMsg = err instanceof Error ? logger.formatError(err) : String(err);
           example.error(
               `There is an error, skipping it.\n${errorMsg}`,
           );
+          handleTaskFailure(example, runId, 'Execution', logger, taskStatuses, taskDurations, userArgs);
         }
       }),
   );
@@ -332,22 +559,33 @@ async function runInParallel(examples: Example[], logger: Logger):
   return results;
 }
 
-async function runSequentially(examples: Example[], logger: Logger):
-    Promise<Array<{results: IndividualPromptRequestResponse[], metadata: ExampleMetadata, label: string}>> {
+async function runSequentially(
+    examples: Example[],
+    logger: Logger,
+    userArgs: UserArgs,
+    runId: RunId,
+    taskStatuses: TaskStatus[],
+    taskDurations: Map<TaskId, number>,
+    ): Promise<Array<{results: IndividualPromptRequestResponse[], metadata: ExampleMetadata, label: string}>> {
   const results: Array<{results: IndividualPromptRequestResponse[], metadata: ExampleMetadata, label: string}> = [];
   logger.head('Running examples sequentially...');
   for (const example of examples) {
     await example.prepare();
     if (!example.isReady()) {
+      handleTaskFailure(example, runId, 'Preparation', logger, taskStatuses, taskDurations, userArgs);
       continue;
     }
 
     try {
       const executedExample = await example.execute();
+      const durationSeconds = example.durationSeconds();
+      taskDurations.set(example.taskId(), durationSeconds);
+      logger.append(`[Task ${example.taskId()}] Finished execution (${durationSeconds}s)`);
       results.push(executedExample);
     } catch (err) {
       const errorMsg = err instanceof Error ? logger.formatError(err) : String(err);
       example.error(`There is an error, skipping it.\n${errorMsg}`);
+      handleTaskFailure(example, runId, 'Execution', logger, taskStatuses, taskDurations, userArgs);
     }
   }
 
@@ -370,6 +608,29 @@ function loadRecipes(target: string): Array<{url: string, label: string}> {
 // Run if this file invoked as a CLI directly
 async function main() {
   const userArgs: UserArgs = userArgsBuilder.parseSync();
+  if (userArgs.grade) {
+    const graderScript = path.resolve(import.meta.dirname, '..', 'suite', `${userArgs.testTarget}.eval.ts`);
+    if (!fs.existsSync(graderScript)) {
+      throw new Error(`Grader script not found at ${graderScript}. Cannot run with --grade.`);
+    }
+  }
+
+  const runId = generateRunId();
+  const runStartTimestamp = new Date().toISOString();
+  console.info(`\n[Info]: Run ID for this evaluation: ${runId}`);
+
+  if (userArgs.upload) {
+    uploadRunStarted({
+      project: PROJECT_ID,
+      runId,
+      agent: `devtools-${userArgs.testTarget}`,
+      // TODO: Figure out if the model ID can be determined prior to execution. Currently,
+      // the exact model ID is resolved server-side by AIDA and only available in the response metadata per task.
+      model: 'default',
+      startTime: runStartTimestamp,
+      status: 'RUNNING',
+    });
+  }
 
   const pairsToRun: Array<{url: string, label: string}> = [];
   const isRecipeMode = !userArgs.exampleUrls || userArgs.exampleUrls.length === 0;
@@ -398,6 +659,8 @@ async function main() {
   }
 
   const logger = new Logger();
+  logger.append(`Evaluation run started for ${runId} at ${runStartTimestamp}`);
+  logger.append(`Target: ${userArgs.testTarget}, Agent: devtools-${userArgs.testTarget}`);
   logger.head('Connecting to the browser...');
   const browser = await puppeteer.connect({
     browserURL: 'http://127.0.0.1:9222',
@@ -432,22 +695,14 @@ async function main() {
   const examples =
       pairsToRun.map(pair => new Example(pair.url, pair.label, browser, userArgs, logger, traceDownloader, allUrls));
 
-  const executionResults =
-      userArgs.parallel ? await runInParallel(examples, logger) : await runSequentially(examples, logger);
+  const taskStatuses: TaskStatus[] = [];
+  const taskDurations = new Map<string, number>();
+
+  const executionResults = userArgs.parallel ?
+      await runInParallel(examples, logger, userArgs, runId, taskStatuses, taskDurations) :
+      await runSequentially(examples, logger, userArgs, runId, taskStatuses, taskDurations);
 
   await browser.disconnect();
-
-  function computeScore(results: IndividualPromptRequestResponse[]): number {
-    let scoreSum = 0;
-    let count = 0;
-    for (const example of results) {
-      if (example.score !== undefined) {
-        scoreSum += example.score;
-        count++;
-      }
-    }
-    return count > 0 ? scoreSum / count : 0;
-  }
 
   // Group results by label
   const groupedResults = new Map<string, {results: IndividualPromptRequestResponse[], metadata: ExampleMetadata[]}>();
@@ -463,84 +718,320 @@ async function main() {
 
   // Write output for each group
   for (const [label, data] of groupedResults) {
-    const score = computeScore(data.results);
-    const output: Output = {
-      score,
+    const output = {
       metadata: data.metadata,
-      examples: data.results,
+      trajectories: data.results,
     };
-    writeOutput(output, {...userArgs, label});
+    writeOutput({
+      output,
+      userArgs: {...userArgs, label},
+      runId,
+      taskStatuses,
+      taskDurations,
+      logger,
+    });
   }
 
+  let graderFailed = false;
   // Run grader once at the end if --grade is set
   if (userArgs.grade) {
     const target = userArgs.testTarget;
     const graderScript = path.resolve(import.meta.dirname, '..', 'suite', `${target}.eval.ts`);
     if (fs.existsSync(graderScript)) {
-      console.info(`\n[Info]: Running grader ${graderScript} at the end`);
+      const graderMsg = `Running grader ${graderScript} at the end`;
+      console.info(`\n[Info]: ${graderMsg}`);
+      logger.append(graderMsg);
       try {
         const cwd = path.resolve(import.meta.dirname, '..');
         const cmd = `node suite/${target}.eval.ts`;
-        console.info(`\n[Info]: Running command: ${cmd} in ${cwd}`);
+        const cmdMsg = `Running command: ${cmd} in ${cwd}`;
+        console.info(`\n[Info]: ${cmdMsg}`);
+        logger.append(cmdMsg);
         const stdout = execSync(cmd, {cwd, encoding: 'utf8'});
         console.info(stdout);
+        logger.append(stdout);
+
+        if (userArgs.upload) {
+          const evalResultPath = path.resolve(import.meta.dirname, 'data', `eval_result-${runId}.json`);
+          fs.writeFileSync(evalResultPath,
+                           JSON.stringify({
+                             runId,
+                             target,
+                             gradingOutput: stdout,
+                           },
+                                          null, 2));
+
+          const scoresPath = path.join(cwd, 'eval_scores.json');
+          const scoresByTaskId: Record<TaskId, number> =
+              fs.existsSync(scoresPath) ? JSON.parse(fs.readFileSync(scoresPath, 'utf8')) : {};
+
+          const allTaskIds = new Set(executionResults.map(r => r.metadata.taskId));
+          for (const taskId of allTaskIds) {
+            const score = scoresByTaskId[taskId] ?? null;
+            const status = (score !== null && score >= PASS_SCORE_THRESHOLD) ? 'PASSED' : 'FAILED';
+
+            uploadEvalToGCS({
+              runId,
+              taskId,
+              localJsonPath: evalResultPath,
+              destinationFileName: TaskOutputFile.EVAL_RESULT,
+            });
+            uploadTaskContent(runId, taskId, TaskOutputFile.GRADER_LOG, stdout);
+            const durationSeconds = taskDurations.get(taskId) ?? 0.0;
+            uploadTaskCompleted({
+              taskId,
+              runId,
+              status,
+              score,
+              durationSeconds,
+              tokens: {},
+            });
+            taskStatuses.push({taskId, status, score});
+          }
+        }
       } catch (error) {
-        console.error(`\n[Error]: Grader failed`, error);
+        graderFailed = true;
+        const errorMsg = error instanceof Error ? (error.stack ?? error.message) : String(error);
+        const errorMessage = `[Error]: Grader failed: ${errorMsg}`;
+        console.error(`\n${errorMessage}`);
+        logger.append(errorMessage);
+        if (userArgs.upload) {
+          const allTaskIds = new Set(executionResults.map(r => r.metadata.taskId));
+          for (const taskId of allTaskIds) {
+            uploadTaskContent(runId, taskId, TaskOutputFile.GRADER_LOG, errorMessage);
+            const durationSeconds = taskDurations.get(taskId) ?? 0.0;
+            recordTaskFailure(taskId, runId, durationSeconds, taskStatuses);
+          }
+        }
       }
     } else {
-      console.warn(`\n[Warn]: Grader script ${graderScript} not found.`);
+      graderFailed = true;
+      const notFoundMessage = `[Error]: Grader script ${graderScript} not found.`;
+      console.error(`\n${notFoundMessage}`);
+      logger.append(notFoundMessage);
+      if (userArgs.upload) {
+        const allTaskIds = new Set(executionResults.map(r => r.metadata.taskId));
+        for (const taskId of allTaskIds) {
+          uploadTaskContent(runId, taskId, TaskOutputFile.GRADER_LOG, notFoundMessage);
+          const durationSeconds = taskDurations.get(taskId) ?? 0.0;
+          recordTaskFailure(taskId, runId, durationSeconds, taskStatuses);
+        }
+      }
     }
+  }
+
+  if (userArgs.upload) {
+    const totalTasks = taskStatuses.length;
+    const failedTasks = taskStatuses.filter(t => t.status === 'FAILED').length;
+    const passedTasks = totalTasks - failedTasks;
+    const runStatus = (graderFailed || failedTasks > 0 || totalTasks === 0) ? 'FAILED' : 'COMPLETED';
+
+    logger.append(`Total tasks: ${totalTasks}, Passed: ${passedTasks}, Failed: ${failedTasks}`);
+    logger.append(`Run completed with status: ${runStatus}`);
+
+    uploadRunLog(runId, logger.getLogContent());
+    uploadRunCompleted({
+      project: PROJECT_ID,
+      runId,
+      status: runStatus,
+      startTime: runStartTimestamp,
+      endTime: new Date().toISOString(),
+      totalTasks,
+      passedTasks,
+      failedTasks,
+    });
   }
 
   logger.destroy();
 }
 
-interface Output {
-  score: number;
-  metadata: ExampleMetadata[];
-  examples: IndividualPromptRequestResponse[];
+/**
+ * Run-wide state shared by every per-task output and upload step.
+ *
+ * Key identifiers:
+ * - `runId` (`RunId`): Identifies the overall `auto-run` suite execution (`runs/<runId>/`).
+ * - `taskId` (`TaskId`): Identifies a single example/task (`tasks/<taskId>/`), stored as
+ *   `taskId` on raw prompt logs (`IndividualPromptRequestResponse`), `ExampleMetadata`,
+ *   `Trajectory['metadata']['task_id']`, and `eval_task_completed.json`.
+ * - `Trajectory['metadata']['session_id']`: Deterministic `<15-char-hash>-<index>` session
+ *   identifier used inside `trajectory.json` and to name local `.eval.json` files.
+ */
+interface EvalRunContext {
+  output: {metadata: ExampleMetadata[], trajectories: IndividualPromptRequestResponse[]};
+  trajectoriesByTaskId: Map<TaskId, IndividualPromptRequestResponse[]>;
+  userArgs: UserArgs;
+  runId: RunId;
+  outputDir: string;
+  gradeTargetDir?: string;
+  taskStatuses: TaskStatus[];
+  taskDurations: Map<TaskId, number>;
+  logger: Logger;
 }
 
-function writeOutput(
-    output: Output,
-    userArgs: UserArgs,
-) {
-  const OUTPUT_DIR = path.resolve(import.meta.dirname, 'data');
-  const dateSuffix = new Date().toISOString().slice(0, 19);
-  const outputPath = path.resolve(OUTPUT_DIR, `${userArgs.label}-${dateSuffix}.json`);
-  fs.mkdirSync(OUTPUT_DIR, {recursive: true});
+/** The parts of {@link EvalRunContext} supplied by the caller; the rest is derived. */
+type WriteOutputOptions = Omit<EvalRunContext, 'outputDir'|'gradeTargetDir'|'trajectoriesByTaskId'>;
 
-  if (output.metadata.length === 0 && output.examples.length === 0) {
+/**
+ * Persists the results of one `--label` group.
+ *
+ * This is the last step of a run: it is called once per label group after every
+ * task has finished and the browser has been disconnected, and just before the
+ * optional `--grade` pass, which picks the exported trajectories back up from
+ * disk.
+ *
+ * Per trajectory it always writes the eval output locally, and additionally
+ * uploads the per-task artifacts and records the task completion when
+ * `--upload` is set.
+ */
+function writeOutput(options: WriteOutputOptions) {
+  const {output, userArgs} = options;
+
+  const outputDir = path.resolve(import.meta.dirname, 'data');
+  fs.mkdirSync(outputDir, {recursive: true});
+
+  if (output.metadata.length === 0 && output.trajectories.length === 0) {
     console.info('\n[Warn]: No results to export.');
     return;
   }
 
-  fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
-  console.info(`\n[Info]: Finished exporting results to ${outputPath}, it took ${formatElapsedTime()}`);
+  const trajectories = convertRawOutputToEval({
+    inputFromAutoRun: output as RawOutput,
+    label: userArgs.label,
+  });
 
-  if (userArgs.eval || userArgs.grade) {
-    const convertedOutput = convertRawOutputToEval({
-      inputFromAutoRun: output as RawOutput,
-      label: userArgs.label,
-    });
-    const evalOutputPath = outputPath.replace('.json', '.eval.json');
-    fs.writeFileSync(evalOutputPath, JSON.stringify(convertedOutput, null, 2));
-    console.info(`\n[Info]: Exported eval output to ${evalOutputPath}`);
+  // When grading, the eval outputs are additionally collected in a dated,
+  // per-test-target folder that the grader reads from.
+  let gradeTargetDir: string|undefined;
+  if (userArgs.grade) {
+    const runDate = new Date().toISOString().slice(0, 10);
+    gradeTargetDir =
+        path.resolve(import.meta.dirname, '..', 'suite', 'outputs', 'outputs', userArgs.testTarget, runDate);
+    fs.mkdirSync(gradeTargetDir, {recursive: true});
+  }
 
-    if (userArgs.grade) {
-      const target = userArgs.testTarget;
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const targetDir = path.resolve(import.meta.dirname, '..', 'suite', 'outputs', 'outputs', target, dateStr);
-      fs.mkdirSync(targetDir, {recursive: true});
+  const trajectoriesByTaskId = Map.groupBy(output.trajectories, e => e.taskId);
+  const ctx: EvalRunContext = {...options, outputDir, gradeTargetDir, trajectoriesByTaskId};
 
-      const copiedFileName = `${userArgs.label}.json`;
-      const copiedFilePath = path.resolve(targetDir, copiedFileName);
+  for (const trajectory of trajectories) {
+    const evalOutputPath = exportEvalTrajectory(ctx, trajectory);
 
-      fs.copyFileSync(evalOutputPath, copiedFilePath);
-      console.info(`\n[Info]: Copied eval output to ${copiedFilePath}`);
+    if (!userArgs.upload) {
+      continue;
+    }
 
+    const allUploadsSucceeded = uploadTaskArtifacts(ctx, trajectory, evalOutputPath);
+    if (!userArgs.grade) {
+      recordTaskCompletion(ctx, trajectory.metadata.task_id, allUploadsSucceeded);
     }
   }
+}
+
+/**
+ * Writes the eval trajectory to the local output directory and, when grading is
+ * enabled, copies it into the dated grading folder. Returns the path of the
+ * canonical local copy.
+ */
+function exportEvalTrajectory(ctx: EvalRunContext, trajectory: Trajectory): string {
+  const fileName = `${slug(ctx.userArgs.label)}-${trajectory.metadata.session_id}`;
+  const evalOutputPath = path.resolve(ctx.outputDir, `${fileName}.eval.json`);
+  fs.writeFileSync(evalOutputPath, JSON.stringify(trajectory, null, 2));
+  console.info(`\n[Info]: Exported eval output to ${evalOutputPath}`);
+
+  if (ctx.gradeTargetDir) {
+    const copiedFilePath = path.resolve(ctx.gradeTargetDir, `${fileName}.json`);
+    fs.copyFileSync(evalOutputPath, copiedFilePath);
+    console.info(`\n[Info]: Copied eval output to ${copiedFilePath}`);
+  }
+
+  return evalOutputPath;
+}
+
+/**
+ * Uploads every per-task artifact to GCS. Returns true only if all of them
+ * were uploaded successfully.
+ */
+function uploadTaskArtifacts(ctx: EvalRunContext, trajectory: Trajectory, evalOutputPath: string): boolean {
+  const {runId, logger} = ctx;
+  const taskId: TaskId = trajectory.metadata.task_id;
+
+  const trajectoryUploaded = uploadEvalToGCS({
+    runId,
+    taskId,
+    localJsonPath: evalOutputPath,
+    destinationFileName: TaskOutputFile.TRAJECTORY,
+  });
+  const agentLogUploaded = uploadTaskContent(runId, taskId, TaskOutputFile.AGENT_LOG, logger.getTaskLogContent(taskId));
+  const chatLogUploaded = uploadTaskContent(runId, taskId, TaskOutputFile.CHAT_LOG, formatChatLog(trajectory));
+  const agentStderrUploaded =
+      uploadTaskContent(runId, taskId, TaskOutputFile.AGENT_STDERR, logger.getTaskStderrContent(taskId));
+  const verificationStdoutUploaded =
+      uploadTaskContent(runId, taskId, TaskOutputFile.VERIFICATION_STDOUT, formatVerificationStdout(ctx, taskId));
+  const verificationStderrUploaded =
+      uploadTaskContent(runId, taskId, TaskOutputFile.VERIFICATION_STDERR, formatVerificationStderr(ctx, taskId));
+
+  return trajectoryUploaded && agentLogUploaded && chatLogUploaded && agentStderrUploaded &&
+      verificationStdoutUploaded && verificationStderrUploaded;
+}
+
+/**
+ * Summarises the outcome of a task's verification step for the
+ * verification_stdout.log artifact.
+ */
+function formatVerificationStdout(ctx: EvalRunContext, taskId: TaskId): string {
+  const matchingTrajectories = ctx.trajectoriesByTaskId.get(taskId) ?? [];
+  const hasError = matchingTrajectories.some(e => Boolean(e.error) ||
+                                                 Boolean(e.assertionFailures && e.assertionFailures.length > 0));
+
+  return [
+    `[Verification] Task: ${taskId}`,
+    `[Verification] Target: ${ctx.userArgs.testTarget}`,
+    `[Verification] Result: ${hasError ? 'FAILED' : 'PASSED'}`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Collects the errors and assertion failures of a task for the
+ * verification_stderr.log artifact. Returns an empty string when the
+ * task did not fail.
+ */
+function formatVerificationStderr(ctx: EvalRunContext, taskId: TaskId): string {
+  const matchingTrajectories = ctx.trajectoriesByTaskId.get(taskId) ?? [];
+  const errorLines = matchingTrajectories.flatMap(
+      e => [...(e.error ? [`[Error]: ${e.error}`] : []),
+            ...(e.assertionFailures ?? []).map(failure => `[AssertionFailure]: ${failure}`),
+  ]);
+
+  return errorLines.length > 0 ? `${errorLines.join('\n')}\n` : '';
+}
+
+/**
+ * Derives the task score and status and reports the completion both to GCS and
+ * to the in-memory run summary.
+ */
+function recordTaskCompletion(ctx: EvalRunContext, taskId: TaskId, allUploadsSucceeded: boolean): void {
+  const {runId, taskDurations, taskStatuses, trajectoriesByTaskId} = ctx;
+  const matchingTrajectories = trajectoriesByTaskId.get(taskId) ?? [];
+  const hasError = matchingTrajectories.some(e => Boolean(e.error) ||
+                                                 Boolean(e.assertionFailures && e.assertionFailures.length > 0));
+
+  // Only report a numeric score if an executor computed an inline assertion score (e.g. PatchingExecutor)
+  // and execution/upload succeeded; otherwise emit null so ungraded tasks or execution failures do not skew averages.
+  const inlineScore = matchingTrajectories.find(e => e.score !== undefined)?.score ?? null;
+  const score = (!allUploadsSucceeded || hasError) ? null : inlineScore;
+  const status =
+      (!allUploadsSucceeded || hasError || (score !== null && score < PASS_SCORE_THRESHOLD)) ? 'FAILED' : 'PASSED';
+  const durationSeconds = taskDurations.get(taskId) ?? 0.0;
+
+  uploadTaskCompleted({
+    taskId,
+    runId,
+    status,
+    score,
+    durationSeconds,
+    tokens: {},
+  });
+  taskStatuses.push({taskId, status, score});
 }
 
 // If run directly, invoke the CLI

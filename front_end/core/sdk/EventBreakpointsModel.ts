@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Root from '../../core/root/root.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 
 import {CategorizedBreakpoint, Category} from './CategorizedBreakpoint.js';
@@ -23,7 +24,6 @@ export const enum InstrumentationNames {
   SET_INTERVAL_CALLBACK = 'setInterval.callback',
   SCRIPT_FIRST_STATEMENT = 'scriptFirstStatement',
   SCRIPT_BLOCKED_BY_CSP = 'scriptBlockedByCSP',
-  SHARED_STORAGE_WORKLET_SCRIPT_FIRST_STATEMENT = 'sharedStorageWorkletScriptFirstStatement',
   REQUEST_ANIMATION_FRAME = 'requestAnimationFrame',
   CANCEL_ANIMATION_FRAME = 'cancelAnimationFrame',
   REQUEST_ANIMATION_FRAME_CALLBACK = 'requestAnimationFrame.callback',
@@ -83,12 +83,11 @@ class EventListenerBreakpoint extends CategorizedBreakpoint {
   static readonly instrumentationPrefix = 'instrumentation:';
 }
 
-let eventBreakpointManagerInstance: EventBreakpointsManager;
-
 export class EventBreakpointsManager implements SDKModelObserver<EventBreakpointsModel> {
   readonly #eventListenerBreakpoints: EventListenerBreakpoint[] = [];
   readonly #targetManager: TargetManager;
 
+  // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
   constructor(targetManager: TargetManager = TargetManager.instance()) {
     this.#targetManager = targetManager;
     this.createInstrumentationBreakpoints(Category.AUCTION_WORKLET, [
@@ -122,9 +121,6 @@ export class EventBreakpointsManager implements SDKModelObserver<EventBreakpoint
       InstrumentationNames.SCRIPT_FIRST_STATEMENT,
       InstrumentationNames.SCRIPT_BLOCKED_BY_CSP,
     ]);
-    this.createInstrumentationBreakpoints(Category.SHARED_STORAGE_WORKLET, [
-      InstrumentationNames.SHARED_STORAGE_WORKLET_SCRIPT_FIRST_STATEMENT,
-    ]);
     this.createInstrumentationBreakpoints(Category.TIMER, [
       InstrumentationNames.SET_TIMEOUT,
       InstrumentationNames.CLEAR_TIMEOUT,
@@ -151,11 +147,17 @@ export class EventBreakpointsManager implements SDKModelObserver<EventBreakpoint
     targetManager?: TargetManager,
   } = {forceNew: null}): EventBreakpointsManager {
     const {forceNew, targetManager} = opts;
-    if (!eventBreakpointManagerInstance || forceNew) {
-      eventBreakpointManagerInstance = new EventBreakpointsManager(targetManager);
+    if (!Root.DevToolsContext.globalInstance().has(EventBreakpointsManager) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(EventBreakpointsManager,
+                                                // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+                                                new EventBreakpointsManager(targetManager ?? TargetManager.instance()));
     }
 
-    return eventBreakpointManagerInstance;
+    return Root.DevToolsContext.globalInstance().get(EventBreakpointsManager);
+  }
+
+  static removeInstance(): void {
+    Root.DevToolsContext.globalInstance().delete(EventBreakpointsManager);
   }
 
   private createInstrumentationBreakpoints(category: Category, instrumentationNames: InstrumentationNames[]): void {

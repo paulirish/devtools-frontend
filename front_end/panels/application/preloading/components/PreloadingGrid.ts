@@ -20,24 +20,24 @@ const {PreloadingStatus} = SDK.PreloadingModel;
 
 const UIStrings = {
   /**
-   * @description Column header: Action of preloading (prefetch/prerender)
+   * @description Column header for the action of a speculative load (prefetch or prerender).
    */
   action: 'Action',
   /**
-   * @description Column header: A rule set of preloading
+   * @description Column header for the rule set of a speculative load.
    */
   ruleSet: 'Rule set',
   /**
-   * @description Column header: Status of preloading attempt
+   * @description Column header for the status of a speculative load attempt.
    */
   status: 'Status',
   /**
-   * @description Status: Prerender failed, but prefetch is available
+   * @description Status text indicating that prerendering failed, but prefetch is available.
    */
   prefetchFallbackReady: 'Prefetch fallback ready',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingGrid.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const {render, html, nothing, Directives: {styleMap}} = Lit;
 

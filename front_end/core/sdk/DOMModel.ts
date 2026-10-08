@@ -38,19 +38,35 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
+import * as Root from '../root/root.js';
 
+import {ConsoleModel} from './ConsoleModel.js';
 import {CSSModel} from './CSSModel.js';
-import {FrameManager} from './FrameManager.js';
+import type {FrameManager} from './FrameManager.js';
 import {OverlayModel} from './OverlayModel.js';
+import {focusInPage, scrollIntoViewInPage, toggleClassAndInjectStyleRule} from './PageFunctions.js';
 import {RemoteObject} from './RemoteObject.js';
 import {Events as ResourceTreeModelEvents, type ResourceTreeFrame, ResourceTreeModel} from './ResourceTreeModel.js';
 import {RuntimeModel} from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
+import {SecurityOrigin} from './SecurityOrigin.js';
 import {Capability, type Target} from './Target.js';
-import {TargetManager} from './TargetManager.js';
+import type {TargetManager} from './TargetManager.js';
+
+export const enum NodeType {
+  ELEMENT_NODE = 1,
+  ATTRIBUTE_NODE = 2,
+  TEXT_NODE = 3,
+  CDATA_SECTION_NODE = 4,
+  PROCESSING_INSTRUCTION_NODE = 7,
+  COMMENT_NODE = 8,
+  DOCUMENT_NODE = 9,
+  DOCUMENT_TYPE_NODE = 10,
+  DOCUMENT_FRAGMENT_NODE = 11,
+}
 
 /** Keep this list in sync with https://w3c.github.io/aria/#state_prop_def **/
-export const ARIA_ATTRIBUTES = new Set<string>([
+export const ARIA_ATTRIBUTES: Set<string> = new Set<string>([
   'role',
   'aria-activedescendant',
   'aria-atomic',
@@ -127,8 +143,50 @@ export interface DOMNodeEventTypes {
   [DOMNodeEvents.CONTAINER_QUERY_OVERLAY_STATE_CHANGED]: {enabled: boolean};
 }
 
+export function cssEscape(value: string): string {
+  const length = value.length;
+  let index = -1;
+  let codeUnit: number;
+  let result = '';
+  const firstCodeUnit = value.charCodeAt(0);
+
+  if (length === 0) {
+    return '';
+  }
+
+  if (length === 1 && firstCodeUnit === 0x002D) {
+    return '\\' + value;
+  }
+
+  while (++index < length) {
+    codeUnit = value.charCodeAt(index);
+    if (codeUnit === 0x0000) {
+      result += '\uFFFD';
+      continue;
+    }
+
+    if ((codeUnit >= 0x0001 && codeUnit <= 0x001F) || codeUnit === 0x007F ||
+        (index === 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+        (index === 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit === 0x002D)) {
+      result += '\\' + codeUnit.toString(16) + ' ';
+      continue;
+    }
+
+    if (codeUnit >= 0x0080 || codeUnit === 0x002D || codeUnit === 0x005F ||
+        (codeUnit >= 0x0030 && codeUnit <= 0x0039) || (codeUnit >= 0x0041 && codeUnit <= 0x005A) ||
+        (codeUnit >= 0x0061 && codeUnit <= 0x007A)) {
+      result += value.charAt(index);
+      continue;
+    }
+
+    result += '\\' + value.charAt(index);
+  }
+  return result;
+}
+
 export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventTypes> {
   #domModel: DOMModel;
+  readonly #frameManager: FrameManager;
   #agent: ProtocolProxyApi.DOMApi;
   ownerDocument!: DOMDocument|null;
   #isInShadowTree!: boolean;
@@ -194,6 +252,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
   constructor(domModel: DOMModel) {
     super();
     this.#domModel = domModel;
+    this.#frameManager = domModel.target().targetManager().getFrameManager();
     this.#agent = this.#domModel.getAgent();
   }
 
@@ -260,7 +319,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
 
     const frameOwnerTags = new Set(['EMBED', 'IFRAME', 'OBJECT', 'FENCEDFRAME']);
     if (payload.contentDocument) {
-      this.contentDocumentInternal = new DOMDocument(this.#domModel, payload.contentDocument);
+      this.contentDocumentInternal = new DOMDocument(this.#domModel, payload.contentDocument, payload.frameId);
       this.contentDocumentInternal.parentNode = this;
       this.childrenInternal = [];
     } else if (payload.frameId && frameOwnerTags.has(payload.nodeName)) {
@@ -294,7 +353,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
       this.#adProvenance = payload.adProvenance;
     }
 
-    if (this.#nodeType === Node.ELEMENT_NODE) {
+    if (this.#nodeType === NodeType.ELEMENT_NODE) {
       // HTML and BODY from internal iframes should not overwrite top-level ones.
       if (this.ownerDocument && !this.ownerDocument.documentElement && this.#nodeName === 'HTML') {
         this.ownerDocument.documentElement = this;
@@ -302,18 +361,18 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
       if (this.ownerDocument && !this.ownerDocument.body && this.#nodeName === 'BODY') {
         this.ownerDocument.body = this;
       }
-    } else if (this.#nodeType === Node.DOCUMENT_TYPE_NODE) {
+    } else if (this.#nodeType === NodeType.DOCUMENT_TYPE_NODE) {
       this.publicId = payload.publicId;
       this.systemId = payload.systemId;
       this.internalSubset = payload.internalSubset;
-    } else if (this.#nodeType === Node.ATTRIBUTE_NODE) {
+    } else if (this.#nodeType === NodeType.ATTRIBUTE_NODE) {
       this.name = payload.name;
       this.value = payload.value;
     }
   }
 
   private async requestChildDocument(frameId: Protocol.Page.FrameId, notInTarget: Target): Promise<DOMDocument|null> {
-    const frame = await FrameManager.instance().getOrWaitForFrame(frameId, notInTarget);
+    const frame = await this.#frameManager.getOrWaitForFrame(frameId, notInTarget);
     const childModel = frame.resourceTreeModel()?.target().model(DOMModel);
     return await (childModel?.requestDocument() || null);
   }
@@ -330,6 +389,14 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
     return this.#topLayerIndex;
   }
 
+  /**
+   * Returns the security origin of the document owning this node, or `null` if
+   * this node is not attached to a document.
+   */
+  securityOrigin(): SecurityOrigin|null {
+    return this.ownerDocument?.securityOrigin() ?? null;
+  }
+
   adProvenance(): Protocol.Network.AdProvenance|undefined {
     if (this.#adProvenance !== undefined) {
       return this.#adProvenance;
@@ -341,7 +408,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
       return undefined;
     }
 
-    const frame = FrameManager.instance().getFrame(this.#frameOwnerFrameId);
+    const frame = this.#frameManager.getFrame(this.#frameOwnerFrameId);
     if (frame && frame.adFrameType() !== Protocol.Page.AdFrameType.None) {
       // The frame is ad-related, but provenance information is unavailable.
       return {};
@@ -351,7 +418,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
   }
 
   isRootNode(): boolean {
-    if (this.nodeType() === Node.ELEMENT_NODE && this.nodeName() === 'HTML') {
+    if (this.nodeType() === NodeType.ELEMENT_NODE && this.nodeName() === 'HTML') {
       return true;
     }
     return false;
@@ -510,6 +577,10 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
 
   pickerIconPseudoElement(): DOMNode|undefined {
     return this.#pseudoElements.get(Protocol.DOM.PseudoType.PickerIcon)?.at(-1);
+  }
+
+  interestButtonPseudoElement(): DOMNode|undefined {
+    return this.#pseudoElements.get(Protocol.DOM.PseudoType.InterestButton)?.at(-1);
   }
 
   markerPseudoElement(): DOMNode|undefined {
@@ -755,7 +826,7 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
       if (node.isShadowRoot()) {
         return node.shadowRootType() === DOMNode.ShadowRootTypes.UserAgent ? 'u' : 'a';
       }
-      if (node.nodeType() === Node.DOCUMENT_NODE) {
+      if (node.nodeType() === NodeType.DOCUMENT_NODE) {
         return 'd';
       }
       return null;
@@ -1006,8 +1077,87 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
         });
   }
 
+  async duplicate(): Promise<{error: string | null, node: DOMNode|null}> {
+    if (this.isInShadowTree()) {
+      return {error: 'Cannot duplicate node in shadow tree', node: null};
+    }
+
+    const parentNode = this.parentNode ? this.parentNode : this;
+    if (parentNode.nodeName() === '#document') {
+      return {error: 'Parent node is document', node: null};
+    }
+
+    return await new Promise(resolve => {
+      this.copyTo(parentNode, this.nextSibling, (error, node) => resolve({error, node}));
+    });
+  }
+
+  /**
+   * Runs a script on the node's remote object that toggles a class name on
+   * the node and injects a stylesheet into the head of the node's document
+   * containing a rule to set "visibility: hidden" on the class and all it's
+   * ancestors.
+   */
+  async toggleHideElement(): Promise<void> {
+    let pseudoElementName = this.pseudoType() ? this.nodeName() : null;
+    const pseudoIdentifier = this.pseudoIdentifier();
+    if (pseudoElementName && pseudoIdentifier) {
+      pseudoElementName += `(${cssEscape(pseudoIdentifier)})`;
+    }
+
+    let effectiveNode: DOMNode|null = this;
+    while (effectiveNode?.pseudoType()) {
+      if (effectiveNode !== this && effectiveNode.pseudoType() === 'column') {
+        // Ideally we would select the specific column pseudo element, but
+        // we don't have a way to do that at the moment.
+        pseudoElementName = '::column' + pseudoElementName;
+      }
+      effectiveNode = effectiveNode.parentNode;
+    }
+    if (!effectiveNode) {
+      return;
+    }
+
+    const hidden = this.marker('hidden-marker');
+    const object = await effectiveNode.resolveToObject('');
+
+    if (!object) {
+      return;
+    }
+
+    await object.callFunction((toggleClassAndInjectStyleRule as (this: Object, ...arg1: unknown[]) => void),
+                              [{value: pseudoElementName}, {value: !hidden}]);
+    object.release();
+    this.setMarker('hidden-marker', hidden ? null : true);
+  }
+
+  isToggledToHidden(): boolean {
+    return Boolean(this.marker('hidden-marker'));
+  }
+
   isXMLNode(): boolean {
     return Boolean(this.#xmlVersion);
+  }
+
+  isCustomElement(): boolean {
+    if (this.nodeType() !== NodeType.ELEMENT_NODE || this.isXMLNode() || Boolean(this.pseudoType())) {
+      return false;
+    }
+    const localName = this.localName() || this.nodeName().toLowerCase();
+    if (localName.includes('-')) {
+      const builtInExclusionList = [
+        'annotation-xml',
+        'color-profile',
+        'font-face',
+        'font-face-src',
+        'font-face-uri',
+        'font-face-format',
+        'font-face-name',
+        'missing-glyph',
+      ];
+      return !builtInExclusionList.includes(localName);
+    }
+    return this.getAttribute('is') !== undefined;
   }
 
   setMarker(name: string, value: unknown): void {
@@ -1099,43 +1249,49 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
     return model;
   }
 
+  canInspectNode(): boolean {
+    if (this.ancestorUserAgentShadowRoot()) {
+      return false;
+    }
+
+    if (this.#pseudoType) {
+      return [
+        Protocol.DOM.PseudoType.Before,
+        Protocol.DOM.PseudoType.After,
+        Protocol.DOM.PseudoType.Marker,
+        Protocol.DOM.PseudoType.ScrollMarker,
+        Protocol.DOM.PseudoType.Backdrop,
+        Protocol.DOM.PseudoType.ViewTransition,
+        Protocol.DOM.PseudoType.ViewTransitionGroup,
+        Protocol.DOM.PseudoType.ViewTransitionImagePair,
+        Protocol.DOM.PseudoType.ViewTransitionOld,
+        Protocol.DOM.PseudoType.ViewTransitionNew,
+      ].includes(this.#pseudoType);
+    }
+    return true;
+  }
+
   async setAsInspectedNode(): Promise<void> {
-    let node: DOMNode|null = this;
-    if (node?.pseudoType()) {
-      node = node.parentNode;
+    if (!this.canInspectNode()) {
+      return;
     }
-    while (node) {
-      let ancestor = node.ancestorUserAgentShadowRoot();
-      if (!ancestor) {
-        break;
-      }
-      ancestor = node.ancestorShadowHost();
-      if (!ancestor) {
-        break;
-      }
-      // User #agent shadow root, keep climbing up.
-      node = ancestor;
-    }
-    if (!node) {
-      throw new Error('In DOMNode.setAsInspectedNode: node is expected to not be null.');
-    }
-    await this.#agent.invoke_setInspectedNode({nodeId: node.id});
+    await this.#agent.invoke_setInspectedNode({nodeId: this.id});
   }
 
   enclosingElementOrSelf(): DOMNode|null {
     let node: DOMNode|null = this;
-    if (node && node.nodeType() === Node.TEXT_NODE && node.parentNode) {
+    if (node && node.nodeType() === NodeType.TEXT_NODE && node.parentNode) {
       node = node.parentNode;
     }
 
-    if (node && node.nodeType() !== Node.ELEMENT_NODE) {
+    if (node && node.nodeType() !== NodeType.ELEMENT_NODE) {
       node = null;
     }
     return node;
   }
 
-  async callFunction<T, U extends string|number>(fn: (this: HTMLElement, ...args: U[]) => T, args: U[] = []):
-      Promise<{value: T}|null> {
+  async callFunction<T, U extends string|number, This = never>(fn: (this: This, ...args: U[]) => T,
+                                                               args: U[] = []): Promise<{value: T}|null> {
     const object = await this.resolveToObject();
     if (!object) {
       return null;
@@ -1151,22 +1307,23 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
     };
   }
 
+  async saveNodeToTempVariable(): Promise<void> {
+    const remoteObjectForConsole = await this.resolveToObject();
+    const consoleModel = this.#domModel.target().model(ConsoleModel);
+    await consoleModel?.saveToTempVariable(remoteObjectForConsole?.runtimeModel().defaultExecutionContext() ?? null,
+                                           remoteObjectForConsole);
+  }
+
   async scrollIntoView(): Promise<void> {
     const node = this.enclosingElementOrSelf();
     if (!node) {
       return;
     }
 
-    const result = await node.callFunction(scrollIntoViewInPage);
-    if (!result) {
-      return;
-    }
-
+    // Highlight synchronously before scrolling to avoid out-of-order highlights
+    // if asynchronous scroll calls resolve late during rapid navigation.
     node.highlightForTwoSeconds();
-
-    function scrollIntoViewInPage(this: Element): void {
-      this.scrollIntoViewIfNeeded(true);
-    }
+    await node.callFunction(scrollIntoViewInPage);
   }
 
   async focus(): Promise<void> {
@@ -1181,15 +1338,11 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
 
     node.highlightForTwoSeconds();
     await this.#domModel.target().pageAgent().invoke_bringToFront();
-
-    function focusInPage(this: HTMLElement): void {
-      this.focus();
-    }
   }
 
   simpleSelector(): string {
     const lowerCaseName = this.localName() || this.nodeName().toLowerCase();
-    if (this.nodeType() !== Node.ELEMENT_NODE) {
+    if (this.nodeType() !== NodeType.ELEMENT_NODE) {
       return lowerCaseName;
     }
     const type = this.getAttribute('type');
@@ -1197,17 +1350,18 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
     const classes = this.getAttribute('class');
 
     if (lowerCaseName === 'input' && type && !id && !classes) {
-      return lowerCaseName + '[type="' + CSS.escape(type) + '"]';
+      return lowerCaseName + '[type="' + cssEscape(type) + '"]';
     }
     if (id) {
-      return lowerCaseName + '#' + CSS.escape(id);
+      return lowerCaseName + '#' + cssEscape(id);
     }
     if (classes) {
       const classList = classes.trim().split(/\s+/g);
-      return (lowerCaseName === 'div' ? '' : lowerCaseName) + '.' + classList.map(cls => CSS.escape(cls)).join('.');
+      return (lowerCaseName === 'div' ? '' : lowerCaseName) + '.' + classList.map(cls => cssEscape(cls)).join('.');
     }
-    if (this.pseudoIdentifier()) {
-      return `${lowerCaseName}(${this.pseudoIdentifier()})`;
+    const pseudoIdentifier = this.pseudoIdentifier();
+    if (pseudoIdentifier) {
+      return `${lowerCaseName}(${cssEscape(pseudoIdentifier)})`;
     }
     return lowerCaseName;
   }
@@ -1225,16 +1379,41 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
     return this.domModel().nodeForId(response.nodeId);
   }
 
-  async takeSnapshot(ownerDocumentSnapshot?: DOMDocument): Promise<DOMNode> {
-    const snapshot = (this instanceof DOMDocument) ? new DOMDocumentSnapshot(this.domModel(), {
+  async getImplicitAnchorCandidates(): Promise<DeferredDOMNode[]> {
+    const response = await this.#agent.invoke_getImplicitAnchorCandidates({
       nodeId: this.id,
-      backendNodeId: this.backendNodeId(),
-      nodeType: this.nodeType(),
-      nodeName: this.nodeName(),
-      localName: this.localName(),
-      nodeValue: this.nodeValueInternal,
-    } as Protocol.DOM.Node) :
-                                                     new DOMNodeSnapshot(this.domModel());
+    });
+
+    if (response.getError() || !response.backendNodeIds) {
+      return [];
+    }
+
+    const target = this.domModel().target();
+    return response.backendNodeIds.map(backendNodeId => new DeferredDOMNode(target, backendNodeId));
+  }
+
+  async takeSnapshot(ownerDocumentSnapshot?: DOMDocument): Promise<DOMNode> {
+    let snapshot: DOMNode;
+    if (this instanceof DOMDocument) {
+      const doc: DOMDocument = this;
+      snapshot = new DOMDocumentSnapshot(
+          this.domModel(),
+          {
+            nodeId: this.id,
+            backendNodeId: this.backendNodeId(),
+            nodeType: this.nodeType(),
+            nodeName: this.nodeName(),
+            localName: this.localName(),
+            nodeValue: this.nodeValueInternal,
+            documentURL: this.documentURL,
+            baseURL: this.baseURL,
+          } as Protocol.DOM.Node,
+          this.frameId(),
+          doc.securityOrigin(),
+      );
+    } else {
+      snapshot = new DOMNodeSnapshot(this.domModel());
+    }
     snapshot.id = this.id;
     snapshot.#backendNodeId = this.#backendNodeId;
     snapshot.#frameOwnerFrameId = this.#frameOwnerFrameId;
@@ -1253,11 +1432,6 @@ export class DOMNode extends Common.ObjectWrapper.ObjectWrapper<DOMNodeEventType
         ownerDocumentSnapshot || ((snapshot instanceof DOMDocument) ? snapshot : this.ownerDocument);
     snapshot.#isInShadowTree = this.#isInShadowTree;
     snapshot.childNodeCountInternal = this.childNodeCountInternal;
-
-    if (snapshot instanceof DOMDocument && this instanceof DOMDocument) {
-      snapshot.documentURL = this.documentURL;
-      snapshot.baseURL = this.baseURL;
-    }
 
     if (!this.childrenInternal && this.childNodeCountInternal > 0) {
       await this.getSubtree(1, false);
@@ -1409,15 +1583,70 @@ export class DOMNodeShortcut {
 export class DOMDocument extends DOMNode {
   body: DOMNode|null;
   documentElement: DOMNode|null;
-  documentURL: Platform.DevToolsPath.UrlString;
-  baseURL: Platform.DevToolsPath.UrlString;
-  constructor(domModel: DOMModel, payload: Protocol.DOM.Node) {
+  #documentURL: Platform.DevToolsPath.UrlString;
+  #baseURL: Platform.DevToolsPath.UrlString;
+  #frameId: Protocol.Page.FrameId|null;
+  #securityOrigin: SecurityOrigin;
+
+  constructor(
+      domModel: DOMModel,
+      payload: Protocol.DOM.Node,
+      frameId?: Protocol.Page.FrameId|null,
+  ) {
     super(domModel);
     this.body = null;
     this.documentElement = null;
     this.init(this, false, payload);
-    this.documentURL = (payload.documentURL || '') as Platform.DevToolsPath.UrlString;
-    this.baseURL = (payload.baseURL || '') as Platform.DevToolsPath.UrlString;
+    this.#documentURL = (payload.documentURL || '') as Platform.DevToolsPath.UrlString;
+    this.#baseURL = (payload.baseURL || '') as Platform.DevToolsPath.UrlString;
+    this.#frameId = frameId ?? null;
+
+    const resourceTreeModel = this.domModel().target().model(ResourceTreeModel);
+    const frame = this.#frameId ? resourceTreeModel?.frameForId(this.#frameId) : null;
+    if (frame) {
+      this.#securityOrigin = frame.securityOrigin();
+    } else if (resourceTreeModel?.mainFrame) {
+      // If the target has an active frame tree, a DOMDocument without a matching
+      // frame is a detached document and must be isolated with an opaque origin.
+      this.#securityOrigin = SecurityOrigin.createUniqueOpaque();
+    } else {
+      // TODO(b/567434846): Migrate synthetic unit tests to attach frames so this
+      // fallback to parsing documentURL can be removed.
+      this.#securityOrigin = SecurityOrigin.create(this.#documentURL);
+    }
+  }
+
+  get documentURL(): Platform.DevToolsPath.UrlString {
+    return this.#documentURL;
+  }
+
+  get baseURL(): Platform.DevToolsPath.UrlString {
+    return this.#baseURL;
+  }
+
+  override frameId(): Protocol.Page.FrameId|null {
+    return this.#frameId;
+  }
+
+  /**
+   * Returns the security origin of this document.
+   *
+   * The security origin is resolved from the document's frame and is recomputed
+   * when the document navigates to a new URL via `setDocumentURL`.
+   */
+  override securityOrigin(): SecurityOrigin {
+    return this.#securityOrigin;
+  }
+
+  /**
+   * Updates the document and base URLs, and updates the document's security origin.
+   */
+  setDocumentURL(url: Platform.DevToolsPath.UrlString, securityOrigin?: SecurityOrigin|null): void {
+    this.#documentURL = url;
+    this.#baseURL = url;
+    // Prefer the canonical security origin from the frame, falling back to creating
+    // an origin from the URL as a last resort for test environments.
+    this.#securityOrigin = securityOrigin ?? SecurityOrigin.create(url);
   }
 }
 
@@ -1432,15 +1661,15 @@ export class AdoptedStyleSheet {
 
 export class DOMModel extends SDKModel<EventTypes> {
   agent: ProtocolProxyApi.DOMApi;
-  idToDOMNode = new Map<Protocol.DOM.NodeId, DOMNode>();
-  frameIdToOwnerNode = new Map<Protocol.Page.FrameId, DOMNode>();
+  idToDOMNode: Map<Protocol.DOM.NodeId, DOMNode> = new Map<Protocol.DOM.NodeId, DOMNode>();
+  frameIdToOwnerNode: Map<Protocol.Page.FrameId, DOMNode> = new Map<Protocol.Page.FrameId, DOMNode>();
   #document: DOMDocument|null = null;
   readonly #attributeLoadNodeIds = new Set<Protocol.DOM.NodeId>();
   readonly runtimeModelInternal: RuntimeModel;
   #lastMutationId!: number;
   #pendingDocumentRequestPromise: Promise<DOMDocument|null>|null = null;
   #frameOwnerNode?: DOMNode|null;
-  #loadNodeAttributesTimeout?: number;
+  #loadNodeAttributesTimeout?: ReturnType<typeof setTimeout>;
   #searchId?: string;
   #topLayerThrottler = new Common.Throttler.Throttler(100);
   #topLayerNodes: DOMNode[] = [];
@@ -1474,7 +1703,7 @@ export class DOMModel extends SDKModel<EventTypes> {
     return this.target().model(OverlayModel) as OverlayModel;
   }
 
-  static cancelSearch(targetManager: TargetManager = TargetManager.instance()): void {
+  static cancelSearch(targetManager: TargetManager): void {
     for (const domModel of targetManager.models(DOMModel)) {
       domModel.cancelSearch();
     }
@@ -1503,8 +1732,7 @@ export class DOMModel extends SDKModel<EventTypes> {
     if (node) {
       const contentDocument = node.contentDocument();
       if (contentDocument && contentDocument.documentURL !== frame.url) {
-        contentDocument.documentURL = frame.url;
-        contentDocument.baseURL = frame.url;
+        contentDocument.setDocumentURL(frame.url, frame.securityOrigin());
         this.dispatchEventToListeners(Events.DocumentURLChanged, contentDocument);
       }
     }
@@ -1629,7 +1857,7 @@ export class DOMModel extends SDKModel<EventTypes> {
   inlineStyleInvalidated(nodeIds: Protocol.DOM.NodeId[]): void {
     nodeIds.forEach(nodeId => this.#attributeLoadNodeIds.add(nodeId));
     if (!this.#loadNodeAttributesTimeout) {
-      this.#loadNodeAttributesTimeout = window.setTimeout(this.loadNodeAttributes.bind(this), 20);
+      this.#loadNodeAttributesTimeout = globalThis.setTimeout(this.loadNodeAttributes.bind(this), 20);
     }
   }
 
@@ -1688,11 +1916,12 @@ export class DOMModel extends SDKModel<EventTypes> {
     this.idToDOMNode = new Map();
     this.frameIdToOwnerNode = new Map();
     if (payload && 'nodeId' in payload) {
-      this.#document = new DOMDocument(this, payload);
+      const mainFrameId = this.target().model(ResourceTreeModel)?.mainFrame?.id;
+      this.#document = new DOMDocument(this, payload, mainFrameId);
     } else {
       this.#document = null;
     }
-    DOMModelUndoStack.instance().dispose(this);
+    this.#undoStack().dispose(this);
 
     if (!this.parentModel()) {
       this.dispatchEventToListeners(Events.DocumentUpdated, this);
@@ -2028,7 +2257,7 @@ export class DOMModel extends SDKModel<EventTypes> {
   }
 
   markUndoableState(minorChange?: boolean): void {
-    void DOMModelUndoStack.instance().markUndoableState(this, minorChange || false);
+    void this.#undoStack().markUndoableState(this, minorChange || false);
   }
 
   async nodeForLocation(x: number, y: number, includeUserAgentShadowDOM: boolean): Promise<DOMNode|null> {
@@ -2065,7 +2294,17 @@ export class DOMModel extends SDKModel<EventTypes> {
 
   override dispose(): void {
     this.#resourceTreeModel?.removeEventListener(ResourceTreeModelEvents.DocumentOpened, this.onDocumentOpened, this);
-    DOMModelUndoStack.instance().dispose(this);
+    this.#undoStack().dispose(this);
+  }
+
+  // TODO(crbug.com/493763857): Remove fallback once all unit tests use TestUniverse.
+  #undoStack(): DOMModelUndoStack {
+    const context = this.target().targetManager().context;
+    if ('has' in context && typeof context.has === 'function' && context.has(DOMModelUndoStack)) {
+      return context.get(DOMModelUndoStack);
+    }
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return DOMModelUndoStack.instance();
   }
 
   parentModel(): DOMModel|null {
@@ -2206,8 +2445,6 @@ class DOMDispatcher implements ProtocolProxyApi.DOMDispatcher {
   }
 }
 
-let domModelUndoStackInstance: DOMModelUndoStack|null = null;
-
 export class DOMModelUndoStack {
   #stack: DOMModel[];
   #index: number;
@@ -2222,11 +2459,11 @@ export class DOMModelUndoStack {
     forceNew: boolean|null,
   } = {forceNew: null}): DOMModelUndoStack {
     const {forceNew} = opts;
-    if (!domModelUndoStackInstance || forceNew) {
-      domModelUndoStackInstance = new DOMModelUndoStack();
+    if (!Root.DevToolsContext.globalInstance().has(DOMModelUndoStack) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(DOMModelUndoStack, new DOMModelUndoStack());
     }
 
-    return domModelUndoStackInstance;
+    return Root.DevToolsContext.globalInstance().get(DOMModelUndoStack);
   }
 
   async markUndoableState(model: DOMModel, minorChange: boolean): Promise<void> {
@@ -2330,12 +2567,36 @@ export class DOMNodeSnapshot extends DOMNode {
       _callback?: ((arg0: string|null, arg1: DOMNode|null) => void)|undefined): void {
   }
 
+  override duplicate(): Promise<{error: string | null, node: DOMNode|null}> {
+    return Promise.resolve({error: null, node: null});
+  }
+
+  override canInspectNode(): boolean {
+    return false;
+  }
+
   override setAsInspectedNode(): Promise<void> {
     return Promise.resolve();
   }
 }
 
 export class DOMDocumentSnapshot extends DOMDocument {
+  readonly #snapshotSecurityOrigin: SecurityOrigin;
+
+  constructor(
+      domModel: DOMModel,
+      payload: Protocol.DOM.Node,
+      frameId: Protocol.Page.FrameId|null|undefined,
+      securityOrigin: SecurityOrigin,
+  ) {
+    super(domModel, payload, frameId);
+    this.#snapshotSecurityOrigin = securityOrigin;
+  }
+
+  override securityOrigin(): SecurityOrigin {
+    return this.#snapshotSecurityOrigin;
+  }
+
   override init(
       _doc: DOMDocument|null, _isInShadowTree: boolean, _payload: Protocol.DOM.Node,
       _retainedNodes?: Set<Protocol.DOM.BackendNodeId>|undefined): void {
@@ -2373,6 +2634,14 @@ export class DOMDocumentSnapshot extends DOMDocument {
   override moveTo(
       _targetNode: DOMNode, _anchorNode: DOMNode|null,
       _callback?: ((arg0: string|null, arg1: DOMNode|null) => void)|undefined): void {
+  }
+
+  override duplicate(): Promise<{error: string | null, node: DOMNode|null}> {
+    return Promise.resolve({error: null, node: null});
+  }
+
+  override canInspectNode(): boolean {
+    return false;
   }
 
   override setAsInspectedNode(): Promise<void> {

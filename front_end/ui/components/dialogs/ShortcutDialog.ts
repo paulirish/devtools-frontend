@@ -13,12 +13,13 @@ import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import {html, nothing, render, type TemplateResult} from '../../../ui/lit/lit.js';
 
 import type {ButtonDialogData} from './ButtonDialog.js';
+import {DialogHorizontalAlignment} from './Dialog.js';
 import shortcutDialogStyles from './shortcutDialog.css.js';
 
 const UIStrings = {
 
   /**
-   * @description Title of question mark button for the shortcuts dialog.
+   * @description Title of the question mark button for the shortcuts dialog.
    */
   showShortcutTitle: 'Show shortcuts',
   /**
@@ -116,6 +117,7 @@ export class ShortcutDialog extends HTMLElement {
           variant: Buttons.Button.Variant.TOOLBAR,
           iconName: 'help',
           iconTitle: i18nString(UIStrings.showShortcutTitle),
+          horizontalAlignment: DialogHorizontalAlignment.AUTO,
         } as ButtonDialogData}>
         <ul class="keybinds-list">
           ${(this.#prependedElement) ? html`${this.#prependedElement}` : nothing}

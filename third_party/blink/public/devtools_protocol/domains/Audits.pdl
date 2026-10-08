@@ -36,7 +36,6 @@ experimental domain Audits
       ExcludeSameSiteLax
       ExcludeSameSiteStrict
       ExcludeDomainNonASCII
-      ExcludeThirdPartyCookieBlockedInFirstPartySet
       ExcludeThirdPartyPhaseout
       ExcludePortMismatch
       ExcludeSchemeMismatch
@@ -124,7 +123,6 @@ experimental domain Audits
 
   type MixedContentResourceType extends string
     enum
-      AttributionSrc
       Audio
       Beacon
       CSPReport
@@ -270,31 +268,6 @@ experimental domain Audits
       optional Network.IPAddressSpace resourceIPAddressSpace
       optional Network.ClientSecurityState clientSecurityState
 
-  type AttributionReportingIssueType extends string
-    enum
-      PermissionPolicyDisabled
-      UntrustworthyReportingOrigin
-      InsecureContext
-      # TODO(apaseltiner): Rename this to InvalidRegisterSourceHeader
-      InvalidHeader
-      InvalidRegisterTriggerHeader
-      SourceAndTriggerHeaders
-      SourceIgnored
-      TriggerIgnored
-      OsSourceIgnored
-      OsTriggerIgnored
-      InvalidRegisterOsSourceHeader
-      InvalidRegisterOsTriggerHeader
-      WebAndOsHeaders
-      NoWebOrOsSupport
-      NavigationRegistrationWithoutTransientUserActivation
-      InvalidInfoHeader
-      NoRegisterSourceHeader
-      NoRegisterTriggerHeader
-      NoRegisterOsSourceHeader
-      NoRegisterOsTriggerHeader
-      NavigationRegistrationUniqueScopeAlreadySet
-
   type SharedDictionaryError extends string
     enum
       UseErrorCrossOriginNoCorsRequest
@@ -367,15 +340,9 @@ experimental domain Audits
       InvalidAllowlistItemType
       ReportingEndpointNotToken
       InvalidUrlPattern
-
-  # Details for issues around "Attribution Reporting API" usage.
-  # Explainer: https://github.com/WICG/attribution-reporting-api
-  type AttributionReportingIssueDetails extends object
-    properties
-      AttributionReportingIssueType violationType
-      optional AffectedRequest request
-      optional DOM.BackendNodeId violatingNodeId
-      optional string invalidParameter
+      IFrameAttributeLoosensEmbeddingRequirement
+      InvalidAllowConnectionAllowlistFrom
+      EmbeddingRequirementNotSatisfied
 
 # Details for issues about documents in Quirks Mode
 # or Limited Quirks Mode that affects page layouting.
@@ -503,6 +470,7 @@ experimental domain Audits
       TooManyRequests
       WellKnownHttpNotFound
       WellKnownNoResponse
+      WellKnownBlockedByConnectionAllowlist
       WellKnownInvalidResponse
       WellKnownListEmpty
       WellKnownInvalidContentType
@@ -510,6 +478,7 @@ experimental domain Audits
       WellKnownTooBig
       ConfigHttpNotFound
       ConfigNoResponse
+      ConfigBlockedByConnectionAllowlist
       ConfigInvalidResponse
       ConfigInvalidContentType
       IdpNotPotentiallyTrustworthy
@@ -519,11 +488,13 @@ experimental domain Audits
       InvalidSigninResponse
       AccountsHttpNotFound
       AccountsNoResponse
+      AccountsBlockedByConnectionAllowlist
       AccountsInvalidResponse
       AccountsListEmpty
       AccountsInvalidContentType
       IdTokenHttpNotFound
       IdTokenNoResponse
+      IdTokenBlockedByConnectionAllowlist
       IdTokenInvalidResponse
       IdTokenIdpErrorResponse
       IdTokenCrossSiteIdpErrorResponse
@@ -541,6 +512,7 @@ experimental domain Audits
       UiDismissedNoEmbargo
       CorsError
       SuppressedBySegmentationPlatform
+      PopupBlockedByConnectionAllowlist
 
   type FederatedAuthUserInfoRequestIssueDetails extends object
     properties
@@ -592,6 +564,42 @@ experimental domain Audits
       WellKnownMissingAccountsEndpoint
       UserLoggedOut
       WellKnownAccountsEndpointCrossOrigin
+      AccountsHttpNotFound
+      AccountsNoResponse
+      AccountsInvalidResponse
+      AccountsInvalidContentType
+      AccountsEmptyList
+      EmailVerificationWellKnownHttpNotFound
+      EmailVerificationWellKnownNoResponse
+      EmailVerificationWellKnownInvalidResponse
+      EmailVerificationWellKnownInvalidContentType
+      JwksHttpNotFound
+      JwksInvalidResponse
+      TokenVerificationSdJwtUnsupportedHeaderAlg
+      TokenVerificationSdJwtInvalidTyp
+      TokenVerificationSdJwtMissingIss
+      TokenVerificationSdJwtMissingIat
+      TokenVerificationSdJwtMissingCnf
+      TokenVerificationSdJwtMissingEmail
+      TokenVerificationSdJwtInvalidIssuedAt
+      TokenVerificationSdJwtInvalidIssuer
+      TokenVerificationSdJwtJwksMissingKeys
+      TokenVerificationSdJwtSignatureFailed
+      TokenVerificationSdJwtInvalidEmailVerified
+      TokenVerificationSdJwtInvalidEmail
+      TokenVerificationSdJwtInvalidHolderKey
+      TokenVerificationKbInvalidTyp
+      TokenVerificationKbMissingAud
+      TokenVerificationKbMissingNonce
+      TokenVerificationKbMissingIat
+      TokenVerificationKbMissingSdHash
+      TokenVerificationKbInvalidIssuedAt
+      TokenVerificationKbInvalidAudience
+      TokenVerificationKbInvalidNonce
+      TokenVerificationKbInvalidSdHash
+      TokenVerificationKbMissingCnf
+      TokenVerificationKbSignatureFailed
+      CrossOriginIframeNotSupported
 
   # This issue tracks client hints related issues. It's used to deprecate old
   # features, encourage the use of new ones, and provide general guidance.
@@ -708,6 +716,8 @@ experimental domain Audits
       FontSizeTooSmall
       FontSizeTooLarge
       InvalidSizeValue
+      NonSecureContext
+      MissingTransientUserActivation
 
   # This issue warns about improper usage of the <permission> element.
   type PermissionElementIssueDetails extends object
@@ -730,6 +740,21 @@ experimental domain Audits
       # Used for messages about activation disabled reason
       optional string disableReason
 
+  type WebInstallIssueReason extends string
+    enum
+      ManifestParsingOrNetworkError
+      StartUrlInvalid
+      ManifestMissingNameOrShortName
+      ManifestMissingId
+      NoManifest
+
+  # This issue reports a failure involving a web app manifest used by a Web
+  # Install operation.
+  type WebInstallIssueDetails extends object
+    properties
+      optional string manifestUrl
+      WebInstallIssueReason reason
+
   # The issue warns about blocked calls to privacy sensitive APIs via the
   # Selective Permissions Intervention.
   type SelectivePermissionsInterventionIssueDetails extends object
@@ -740,6 +765,16 @@ experimental domain Audits
       Network.AdAncestry adAncestry
       # The stack trace at the time of the intervention.
       optional Runtime.StackTrace stackTrace
+
+  # Details for issues about lazy-loaded images without explicit dimensions.
+  type LazyLoadImageIssueDetails extends object
+    properties
+      # DOM node of the problematic HTMLImageElement.
+      DOM.BackendNodeId nodeId
+      # URL or src attribute of the image.
+      string url
+      # Frame containing the image.
+      Page.FrameId frameId
 
   # A unique identifier for the type of issue. Each type may use one of the
   # optional fields in InspectorIssueDetails to convey more specific
@@ -753,7 +788,6 @@ experimental domain Audits
       ContentSecurityPolicyIssue
       SharedArrayBufferIssue
       CorsIssue
-      AttributionReportingIssue
       QuirksModeIssue
       PartitioningBlobURLIssue
       # Deprecated
@@ -777,6 +811,8 @@ experimental domain Audits
       PerformanceIssue
       SelectivePermissionsInterventionIssue
       EmailVerificationRequestIssue
+      LazyLoadImageIssue
+      WebInstallIssue
 
   # This struct holds a list of optional fields with additional information
   # specific to the kind of issue. When adding a new issue code, please also
@@ -790,7 +826,6 @@ experimental domain Audits
       optional ContentSecurityPolicyIssueDetails contentSecurityPolicyIssueDetails
       optional SharedArrayBufferIssueDetails sharedArrayBufferIssueDetails
       optional CorsIssueDetails corsIssueDetails
-      optional AttributionReportingIssueDetails attributionReportingIssueDetails
       optional QuirksModeIssueDetails quirksModeIssueDetails
       optional PartitioningBlobURLIssueDetails partitioningBlobURLIssueDetails
       deprecated optional NavigatorUserAgentIssueDetails navigatorUserAgentIssueDetails
@@ -813,6 +848,8 @@ experimental domain Audits
       optional PerformanceIssueDetails performanceIssueDetails
       optional SelectivePermissionsInterventionIssueDetails selectivePermissionsInterventionIssueDetails
       optional EmailVerificationRequestIssueDetails emailVerificationRequestIssueDetails
+      optional LazyLoadImageIssueDetails lazyLoadImageIssueDetails
+      optional WebInstallIssueDetails webInstallIssueDetails
 
   # A unique id for a DevTools inspector issue. Allows other entities (e.g.
   # exceptions, CDP message, console messages, etc.) to reference an issue.

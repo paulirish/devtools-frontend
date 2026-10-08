@@ -18,26 +18,23 @@ devtools_ui_module("web_audio") {
     "WebAudioView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../../ui/legacy:bundle",
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "web_audio.ts"
 
-  deps = [
-    ":css_files",
-    ":web_audio",
-  ]
+  ts_deps = [ ":web_audio" ]
 
   visibility = [
     ":*",
@@ -50,7 +47,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "web_audio-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/i18n:bundle",
     "../../ui/legacy:bundle",
@@ -67,7 +64,7 @@ devtools_ui_module("unittests") {
     "web_audio.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/platform:bundle",
     "../../generated",

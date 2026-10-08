@@ -3,18 +3,23 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {TestPlugin} from '../../testing/LanguagePluginHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {MockDebuggerBackend} from '../../testing/MockScopeChain.js';
-import {protocolCallFrame, stringifyFrame} from '../../testing/StackTraceHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {protocolCallFrame, stringifyFrame, stringifyStackTrace} from '../../testing/StackTraceHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import {createContentProviderUISourceCode} from '../../testing/UISourceCodeHelpers.js';
 import * as StackTrace from '../stack_trace/stack_trace.js';
-import type * as StackTraceImpl from '../stack_trace/stack_trace_impl.js';
+// eslint-disable-next-line @devtools/es-modules-import
+import * as StackTraceImpl from '../stack_trace/stack_trace_impl.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import * as Bindings from './bindings.js';
@@ -51,7 +56,11 @@ describe('ExtensionRemoteObject', () => {
 });
 
 describe('DebuggerLanguagePluginManager', () => {
-  describeWithEnvironment('getFunctionInfo', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  describe('getFunctionInfo', () => {
     let target: SDK.Target.Target;
     let pluginManager: Bindings.DebuggerLanguagePlugins.DebuggerLanguagePluginManager;
     let debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding;
@@ -83,28 +92,19 @@ describe('DebuggerLanguagePluginManager', () => {
       }
     }
 
+    let universe: TestUniverse;
     beforeEach(() => {
-      target = createTarget();
-      const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-      const targetManager = target.targetManager();
-      const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-      const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
-      debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
-        forceNew: true,
-        resourceMapping,
-        targetManager,
-        ignoreListManager,
-        workspace,
-      });
+      universe = new TestUniverse();
+      target = universe.createTarget();
+      debuggerWorkspaceBinding = universe.debuggerWorkspaceBinding;
       pluginManager = debuggerWorkspaceBinding.pluginManager;
     });
 
     function createAndRegisterScript(): SDK.Script.Script {
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
       const scriptUrl = urlString`https://script-host/script.js`;
-      return debuggerModel.parsedScriptSource(
-          '0' as Protocol.Runtime.ScriptId, scriptUrl, 0, 0, 0, 0, 0, '', null, false, undefined, false, false, 0, null,
-          null, null, null, null, null, null);
+      return debuggerModel.parsedScriptSource('0' as Protocol.Runtime.ScriptId, scriptUrl, 0, 0, 0, 0, 0, '', null,
+                                              undefined, false, false, 0, null, null, null, null, null, null, null);
     }
 
     it('correctly processes missing debug info if available', async () => {
@@ -161,7 +161,7 @@ describe('DebuggerLanguagePluginManager', () => {
     });
   });
 
-  describeWithEnvironment('translateRawFramesStep', () => {
+  describe('translateRawFrame', () => {
     function setup() {
       const backend = new MockDebuggerBackend();
       const target = backend.createTarget();
@@ -169,17 +169,16 @@ describe('DebuggerLanguagePluginManager', () => {
           sinon.createStubInstance(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding);
       const workspace = sinon.createStubInstance(Workspace.Workspace.WorkspaceImpl);
       const pluginManager = new Bindings.DebuggerLanguagePlugins.DebuggerLanguagePluginManager(
-          target.targetManager(), workspace, debuggerWorkspaceBinding);
+          target.targetManager(), workspace, debuggerWorkspaceBinding, target.targetManager().getConsole());
       return {target, backend, pluginManager, debuggerWorkspaceBinding};
     }
 
-    it('returns false if no plugin is registered for the top-most frame', async () => {
+    it('returns null if no plugin is registered for the frame', async () => {
       const {target, backend, pluginManager} = setup();
       const script = await backend.addScript(target, {url: urlString`foo.js`, content: ''}, null);
-      const rawFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`)];
+      const rawFrame = protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`);
 
-      assert.isFalse(await pluginManager.translateRawFramesStep(rawFrames, [], target));
-      assert.lengthOf(rawFrames, 1);
+      assert.isNull(await pluginManager.translateRawFrame(rawFrame, target));
     });
 
     it('identity maps the frame with a NO_INFO status when the plugin returns an empty array', async () => {
@@ -196,16 +195,15 @@ describe('DebuggerLanguagePluginManager', () => {
         }
       })('TestPlugin');
       pluginManager.addPlugin(plugin);
-      const rawFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`)];
-      const translatedFrames: Awaited<ReturnType<StackTraceImpl.StackTraceModel.TranslateRawFrames>> = [];
+      const rawFrame = protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`);
 
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
+      const translatedFrame = await pluginManager.translateRawFrame(rawFrame, target);
 
-      assert.lengthOf(rawFrames, 0);
-      assert.lengthOf(translatedFrames, 1);
-      assert.strictEqual(translatedFrames[0].map(stringifyFrame).join('\n'), 'at foo (foo.js:1:10)');
-      assert.strictEqual(
-          translatedFrames[0][0].missingDebugInfo?.type, StackTrace.StackTrace.MissingDebugInfoType.NO_INFO);
+      assert.exists(translatedFrame);
+      assert.deepInclude(translatedFrame, {kind: StackTraceImpl.Trie.FrameKind.VISIBLE, unmapped: true});
+      assert.strictEqual(translatedFrame.frames.map(stringifyFrame).join('\n'), 'at foo (foo.js:1:10)');
+      assert.strictEqual(translatedFrame.frames[0].missingDebugInfo?.type,
+                         StackTrace.StackTrace.MissingDebugInfoType.NO_INFO);
     });
 
     it('identity maps the frame with a PARTIAL_INFO status when the plugin returns missing debug symbols', async () => {
@@ -222,21 +220,20 @@ describe('DebuggerLanguagePluginManager', () => {
         }
       })('TestPlugin');
       pluginManager.addPlugin(plugin);
-      const rawFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`)];
-      const translatedFrames: Awaited<ReturnType<StackTraceImpl.StackTraceModel.TranslateRawFrames>> = [];
+      const rawFrame = protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`);
 
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
+      const translatedFrame = await pluginManager.translateRawFrame(rawFrame, target);
 
-      assert.lengthOf(rawFrames, 0);
-      assert.lengthOf(translatedFrames, 1);
-      assert.strictEqual(translatedFrames[0].map(stringifyFrame).join('\n'), 'at foo (foo.js:1:10)');
-      assert.deepEqual(translatedFrames[0][0].missingDebugInfo, {
+      assert.exists(translatedFrame);
+      assert.deepInclude(translatedFrame, {kind: StackTraceImpl.Trie.FrameKind.VISIBLE, unmapped: true});
+      assert.strictEqual(translatedFrame.frames.map(stringifyFrame).join('\n'), 'at foo (foo.js:1:10)');
+      assert.deepEqual(translatedFrame.frames[0].missingDebugInfo, {
         type: StackTrace.StackTrace.MissingDebugInfoType.PARTIAL_INFO,
         missingDebugFiles: [{resourceUrl: urlString`foo.dwo`, initiator: plugin.createPageResourceLoadInitiator()}],
       });
     });
 
-    it('translates one frame at a time', async () => {
+    it('translates frames by their position', async () => {
       const {target, backend, pluginManager} = setup();
       sinon.stub(pluginManager, 'uiSourceCodeForURL')
           .callsFake(
@@ -266,23 +263,16 @@ describe('DebuggerLanguagePluginManager', () => {
         }
       })('TestPlugin');
       pluginManager.addPlugin(plugin);
-      const rawFrames = [
+      const [fooFrame, barFrame] = [
         `${script.sourceURL}:${script.scriptId}::0:10`,
         `${script.sourceURL}:${script.scriptId}::0:20`,
       ].map(protocolCallFrame);
-      const translatedFrames: Awaited<ReturnType<StackTraceImpl.StackTraceModel.TranslateRawFrames>> = [];
 
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
+      const translatedFoo = await pluginManager.translateRawFrame(fooFrame, target);
+      const translatedBar = await pluginManager.translateRawFrame(barFrame, target);
 
-      assert.lengthOf(rawFrames, 1);
-      assert.lengthOf(translatedFrames, 1);
-      assert.strictEqual(translatedFrames[0].map(stringifyFrame).join('\n'), 'at foo (foo.cc:1:5)');
-
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
-
-      assert.lengthOf(rawFrames, 0);
-      assert.lengthOf(translatedFrames, 2);
-      assert.strictEqual(translatedFrames[1].map(stringifyFrame).join('\n'), 'at bar (bar.cc:2:10)');
+      assert.strictEqual(translatedFoo?.frames.map(stringifyFrame).join('\n'), 'at foo (foo.cc:1:5)');
+      assert.strictEqual(translatedBar?.frames.map(stringifyFrame).join('\n'), 'at bar (bar.cc:2:10)');
     });
 
     it('translates inlined frames correctly', async () => {
@@ -314,14 +304,13 @@ describe('DebuggerLanguagePluginManager', () => {
         }
       })('TestPlugin');
       pluginManager.addPlugin(plugin);
-      const rawFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}::0:10`)];
-      const translatedFrames: Awaited<ReturnType<StackTraceImpl.StackTraceModel.TranslateRawFrames>> = [];
+      const rawFrame = protocolCallFrame(`${script.sourceURL}:${script.scriptId}::0:10`);
 
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
+      const translatedFrame = await pluginManager.translateRawFrame(rawFrame, target);
 
-      assert.lengthOf(rawFrames, 0);
-      assert.lengthOf(translatedFrames, 1);
-      assert.deepEqual(translatedFrames[0].map(stringifyFrame), [
+      assert.exists(translatedFrame);
+      assert.deepInclude(translatedFrame, {kind: StackTraceImpl.Trie.FrameKind.VISIBLE, unmapped: false});
+      assert.deepEqual(translatedFrame.frames.map(stringifyFrame), [
         'at foo (foo.cc:2:5)',
         'at bar (bar.cc:4:10)',
       ]);
@@ -346,19 +335,195 @@ describe('DebuggerLanguagePluginManager', () => {
           createContentProviderUISourceCode({url: urlString`foo.cc`, target, mimeType: 'text/plain'}).uiSourceCode;
       debuggerWorkspaceBinding.rawLocationToUILocation.resolves(uiSourceCode.uiLocation(10, 5));
 
-      const rawFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`)];
-      const translatedFrames: Awaited<ReturnType<StackTraceImpl.StackTraceModel.TranslateRawFrames>> = [];
+      const rawFrame = protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`);
 
-      assert.isTrue(await pluginManager.translateRawFramesStep(rawFrames, translatedFrames, target));
+      const translatedFrame = await pluginManager.translateRawFrame(rawFrame, target);
 
-      assert.lengthOf(rawFrames, 0);
-      assert.lengthOf(translatedFrames, 1);
-      assert.strictEqual(translatedFrames[0].map(stringifyFrame).join('\n'), 'at foo (foo.cc:10:5)');
-      assert.strictEqual(translatedFrames[0][0].uiSourceCode, uiSourceCode);
-      assert.deepEqual(translatedFrames[0][0].missingDebugInfo, {
+      assert.exists(translatedFrame);
+      assert.strictEqual(translatedFrame.frames.map(stringifyFrame).join('\n'), 'at foo (foo.cc:10:5)');
+      assert.strictEqual(translatedFrame.frames[0].uiSourceCode, uiSourceCode);
+      assert.deepEqual(translatedFrame.frames[0].missingDebugInfo, {
         type: StackTrace.StackTrace.MissingDebugInfoType.PARTIAL_INFO,
         missingDebugFiles: [{resourceUrl: urlString`foo.dwo`, initiator: plugin.createPageResourceLoadInitiator()}],
       });
     });
+  });
+
+  describe('removePlugin', () => {
+    it('updates existing stack traces and invalidates cached translations when no other plugin takes over',
+       async () => {
+         const backend = new MockDebuggerBackend();
+         const target = backend.createTarget();
+         const {debuggerWorkspaceBinding} = backend.universe;
+         const {pluginManager} = debuggerWorkspaceBinding;
+
+         const script = await backend.addScript(target, {url: urlString`http://example.com/foo.js`, content: ''}, null);
+         const callFrames = [protocolCallFrame(`${script.sourceURL}:${script.scriptId}:foo:1:10`)];
+
+         const plugin = new (class extends TestPlugin {
+           override handleScript(_: SDK.Script.Script) {
+             return true;
+           }
+           override addRawModule(): Promise<string[]> {
+             return Promise.resolve(['http://example.com/foo.cc']);
+           }
+           override getFunctionInfo(): Promise<{frames: Chrome.DevTools.FunctionInfo[]}> {
+             return Promise.resolve({frames: [{name: 'plugin_func'}]});
+           }
+           override rawLocationToSourceLocation(rawLocation: Chrome.DevTools.RawLocation):
+               Promise<Chrome.DevTools.SourceLocation[]> {
+             return Promise.resolve([{
+               rawModuleId: rawLocation.rawModuleId,
+               sourceFileURL: 'http://example.com/foo.cc',
+               lineNumber: 2,
+               columnNumber: 5,
+             }]);
+           }
+         })('TestPlugin');
+         pluginManager.addPlugin(plugin);
+         await pluginManager.getSourcesForScript(script);
+
+         const existingStackTrace =
+             await debuggerWorkspaceBinding.createStackTraceFromProtocolRuntime({callFrames}, target);
+         assert.strictEqual(stringifyStackTrace(existingStackTrace), 'at plugin_func (foo.cc:2:5)');
+
+         const updatedPromise = existingStackTrace.once(StackTrace.StackTrace.Events.UPDATED);
+         pluginManager.removePlugin(plugin);
+
+         const newStackTrace = await debuggerWorkspaceBinding.createStackTraceFromProtocolRuntime({callFrames}, target);
+         assert.strictEqual(stringifyStackTrace(newStackTrace), 'at foo (foo.js:1:10)');
+
+         await updatedPromise;
+         assert.strictEqual(stringifyStackTrace(existingStackTrace), 'at foo (foo.js:1:10)');
+       });
+  });
+
+  describe('project securityOrigin partitioning', () => {
+    it('assigns the script network origin to language plugin projects and isolates cross-origin scripts', async () => {
+      const backend = new MockDebuggerBackend();
+      const target = backend.createTarget();
+      const pluginManager = backend.universe.debuggerWorkspaceBinding.pluginManager;
+
+      const plugin = new (class extends TestPlugin {
+        override handleScript(_: SDK.Script.Script) {
+          return true;
+        }
+        override addRawModule(_rawModuleId: string, _symbolsURL: string,
+                              _rawModule: Chrome.DevTools.RawModule): Promise<string[]|{missingSymbolFiles: string[]}> {
+          return Promise.resolve(['https://victim.example/source.c']);
+        }
+      })('TestPlugin');
+      pluginManager.addPlugin(plugin);
+
+      const attackerScript = await backend.addScript(target, {
+        url: urlString`https://attacker.com/module.wasm`,
+        embedderName: urlString`https://attacker.com/module.wasm`,
+        content: '',
+      },
+                                                     null);
+      const attackerUiSourceCode =
+          await backend.universe.debuggerWorkspaceBinding.uiSourceCodeForDebuggerLanguagePluginSourceURLPromise(
+              attackerScript.debuggerModel, urlString`https://victim.example/source.c`);
+      assert.isNotNull(attackerUiSourceCode);
+      assert.strictEqual(attackerUiSourceCode.project().securityOrigin()?.siteId(), 'https://attacker.com');
+      assert.isTrue(attackerUiSourceCode.project().id().includes('https://attacker.com'));
+
+      const victimScript = await backend.addScript(target, {
+        url: urlString`https://victim.example/module.wasm`,
+        embedderName: urlString`https://victim.example/module.wasm`,
+        content: '',
+      },
+                                                   null);
+      await pluginManager.getSourcesForScript(victimScript);
+      const victimUiSourceCode = pluginManager.uiSourceCodeForURL(
+          victimScript.debuggerModel, urlString`https://victim.example/source.c`, victimScript);
+      assert.isNotNull(victimUiSourceCode);
+      assert.notStrictEqual(victimUiSourceCode, attackerUiSourceCode);
+      assert.strictEqual(victimUiSourceCode.project().securityOrigin()?.siteId(), 'https://victim.example');
+    });
+
+    it('assigns an opaque security origin to language plugin projects for opaque scripts', async () => {
+      const backend = new MockDebuggerBackend();
+      const target = backend.createTarget();
+      const pluginManager = backend.universe.debuggerWorkspaceBinding.pluginManager;
+
+      const plugin = new (class extends TestPlugin {
+        override handleScript(_: SDK.Script.Script) {
+          return true;
+        }
+        override addRawModule(_rawModuleId: string, _symbolsURL: string,
+                              _rawModule: Chrome.DevTools.RawModule): Promise<string[]|{missingSymbolFiles: string[]}> {
+          return Promise.resolve(['https://victim.example/source.c']);
+        }
+      })('TestPlugin');
+      pluginManager.addPlugin(plugin);
+
+      const dataScript = await backend.addScript(target, {
+        url: urlString`data:application/wasm;base64,AGFzbQEAAAA=`,
+        embedderName: urlString`data:application/wasm;base64,AGFzbQEAAAA=`,
+        content: '',
+      },
+                                                 null);
+      const uiSourceCode =
+          await backend.universe.debuggerWorkspaceBinding.uiSourceCodeForDebuggerLanguagePluginSourceURLPromise(
+              dataScript.debuggerModel, urlString`https://victim.example/source.c`);
+      assert.isNotNull(uiSourceCode);
+      assert.strictEqual(dataScript.securityOrigin(), dataScript.securityOrigin());
+      assert.isNotNull(uiSourceCode.project().securityOrigin());
+      assert.isTrue(uiSourceCode.project().securityOrigin()?.isOpaque());
+      assert.strictEqual(pluginManager.uiSourceCodeForURL(dataScript.debuggerModel,
+                                                          urlString`https://victim.example/source.c`, dataScript),
+                         uiSourceCode);
+    });
+  });
+});
+
+describe('SourceScope', () => {
+  function createMockCallFrame(): SDK.DebuggerModel.CallFrame {
+    const callFrame = sinon.createStubInstance(SDK.DebuggerModel.CallFrame);
+    const runtimeModel = sinon.createStubInstance(SDK.RuntimeModel.RuntimeModel);
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    runtimeModel.target.returns(target);
+    const debuggerModel = sinon.createStubInstance(SDK.DebuggerModel.DebuggerModel);
+    debuggerModel.runtimeModel.returns(runtimeModel);
+    callFrame.debuggerModel = debuggerModel;
+
+    const script = sinon.createStubInstance(SDK.Script.Script);
+    script.codeOffset.returns(0);
+    Object.defineProperty(script, 'sourceURL', {value: 'test.wasm'});
+    Object.defineProperty(script, 'scriptId', {value: '1'});
+    Object.defineProperty(callFrame, 'script', {value: script});
+    callFrame.location.returns(new SDK.DebuggerModel.Location(debuggerModel, script.scriptId, 0));
+    Object.defineProperty(callFrame, 'inlineFrameIndex', {value: 0});
+    return callFrame;
+  }
+
+  it('handles Object.prototype property names in the root namespace', async () => {
+    const callFrame = createMockCallFrame();
+    const plugin = new TestPlugin('TestPlugin');
+    const scope = new Bindings.DebuggerLanguagePlugins.SourceScope(callFrame, 0n, 'LOCAL', 'Local', undefined, plugin);
+
+    scope.object().variables = [
+      {scope: 'LOCAL', name: 'v', nestedName: ['__proto__', 'polluted'], type: 'i32'},
+      {scope: 'LOCAL', name: 'w', nestedName: ['constructor', 'evil'], type: 'i32'},
+    ];
+
+    const result = await scope.object().getAllProperties(false, false);
+    assert.isNotNull(result.properties);
+    assert.sameMembers(result.properties!.map(property => property.name), ['__proto__', 'constructor']);
+  });
+
+  it('handles Object.prototype property names in a child namespace', async () => {
+    const callFrame = createMockCallFrame();
+    const plugin = new TestPlugin('TestPlugin');
+    const scope = new Bindings.DebuggerLanguagePlugins.SourceScope(callFrame, 0n, 'LOCAL', 'Local', undefined, plugin);
+
+    scope.object().variables = [
+      {scope: 'LOCAL', name: 'v', nestedName: ['safe', '__proto__', 'polluted'], type: 'i32'},
+    ];
+
+    const result = await scope.object().getAllProperties(false, false);
+    assert.isNotNull(result.properties);
+    assert.deepEqual(result.properties!.map(property => property.name), ['safe']);
   });
 });

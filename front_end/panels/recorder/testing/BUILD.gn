@@ -8,8 +8,7 @@ ts_library("testing") {
   testonly = true
 
   sources = [ "RecorderHelpers.ts" ]
-
-  deps = [
+  ts_deps = [
     "../../../core/sdk:bundle",
     "../models:bundle",
   ]

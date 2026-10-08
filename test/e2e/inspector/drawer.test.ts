@@ -5,7 +5,7 @@
 import {assert} from 'chai';
 
 import {runCommandWithQuickOpen} from '../helpers/quick_open-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 const MINIMIZE_BUTTON_SELECTOR = '[aria-label="Minimize drawer"]';
 const EXPAND_BUTTON_SELECTOR = '[aria-label="Expand drawer"]';
@@ -455,15 +455,15 @@ describe('Drawer', () => {
     await devToolsPage.click('#tab-elements');
     await devToolsPage.waitForNone(DRAWER_SELECTOR);
 
-    await runCommandWithQuickOpen('Toggle console', devToolsPage);
+    await runCommandWithQuickOpen(devToolsPage, 'Toggle console');
     await devToolsPage.waitFor(DRAWER_SELECTOR);
     await devToolsPage.waitFor(MINIMIZE_BUTTON_SELECTOR);
 
-    await runCommandWithQuickOpen('Toggle console', devToolsPage);
+    await runCommandWithQuickOpen(devToolsPage, 'Toggle console');
     await devToolsPage.waitFor(DRAWER_SELECTOR);
     await devToolsPage.waitFor(EXPAND_BUTTON_SELECTOR);
 
-    await runCommandWithQuickOpen('Toggle console', devToolsPage);
+    await runCommandWithQuickOpen(devToolsPage, 'Toggle console');
     await devToolsPage.waitFor(DRAWER_SELECTOR);
     await devToolsPage.waitFor(MINIMIZE_BUTTON_SELECTOR);
   });

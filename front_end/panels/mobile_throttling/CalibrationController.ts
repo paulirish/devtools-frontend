@@ -4,12 +4,13 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as PanelsCommon from '../common/common.js';
 
 const UIStrings = {
   /**
    * @description Text to display to user while a calibration process is running.
    */
-  runningCalibration: 'Running CPU calibration, please do not leave this tab or close DevTools.',
+  runningCalibration: 'Running CPU calibration, don’t leave this tab or close DevTools',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/CalibrationController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -55,7 +56,7 @@ export class CalibrationController {
   #runtimeModel!: SDK.RuntimeModel.RuntimeModel;
   #emulationModel!: SDK.EmulationModel.EmulationModel;
   #originalUrl!: string;
-  #result?: SDK.CPUThrottlingManager.CalibratedCPUThrottling;
+  #result?: PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling;
   #state: 'idle'|'running'|'aborting' = 'idle';
 
   /**
@@ -220,14 +221,15 @@ export class CalibrationController {
       if (actualScore < midScore) {
         if (actualScore < lowScore) {
           this.#result = {
-            low: SDK.CPUThrottlingManager.CalibrationError.DEVICE_TOO_WEAK,
-            mid: SDK.CPUThrottlingManager.CalibrationError.DEVICE_TOO_WEAK,
+            low: PanelsCommon.CPUThrottlingOption.CalibrationError.DEVICE_TOO_WEAK,
+            mid: PanelsCommon.CPUThrottlingOption.CalibrationError.DEVICE_TOO_WEAK,
+            actualScore,
           };
           return;
         }
 
         // Can still emulate the low-end device.
-        this.#result = {mid: SDK.CPUThrottlingManager.CalibrationError.DEVICE_TOO_WEAK};
+        this.#result = {mid: PanelsCommon.CPUThrottlingOption.CalibrationError.DEVICE_TOO_WEAK};
         isHalfwayDone = true;
       }
     }
@@ -249,6 +251,8 @@ export class CalibrationController {
       this.#result.mid = mid;
     }
 
+    this.#result.actualScore = actualScore;
+
     yield {progress: 1};
   }
 
@@ -258,7 +262,7 @@ export class CalibrationController {
     }
   }
 
-  result(): SDK.CPUThrottlingManager.CalibratedCPUThrottling|undefined {
+  result(): PanelsCommon.CPUThrottlingOption.CalibratedCPUThrottling|undefined {
     return this.#result;
   }
 

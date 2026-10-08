@@ -4,7 +4,6 @@
 
 import * as AddSourceMapURLDialog from './AddSourceMapURLDialog.js';
 import * as AiCodeCompletionPlugin from './AiCodeCompletionPlugin.js';
-import * as AiWarningInfobarPlugin from './AiWarningInfobarPlugin.js';
 import * as BreakpointEditDialog from './BreakpointEditDialog.js';
 import * as BreakpointsView from './BreakpointsView.js';
 import * as BreakpointsViewUtils from './BreakpointsViewUtils.js';
@@ -15,10 +14,10 @@ import * as CSSPlugin from './CSSPlugin.js';
 import * as DebuggerPausedMessage from './DebuggerPausedMessage.js';
 import * as DebuggerPlugin from './DebuggerPlugin.js';
 import * as EditingLocationHistoryManager from './EditingLocationHistoryManager.js';
+import * as EditorHistory from './EditorHistory.js';
 import * as FilePathScoreFunction from './FilePathScoreFunction.js';
 import * as FilteredUISourceCodeListProvider from './FilteredUISourceCodeListProvider.js';
 import * as GoToLineQuickOpen from './GoToLineQuickOpen.js';
-import * as InplaceFormatterEditorAction from './InplaceFormatterEditorAction.js';
 import * as NavigatorView from './NavigatorView.js';
 import * as OpenFileQuickOpen from './OpenFileQuickOpen.js';
 import * as OutlineQuickOpen from './OutlineQuickOpen.js';
@@ -40,7 +39,6 @@ import * as WatchExpressionsSidebarPane from './WatchExpressionsSidebarPane.js';
 export {
   AddSourceMapURLDialog,
   AiCodeCompletionPlugin,
-  AiWarningInfobarPlugin,
   BreakpointEditDialog,
   BreakpointsView,
   BreakpointsViewUtils,
@@ -51,10 +49,10 @@ export {
   DebuggerPausedMessage,
   DebuggerPlugin,
   EditingLocationHistoryManager,
+  EditorHistory,
   FilePathScoreFunction,
   FilteredUISourceCodeListProvider,
   GoToLineQuickOpen,
-  InplaceFormatterEditorAction,
   NavigatorView,
   OpenFileQuickOpen,
   OutlineQuickOpen,

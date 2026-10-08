@@ -1,0 +1,17 @@
+# Update expectations for tests
+#
+# Supported Format:
+# bug [platforms] testName [results]
+#
+# - bug: Required. Must start with crbug.com/ followed by numbers.
+# - platforms: Optional. Wrapped in brackets. Supported platforms: mac, win32, linux. E.g., [ mac win32 ]
+# - testName: Required. Full exact test ID or exact file path.
+# - results: Required. Wrapped in brackets. Supported: Failure, Pass, Skip.
+#
+# Prefer [ Pass Failure ] for flaky tests instead of skipping them altogether. Skipped tests won't run and
+# would not report coverage.
+#
+# Examples
+# crbug.com/1342718 [ mac win32 linux ] front_end/panels/explain/components/ConsoleInsight.test.ts:ConsoleInsight:shows_opt-in_teaser_when_setting_is_turned_off [ Failure Pass Skip ]
+# crbug.com/1342718 front_end/panels/explain/components/ConsoleInsight.test.ts:ConsoleInsight:shows_opt-in_teaser_when_setting_is_turned_off [ Failure Pass ]
+# crbug.com/1234567 [ mac ] front_end/panels/elements/ElementsPanel.test.ts [ Failure ]

@@ -22,20 +22,18 @@ generate_css("css_files") {
 
 devtools_ui_module("report_view") {
   sources = [ "ReportView.ts" ]
-  deps = [
+  ts_deps = [
     "../../../core/platform:bundle",
     "../../legacy/components/utils:bundle",
     "../../lit:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "report_view.ts"
 
-  deps = [
-    ":css_files",
-    ":report_view",
-  ]
+  ts_deps = [ ":report_view" ]
 
   visibility = default_components_visibility
 }
@@ -45,7 +43,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "ReportView.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../lit:bundle",
@@ -55,7 +53,7 @@ devtools_ui_module("unittests") {
 component_doc("docs") {
   sources = [ "ReportView.docs.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../lit:bundle",
   ]

@@ -15,15 +15,15 @@ import consoleContextSelectorStyles from './consoleContextSelector.css.js';
 const {render, nothing, html} = Lit;
 const UIStrings = {
   /**
-   * @description Title of toolbar item in console context selector of the console panel
+   * @description Title of toolbar item in Console context selector of the Console panel.
    */
   javascriptContextNotSelected: 'JavaScript context: Not selected',
   /**
-   * @description Text in Console Context Selector of the Console panel
+   * @description Text in Console context selector of the Console panel.
    */
   extension: 'Extension',
   /**
-   * @description Text in Console Context Selector of the Console panel
+   * @description Text in Console context selector of the Console panel.
    * @example {top} PH1
    */
   javascriptContextS: 'JavaScript context: {PH1}',
@@ -78,7 +78,7 @@ export class ConsoleContextSelector implements SDK.TargetManager.SDKModelObserve
   highlightedItemChanged(
       _from: SDK.RuntimeModel.ExecutionContext|null, to: SDK.RuntimeModel.ExecutionContext|null,
       fromElement: Element|null, toElement: Element|null): void {
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     if (to?.frameId) {
       const frame = SDK.FrameManager.FrameManager.instance().getFrame(to.frameId);
       if (frame && !frame.isOutermostFrame()) {
@@ -232,18 +232,25 @@ export class ConsoleContextSelector implements SDK.TargetManager.SDKModelObserve
       return i18nString(UIStrings.extension);
     }
     const sameTargetParentFrame = frame?.sameTargetParentFrame();
+    const executionContextOrigin =
+        executionContext.origin ? SDK.SecurityOrigin.SecurityOrigin.create(executionContext.origin) : null;
     // TODO(crbug.com/1159332): Understand why condition involves the sameTargetParentFrame.
-    if (!frame || !sameTargetParentFrame || sameTargetParentFrame.securityOrigin !== executionContext.origin) {
+    if (!frame || !sameTargetParentFrame ||
+        !sameTargetParentFrame.securityOrigin().isSameOriginWith(executionContextOrigin)) {
       const url = Common.ParsedURL.ParsedURL.fromString(executionContext.origin);
       if (url) {
         return url.domain();
       }
     }
 
-    if (frame?.securityOrigin) {
-      const domain = new Common.ParsedURL.ParsedURL(frame.securityOrigin).domain();
-      if (domain) {
-        return domain;
+    if (frame) {
+      const origin = frame.securityOrigin();
+      if (!origin.isOpaque()) {
+        const domain =
+            Common.ParsedURL.ParsedURL.fromString(origin.siteId() as Platform.DevToolsPath.UrlString)?.domain();
+        if (domain) {
+          return domain;
+        }
       }
     }
     return 'IFrame';

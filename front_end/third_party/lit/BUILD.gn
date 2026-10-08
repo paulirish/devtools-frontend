@@ -28,14 +28,13 @@ devtools_pre_built("lit") {
     "lib/static-html.d.ts",
     "lib/static-html.js",
     "lib/static-html.js.map",
-    "lit-tsconfig.json",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "lit.ts"
 
-  deps = [ ":lit" ]
+  ts_deps = [ ":lit" ]
 
   visibility = [
     # Only visible to the indirect form of Lit that is used by components.

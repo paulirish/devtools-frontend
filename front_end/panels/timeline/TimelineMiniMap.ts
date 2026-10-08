@@ -40,8 +40,13 @@ export interface OverviewData {
  * update the visible trace window, and when this happens it will update the
  * TraceBounds service with the new values.
  */
-export class TimelineMiniMap extends
-    Common.ObjectWrapper.eventMixin<PerfUI.TimelineOverviewPane.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
+const TimelineMiniMapBase:
+    Common.ObjectWrapper.EventMixin<PerfUI.TimelineOverviewPane.EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class TimelineMiniMap extends TimelineMiniMapBase {
   #overviewComponent = new PerfUI.TimelineOverviewPane.TimelineOverviewPane('timeline');
   #controls: TimelineEventOverview[] = [];
   breadcrumbs: TimelineComponents.Breadcrumbs.Breadcrumbs|null = null;
@@ -108,9 +113,9 @@ export class TimelineMiniMap extends
       return;
     }
 
-    const left = (event.data.startTime > 0) ? event.data.startTime : traceBoundsState.milli.entireTraceBounds.min;
+    const left = (event.data.startTime > 0) ? event.data.startTime : traceBoundsState.milli.minimapTraceBounds.min;
     const right =
-        Number.isFinite(event.data.endTime) ? event.data.endTime : traceBoundsState.milli.entireTraceBounds.max;
+        Number.isFinite(event.data.endTime) ? event.data.endTime : traceBoundsState.milli.minimapTraceBounds.max;
 
     TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
         Trace.Helpers.Timing.traceWindowFromMilliSeconds(
@@ -118,7 +123,7 @@ export class TimelineMiniMap extends
             Trace.Types.Timing.Milli(right),
             ),
         {
-          shouldAnimate: true,
+          shouldAnimate: false,
         },
     );
   }

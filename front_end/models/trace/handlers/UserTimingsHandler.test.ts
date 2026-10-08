@@ -4,14 +4,13 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {
   type ConsoleAPIExtensionTestData,
   makeCompleteEvent,
   makeTimingEventWithConsoleExtensionData,
   makeTimingEventWithPerformanceExtensionData,
   type PerformanceAPIExtensionTestData,
-} from '../../../testing/TraceHelpers.js';
+} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
@@ -42,7 +41,7 @@ async function createUserTimingsDataFromEvents(events: readonly Trace.Types.Even
   return Trace.Handlers.ModelHandlers.UserTimings.data();
 }
 
-describeWithEnvironment('UserTimingsHandler', function() {
+describe('UserTimingsHandler', function() {
   let timingsData: Trace.Handlers.ModelHandlers.UserTimings.UserTimingsData;
   describe('performance timings', function() {
     async function getTimingsDataFromEvents(events: readonly Trace.Types.Events.Event[]):
@@ -54,12 +53,9 @@ describeWithEnvironment('UserTimingsHandler', function() {
       await Trace.Handlers.ModelHandlers.UserTimings.finalize();
       return Trace.Handlers.ModelHandlers.UserTimings.data();
     }
-    beforeEach(async function() {
+    before(async function() {
       const events = await TraceLoader.rawEvents(this, 'user-timings.json.gz');
       timingsData = await getTimingsDataFromEvents(events);
-    });
-    afterEach(function() {
-      Trace.Handlers.ModelHandlers.UserTimings.reset();
     });
     describe('performance.measure events parsing', function() {
       it('parses the start and end events and returns a list of blocks', async () => {
@@ -156,7 +152,7 @@ describeWithEnvironment('UserTimingsHandler', function() {
   });
 
   describe('console timings', function() {
-    beforeEach(async function() {
+    before(async function() {
       const {data} = await TraceLoader.traceEngine(this, 'timings-track.json.gz');
       timingsData = data.UserTimings;
     });
@@ -387,7 +383,8 @@ describeWithEnvironment('UserTimingsHandler', function() {
     }
 
     function sortAll(events: Array<Trace.Types.Events.SyntheticEventPair|Trace.Types.Events.ConsoleTimeStamp>) {
-      events.sort((a, b) => Trace.Handlers.ModelHandlers.UserTimings.userTimingComparator(a, b, [...events]));
+      const indexMap = new Map(events.map((e, i) => [e, i] as const));
+      events.sort((a, b) => Trace.Handlers.ModelHandlers.UserTimings.userTimingComparator(a, b, indexMap));
     }
 
     it('sorts synthetic events by start time in ASC order', () => {

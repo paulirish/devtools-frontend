@@ -6,6 +6,7 @@
 import '../../../ui/kit/kit.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Root from '../../../core/root/root.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import type * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../ui/legacy/legacy.js';
@@ -16,25 +17,25 @@ import devicesSettingsTabStyles from './devicesSettingsTab.css.js';
 
 const UIStrings = {
   /**
-   * @description Title for a section of the UI that shows all of the custom devices the user can emulate, in the Device Toolbar.
+   * @description Title for a section of the UI that shows all of the custom devices the user can emulate, in the device toolbar.
    */
   customDevices: 'Custom devices',
   /**
-   * @description Title for a section of the UI that shows all of the default devices the user can emulate, in the Device Toolbar.
+   * @description Title for a section of the UI that shows all of the default devices the user can emulate, in the device toolbar.
    */
   defaultDevices: 'Default devices',
   /**
-   * @description Button to add a custom device (e.g. phone, tablet) the Device Toolbar.
+   * @description Button to add a custom device (e.g., phone, tablet) to the device toolbar.
    */
   addCustomDevice: 'Add custom device',
   /**
-   * @description Label/title for UI to add a new custom device type. Device means mobile/tablet etc.
+   * @description Label/title for UI to add a new custom device type. Device means mobile/tablet, etc.
    */
   device: 'Device',
   /**
    * @description Placeholder for text input for the name of a custom device.
    */
-  deviceName: 'Device Name',
+  deviceName: 'Device name',
   /**
    * @description Placeholder text for text input for the width of a custom device in pixels.
    */
@@ -48,35 +49,203 @@ const UIStrings = {
    */
   devicePixelRatio: 'Device pixel ratio',
   /**
-   * @description Label in the Devices settings pane for the user agent string input of a custom device
+   * @description Label in the Devices settings tab for the user agent string input of a custom device.
    */
   userAgentString: 'User agent string',
   /**
-   * @description Tooltip text for a drop-down in the Devices settings pane, for the 'user agent type' input of a custom device.
-   * 'Type' refers to different options e.g. mobile or desktop.
+   * @description Tooltip text for a drop-down in the Devices settings tab for the user agent type input of a custom device.
+   * 'Type' refers to different options, such as mobile or desktop.
    */
   userAgentType: 'User agent type',
   /**
-   * @description Error message in the Devices settings pane that declares the maximum length of the device name input
+   * @description Error message in the Devices settings tab that declares the maximum length of the device name input.
    * @example {50} PH1
    */
-  deviceNameMustBeLessThanS: 'Device name must be less than {PH1} characters.',
+  deviceNameMustBeLessThanS: 'Device name must be less than {PH1} characters',
   /**
-   * @description Error message in the Devices settings pane that declares that the device name input must not be empty
+   * @description Error message in the Devices settings tab that declares that the device name input must not be empty.
    */
-  deviceNameCannotBeEmpty: 'Device name cannot be empty.',
+  deviceNameCannotBeEmpty: 'Device name can’t be empty',
   /**
    * @description Success message for screen readers when device is added.
    * @example {TestDevice} PH1
    */
-  deviceAddedOrUpdated: 'Device {PH1} successfully added/updated.',
+  deviceAddedOrUpdated: 'Device {PH1} successfully added/updated',
   /**
-   * @description Error message in the Devices settings pane shown when the user agent string is empty.
+   * @description Error message in the Devices settings tab shown when the user agent string is empty.
    */
-  userAgentStringCannotBeEmpty: 'User agent string cannot be empty.',
+  userAgentStringCannotBeEmpty: 'User agent string can’t be empty',
+  /**
+   * @description Label for portrait safe-area values on a custom device.
+   */
+  portraitSafeArea: 'Portrait safe area',
+  /**
+   * @description Label for landscape safe-area values on a custom device.
+   */
+  landscapeSafeArea: 'Landscape safe area',
+  /**
+   * @description Placeholder text for a custom device safe-area left inset field.
+   */
+  safeAreaLeft: 'Left inset',
+  /**
+   * @description Placeholder text for a custom device safe-area top inset field.
+   */
+  safeAreaTop: 'Top inset',
+  /**
+   * @description Placeholder text for a custom device safe-area right inset field.
+   */
+  safeAreaRight: 'Right inset',
+  /**
+   * @description Placeholder text for a custom device safe-area bottom inset field.
+   */
+  safeAreaBottom: 'Bottom inset',
+  /**
+   * @description Error message shown when a custom device safe-area value is invalid.
+   * @example {Portrait safe area} PH1
+   * @example {Top inset} PH2
+   * @example {9999} PH3
+   */
+  safeAreaValueMustBeInRange: '{PH1}: {PH2} must be an integer from 0 to {PH3}',
+  /**
+   * @description Error message shown when custom device safe-area left and right insets are too large.
+   * @example {Portrait safe area} PH1
+   */
+  safeAreaHorizontalInsetsExceedWidth: '{PH1}: Left and right insets mustn’t exceed the device width',
+  /**
+   * @description Error message shown when custom device safe-area top and bottom insets are too large.
+   * @example {Landscape safe area} PH1
+   */
+  safeAreaVerticalInsetsExceedHeight: '{PH1}: Top and bottom insets mustn’t exceed the device height',
+  /**
+   * @description Label for display cutout values on a custom device.
+   */
+  displayCutout: 'Display cutout',
+  /**
+   * @description Option shown when a custom device has no display cutout.
+   */
+  noDisplayCutout: 'No cutout',
+  /**
+   * @description Option shown for pill-shaped display cutouts such as Dynamic Island.
+   */
+  pillDisplayCutout: 'Pill',
+  /**
+   * @description Option shown for classic notch display cutouts.
+   */
+  notchDisplayCutout: 'Notch',
+  /**
+   * @description Option shown for circular display cutouts such as hole-punch cameras.
+   */
+  circleDisplayCutout: 'Circle',
+  /**
+   * @description Option shown for rectangular display cutouts.
+   */
+  rectangleDisplayCutout: 'Rectangle',
+  /**
+   * @description Placeholder text for a custom device display cutout x coordinate field.
+   */
+  cutoutX: 'Cutout x',
+  /**
+   * @description Placeholder text for a custom device display cutout y coordinate field.
+   */
+  cutoutY: 'Cutout y',
+  /**
+   * @description Placeholder text for a custom device display cutout width field.
+   */
+  cutoutWidth: 'Cutout width',
+  /**
+   * @description Placeholder text for a custom device display cutout height field.
+   */
+  cutoutHeight: 'Cutout height',
+  /**
+   * @description Placeholder text for a custom device pill-shaped display cutout radius field.
+   */
+  cutoutBorderRadius: 'Pill radius',
+  /**
+   * @description Placeholder text for a custom device notch upper radius field.
+   */
+  cutoutUpperRadius: 'Upper radius',
+  /**
+   * @description Placeholder text for a custom device notch lower radius field.
+   */
+  cutoutLowerRadius: 'Lower radius',
+  /**
+   * @description Placeholder text for a custom device circular display cutout center x coordinate field.
+   */
+  cutoutCenterX: 'Center x',
+  /**
+   * @description Placeholder text for a custom device circular display cutout center y coordinate field.
+   */
+  cutoutCenterY: 'Center y',
+  /**
+   * @description Placeholder text for a custom device circular display cutout radius field.
+   */
+  cutoutRadius: 'Radius',
+  /**
+   * @description Error message shown when a custom display cutout field is required.
+   * @example {Cutout width} PH1
+   */
+  cutoutFieldRequired: '{PH1} is required when display cutout is enabled',
+  /**
+   * @description Error message shown when a custom display cutout field is outside its supported integer range.
+   * @example {Cutout x} PH1
+   * @example {9999} PH2
+   */
+  cutoutValueMustBeInRange: '{PH1} must be an integer from 0 to {PH2}',
+  /**
+   * @description Error message shown when a custom display cutout field must be positive.
+   * @example {Cutout width} PH1
+   */
+  cutoutValueMustBePositiveInteger: '{PH1} must be a positive integer',
+  /**
+   * @description Error message shown when a custom display cutout's x coordinate plus its width exceeds the device width.
+   */
+  cutoutXAndWidthExceedDeviceWidth: 'Cutout x plus width mustn’t exceed the device width',
+  /**
+   * @description Error message shown when a custom display cutout's y coordinate plus its height exceeds the device height.
+   */
+  cutoutYAndHeightExceedDeviceHeight: 'Cutout y plus height mustn’t exceed the device height',
+  /**
+   * @description Error message shown when a circular display cutout is outside its cutout bounds.
+   */
+  circleMustFitCutoutBounds: 'Circle must fit within the cutout bounds',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/emulation/DevicesSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+function parseOptionalNonNegativeInteger(value: string): number|null {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return 0;
+  }
+  if (!/^\d+$/.test(trimmedValue)) {
+    return null;
+  }
+  const parsedValue = Number(trimmedValue);
+  if (!Number.isSafeInteger(parsedValue) || parsedValue < 0 ||
+      parsedValue > EmulationModel.DeviceModeModel.MaxDeviceSize) {
+    return null;
+  }
+  return parsedValue;
+}
+
+const NO_CUSTOM_CUTOUT = 'none';
+
+type DeviceEditorValidator = (item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+                              input: UI.ListWidget.EditorControl) => UI.ListWidget.ValidatorResult;
+
+interface CutoutFieldValidators {
+  shape: DeviceEditorValidator;
+  x: DeviceEditorValidator;
+  y: DeviceEditorValidator;
+  width: DeviceEditorValidator;
+  height: DeviceEditorValidator;
+  pillRadius: DeviceEditorValidator;
+  notchUpperRadius: DeviceEditorValidator;
+  notchLowerRadius: DeviceEditorValidator;
+  circleCenterX: DeviceEditorValidator;
+  circleCenterY: DeviceEditorValidator;
+  circleRadius: DeviceEditorValidator;
+}
 
 export class DevicesSettingsTab extends UI.Widget.VBox implements
     UI.ListWidget.Delegate<EmulationModel.EmulatedDevices.EmulatedDevice> {
@@ -84,7 +253,10 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
   private readonly addCustomButton: Buttons.Button.Button;
   private readonly ariaSuccessMessageElement: HTMLElement;
   readonly #customDeviceList: UI.ListWidget.ListWidget<EmulationModel.EmulatedDevices.EmulatedDevice>;
-  readonly #defaultDeviceList: UI.ListWidget.ListWidget<EmulationModel.EmulatedDevices.EmulatedDevice>;
+  readonly #defaultDeviceLists = new Map<EmulationModel.EmulatedDevices.Category, {
+    container: HTMLElement,
+    list: UI.ListWidget.ListWidget<EmulationModel.EmulatedDevices.EmulatedDevice>,
+  }>();
   private muteUpdate: boolean;
   private emulatedDevicesList: EmulationModel.EmulatedDevices.EmulatedDevicesList;
   private editor?: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>;
@@ -96,10 +268,6 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     this.containerElement =
         this.contentElement.createChild('div', 'settings-card-container-wrapper').createChild('div');
     this.containerElement.classList.add('settings-card-container', 'ignore-list-settings');
-
-    this.#defaultDeviceList = new UI.ListWidget.ListWidget(this, false /* delegatesFocus */);
-    this.#defaultDeviceList.registerRequiredCSS(devicesSettingsTabStyles);
-    this.#defaultDeviceList.element.classList.add('devices-list', 'device-card-content');
 
     this.muteUpdate = false;
     this.emulatedDevicesList = EmulationModel.EmulatedDevices.EmulatedDevicesList.instance();
@@ -132,7 +300,23 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
 
     const defaultDevicesCard = this.containerElement.createChild('devtools-card');
     defaultDevicesCard.heading = i18nString(UIStrings.defaultDevices);
-    defaultDevicesCard.append(this.#defaultDeviceList.element);
+
+    for (const category of EmulationModel.EmulatedDevices.CATEGORY_ORDER) {
+      const groupContainer = document.createElement('div');
+      groupContainer.classList.add('device-group-container');
+
+      const groupTitle = groupContainer.createChild('div', 'device-group-title');
+      groupTitle.textContent = EmulationModel.EmulatedDevices.getCategoryTitle(category);
+
+      defaultDevicesCard.append(groupContainer);
+
+      const listWidget = new UI.ListWidget.ListWidget(this, false /* delegatesFocus */);
+      listWidget.registerRequiredCSS(devicesSettingsTabStyles);
+      listWidget.element.classList.add('devices-list', 'device-card-content');
+      listWidget.show(groupContainer);
+
+      this.#defaultDeviceLists.set(category, {container: groupContainer, list: listWidget});
+    }
   }
 
   override wasShown(): void {
@@ -145,18 +329,32 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
       return;
     }
 
-    this.#defaultDeviceList.clear();
+    for (const {list} of this.#defaultDeviceLists.values()) {
+      list.clear();
+    }
     this.#customDeviceList.clear();
 
-    let devices = this.emulatedDevicesList.custom().slice();
-    for (let i = 0; i < devices.length; ++i) {
-      this.#customDeviceList.appendItem(devices[i], true);
+    const customDevices = this.emulatedDevicesList.custom().slice();
+    for (let i = 0; i < customDevices.length; ++i) {
+      this.#customDeviceList.appendItem(customDevices[i], true);
     }
 
-    devices = this.emulatedDevicesList.standard().slice();
-    devices.sort(EmulationModel.EmulatedDevices.EmulatedDevice.deviceComparator);
-    for (let i = 0; i < devices.length; ++i) {
-      this.#defaultDeviceList.appendItem(devices[i], false);
+    const standardDevices = this.emulatedDevicesList.standard().slice();
+    standardDevices.sort(EmulationModel.EmulatedDevices.EmulatedDevice.deviceComparator);
+
+    const categoryItemCounts = new Map<EmulationModel.EmulatedDevices.Category, number>();
+    for (const device of standardDevices) {
+      const cat = EmulationModel.EmulatedDevices.deviceCategory(device);
+      const group = this.#defaultDeviceLists.get(cat);
+      if (group) {
+        group.list.appendItem(device, false);
+        categoryItemCounts.set(cat, (categoryItemCounts.get(cat) || 0) + 1);
+      }
+    }
+
+    for (const [cat, group] of this.#defaultDeviceLists.entries()) {
+      const count = categoryItemCounts.get(cat) || 0;
+      group.container.style.display = count > 0 ? '' : 'none';
     }
   }
 
@@ -177,11 +375,27 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     device.horizontal.height = 400;
     device.vertical.width = 400;
     device.vertical.height = 700;
+    device.userAgent = navigator.userAgent;
     this.#customDeviceList.addNewItem(this.emulatedDevicesList.custom().length, device);
   }
 
   private toNumericInputValue(value: number): string {
     return value ? String(value) : '';
+  }
+
+  private verticalMode(device: EmulationModel.EmulatedDevices.EmulatedDevice): EmulationModel.EmulatedDevices.Mode
+      |null {
+    return device.modes.find(mode => mode.orientation === EmulationModel.EmulatedDevices.Vertical) || null;
+  }
+
+  private horizontalMode(device: EmulationModel.EmulatedDevices.EmulatedDevice): EmulationModel.EmulatedDevices.Mode
+      |null {
+    return device.modes.find(mode => mode.orientation === EmulationModel.EmulatedDevices.Horizontal) || null;
+  }
+
+  private editorIntegerValue(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                             controlName: string): number {
+    return parseOptionalNonNegativeInteger(editor.control(controlName).value) ?? 0;
   }
 
   renderItem(device: EmulationModel.EmulatedDevices.EmulatedDevice, editable: boolean): Element {
@@ -221,18 +435,32 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     device.deviceScaleFactor = editor.control('scale').value ? parseFloat(editor.control('scale').value) : 0;
     device.userAgent = editor.control('user-agent').value;
     device.modes = [];
-    device.modes.push({
+    const verticalMode: EmulationModel.EmulatedDevices.Mode = {
       title: '',
       orientation: EmulationModel.EmulatedDevices.Vertical,
-      insets: new EmulationModel.DeviceModeModel.Insets(0, 0, 0, 0),
-      image: null,
-    });
-    device.modes.push({
+    };
+    if (Root.Runtime.hostConfig.devToolsMobileSafeAreaEmulation?.enabled) {
+      const safeAreaInsets = this.safeAreaInsetsFromEditor(editor);
+      if (safeAreaInsets) {
+        verticalMode.safeAreaInsets = safeAreaInsets;
+      }
+      const cutout = this.cutoutFromEditor(editor);
+      if (cutout) {
+        verticalMode.cutout = cutout;
+      }
+    }
+    device.modes.push(verticalMode);
+    const horizontalMode: EmulationModel.EmulatedDevices.Mode = {
       title: '',
       orientation: EmulationModel.EmulatedDevices.Horizontal,
-      insets: new EmulationModel.DeviceModeModel.Insets(0, 0, 0, 0),
-      image: null,
-    });
+    };
+    if (Root.Runtime.hostConfig.devToolsMobileSafeAreaEmulation?.enabled) {
+      const landscapeSafeAreaInsets = this.safeAreaInsetsFromEditor(editor, 'landscape-');
+      if (landscapeSafeAreaInsets) {
+        horizontalMode.safeAreaInsets = landscapeSafeAreaInsets;
+      }
+    }
+    device.modes.push(horizontalMode);
     device.capabilities = [];
     const uaType = editor.control('ua-type').value;
     if (uaType === EmulationModel.DeviceModeModel.UA.MOBILE ||
@@ -276,6 +504,10 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     editor.control('height').value = this.toNumericInputValue(device.vertical.height);
     editor.control('scale').value = this.toNumericInputValue(device.deviceScaleFactor);
     editor.control('user-agent').value = device.userAgent;
+    if (Root.Runtime.hostConfig.devToolsMobileSafeAreaEmulation?.enabled) {
+      this.populateSafeAreaEditor(editor, device);
+      this.populateCutoutEditor(editor, device);
+    }
     let uaType;
     if (device.mobile()) {
       uaType =
@@ -289,6 +521,118 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
      UI.ListWidget.CustomEditorControl<EmulationComponents.UserAgentClientHintsForm.UserAgentClientHintsFormData>)
         .value = {metaData: device.userAgentMetadata || undefined};
     return editor;
+  }
+
+  private safeAreaInsetsFromEditor(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                                   controlPrefix = ''): EmulationModel.DeviceModeModel.Insets|null {
+    const left = this.editorIntegerValue(editor, `${controlPrefix}safe-area-left`);
+    const top = this.editorIntegerValue(editor, `${controlPrefix}safe-area-top`);
+    const right = this.editorIntegerValue(editor, `${controlPrefix}safe-area-right`);
+    const bottom = this.editorIntegerValue(editor, `${controlPrefix}safe-area-bottom`);
+    if (!left && !top && !right && !bottom) {
+      return null;
+    }
+    return new EmulationModel.DeviceModeModel.Insets(left, top, right, bottom);
+  }
+
+  private cutoutFromEditor(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>):
+      EmulationModel.EmulatedDevices.Cutout|null {
+    const shape = editor.control('cutout-shape').value;
+    const baseCutout = {
+      x: this.editorIntegerValue(editor, 'cutout-x'),
+      y: this.editorIntegerValue(editor, 'cutout-y'),
+      width: this.editorIntegerValue(editor, 'cutout-width'),
+      height: this.editorIntegerValue(editor, 'cutout-height'),
+    };
+    switch (shape) {
+      case EmulationModel.EmulatedDevices.CutoutShape.PILL:
+        return {
+          shape,
+          ...baseCutout,
+          borderRadius: this.editorIntegerValue(editor, 'cutout-border-radius'),
+        };
+      case EmulationModel.EmulatedDevices.CutoutShape.NOTCH:
+        return {
+          shape,
+          ...baseCutout,
+          upperRadius: this.editorIntegerValue(editor, 'cutout-upper-radius'),
+          lowerRadius: this.editorIntegerValue(editor, 'cutout-lower-radius'),
+        };
+      case EmulationModel.EmulatedDevices.CutoutShape.CIRCLE:
+        return {
+          shape,
+          ...baseCutout,
+          cx: this.editorIntegerValue(editor, 'cutout-cx'),
+          cy: this.editorIntegerValue(editor, 'cutout-cy'),
+          radius: this.editorIntegerValue(editor, 'cutout-radius'),
+        };
+      case EmulationModel.EmulatedDevices.CutoutShape.RECTANGLE:
+        return {shape, ...baseCutout};
+      default:
+        return null;
+    }
+  }
+
+  private populateSafeAreaEditor(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                                 device: EmulationModel.EmulatedDevices.EmulatedDevice): void {
+    const safeAreaInsets = this.verticalMode(device)?.safeAreaInsets;
+    editor.control('safe-area-left').value = this.toNumericInputValue(safeAreaInsets?.left || 0);
+    editor.control('safe-area-top').value = this.toNumericInputValue(safeAreaInsets?.top || 0);
+    editor.control('safe-area-right').value = this.toNumericInputValue(safeAreaInsets?.right || 0);
+    editor.control('safe-area-bottom').value = this.toNumericInputValue(safeAreaInsets?.bottom || 0);
+
+    const landscapeSafeAreaInsets = this.horizontalMode(device)?.safeAreaInsets;
+    editor.control('landscape-safe-area-left').value = this.toNumericInputValue(landscapeSafeAreaInsets?.left || 0);
+    editor.control('landscape-safe-area-top').value = this.toNumericInputValue(landscapeSafeAreaInsets?.top || 0);
+    editor.control('landscape-safe-area-right').value = this.toNumericInputValue(landscapeSafeAreaInsets?.right || 0);
+    editor.control('landscape-safe-area-bottom').value = this.toNumericInputValue(landscapeSafeAreaInsets?.bottom || 0);
+  }
+
+  private populateCutoutEditor(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                               device: EmulationModel.EmulatedDevices.EmulatedDevice): void {
+    const cutout = this.verticalMode(device)?.cutout;
+    editor.control('cutout-shape').value = cutout?.shape || NO_CUSTOM_CUTOUT;
+    editor.control('cutout-x').value = String(cutout?.x ?? '');
+    editor.control('cutout-y').value = String(cutout?.y ?? '');
+    editor.control('cutout-width').value = String(cutout?.width ?? '');
+    editor.control('cutout-height').value = String(cutout?.height ?? '');
+    editor.control('cutout-border-radius').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.PILL ? cutout.borderRadius : '');
+    editor.control('cutout-upper-radius').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.NOTCH ? cutout.upperRadius : '');
+    editor.control('cutout-lower-radius').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.NOTCH ? cutout.lowerRadius : '');
+    editor.control('cutout-cx').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.CIRCLE ? cutout.cx : '');
+    editor.control('cutout-cy').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.CIRCLE ? cutout.cy : '');
+    editor.control('cutout-radius').value =
+        String(cutout?.shape === EmulationModel.EmulatedDevices.CutoutShape.CIRCLE ? cutout.radius : '');
+    this.updateCutoutFieldsVisibility(editor);
+  }
+
+  private updateCutoutFieldsVisibility(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>):
+      void {
+    const shape = editor.control('cutout-shape').value;
+    const noCutout = shape === NO_CUSTOM_CUTOUT;
+    const isPill = shape === EmulationModel.EmulatedDevices.CutoutShape.PILL;
+    const isNotch = shape === EmulationModel.EmulatedDevices.CutoutShape.NOTCH;
+    const isCircle = shape === EmulationModel.EmulatedDevices.CutoutShape.CIRCLE;
+    const content = editor.contentElement();
+    const rectRow = content.querySelector<HTMLElement>('.devices-edit-cutout-rect-row');
+    const radiusRow = content.querySelector<HTMLElement>('.devices-edit-cutout-radius-row');
+    if (rectRow) {
+      rectRow.hidden = noCutout;
+    }
+    if (radiusRow) {
+      radiusRow.hidden = noCutout || !(isPill || isNotch || isCircle);
+    }
+    (editor.control('cutout-border-radius') as HTMLElement).hidden = !isPill;
+    (editor.control('cutout-upper-radius') as HTMLElement).hidden = !isNotch;
+    (editor.control('cutout-lower-radius') as HTMLElement).hidden = !isNotch;
+    (editor.control('cutout-cx') as HTMLElement).hidden = !isCircle;
+    (editor.control('cutout-cy') as HTMLElement).hidden = !isCircle;
+    (editor.control('cutout-radius') as HTMLElement).hidden = !isCircle;
   }
 
   private createEditor(): UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice> {
@@ -311,6 +655,26 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     const dpr = editor.createInput('scale', 'text', i18nString(UIStrings.devicePixelRatio), scaleValidator);
     dpr.classList.add('device-edit-fixed');
     screen.appendChild(dpr);
+
+    if (Root.Runtime.hostConfig.devToolsMobileSafeAreaEmulation?.enabled) {
+      this.appendSafeAreaFields(editor, deviceFields, i18nString(UIStrings.portraitSafeArea), '',
+                                portraitSafeAreaValidator);
+      this.appendSafeAreaFields(editor, deviceFields, i18nString(UIStrings.landscapeSafeArea), 'landscape-',
+                                landscapeSafeAreaValidator);
+      this.appendCutoutFields(editor, content, {
+        shape: cutoutShapeValidator,
+        x: cutoutXValidator,
+        y: cutoutYValidator,
+        width: cutoutWidthValidator,
+        height: cutoutHeightValidator,
+        pillRadius: cutoutPillRadiusValidator,
+        notchUpperRadius: cutoutNotchUpperRadiusValidator,
+        notchLowerRadius: cutoutNotchLowerRadiusValidator,
+        circleCenterX: cutoutCircleCenterXValidator,
+        circleCenterY: cutoutCircleCenterYValidator,
+        circleRadius: cutoutCircleRadiusValidator,
+      });
+    }
 
     const uaStringFields = content.createChild('div', 'devices-edit-fields');
     UI.UIUtils.createTextChild(uaStringFields.createChild('b'), i18nString(UIStrings.userAgentString));
@@ -388,5 +752,279 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
       return EmulationModel.DeviceModeModel.DeviceModeModel.scaleValidator(input.value);
     }
+
+    function nonNegativeIntegerValue(controlName: string): number|null {
+      return parseOptionalNonNegativeInteger(editor.control(controlName).value);
+    }
+
+    function positiveIntegerValue(controlName: string): number|null {
+      const value = nonNegativeIntegerValue(controlName);
+      return value && value > 0 ? value : null;
+    }
+
+    function requiredIntegerValue(controlName: string): number|null {
+      const value = editor.control(controlName).value.trim();
+      return value ? parseOptionalNonNegativeInteger(value) : null;
+    }
+
+    function controlLabel(input: UI.ListWidget.EditorControl): string {
+      return input.getAttribute('aria-label') || input.getAttribute('placeholder') || '';
+    }
+
+    function safeAreaValidator(controlPrefix: string, orientationLabel: string, widthControlName: string,
+                               heightControlName: string,
+                               input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      const ownValue = parseOptionalNonNegativeInteger(input.value);
+      if (ownValue === null) {
+        return {
+          valid: false,
+          errorMessage: i18nString(UIStrings.safeAreaValueMustBeInRange, {
+            PH1: orientationLabel,
+            PH2: input.getAttribute('aria-label') || input.getAttribute('placeholder') || '',
+            PH3: EmulationModel.DeviceModeModel.MaxDeviceSize,
+          }),
+        };
+      }
+
+      const left = nonNegativeIntegerValue(`${controlPrefix}safe-area-left`);
+      const top = nonNegativeIntegerValue(`${controlPrefix}safe-area-top`);
+      const right = nonNegativeIntegerValue(`${controlPrefix}safe-area-right`);
+      const bottom = nonNegativeIntegerValue(`${controlPrefix}safe-area-bottom`);
+      const width = positiveIntegerValue(widthControlName);
+      const height = positiveIntegerValue(heightControlName);
+      if (input === editor.control(`${controlPrefix}safe-area-right`) && left !== null && right !== null &&
+          width !== null && left + right > width) {
+        return {
+          valid: false,
+          errorMessage: i18nString(UIStrings.safeAreaHorizontalInsetsExceedWidth, {PH1: orientationLabel}),
+        };
+      }
+      if (input === editor.control(`${controlPrefix}safe-area-bottom`) && top !== null && bottom !== null &&
+          height !== null && top + bottom > height) {
+        return {
+          valid: false,
+          errorMessage: i18nString(UIStrings.safeAreaVerticalInsetsExceedHeight, {PH1: orientationLabel}),
+        };
+      }
+      return {valid: true};
+    }
+
+    function portraitSafeAreaValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                       input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return safeAreaValidator('', i18nString(UIStrings.portraitSafeArea), 'width', 'height', input);
+    }
+
+    function landscapeSafeAreaValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                        input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return safeAreaValidator('landscape-', i18nString(UIStrings.landscapeSafeArea), 'height', 'width', input);
+    }
+
+    function cutoutShapeValidator(): UI.ListWidget.ValidatorResult {
+      return {valid: true};
+    }
+
+    function cutoutValueValidator(input: UI.ListWidget.EditorControl,
+                                  mustBePositive = false): UI.ListWidget.ValidatorResult {
+      const label = controlLabel(input);
+      const value = input.value.trim();
+      if (!value) {
+        return {valid: false, errorMessage: i18nString(UIStrings.cutoutFieldRequired, {PH1: label})};
+      }
+      const numericValue = parseOptionalNonNegativeInteger(value);
+      if (numericValue === null) {
+        return {
+          valid: false,
+          errorMessage: i18nString(UIStrings.cutoutValueMustBeInRange, {
+            PH1: label,
+            PH2: EmulationModel.DeviceModeModel.MaxDeviceSize,
+          }),
+        };
+      }
+      if (mustBePositive && numericValue === 0) {
+        return {valid: false, errorMessage: i18nString(UIStrings.cutoutValueMustBePositiveInteger, {PH1: label})};
+      }
+      return {valid: true};
+    }
+
+    function isCutoutFieldActive(shape?: EmulationModel.EmulatedDevices.CutoutShape): boolean {
+      const selectedShape = editor.control('cutout-shape').value;
+      return selectedShape !== NO_CUSTOM_CUTOUT && (shape === undefined || selectedShape === shape);
+    }
+
+    function cutoutXValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                              input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive() ? cutoutValueValidator(input) : {valid: true};
+    }
+
+    function cutoutYValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                              input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive() ? cutoutValueValidator(input) : {valid: true};
+    }
+
+    function cutoutWidthValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                  input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      if (!isCutoutFieldActive()) {
+        return {valid: true};
+      }
+      const validation = cutoutValueValidator(input, true);
+      if (!validation.valid) {
+        return validation;
+      }
+
+      const cutoutX = requiredIntegerValue('cutout-x');
+      const cutoutWidth = positiveIntegerValue('cutout-width');
+      const width = positiveIntegerValue('width');
+      if (width !== null && cutoutX !== null && cutoutWidth !== null && cutoutX + cutoutWidth > width) {
+        return {valid: false, errorMessage: i18nString(UIStrings.cutoutXAndWidthExceedDeviceWidth)};
+      }
+      return {valid: true};
+    }
+
+    function cutoutHeightValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                   input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      if (!isCutoutFieldActive()) {
+        return {valid: true};
+      }
+      const validation = cutoutValueValidator(input, true);
+      if (!validation.valid) {
+        return validation;
+      }
+
+      const cutoutY = requiredIntegerValue('cutout-y');
+      const cutoutHeight = positiveIntegerValue('cutout-height');
+      const height = positiveIntegerValue('height');
+      if (height !== null && cutoutY !== null && cutoutHeight !== null && cutoutY + cutoutHeight > height) {
+        return {valid: false, errorMessage: i18nString(UIStrings.cutoutYAndHeightExceedDeviceHeight)};
+      }
+      return {valid: true};
+    }
+
+    function cutoutPillRadiusValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                       input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.PILL) ? cutoutValueValidator(input) :
+                                                                                    {valid: true};
+    }
+
+    function cutoutNotchUpperRadiusValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                             input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.NOTCH) ? cutoutValueValidator(input) :
+                                                                                     {valid: true};
+    }
+
+    function cutoutNotchLowerRadiusValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                             input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.NOTCH) ? cutoutValueValidator(input) :
+                                                                                     {valid: true};
+    }
+
+    function cutoutCircleCenterXValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                          input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.CIRCLE) ? cutoutValueValidator(input) :
+                                                                                      {valid: true};
+    }
+
+    function cutoutCircleCenterYValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                          input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      return isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.CIRCLE) ? cutoutValueValidator(input) :
+                                                                                      {valid: true};
+    }
+
+    function cutoutCircleRadiusValidator(_item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
+                                         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
+      if (!isCutoutFieldActive(EmulationModel.EmulatedDevices.CutoutShape.CIRCLE)) {
+        return {valid: true};
+      }
+      const validation = cutoutValueValidator(input, true);
+      if (!validation.valid) {
+        return validation;
+      }
+
+      const cutoutX = requiredIntegerValue('cutout-x');
+      const cutoutY = requiredIntegerValue('cutout-y');
+      const cutoutWidth = positiveIntegerValue('cutout-width');
+      const cutoutHeight = positiveIntegerValue('cutout-height');
+      const centerX = requiredIntegerValue('cutout-cx');
+      const centerY = requiredIntegerValue('cutout-cy');
+      const radius = positiveIntegerValue('cutout-radius');
+      if (cutoutX !== null && cutoutY !== null && cutoutWidth !== null && cutoutHeight !== null && centerX !== null &&
+          centerY !== null && radius !== null &&
+          (centerX - radius < cutoutX || centerX + radius > cutoutX + cutoutWidth || centerY - radius < cutoutY ||
+           centerY + radius > cutoutY + cutoutHeight)) {
+        return {valid: false, errorMessage: i18nString(UIStrings.circleMustFitCutoutBounds)};
+      }
+      return {valid: true};
+    }
+  }
+
+  private appendSafeAreaFields(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                               deviceFields: HTMLElement, title: string, controlPrefix: string,
+                               safeAreaValidator:
+                                   (item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+                                    input: UI.ListWidget.EditorControl) => UI.ListWidget.ValidatorResult): void {
+    const safeAreaGroup = deviceFields.createChild('div', 'devices-edit-safe-area-group');
+    UI.ARIAUtils.markAsGroup(safeAreaGroup);
+    const heading = safeAreaGroup.createChild('b');
+    heading.id = UI.ARIAUtils.nextId('safe-area-heading-');
+    UI.UIUtils.createTextChild(heading, title);
+    safeAreaGroup.setAttribute('aria-labelledby', heading.id);
+    const safeAreaRow = safeAreaGroup.createChild('div', 'hbox');
+    safeAreaRow.appendChild(editor.createInput(`${controlPrefix}safe-area-left`, 'text',
+                                               i18nString(UIStrings.safeAreaLeft), safeAreaValidator));
+    safeAreaRow.appendChild(editor.createInput(`${controlPrefix}safe-area-top`, 'text',
+                                               i18nString(UIStrings.safeAreaTop), safeAreaValidator));
+    safeAreaRow.appendChild(editor.createInput(`${controlPrefix}safe-area-right`, 'text',
+                                               i18nString(UIStrings.safeAreaRight), safeAreaValidator));
+    safeAreaRow.appendChild(editor.createInput(`${controlPrefix}safe-area-bottom`, 'text',
+                                               i18nString(UIStrings.safeAreaBottom), safeAreaValidator));
+  }
+
+  private appendCutoutFields(editor: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>,
+                             content: Element, validators: CutoutFieldValidators): void {
+    const cutoutFields = content.createChild('div', 'devices-edit-fields');
+    cutoutFields.classList.add('devices-edit-cutout-fields');
+    UI.ARIAUtils.markAsGroup(cutoutFields);
+    const heading = cutoutFields.createChild('b');
+    heading.id = UI.ARIAUtils.nextId('cutout-heading-');
+    UI.UIUtils.createTextChild(heading, i18nString(UIStrings.displayCutout));
+    cutoutFields.setAttribute('aria-labelledby', heading.id);
+    const shapeOptions = [
+      NO_CUSTOM_CUTOUT,
+      EmulationModel.EmulatedDevices.CutoutShape.PILL,
+      EmulationModel.EmulatedDevices.CutoutShape.NOTCH,
+      EmulationModel.EmulatedDevices.CutoutShape.CIRCLE,
+      EmulationModel.EmulatedDevices.CutoutShape.RECTANGLE,
+    ];
+    const shapeControl =
+        editor.createSelect('cutout-shape', shapeOptions, validators.shape, i18nString(UIStrings.displayCutout));
+    shapeControl.options[0].textContent = i18nString(UIStrings.noDisplayCutout);
+    shapeControl.options[1].textContent = i18nString(UIStrings.pillDisplayCutout);
+    shapeControl.options[2].textContent = i18nString(UIStrings.notchDisplayCutout);
+    shapeControl.options[3].textContent = i18nString(UIStrings.circleDisplayCutout);
+    shapeControl.options[4].textContent = i18nString(UIStrings.rectangleDisplayCutout);
+    cutoutFields.createChild('div', 'hbox').appendChild(shapeControl);
+    shapeControl.addEventListener('input', () => this.updateCutoutFieldsVisibility(editor), false);
+
+    const rectRow = cutoutFields.createChild('div', 'hbox devices-edit-cutout-rect-row');
+    rectRow.appendChild(editor.createInput('cutout-x', 'text', i18nString(UIStrings.cutoutX), validators.x));
+    rectRow.appendChild(editor.createInput('cutout-y', 'text', i18nString(UIStrings.cutoutY), validators.y));
+    rectRow.appendChild(
+        editor.createInput('cutout-width', 'text', i18nString(UIStrings.cutoutWidth), validators.width));
+    rectRow.appendChild(
+        editor.createInput('cutout-height', 'text', i18nString(UIStrings.cutoutHeight), validators.height));
+
+    const radiusRow = cutoutFields.createChild('div', 'hbox devices-edit-cutout-radius-row');
+    radiusRow.appendChild(editor.createInput('cutout-border-radius', 'text', i18nString(UIStrings.cutoutBorderRadius),
+                                             validators.pillRadius));
+    radiusRow.appendChild(editor.createInput('cutout-upper-radius', 'text', i18nString(UIStrings.cutoutUpperRadius),
+                                             validators.notchUpperRadius));
+    radiusRow.appendChild(editor.createInput('cutout-lower-radius', 'text', i18nString(UIStrings.cutoutLowerRadius),
+                                             validators.notchLowerRadius));
+    radiusRow.appendChild(
+        editor.createInput('cutout-cx', 'text', i18nString(UIStrings.cutoutCenterX), validators.circleCenterX));
+    radiusRow.appendChild(
+        editor.createInput('cutout-cy', 'text', i18nString(UIStrings.cutoutCenterY), validators.circleCenterY));
+    radiusRow.appendChild(
+        editor.createInput('cutout-radius', 'text', i18nString(UIStrings.cutoutRadius), validators.circleRadius));
+    this.updateCutoutFieldsVisibility(editor);
   }
 }

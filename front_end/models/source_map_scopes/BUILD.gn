@@ -7,21 +7,23 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("source_map_scopes") {
+devtools_foundation_module("source_map_scopes") {
   sources = [
     "FunctionCodeResolver.ts",
     "NamesResolver.ts",
     "ScopeChainModel.ts",
+    "ScopeChainResolver.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/bindings:bundle",
     "../../models/formatter:bundle",
-    "../../models/text_utils:bundle",
     "../workspace:bundle",
   ]
 }
@@ -29,13 +31,15 @@ devtools_module("source_map_scopes") {
 devtools_entrypoint("bundle") {
   entrypoint = "source_map_scopes.ts"
 
-  deps = [ ":source_map_scopes" ]
+  ts_deps = [ ":source_map_scopes" ]
 
   visibility = [
     ":*",
+    "../../foundation/*",
     "../../panels/console/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",
+    "../../testing/*",
     "../../ui/components/text_editor/*",
     "../../ui/legacy/components/object_ui/*",
     "../ai_assistance/*",
@@ -46,21 +50,37 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
   sources = [
     "FunctionCodeResolver.test.ts",
     "NamesResolver.test.ts",
     "ScopeChainModel.test.ts",
+    "ScopeChainResolver.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/platform:bundle",
-    "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../generated",
     "../../testing",
+    "../../third_party/source-map-scopes-codec:bundle",
     "../bindings:bundle",
+    "../formatter:bundle",
     "../workspace:bundle",
+  ]
+}
+
+devtools_api_test_module("api_tests") {
+  sources = [ "NamesResolver.test.api.ts" ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/platform:bundle",
+    "../../core/sdk:bundle",
+    "../../models/formatter:bundle",
+    "../../testing",
+    "../../third_party/source-map-scopes-codec:bundle",
   ]
 }

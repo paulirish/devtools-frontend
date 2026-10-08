@@ -56,6 +56,15 @@ describeWithEnvironment('AppenderUtils', () => {
           /* expanded= */ true, /* showStackContextMenu= */ true);
       assert.deepEqual(builtHeader, trackHeader);
     });
+
+    it('sets fullTrackName and url optional properties correctly', () => {
+      const builtHeader = Timeline.AppenderUtils.buildTrackHeader(
+          Timeline.CompatibilityTracksAppender.VisualLoggingTrackName.ANIMATIONS,
+          /* startLevel= */ 0, 'Header Name', Timeline.AppenderUtils.buildGroupStyle(), /* selectable= */ true,
+          /* expanded= */ true, /* showStackContextMenu= */ true, 'Full description text', 'https://example.com');
+      assert.strictEqual(builtHeader.fullTrackName, 'Full description text');
+      assert.strictEqual(builtHeader.url, 'https://example.com');
+    });
   });
 
   describe('getDurationWithSelf', () => {
@@ -66,7 +75,7 @@ describeWithEnvironment('AppenderUtils', () => {
       return Timeline.AppenderUtils.getDurationString(totalTime, selfTime);
     };
 
-    it('returns the time info for a entry with no duration correctly', async () => {
+    it('returns the time info for an entry with no duration correctly', async () => {
       const totalTime = Trace.Types.Timing.Micro(0);
       const formattedTime = Timeline.AppenderUtils.getDurationString(totalTime);
       assert.strictEqual(formattedTime, '');

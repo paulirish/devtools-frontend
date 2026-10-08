@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
@@ -13,6 +14,7 @@ import {
   describeWithEnvironment,
 } from '../../../testing/EnvironmentHelpers.js';
 import {createViewFunctionStub, type ViewFunctionStub} from '../../../testing/ViewFunctionHelpers.js';
+import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
 import * as AiAssistance from '../ai_assistance.js';
 
 describeWithEnvironment('ChatInput', () => {
@@ -23,18 +25,6 @@ describeWithEnvironment('ChatInput', () => {
     component.wasShown();
     component.performUpdate();
     return [view, component];
-  }
-
-  class MockFileReader {
-    result: string|null = null;
-    onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => void)|null = null;
-
-    readAsDataURL(_file: Blob): void {
-      if (this.onload) {
-        this.result = 'data:image/png;base64,dGVzdA==';
-        this.onload.call(this as unknown as FileReader, new ProgressEvent('load') as ProgressEvent<FileReader>);
-      }
-    }
   }
 
   it('should disable the send button when the input is empty', async () => {
@@ -98,8 +88,11 @@ describeWithEnvironment('ChatInput', () => {
         value: [file],
         writable: false,
       });
+      const nextInput = view.nextInput;
       mockInput.dispatchEvent(new Event('change'));
-      await new Promise(resolve => setTimeout(resolve, 0));
+      if (file.size <= 10 * 1024 * 1024) {
+        await nextInput;
+      }
     }
 
     beforeEach(() => {
@@ -108,6 +101,14 @@ describeWithEnvironment('ChatInput', () => {
       assert.exists(maybeModel);
       model = maybeModel;
       SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+
+      AiAssistance.ImageResize.setCompressImplementationForTest(async () => {
+        return {data: 'dGVzdA==', mimeType: 'image/jpeg'};
+      });
+    });
+
+    afterEach(() => {
+      AiAssistance.ImageResize.setCompressImplementationForTest(null);
     });
 
     it('handles screenshot capture', async () => {
@@ -116,41 +117,37 @@ describeWithEnvironment('ChatInput', () => {
       const [view] = createComponent();
 
       // Simulate screenshot button click
+      const nextInput = view.nextInput;
       view.input.onTakeScreenshot();
 
       // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await nextInput;
 
       sinon.assert.calledOnce(captureScreenshotStub);
       assert.deepEqual(view.input.imageInput, {
         isLoading: false,
         data: 'screenshot-data',
         mimeType: 'image/jpeg',
-        inputType: AiAssistanceModel.AiAgent.MultimodalInputType.SCREENSHOT
+        inputType: AiAssistanceModel.AiAgent.MultimodalInputType.SCREENSHOT,
       });
     });
 
     it('handles image upload', async () => {
       const [view] = createComponent();
-      const file = new File(['test'], 'image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
 
       await triggerImageUpload(view, file);
 
-      assert.deepEqual(view.input.imageInput, {
-        isLoading: false,
-        data: 'dGVzdA==',
-        mimeType: 'image/png',
-        inputType: AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE
-      });
+      assert.exists(view.input.imageInput);
+      assert.isFalse(view.input.imageInput.isLoading);
+      assert.strictEqual(view.input.imageInput.data, 'dGVzdA==');
+      assert.strictEqual(view.input.imageInput.mimeType, 'image/jpeg');
+      assert.strictEqual(view.input.imageInput.inputType, AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE);
     });
 
     it('removes image input', async () => {
       const [view] = createComponent();
-      const file = new File(['test'], 'image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
 
       await triggerImageUpload(view, file);
       assert.isDefined(view.input.imageInput);
@@ -161,9 +158,7 @@ describeWithEnvironment('ChatInput', () => {
 
     it('clears image input on submit', async () => {
       const [view, component] = createComponent();
-      const file = new File(['test'], 'image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
 
       await triggerImageUpload(view, file);
       component.setInputValue('test');
@@ -178,33 +173,28 @@ describeWithEnvironment('ChatInput', () => {
       const [view, component] = createComponent();
       component.conversationType = AiAssistanceModel.AiHistoryStorage.ConversationType.STYLING;
 
-      const file = new File(['test'], 'pasted_image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
       const clipboardEvent = new ClipboardEvent('paste', {
         clipboardData: dataTransfer,
       });
 
+      const nextInput = view.nextInput;
       view.input.onImagePaste(clipboardEvent);
+      await nextInput;
 
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      assert.deepEqual(view.input.imageInput, {
-        isLoading: false,
-        data: btoa('test'),
-        mimeType: 'image/png',
-        inputType: AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE
-      });
+      assert.exists(view.input.imageInput);
+      assert.isFalse(view.input.imageInput.isLoading);
+      assert.strictEqual(view.input.imageInput.data, 'dGVzdA==');
+      assert.strictEqual(view.input.imageInput.mimeType, 'image/jpeg');
+      assert.strictEqual(view.input.imageInput.inputType, AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE);
     });
 
     it('handles drag-and-drop image upload', async () => {
       const [view] = createComponent();
 
-      const file = new File(['test'], 'dropped_image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
       const dragOverEvent = new DragEvent('dragover', {
@@ -216,17 +206,16 @@ describeWithEnvironment('ChatInput', () => {
 
       view.input.onImageDragOver(dragOverEvent);
       dragOverEvent.preventDefault();
+      const nextInput = view.nextInput;
       view.input.onImageDrop(dropEvent);
       dropEvent.preventDefault();
+      await nextInput;
 
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      assert.deepEqual(view.input.imageInput, {
-        isLoading: false,
-        data: btoa('test'),
-        mimeType: 'image/png',
-        inputType: AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE
-      });
+      assert.exists(view.input.imageInput);
+      assert.isFalse(view.input.imageInput.isLoading);
+      assert.strictEqual(view.input.imageInput.data, 'dGVzdA==');
+      assert.strictEqual(view.input.imageInput.mimeType, 'image/jpeg');
+      assert.strictEqual(view.input.imageInput.inputType, AiAssistanceModel.AiAgent.MultimodalInputType.UPLOADED_IMAGE);
     });
 
     it('should clear image input on primary page change', async () => {
@@ -234,9 +223,7 @@ describeWithEnvironment('ChatInput', () => {
       const [view] = createComponent();
 
       // Set up initial state with an image and non-empty conversation
-      const file = new File(['test'], 'image.png', {type: 'image/png'});
-      const fileReaderStub = sinon.stub(window, 'FileReader');
-      fileReaderStub.returns(new MockFileReader() as unknown as FileReader);
+      const file = new File(['dummy'], 'dummy.jpg', {type: 'image/jpeg'});
 
       await triggerImageUpload(view, file);
 
@@ -253,6 +240,35 @@ describeWithEnvironment('ChatInput', () => {
 
       // Verify image input is cleared
       assert.isUndefined(view.input.imageInput);
+    });
+
+    it('rejects image files larger than 10MB', async () => {
+      const [view] = createComponent();
+      const largeFile = new File([new ArrayBuffer(11 * 1024 * 1024)], 'large.png', {type: 'image/png'});
+      const snackbarSpy = sinon.spy(Snackbars.Snackbar.Snackbar, 'show');
+
+      await triggerImageUpload(view, largeFile);
+
+      assert.isUndefined(view.input.imageInput);
+      sinon.assert.calledOnce(snackbarSpy);
+      assert.include(snackbarSpy.firstCall.args[0].message, 'File is too large');
+    });
+
+    it('handles image compression failures gracefully', async () => {
+      AiAssistance.ImageResize.setCompressImplementationForTest(async () => {
+        throw new Error('Failed to compress image');
+      });
+      const consoleErrorStub = sinon.stub(console, 'error');
+      const [view] = createComponent();
+      const file = new File(['test'], 'image.png', {type: 'image/png'});
+      const snackbarSpy = sinon.spy(Snackbars.Snackbar.Snackbar, 'show');
+
+      await triggerImageUpload(view, file);
+
+      assert.isUndefined(view.input.imageInput);
+      sinon.assert.calledOnce(snackbarSpy);
+      assert.include(snackbarSpy.firstCall.args[0].message, 'Failed to upload image');
+      sinon.assert.calledOnce(consoleErrorStub);
     });
   });
 
@@ -344,6 +360,7 @@ describeWithEnvironment('ChatInput', () => {
 
   describe('view', () => {
     class MockContext extends AiAssistanceModel.AiAgent.ConversationContext<string> {
+      override readonly jslogContext = 'ai-context-file' as const;
       getIcon() {
         return document.createElement('span');
       }
@@ -353,8 +370,8 @@ describeWithEnvironment('ChatInput', () => {
       getItem() {
         return 'test';
       }
-      override getURL() {
-        return '';
+      override getOrigin(): SDK.SecurityOrigin.SecurityOrigin {
+        return SDK.SecurityOrigin.SecurityOrigin.createUniqueOpaque();
       }
     }
 
@@ -365,6 +382,7 @@ describeWithEnvironment('ChatInput', () => {
         blockedByCrossOrigin: false,
         isTextInputDisabled: false,
         inputPlaceholder: 'Type a message...' as Platform.UIString.LocalizedString,
+        textInputValue: '',
         context: null,
         isContextSelected: false,
         inspectElementToggled: false,
@@ -394,7 +412,7 @@ describeWithEnvironment('ChatInput', () => {
 
     it('renders correctly when multimodal is enabled', async () => {
       const target = document.createElement('div');
-      renderElementIntoDOM(target);
+      renderElementIntoDOM(target, {includeCommonStyles: true});
       AiAssistance.ChatInput.DEFAULT_VIEW(
           {
             ...createDefaultViewInput(),
@@ -407,7 +425,7 @@ describeWithEnvironment('ChatInput', () => {
 
     it('renders correctly when multimodal is disabled', async () => {
       const target = document.createElement('div');
-      renderElementIntoDOM(target);
+      renderElementIntoDOM(target, {includeCommonStyles: true});
       AiAssistance.ChatInput.DEFAULT_VIEW(
           {
             ...createDefaultViewInput(),
@@ -474,6 +492,16 @@ describeWithEnvironment('ChatInput', () => {
       assert.isNotNull(addButton);
       addButton.click();
       sinon.assert.calledOnce(onContextAdd);
+    });
+    it('does not trigger onTextSubmit on submit event when input is empty', async () => {
+      const [, component] = createComponent();
+      const onTextSubmit = sinon.stub();
+      component.onTextSubmit = onTextSubmit;
+
+      const event = new SubmitEvent('submit', {cancelable: true});
+      component.onSubmit(event);
+
+      sinon.assert.notCalled(onTextSubmit);
     });
   });
 });

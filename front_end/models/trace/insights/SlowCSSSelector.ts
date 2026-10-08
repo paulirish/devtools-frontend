@@ -4,9 +4,7 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Handlers from '../handlers/handlers.js';
-import type {SelectorStatsData} from '../handlers/SelectorStatsHandler.js';
 import * as Helpers from '../helpers/helpers.js';
-import {type SelectorTiming, SelectorTimingsKey} from '../types/TraceEvents.js';
 import * as Types from '../types/types.js';
 
 import {
@@ -21,23 +19,23 @@ export const UIStrings = {
   /**
    * @description Title of an insight that provides details about slow CSS selectors.
    */
-  title: 'CSS Selector costs',
+  title: 'CSS selector costs',
 
   /**
    * @description Text to describe how to improve the performance of CSS selectors.
    */
   description:
-      'If Recalculate Style costs remain high, selector optimization can reduce them. [Optimize the selectors](https://developer.chrome.com/docs/performance/insights/slow-css-selector) with both high elapsed time and high slow-path %. Simpler selectors, fewer selectors, a smaller DOM, and a shallower DOM will all reduce matching costs.',
+      'If recalculate style costs remain high, selector optimization can reduce them. [Optimize the selectors](https://developer.chrome.com/docs/performance/insights/slow-css-selector) with both high elapsed time and high slow-path %. Simpler selectors, fewer selectors, a smaller DOM, and a shallower DOM will all reduce matching costs.',
   /**
-   * @description Column name for count of elements that the engine attempted to match against a style rule
+   * @description Column name for count of elements that the engine attempted to match against a style rule.
    */
   matchAttempts: 'Match attempts',
   /**
-   * @description Column name for count of elements that matched a style rule
+   * @description Column name for count of elements that matched a style rule.
    */
   matchCount: 'Match count',
   /**
-   * @description Column name for elapsed time spent computing a style rule
+   * @description Column name for elapsed time spent computing a style rule.
    */
   elapsed: 'Elapsed time',
   /**
@@ -52,19 +50,19 @@ export const UIStrings = {
    * @description Text status indicating that no CSS selector data was found.
    */
   enableSelectorData:
-      'No CSS selector data was found. CSS selector stats need to be enabled in the performance panel settings.',
+      'No CSS selector data was found. CSS selector stats need to be enabled in the Performance panel settings.',
   /**
-   * @description top CSS selector when ranked by elapsed time in ms
+   * @description Top CSS selector when ranked by elapsed time in ms.
    */
   topSelectorElapsedTime: 'Top selector elapsed time',
   /**
-   * @description top CSS selector when ranked by match attempt
+   * @description Top CSS selector when ranked by match attempt.
    */
   topSelectorMatchAttempt: 'Top selector match attempt',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/SlowCSSSelector.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const slowCSSSelectorThreshold = 500;  // 500us threshold for slow selectors
 
 export type SlowCSSSelectorInsightModel = InsightModel<typeof UIStrings, {
@@ -75,8 +73,9 @@ export type SlowCSSSelectorInsightModel = InsightModel<typeof UIStrings, {
   topSelectorMatchAttempts: Types.Events.SelectorTiming | null,
 }>;
 
-function aggregateSelectorStats(data: SelectorStatsData, context: InsightSetContext): SelectorTiming[] {
-  const selectorMap = new Map<String, SelectorTiming>();
+function aggregateSelectorStats(data: Handlers.ModelHandlers.SelectorStats.SelectorStatsData,
+                                context: InsightSetContext): Types.Events.SelectorTiming[] {
+  const selectorMap = new Map<String, Types.Events.SelectorTiming>();
 
   for (const [event, value] of data.dataForRecalcStyleEvent) {
     if (event.args.beginData?.frame !== context.frameId) {
@@ -86,13 +85,16 @@ function aggregateSelectorStats(data: SelectorStatsData, context: InsightSetCont
       continue;
     }
     for (const timing of value.timings) {
-      const key = timing[SelectorTimingsKey.Selector] + '_' + timing[SelectorTimingsKey.StyleSheetId];
+      const key =
+          timing[Types.Events.SelectorTimingsKey.Selector] + '_' + timing[Types.Events.SelectorTimingsKey.StyleSheetId];
       const findTiming = selectorMap.get(key);
       if (findTiming !== undefined) {
-        findTiming[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
-        findTiming[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
-        findTiming[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
-        findTiming[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
+        findTiming[Types.Events.SelectorTimingsKey.Elapsed] += timing[Types.Events.SelectorTimingsKey.Elapsed];
+        findTiming[Types.Events.SelectorTimingsKey.FastRejectCount] +=
+            timing[Types.Events.SelectorTimingsKey.FastRejectCount];
+        findTiming[Types.Events.SelectorTimingsKey.MatchAttempts] +=
+            timing[Types.Events.SelectorTimingsKey.MatchAttempts];
+        findTiming[Types.Events.SelectorTimingsKey.MatchCount] += timing[Types.Events.SelectorTimingsKey.MatchCount];
       } else {
         selectorMap.set(key, {...timing});
       }
@@ -134,28 +136,30 @@ export function generateInsight(
   let totalMatchCount = 0;
 
   selectorTimings.map(timing => {
-    totalElapsedUs += timing[SelectorTimingsKey.Elapsed];
-    totalMatchAttempts += timing[SelectorTimingsKey.MatchAttempts];
-    totalMatchCount += timing[SelectorTimingsKey.MatchCount];
+    totalElapsedUs += timing[Types.Events.SelectorTimingsKey.Elapsed];
+    totalMatchAttempts += timing[Types.Events.SelectorTimingsKey.MatchAttempts];
+    totalMatchCount += timing[Types.Events.SelectorTimingsKey.MatchCount];
   });
 
-  let topSelectorElapsedMs: SelectorTiming|null = null;
-  let topSelectorMatchAttempts: SelectorTiming|null = null;
+  let topSelectorElapsedMs: Types.Events.SelectorTiming|null = null;
+  let topSelectorMatchAttempts: Types.Events.SelectorTiming|null = null;
 
   if (selectorTimings.length > 0) {
     // find the selector with most elapsed time
     topSelectorElapsedMs = selectorTimings.reduce((a, b) => {
-      return a[SelectorTimingsKey.Elapsed] > b[SelectorTimingsKey.Elapsed] ? a : b;
+      return a[Types.Events.SelectorTimingsKey.Elapsed] > b[Types.Events.SelectorTimingsKey.Elapsed] ? a : b;
     });
 
     // check if the slowest selector is slow enough to trigger insights info
-    if (topSelectorElapsedMs && topSelectorElapsedMs[SelectorTimingsKey.Elapsed] < slowCSSSelectorThreshold) {
+    if (topSelectorElapsedMs &&
+        topSelectorElapsedMs[Types.Events.SelectorTimingsKey.Elapsed] < slowCSSSelectorThreshold) {
       topSelectorElapsedMs = null;
     }
 
     // find the selector with most match attempts
     topSelectorMatchAttempts = selectorTimings.reduce((a, b) => {
-      return a[SelectorTimingsKey.MatchAttempts] > b[SelectorTimingsKey.MatchAttempts] ? a : b;
+      return a[Types.Events.SelectorTimingsKey.MatchAttempts] > b[Types.Events.SelectorTimingsKey.MatchAttempts] ? a :
+                                                                                                                   b;
     });
   }
 

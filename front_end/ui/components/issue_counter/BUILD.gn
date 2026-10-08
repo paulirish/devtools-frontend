@@ -21,27 +21,25 @@ devtools_ui_module("issue_counter") {
     "IssueLinkIcon.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/i18n:bundle",
     "../../../core/platform:bundle",
     "../../../generated",
     "../../../models/issues_manager:bundle",
-    "../../../ui/lit:bundle",
-    "../../../ui/visual_logging:bundle",
     "../../kit:bundle",
+    "../../lit:bundle",
+    "../../visual_logging:bundle",
     "../icon_button:bundle",
     "../render_coordinator:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "issue_counter.ts"
 
-  deps = [
-    ":css_files",
-    ":issue_counter",
-  ]
+  ts_deps = [ ":issue_counter" ]
 
   visibility = default_components_visibility
 }
@@ -54,7 +52,7 @@ devtools_ui_module("unittests") {
     "IssueLinkIcon.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/common:bundle",
     "../../../generated",
@@ -64,4 +62,6 @@ devtools_ui_module("unittests") {
     "../icon_button:bundle",
     "../render_coordinator:bundle",
   ]
+
+  data_deps = [ "../../../models/issues_manager:descriptions" ]
 }

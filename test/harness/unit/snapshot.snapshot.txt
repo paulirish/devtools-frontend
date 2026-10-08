@@ -1,0 +1,4 @@
+Title: Snapshot test harness supports snapshot assertion in test harness
+Content:
+snapshot harness test content
+=== end content

@@ -10,8 +10,6 @@ import("../visibility.gni")
 devtools_entrypoint("bundle") {
   entrypoint = "render_coordinator.ts"
 
-  deps = [ "../../../core/platform:bundle" ]
-
   visibility = default_components_visibility
   visibility += [ "../../../models/ai_assistance/*" ]
 }
@@ -21,7 +19,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "render_coordinator.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
   ]

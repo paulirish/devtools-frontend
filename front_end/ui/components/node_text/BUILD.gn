@@ -15,16 +15,14 @@ generate_css("css_files") {
 devtools_ui_module("node_text") {
   sources = [ "NodeText.ts" ]
 
-  deps = [ "../../../ui/lit:bundle" ]
+  ts_deps = [ "../../lit:bundle" ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "node_text.ts"
 
-  deps = [
-    ":css_files",
-    ":node_text",
-  ]
+  ts_deps = [ ":node_text" ]
 
   visibility = default_components_visibility
 }
@@ -34,7 +32,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "NodeText.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
   ]

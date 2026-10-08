@@ -24,6 +24,7 @@ devtools_ui_module("issues") {
     "AffectedDocumentsInQuirksModeView.ts",
     "AffectedElementsView.ts",
     "AffectedHeavyAdView.ts",
+    "AffectedLazyLoadImagesView.ts",
     "AffectedMetadataAllowedSitesView.ts",
     "AffectedPartitioningBlobURLView.ts",
     "AffectedPermissionElementsView.ts",
@@ -32,7 +33,6 @@ devtools_ui_module("issues") {
     "AffectedSharedArrayBufferIssueDetailsView.ts",
     "AffectedSourcesView.ts",
     "AffectedTrackingSitesView.ts",
-    "AttributionReportingIssueDetailsView.ts",
     "CorsIssueDetailsView.ts",
     "GenericIssueDetailsView.ts",
     "HiddenIssuesRow.ts",
@@ -42,7 +42,7 @@ devtools_ui_module("issues") {
     "IssuesPane.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
@@ -66,15 +66,13 @@ devtools_ui_module("issues") {
     "../common:bundle",
     "./components:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "issues.ts"
 
-  deps = [
-    ":css_files",
-    ":issues",
-  ]
+  ts_deps = [ ":issues" ]
 
   visibility = [
     ":*",
@@ -88,7 +86,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "issues-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
@@ -103,13 +101,15 @@ devtools_ui_module("unittests") {
   testonly = true
 
   sources = [
+    "AffectedLazyLoadImagesView.test.ts",
     "AffectedSelectivePermissionsInterventionView.test.ts",
     "IssueView.test.ts",
     "IssuesPane.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/sdk:bundle",
     "../../generated",

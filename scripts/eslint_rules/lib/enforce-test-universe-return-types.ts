@@ -9,22 +9,58 @@ import {createRule} from './utils/ruleCreator.ts';
 /**
  * Only classes/types are allowed that don't access any global state (modulo experiments/host config :cry:).
  *
- * In particular, any listed types must take it's dependencies via constructor. No `.instance()` call must
- * happen when any of these types is used.
+ * In particular, any listed type must take its dependencies via constructor. No `.instance()` call must
+ * happen when any such type is used.
  */
 const ALLOWED_RETURN_TYPES = new Set([
+  'AiAssistance.AiHistoryStorage.AiHistoryStorage',
+  'AiAssistance.BuiltInAi.BuiltInAi',
+  'AutofillManager.AutofillManager.AutofillManager',
+  'Badges.UserBadges',
+  'ChangeTracker.ChangeTracker.ChangeTracker',
   'Common.Console.Console',
   'Common.Settings.Settings',
+  'CommentManager.CD4ABridge.CD4ABridge',
+  'CommentManager.CommentManager.CommentManager',
+  'CrUXManager.CrUXManager',
+  'Host.AidaClient.HostConfigTracker',
+  'Host.GdpClient.GdpClient',
+  'Emulation.DeviceModeModel.DeviceModeModel',
+  'Emulation.EmulatedDevices.EmulatedDevicesList',
   'Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding',
   'Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding',
+  'Bindings.NetworkProject.NetworkProjectManager',
+  'Bindings.PresentationConsoleMessageHelper.PresentationConsoleMessageManager',
   'Bindings.ResourceMapping.ResourceMapping',
+  'Breakpoints.BreakpointManager.BreakpointManager',
+  'IssuesManager.DOMIssuesManager.DOMIssuesManager',
+  'IssuesManager.IssuesManager.IssuesManager',
+  'JavaScriptMetadata.JavaScriptMetadata.JavaScriptMetadataImpl',
+  'Logs.LogManager.LogManager',
+  'LiveMetrics.LiveMetrics',
+  'Logs.NetworkLog.NetworkLog',
+  'Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager',
+  'Persistence.AutomaticFileSystemWorkspaceBinding.AutomaticFileSystemWorkspaceBinding',
+  'Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding',
+  'Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager',
+  'Persistence.NetworkPersistenceManager.NetworkPersistenceManager',
+  'Persistence.Persistence.PersistenceImpl',
+  'ProjectSettings.ProjectSettingsModel.ProjectSettingsModel',
+  'SDK.CPUThrottlingManager.CPUThrottlingManager',
+  'SDK.DOMDebuggerModel.DOMDebuggerManager',
+  'SDK.DOMModel.DOMModelUndoStack',
+  'SDK.EventBreakpointsModel.EventBreakpointsManager',
   'SDK.FrameManager.FrameManager',
+  'SDK.IsolateManager.IsolateManager',
   'SDK.NetworkManager.MultitargetNetworkManager',
   'SDK.PageResourceLoader.PageResourceLoader',
   'SDK.Target.Target',
   'SDK.TargetManager.TargetManager',
+  'SourceMapScopes.ScopeChainResolver.ScopeChainResolver',
+  'Workspace.FileManager.FileManager',
   'Workspace.IgnoreListManager.IgnoreListManager',
   'Workspace.Workspace.WorkspaceImpl',
+  'WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl',
 ]);
 
 export default createRule({

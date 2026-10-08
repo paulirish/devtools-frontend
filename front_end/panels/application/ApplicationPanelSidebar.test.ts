@@ -3,148 +3,66 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import type * as Common from '../../core/common/common.js';
+import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {createTarget, expectConsoleLogs, stubNoopSettings, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
+import * as AiAssistance from '../../models/ai_assistance/ai_assistance.js';
+import {getContextMenuForElement} from '../../testing/ContextMenuHelpers.js';
 import {
-  describeWithMockConnection,
-  setMockConnectionResponseHandler,
-} from '../../testing/MockConnection.js';
-import {createResource, getMainFrame} from '../../testing/ResourceTreeHelpers.js';
+  createTarget,
+  describeWithEnvironment,
+  expectConsoleLogs,
+  updateHostConfig,
+} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {createResource, getMainFrame, mockResourceTree} from '../../testing/ResourceTreeHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 
 import * as Application from './application.js';
 
+const {html} = Lit;
+
 const {urlString} = Platform.DevToolsPath;
 
-class SharedStorageTreeElementListener {
-  #sidebar: Application.ApplicationPanelSidebar.ApplicationPanelSidebar;
-  #originsAdded: string[] = [];
-
-  constructor(sidebar: Application.ApplicationPanelSidebar.ApplicationPanelSidebar) {
-    this.#sidebar = sidebar;
-
-    this.#sidebar.sharedStorageTreeElementDispatcher.addEventListener(
-        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SHARED_STORAGE_TREE_ELEMENT_ADDED,
-        this.#treeElementAdded, this);
-  }
-
-  dispose(): void {
-    this.#sidebar.sharedStorageTreeElementDispatcher.removeEventListener(
-        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SHARED_STORAGE_TREE_ELEMENT_ADDED,
-        this.#treeElementAdded, this);
-  }
-
-  #treeElementAdded(
-      event: Common.EventTarget.EventTargetEvent<Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher
-                                                     .SharedStorageTreeElementAddedEvent>): void {
-    this.#originsAdded.push(event.data.origin);
-  }
-
-  async waitForElementsAdded(expectedCount: number): Promise<void> {
-    while (this.#originsAdded.length < expectedCount) {
-      await this.#sidebar.sharedStorageTreeElementDispatcher.once(
-          Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events
-              .SHARED_STORAGE_TREE_ELEMENT_ADDED);
-    }
-  }
-}
-
-describeWithMockConnection('ApplicationPanelSidebar', () => {
+describeWithEnvironment('ApplicationPanelSidebar', () => {
   let target: SDK.Target.Target;
-
-  const TEST_ORIGIN_A = 'http://www.example.com/';
-  const TEST_SITE_A = 'http://example.com';
-  const TEST_ORIGIN_B = 'http://www.example.org/';
-  const TEST_ORIGIN_C = 'http://www.example.net/';
-  const TEST_SITE_C = 'http://example.net';
+  let tabTarget: SDK.Target.Target;
 
   const TEST_EXTENSION_NAME = 'Test Extension';
 
-  const ID = 'main' as Protocol.Page.FrameId;
-
-  const EVENTS = [
-    {
-      accessTime: 0,
-      method: Protocol.Storage.SharedStorageAccessMethod.Append,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_A,
-      ownerSite: TEST_SITE_A,
-      params: {key: 'key0', value: 'value0'} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.Window,
-    },
-    {
-      accessTime: 10,
-      method: Protocol.Storage.SharedStorageAccessMethod.Get,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_A,
-      ownerSite: TEST_SITE_A,
-      params: {key: 'key0'} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.SharedStorageWorklet,
-    },
-    {
-      accessTime: 15,
-      method: Protocol.Storage.SharedStorageAccessMethod.Length,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_A,
-      ownerSite: TEST_SITE_A,
-      params: {} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.SharedStorageWorklet,
-    },
-    {
-      accessTime: 20,
-      method: Protocol.Storage.SharedStorageAccessMethod.Clear,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_C,
-      ownerSite: TEST_SITE_C,
-      params: {} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.Window,
-    },
-    {
-      accessTime: 100,
-      method: Protocol.Storage.SharedStorageAccessMethod.Set,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_C,
-      ownerSite: TEST_SITE_C,
-      params: {key: 'key0', value: 'value1', ignoreIfPresent: true} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.SharedStorageWorklet,
-    },
-    {
-      accessTime: 150,
-      method: Protocol.Storage.SharedStorageAccessMethod.RemainingBudget,
-      mainFrameId: ID,
-      ownerOrigin: TEST_ORIGIN_C,
-      ownerSite: TEST_SITE_C,
-      params: {} as Protocol.Storage.SharedStorageAccessParams,
-      scope: Protocol.Storage.SharedStorageAccessScope.SharedStorageWorklet,
-    },
-  ];
-
   beforeEach(() => {
-    stubNoopSettings();
     SDK.ChildTargetManager.ChildTargetManager.install();
-    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
+    const connection = new MockCDPConnection();
+    mockResourceTree(connection);
+    tabTarget = createTarget({type: SDK.Target.Type.TAB, connection});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();  // Silence console error
-    setMockConnectionResponseHandler(
-        'Storage.getSharedStorageEntries', () => ({} as Protocol.Storage.GetSharedStorageEntriesResponse));
-    setMockConnectionResponseHandler('Storage.setSharedStorageTracking', () => ({}));
   });
 
-  it('shows WebMCP only if the WebMCP config is enabled', async () => {
-    updateHostConfig({devToolsWebMCPSupport: {enabled: true}});
+  it('shows WebMCP tree element', async () => {
+    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+    assert.exists(sidebar.webMcpTreeElement);
+  });
+
+  it('shows Ads panel only if the Ads panel config is enabled', async () => {
+    updateHostConfig({devToolsAdsPanel: {enabled: true}});
     Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
     let sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
-    assert.exists(sidebar.webMcpTreeElement);
+    assert.exists(sidebar.adsTreeElement);
 
-    updateHostConfig({devToolsWebMCPSupport: {enabled: false}});
+    updateHostConfig({devToolsAdsPanel: {enabled: false}});
     Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
     sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
-    assert.isUndefined(sidebar.webMcpTreeElement);
+    assert.isUndefined(sidebar.adsTreeElement);
   });
 
   it('shows cookies for all frames', async () => {
@@ -174,48 +92,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
     assert.strictEqual(sidebar.cookieListTreeElement.childCount(), 2);
     assert.deepEqual(
         sidebar.cookieListTreeElement.children().map(e => e.title), ['https://example.com', 'https://example.org']);
-  });
-
-  it('shows shared storages and events for origins using shared storage', async () => {
-    const securityOriginManager = target.model(SDK.SecurityOriginManager.SecurityOriginManager);
-    assert.exists(securityOriginManager);
-    sinon.stub(securityOriginManager, 'securityOrigins').returns([
-      TEST_ORIGIN_A,
-      TEST_ORIGIN_B,
-      TEST_ORIGIN_C,
-    ]);
-
-    const sharedStorageModel = target.model(Application.SharedStorageModel.SharedStorageModel);
-    assert.exists(sharedStorageModel);
-    const setTrackingSpy = sinon.stub(sharedStorageModel.storageAgent, 'invoke_setSharedStorageTracking').resolves({
-      getError: () => undefined,
-    });
-
-    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
-    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
-
-    const listener = new SharedStorageTreeElementListener(sidebar);
-    const addedPromise = listener.waitForElementsAdded(4);
-
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    assert.exists(resourceTreeModel);
-    resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, resourceTreeModel);
-    await addedPromise;
-
-    sinon.assert.calledOnceWithExactly(setTrackingSpy, {enable: true});
-
-    assert.strictEqual(sidebar.sharedStorageListTreeElement.childCount(), 4);
-    assert.deepEqual(sidebar.sharedStorageListTreeElement.children().map(e => e.title), [
-      TEST_ORIGIN_A, TEST_ORIGIN_B, TEST_ORIGIN_C,
-      'https://example.com',  // frame origin
-    ]);
-
-    sidebar.sharedStorageListTreeElement.view.setDefaultIdForTesting(ID);
-    for (const event of EVENTS) {
-      sharedStorageModel.dispatchEventToListeners(Application.SharedStorageModel.Events.SHARED_STORAGE_ACCESS, event);
-    }
-
-    assert.deepEqual(sidebar.sharedStorageListTreeElement.view.getEventsForTesting(), EVENTS);
   });
 
   it('shows extension storage based on added models', async () => {
@@ -331,15 +207,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
     assert.strictEqual(expectedCall.called, inScope);
   };
 
-  it('adds interest group event on in scope event',
-     testUiUpdate(
-         Application.InterestGroupStorageModel.Events.INTEREST_GROUP_ACCESS,
-         Application.InterestGroupStorageModel.InterestGroupStorageModel, 'interestGroupTreeElement.addEvent', true));
-
-  it('does not add interest group event on out of scope event',
-     testUiUpdate(
-         Application.InterestGroupStorageModel.Events.INTEREST_GROUP_ACCESS,
-         Application.InterestGroupStorageModel.InterestGroupStorageModel, 'interestGroupTreeElement.addEvent', false));
   it('adds DOM storage on in scope event',
      testUiUpdate(
          SDK.DOMStorageModel.Events.DOM_STORAGE_ADDED, SDK.DOMStorageModel.DOMStorageModel,
@@ -359,16 +226,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
      testUiUpdate(
          Application.IndexedDBModel.Events.DatabaseAdded, Application.IndexedDBModel.IndexedDBModel,
          'indexedDBListTreeElement.appendChild', false));
-
-  it('adds shared storage on in scope event',
-     testUiUpdate(
-         Application.SharedStorageModel.Events.SHARED_STORAGE_ADDED, Application.SharedStorageModel.SharedStorageModel,
-         'sharedStorageListTreeElement.appendChild', true));
-
-  it('does not add shared storage on out of scope event',
-     testUiUpdate(
-         Application.SharedStorageModel.Events.SHARED_STORAGE_ADDED, Application.SharedStorageModel.SharedStorageModel,
-         'sharedStorageListTreeElement.appendChild', false));
 
   const MOCK_GETTER_ITEM = {
     ...MOCK_EVENT_ITEM,
@@ -390,10 +247,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
   it('adds DOM storage element after scope change',
      testUiUpdateOnScopeChange(
          SDK.DOMStorageModel.DOMStorageModel, 'storages', 'sessionStorageListTreeElement.appendChild'));
-
-  it('adds shared storage after scope change',
-     testUiUpdateOnScopeChange(
-         Application.SharedStorageModel.SharedStorageModel, 'storages', 'sharedStorageListTreeElement.appendChild'));
 
   it('adds indexed db after scope change',
      testUiUpdateOnScopeChange(
@@ -450,16 +303,19 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
   });
 });
 
-describeWithMockConnection('IDBDatabaseTreeElement', () => {
+describeWithEnvironment('IDBDatabaseTreeElement', () => {
+  let target: SDK.Target.Target;
   beforeEach(() => {
-    stubNoopSettings();
+    const connection = new MockCDPConnection();
+    mockResourceTree(connection);
+    target = createTarget({connection});
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
   });
   expectConsoleLogs({
     error: ['Error: No LanguageSelector instance exists yet.'],
   });
 
   it('only becomes selectable after database is updated', () => {
-    const target = createTarget();
     const model = target.model(Application.IndexedDBModel.IndexedDBModel);
     assert.exists(model);
     const panel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
@@ -472,13 +328,14 @@ describeWithMockConnection('IDBDatabaseTreeElement', () => {
   });
 });
 
-describeWithMockConnection('ResourcesSection', () => {
+describeWithEnvironment('ResourcesSection', () => {
   const tests = (inScope: boolean) => () => {
     let target: SDK.Target.Target;
     beforeEach(() => {
-      stubNoopSettings();
       SDK.FrameManager.FrameManager.instance({forceNew: true});
-      target = createTarget();
+      const connection = new MockCDPConnection();
+      mockResourceTree(connection);
+      target = createTarget({connection});
     });
 
     expectConsoleLogs({
@@ -524,15 +381,17 @@ describeWithMockConnection('ResourcesSection', () => {
   describe('out of scope', tests(false));
 });
 
-describeWithMockConnection('IndexedDBTreeElement live update', () => {
+describeWithEnvironment('IndexedDBTreeElement live update', () => {
   let target: SDK.Target.Target;
   let model: Application.IndexedDBModel.IndexedDBModel;
   let sidebar: Application.ApplicationPanelSidebar.ApplicationPanelSidebar;
   let indexedDBTreeElement: Application.ApplicationPanelSidebar.IndexedDBTreeElement;
 
   beforeEach(async () => {
-    stubNoopSettings();
-    target = createTarget();
+    const connection = new MockCDPConnection();
+    mockResourceTree(connection);
+    target = createTarget({connection});
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     model = target.model(Application.IndexedDBModel.IndexedDBModel) as Application.IndexedDBModel.IndexedDBModel;
     sinon.stub(model, 'refreshDatabase');
     sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();  // Silence console error
@@ -643,5 +502,338 @@ describeWithMockConnection('IndexedDBTreeElement live update', () => {
     model.dispatchEventToListeners(Application.IndexedDBModel.Events.DatabaseRemoved, {databaseId: db2Id, model});
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.strictEqual(indexedDBTreeElement.childCount(), 0);
+  });
+
+  it('marks object store and index views as needing refresh on indexedDBContentUpdated', async () => {
+    const MAIN_FRAME_ID = 'main' as Protocol.Page.FrameId;
+    const storageKey = `test-storage-key|${MAIN_FRAME_ID}|http://www.example.com`;
+
+    sinon.stub(model, 'loadObjectStoreData')
+        .callsFake((_dbId, _storeName, _keyRange, _skipCount, _pageSize, callback) => {
+          callback([], false);
+        });
+    sinon.stub(model, 'loadIndexData')
+        .callsFake((_dbId, _storeName, _indexName, _keyRange, _skipCount, _pageSize, callback) => {
+          callback([], false);
+        });
+    sinon.stub(model, 'getMetadata').resolves({entriesCount: 0, keyGeneratorValue: 0});
+
+    const db1Id = new Application.IndexedDBModel.DatabaseId({storageKey}, 'database1');
+    model.dispatchEventToListeners(Application.IndexedDBModel.Events.DatabaseAdded, {databaseId: db1Id, model});
+    const db1 = new Application.IndexedDBModel.Database(db1Id, 1);
+    const os1 = new Application.IndexedDBModel.ObjectStore('objectStore1', 'test', false);
+    os1.indexes.set('index1', new Application.IndexedDBModel.Index('index1', 'test', false, false));
+    db1.objectStores.set('objectStore1', os1);
+    model.dispatchEventToListeners(Application.IndexedDBModel.Events.DatabaseLoaded,
+                                   {database: db1, model, entriesUpdated: true});
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const db1TreeElement =
+        indexedDBTreeElement.children()[0] as Application.ApplicationPanelSidebar.IDBDatabaseTreeElement;
+    const os1TreeElement =
+        db1TreeElement.children()[0] as Application.ApplicationPanelSidebar.IDBObjectStoreTreeElement;
+    const index1TreeElement = os1TreeElement.children()[0] as Application.ApplicationPanelSidebar.IDBIndexTreeElement;
+
+    os1TreeElement.onselect(false);
+    index1TreeElement.onselect(false);
+
+    interface TreeElementWithView {
+      view?: Application.IndexedDBViews.IDBDataView;
+    }
+    const os1View = (os1TreeElement as unknown as TreeElementWithView).view;
+    const index1View = (index1TreeElement as unknown as TreeElementWithView).view;
+    assert.exists(os1View);
+    assert.exists(index1View);
+
+    assert.isNull(os1View.element.querySelector('.stale-data-warning'));
+    assert.isNull(index1View.element.querySelector('.stale-data-warning'));
+
+    model.dispatchEventToListeners(Application.IndexedDBModel.Events.IndexedDBContentUpdated,
+                                   {databaseId: db1Id, objectStoreName: 'objectStore1', model});
+
+    assert.isNotNull(os1View.element.querySelector('.stale-data-warning'));
+    assert.isNotNull(index1View.element.querySelector('.stale-data-warning'));
+
+    os1View.refreshData();
+    index1View.refreshData();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.isNull(os1View.element.querySelector('.stale-data-warning'));
+    assert.isNull(index1View.element.querySelector('.stale-data-warning'));
+  });
+
+  describe('ResourcesPanel toolbar', () => {
+    it('hides toolbar when view.toolbarItems() resolves to nothing', async () => {
+      const resourcesPanel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+      const simpleView = new UI.View.SimpleView({
+        title: 'Test View' as Platform.UIString.LocalizedString,
+        viewId: 'test-view',
+      });
+      sinon.stub(simpleView, 'toolbarItems').resolves(Lit.nothing);
+
+      resourcesPanel.showView(simpleView);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const toolbar = resourcesPanel.element.querySelector('.resources-toolbar');
+      assert.isNotNull(toolbar);
+      assert.isTrue(toolbar?.classList.contains('hidden'));
+    });
+
+    it('shows toolbar when view.toolbarItems() resolves to a template', async () => {
+      const resourcesPanel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+      const simpleView = new UI.View.SimpleView({
+        title: 'Test View' as Platform.UIString.LocalizedString,
+        viewId: 'test-view',
+      });
+      sinon.stub(simpleView, 'toolbarItems').resolves(html`<span>Test Item</span>`);
+
+      resourcesPanel.showView(simpleView);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const toolbar = resourcesPanel.element.querySelector('.resources-toolbar');
+      assert.isNotNull(toolbar);
+      assert.isFalse(toolbar?.classList.contains('hidden'));
+      assert.include(toolbar?.innerHTML ?? '', 'Test Item');
+    });
+  });
+});
+
+describe('Ask-AI Hover Floating Button', () => {
+  setupLocaleHooks();
+
+  let universe: TestUniverse;
+  let target: SDK.Target.Target;
+  let panel: Application.ResourcesPanel.ResourcesPanel;
+
+  before(() => {
+    UI.ActionRegistration.registerActionExtension({
+      actionId: 'ai-assistance.storage-floating-button',
+      category: UI.ActionRegistration.ActionCategory.GLOBAL,
+      title: () => 'Ask Ai' as Common.UIString.LocalizedString,
+    });
+  });
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    target = universe.createTarget({url: urlString`http://example.com/`});
+    sinon.stub(target, 'inspectedURL').returns(urlString`http://example.com/`);
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    // Bridge legacy SDK and Settings singletons for legacy tree elements
+    const {targetManager, settings} = universe;
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(targetManager);
+    sinon.stub(Common.Settings.Settings, 'instance').returns(settings);
+
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry});
+
+    panel = sinon.createStubInstance(Application.ResourcesPanel.ResourcesPanel);
+  });
+
+  it('adds hover Ask-AI button for DOMStorageTreeElement', () => {
+    const domStorageModel = target.model(SDK.DOMStorageModel.DOMStorageModel);
+    assert.exists(domStorageModel);
+    const domStorage = new SDK.DOMStorageModel.DOMStorage(domStorageModel, 'http://example.com/', true);
+    const treeElement = new Application.ApplicationPanelSidebar.DOMStorageTreeElement(panel, domStorage);
+    treeElement.onattach();
+
+    const floatingButton = treeElement.listItemElement.querySelector('devtools-floating-button');
+    assert.exists(floatingButton, 'Expected Ask-AI floating button on tree element');
+  });
+
+  it('adds hover Ask-AI button for CookieTreeElement', () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const frame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+    frame.resourceTreeModel.returns(resourceTreeModel);
+    const cookieUrl = new Common.ParsedURL.ParsedURL('https://example.com/');
+    const treeElement = new Application.ApplicationPanelSidebar.CookieTreeElement(panel, frame, cookieUrl);
+    treeElement.onattach();
+    const floatingButton = treeElement.listItemElement.querySelector('devtools-floating-button') ||
+        treeElement.listItemElement.querySelector('button');
+    assert.exists(floatingButton, 'Expected Ask-AI floating button on tree element');
+  });
+
+  it('adds hover Ask-AI button for general local storage', () => {
+    const expandableTreeElement = new Application.ApplicationPanelTreeElement.ExpandableApplicationPanelTreeElement(
+        panel, 'Local Storage', 'No local storage', 'Local Storage Description', 'local-storage');
+    expandableTreeElement.onattach();
+    const floatingButton = expandableTreeElement.listItemElement.querySelector('devtools-floating-button');
+    assert.exists(floatingButton, 'Expected Ask-AI floating button on tree element');
+  });
+});
+
+describe('Storage Agent Context Menu', () => {
+  setupLocaleHooks();
+
+  let universe: TestUniverse;
+  let target: SDK.Target.Target;
+  let panel: Application.ResourcesPanel.ResourcesPanel;
+  let actionExecutedStub: sinon.SinonStub;
+
+  before(() => {
+    actionExecutedStub = sinon.stub();
+    UI.ActionRegistration.registerActionExtension({
+      actionId: 'ai-assistance.application-panel-context',
+      category: UI.ActionRegistration.ActionCategory.GLOBAL,
+      title: () => 'Debug with AI' as Common.UIString.LocalizedString,
+      contextTypes() {
+        return [AiAssistance.StorageItem.StorageItem];
+      },
+    });
+    universe = new TestUniverse();
+    target = universe.createTarget({url: urlString`http://example.com/`});
+    panel = sinon.createStubInstance(Application.ResourcesPanel.ResourcesPanel);
+  });
+
+  beforeEach(() => {
+    actionExecutedStub.resetHistory();
+    sinon.stub(target, 'inspectedURL').returns(urlString`http://example.com/`);
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+    sinon.stub(Common.Settings.Settings, 'instance').returns(universe.settings);
+
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry});
+  });
+
+  it('populates context menu with Debug with AI submenu and expected items for DOMStorageTreeElement', () => {
+    const domStorageModel = target.model(SDK.DOMStorageModel.DOMStorageModel);
+    assert.exists(domStorageModel);
+    const domStorage = new SDK.DOMStorageModel.DOMStorage(domStorageModel, 'http://example.com/', true);
+    const treeElement = new Application.ApplicationPanelSidebar.DOMStorageTreeElement(panel, domStorage);
+    treeElement.onattach();
+
+    const contextMenu = getContextMenuForElement(treeElement.listItemElement);
+    const footerSection = contextMenu.footerSection();
+    const debugWithAiItemInFooter = footerSection.items.find(item => item.buildDescriptor().label === 'Debug with AI');
+    assert.exists(debugWithAiItemInFooter, 'Expected Debug with AI context menu item in footer section');
+
+    const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
+    assert.exists(debugWithAiItem, 'Expected Debug with AI context menu item');
+
+    assert.deepEqual(debugWithAiItem.subItems?.map(item => item.label), ['Start a chat', 'Explain storage']);
+
+    // Test primary action execution (Start a chat)
+    const startChatSubItem = debugWithAiItem.subItems?.find(item => item.label === 'Start a chat');
+    assert.exists(startChatSubItem?.id);
+    contextMenu.invokeHandler(startChatSubItem.id);
+
+    const flavor = UI.Context.Context.instance().flavor(AiAssistance.StorageItem.StorageItem);
+    assert.exists(flavor);
+    assert.instanceOf(flavor, AiAssistance.StorageItem.DOMStorageItem);
+    assert.strictEqual((flavor as AiAssistance.StorageItem.DOMStorageItem).type, 'localStorage');
+  });
+
+  it('populates context menu with Debug with AI submenu and expected items for CookieTreeElement', () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const frame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+    frame.resourceTreeModel.returns(resourceTreeModel);
+    const cookieUrl = new Common.ParsedURL.ParsedURL('https://example.com/');
+    const treeElement = new Application.ApplicationPanelSidebar.CookieTreeElement(panel, frame, cookieUrl);
+    treeElement.onattach();
+
+    const contextMenu = getContextMenuForElement(treeElement.listItemElement);
+    const footerSection = contextMenu.footerSection();
+    const debugWithAiItemInFooter = footerSection.items.find(item => item.buildDescriptor().label === 'Debug with AI');
+    assert.exists(debugWithAiItemInFooter, 'Expected Debug with AI context menu item in footer section');
+
+    const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
+    assert.exists(debugWithAiItem, 'Expected Debug with AI context menu item');
+
+    assert.deepEqual(debugWithAiItem.subItems?.map(item => item.label), ['Start a chat', 'Explain cookies']);
+
+    // Test secondary action execution (Explain cookies)
+    const explainCookiesSubItem = debugWithAiItem.subItems?.find(item => item.label === 'Explain cookies');
+    assert.exists(explainCookiesSubItem?.id);
+    contextMenu.invokeHandler(explainCookiesSubItem.id);
+
+    const flavor = UI.Context.Context.instance().flavor(AiAssistance.StorageItem.StorageItem);
+    assert.exists(flavor);
+    assert.instanceOf(flavor, AiAssistance.StorageItem.CookieItem);
+    assert.strictEqual((flavor as AiAssistance.StorageItem.CookieItem).origin, 'https://example.com');
+  });
+});
+
+describe('Storage Agent Selection', () => {
+  setupLocaleHooks();
+
+  let universe: TestUniverse;
+  let target: SDK.Target.Target;
+  let panel: Application.ResourcesPanel.ResourcesPanel;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    target = universe.createTarget({url: urlString`http://example.com/`});
+    sinon.stub(target, 'inspectedURL').returns(urlString`http://example.com/`);
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+    sinon.stub(Common.Settings.Settings, 'instance').returns(universe.settings);
+
+    panel = sinon.createStubInstance(Application.ResourcesPanel.ResourcesPanel);
+  });
+
+  it('sets active StorageItem flavor on DOMStorageTreeElement selection', () => {
+    const domStorageModel = target.model(SDK.DOMStorageModel.DOMStorageModel);
+    assert.exists(domStorageModel);
+    const domStorage = new SDK.DOMStorageModel.DOMStorage(domStorageModel, 'http://example.com/', true);
+    const treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
+    const treeElement = new Application.ApplicationPanelSidebar.DOMStorageTreeElement(panel, domStorage);
+    treeOutline.appendChild(treeElement);
+
+    // Clear flavor first
+    UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, null);
+
+    // Select the element
+    treeElement.select();
+
+    const flavor = UI.Context.Context.instance().flavor(AiAssistance.StorageItem.StorageItem);
+    assert.exists(flavor);
+    assert.instanceOf(flavor, AiAssistance.StorageItem.DOMStorageItem);
+    assert.strictEqual((flavor as AiAssistance.StorageItem.DOMStorageItem).type, 'localStorage');
+  });
+
+  it('sets active StorageItem flavor on CookieTreeElement selection', () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const frame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+    frame.resourceTreeModel.returns(resourceTreeModel);
+    const cookieUrl = new Common.ParsedURL.ParsedURL('https://example.com/');
+    const treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
+    const treeElement = new Application.ApplicationPanelSidebar.CookieTreeElement(panel, frame, cookieUrl);
+    treeOutline.appendChild(treeElement);
+
+    // Clear flavor first
+    UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, null);
+
+    // Select the element
+    treeElement.select();
+
+    const flavor = UI.Context.Context.instance().flavor(AiAssistance.StorageItem.StorageItem);
+    assert.exists(flavor);
+    assert.instanceOf(flavor, AiAssistance.StorageItem.CookieItem);
+    assert.strictEqual((flavor as AiAssistance.StorageItem.CookieItem).origin, 'https://example.com');
+  });
+
+  it('sets active DOMStorageItem flavor on Local Storage category selection', () => {
+    const treeElement = new Application.ApplicationPanelTreeElement.ExpandableApplicationPanelTreeElement(
+        panel, 'Local Storage', 'No local storage', 'Local Storage Description', 'local-storage');
+    const treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
+    treeOutline.appendChild(treeElement);
+
+    // Clear flavor first
+    UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, null);
+
+    // Select the element
+    treeElement.select();
+
+    const flavor = UI.Context.Context.instance().flavor(AiAssistance.StorageItem.StorageItem);
+    assert.exists(flavor);
+    assert.instanceOf(flavor, AiAssistance.StorageItem.DOMStorageItem);
+    assert.strictEqual(flavor.origin, '');
+    assert.isTrue(flavor.isGenericContext);
+    assert.strictEqual(flavor.primaryTargetOrigin, 'http://example.com');
+    assert.strictEqual((flavor as AiAssistance.StorageItem.DOMStorageItem).type, 'localStorage');
   });
 });

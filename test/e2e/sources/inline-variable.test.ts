@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert} from 'chai';
-
 import {
   openSourceCodeEditorForFile,
   RESUME_BUTTON,
   STEP_INTO_BUTTON,
   STEP_OVER_BUTTON,
 } from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
-async function waitForInlineVariables(devToolsPage: DevToolsPage, count: number): Promise<string[]> {
-  const inlineVariables = await devToolsPage.waitForMany('.cm-variableValues', count);
-  return await Promise.all(inlineVariables.map(e => e.evaluate(e => e.textContent)));
+async function waitForInlineVariables(devToolsPage: DevToolsPage, expected: string[]): Promise<void> {
+  await devToolsPage.waitForFunction(async () => {
+    const inlineVariables = await devToolsPage.$$('.cm-variableValues');
+    const actual = await Promise.all(inlineVariables.map(e => e.evaluate(e => e.textContent)));
+    if (actual.length !== expected.length) {
+      return undefined;
+    }
+    return actual.every((value, index) => value === expected[index]) ? true : undefined;
+  });
 }
 
 describe('Sources Tab', function() {
   it('shows correct inline variable at definition', async ({devToolsPage, inspectedPage}) => {
-    await openSourceCodeEditorForFile('inline-variable.js', 'inline-variable.html', devToolsPage, inspectedPage);
+    await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'inline-variable.js', 'inline-variable.html');
 
     // For each step, which inline variables we expect CodeMirror to show.
     const expectedInlineVariables: string[][] = [
@@ -31,23 +35,31 @@ describe('Sources Tab', function() {
       ['a = {k: 1}', 'b = (5) [1, 2, 3, 4, 5]', 'c = (100) [empty × 10, 1, empty × 89]'],
       ['a = {k: 2}', 'b = (5) [1, 2, 3, 4, 5]', 'c = (100) [empty × 10, 1, empty × 89]', 'a = {k: 2}'],
       [
-        'a = {k: 2, l: Window}', 'b = (5) [1, 2, 3, 4, 5]', 'c = (100) [empty × 10, 1, empty × 89]',
-        'a = {k: 2, l: Window}'
+        'a = {k: 2, l: Window}',
+        'b = (5) [1, 2, 3, 4, 5]',
+        'c = (100) [empty × 10, 1, empty × 89]',
+        'a = {k: 2, l: Window}',
       ],
       [
-        'a = {k: 2, l: Window}', 'b = (5) [1, 3, 3, 4, 5]', 'c = (100) [empty × 10, 1, empty × 89]',
-        'a = {k: 2, l: Window}', 'b = (5) [1, 3, 3, 4, 5]'
+        'a = {k: 2, l: Window}',
+        'b = (5) [1, 3, 3, 4, 5]',
+        'c = (100) [empty × 10, 1, empty × 89]',
+        'a = {k: 2, l: Window}',
+        'b = (5) [1, 3, 3, 4, 5]',
       ],
       [
-        'a = {k: 2, l: Window}', 'b = (5) [1, 3, body, 4, 5]', 'c = (100) [empty × 10, 1, empty × 89]',
-        'a = {k: 2, l: Window}', 'b = (5) [1, 3, body, 4, 5]'
+        'a = {k: 2, l: Window}',
+        'b = (5) [1, 3, body, 4, 5]',
+        'c = (100) [empty × 10, 1, empty × 89]',
+        'a = {k: 2, l: Window}',
+        'b = (5) [1, 3, body, 4, 5]',
       ],
     ];
 
     const scriptEvaluation = inspectedPage.evaluate('testFunction();');
 
     for (const expected of expectedInlineVariables) {
-      assert.deepEqual(await waitForInlineVariables(devToolsPage, expected.length), expected);
+      await waitForInlineVariables(devToolsPage, expected);
       await devToolsPage.click(STEP_OVER_BUTTON);
     }
 
@@ -57,8 +69,8 @@ describe('Sources Tab', function() {
 
   it('shows correct inline variables for same-named variables in different functions',
      async ({devToolsPage, inspectedPage}) => {
-       await openSourceCodeEditorForFile(
-           'inline-variable-frames.js', 'inline-variable-frames.html', devToolsPage, inspectedPage);
+       await openSourceCodeEditorForFile(devToolsPage, inspectedPage, 'inline-variable-frames.js',
+                                         'inline-variable-frames.html');
 
        // For each step, which inline variables we expect CodeMirror to show.
        const expectedInlineVariables: string[][] = [
@@ -73,7 +85,7 @@ describe('Sources Tab', function() {
        const scriptEvaluation = inspectedPage.evaluate('testFunction();');
 
        for (const expected of expectedInlineVariables) {
-         assert.deepEqual(await waitForInlineVariables(devToolsPage, expected.length), expected);
+         await waitForInlineVariables(devToolsPage, expected);
          await devToolsPage.click(STEP_INTO_BUTTON);
        }
 

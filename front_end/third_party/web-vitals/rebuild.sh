@@ -4,8 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-VERSION=5.2.0
-GIT_SHA=331486c02721e1d37835177ffc89589a580ba57e # web-vitals does not tag releases.
+VERSION=6.2.3
+GIT_SHA="400d01968abffcd91a6f0307c9aaac97c5f7a76a" # web-vitals does not tag releases.
 
 # Note: this is just to handle updating README.chromium.
 # For the actual sources, below we checkout the repo, apply local patches, then build with tsc.
@@ -17,7 +17,7 @@ cd "$SCRIPT_DIR"
 rm -rf package/src package/dist
 
 if [ ! -d tmp-repo ]; then
-    git clone http://github.com/GoogleChrome/web-vitals tmp-repo
+    git clone https://github.com/GoogleChrome/web-vitals tmp-repo
 fi
 
 cd tmp-repo
@@ -33,6 +33,6 @@ cd -
 
 # Copy the source files to our repo, and build it.
 cp -r tmp-repo/src package/src
-../../../node_modules/.bin/tsc --ignoreConfig -d -t esnext -m esnext --moduleResolution bundler --strict --outDir package/dist/modules/ package/src/**/*.ts package/src/index.ts
+vpython3 ../../../third_party/typescript/typescript.py --ignoreConfig --skipLibCheck -d -t esnext -m esnext --moduleResolution bundler --strict --outDir package/dist/modules/ package/src/**/*.ts package/src/index.ts
 
 echo "Rebuild complete."

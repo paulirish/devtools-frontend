@@ -14,11 +14,11 @@ import {Events as LmiEvents, LinearMemoryInspectorPane} from './LinearMemoryInsp
 
 const UIStrings = {
   /**
-   * @description Error message that shows up in the console if a buffer to be opened in the linear memory inspector cannot be found.
+   * @description Error message that shows up in the console if a buffer to be opened in the Memory inspector panel cannot be found.
    */
-  couldNotOpenLinearMemory: 'Could not open linear memory inspector: failed locating buffer.',
+  couldNotOpenLinearMemory: 'Couldn’t open Memory inspector: buffer not found',
   /**
-   * @description A context menu item in the Scope View of the Sources Panel
+   * @description A context menu item in the Scope view of the Sources panel.
    */
   openInMemoryInspectorPanel: 'Open in Memory inspector panel',
 } as const;
@@ -87,7 +87,7 @@ interface SerializableSettings {
 
 export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelObserver<SDK.RuntimeModel.RuntimeModel>
     implements Common.Revealer.Revealer<SDK.RemoteObject.LinearMemoryInspectable>,
-               UI.ContextMenu.Provider<ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement> {
+               UI.ContextMenu.Provider<ObjectUI.ObjectPropertiesSection.ObjectTreeNode> {
   #paneInstance = LinearMemoryInspectorPane.instance();
   #bufferIdToRemoteObject = new Map<string, SDK.RemoteObject.RemoteObject>();
   #bufferIdToHighlightInfo = new Map<string, LinearMemoryInspectorComponents.LinearMemoryViewerUtils.HighlightInfo>();
@@ -315,12 +315,11 @@ export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelO
     void UI.ViewManager.ViewManager.instance().showView('linear-memory-inspector', omitFocus);
   }
 
-  appendApplicableItems(
-      _event: Event, contextMenu: UI.ContextMenu.ContextMenu,
-      target: ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement): void {
-    if (target.property.object?.isLinearMemoryInspectable()) {
-      const expression = target.path();
-      const object = target.property.object;
+  appendApplicableItems(_event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+                        target: ObjectUI.ObjectPropertiesSection.ObjectTreeNode): void {
+    if (target.object?.isLinearMemoryInspectable()) {
+      const expression = target.path;
+      const object = target.object;
       contextMenu.debugSection().appendItem(
           i18nString(UIStrings.openInMemoryInspectorPanel),
           this.reveal.bind(this, new SDK.RemoteObject.LinearMemoryInspectable(object, expression)),

@@ -2,21 +2,74 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("../../../scripts/build/ninja/vars.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 
 template("devtools_base_module") {
   ts_library(target_name) {
     forward_variables_from(invoker, "*", [ "visibility" ])
 
-    reset_timestamps = true
-
     visibility += [ ":*" ]
   }
 }
 
+# Legacy exceptions for devtools_module in core and models.
+# New modules in these directories must use devtools_foundation_module instead.
+_devtools_module_folder_exceptions = [
+  "front_end/core/platform/browser",
+  "front_end/core/platform/node",
+]
+
+_devtools_module_folder_exceptions_full = []
+foreach(_dir, _devtools_module_folder_exceptions) {
+  _devtools_module_folder_exceptions_full +=
+      [ devtools_location_prepend + _dir ]
+}
+
 template("devtools_module") {
+  _target_dir = get_label_info(":$target_name", "dir")
+  _disallowed =
+      filter_include([ _target_dir ],
+                     [
+                       devtools_location_prepend + "front_end/core",
+                       devtools_location_prepend + "front_end/core/*",
+                       devtools_location_prepend + "front_end/models",
+                       devtools_location_prepend + "front_end/models/*",
+                     ])
+  assert(
+      filter_exclude(_disallowed, _devtools_module_folder_exceptions_full) ==
+          [],
+      "devtools_module is not allowed in $_target_dir. Use devtools_foundation_module instead.")
+
   devtools_base_module(target_name) {
     forward_variables_from(invoker, "*")
+  }
+}
+
+template("devtools_api_test_module") {
+  devtools_base_module(target_name) {
+    testonly = true
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "additional_type_definitions",
+                             "testonly",
+                             "ts_deps",
+                           ])
+    if (defined(invoker.additional_type_definitions)) {
+      additional_type_definitions = invoker.additional_type_definitions
+    } else {
+      additional_type_definitions = []
+    }
+    additional_type_definitions +=
+        [ devtools_location_prepend + "test/api/types.d.ts" ]
+
+    if (defined(invoker.ts_deps)) {
+      ts_deps = invoker.ts_deps
+    } else {
+      ts_deps = []
+    }
+    ts_deps += [ devtools_location_prepend + "test/api:test_interface_types" ]
   }
 }
 
@@ -25,24 +78,31 @@ template("devtools_module") {
 #
 # To check for this we type-check both against browser and node runtime APIs.
 template("devtools_foundation_module") {
-  if (!devtools_skip_typecheck) {
-    _node_type_check_target = target_name + "_node_typecheck"
+  _node_type_check_target = target_name + "_node_typecheck"
 
-    ts_library(_node_type_check_target) {
-      forward_variables_from(invoker, "*", [ "visibility" ])
+  ts_type_check(_node_type_check_target) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "ts_deps",
+                             "visibility",
+                           ])
 
-      es_target = "es2023"
-      es_libs = []
-
-      no_emit = true
-      runs_in = "node_esm"
+    if (defined(invoker.ts_deps)) {
+      ts_deps = invoker.ts_deps
     }
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+
+    es_target = "es2023"
+    es_libs = []
+    runs_in = "node"
   }
 
   ts_library(target_name) {
     forward_variables_from(invoker, "*", [ "visibility" ])
-
-    reset_timestamps = true
 
     es_target = "es2023"
     es_libs = [
@@ -52,9 +112,7 @@ template("devtools_foundation_module") {
 
     visibility += [ ":*" ]
 
-    if (!devtools_skip_typecheck) {
-      public_deps += [ ":$_node_type_check_target" ]
-    }
+    public_deps += [ ":$_node_type_check_target" ]
   }
 }
 
@@ -72,6 +130,7 @@ template("devtools_ui_module") {
 
 foreach(module,
         [
+          "devtools_api_test_module",
           "devtools_foundation_module",
           "devtools_module",
           "devtools_ui_module",

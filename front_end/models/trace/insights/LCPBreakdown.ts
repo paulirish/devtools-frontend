@@ -58,12 +58,12 @@ export const UIStrings = {
    */
   fieldDuration: 'Field p75',
   /**
-   * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
+   * @description Text status indicating that the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
    */
   noLcp: 'No LCP detected',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPBreakdown.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 /** A TraceWindow plus its UIString. **/
 export type Subpart = Types.Timing.TraceWindowMicro&{label: Common.UIString.LocalizedString};
@@ -110,10 +110,10 @@ function anyValuesNaN(...values: number[]): boolean {
  * them to be missing on newer traces, but old trace files may lack some of the
  * data we rely on, so we want to handle that case.
  */
-function determineSubparts(
-    nav: Types.Events.NavigationStart, docRequest: Types.Events.SyntheticNetworkRequest,
-    lcpEvent: Types.Events.AnyLargestContentfulPaintCandidate,
-    lcpRequest: Types.Events.SyntheticNetworkRequest|undefined): LCPSubparts|null {
+function determineSubparts(nav: Types.Events.NavigationStart|Types.Events.SoftNavigationStart,
+                           docRequest: Types.Events.SyntheticNetworkRequest,
+                           lcpEvent: Types.Events.AnyLargestContentfulPaintCandidate,
+                           lcpRequest: Types.Events.SyntheticNetworkRequest|undefined): LCPSubparts|null {
   const firstDocByteTs = calculateDocFirstByteTs(docRequest);
   if (firstDocByteTs === null) {
     return null;
@@ -232,9 +232,10 @@ export function generateInsight(
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
   // This helps position things on the timeline's UI accurately for a trace.
   const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
-  const lcpRequest = data.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
+  const lcpRequest =
+      'navigationId' in context ? data.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId) : undefined;
 
-  const docRequest = networkRequests.byId.get(context.navigationId);
+  const docRequest = 'navigationId' in context ? networkRequests.byId.get(context.navigationId) : undefined;
   if (!docRequest) {
     return finalize({lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
   }

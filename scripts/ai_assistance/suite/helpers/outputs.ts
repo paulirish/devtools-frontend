@@ -6,27 +6,32 @@ import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
-import type {Conversation, EvalFileOutput} from '../types.js';
+import type {Trajectory} from '../types.js';
 
 const BASE_DIR = path.join(path.dirname(import.meta.filename), '..', 'outputs', 'outputs');
 
-export function getMarkdownConversation(example: Conversation): string {
+export function getMarkdownConversation(example: Trajectory): string {
   let markdown = '';
-  for (const query of example.queries) {
-    markdown += '## REQUEST FROM CLIENT:\n';
-    if (query.request.prompt) {
-      markdown += `### QUERY:\n${query.request.prompt}\n`;
-    }
-    if (query.request.functionCallResponse) {
-      markdown += `### FUNCTION CALL RESPONSE:\n${query.request.functionCallResponse}\n`;
-    }
-
-    markdown += '## RESPONSE FROM SERVER:\n';
-    if (query.response.text) {
-      markdown += `### EXPLANATION:\n${query.response.text}\n`;
-    }
-    if (query.response.functionCallRequests?.length) {
-      markdown += `### FUNCTION CALL REQUESTS:\n${query.response.functionCallRequests.join(', ')}\n`;
+  for (const turn of example.data ?? []) {
+    if (turn.role === 'user') {
+      markdown += '## REQUEST FROM CLIENT:\n';
+      if (turn.content?.length) {
+        markdown += `### QUERY:\n${turn.content.join('\n')}\n`;
+      }
+    } else {
+      markdown += '## RESPONSE FROM SERVER:\n';
+      if (turn.content?.length) {
+        markdown += `### EXPLANATION:\n${turn.content.join('\n')}\n`;
+      }
+      if (turn.tool_calls?.length) {
+        const calls = turn.tool_calls.map(tc => tc.name).join(', ');
+        markdown += `### FUNCTION CALL REQUESTS:\n${calls}\n`;
+        for (const tc of turn.tool_calls) {
+          if (tc.result) {
+            markdown += `### FUNCTION CALL RESPONSE FOR ${tc.name}:\n${JSON.stringify(tc.result)}\n`;
+          }
+        }
+      }
     }
     markdown += '\n';
   }
@@ -39,7 +44,7 @@ export interface Output {
   label: string;
   dateFolder: string;
   type: string;
-  contents: EvalFileOutput;
+  contents: Trajectory;
 }
 
 export async function getOutputs(type: string, label: string): Promise<Output[]> {
@@ -56,18 +61,18 @@ export async function getOutputs(type: string, label: string): Promise<Output[]>
       dateFolder: parentDir,
       type,
       label,
-      contents: JSON.parse(fs.readFileSync(absoluteFilePath, 'utf8')) as EvalFileOutput,
+      contents: JSON.parse(fs.readFileSync(absoluteFilePath, 'utf8')) as Trajectory,
     };
   });
 }
 
-export async function getGolden(type: string, label: string): Promise<Conversation|null> {
+export async function getGolden(type: string, label: string): Promise<Trajectory|null> {
   const goldenPath = path.join(BASE_DIR, type, 'golden', `${label}.json`);
   if (!fs.existsSync(goldenPath)) {
     return null;
   }
-  const contents = JSON.parse(fs.readFileSync(goldenPath, 'utf8')) as EvalFileOutput;
-  return contents.conversations[0] || null;
+  const contents = JSON.parse(fs.readFileSync(goldenPath, 'utf8')) as Trajectory;
+  return contents || null;
 }
 
 /**
@@ -77,7 +82,7 @@ export async function getGolden(type: string, label: string): Promise<Conversati
  * Example: if `baseDirPath` contains `folder1/fileA.txt` and `folder2/fileB.js`,
  * and `folder1` contains `fileA.txt`, `folder2` contains `fileB.js`,
  * the result would be `['folder1/fileA.txt', 'folder2/fileB.js']`.
- * Files directly in `baseDirPath` are ignored.
+ * Files directly in `baseDirPath` and in 'golden' directory are ignored.
  *
  * @param baseDirPath The path to the base directory to search within.
  * @returns A promise that resolves to an array of file paths in 'foldername/filename' format.
@@ -92,6 +97,9 @@ export async function findNestedFiles(
     for (const entry of entries) {
       // If the entry is a directory, it's a "nested folder"
       if (entry.isDirectory()) {
+        if (entry.name === 'golden') {
+          continue;
+        }
         const nestedFolderPath = path.join(baseDirPath, entry.name);
         try {
           // Read entries in the nested folder

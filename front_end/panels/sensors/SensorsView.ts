@@ -7,11 +7,12 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as SettingsUI from '../../ui/legacy/components/settings_ui/settings_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, render} from '../../ui/lit/lit.js';
+import * as SettingUIRegistration from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
@@ -20,11 +21,11 @@ import sensorsStyles from './sensors.css.js';
 
 const UIStrings = {
   /**
-   * @description Title for a group of cities
+   * @description Title for a group of cities.
    */
   location: 'Location',
   /**
-   * @description An option that appears in a drop-down to prevent the GPS location of the user from being overridden.
+   * @description An option that appears in a drop-down to stop the GPS location of the user from being overridden.
    */
   noOverride: 'No override',
   /**
@@ -32,23 +33,23 @@ const UIStrings = {
    */
   overrides: 'Overrides',
   /**
-   * @description Text of button in Sensors View, takes the user to the custom location setting screen
-   *where they can enter/edit custom locations.
+   * @description Text of button in the Sensors view, takes the user to the Locations settings tab
+   * where they can enter or edit custom locations.
    */
   manage: 'Manage',
   /**
-   * @description Aria-label for location manage button in Sensors View
+   * @description Aria-label for location manage button in the Sensors view.
    */
   manageTheListOfLocations: 'Manage the list of locations',
   /**
    * @description Option in a drop-down input for selecting the GPS location of the user. As an
-   *alternative to selecting a location from the list, the user can select this option and they are
-   *prompted to enter the details for a new custom location.
+   * alternative to selecting a location from the list, the user can select this option and they are
+   * prompted to enter the details for a new custom location.
    */
   other: 'Other…',
   /**
-   * @description Title of a section in a drop-down input that contains error locations, e.g. to select
-   *a location override that says 'the location is not available'. A noun.
+   * @description Title of a section in a drop-down input that contains error locations, for example, to select
+   * a location override that says the location is not available. A noun.
    */
   error: 'Error',
   /**
@@ -57,17 +58,17 @@ const UIStrings = {
   locationUnavailable: 'Location unavailable',
   /**
    * @description Tooltip text telling the user how to change the value of a latitude/longitude input
-   *text box. several shortcuts are provided for convenience. The placeholder can be different
-   *keyboard keys, depending on the user's settings.
+   * text box. Several shortcuts are provided for convenience. The placeholder can be different
+   * keyboard keys, depending on the user's settings.
    * @example {Ctrl} PH1
    */
-  adjustWithMousewheelOrUpdownKeys: 'Adjust with mousewheel or up/down keys. {PH1}: ±10, Shift: ±1, Alt: ±0.01',
+  adjustWithMousewheelOrUpdownKeys: 'Adjust with mousewheel or up/down keys. {PH1}: ±10, Shift: ±1, Alt: ±0.01.',
   /**
    * @description Label for latitude of a GPS location.
    */
   latitude: 'Latitude',
   /**
-   * @description Label for Longitude of a GPS location.
+   * @description Label for longitude of a GPS location.
    */
   longitude: 'Longitude',
   /**
@@ -79,11 +80,11 @@ const UIStrings = {
    */
   locale: 'Locale',
   /**
-   * @description Label for Accuracy of a GPS location.
+   * @description Label for accuracy of a GPS location.
    */
   accuracy: 'Accuracy',
   /**
-   * @description Label the orientation of a user's device e.g. tilt in 3D-space.
+   * @description Label for the orientation of a user's device, for example, tilt in 3D space.
    */
   orientation: 'Orientation',
   /**
@@ -91,45 +92,54 @@ const UIStrings = {
    */
   off: 'Off',
   /**
-   * @description Option that when chosen, allows the user to enter a custom orientation for the device e.g. tilt in 3D-space.
+   * @description Option that when chosen, allows the user to enter a custom orientation for the device, for example, tilt in 3D space.
    */
   customOrientation: 'Custom orientation',
   /**
    * @description Warning to the user they should enable the device orientation override, in order to
-   *enable this input which allows them to interactively select orientation by dragging a 3D phone
-   *model.
+   * enable this input which allows them to interactively select orientation by dragging a 3D phone
+   * model.
    */
   enableOrientationToRotate: 'Enable orientation to rotate',
   /**
    * @description Text telling the user how to use an input which allows them to interactively select
-   *orientation by dragging a 3D phone model.
+   * orientation by dragging a 3D phone model.
    */
   shiftdragHorizontallyToRotate: 'Shift+drag horizontally to rotate around the y-axis',
   /**
-   * @description Message in the Sensors tool that is alerted (for screen readers) when the device orientation setting is changed
+   * @description Message in the Sensors view that is alerted (for screen readers) when the device orientation setting is changed.
    * @example {180} PH1
    * @example {-90} PH2
    * @example {0} PH3
    */
   deviceOrientationSetToAlphaSBeta: 'Device orientation set to alpha: {PH1}, beta: {PH2}, gamma: {PH3}',
   /**
-   * @description Text of orientation reset button in Sensors View of the Device Toolbar
+   * @description Text of orientation reset button in the Sensors view of the Device toolbar.
    */
   reset: 'Reset',
   /**
-   * @description Aria-label for orientation reset button in Sensors View. Command.
+   * @description Aria-label for orientation reset button in the Sensors view. Command.
    */
   resetDeviceOrientation: 'Reset device orientation',
   /**
-   * @description Description of the Touch select in Sensors tab
+   * @description Description of the Touch select in the Sensors view.
    */
   forcesTouchInsteadOfClick: 'Forces touch instead of click',
   /**
-   * @description Description of the Emulate Idle State select in Sensors tab
+   * @description Description of the Emulate Idle State select in the Sensors view.
    */
   forcesSelectedIdleStateEmulation: 'Forces selected idle state emulation',
   /**
-   * @description Description of the Emulate CPU Pressure State select in Sensors tab
+   * @description Description of the Emulate CPU Performance Tier select in the Sensors view.
+   */
+  forcesSelectedCpuPerformanceTierEmulation: 'Forces CPU performance tier emulation',
+  /**
+   * @description Option value for no CPU Performance override with default value
+   * @example {Tier 3: HIGH} PH1
+   */
+  cpuPerformanceNoOverrideWithDefault: 'No override ({PH1})',
+  /**
+   * @description Description of the Emulate CPU Pressure State select in the Sensors view.
    */
   forcesSelectedPressureStateEmulation: 'Forces selected pressure state emulation',
   /**
@@ -154,12 +164,12 @@ const UIStrings = {
   landscapeRight: 'Landscape right',
   /**
    * @description Drop-down input option for the orientation of a device in 3D space. Noun indicating
-   *the display of the device is pointing up.
+   * the display of the device is pointing up.
    */
   displayUp: 'Display up',
   /**
    * @description Drop-down input option for the orientation of a device in 3D space. Noun indicating
-   *the display of the device is pointing down.
+   * the display of the device is pointing down.
    */
   displayDown: 'Display down',
   /**
@@ -206,6 +216,8 @@ export class SensorsView extends UI.Widget.VBox {
   private boxMatrix?: DOMMatrix;
   private mouseDownVector?: Geometry.Vector|null;
   private originalBoxMatrix?: DOMMatrix;
+  readonly #cpuThrottlingManager: SDK.CPUThrottlingManager.CPUThrottlingManager;
+  #cpuPerformanceNoOverrideOptionElement?: HTMLOptionElement;
 
   constructor() {
     super({
@@ -215,13 +227,15 @@ export class SensorsView extends UI.Widget.VBox {
     this.registerRequiredCSS(sensorsStyles);
     this.contentElement.classList.add('sensors-view');
 
+    this.#cpuThrottlingManager = SDK.CPUThrottlingManager.CPUThrottlingManager.instance();
+
     this.#locationSetting = Common.Settings.Settings.instance().createSetting('emulation.location-override', '');
     this.#location = SDK.EmulationModel.Location.parseSetting(this.#locationSetting.get());
     this.#locationOverrideEnabled = false;
 
     this.#locationSectionElement = this.contentElement.createChild('section', 'sensors-group');
-    const customLocationsSetting =
-        Common.Settings.Settings.instance().moduleSetting<LocationDescription[]>('emulation.locations');
+    const customLocationsSetting = Common.Settings.Settings.instance().resolve(
+        SettingUIRegistration.EmulationSettings.emulationLocationsSettingDescriptor);
     this.renderLocationSection(this.#location, customLocationsSetting);
     customLocationsSetting.addChangeListener(() => this.renderLocationSection(this.#location, customLocationsSetting));
 
@@ -249,6 +263,10 @@ export class SensorsView extends UI.Widget.VBox {
     this.createPanelSeparator();
 
     this.createPressureSection();
+
+    this.createPanelSeparator();
+
+    this.createCPUPerformanceSection();
 
     this.createPanelSeparator();
   }
@@ -711,7 +729,7 @@ export class SensorsView extends UI.Widget.VBox {
           </div>
         </div>
       `,
-      orientationGroup
+      orientationGroup,
     );
     // clang-format on
 
@@ -726,11 +744,80 @@ export class SensorsView extends UI.Widget.VBox {
   private createPressureSection(): void {
     const container = this.contentElement.createChild('div', 'pressure-section');
     const control = SettingsUI.SettingsUI.createControlForSetting(
-        Common.Settings.Settings.instance().moduleSetting('emulation.cpu-pressure'),
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.cpuPressureSettingDescriptor),
         i18nString(UIStrings.forcesSelectedPressureStateEmulation));
 
     if (control) {
       container.appendChild(control);
+    }
+  }
+
+  private createCPUPerformanceSection(): void {
+    const container = this.contentElement.createChild('div', 'cpu-performance-section');
+    const control = SettingsUI.SettingsUI.createControlForSetting(
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.cpuPerformanceSettingDescriptor),
+        i18nString(UIStrings.forcesSelectedCpuPerformanceTierEmulation));
+
+    if (control) {
+      container.appendChild(control);
+      // The text of the "no override" option element needs to be updated dynamically.
+      const noOverrideOption = control.querySelector<HTMLOptionElement>('select option[value="no-override"]');
+      if (noOverrideOption) {
+        this.#cpuPerformanceNoOverrideOptionElement = noOverrideOption;
+        this.#updateCPUPerformanceNoOverrideLabel();
+      } else {
+        this.#cpuPerformanceNoOverrideOptionElement = undefined;
+      }
+    }
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    if (this.#cpuPerformanceNoOverrideOptionElement) {
+      this.#cpuThrottlingManager.addEventListener(SDK.CPUThrottlingManager.Events.CPU_PERFORMANCE_TIER_CHANGED,
+                                                  this.#updateCPUPerformanceNoOverrideLabel, this);
+      this.#cpuThrottlingManager.addEventListener(SDK.CPUThrottlingManager.Events.RATE_CHANGED,
+                                                  this.#updateCPUPerformanceNoOverrideLabel, this);
+      this.#updateCPUPerformanceNoOverrideLabel();
+    }
+  }
+
+  override willHide(): void {
+    super.willHide();
+    if (this.#cpuPerformanceNoOverrideOptionElement) {
+      this.#cpuThrottlingManager.removeEventListener(SDK.CPUThrottlingManager.Events.CPU_PERFORMANCE_TIER_CHANGED,
+                                                     this.#updateCPUPerformanceNoOverrideLabel, this);
+      this.#cpuThrottlingManager.removeEventListener(SDK.CPUThrottlingManager.Events.RATE_CHANGED,
+                                                     this.#updateCPUPerformanceNoOverrideLabel, this);
+    }
+  }
+
+  #updateCPUPerformanceNoOverrideLabel(): void {
+    if (!this.#cpuPerformanceNoOverrideOptionElement) {
+      return;
+    }
+    // Helper function to retrieve the tier labels (i18n) from the settings.
+    const options =
+        SettingUIRegistration.SettingUIRegistration.resolve(SDK.SDKSettings.cpuPerformanceSettingDescriptor).options;
+    const getOptionTitle = (value: string): string => {
+      const opt = options.find(o => o.value === value);
+      if (!opt) {
+        return '';
+      }
+      return opt.title;
+    };
+    // Helper function to return a fallback title, to be used if the above fails.
+    const getFallbackTitle = (tier: SDK.CPUThrottlingManager.CPUPerformanceTier): string => {
+      return `Tier ${SDK.CPUThrottlingManager.tierToNumber(tier)}: ${tier.toUpperCase()}`;
+    };
+    // Update the text of the "no-override" element using the calculated tier.
+    const calculatedTier = this.#cpuThrottlingManager.calculatedCPUPerformanceTier();
+    if (calculatedTier !== undefined) {
+      const tierTitle = getOptionTitle(calculatedTier) || getFallbackTitle(calculatedTier);
+      this.#cpuPerformanceNoOverrideOptionElement.text =
+          i18nString(UIStrings.cpuPerformanceNoOverrideWithDefault, {PH1: tierTitle});
+    } else {
+      this.#cpuPerformanceNoOverrideOptionElement.text = getOptionTitle('no-override') || 'No override';
     }
   }
 
@@ -967,7 +1054,7 @@ export class SensorsView extends UI.Widget.VBox {
   private appendTouchControl(): void {
     const container = this.contentElement.createChild('div', 'touch-section');
     const control = SettingsUI.SettingsUI.createControlForSetting(
-        Common.Settings.Settings.instance().moduleSetting('emulation.touch'),
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.touchSettingDescriptor),
         i18nString(UIStrings.forcesTouchInsteadOfClick));
 
     if (control) {
@@ -978,7 +1065,7 @@ export class SensorsView extends UI.Widget.VBox {
   private appendIdleEmulator(): void {
     const container = this.contentElement.createChild('div', 'idle-section');
     const control = SettingsUI.SettingsUI.createControlForSetting(
-        Common.Settings.Settings.instance().moduleSetting('emulation.idle-detection'),
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.idleDetectionSettingDescriptor),
         i18nString(UIStrings.forcesSelectedIdleStateEmulation));
 
     if (control) {

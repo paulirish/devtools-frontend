@@ -3,18 +3,25 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import * as Bindings from './bindings.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-describeWithMockConnection('ResourceUtils', () => {
+describe('ResourceUtils', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
   const INSPECTED_URL_SCHEME = 'http://';
   const INSPECTED_URL_DOMAIN = 'example.com';
   const OTHER_DOMAIN = 'example.org';
@@ -25,6 +32,7 @@ describeWithMockConnection('ResourceUtils', () => {
   const OTHER_PATH = '/OTHER/PATH';
   const INVALID_URL = urlString`:~INVALID_URL~:`;
   let target: SDK.Target.Target;
+  let universe: TestUniverse;
   let resourceForURLStub: sinon.SinonStub;
   let uiSourceCodeForURLStub: sinon.SinonStub;
 
@@ -32,13 +40,19 @@ describeWithMockConnection('ResourceUtils', () => {
     const {displayNameForURL} = Bindings.ResourceUtils;
 
     beforeEach(() => {
-      const tabTarget = createTarget({type: SDK.Target.Type.TAB});
-      createTarget({parentTarget: tabTarget, subtype: 'prerender'});
-      target = createTarget({parentTarget: tabTarget});
+      universe = new TestUniverse();
+      const tabTarget = universe.createTarget({type: SDK.Target.Type.TAB});
+      universe.createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+      target = universe.createTarget({parentTarget: tabTarget});
       target.setInspectedURL(INSPECTED_URL);
       resourceForURLStub = sinon.stub(SDK.ResourceTreeModel.ResourceTreeModel, 'resourceForURL').returns(null);
-      uiSourceCodeForURLStub =
-          sinon.stub(Workspace.Workspace.WorkspaceImpl.instance(), 'uiSourceCodeForURL').returns(null);
+      uiSourceCodeForURLStub = sinon.stub(universe.workspace, 'uiSourceCodeForURL').returns(null);
+      sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(universe.workspace);
+      sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+    });
+
+    afterEach(() => {
+      sinon.restore();
     });
 
     it('favors displayName from UISourceCode', () => {

@@ -15,11 +15,11 @@ import {ariaMetadata} from './ARIAMetadata.js';
 
 const UIStrings = {
   /**
-   * @description Text in ARIAAttributes View of the Accessibility panel
+   * @description Text in the ARIA attributes view under the Accessibility tab in the Elements panel.
    */
-  ariaAttributes: 'ARIA Attributes',
+  ariaAttributes: 'ARIA attributes',
   /**
-   * @description Text in ARIAAttributes View of the Accessibility panel
+   * @description Text in the ARIA attributes view under the Accessibility tab in the Elements panel.
    */
   noAriaAttributes: 'No ARIA attributes',
 } as const;
@@ -35,6 +35,8 @@ interface ViewInput {
   onCancelEditing: (attribute: SDK.DOMModel.Attribute) => void;
   attributeBeingEdited: SDK.DOMModel.Attribute|null;
   attributes: SDK.DOMModel.Attribute[];
+  backendNodeId?: number;
+  targetId?: string;
 }
 
 type View = (input: ViewInput, output: object, target: HTMLElement|DocumentFragment) => void;
@@ -70,7 +72,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
            .template=${html`
              <ul role="tree">
               ${input.attributes?.map(attribute => html`
-                <li role="treeitem">
+                <li role="treeitem" jslog=${VisualLogging.treeItem('aria-attribute')}>
                   <style>${accessibilityPropertiesStyles}</style>
                   <span class="ax-name monospace" @mousedown=${onStartEditing.bind(null, attribute)}>
                     ${attribute.name}
@@ -79,6 +81,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                   <devtools-prompt
                     completions=completions
                     class="monospace"
+                    value=${attribute.value}
                     @mousedown=${onStartEditing.bind(null, attribute)}
                     .completionTimeout=${0}
                     ?editing=${input.attributeBeingEdited === attribute}
@@ -92,15 +95,23 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
              </ul>
            `}></devtools-tree>`,
       // clang-format on
-      target, {container: {attributes: {jslog: `${VisualLogging.section('aria-attributes')}`}}});
+      target, {
+        container: {
+          attributes: {
+            jslog: `${VisualLogging.section('aria-attributes')}`,
+            ...(input.backendNodeId ? {'data-backend-node-id': `${input.backendNodeId}`} : {}),
+            ...(input.targetId ? {'data-target-id': `${input.targetId}`} : {}),
+          },
+        },
+      });
 };
 
 export class ARIAAttributesPane extends AccessibilitySubPane<ShadowRoot> {
   readonly #view: View;
   #attributeBeingEdited: SDK.DOMModel.Attribute|null = null;
 
-  constructor(view = DEFAULT_VIEW) {
-    super({
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element, {
       title: i18nString(UIStrings.ariaAttributes),
       viewId: 'aria-attributes',
       useShadowDom: 'pure',
@@ -128,7 +139,7 @@ export class ARIAAttributesPane extends AccessibilitySubPane<ShadowRoot> {
 
     const onCommitEditing = (attribute: SDK.DOMModel.Attribute, result: string): void => {
       // Make the changes to the attribute
-      const node = this.node();
+      const node = this.node;
       if (node && attribute.value !== result) {
         node.setAttributeValue(attribute.name, result);
       }
@@ -138,7 +149,7 @@ export class ARIAAttributesPane extends AccessibilitySubPane<ShadowRoot> {
       this.requestUpdate();
     };
 
-    const attributes = this.node()?.attributes()?.filter(attribute => this.isARIAAttribute(attribute)) ?? [];
+    const attributes = this.node?.attributes()?.filter(attribute => this.isARIAAttribute(attribute)) ?? [];
     const propertyCompletions =
         new Map(attributes.map(attribute => [attribute, ariaMetadata().valuesForProperty(attribute.name)]));
 
@@ -149,6 +160,8 @@ export class ARIAAttributesPane extends AccessibilitySubPane<ShadowRoot> {
       onCommitEditing,
       onCancelEditing,
       propertyCompletions,
+      backendNodeId: this.node?.backendNodeId(),
+      targetId: this.node?.domModel().target().id(),
     };
     this.#view(input, {}, this.contentElement);
   }

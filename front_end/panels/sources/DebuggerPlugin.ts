@@ -9,6 +9,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
@@ -16,7 +17,6 @@ import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Formatter from '../../models/formatter/formatter.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as StackTrace from '../../models/stack_trace/stack_trace.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
@@ -26,6 +26,7 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AddDebugInfoURLDialog} from './AddSourceMapURLDialog.js';
@@ -39,119 +40,119 @@ const {EMPTY_BREAKPOINT_CONDITION, NEVER_PAUSE_HERE_CONDITION} = Breakpoints.Bre
 
 const UIStrings = {
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
-  thisScriptIsOnTheDebuggersIgnore: 'This script is on the debugger\'s ignore list',
+  thisScriptIsOnTheDebuggersIgnore: 'This script is on the debugger’s ignore list',
   /**
-   * @description Text to stop preventing the debugger from stepping into library code
+   * @description Text to stop preventing the debugger from stepping into library code.
    */
   removeFromIgnoreList: 'Remove from ignore list',
   /**
-   * @description Text of a button in the Sources panel Debugger Plugin to configure ignore listing in Settings
+   * @description Text of a button in the Sources panel Debugger plugin to configure ignore listing in Settings.
    */
   configure: 'Configure',
   /**
-   * @description Text to add a breakpoint
+   * @description Text to add a breakpoint.
    */
   addBreakpoint: 'Add breakpoint',
   /**
-   * @description A context menu item in the Debugger Plugin of the Sources panel
+   * @description A context menu item in the Debugger plugin of the Sources panel.
    */
   addConditionalBreakpoint: 'Add conditional breakpoint…',
   /**
-   * @description A context menu item in the Debugger Plugin of the Sources panel
+   * @description A context menu item in the Debugger plugin of the Sources panel.
    */
   addLogpoint: 'Add logpoint…',
   /**
-   * @description A context menu item in the Debugger Plugin of the Sources panel
+   * @description A context menu item in the Debugger plugin of the Sources panel.
    */
   neverPauseHere: 'Never pause here',
   /**
    * @description Context menu command to delete/remove a breakpoint that the user
-   *has set. One line of code can have multiple breakpoints. Always >= 1 breakpoint.
+   * has set. One line of code can have multiple breakpoints. Always >= 1 breakpoint.
    */
   removeBreakpoint: '{n, plural, =1 {Remove breakpoint} other {Remove all breakpoints in line}}',
   /**
-   * @description A context menu item in the Debugger Plugin of the Sources panel
+   * @description A context menu item in the Debugger plugin of the Sources panel.
    */
   editBreakpoint: 'Edit breakpoint…',
   /**
    * @description Context menu command to disable (but not delete) a breakpoint
-   *that the user has set. One line of code can have multiple breakpoints. Always
-   *>= 1 breakpoint.
+   * that the user has set. One line of code can have multiple breakpoints. Always
+   * >= 1 breakpoint.
    */
   disableBreakpoint: '{n, plural, =1 {Disable breakpoint} other {Disable all breakpoints in line}}',
   /**
    * @description Context menu command to enable a breakpoint that the user has
-   *set. One line of code can have multiple breakpoints. Always >= 1 breakpoint.
+   * set. One line of code can have multiple breakpoints. Always >= 1 breakpoint.
    */
   enableBreakpoint: '{n, plural, =1 {Enable breakpoint} other {Enable all breakpoints in line}}',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   addSourceMap: 'Add source map…',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   addWasmDebugInfo: 'Add DWARF debug info…',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   sourceMapLoaded: 'Source map loaded',
   /**
-   * @description Title of the Filtered List WidgetProvider of Quick Open
+   * @description Title of the filtered list widget provider of Quick Open.
    * @example {Ctrl+P Ctrl+O} PH1
    */
-  associatedFilesAreAvailable: 'Associated files are available via file tree or {PH1}.',
+  associatedFilesAreAvailable: 'Associated files are available via file tree or {PH1}',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   associatedFilesShouldBeAdded:
       'Associated files should be added to the file tree. You can debug these resolved source files as regular JavaScript files.',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
-  theDebuggerWillSkipStepping: 'The debugger will skip stepping through this script, and will not stop on exceptions.',
+  theDebuggerWillSkipStepping: 'The debugger will skip stepping through this script, and won’t stop on exceptions',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   sourceMapSkipped: 'Source map skipped for this file',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
   sourceMapFailed: 'Source map failed to load',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
-  debuggingPowerReduced: 'DevTools can\'t show authored sources, but you can debug the deployed code.',
+  debuggingPowerReduced: 'DevTools can’t show authored sources, but you can debug the deployed code',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
+   * @description Text in Debugger plugin of the Sources panel.
    */
-  reloadForSourceMap: 'To enable again, make sure the file isn\'t on the ignore list and reload.',
+  reloadForSourceMap: 'To enable again, make sure the file isn’t on the ignore list and reload',
   /**
-   * @description Text in Debugger Plugin of the Sources panel
-   * @example {http://site.com/lib.js.map} PH1
+   * @description Text in Debugger plugin of the Sources panel.
+   * @example {https://example.com/lib.js.map} PH1
    * @example {HTTP error: status code 404, net::ERR_UNKNOWN_URL_SCHEME} PH2
    */
-  errorLoading: 'Error loading url {PH1}: {PH2}',
+  errorLoading: 'Error loading URL {PH1}: {PH2}',
   /**
-   * @description Error message that is displayed in UI when a file needed for debugging information for a call frame is missing
+   * @description Error message that is displayed in UI when a file needed for debugging information for a call frame is missing.
    * @example {src/myapp.debug.wasm.dwp} PH1
    */
-  debugFileNotFound: 'Failed to load debug file "{PH1}".',
+  debugFileNotFound: 'Failed to load debug file "{PH1}"',
   /**
-   * @description Error message that is displayed when no debug info could be loaded
+   * @description Error message that is displayed when no debug info could be loaded.
    * @example {app.wasm} PH1
    */
   debugInfoNotFound: 'Failed to load any debug info for {PH1}',
   /**
-   * @description Text of a button to open up details on a request when no debug info could be loaded
+   * @description Text of a button to open up details on a request when no debug info could be loaded.
    */
   showRequest: 'Show request',
   /**
-   * @description Tooltip text that shows on hovering over a button to see more details on a request
+   * @description Tooltip text that shows on hovering over a button to see more details on a request.
    */
-  openDeveloperResources: 'Opens the request in the Developer resource panel',
+  openDeveloperResources: 'Opens the request in the Developer resources panel',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/DebuggerPlugin.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -244,8 +245,7 @@ export class DebuggerPlugin extends Plugin {
     this.scriptFileForDebuggerModel = new Map();
 
     this.loader = SDK.PageResourceLoader.PageResourceLoader.instance();
-    this.loader.addEventListener(
-        SDK.PageResourceLoader.Events.UPDATE, this.showSourceMapInfobarIfNeeded.bind(this), this);
+    this.loader.addEventListener(SDK.PageResourceLoader.Events.UPDATE, this.showSourceMapInfobarIfNeeded, this);
 
     this.ignoreListCallback = this.showIgnoreListInfobarIfNeeded.bind(this);
     Workspace.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.ignoreListCallback);
@@ -260,9 +260,6 @@ export class DebuggerPlugin extends Plugin {
 
     this.ignoreListInfobar = null;
     this.showIgnoreListInfobarIfNeeded();
-    for (const scriptFile of this.scriptFileForDebuggerModel.values()) {
-      scriptFile.checkMapping();
-    }
   }
 
   override editorExtension(): CodeMirror.Extension {
@@ -403,25 +400,25 @@ export class DebuggerPlugin extends Plugin {
       Workspace.IgnoreListManager.IgnoreListManager.instance().unIgnoreListUISourceCode(uiSourceCode);
     }
 
-    const infobar = new UI.Infobar.Infobar(
-        UI.Infobar.Type.WARNING, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
-        [
-          {
-            text: i18nString(UIStrings.configure),
-            delegate:
-                UI.ViewManager.ViewManager.instance().showView.bind(UI.ViewManager.ViewManager.instance(), 'blackbox'),
-            dismiss: false,
-            jslogContext: 'configure',
-          },
-          {
-            text: i18nString(UIStrings.removeFromIgnoreList),
-            delegate: unIgnoreList,
-            buttonVariant: Buttons.Button.Variant.TONAL,
-            dismiss: true,
-            jslogContext: 'remove-from-ignore-list',
-          }
-        ],
-        undefined, 'script-on-ignore-list');
+    const infobar =
+        new UI.Infobar.Infobar(UI.Infobar.Type.WARNING, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
+                               [
+                                 {
+                                   text: i18nString(UIStrings.configure),
+                                   delegate: UI.ViewManager.ViewManager.instance().showView.bind(
+                                       UI.ViewManager.ViewManager.instance(), 'blackbox'),
+                                   dismiss: false,
+                                   jslogContext: 'configure',
+                                 },
+                                 {
+                                   text: i18nString(UIStrings.removeFromIgnoreList),
+                                   delegate: unIgnoreList,
+                                   buttonVariant: Buttons.Button.Variant.TONAL,
+                                   dismiss: true,
+                                   jslogContext: 'remove-from-ignore-list',
+                                 },
+                               ],
+                               undefined, 'script-on-ignore-list');
     this.ignoreListInfobar = infobar;
     infobar.setCloseCallback(() => this.removeInfobar(this.ignoreListInfobar));
 
@@ -543,7 +540,7 @@ export class DebuggerPlugin extends Plugin {
       if (!url) {
         return;
       }
-      scriptFile.addSourceMapURL(url);
+      scriptFile.addSourceMapURL(url, SDK.SourceMap.SourceMapProvenance.USER);
     }
 
     function addDebugInfoURL(
@@ -566,7 +563,7 @@ export class DebuggerPlugin extends Plugin {
     }
 
     if (this.uiSourceCode.project().type() === Workspace.Workspace.projectTypes.Network &&
-        Common.Settings.Settings.instance().moduleSetting('js-source-maps-enabled').get() &&
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.jsSourceMapsEnabledSettingDescriptor).get() &&
         !Workspace.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(this.uiSourceCode.url())) {
       if (this.scriptFileForDebuggerModel.size) {
         const scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile =
@@ -586,26 +583,13 @@ export class DebuggerPlugin extends Plugin {
   }
 
   private workingCopyChanged(): void {
-    if (!this.scriptFileForDebuggerModel.size) {
-      this.setMuted(this.uiSourceCode.isDirty());
-    }
+    this.#scopeMappingsCache.clear();
+    this.setMuted(this.uiSourceCode.isDirty());
   }
 
   private workingCopyCommitted(): void {
     this.scriptsPanel.updateLastModificationTime();
-    if (!this.scriptFileForDebuggerModel.size) {
-      this.setMuted(false);
-    }
-  }
-
-  private didMergeToVM(): void {
-    if (this.consistentScripts()) {
-      this.setMuted(false);
-    }
-  }
-
-  private didDivergeFromVM(): void {
-    this.setMuted(true);
+    this.setMuted(false);
   }
 
   private setMuted(value: boolean): void {
@@ -622,21 +606,12 @@ export class DebuggerPlugin extends Plugin {
     }
   }
 
-  private consistentScripts(): boolean {
-    for (const scriptFile of this.scriptFileForDebuggerModel.values()) {
-      if (scriptFile.hasDivergedFromVM() || scriptFile.isMergingToVM()) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   private isIdentifier(tokenType: string): boolean {
     return tokenType === 'VariableName' || tokenType === 'VariableDefinition' || tokenType === 'PropertyName' ||
         tokenType === 'PropertyDefinition';
   }
 
-  private getPopoverRequest(event: MouseEvent|KeyboardEvent): UI.PopoverHelper.PopoverRequest|null {
+  getPopoverRequest(event: MouseEvent|KeyboardEvent): UI.PopoverHelper.PopoverRequest|null {
     if (event instanceof KeyboardEvent) {
       return null;
     }
@@ -654,7 +629,6 @@ export class DebuggerPlugin extends Plugin {
     if (!debuggableFrame) {
       return null;
     }
-    const selectedCallFrame = debuggableFrame.sdkFrame;
 
     let textPosition = editor.editor.posAtCoords(event);
     if (!textPosition) {
@@ -692,47 +666,17 @@ export class DebuggerPlugin extends Plugin {
     return {
       box,
       show: async (popover: UI.GlassPane.GlassPane) => {
-        let resolvedText = '';
-        if (selectedCallFrame.script.isJavaScript()) {
-          const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
-          try {
-            resolvedText =
-                await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
-          } catch {
-          }
-        }
-        // We use side-effect free debug-evaluate when the highlighted expression contains a
-        // function/method call. Otherwise we allow side-effects. The motiviation here are
-        // frameworks like Vue, that heavily use proxies for caching:
-        //
-        //   * We deem a simple property access of a proxy as deterministic so it should be
-        //     successful even if V8 thinks its side-effecting.
-        //   * Explicit function calls on the other hand must be side-effect free. The canonical
-        //     example is hovering over {Math.random()} which would result in a different value
-        //     each time the user hovers over it.
-        const throwOnSideEffect = highlightRange.containsSideEffects;
-        const result = await selectedCallFrame.evaluate({
-          expression: resolvedText || evaluationText,
-          objectGroup: 'popover',
-          includeCommandLineAPI: false,
-          silent: true,
-          returnByValue: false,
-          generatePreview: false,
-          throwOnSideEffect,
-        });
-        if (!result || 'error' in result || !result.object ||
-            (result.object.type === 'object' && result.object.subtype === 'error')) {
+        const object = await this.#evaluateForPopover(debuggableFrame, highlightRange, evaluationText);
+        if (!object) {
           return false;
         }
         objectPopoverHelper =
-            await ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper.buildObjectPopover(result.object, popover);
+            await ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper.buildObjectPopover(object, popover);
         const potentiallyUpdatedCallFrame =
             UI.Context.Context.instance().flavor(StackTrace.StackTrace.DebuggableFrameFlavor);
         if (!objectPopoverHelper || debuggableFrame !== potentiallyUpdatedCallFrame) {
           debuggerModel.runtimeModel().releaseObjectGroup('popover');
-          if (objectPopoverHelper) {
-            objectPopoverHelper.dispose();
-          }
+          objectPopoverHelper?.dispose();
           return false;
         }
         const decoration = CodeMirror.Decoration.set(evalExpressionMark.range(highlightRange.from, highlightRange.to));
@@ -747,6 +691,52 @@ export class DebuggerPlugin extends Plugin {
         editor.dispatch({effects: evalExpression.update.of(CodeMirror.Decoration.none)});
       },
     };
+  }
+
+  async #evaluateForPopover(debuggableFrame: StackTrace.StackTrace.DebuggableFrameFlavor,
+                            highlightRange: {from: number, to: number, containsSideEffects: boolean},
+                            evaluationText: string): Promise<SDK.RemoteObject.RemoteObject|null> {
+    const scopeMappings = await this.#getScopeMappings(debuggableFrame) ?? [];
+    const scopedVariable = findVariableInScopeMappings(evaluationText, highlightRange.from, scopeMappings);
+    if (scopedVariable.found) {
+      return scopedVariable.value;
+    }
+
+    const selectedCallFrame = debuggableFrame.sdkFrame;
+    let resolvedText = '';
+    if (selectedCallFrame.script.isJavaScript()) {
+      const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(
+          selectedCallFrame, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance());
+      try {
+        resolvedText =
+            await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
+      } catch {
+      }
+    }
+    // We use side-effect free debug-evaluate when the highlighted expression contains a
+    // function/method call. Otherwise we allow side-effects. The motivation here are
+    // frameworks like Vue, that heavily use proxies for caching:
+    //
+    //   * We deem a simple property access of a proxy as deterministic so it should be
+    //     successful even if V8 thinks its side-effecting.
+    //   * Explicit function calls on the other hand must be side-effect free. The canonical
+    //     example is hovering over {Math.random()} which would result in a different value
+    //     each time the user hovers over it.
+    const throwOnSideEffect = highlightRange.containsSideEffects;
+    const result = await selectedCallFrame.evaluate({
+      expression: resolvedText || evaluationText,
+      objectGroup: 'popover',
+      includeCommandLineAPI: false,
+      silent: true,
+      returnByValue: false,
+      generatePreview: false,
+      throwOnSideEffect,
+    });
+    if (!result || 'error' in result || !result.object ||
+        (result.object.type === 'object' && result.object.subtype === 'error')) {
+      return null;
+    }
+    return result.object;
   }
 
   private onEditorUpdate(update: CodeMirror.ViewUpdate): void {
@@ -870,6 +860,15 @@ export class DebuggerPlugin extends Plugin {
     dialog.oldCondition = oldCondition,
     dialog.breakpointType = isLogpointForDialog ? SDK.DebuggerModel.BreakpointType.LOGPOINT :
                                                   SDK.DebuggerModel.BreakpointType.CONDITIONAL_BREAKPOINT;
+    dialog.location = async () => {
+      const uiLocation = breakpoint ? (breakpoint.getClosestResolvedLocation() ??
+                                       {lineNumber: breakpoint.lineNumber(), columnNumber: breakpoint.columnNumber()}) :
+                                      (location ?? await this.defaultBreakpointLocation(line));
+      const rawLocations =
+          await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().uiLocationToRawLocations(
+              this.uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber);
+      return rawLocations[0] ?? null;
+    };
     dialog.onFinish = async result => {
       this.activeBreakpointDialog = null;
       this.#activeBreakpointEditRequest = undefined;
@@ -975,11 +974,27 @@ export class DebuggerPlugin extends Plugin {
     return offset ?? null;
   }
 
+  readonly #scopeMappingsCache = new ScopeMappingsCache(this.uiSourceCode);
+
+  /** @returns `null` if the scope mappings can't be used because the file has unsaved edits. */
+  #getScopeMappings(debuggableFrame: StackTrace.StackTrace.DebuggableFrameFlavor,
+                    resolvedScopeChain?: SDK.DebuggerModel.ScopeChainEntry[]): Promise<ScopeMapping[]>|null {
+    const url = this.uiSourceCode.url();
+    return this.#scopeMappingsCache.get(
+        debuggableFrame,
+        () => computeScopeMappings(
+            debuggableFrame.sdkFrame, location => this.#rawLocationToEditorOffset(location, url),
+            (line, col) => this.editor?.toOffset(this.transformer.uiLocationToEditorLocation(line, col)) ?? null,
+            resolvedScopeChain));
+  }
+
   private async computeValueDecorations(): Promise<CodeMirror.DecorationSet|null> {
     if (!this.editor) {
       return null;
     }
-    if (!Common.Settings.Settings.instance().moduleSetting('inline-variable-values').get()) {
+    if (!Common.Settings.Settings.instance()
+             .resolve(SettingsUI.SourcesSettings.inlineVariableValuesSettingDescriptor)
+             .get()) {
       return null;
     }
     const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
@@ -993,13 +1008,22 @@ export class DebuggerPlugin extends Plugin {
     const callFrame = debuggableFrame.sdkFrame;
     const url = this.uiSourceCode.url();
 
-    const rawLocationToEditorOffset: (location: SDK.DebuggerModel.Location|null) => Promise<number|null> = location =>
-        this.#rawLocationToEditorOffset(location, url);
+    const uiPositionToEditorOffset = (lineNumber: number, columnNumber: number): number|null =>
+        this.editor?.toOffset(this.transformer.uiLocationToEditorLocation(lineNumber, columnNumber)) ?? null;
+    const scopeChain =
+        await SourceMapScopes.ScopeChainResolver.ScopeChainResolver.instance().resolveScopeChain(callFrame);
+    const localOriginalScope = scopeChain
+                                   .find((s): s is SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry =>
+                                             s instanceof SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry &&
+                                             s.type() === Protocol.Debugger.ScopeType.Local)
+                                   ?.originalScope();
 
-    const functionOffsetPromise = this.#rawLocationToEditorOffset(callFrame.functionLocation(), url);
+    const functionOffsetPromise = localOriginalScope ?
+        Promise.resolve(uiPositionToEditorOffset(localOriginalScope.start.line, localOriginalScope.start.column)) :
+        this.#rawLocationToEditorOffset(callFrame.functionLocation(), url);
     const executionOffsetPromise = this.#rawLocationToEditorOffset(callFrame.location(), url);
     const [functionOffset, executionOffset] = await Promise.all([functionOffsetPromise, executionOffsetPromise]);
-    if (!functionOffset || !executionOffset || !this.editor) {
+    if (functionOffset === null || !executionOffset || !this.editor) {
       return null;
     }
 
@@ -1016,14 +1040,15 @@ export class DebuggerPlugin extends Plugin {
       CodeMirror.ensureSyntaxTree(this.editor.state, executionOffset, 16);
     }
 
-    const variableNames = getVariableNamesByLine(this.editor.state, functionOffset, executionOffset, executionOffset);
+    const variableNames = getVariableNamesByLine(this.editor.state, functionOffset, executionOffset, executionOffset,
+                                                 Boolean(localOriginalScope));
     if (variableNames.length === 0) {
       return null;
     }
 
-    const scopeMappings = await computeScopeMappings(callFrame, rawLocationToEditorOffset);
+    const scopeMappings = await this.#getScopeMappings(debuggableFrame, scopeChain);
     // After the `await` the DebuggerPlugin could have been disposed. Re-check `this.editor`.
-    if (!this.editor || scopeMappings.length === 0) {
+    if (!this.editor || !scopeMappings?.length) {
       return null;
     }
 
@@ -1332,11 +1357,6 @@ export class DebuggerPlugin extends Plugin {
     if (uiLocation.uiSourceCode !== this.uiSourceCode || this.muted) {
       return;
     }
-    for (const scriptFile of this.scriptFileForDebuggerModel.values()) {
-      if (scriptFile.isDivergingFromVM() || scriptFile.isMergingToVM()) {
-        return;
-      }
-    }
     // These tend to arrive in bursts, so debounce them
     window.clearTimeout(this.refreshBreakpointsTimeout);
     this.refreshBreakpointsTimeout = window.setTimeout(() => this.refreshBreakpoints(), 50);
@@ -1410,28 +1430,13 @@ export class DebuggerPlugin extends Plugin {
   }
 
   private updateScriptFile(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
-    const oldScriptFile = this.scriptFileForDebuggerModel.get(debuggerModel);
+    this.scriptFileForDebuggerModel.delete(debuggerModel);
     const newScriptFile = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().scriptFile(
         this.uiSourceCode, debuggerModel);
-    this.scriptFileForDebuggerModel.delete(debuggerModel);
-    if (oldScriptFile) {
-      oldScriptFile.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
-      oldScriptFile.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
-      if (this.muted && !this.uiSourceCode.isDirty() && this.consistentScripts()) {
-        this.setMuted(false);
-      }
-    }
     if (!newScriptFile) {
       return;
     }
     this.scriptFileForDebuggerModel.set(debuggerModel, newScriptFile);
-    newScriptFile.addEventListener(
-        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
-    newScriptFile.addEventListener(
-        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
-    newScriptFile.checkMapping();
 
     void newScriptFile.missingSymbolFiles().then(resources => {
       if (resources) {
@@ -1518,7 +1523,7 @@ export class DebuggerPlugin extends Plugin {
     if (this.sourceMapInfobar) {
       return;
     }
-    if (!Common.Settings.Settings.instance().moduleSetting('js-source-maps-enabled').get()) {
+    if (!Common.Settings.Settings.instance().resolve(SDK.SDKSettings.jsSourceMapsEnabledSettingDescriptor).get()) {
       return;
     }
     if (!this.scriptHasSourceMap()) {
@@ -1643,7 +1648,7 @@ export class DebuggerPlugin extends Plugin {
   private async setBreakpoint(
       lineNumber: number, columnNumber: number|undefined, condition: Breakpoints.BreakpointManager.UserCondition,
       enabled: boolean, isLogpoint: boolean): Promise<Breakpoints.BreakpointManager.Breakpoint|undefined> {
-    Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(true);
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.breakpointsActiveSettingDescriptor).set(true);
     const bp = await this.breakpointManager.setBreakpoint(
         this.uiSourceCode, lineNumber, columnNumber, condition, enabled, isLogpoint,
         Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION);
@@ -1713,12 +1718,6 @@ export class DebuggerPlugin extends Plugin {
     if (this.sourceMapInfobar) {
       this.sourceMapInfobar.dispose();
     }
-    for (const script of this.scriptFileForDebuggerModel.values()) {
-      script.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
-      script.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
-    }
     this.scriptFileForDebuggerModel.clear();
 
     this.popoverHelper?.hidePopover();
@@ -1733,6 +1732,7 @@ export class DebuggerPlugin extends Plugin {
         Workspace.UISourceCode.Events.WorkingCopyChanged, this.workingCopyChanged, this);
     this.uiSourceCode.removeEventListener(
         Workspace.UISourceCode.Events.WorkingCopyCommitted, this.workingCopyCommitted, this);
+    this.loader.removeEventListener(SDK.PageResourceLoader.Events.UPDATE, this.showSourceMapInfobarIfNeeded, this);
 
     Workspace.IgnoreListManager.IgnoreListManager.instance().removeChangeListener(this.ignoreListCallback);
 
@@ -1772,7 +1772,7 @@ export class BreakpointLocationRevealer implements
   async reveal(breakpointLocation: Breakpoints.BreakpointManager.BreakpointLocation, omitFocus?: boolean|undefined):
       Promise<void> {
     const {uiLocation} = breakpointLocation;
-    SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
+    await SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
     const debuggerPlugin = debuggerPluginForUISourceCode.get(uiLocation.uiSourceCode);
     if (debuggerPlugin) {
       debuggerPlugin.editBreakpointLocation(breakpointLocation);
@@ -2023,9 +2023,12 @@ class ValueDecoration extends CodeMirror.WidgetType {
         /* eslint-disable-next-line  @devtools/no-lit-render-outside-of-view */
         render(formatter.renderObjectPreview(value.preview), nameValuePair.createChild('span'));
       } else {
-        const propertyValue = ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.createPropertyValue(
-            value, /* wasThrown */ false, /* showPreview */ false);
-        nameValuePair.appendChild(propertyValue);
+        const propertyValue =
+            ObjectUI.ObjectPropertiesSection.renderPropertyValue(value, /* wasThrown */ false, /* showPreview */ false);
+        const fragment = document.createDocumentFragment();
+        /* eslint-disable-next-line  @devtools/no-lit-render-outside-of-view */
+        render(propertyValue, fragment);
+        nameValuePair.appendChild(fragment);
       }
     }
     return widget;
@@ -2034,8 +2037,19 @@ class ValueDecoration extends CodeMirror.WidgetType {
 
 const valueDecorations = defineStatefulDecoration();
 
-function isVariableIdentifier(tokenType: string): boolean {
-  return tokenType === 'VariableName' || tokenType === 'VariableDefinition';
+function isVariableIdentifierNode(node: {name: string, from: number, to: number}, doc: CodeMirror.Text): boolean {
+  switch (node.name) {
+    case 'VariableName':
+    case 'VariableDefinition':
+    case 'Identifier':
+    case 'Definition':
+    case 'variableName':
+    case 'variableName.definition':
+      return (node.from === 0 || doc.sliceString(node.from - 1, node.from) !== '.') &&
+          doc.sliceString(node.to, node.to + 1) !== '(';
+    default:
+      return false;
+  }
 }
 
 function isVariableDefinition(tokenType: string): boolean {
@@ -2055,9 +2069,9 @@ class SiblingScopeVariables {
   variables: Array<{line: number, from: number, id: string}> = [];
 }
 
-export function getVariableNamesByLine(
-    editorState: CodeMirror.EditorState, fromPos: number, toPos: number,
-    currentPos: number): Array<{line: number, from: number, id: string}> {
+export function getVariableNamesByLine(editorState: CodeMirror.EditorState, fromPos: number, toPos: number,
+                                       currentPos: number,
+                                       useOriginalScopes = false): Array<{line: number, from: number, id: string}> {
   const fromLine = editorState.doc.lineAt(fromPos);
   fromPos = Math.min(fromLine.to, fromPos);
   toPos = editorState.doc.lineAt(toPos).from;
@@ -2068,7 +2082,7 @@ export function getVariableNamesByLine(
    * We will exclude variables that are defined (and used in those scopes (since we are currently outside of their lifetime).
    **/
   function isSiblingScopeNode(node: {name: string, from: number, to: number}): boolean {
-    return isScopeNode(node.name) && (node.to < currentPos || currentPos < node.from);
+    return !useOriginalScopes && isScopeNode(node.name) && (node.to < currentPos || currentPos < node.from);
   }
 
   const names: Array<{line: number, from: number, id: string}> = [];
@@ -2098,7 +2112,7 @@ export function getVariableNamesByLine(
         return;
       }
 
-      const varName = isVariableIdentifier(node.name) && editorState.sliceDoc(node.from, node.to);
+      const varName = isVariableIdentifierNode(node, editorState.doc) && editorState.sliceDoc(node.from, node.to);
       if (!varName) {
         return;
       }
@@ -2131,47 +2145,126 @@ export function getVariableNamesByLine(
   return names;
 }
 
+export interface ScopeMapping {
+  scopeStart: number;
+  scopeEnd: number;
+  variableMap: Map<string, SDK.RemoteObject.RemoteObject|null>;
+}
+
+/**
+ * Caches the {@link ScopeMapping}s for the selected frame of a single {@link DebuggerPlugin}.
+ *
+ * The editor offsets in a {@link ScopeMapping} are derived from raw and UI locations, which describe
+ * the committed script content. Once the user edits the file, these offsets no longer match the
+ * editor content. So no mappings are handed out while the UISourceCode has unsaved edits.
+ *
+ * The cache is keyed on the DebuggableFrameFlavor rather than the SDK CallFrame: Re-translating a
+ * frame (e.g. after a source map is attached) produces a new flavor for the same SDK CallFrame.
+ */
+export class ScopeMappingsCache {
+  readonly #uiSourceCode: Workspace.UISourceCode.UISourceCode;
+  #cached?: {frame: StackTrace.StackTrace.DebuggableFrameFlavor, promise: Promise<ScopeMapping[]>};
+
+  constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode) {
+    this.#uiSourceCode = uiSourceCode;
+  }
+
+  /** @returns the (cached) scope mappings for `frame`, or `null` if the UISourceCode has unsaved edits. */
+  get(frame: StackTrace.StackTrace.DebuggableFrameFlavor,
+      compute: () => Promise<ScopeMapping[]>): Promise<ScopeMapping[]>|null {
+    if (this.#uiSourceCode.isDirty()) {
+      return null;
+    }
+    if (this.#cached?.frame !== frame) {
+      this.#cached = {frame, promise: compute()};
+    }
+    return this.#cached.promise;
+  }
+
+  clear(): void {
+    this.#cached = undefined;
+  }
+}
+
 export async function computeScopeMappings(
     callFrame: SDK.DebuggerModel.CallFrame,
-    rawLocationToEditorOffset: (l: SDK.DebuggerModel.Location|null) => Promise<number|null>):
-    Promise<Array<{scopeStart: number, scopeEnd: number, variableMap: Map<string, SDK.RemoteObject.RemoteObject>}>> {
-  const scopeMappings:
-      Array<{scopeStart: number, scopeEnd: number, variableMap: Map<string, SDK.RemoteObject.RemoteObject>}> = [];
-  for (const scope of callFrame.scopeChain()) {
-    const scopeStart = await rawLocationToEditorOffset(scope.range()?.start ?? null);
-    if (!scopeStart) {
-      break;
+    rawLocationToEditorOffset: (l: SDK.DebuggerModel.Location|null) => Promise<number|null>,
+    uiPositionToEditorOffset?: (line: number, column: number) => number | null,
+    resolvedScopeChain?: SDK.DebuggerModel.ScopeChainEntry[]): Promise<ScopeMapping[]> {
+  const scopeMappings: ScopeMapping[] = [];
+  const scopeChain = resolvedScopeChain ??
+      await SourceMapScopes.ScopeChainResolver.ScopeChainResolver.instance().resolveScopeChain(callFrame);
+  const activeScopes =
+      new Set(scopeChain.filter(s => s instanceof SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry)
+                  .map(s => s.originalScope()));
+  const addInactiveChildren =
+      (children: ReturnType<SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry['originalScope']>['children']):
+          void => {
+            for (const child of children) {
+              if (!activeScopes.has(child)) {
+                const scopeStart = uiPositionToEditorOffset?.(child.start.line, child.start.column) ?? null;
+                const scopeEnd = uiPositionToEditorOffset?.(child.end.line, child.end.column) ?? null;
+                if (scopeStart !== null && scopeEnd !== null && child.variables.length > 0) {
+                  scopeMappings.push({scopeStart, scopeEnd, variableMap: new Map(child.variables.map(v => [v, null]))});
+                }
+                addInactiveChildren(child.children);
+              }
+            }
+          };
+
+  for (const scope of scopeChain) {
+    let scopeStart: number|null = null;
+    let scopeEnd: number|null = null;
+    if (scope instanceof SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry) {
+      const orig = scope.originalScope();
+      scopeStart = uiPositionToEditorOffset?.(orig.start.line, orig.start.column) ?? null;
+      scopeEnd = uiPositionToEditorOffset?.(orig.end.line, orig.end.column) ?? null;
+      addInactiveChildren(orig.children);
+    } else {
+      scopeStart = await rawLocationToEditorOffset(scope.range()?.start ?? null);
+      scopeEnd = await rawLocationToEditorOffset(scope.range()?.end ?? null);
     }
-    const scopeEnd = await rawLocationToEditorOffset(scope.range()?.end ?? null);
-    if (!scopeEnd) {
+    if (scopeStart === null || scopeEnd === null) {
       break;
     }
 
-    const {properties} = await SourceMapScopes.NamesResolver.resolveScopeInObject(scope).getAllProperties(false, false);
+    const {properties} = await scope.object().getAllProperties(false, true);
     if (!properties || properties.length > MAX_PROPERTIES_IN_SCOPE_FOR_VALUE_DECORATIONS) {
       break;
     }
-    const variableMap = new Map<string, SDK.RemoteObject.RemoteObject>(
-        properties.map(p => [p.name, p.value] as [string, SDK.RemoteObject.RemoteObject]));
+    const variableMap =
+        new Map<string, SDK.RemoteObject.RemoteObject|null>(properties.map(p => [p.name, p.value ?? null]));
 
     scopeMappings.push({scopeStart, scopeEnd, variableMap});
 
     // Let us only get mappings for block scopes until we see a surrounding function (local) scope.
-    if (scope.type() === Protocol.Debugger.ScopeType.Local) {
+    if (scope.type() === Protocol.Debugger.ScopeType.Local &&
+        !(scope instanceof SDK.SourceMapScopeChainEntry.SourceMapScopeChainEntry)) {
       break;
     }
   }
   return scopeMappings;
 }
 
-export function getVariableValuesByLine(
-    scopeMappings:
-        Array<{scopeStart: number, scopeEnd: number, variableMap: Map<string, SDK.RemoteObject.RemoteObject>}>,
-    variableNames: Array<{line: number, from: number, id: string}>):
+export function findVariableInScopeMappings(name: string, pos: number, scopeMappings: ScopeMapping[]):
+    {found: boolean, value: SDK.RemoteObject.RemoteObject|null} {
+  for (const scope of scopeMappings) {
+    if (pos < scope.scopeStart || pos >= scope.scopeEnd) {
+      continue;
+    }
+    if (scope.variableMap.has(name)) {
+      return {found: true, value: scope.variableMap.get(name) ?? null};
+    }
+  }
+  return {found: false, value: null};
+}
+
+export function getVariableValuesByLine(scopeMappings: ScopeMapping[],
+                                        variableNames: Array<{line: number, from: number, id: string}>):
     Map<number, Map<string, SDK.RemoteObject.RemoteObject>>|null {
   const namesPerLine = new Map<number, Map<string, SDK.RemoteObject.RemoteObject>>();
   for (const {line, from, id} of variableNames) {
-    const varValue = findVariableInChain(id, from, scopeMappings);
+    const varValue = findVariableInScopeMappings(id, from, scopeMappings).value;
     if (!varValue) {
       continue;
     }
@@ -2183,24 +2276,6 @@ export function getVariableValuesByLine(
     names.set(id, varValue);
   }
   return namesPerLine;
-
-  function findVariableInChain(
-      name: string,
-      pos: number,
-      scopeMappings:
-          Array<{scopeStart: number, scopeEnd: number, variableMap: Map<string, SDK.RemoteObject.RemoteObject>}>,
-      ): SDK.RemoteObject.RemoteObject|null {
-    for (const scope of scopeMappings) {
-      if (pos < scope.scopeStart || pos >= scope.scopeEnd) {
-        continue;
-      }
-      const value = scope.variableMap.get(name);
-      if (value) {
-        return value;
-      }
-    }
-    return null;
-  }
 }
 
 // Pop-over
@@ -2275,8 +2350,9 @@ export function computePopoverHighlightRange(state: CodeMirror.EditorState, mime
 
     default: {
       // In other languages, just assume a token consisting entirely
-      // of identifier-like characters is an identifier.
-      if (node.to - node.from > 50 || /[^\w_\-$]/.test(state.sliceDoc(node.from, node.to))) {
+      // of identifier-like characters is an identifier, unless it is a member access.
+      if (node.to - node.from > 50 || /[^\w_\-$]/.test(state.sliceDoc(node.from, node.to)) ||
+          state.sliceDoc(node.from - 1, node.from) === '.' || state.sliceDoc(node.from - 2, node.from) === '->') {
         return null;
       }
       return {from: node.from, to: node.to, containsSideEffects: false};
@@ -2284,15 +2360,26 @@ export function computePopoverHighlightRange(state: CodeMirror.EditorState, mime
   }
 }
 
-function containsSideEffects(doc: CodeMirror.Text, root: CodeMirror.SyntaxNode): boolean {
+export function containsSideEffects(doc: CodeMirror.Text, root: CodeMirror.SyntaxNode): boolean {
   let containsSideEffects = false;
   root.toTree().iterate({
     enter(node: CodeMirror.SyntaxNode): boolean {
       switch (node.name) {
         case 'AssignmentExpression':
-        case 'CallExpression': {
+        case 'CallExpression':
+        case 'NewExpression':
+        case 'TaggedTemplateExpression':
+        case 'DynamicImport': {
           containsSideEffects = true;
           return false;
+        }
+        case 'UnaryExpression': {
+          const text = doc.sliceString(root.from + node.from, root.from + node.to).trim();
+          if (text.startsWith('delete')) {
+            containsSideEffects = true;
+            return false;
+          }
+          break;
         }
         case 'ArithOp': {
           const op = doc.sliceString(root.from + node.from, root.from + node.to);
@@ -2318,6 +2405,12 @@ const evalExpression = defineStatefulDecoration();
 // Styling for plugin-local elements
 
 const theme = CodeMirror.EditorView.baseTheme({
+  '&.source-frame-debugger-script': {
+    backgroundColor: 'rgb(255 255 194 / 50%)',
+  },
+  '&dark.source-frame-debugger-script': {
+    backgroundColor: 'rgb(61 61 0 / 50%)',
+  },
   '.cm-line::selection': {
     backgroundColor: 'transparent',
     color: 'currentColor',

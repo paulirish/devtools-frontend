@@ -29,14 +29,13 @@
 
 import * as Platform from '../../core/platform/platform.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import {
   COND_BREAKPOINT_SOURCE_URL,
   type DebuggerModel,
-  Events,
   Location,
   LOGPOINT_SOURCE_URL,
 } from './DebuggerModel.js';
@@ -44,18 +43,19 @@ import type {FrameAssociated} from './FrameAssociated.js';
 import type {PageResourceLoadInitiator} from './PageResourceLoader.js';
 import {ResourceTreeModel} from './ResourceTreeModel.js';
 import type {ExecutionContext} from './RuntimeModel.js';
+import {SecurityOrigin} from './SecurityOrigin.js';
 import type {DebugId, SourceMap} from './SourceMap.js';
 import type {Target} from './Target.js';
 
 const UIStrings = {
   /**
-   * @description Error message for when a script can't be loaded which had been previously
+   * @description Error message for when a script can't be loaded because it was removed or deleted.
    */
-  scriptRemovedOrDeleted: 'Script removed or deleted.',
+  scriptRemovedOrDeleted: 'Script removed or deleted',
   /**
-   * @description Error message when failing to load a script source text
+   * @description Error message when failing to load a script source text.
    */
-  unableToFetchScriptSource: 'Unable to fetch script source.',
+  unableToFetchScriptSource: 'Unable to fetch script source',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/Script.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -80,7 +80,6 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   executionContextId: number;
   hash: string;
   readonly #isContentScript: boolean;
-  readonly #isLiveEdit: boolean;
   sourceMapURL?: string;
   debugSymbols: Protocol.Debugger.DebugSymbols|null;
   hasSourceURL: boolean;
@@ -90,15 +89,16 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   readonly #language: string|null;
   #contentPromise: Promise<TextUtils.ContentData.ContentDataOrError>|null;
   readonly #embedderName: Platform.DevToolsPath.UrlString|null;
+  readonly #securityOrigin: SecurityOrigin;
   readonly isModule: boolean|null;
   readonly buildId: string|null;
-  constructor(
-      debuggerModel: DebuggerModel, scriptId: Protocol.Runtime.ScriptId, sourceURL: Platform.DevToolsPath.UrlString,
-      startLine: number, startColumn: number, endLine: number, endColumn: number, executionContextId: number,
-      hash: string, isContentScript: boolean, isLiveEdit: boolean, sourceMapURL: string|undefined,
-      hasSourceURL: boolean, length: number, isModule: boolean|null, originStackTrace: Protocol.Runtime.StackTrace|null,
-      codeOffset: number|null, scriptLanguage: string|null, debugSymbols: Protocol.Debugger.DebugSymbols|null,
-      embedderName: Platform.DevToolsPath.UrlString|null, buildId: string|null) {
+  constructor(debuggerModel: DebuggerModel, scriptId: Protocol.Runtime.ScriptId,
+              sourceURL: Platform.DevToolsPath.UrlString, startLine: number, startColumn: number, endLine: number,
+              endColumn: number, executionContextId: number, hash: string, isContentScript: boolean,
+              sourceMapURL: string|undefined, hasSourceURL: boolean, length: number, isModule: boolean|null,
+              originStackTrace: Protocol.Runtime.StackTrace|null, codeOffset: number|null, scriptLanguage: string|null,
+              debugSymbols: Protocol.Debugger.DebugSymbols|null, embedderName: Platform.DevToolsPath.UrlString|null,
+              buildId: string|null) {
     this.debuggerModel = debuggerModel;
     this.scriptId = scriptId;
     this.sourceURL = sourceURL;
@@ -112,7 +112,6 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     this.executionContextId = executionContextId;
     this.hash = hash;
     this.#isContentScript = isContentScript;
-    this.#isLiveEdit = isLiveEdit;
     this.sourceMapURL = sourceMapURL;
     this.debugSymbols = debugSymbols;
     this.hasSourceURL = hasSourceURL;
@@ -122,10 +121,29 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     this.#language = scriptLanguage;
     this.#contentPromise = null;
     this.#embedderName = embedderName;
+    this.#securityOrigin = SecurityOrigin.create(this.#embedderName ?? '');
   }
 
   embedderName(): Platform.DevToolsPath.UrlString|null {
     return this.#embedderName;
+  }
+
+  /**
+   * Returns the security origin of the script derived exclusively from its
+   * embedder/network URL (`#embedderName`), or a unique opaque origin if the
+   * script has no valid network provenance (e.g. `eval()` or buffer-based Wasm).
+   *
+   * Security note: Do NOT fall back to `this.sourceURL` or
+   * `this.target().inspectedSecurityOrigin()`:
+   * - `sourceURL` is overwritten by `//# sourceURL=` comments, allowing a script
+   *   to spoof an arbitrary origin.
+   * - Third-party scripts (`<script src="https://attacker.example/...">`) run in
+   *   the same target/frame as the main page; falling back to the target's
+   *   origin would allow them to launder their origin by dynamically evaluating
+   *   code via `eval()` or `WebAssembly.instantiate(buffer)`.
+   */
+  securityOrigin(): SecurityOrigin {
+    return this.#securityOrigin;
   }
 
   target(): Target {
@@ -173,10 +191,6 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
 
   executionContext(): ExecutionContext|null {
     return this.debuggerModel.runtimeModel().executionContext(this.executionContextId);
-  }
-
-  isLiveEdit(): boolean {
-    return this.#isLiveEdit;
   }
 
   contentURL(): Platform.DevToolsPath.UrlString {
@@ -261,8 +275,8 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   requestContentData(): Promise<TextUtils.ContentData.ContentDataOrError> {
     if (!this.#contentPromise) {
       const fileSizeToCache = 65535;  // We won't bother cacheing files under 64K
-      if (this.hash && !this.#isLiveEdit && this.contentLength > fileSizeToCache) {
-        // For large files that aren't live edits and have a hash, we keep a content-addressed cache
+      if (this.hash && this.contentLength > fileSizeToCache) {
+        // For large files that have a hash, we keep a content-addressed cache
         // so we don't need to load multiple copies or disassemble wasm modules multiple times.
         if (!scriptCacheInstance) {
           // Initialize script cache singleton. Add a finalizer for removing keys from the map.
@@ -329,43 +343,6 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     const matches = await this.debuggerModel.target().debuggerAgent().invoke_searchInContent(
         {scriptId: this.scriptId, query, caseSensitive, isRegex});
     return TextUtils.TextUtils.performSearchInSearchMatches(matches.result || [], query, caseSensitive, isRegex);
-  }
-
-  private appendSourceURLCommentIfNeeded(source: string): string {
-    if (!this.hasSourceURL) {
-      return source;
-    }
-    return source + '\n //# sourceURL=' + this.sourceURL;
-  }
-
-  async editSource(newSource: string): Promise<{
-    changed: boolean,
-    status: Protocol.Debugger.SetScriptSourceResponseStatus,
-    exceptionDetails?: Protocol.Runtime.ExceptionDetails,
-  }> {
-    newSource = Script.trimSourceURLComment(newSource);
-    // We append correct #sourceURL to script for consistency only. It's not actually needed for things to work correctly.
-    newSource = this.appendSourceURLCommentIfNeeded(newSource);
-
-    const oldSource = TextUtils.ContentData.ContentData.textOr(await this.requestContentData(), null);
-    if (oldSource === newSource) {
-      return {changed: false, status: Protocol.Debugger.SetScriptSourceResponseStatus.Ok};
-    }
-    const response = await this.debuggerModel.target().debuggerAgent().invoke_setScriptSource(
-        {scriptId: this.scriptId, scriptSource: newSource, allowTopFrameEditing: true});
-    if (response.getError()) {
-      // Something went seriously wrong, like the V8 inspector no longer knowing about this script without
-      // shutting down the Debugger agent etc.
-      throw new Error(`Script#editSource failed for script with id ${this.scriptId}: ${response.getError()}`);
-    }
-
-    if (!response.getError() && response.status === Protocol.Debugger.SetScriptSourceResponseStatus.Ok) {
-      this.#contentPromise =
-          Promise.resolve(new TextUtils.ContentData.ContentData(newSource, /* isBase64 */ false, 'text/javascript'));
-    }
-
-    this.debuggerModel.dispatchEventToListeners(Events.ScriptSourceWasEdited, {script: this, status: response.status});
-    return {changed: true, status: response.status, exceptionDetails: response.exceptionDetails};
   }
 
   rawLocation(lineNumber: number, columnNumber: number): Location|null {
@@ -501,7 +478,7 @@ function frameIdForScript(script: Script): Protocol.Page.FrameId|null {
   return resourceTreeModel.mainFrame.id;
 }
 
-export const sourceURLRegex = /^[\x20\t]*\/\/[@#] sourceURL=\s*(\S*?)\s*$/;
+export const sourceURLRegex: RegExp = /^[\x20\t]*\/\/[@#] sourceURL=\s*(\S*?)\s*$/;
 
 export async function disassembleWasm(content: string): Promise<TextUtils.WasmDisassembly.WasmDisassembly> {
   const worker = Platform.HostRuntime.HOST_RUNTIME.createWorker(

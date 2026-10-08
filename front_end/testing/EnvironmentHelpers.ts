@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../core/common/common.js';
 import * as Host from '../core/host/host.js';
@@ -10,11 +11,11 @@ import * as Platform from '../core/platform/platform.js';
 import * as Root from '../core/root/root.js';
 import * as SDK from '../core/sdk/sdk.js';
 import * as Bindings from '../models/bindings/bindings.js';
+import * as EmulationModel from '../models/emulation/emulation.js';
 import * as Formatter from '../models/formatter/formatter.js';
 import * as IssuesManager from '../models/issues_manager/issues_manager.js';
 import * as Logs from '../models/logs/logs.js';
 import * as Persistence from '../models/persistence/persistence.js';
-import * as ProjectSettings from '../models/project_settings/project_settings.js';
 import * as Workspace from '../models/workspace/workspace.js';
 import type * as UIModule from '../ui/legacy/legacy.js';
 
@@ -28,8 +29,7 @@ import {cleanupSettings, setupSettings} from './SettingsHelpers.js';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 let UI: typeof UIModule;
 
-export {createTarget} from './TargetHelpers.js';
-export {stubNoopSettings} from './SettingsHelpers.js';
+export {createTarget, waitForTarget} from './TargetHelpers.js';
 
 export function registerActions(actions: UIModule.ActionRegistration.ActionRegistration[]): void {
   for (const action of actions) {
@@ -53,7 +53,9 @@ export function registerNoopActions(actionIds: string[]): void {
   UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
 }
 
-export async function initializeGlobalVars({reset = true} = {}) {
+export async function initializeGlobalVars({reset = true}: {
+    reset?: boolean | undefined,
+} = {}): Promise<void> {
   await initializeGlobalLocaleVars();
 
   setupSettings(reset);
@@ -68,7 +70,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
   UI.UIUtils.initializeUIUtils(document);
 }
 
-export async function deinitializeGlobalVars() {
+export async function deinitializeGlobalVars(): Promise<void> {
   // Remove the global SDK.
   // eslint-disable-next-line @typescript-eslint/naming-convention
   const globalObject = (globalThis as unknown as {SDK?: unknown, ls?: unknown});
@@ -76,26 +78,35 @@ export async function deinitializeGlobalVars() {
   delete globalObject.ls;
 
   for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
-    target.dispose('deinitializeGlobalVars');
+    if (typeof target.dispose === 'function') {
+      target.dispose('deinitializeGlobalVars');
+    }
   }
 
   // Remove instances.
   deinitializeGlobalLocaleVars();
+  Host.GdpClient.GdpClient.removeInstance();
+  Host.AidaClient.HostConfigTracker.removeInstance();
   Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
   SDK.CPUThrottlingManager.CPUThrottlingManager.removeInstance();
   SDK.FrameManager.FrameManager.removeInstance();
+  SDK.EventBreakpointsModel.EventBreakpointsManager.removeInstance();
+  SDK.PageResourceLoader.PageResourceLoader.removeInstance();
   Common.Settings.Settings.removeInstance();
   Common.Revealer.RevealerRegistry.removeInstance();
   Common.Console.Console.removeInstance();
   Workspace.Workspace.WorkspaceImpl.removeInstance();
+  Workspace.FileManager.FileManager.removeInstance();
   Workspace.IgnoreListManager.IgnoreListManager.removeInstance();
   Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();
   Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.removeInstance();
+  Bindings.NetworkProject.NetworkProjectManager.removeInstance();
   IssuesManager.IssuesManager.IssuesManager.removeInstance();
   Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.removeInstance();
-  ProjectSettings.ProjectSettingsModel.ProjectSettingsModel.removeInstance();
+  Persistence.NetworkPersistenceManager.NetworkPersistenceManager.removeInstance();
   Formatter.FormatterWorkerPool.FormatterWorkerPool.removeInstance();
+  EmulationModel.DeviceModeModel.DeviceModeModel.removeInstance();
 
   cleanupSettings();
 
@@ -108,58 +119,62 @@ export async function deinitializeGlobalVars() {
     UI.InspectorView.InspectorView.removeInstance();
     UI.ActionRegistry.ActionRegistry.reset();
   }
+  // We must dynamically import the highlighting module because evaluating
+  // `HighlightElement.ts` requires `HTMLElement` to be available. When running
+  // unit tests in the Node.js environment, `HTMLElement` is missing, so a
+  // static import at the top of this file would break Node unit tests.
+  if (typeof HTMLElement !== 'undefined') {
+    const Highlighting = await import('../ui/components/highlighting/highlighting.js');
+    Highlighting.HighlightManager.HighlightManager.removeInstance();
+  }
 
   cleanupRuntime();
 }
 
 export function describeWithEnvironment(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
   reset: true,
-}) {
+}): Mocha.Suite {
   return describe(title, function() {
-    before(async () => await initializeGlobalVars(opts));
+    beforeEach(async () => await initializeGlobalVars(opts));
     fn.call(this);
-    after(async () => await deinitializeGlobalVars());
+    afterEach(async () => await deinitializeGlobalVars());
   });
 }
 
-describeWithEnvironment.only = function(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
-  reset: true,
-}) {
-  // eslint-disable-next-line mocha/no-exclusive-tests
-  return describe.only(title, function() {
-    before(async () => await initializeGlobalVars(opts));
-    fn.call(this);
-    after(async () => await deinitializeGlobalVars());
-  });
-};
-describeWithEnvironment.skip = function(title: string, fn: (this: Mocha.Suite) => void, _opts: {reset: boolean} = {
-  reset: true,
-}) {
-  // eslint-disable-next-line @devtools/check-test-definitions
-  return describe.skip(title, function() {
-    fn.call(this);
-  });
-};
+export namespace describeWithEnvironment {
+  export function only(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
+    reset: true,
+  }): Mocha.Suite {
+    // eslint-disable-next-line mocha/no-exclusive-tests
+    return describe.only(title, function() {
+      beforeEach(async () => await initializeGlobalVars(opts));
+      fn.call(this);
+      afterEach(async () => await deinitializeGlobalVars());
+    });
+  }
+}
 
 export function createFakeSetting<T>(name: string, defaultValue: T): Common.Settings.Setting<T> {
   const storage = new Common.Settings.SettingsStorage({}, undefined, 'test');
-  return new Common.Settings.Setting(name, defaultValue, new Common.ObjectWrapper.ObjectWrapper(), storage);
+  return new Common.Settings.Setting(name, defaultValue, new Common.ObjectWrapper.ObjectWrapper(), storage,
+                                     Common.Console.Console.instance());
 }
 
 export function createFakeRegExpSetting(name: string, defaultValue: string): Common.Settings.RegExpSetting {
   const storage = new Common.Settings.SettingsStorage({}, undefined, 'test');
-  return new Common.Settings.RegExpSetting(name, defaultValue, new Common.ObjectWrapper.ObjectWrapper(), storage);
+  return new Common.Settings.RegExpSetting(name, defaultValue, new Common.ObjectWrapper.ObjectWrapper(), storage,
+                                           Common.Console.Console.instance());
 }
 
-export function setupActionRegistry() {
-  before(function() {
+export function setupActionRegistry(): void {
+  beforeEach(function() {
     const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
     UI.ShortcutRegistry.ShortcutRegistry.instance({
       forceNew: true,
       actionRegistry,
     });
   });
-  after(function() {
+  afterEach(function() {
     if (UI) {
       UI.ShortcutRegistry.ShortcutRegistry.removeInstance();
       UI.ActionRegistry.ActionRegistry.removeInstance();
@@ -168,7 +183,7 @@ export function setupActionRegistry() {
 }
 
 /** This needs to be invoked within a describe block, rather than within an it() block. **/
-export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[], error?: string[]}) {
+export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[], error?: string[]}): void {
   const {error, warn, log} = console;
   before(() => {
     if (expectedLogs.log) {
@@ -211,7 +226,9 @@ export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[]
 let userAgentStub: sinon.SinonStub|undefined;
 
 export function setUserAgentForTesting(): void {
-  userAgentStub = sinon.stub(Platform.HostRuntime.HOST_RUNTIME, 'getUserAgent').returns('Chrome/unit_test');
+  if (Platform.HostRuntime.HOST_RUNTIME.getUserAgent() !== 'Chrome/unit_test') {
+    userAgentStub = sinon.stub(Platform.HostRuntime.HOST_RUNTIME, 'getUserAgent').returns('Chrome/unit_test');
+  }
 }
 
 export function restoreUserAgentForTesting(): void {
@@ -219,7 +236,7 @@ export function restoreUserAgentForTesting(): void {
   userAgentStub = undefined;
 }
 
-export function resetHostConfig() {
+export function resetHostConfig(): void {
   for (const key of Object.keys(Root.Runtime.hostConfig)) {
     // @ts-expect-error TypeScript does not deduce the correct type
     delete Root.Runtime.hostConfig[key];
@@ -231,17 +248,18 @@ export function resetHostConfig() {
  * `Root.Runtime.hostConfig` is automatically cleaned-up between unit
  * tests.
  */
-export function updateHostConfig(config: Root.Runtime.HostConfig) {
+export function updateHostConfig(config: Root.Runtime.HostConfig): void {
   Object.assign(Root.Runtime.hostConfig, config);
 }
 
-export async function waitFor(selector: string, root?: Element|ShadowRoot): Promise<Element|null> {
+export async function waitFor<T extends Element = Element>(selector: string,
+                                                           root?: Element|ShadowRoot): Promise<T|null> {
   let element = null;
   let polls = 0;
   // Poll for element until found
   while (!element) {
     assert.isBelow(polls, 200, `Element with selector ${selector} was not found.`);
-    element = root ? root.querySelector(selector) : document.querySelector(selector);
+    element = root ? root.querySelector<T>(selector) : document.querySelector<T>(selector);
     await new Promise(resolve => setTimeout(resolve, 10));
     polls++;
   }

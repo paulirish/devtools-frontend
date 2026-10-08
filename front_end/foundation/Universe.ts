@@ -3,34 +3,77 @@
 // found in the LICENSE file.
 
 import * as Common from '../core/common/common.js';
+import * as Host from '../core/host/host.js';
 import * as Root from '../core/root/root.js';
 import * as SDK from '../core/sdk/sdk.js';
+import * as AiAssistance from '../models/ai_assistance/ai_assistance.js';
+import * as AutofillManager from '../models/autofill_manager/autofill_manager.js';
+import * as Badges from '../models/badges/badges.js';
 import * as Bindings from '../models/bindings/bindings.js';
+import * as Breakpoints from '../models/breakpoints/breakpoints.js';
+import * as ChangeTracker from '../models/change_tracker/change_tracker.js';
+import * as CommentManager from '../models/comment_manager/comment_manager.js';
+import * as CrUXManager from '../models/crux-manager/crux-manager.js';
+import * as Emulation from '../models/emulation/emulation.js';
+import * as IssuesManager from '../models/issues_manager/issues_manager.js';
+import * as JavaScriptMetadata from '../models/javascript_metadata/javascript_metadata.js';
+import * as LiveMetrics from '../models/live-metrics/live-metrics.js';
+import * as Logs from '../models/logs/logs.js';
+import * as Persistence from '../models/persistence/persistence.js';
+import * as ProjectSettings from '../models/project_settings/project_settings.js';
+import * as SourceMapScopes from '../models/source_map_scopes/source_map_scopes.js';
 import * as Workspace from '../models/workspace/workspace.js';
+import * as WorkspaceDiff from '../models/workspace_diff/workspace_diff.js';
 
 export interface CreationOptions {
-  settingsCreationOptions: Common.Settings.SettingsCreationOptions;
+  settingsCreationOptions: Omit<Common.Settings.SettingsCreationOptions, 'console'>;
   overrideAutoStartModels?: Set<SDK.SDKModel.SDKModelConstructor>;
+  hostConfig: Root.Runtime.HostConfig;
+  inspectorFrontendHost: Host.InspectorFrontendHostAPI.InspectorFrontendHostAPI;
+  supportsEmulation: boolean;
+  initAutomaticFilesystem?: boolean;
 }
 
 export class Universe {
+  // TODO(crbug.com/493763857): Once a singleton is no longer a singleton (i.e. it has no 'instance')
+  //                            static method, we can move it out of the `DevToolsContext` and store it
+  //                            directly on the `Universe`.
   readonly context: Root.DevToolsContext.DevToolsContext;
+  readonly autofillManager: AutofillManager.AutofillManager.AutofillManager;
+  readonly cd4aBridge: CommentManager.CD4ABridge.CD4ABridge|null = null;
+  readonly supportsEmulation: boolean;
+  readonly initAutomaticFilesystem: boolean;
+  readonly fileSystemWorkspaceBinding: Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding;
 
   constructor(options: CreationOptions) {
     const context = new Root.DevToolsContext.WritableDevToolsContext();
     this.context = context;
+
+    const console = new Common.Console.Console();
+    context.set(Common.Console.Console, console);
+
+    const hostConfigTracker = new Host.AidaClient.HostConfigTracker();
+    context.set(Host.AidaClient.HostConfigTracker, hostConfigTracker);
+
+    const gdpClient = new Host.GdpClient.GdpClient();
+    context.set(Host.GdpClient.GdpClient, gdpClient);
 
     // TODO(crbug.com/458180550): Store instance only on this.context instead.
     //                            For now the global is required as not everything in foundation cleanly
     //                            reads from the scoped `Settings` instance.
     const settings = Common.Settings.Settings.instance({
       forceNew: true,
+      console,
       ...options.settingsCreationOptions,
     });
     context.set(Common.Settings.Settings, settings);
 
-    const console = new Common.Console.Console();
-    context.set(Common.Console.Console, console);
+    const emulatedDevicesList = new Emulation.EmulatedDevices.EmulatedDevicesList(settings);
+    context.set(Emulation.EmulatedDevices.EmulatedDevicesList, emulatedDevicesList);
+
+    const isolatedFileSystemManager =
+        new Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager(settings, console);
+    context.set(Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager, isolatedFileSystemManager);
 
     const targetManager = new SDK.TargetManager.TargetManager(context, options.overrideAutoStartModels);
     context.set(SDK.TargetManager.TargetManager, targetManager);
@@ -41,12 +84,71 @@ export class Universe {
     const multitargetNetworkManager = new SDK.NetworkManager.MultitargetNetworkManager(targetManager);
     context.set(SDK.NetworkManager.MultitargetNetworkManager, multitargetNetworkManager);
 
+    this.supportsEmulation = options.supportsEmulation;
+    let deviceModeModel = null;
+    if (options.supportsEmulation) {
+      deviceModeModel =
+          new Emulation.DeviceModeModel.DeviceModeModel(targetManager, settings, multitargetNetworkManager);
+      context.set(Emulation.DeviceModeModel.DeviceModeModel, deviceModeModel);
+    }
+
     const pageResourceLoader =
         new SDK.PageResourceLoader.PageResourceLoader(targetManager, settings, multitargetNetworkManager, null);
     context.set(SDK.PageResourceLoader.PageResourceLoader, pageResourceLoader);
 
+    this.initAutomaticFilesystem = options.initAutomaticFilesystem ?? false;
+    let automaticFileSystemManager = null;
+    let projectSettingsModel = null;
+    if (this.initAutomaticFilesystem) {
+      projectSettingsModel = new ProjectSettings.ProjectSettingsModel.ProjectSettingsModel(
+          pageResourceLoader,
+          targetManager,
+      );
+      context.set(ProjectSettings.ProjectSettingsModel.ProjectSettingsModel, projectSettingsModel);
+
+      automaticFileSystemManager = new Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager(
+          options.inspectorFrontendHost, projectSettingsModel);
+      context.set(Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager, automaticFileSystemManager);
+    }
+
+    const cpuThrottlingManager = new SDK.CPUThrottlingManager.CPUThrottlingManager(settings, targetManager);
+    context.set(SDK.CPUThrottlingManager.CPUThrottlingManager, cpuThrottlingManager);
+
+    const domDebuggerManager = new SDK.DOMDebuggerModel.DOMDebuggerManager(targetManager);
+    context.set(SDK.DOMDebuggerModel.DOMDebuggerManager, domDebuggerManager);
+
+    const cruxManager = new CrUXManager.CrUXManager(targetManager, settings);
+    context.set(CrUXManager.CrUXManager, cruxManager);
+
+    const isolateManager = new SDK.IsolateManager.IsolateManager(targetManager);
+    context.set(SDK.IsolateManager.IsolateManager, isolateManager);
+    const eventBreakpointsManager = new SDK.EventBreakpointsModel.EventBreakpointsManager(targetManager);
+    context.set(SDK.EventBreakpointsModel.EventBreakpointsManager, eventBreakpointsManager);
+
+    const domModelUndoStack = new SDK.DOMModel.DOMModelUndoStack();
+    context.set(SDK.DOMModel.DOMModelUndoStack, domModelUndoStack);
     const workspace = new Workspace.Workspace.WorkspaceImpl();
     context.set(Workspace.Workspace.WorkspaceImpl, workspace);
+
+    const fileManager = new Workspace.FileManager.FileManager();
+    context.set(Workspace.FileManager.FileManager, fileManager);
+
+    if (automaticFileSystemManager) {
+      const automaticFileSystemWorkspaceBinding =
+          new Persistence.AutomaticFileSystemWorkspaceBinding.AutomaticFileSystemWorkspaceBinding(
+              automaticFileSystemManager,
+              isolatedFileSystemManager,
+              workspace,
+          );
+      context.set(
+          Persistence.AutomaticFileSystemWorkspaceBinding.AutomaticFileSystemWorkspaceBinding,
+          automaticFileSystemWorkspaceBinding,
+      );
+    }
+
+    this.fileSystemWorkspaceBinding =
+        new Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding(isolatedFileSystemManager, workspace);
+    context.set(Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding, this.fileSystemWorkspaceBinding);
 
     const ignoreListManager = new Workspace.IgnoreListManager.IgnoreListManager(settings, targetManager);
     context.set(Workspace.IgnoreListManager.IgnoreListManager, ignoreListManager);
@@ -58,5 +160,259 @@ export class Universe {
     const debuggerWorkspaceBinding = new Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding(
         resourceMapping, targetManager, ignoreListManager, workspace);
     context.set(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, debuggerWorkspaceBinding);
+
+    const scopeChainResolver =
+        new SourceMapScopes.ScopeChainResolver.ScopeChainResolver(targetManager, debuggerWorkspaceBinding);
+    context.set(SourceMapScopes.ScopeChainResolver.ScopeChainResolver, scopeChainResolver);
+
+    const presentationConsoleMessageManager =
+        new Bindings.PresentationConsoleMessageHelper.PresentationConsoleMessageManager(
+            targetManager, workspace, debuggerWorkspaceBinding, cssWorkspaceBinding);
+    context.set(
+        Bindings.PresentationConsoleMessageHelper.PresentationConsoleMessageManager,
+        presentationConsoleMessageManager,
+    );
+
+    const networkProjectManager = new Bindings.NetworkProject.NetworkProjectManager();
+    context.set(Bindings.NetworkProject.NetworkProjectManager, networkProjectManager);
+
+    const breakpointManager = new Breakpoints.BreakpointManager.BreakpointManager(targetManager, workspace,
+                                                                                  debuggerWorkspaceBinding, settings);
+    context.set(Breakpoints.BreakpointManager.BreakpointManager, breakpointManager);
+
+    const persistence = new Persistence.Persistence.PersistenceImpl(workspace, breakpointManager);
+    context.set(Persistence.Persistence.PersistenceImpl, persistence);
+
+    const networkPersistenceManager = new Persistence.NetworkPersistenceManager.NetworkPersistenceManager(
+        workspace,
+        persistence,
+        breakpointManager,
+        targetManager,
+        settings,
+        isolatedFileSystemManager,
+        multitargetNetworkManager,
+    );
+    context.set(Persistence.NetworkPersistenceManager.NetworkPersistenceManager, networkPersistenceManager);
+
+    const workspaceDiff = new WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl(
+        workspace,
+        persistence,
+        networkPersistenceManager,
+        settings,
+    );
+    context.set(WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl, workspaceDiff);
+
+    const networkLog = new Logs.NetworkLog.NetworkLog(targetManager, settings);
+    context.set(Logs.NetworkLog.NetworkLog, networkLog);
+
+    const logManager = new Logs.LogManager.LogManager(targetManager, networkLog);
+    context.set(Logs.LogManager.LogManager, logManager);
+
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager(
+        IssuesManager.Issue.getShowThirdPartyIssuesSetting(settings),
+        IssuesManager.IssuesManager.getHideIssueByCodeSetting(settings),
+        frameManager,
+        targetManager,
+        workspace,
+        debuggerWorkspaceBinding,
+        cssWorkspaceBinding,
+    );
+    context.set(IssuesManager.IssuesManager.IssuesManager, issuesManager);
+
+    const domIssuesManager = new IssuesManager.DOMIssuesManager.DOMIssuesManager(issuesManager, targetManager);
+    context.set(IssuesManager.DOMIssuesManager.DOMIssuesManager, domIssuesManager);
+    const javaScriptMetadata = new JavaScriptMetadata.JavaScriptMetadata.JavaScriptMetadataImpl();
+    context.set(JavaScriptMetadata.JavaScriptMetadata.JavaScriptMetadataImpl, javaScriptMetadata);
+
+    const liveMetrics = new LiveMetrics.LiveMetrics(targetManager, settings, deviceModeModel);
+    context.set(LiveMetrics.LiveMetrics, liveMetrics);
+
+    const userBadges = new Badges.UserBadges(settings, gdpClient, options.inspectorFrontendHost);
+    context.set(Badges.UserBadges, userBadges);
+
+    const aiHistoryStorage = new AiAssistance.AiHistoryStorage.AiHistoryStorage(settings);
+    context.set(AiAssistance.AiHistoryStorage.AiHistoryStorage, aiHistoryStorage);
+
+    const builtInAi = new AiAssistance.BuiltInAi.BuiltInAi();
+    context.set(AiAssistance.BuiltInAi.BuiltInAi, builtInAi);
+
+    const commentManager = new CommentManager.CommentManager.CommentManager();
+    context.set(CommentManager.CommentManager.CommentManager, commentManager);
+
+    if (options.hostConfig.devToolsComments?.enabled ?? Root.Runtime.hostConfig.devToolsComments?.enabled) {
+      this.cd4aBridge = new CommentManager.CD4ABridge.CD4ABridge(commentManager, targetManager, networkLog);
+      context.set(CommentManager.CD4ABridge.CD4ABridge, this.cd4aBridge);
+    }
+
+    const changeTracker = new ChangeTracker.ChangeTracker.ChangeTracker(commentManager);
+    context.set(ChangeTracker.ChangeTracker.ChangeTracker, changeTracker);
+
+    this.autofillManager = new AutofillManager.AutofillManager.AutofillManager(targetManager, frameManager);
+    context.set(AutofillManager.AutofillManager.AutofillManager, this.autofillManager);
+  }
+
+  // TODO(crbug.com/542394587): Should be `Symbol.dispose`
+  dispose(): void {
+    // TODO(crbug.com/542394587): Track these in a DisposableStack.
+    this.cd4aBridge?.dispose();
+    this.context.get(Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager).dispose();
+    if (this.initAutomaticFilesystem) {
+      this.context.get(Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager).dispose();
+    }
+    this.context.get(Workspace.FileManager.FileManager).dispose();
+    this.context.get(SDK.TargetManager.TargetManager).dispose();
+  }
+
+  get automaticFileSystemManager(): Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager {
+    return this.context.get(Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager);
+  }
+
+  get automaticFileSystemWorkspaceBinding():
+      Persistence.AutomaticFileSystemWorkspaceBinding.AutomaticFileSystemWorkspaceBinding {
+    return this.context.get(Persistence.AutomaticFileSystemWorkspaceBinding.AutomaticFileSystemWorkspaceBinding);
+  }
+
+  get aiHistoryStorage(): AiAssistance.AiHistoryStorage.AiHistoryStorage {
+    return this.context.get(AiAssistance.AiHistoryStorage.AiHistoryStorage);
+  }
+
+  get builtInAi(): AiAssistance.BuiltInAi.BuiltInAi {
+    return this.context.get(AiAssistance.BuiltInAi.BuiltInAi);
+  }
+
+  get breakpointManager(): Breakpoints.BreakpointManager.BreakpointManager {
+    return this.context.get(Breakpoints.BreakpointManager.BreakpointManager);
+  }
+
+  get changeTracker(): ChangeTracker.ChangeTracker.ChangeTracker {
+    return this.context.get(ChangeTracker.ChangeTracker.ChangeTracker);
+  }
+
+  get commentManager(): CommentManager.CommentManager.CommentManager {
+    return this.context.get(CommentManager.CommentManager.CommentManager);
+  }
+  get cpuThrottlingManager(): SDK.CPUThrottlingManager.CPUThrottlingManager {
+    return this.context.get(SDK.CPUThrottlingManager.CPUThrottlingManager);
+  }
+
+  get cruxManager(): CrUXManager.CrUXManager {
+    return this.context.get(CrUXManager.CrUXManager);
+  }
+
+  get cssWorkspaceBinding(): Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding {
+    return this.context.get(Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding);
+  }
+
+  get debuggerWorkspaceBinding(): Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding {
+    return this.context.get(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding);
+  }
+
+  // The DeviceModeModel may not be present, as emulation is only present for the `devtools_app` entrypoint, but not for the others.
+  get deviceModeModel(): Emulation.DeviceModeModel.DeviceModeModel|null {
+    return this.supportsEmulation ? this.context.get(Emulation.DeviceModeModel.DeviceModeModel) : null;
+  }
+
+  get domDebuggerManager(): SDK.DOMDebuggerModel.DOMDebuggerManager {
+    return this.context.get(SDK.DOMDebuggerModel.DOMDebuggerManager);
+  }
+
+  get domIssuesManager(): IssuesManager.DOMIssuesManager.DOMIssuesManager {
+    return this.context.get(IssuesManager.DOMIssuesManager.DOMIssuesManager);
+  }
+  get domModelUndoStack(): SDK.DOMModel.DOMModelUndoStack {
+    return this.context.get(SDK.DOMModel.DOMModelUndoStack);
+  }
+
+  get emulatedDevicesList(): Emulation.EmulatedDevices.EmulatedDevicesList {
+    return this.context.get(Emulation.EmulatedDevices.EmulatedDevicesList);
+  }
+
+  get eventBreakpointsManager(): SDK.EventBreakpointsModel.EventBreakpointsManager {
+    return this.context.get(SDK.EventBreakpointsModel.EventBreakpointsManager);
+  }
+
+  get fileManager(): Workspace.FileManager.FileManager {
+    return this.context.get(Workspace.FileManager.FileManager);
+  }
+
+  get gdpClient(): Host.GdpClient.GdpClient {
+    return this.context.get(Host.GdpClient.GdpClient);
+  }
+
+  get hostConfigTracker(): Host.AidaClient.HostConfigTracker {
+    return this.context.get(Host.AidaClient.HostConfigTracker);
+  }
+
+  get isolatedFileSystemManager(): Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager {
+    return this.context.get(Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager);
+  }
+
+  get isolateManager(): SDK.IsolateManager.IsolateManager {
+    return this.context.get(SDK.IsolateManager.IsolateManager);
+  }
+
+  get issuesManager(): IssuesManager.IssuesManager.IssuesManager {
+    return this.context.get(IssuesManager.IssuesManager.IssuesManager);
+  }
+
+  get networkPersistenceManager(): Persistence.NetworkPersistenceManager.NetworkPersistenceManager {
+    return this.context.get(Persistence.NetworkPersistenceManager.NetworkPersistenceManager);
+  }
+
+  get networkProjectManager(): Bindings.NetworkProject.NetworkProjectManager {
+    return this.context.get(Bindings.NetworkProject.NetworkProjectManager);
+  }
+
+  get liveMetrics(): LiveMetrics.LiveMetrics {
+    return this.context.get(LiveMetrics.LiveMetrics);
+  }
+
+  get frameManager(): SDK.FrameManager.FrameManager {
+    return this.context.get(SDK.FrameManager.FrameManager);
+  }
+
+  get pageResourceLoader(): SDK.PageResourceLoader.PageResourceLoader {
+    return this.context.get(SDK.PageResourceLoader.PageResourceLoader);
+  }
+
+  get persistence(): Persistence.Persistence.PersistenceImpl {
+    return this.context.get(Persistence.Persistence.PersistenceImpl);
+  }
+
+  get presentationConsoleMessageManager(): Bindings.PresentationConsoleMessageHelper.PresentationConsoleMessageManager {
+    return this.context.get(Bindings.PresentationConsoleMessageHelper.PresentationConsoleMessageManager);
+  }
+
+  get projectSettingsModel(): ProjectSettings.ProjectSettingsModel.ProjectSettingsModel|null {
+    return this.initAutomaticFilesystem ? this.context.get(ProjectSettings.ProjectSettingsModel.ProjectSettingsModel) :
+                                          null;
+  }
+
+  get scopeChainResolver(): SourceMapScopes.ScopeChainResolver.ScopeChainResolver {
+    return this.context.get(SourceMapScopes.ScopeChainResolver.ScopeChainResolver);
+  }
+
+  get settings(): Common.Settings.Settings {
+    return this.context.get(Common.Settings.Settings);
+  }
+
+  get targetManager(): SDK.TargetManager.TargetManager {
+    return this.context.get(SDK.TargetManager.TargetManager);
+  }
+
+  get userBadges(): Badges.UserBadges {
+    return this.context.get(Badges.UserBadges);
+  }
+
+  get workspace(): Workspace.Workspace.WorkspaceImpl {
+    return this.context.get(Workspace.Workspace.WorkspaceImpl);
+  }
+
+  get workspaceDiff(): WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl {
+    return this.context.get(WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl);
+  }
+
+  get<T>(ctor: Root.DevToolsContext.ConstructorT<T>): T {
+    return this.context.get(ctor);
   }
 }

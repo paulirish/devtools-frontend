@@ -5,32 +5,29 @@
 import '../../../ui/components/settings/settings.js';
 import '../../../ui/kit/kit.js';
 import './FieldSettingsDialog.js';
-import './NetworkThrottlingSelector.js';
-import '../../../ui/components/menus/menus.js';
-import './MetricCard.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import type * as Platform from '../../../core/platform/platform.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as LiveMetrics from '../../../models/live-metrics/live-metrics.js';
+import type * as Spec from '../../../models/live-metrics/web-vitals-injected/spec/spec.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import type * as Menus from '../../../ui/components/menus/menus.js';
 import type * as Settings from '../../../ui/components/settings/settings.js';
 import * as uiI18n from '../../../ui/i18n/i18n.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as PanelsCommon from '../../common/common.js';
+import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
-import {CPUThrottlingSelector} from './CPUThrottlingSelector.js';
-import {md} from './insights/Helpers.js';
+import * as Insights from './insights/insights.js';
 import liveMetricsViewStyles from './liveMetricsView.css.js';
-import type {MetricCardData} from './MetricCard.js';
+import {MetricCard} from './MetricCard.js';
 import metricValueStyles from './metricValueStyles.css.js';
 import {CLS_THRESHOLDS, INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 
@@ -45,156 +42,162 @@ const RTT_MINIMUM = 60;
 
 const UIStrings = {
   /**
-   * @description Title of a view that shows performance metrics from the local environment and field metrics collected from real users. "field metrics" should be interpreted as "real user metrics".
+   * @description Badge label indicating that the metrics are for a soft navigation in the Performance panel.
+   */
+  softNavigationPillText: 'SOFT NAV',
+  /**
+   * @description Title of a view that shows performance metrics from the local environment and field metrics collected from real users in the Performance panel.
    */
   localAndFieldMetrics: 'Local and field metrics',
   /**
-   * @description Title of a view that shows performance metrics from the local environment.
+   * @description Title of a view that shows performance metrics from the local environment in the Performance panel.
    */
   localMetrics: 'Local metrics',
   /**
-   *@description Text for the link to the historical field data for the specific URL or origin that is shown. This link text appears in parenthesis after the collection period information in the field data dialog. The link opens the CrUX Vis viewer (https://cruxvis.withgoogle.com).
+   * @description Link text to historical field data in the Performance panel.
    */
   fieldDataHistoryLink: 'View history',
   /**
-   *@description Tooltip for the CrUX Vis viewer link which shows the history of the field data for the specific URL or origin.
+   * @description Tooltip for the link to historical field data in the Performance panel.
    */
   fieldDataHistoryTooltip: 'View field data history in CrUX Vis',
   /**
-   * @description Accessible label for a section that logs user interactions and layout shifts. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user.
+   * @description Accessible label for the section that logs user interactions and layout shifts in the Performance panel.
    */
   eventLogs: 'Interaction and layout shift logs section',
   /**
-   * @description Title of a section that lists user interactions.
+   * @description Section title for user interactions in the live metrics view of the Performance panel.
    */
   interactions: 'Interactions',
   /**
-   * @description Title of a section that lists layout shifts. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user.
+   * @description Section title for layout shifts in the live metrics view of the Performance panel.
    */
   layoutShifts: 'Layout shifts',
   /**
-   * @description Title of a sidebar section that shows options for the user to take after using the main view.
+   * @description Title of a sidebar section that shows next step options in the Performance panel.
    */
   nextSteps: 'Next steps',
   /**
-   * @description Title of a section that shows options for how real user data in the field should be fetched. This should be interpreted as "Real user data".
+   * @description Section title for field metrics in the live metrics view of the Performance panel.
    */
   fieldMetricsTitle: 'Field metrics',
   /**
-   * @description Title of a section that shows settings to control the developers local testing environment.
+   * @description Section title for local environment settings in the live metrics view of the Performance panel.
    */
   environmentSettings: 'Environment settings',
   /**
-   * @description Label for an select box that selects which device type field metrics be shown for (e.g. desktop/mobile/all devices/etc). "field metrics" should be interpreted as "real user data".
+   * @description Label for a select dropdown to choose the device type for field metrics in the Performance panel.
    * @example {Mobile} PH1
    */
   showFieldDataForDevice: 'Show field metrics for device type: {PH1}',
   /**
-   * @description Text indicating that there is not enough data to report real user statistics.
+   * @description Text indicating that there is not enough data to report real user statistics in the Performance panel.
    */
   notEnoughData: 'Not enough data',
   /**
-   * @description Label for a text block that describes the network connections of real users.
-   * @example {75th percentile is similar to Slow 4G throttling} PH1
+   * @description Label for real user network conditions in the live metrics view of the Performance panel.
    */
-  network: 'Network: {PH1}',
+  network: 'Network:',
   /**
-   * @description Label for an select box that selects which device type real user data should be shown for (e.g. desktop/mobile/all devices/etc).
-   * @example {Mobile} PH1
+   * @description Label for a select dropdown to choose the device form factor in the Performance panel.
    */
-  device: 'Device: {PH1}',
+  device: 'Device:',
   /**
-   * @description Label for an option to select all device form factors.
+   * @description Label for an option to select all device form factors in the Performance panel.
    */
   allDevices: 'All devices',
   /**
-   * @description Label for an option to select the desktop form factor.
+   * @description Label for an option to select the desktop form factor in the Performance panel.
    */
   desktop: 'Desktop',
   /**
-   * @description Label for an option to select the mobile form factor.
+   * @description Label for an option to select the mobile form factor in the Performance panel.
    */
   mobile: 'Mobile',
   /**
-   * @description Label for an option to select the tablet form factor.
+   * @description Label for an option to select the tablet form factor in the Performance panel.
    */
   tablet: 'Tablet',
   /**
-   * @description Label for an option to to automatically select the form factor. The automatic selection will be displayed in PH1.
+   * @description Label for an option to automatically select the form factor in the Performance panel.
    * @example {Desktop} PH1
    */
   auto: 'Auto ({PH1})',
   /**
-   * @description Label for an option that is loading.
+   * @description Label for an option that is currently loading in the Performance panel.
    * @example {Desktop} PH1
    */
   loadingOption: '{PH1} - Loading…',
   /**
-   * @description Label for an option that does not have enough data and the user should ignore.
+   * @description Label for an option that lacks enough data in the Performance panel.
    * @example {Desktop} PH1
    */
   needsDataOption: '{PH1} - No data',
   /**
-   * @description Label for an option that selects the page's specific URL as opposed to it's entire origin/domain.
+   * @description Label for an option that selects the page specific URL in the Performance panel.
    */
   urlOption: 'URL',
   /**
-   * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
+   * @description Label for an option that selects the entire origin in the Performance panel.
    */
   originOption: 'Origin',
   /**
-   * @description Label for an option that selects the page's specific URL as opposed to it's entire origin/domain.
+   * @description Label for an option that selects the specific URL with the URL displayed in the Performance panel.
    * @example {https://example.com/} PH1
    */
   urlOptionWithKey: 'URL: {PH1}',
   /**
-   * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
+   * @description Label for an option that selects the entire origin with the origin displayed in the Performance panel.
    * @example {https://example.com} PH1
    */
   originOptionWithKey: 'Origin: {PH1}',
   /**
-   * @description Label for an combo-box that indicates if field metrics should be taken from the page's URL or it's origin/domain. "field metrics" should be interpreted as "real user data".
+   * @description Label for a dropdown indicating whether field metrics are shown for the URL or origin in the Performance panel.
    * @example {Origin: https://example.com} PH1
    */
   showFieldDataForPage: 'Show field metrics for {PH1}',
   /**
-   * @description Tooltip text explaining that real user connections are similar to a test environment with no throttling. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
+   * @description Tooltip text explaining that real user connections are too fast to simulate with network throttling in the Performance panel.
    */
   tryDisablingThrottling: '75th percentile is too fast to simulate with throttling',
   /**
-   * @description Tooltip text explaining that real user connections are similar to a specif network throttling setup. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
+   * @description Tooltip text explaining that real user connections are similar to a specific network throttling preset in the Performance panel.
    * @example {Slow 4G} PH1
    */
   tryUsingThrottling: '75th percentile is similar to {PH1} throttling',
   /**
-   * @description Text block listing what percentage of real users are on different device form factors.
+   * @description Text block listing the distribution of real users across device form factors in the Performance panel.
    * @example {60%} PH1
    * @example {30%} PH2
    */
   percentDevices: '{PH1}% mobile, {PH2}% desktop',
   /**
-   * @description Text block explaining how to simulate different mobile and desktop devices.
+   * @description Text block explaining how to simulate different mobile and desktop devices in the Performance panel.
    */
   useDeviceToolbar:
-      'Use the [device toolbar](https://developer.chrome.com/docs/devtools/device-mode) and configure throttling to simulate real user environments and identify more performance issues.',
+      'Use the [device toolbar](https://developer.chrome.com/docs/devtools/device-mode) and configure throttling to simulate real user environments and identify more performance issues',
   /**
-   * @description Text label for a checkbox that controls if the network cache is disabled.
+   * @description Checkbox label that controls if the network cache is disabled in the Performance panel.
    */
   disableNetworkCache: 'Disable network cache',
   /**
-   * @description Text label for a link to the Largest Contentful Paint (LCP) related page element. This element represents the largest content on the page. "LCP" should not be translated.
+   * @description Label for the CPU throttling dropdown in the live metrics view of the Performance panel.
+   */
+  cpuThrottling: 'CPU:',
+  /**
+   * @description Link label to the Largest Contentful Paint (LCP) page element in the live metrics view of the Performance panel.
    */
   lcpElement: 'LCP element',
   /**
-   * @description Text label for a button that reveals the user interaction associated with the Interaction to Next Paint (INP) performance metric. "INP" should not be translated.
+   * @description Button label to reveal the user interaction associated with INP in the live metrics view of the Performance panel.
    */
   inpInteractionLink: 'INP interaction',
   /**
-   * @description Text label for a button that reveals the cluster of layout shift events that affected the page content the most. A cluster is a group of layout shift events that occur in quick succession.
+   * @description Button label to reveal the worst layout shift cluster in the live metrics view of the Performance panel.
    */
   worstCluster: 'Worst cluster',
   /**
-   * @description [ICU Syntax] Text content of a button that reveals the cluster of layout shift events that affected the page content the most. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user. This text will indicate how many shifts were in the cluster.
+   * @description [ICU Syntax] Button label indicating the number of shifts in the worst layout shift cluster in the live metrics view of the Performance panel.
    * @example {3} shiftCount
    */
   numShifts: `{shiftCount, plural,
@@ -202,99 +205,103 @@ const UIStrings = {
     other {{shiftCount} shifts}
   }`,
   /**
-   * @description Label for a a range of dates that represents the period of time a set of field metrics is collected from.
+   * @description Label for the date range representing the collection period for field metrics in the Performance panel.
    * @example {Oct 1, 2024 - Nov 1, 2024} PH1
    */
   collectionPeriod: 'Collection period: {PH1}',
   /**
-   * @description Text showing a range of dates meant to represent a period of time.
+   * @description Date range format string in the live metrics view of the Performance panel.
    * @example {Oct 1, 2024} PH1
    * @example {Nov 1, 2024} PH2
    */
   dateRange: '{PH1} - {PH2}',
   /**
-   * @description Text block telling the user to see how performance metrics measured on their local computer compare to data collected from real users. PH1 will be a link to more information about the Chrome UX Report and the link text will be untranslated because it is a product name.
+   * @description Text banner explaining how to compare local metrics to real user data in the Performance panel.
    * @example {Chrome UX Report} PH1
    */
-  seeHowYourLocalMetricsCompare: 'See how your local metrics compare to real user data in the {PH1}.',
+  seeHowYourLocalMetricsCompare: 'See how your local metrics compare to real user data in the {PH1}',
   /**
-   * @description Text for a link that goes to more documentation about local and field metrics. "Local" refers to performance metrics measured in the developers local environment. "field metrics" should be interpreted as "real user data".
+   * @description Link text for documentation about local and field metrics in the Performance panel.
    */
   localFieldLearnMoreLink: 'Learn more about local and field metrics',
   /**
-   * @description Tooltip text for a link that goes to documentation explaining the difference between local and field metrics. "Local metrics" are performance metrics measured in the developers local environment. "field metrics" should be interpreted as "real user data".
+   * @description Tooltip text explaining the difference between local and field metrics in the Performance panel.
    */
   localFieldLearnMoreTooltip:
-      'Local metrics are captured from the current page using your network connection and device. field metrics is measured by real users using many different network connections and devices.',
+      'Local metrics are captured from the current page using your network connection and device. Field metrics are measured by real users using many different network connections and devices.',
   /**
-   * @description Tooltip text explaining that this user interaction was ignored when calculating the Interaction to Next Paint (INP) metric because the interaction delay fell beyond the 98th percentile of interaction delays on this page. "INP" is an acronym and should not be translated.
+   * @description Tooltip text explaining why an interaction was excluded from the INP calculation in the Performance panel.
    */
   interactionExcluded:
-      'INP is calculated using the 98th percentile of interaction delays, so some interaction delays may be larger than the INP value.',
+      'INP is calculated using the 98th percentile of interaction delays, so some interaction delays may be larger than the INP value',
   /**
-   * @description Tooltip for a button that will remove everything from the currently selected log.
+   * @description Tooltip for the button to clear the currently selected log in the live metrics view of the Performance panel.
    */
-  clearCurrentLog: 'Clear the current log',
+  clearCurrentLog: 'Clear current log',
   /**
-   * @description Title for a page load phase that measures the time between when the page load starts and the time when the first byte of the initial document is downloaded.
+   * @description Label for the time to first byte subpart in the live metrics view of the Performance panel.
    */
   timeToFirstByte: 'Time to first byte',
   /**
-   * @description Title for a page load phase that measures the time between when the first byte of the initial document is downloaded and when the request for the largest image content starts.
+   * @description Label for the resource load delay subpart in the live metrics view of the Performance panel.
    */
   resourceLoadDelay: 'Resource load delay',
   /**
-   * @description Title for a page load phase that measures the time between when the request for the largest image content starts and when it finishes.
+   * @description Label for the resource load duration subpart in the live metrics view of the Performance panel.
    */
   resourceLoadDuration: 'Resource load duration',
   /**
-   * @description Title for a page load phase that measures the time between when the request for the largest image content finishes and when the largest image element is rendered on the page.
+   * @description Label for the element render delay subpart in the live metrics view of the Performance panel.
    */
   elementRenderDelay: 'Element render delay',
   /**
-   * @description Title for a phase during a user interaction that measures the time between when the interaction starts and when the browser starts running interaction handlers.
+   * @description Label for the input delay subpart of an interaction in the live metrics view of the Performance panel.
    */
   inputDelay: 'Input delay',
   /**
-   * @description Title for a phase during a user interaction that measures the time between when the browser starts running interaction handlers and when the browser finishes running interaction handlers.
+   * @description Label for the processing duration subpart of an interaction in the live metrics view of the Performance panel.
    */
   processingDuration: 'Processing duration',
   /**
-   * @description Title for a phase during a user interaction that measures the time between when the browser finishes running interaction handlers and when the browser renders the next visual frame that shows the result of the interaction.
+   * @description Label for the presentation delay subpart of an interaction in the live metrics view of the Performance panel.
    */
   presentationDelay: 'Presentation delay',
   /**
-   * @description Tooltip text for a status chip in a list of user interactions that indicates if the associated interaction is the interaction used in the Interaction to Next Paint (INP) performance metric because it's interaction delay is at the 98th percentile.
+   * @description Tooltip text for an interaction status chip indicating that it represents the 98th percentile INP interaction in the Performance panel.
    */
-  inpInteraction: 'The INP interaction is at the 98th percentile of interaction delays.',
+  inpInteraction: 'The INP interaction is at the 98th percentile of interaction delays',
   /**
-   * @description Tooltip text for a button that reveals the user interaction associated with the Interaction to Next Paint (INP) performance metric.
+   * @description Tooltip text for the button to reveal the INP interaction in the live metrics view of the Performance panel.
    */
-  showInpInteraction: 'Go to the INP interaction.',
+  showInpInteraction: 'Go to the INP interaction',
   /**
-   * @description Tooltip text for a button that reveals the cluster of layout shift events that affected the page content the most. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user. A cluster is a group of layout shift events that occur in quick succession.
+   * @description Tooltip text for the button to reveal the worst layout shift cluster in the live metrics view of the Performance panel.
    */
-  showClsCluster: 'Go to worst layout shift cluster.',
+  showClsCluster: 'Go to worst layout shift cluster',
   /**
-   * @description Column header for table cell values representing the phase/component/stage/section of a larger duration.
+   * @description Table column header for subpart stage names in the live metrics view of the Performance panel.
    */
-  phase: 'Phase',
+  subpart: 'Subpart',
   /**
-   * @description Column header for table cell values representing a phase duration (in milliseconds) that was measured in the developers local environment.
+   * @description Table column header for local duration values in milliseconds in the live metrics view of the Performance panel.
    */
   duration: 'Local duration (ms)',
   /**
-   * @description Tooltip text for a button that will open the Chrome DevTools console to and log additional details about a user interaction.
+   * @description Tooltip text for the button to log interaction details to the console in the live metrics view of the Performance panel.
    */
-  logToConsole: 'Log additional interaction data to the console',
+  logToConsole: 'Log more interaction data to the console',
   /**
-   * @description Title of a view that can be used to analyze the performance of a Node process as a timeline. "Node" is a product name and should not be translated.
+   * @description Section title for Node process performance in the Performance panel.
    */
   nodePerformanceTimeline: 'Node performance',
   /**
-   * @description Description of a view that can be used to analyze the performance of a Node process as a timeline. "Node" is a product name and should not be translated.
+   * @description Description text for recording a performance timeline of a connected Node process in the Performance panel.
    */
-  nodeClickToRecord: 'Record a performance timeline of the connected Node process.',
+  nodeClickToRecord: 'Record a performance timeline of the connected Node process',
+  /**
+   * @description Tooltip text explaining why the user should adjust throttling settings in the Performance panel.
+   */
+  recommendedThrottlingReason: 'Consider changing setting to simulate real user environments',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
@@ -310,13 +317,14 @@ export interface ViewInput {
   toggleRecordAction: UI.ActionRegistration.Action;
   recordReloadAction: UI.ActionRegistration.Action;
   cruxManager: CrUXManager.CrUXManager;
-  handlePageScopeSelected: (event: Menus.SelectMenu.SelectMenuItemSelectedEvent) => void;
-  handleDeviceOptionSelected: (event: Menus.SelectMenu.SelectMenuItemSelectedEvent) => void;
+  handlePageScopeSelected: (pageScope: CrUXManager.PageScope) => void;
+  handleDeviceOptionSelected: (deviceOption: DeviceOption) => void;
   revealLayoutShiftCluster: (clusterIds: Set<LiveMetrics.LayoutShift['uniqueLayoutShiftId']>) => void;
   revealInteraction: (interaction: LiveMetrics.Interaction) => void;
   logExtraInteractionDetails: (interaction: LiveMetrics.Interaction) => void;
   highlightedInteractionId?: string;
   highlightedLayoutShiftClusterIds?: Set<string>;
+  navigationType?: Spec.NavigationType;
 }
 
 export interface ViewOutput {
@@ -328,7 +336,7 @@ export interface ViewOutput {
 
 export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement|DocumentFragment) => void;
 
-function getLcpFieldPhases(cruxManager: CrUXManager.CrUXManager): LiveMetrics.LcpValue['phases']|null {
+function getLcpFieldSubparts(cruxManager: CrUXManager.CrUXManager): LiveMetrics.LcpValue['subparts']|null {
   const ttfb =
       cruxManager.getSelectedFieldMetricData('largest_contentful_paint_image_time_to_first_byte')?.percentiles?.p75;
   const loadDelay =
@@ -468,39 +476,27 @@ function getCollectionPeriodRange(cruxManager: CrUXManager.CrUXManager): string|
   });
 }
 
-function createMetricCardRef(cardData: Omit<MetricCardData, 'tooltipContainer'>):
-    ReturnType<typeof Lit.Directives.ref> {
-  return Lit.Directives.ref(el => {
-    if (el instanceof HTMLElement) {
-      (el as HTMLElement & {data: MetricCardData}).data = {
-        ...cardData,
-        tooltipContainer: (el.closest('.metric-cards') as HTMLElement) || undefined,
-      };
-    }
-  });
-}
-
 function renderLcpCard(input: ViewInput): Lit.LitTemplate {
   const fieldData = input.cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
   const nodeLink =
       input.lcpValue?.nodeRef && PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(input.lcpValue?.nodeRef);
-  const phases = input.lcpValue?.phases;
+  const subparts = input.lcpValue?.subparts;
 
-  const fieldPhases = getLcpFieldPhases(input.cruxManager);
+  const fieldSubparts = getLcpFieldSubparts(input.cruxManager);
 
   // clang-format off
   return html`
-    <devtools-metric-card ${createMetricCardRef({
+    <devtools-widget ${widget(MetricCard, {
       metric: 'LCP',
       localValue: input.lcpValue?.value,
       fieldValue: fieldData?.percentiles?.p75,
       histogram: fieldData?.histogram,
       warnings: input.lcpValue?.warnings,
-      phases: phases && [
-        [i18nString(UIStrings.timeToFirstByte), phases.timeToFirstByte, fieldPhases?.timeToFirstByte],
-        [i18nString(UIStrings.resourceLoadDelay), phases.resourceLoadDelay, fieldPhases?.resourceLoadDelay],
-        [i18nString(UIStrings.resourceLoadDuration), phases.resourceLoadTime, fieldPhases?.resourceLoadTime],
-        [i18nString(UIStrings.elementRenderDelay), phases.elementRenderDelay, fieldPhases?.elementRenderDelay],
+      subparts: subparts && [
+        [i18nString(UIStrings.timeToFirstByte), subparts.timeToFirstByte, fieldSubparts?.timeToFirstByte],
+        [i18nString(UIStrings.resourceLoadDelay), subparts.resourceLoadDelay, fieldSubparts?.resourceLoadDelay],
+        [i18nString(UIStrings.resourceLoadDuration), subparts.resourceLoadTime, fieldSubparts?.resourceLoadTime],
+        [i18nString(UIStrings.elementRenderDelay), subparts.elementRenderDelay, fieldSubparts?.elementRenderDelay],
       ],
     })}>
       ${nodeLink ? html`
@@ -512,7 +508,7 @@ function renderLcpCard(input: ViewInput): Lit.LitTemplate {
           </div>
         `
         : nothing}
-    </devtools-metric-card>
+    </devtools-widget>
   `;
   // clang-format on
 }
@@ -526,7 +522,7 @@ function renderClsCard(input: ViewInput): Lit.LitTemplate {
 
   // clang-format off
   return html`
-    <devtools-metric-card ${createMetricCardRef({
+    <devtools-widget ${widget(MetricCard, {
       metric: 'CLS',
       localValue: input.clsValue?.value,
       fieldValue: fieldData?.percentiles?.p75,
@@ -544,28 +540,28 @@ function renderClsCard(input: ViewInput): Lit.LitTemplate {
           >${i18nString(UIStrings.numShifts, {shiftCount: clusterIds.size})}</button>
         </div>
       ` : nothing}
-    </devtools-metric-card>
+    </devtools-widget>
   `;
   // clang-format on
 }
 
 function renderInpCard(input: ViewInput): Lit.LitTemplate {
   const fieldData = input.cruxManager.getSelectedFieldMetricData('interaction_to_next_paint');
-  const phases = input.inpValue?.phases;
-  const interaction = input.inpValue && input.interactions.get(input.inpValue.interactionId);
+  const subparts = input.inpValue?.subparts;
+  const interaction = input.inpValue?.interactionId ? input.interactions.get(input.inpValue.interactionId) : undefined;
 
   // clang-format off
   return html`
-    <devtools-metric-card ${createMetricCardRef({
+    <devtools-widget ${widget(MetricCard, {
       metric: 'INP',
       localValue: input.inpValue?.value,
       fieldValue: fieldData?.percentiles?.p75,
       histogram: fieldData?.histogram,
       warnings: input.inpValue?.warnings,
-      phases: phases && [
-        [i18nString(UIStrings.inputDelay), phases.inputDelay],
-        [i18nString(UIStrings.processingDuration), phases.processingDuration],
-        [i18nString(UIStrings.presentationDelay), phases.presentationDelay],
+      subparts: subparts && [
+        [i18nString(UIStrings.inputDelay), subparts.inputDelay],
+        [i18nString(UIStrings.processingDuration), subparts.processingDuration],
+        [i18nString(UIStrings.presentationDelay), subparts.presentationDelay],
       ],
     })}>
       ${interaction ? html`
@@ -579,7 +575,7 @@ function renderInpCard(input: ViewInput): Lit.LitTemplate {
           >${interaction.interactionType}</button>
         </div>
       ` : nothing}
-    </devtools-metric-card>
+    </devtools-widget>
   `;
   // clang-format on
 }
@@ -613,29 +609,39 @@ function renderRecordingSettings(input: ViewInput): Lit.LitTemplate {
   const deviceRec = getDeviceRec(input.cruxManager) || i18nString(UIStrings.notEnoughData);
   const networkRec = getNetworkRecTitle(input.cruxManager) || i18nString(UIStrings.notEnoughData);
 
-  const recs = PanelsCommon.ThrottlingUtils.getThrottlingRecommendations();
-
   // clang-format off
   return html`
     <h3 class="card-title">${i18nString(UIStrings.environmentSettings)}</h3>
-    <div class="device-toolbar-description">${md(i18nString(UIStrings.useDeviceToolbar))}</div>
+    <div class="device-toolbar-description">${Insights.Helpers.md(i18nString(UIStrings.useDeviceToolbar))}</div>
     ${fieldEnabled ? html`
       <ul class="environment-recs-list">
-        <li>${uiI18n.getFormatLocalizedStringTemplate(str_, UIStrings.device, {PH1: html`<span class="environment-rec">${deviceRec}</span>`})}</li>
-        <li>${uiI18n.getFormatLocalizedStringTemplate(str_, UIStrings.network, {PH1: html`<span class="environment-rec">${networkRec}</span>`})}</li>
+        <li>${i18nString(UIStrings.device)} <span class="environment-rec">${deviceRec}</span></li>
+        <li>${i18nString(UIStrings.network)} <span class="environment-rec">${networkRec}</span></li>
       </ul>
     ` : nothing}
     <div class="environment-option">
-      ${widget(CPUThrottlingSelector, {recommendedOption: recs.cpuOption})}
+      <label class="environment-option-label">
+        ${i18nString(UIStrings.cpuThrottling)}
+        <select ${widget(MobileThrottling.CPUThrottlingSelector.CPUThrottlingSelector)}></select>
+      </label>
+      <devtools-icon title=${i18nString(UIStrings.recommendedThrottlingReason)} name="info"></devtools-icon>
     </div>
     <div class="environment-option">
-      <devtools-network-throttling-selector .recommendedConditions=${recs.networkConditions}></devtools-network-throttling-selector>
+      <label class="environment-option-label">
+        ${i18nString(UIStrings.network)}
+        <select
+          ${widget(MobileThrottling.NetworkThrottlingSelector.NetworkThrottlingSelect, {
+            bindToGlobalConditions: true,
+          })}
+        ></select>
+      </label>
+      <devtools-icon title=${i18nString(UIStrings.recommendedThrottlingReason)} name="info"></devtools-icon>
     </div>
     <div class="environment-option">
       <setting-checkbox
         class="network-cache-setting"
         .data=${{
-          setting: Common.Settings.Settings.instance().moduleSetting('cache-disabled'),
+          setting: Common.Settings.Settings.instance().resolve(SDK.SDKSettings.cacheDisabledSettingDescriptor),
           textOverride: i18nString(UIStrings.disableNetworkCache),
         } as Settings.SettingCheckbox.SettingCheckboxData}
       ></setting-checkbox>
@@ -658,35 +664,38 @@ function renderPageScopeSetting(input: ViewInput): Lit.LitTemplate {
   // If there is no data at all we should force users to switch pages or reconfigure CrUX.
   const shouldDisable = !input.cruxManager.pageResult?.['url-ALL'] && !input.cruxManager.pageResult?.['origin-ALL'];
 
-  /* eslint-disable @devtools/no-deprecated-component-usages */
   return html`
-    <devtools-select-menu
+    <select
       id="page-scope-select"
       class="field-data-option"
-      @selectmenuselected=${input.handlePageScopeSelected}
-      .showDivider=${true}
-      .showArrow=${true}
-      .sideButton=${false}
-      .showSelectedItem=${true}
-      .buttonTitle=${buttonTitle}
-      .disabled=${shouldDisable}
+      @change=${
+      (e: Event) => input.handlePageScopeSelected((e.target as HTMLSelectElement).value as CrUXManager.PageScope)}
+      ?disabled=${shouldDisable}
       title=${accessibleTitle}
+      aria-label=${accessibleTitle}
+      .value=${live(input.cruxManager.fieldPageScope)}
+      jslog=${VisualLogging.dropDown('page-scope').track({
+    change: true,
+  })}
     >
-      <devtools-menu-item
-        .value=${'url'}
-        .selected=${input.cruxManager.fieldPageScope === 'url'}
+      <option
+        value="url"
+        jslog=${VisualLogging.item('url').track({
+    click: true,
+  })}
       >
         ${urlLabel}
-      </devtools-menu-item>
-      <devtools-menu-item
-        .value=${'origin'}
-        .selected=${input.cruxManager.fieldPageScope === 'origin'}
+      </option>
+      <option
+        value="origin"
+        jslog=${VisualLogging.item('origin').track({
+    click: true,
+  })}
       >
         ${originLabel}
-      </devtools-menu-item>
-    </devtools-select-menu>
+      </option>
+    </select>
   `;
-  /* eslint-enable @devtools/no-deprecated-component-usages */
 }
 
 function renderDeviceScopeSetting(input: ViewInput): Lit.LitTemplate {
@@ -699,35 +708,35 @@ function renderDeviceScopeSetting(input: ViewInput): Lit.LitTemplate {
   const shouldDisable = !input.cruxManager.getFieldResponse(input.cruxManager.fieldPageScope, 'ALL');
 
   const currentDeviceLabel = getLabelForDeviceOption(input.cruxManager, input.cruxManager.fieldDeviceOption);
+  const accessibleTitle = i18nString(UIStrings.showFieldDataForDevice, {PH1: currentDeviceLabel});
 
   // clang-format off
-  /* eslint-disable @devtools/no-deprecated-component-usages */
   return html`
-    <devtools-select-menu
-      id="device-scope-select"
-      class="field-data-option"
-      @selectmenuselected=${input.handleDeviceOptionSelected}
-      .showDivider=${true}
-      .showArrow=${true}
-      .sideButton=${false}
-      .showSelectedItem=${true}
-      .buttonTitle=${i18nString(UIStrings.device, {PH1: currentDeviceLabel})}
-      .disabled=${shouldDisable}
-      title=${i18nString(UIStrings.showFieldDataForDevice, {PH1: currentDeviceLabel})}
-    >
-      ${DEVICE_OPTION_LIST.map(deviceOption => {
-        return html`
-          <devtools-menu-item
-            .value=${deviceOption}
-            .selected=${input.cruxManager.fieldDeviceOption === deviceOption}
-          >
-            ${getLabelForDeviceOption(input.cruxManager, deviceOption)}
-          </devtools-menu-item>
-        `;
-      })}
-    </devtools-select-menu>
+    <label class="field-data-option">
+      ${i18nString(UIStrings.device)}
+      <select
+        id="device-scope-select"
+        @change=${(e: Event) => input.handleDeviceOptionSelected((e.target as HTMLSelectElement).value as DeviceOption)}
+        ?disabled=${shouldDisable}
+        title=${accessibleTitle}
+        aria-label=${accessibleTitle}
+        .value=${live(input.cruxManager.fieldDeviceOption)}
+        jslog=${VisualLogging.dropDown('device-scope').track({change: true})}
+      >
+        ${DEVICE_OPTION_LIST.map(deviceOption => {
+          return html`
+            <option
+              value=${deviceOption}
+              ?selected=${input.cruxManager.fieldDeviceOption === deviceOption}
+              jslog=${VisualLogging.item(Platform.StringUtilities.toKebabCase(deviceOption)).track({click: true})}
+            >
+              ${getLabelForDeviceOption(input.cruxManager, deviceOption)}
+            </option>
+          `;
+        })}
+      </select>
+    </label>
   `;
-  /* eslint-enable @devtools/no-deprecated-component-usages */
   // clang-format on
 }
 
@@ -873,30 +882,30 @@ function renderInteractionsLog(input: ViewInput, output: ViewOutput): Lit.LitTem
                 ></devtools-icon>` : nothing}
                 <span class="interaction-duration">${metricValue}</span>
               </summary>
-              <div class="phase-table" role="table">
-                <div class="phase-table-row phase-table-header-row" role="row">
-                  <div role="columnheader">${i18nString(UIStrings.phase)}</div>
+              <div class="subpart-table" role="table">
+                <div class="subpart-table-row subpart-table-header-row" role="row">
+                  <div role="columnheader">${i18nString(UIStrings.subpart)}</div>
                   <div role="columnheader">
                     ${interaction.longAnimationFrameTimings.length ? html`
-                      <button
-                        class="log-extra-details-button"
-                        title=${i18nString(UIStrings.logToConsole)}
-                        @click=${() => input.logExtraInteractionDetails(interaction)}
-                      >${i18nString(UIStrings.duration)}</button>
-                    ` : i18nString(UIStrings.duration)}
+                       <button
+                         class="log-extra-details-button"
+                         title=${i18nString(UIStrings.logToConsole)}
+                         @click=${() => input.logExtraInteractionDetails(interaction)}
+                       >${i18nString(UIStrings.duration)}</button>
+                     ` : i18nString(UIStrings.duration)}
                   </div>
                 </div>
-                <div class="phase-table-row" role="row">
+                <div class="subpart-table-row" role="row">
                   <div role="cell">${i18nString(UIStrings.inputDelay)}</div>
-                  <div role="cell">${Math.round(interaction.phases.inputDelay)}</div>
+                  <div role="cell">${Math.round(interaction.subparts.inputDelay)}</div>
                 </div>
-                <div class="phase-table-row" role="row">
+                <div class="subpart-table-row" role="row">
                   <div role="cell">${i18nString(UIStrings.processingDuration)}</div>
-                  <div role="cell">${Math.round(interaction.phases.processingDuration)}</div>
+                  <div role="cell">${Math.round(interaction.subparts.processingDuration)}</div>
                 </div>
-                <div class="phase-table-row" role="row">
+                <div class="subpart-table-row" role="row">
                   <div role="cell">${i18nString(UIStrings.presentationDelay)}</div>
-                  <div role="cell">${Math.round(interaction.phases.presentationDelay)}</div>
+                  <div role="cell">${Math.round(interaction.subparts.presentationDelay)}</div>
                 </div>
               </div>
             </details>
@@ -1010,7 +1019,10 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     <div class="container">
       <div class="live-metrics-view">
         <main class="live-metrics">
-          <h2 class="section-title">${liveMetricsTitle}</h2>
+          <div class="section-header">
+            <h2 class="section-title">${liveMetricsTitle}</h2>
+            ${input.navigationType === 'soft-navigation' ? html`<span class="badge">${i18nString(UIStrings.softNavigationPillText)}</span>` : nothing}
+          </div>
           <div class="metric-cards">
             <div id="lcp">
               ${renderLcpCard(input)}
@@ -1093,11 +1105,12 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
 };
 
 export class LiveMetricsView extends UI.Widget.Widget {
-  isNode = Root.Runtime.Runtime.isNode();
+  isNode: boolean = Root.Runtime.Runtime.isNode();
 
   #lcpValue?: LiveMetrics.LcpValue;
   #clsValue?: LiveMetrics.ClsValue;
   #inpValue?: LiveMetrics.InpValue;
+  #navigationType?: Spec.NavigationType;
   #interactions: LiveMetrics.InteractionMap = new Map();
   #layoutShifts: LiveMetrics.LayoutShift[] = [];
 
@@ -1125,6 +1138,7 @@ export class LiveMetricsView extends UI.Widget.Widget {
     this.#lcpValue = event.data.lcp;
     this.#clsValue = event.data.cls;
     this.#inpValue = event.data.inp;
+    this.#navigationType = event.data.navigationType;
 
     const hasNewLS = this.#layoutShifts.length < event.data.layoutShifts.length;
     this.#layoutShifts = [...event.data.layoutShifts];
@@ -1182,6 +1196,7 @@ export class LiveMetricsView extends UI.Widget.Widget {
     this.#inpValue = liveMetrics.inpValue;
     this.#interactions = liveMetrics.interactions;
     this.#layoutShifts = liveMetrics.layoutShifts;
+    this.#navigationType = liveMetrics.navigationType;
     this.requestUpdate();
   }
 
@@ -1196,8 +1211,8 @@ export class LiveMetricsView extends UI.Widget.Widget {
         EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
   }
 
-  #onPageScopeMenuItemSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
-    if (event.itemValue === 'url') {
+  #onPageScopeMenuItemSelected(pageScope: CrUXManager.PageScope): void {
+    if (pageScope === 'url') {
       this.#cruxManager.fieldPageScope = 'url';
     } else {
       this.#cruxManager.fieldPageScope = 'origin';
@@ -1205,8 +1220,8 @@ export class LiveMetricsView extends UI.Widget.Widget {
     this.requestUpdate();
   }
 
-  #onDeviceOptionMenuItemSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
-    this.#cruxManager.fieldDeviceOption = event.itemValue as DeviceOption;
+  #onDeviceOptionMenuItemSelected(deviceOption: DeviceOption): void {
+    this.#cruxManager.fieldDeviceOption = deviceOption;
     this.requestUpdate();
   }
 
@@ -1249,6 +1264,7 @@ export class LiveMetricsView extends UI.Widget.Widget {
       logExtraInteractionDetails: this.#logExtraInteractionDetails.bind(this),
       highlightedInteractionId: this.#highlightedInteractionId,
       highlightedLayoutShiftClusterIds: this.#highlightedLayoutShiftClusterIds,
+      navigationType: this.#navigationType,
     };
 
     this.#view(viewInput, this.#viewOutput, this.contentElement);

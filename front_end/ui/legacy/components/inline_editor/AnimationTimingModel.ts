@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Geometry from '../../../../models/geometry/geometry.js';
+import * as Geometry from '../../../geometry/geometry.js';
 
 import {CSSLinearEasingModel} from './CSSLinearEasingModel.js';
 
@@ -27,4 +27,4 @@ export abstract class AnimationTimingModel {
   }
 }
 
-export const LINEAR_BEZIER = Geometry.LINEAR_BEZIER;
+export const LINEAR_BEZIER: Geometry.CubicBezier = Geometry.LINEAR_BEZIER;

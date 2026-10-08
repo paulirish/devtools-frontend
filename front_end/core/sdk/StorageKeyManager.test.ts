@@ -4,18 +4,28 @@
 
 import {assert} from 'chai';
 
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-describeWithMockConnection('StorageKeyManager', () => {
+describe('StorageKeyManager', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
   let manager: SDK.StorageKeyManager.StorageKeyManager;
   beforeEach(() => {
-    const target = createTarget();
+    const target = universe.createTarget();
     manager = new SDK.StorageKeyManager.StorageKeyManager(target);
   });
 

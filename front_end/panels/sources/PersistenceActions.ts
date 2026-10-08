@@ -7,50 +7,50 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-   * @description Text to save content as a specific file type
+   * @description Text to save content as a specific file type.
    */
   saveAs: 'Save as…',
   /**
-   * @description Context menu item for saving an image
+   * @description Context menu item for saving an image.
    */
   saveImage: 'Save image',
   /**
-   * @description Context menu item for showing all overridden files
+   * @description Context menu item for showing all overridden files.
    */
   showOverrides: 'Show all overrides',
   /**
-   * @description A context menu item in the Persistence Actions of the Workspace settings in Settings
+   * @description A context menu item in the Persistence actions of the Workspace settings in Settings.
    */
   overrideContent: 'Override content',
   /**
-   * @description A context menu item in the Persistence Actions of the Workspace settings in Settings
+   * @description A context menu item in the Persistence actions of the Workspace settings in Settings.
    */
   openInContainingFolder: 'Open in containing folder',
   /**
-   * @description A message in a confirmation dialog in the Persistence Actions
+   * @description A message in a confirmation dialog in the Persistence actions.
    * @example {bundle.min.js} PH1
    */
   overrideSourceMappedFileWarning: 'Override ‘{PH1}’ instead?',
   /**
-   * @description A message in a confirmation dialog to explain why the action is failed in the Persistence Actions
+   * @description A message in a confirmation dialog to explain why the action failed in the Persistence actions.
    * @example {index.ts} PH1
    */
-  overrideSourceMappedFileExplanation: '‘{PH1}’ is a source mapped file and cannot be overridden.',
+  overrideSourceMappedFileExplanation: '‘{PH1}’ is a source mapped file and can’t be overridden',
   /**
-   * @description An error message shown in the DevTools console after the user clicked "Save as" in
+   * @description An error message shown in the DevTools Console after the user clicked "Save as" in
    * the context menu of a page resource.
    */
-  saveFailed: 'Failed to save file to disk.',
+  saveFailed: 'Failed to save file to disk',
   /**
-   * @description An error message shown in the DevTools console after the user clicked "Save as" in
+   * @description An error message shown in the DevTools Console after the user clicked "Save as" in
    * the context menu of a WebAssembly file.
    */
   saveWasmFailed: 'Unable to save WASM module to disk. Most likely the module is too large.',

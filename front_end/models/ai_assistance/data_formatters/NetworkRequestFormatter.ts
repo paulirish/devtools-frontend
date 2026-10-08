@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as SDK from '../../../core/sdk/sdk.js';
+import * as SDK from '../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import * as Protocol from '../../../generated/protocol.js';
-import * as Annotations from '../../annotations/annotations.js';
 import * as Logs from '../../logs/logs.js';
 import * as NetworkTimeCalculator from '../../network_time_calculator/network_time_calculator.js';
-import * as TextUtils from '../../text_utils/text_utils.js';
 
 import {seconds} from './UnitFormatters.js';
 
@@ -15,7 +14,10 @@ const MAX_HEADERS_SIZE = 1000;
 const MAX_BODY_SIZE = 10000;
 
 /**
- * Sanitizes the set of headers, removing values that are not on the allow-list and replacing them with '<redacted>'.
+ * Sanitizes headers by replacing unapproved header values with '<redacted>'.
+ *
+ * @param headers List of header name/value pairs to sanitize.
+ * @returns Sanitized list of headers with unapproved values redacted.
  */
 export function sanitizeHeaders(headers: Array<{name: string, value: string}>): Array<{name: string, value: string}> {
   return headers.map(header => {
@@ -26,9 +28,60 @@ export function sanitizeHeaders(headers: Array<{name: string, value: string}>): 
   });
 }
 
+/**
+ * Options for configuring {@link NetworkRequestFormatter}.
+ */
+export interface NetworkRequestFormatterOptions {
+  /**
+   * The security origin used to evaluate Same-Origin Policy (SOP) and Cross-Origin
+   * Resource Sharing (CORS) access.
+   *
+   * This is required because evaluating access solely against `request.initiatorSecurityOrigin()`
+   * is unsafe in cross-origin embedded contexts.
+   *
+   * Example:
+   * When debugging a page at `https://example.com` (the active conversation origin), an embedded
+   * `<iframe>` at `https://third-party.com` may fetch `https://third-party.com/api/user.json`.
+   * Relative to the iframe, that request is same-origin (`request.initiatorSecurityOrigin() === https://third-party.com`).
+   * However, from the perspective of the top-level conversation (`https://example.com`), that request
+   * is cross-origin. Its response body and unexposed headers must be redacted to prevent leaking
+   * unauthorized data into the prompt.
+   */
+  accessingSecurityOrigin: SDK.SecurityOrigin.SecurityOrigin;
+  /** Optional network log instance for resolving initiator graphs. */
+  networkLog?: Logs.NetworkLog.NetworkLog;
+}
+
 export class NetworkRequestFormatter {
   #calculator: NetworkTimeCalculator.NetworkTransferTimeCalculator;
   #request: SDK.NetworkRequest.NetworkRequest;
+  readonly #networkLog?: Logs.NetworkLog.NetworkLog;
+  readonly #accessingSecurityOrigin: SDK.SecurityOrigin.SecurityOrigin;
+
+  /**
+   * @param request The network request to format.
+   * @param calculator Calculator for request timing metrics.
+   * @param options Configuration options specifying the accessing security origin.
+   */
+  constructor(
+      request: SDK.NetworkRequest.NetworkRequest,
+      calculator: NetworkTimeCalculator.NetworkTransferTimeCalculator,
+      options: NetworkRequestFormatterOptions,
+  ) {
+    this.#request = request;
+    this.#calculator = calculator;
+    this.#networkLog = options.networkLog;
+    this.#accessingSecurityOrigin = options.accessingSecurityOrigin;
+  }
+
+  /**
+   * Evaluates the response access mode for this network request relative to the accessing security origin.
+   *
+   * @returns The evaluated `ResponseAccessMode`.
+   */
+  responseAccessMode(): SDK.NetworkRequestAccess.ResponseAccessMode {
+    return SDK.NetworkRequestAccess.evaluateResponseAccessMode(this.#request, this.#accessingSecurityOrigin);
+  }
 
   static allowHeader(headerName: string): boolean {
     return allowedHeaders.has(headerName.toLowerCase().trim());
@@ -68,17 +121,21 @@ export class NetworkRequestFormatter {
     return `${title}\n<binary data>`;
   }
 
-  static formatInitiatorUrl(initiatorUrl: string, allowedOrigin: string): string {
-    try {
-      // Some scheme or URLs might cause errors depending on the runtime environment.
-      const initiatorOrigin = new URL(initiatorUrl).origin;
-      if (initiatorOrigin === allowedOrigin) {
-        return initiatorUrl;
-      }
-      return '<redacted cross-origin initiator URL>';
-    } catch {
-      return '<redacted cross-origin initiator URL>';
+  /**
+   * Returns the URL of `initiator` if it is same-origin with `request`, or a redaction
+   * placeholder otherwise.
+   *
+   * Both sides use `requestURLSecurityOrigin()`, so imported HAR requests are compared
+   * using their `imported-har://` origins.
+   */
+  static formatInitiatorUrl(
+      initiator: SDK.NetworkRequest.NetworkRequest,
+      request: SDK.NetworkRequest.NetworkRequest,
+      ): string {
+    if (initiator.requestURLSecurityOrigin().isSameOriginWith(request.requestURLSecurityOrigin())) {
+      return initiator.url();
     }
+    return '<redacted cross-origin initiator URL>';
   }
 
   static formatStatus(status: {
@@ -91,7 +148,8 @@ export class NetworkRequestFormatter {
   }): string {
     let responseStatus = '';
     if (status.statusCode) {
-      responseStatus = `Response status: ${status.statusCode} ${status.statusText}\n`;
+      const statusText = status.statusText ? ` ${status.statusText}` : '';
+      responseStatus = `Response status: ${status.statusCode}${statusText}\n`;
     }
     const flags = [];
     flags.push(status.finished ? 'finished' : 'pending');
@@ -130,21 +188,35 @@ export class NetworkRequestFormatter {
     return lines.length > 0 ? `${lines.join('\n')}\n` : '';
   }
 
-  constructor(
-      request: SDK.NetworkRequest.NetworkRequest, calculator: NetworkTimeCalculator.NetworkTransferTimeCalculator) {
-    this.#request = request;
-    this.#calculator = calculator;
-  }
-
   formatRequestHeaders(): string {
     return NetworkRequestFormatter.formatHeaders('Request headers:', this.#request.requestHeaders());
   }
 
+  /**
+   * Formats response headers for the AI prompt.
+   *
+   * Headers are filtered based on the request's evaluated ResponseAccessMode:
+   * - Opaque cross-origin requests only include CORS-safelisted response headers.
+   * - CORS-authorized requests include CORS-safelisted and Access-Control-Expose-Headers.
+   * - Same-origin requests include all response headers.
+   * Values of headers not present on the global allowedHeaders list are then redacted.
+   */
   formatResponseHeaders(): string {
-    return NetworkRequestFormatter.formatHeaders('Response headers:', this.#request.responseHeaders);
+    const accessMode = this.responseAccessMode();
+    const headers = SDK.NetworkRequestAccess.getFilterableResponseHeaders(this.#request, accessMode);
+    return NetworkRequestFormatter.formatHeaders('Response headers:', headers);
   }
 
+  /**
+   * Formats the response body for the AI prompt.
+   *
+   * For opaque cross-origin requests, the response body is redacted because the accessing
+   * security origin is forbidden by the Same-Origin Policy from reading it.
+   */
   async formatResponseBody(): Promise<string> {
+    if (this.responseAccessMode() === SDK.NetworkRequestAccess.ResponseAccessMode.OPAQUE_CROSS_ORIGIN) {
+      return SDK.NetworkRequestAccess.REDACTED_RESPONSE_BODY;
+    }
     return await NetworkRequestFormatter.formatBody('Response body:', this.#request, MAX_BODY_SIZE);
   }
 
@@ -161,7 +233,6 @@ export class NetworkRequestFormatter {
     }
 
     return `Request: ${this.#request.url()}
-${Annotations.AnnotationRepository.annotationsEnabled() ? `\nRequest ID: ${this.#request.requestId()}\n` : ''}
 ${this.formatRequestHeaders()}
 
 ${this.formatResponseHeaders()}${responseBody}
@@ -196,22 +267,9 @@ Request initiator chain:\n${this.formatRequestInitiatorChain()}`;
    * the request's origin.
    */
   formatRequestInitiatorChain(): string {
-    const allowedOrigin = new URL(this.#request.url()).origin;
-    let initiatorChain = '';
-    let lineStart = '- URL: ';
-    const graph = Logs.NetworkLog.NetworkLog.instance().initiatorGraphForRequest(this.#request);
-
-    for (const initiator of Array.from(graph.initiators).reverse()) {
-      initiatorChain = initiatorChain + lineStart +
-          NetworkRequestFormatter.formatInitiatorUrl(initiator.url(), allowedOrigin) + '\n';
-      lineStart = '\t' + lineStart;
-      if (initiator === this.#request) {
-        initiatorChain =
-            this.#formatRequestInitiated(graph.initiated, this.#request, initiatorChain, lineStart, allowedOrigin);
-      }
-    }
-
-    return initiatorChain.trim();
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    const networkLog = this.#networkLog ?? Logs.NetworkLog.NetworkLog.instance();
+    return formatRequestInitiatorChain(this.#request, networkLog);
   }
 
   formatNetworkRequestTiming(): string {
@@ -262,32 +320,57 @@ Request initiator chain:\n${this.formatRequestInitiatorChain()}`;
 
     return labels.filter(label => !!label.value).map(label => `${label.label}: ${label.value}`).join('\n');
   }
+}
 
-  #formatRequestInitiated(
-      initiated: Map<SDK.NetworkRequest.NetworkRequest, SDK.NetworkRequest.NetworkRequest>,
-      parentRequest: SDK.NetworkRequest.NetworkRequest,
-      initiatorChain: string,
-      lineStart: string,
-      allowedOrigin: string,
-      ): string {
-    const visited = new Set<SDK.NetworkRequest.NetworkRequest>();
+/**
+ * Formats the initiator chain for a given network request into a formatted string.
+ *
+ * @param request The network request to format the initiator chain for.
+ * @param networkLog Network log instance used to build the initiator graph.
+ * @returns Formatted initiator chain.
+ */
+export function formatRequestInitiatorChain(
+    request: SDK.NetworkRequest.NetworkRequest,
+    networkLog: Logs.NetworkLog.NetworkLog,
+    ): string {
+  let initiatorChain = '';
+  let lineStart = '- URL: ';
+  const graph = networkLog.initiatorGraphForRequest(request);
 
-    // this.request should be already in the tree when build initiator part
-    visited.add(this.#request);
-    for (const [keyRequest, initiatedRequest] of initiated.entries()) {
-      if (initiatedRequest === parentRequest) {
-        if (!visited.has(keyRequest)) {
-          visited.add(keyRequest);
-          initiatorChain = initiatorChain + lineStart +
-              NetworkRequestFormatter.formatInitiatorUrl(keyRequest.url(), allowedOrigin) + '\n';
-          initiatorChain =
-              this.#formatRequestInitiated(initiated, keyRequest, initiatorChain, '\t' + lineStart, allowedOrigin);
-        }
+  for (const initiator of Array.from(graph.initiators).reverse()) {
+    initiatorChain = initiatorChain + lineStart + NetworkRequestFormatter.formatInitiatorUrl(initiator, request) + '\n';
+    lineStart = '\t' + lineStart;
+    if (initiator === request) {
+      initiatorChain = formatRequestInitiated(graph.initiated, request, request, initiatorChain, lineStart);
+    }
+  }
+
+  return initiatorChain.trim();
+}
+
+function formatRequestInitiated(
+    initiated: Map<SDK.NetworkRequest.NetworkRequest, SDK.NetworkRequest.NetworkRequest>,
+    rootRequest: SDK.NetworkRequest.NetworkRequest,
+    parentRequest: SDK.NetworkRequest.NetworkRequest,
+    initiatorChain: string,
+    lineStart: string,
+    ): string {
+  const visited = new Set<SDK.NetworkRequest.NetworkRequest>();
+
+  // rootRequest should be already in the tree when building initiator part
+  visited.add(rootRequest);
+  for (const [keyRequest, initiatedRequest] of initiated.entries()) {
+    if (initiatedRequest === parentRequest) {
+      if (!visited.has(keyRequest)) {
+        visited.add(keyRequest);
+        initiatorChain =
+            initiatorChain + lineStart + NetworkRequestFormatter.formatInitiatorUrl(keyRequest, rootRequest) + '\n';
+        initiatorChain = formatRequestInitiated(initiated, rootRequest, keyRequest, initiatorChain, '\t' + lineStart);
       }
     }
-
-    return initiatorChain;
   }
+
+  return initiatorChain;
 }
 
 // Header names that could be included in the prompt, lowercase.

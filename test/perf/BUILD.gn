@@ -6,6 +6,7 @@ import("../../scripts/build/ninja/copy.gni")
 import("../../scripts/build/typescript/typescript.gni")
 
 group("perf") {
+  testonly = true
   deps = [
     ":test_inputs",
     ":tests",
@@ -13,19 +14,25 @@ group("perf") {
 }
 
 node_ts_library("tests") {
-  deps = [
+  sources = [ "run-mocha.ts" ]
+
+  ts_deps = [
+    "../conductor:implementation",
     "../e2e/conductor:implementation",
+    "../shared",
+  ]
+
+  deps = [
     "application",
     "helpers",
     "panels/performance",
     "report",
     "setup",
   ]
-
-  sources = [ "mocharc.ts" ]
 }
 
 generated_file("test_inputs") {
+  testonly = true
   outputs = [ "$target_gen_dir/tests.txt" ]
   data_keys = [ "tests" ]
   rebase = target_gen_dir

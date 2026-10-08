@@ -6,7 +6,6 @@ import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_pre_built.gni")
 
 EXCLUDED_SOURCES = [
-  "package/lib/cjs/main.d.ts",
   "package/lib/cli.js.map",
   "package/lib/cli.js",
   "package/lib/extension-test.js",
@@ -17,7 +16,6 @@ EXCLUDED_SOURCES = [
 SOURCES = [
   "package/lib/main.d.ts",
   "package/lib/main.js",
-  "puppeteer-replay-tsconfig.json",
 ]
 
 devtools_pre_built("puppeteer-replay") {
@@ -29,7 +27,7 @@ devtools_pre_built("puppeteer-replay") {
 devtools_entrypoint("bundle") {
   entrypoint = "puppeteer-replay.ts"
 
-  deps = [ ":puppeteer-replay" ]
+  ts_deps = [ ":puppeteer-replay" ]
 
   visibility = [ "../../panels/recorder/*" ]
 }

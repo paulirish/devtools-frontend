@@ -6,43 +6,42 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as TextUtils from '../text_utils/text_utils.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 
 import {Events, type IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
 import {Events as PlatformFileSystemEvents, PlatformFileSystem, PlatformFileSystemType} from './PlatformFileSystem.js';
 
 const UIStrings = {
   /**
-   * @description Text in Isolated File System of the Workspace settings in Settings
+   * @description Text in isolated file system of workspace settings in Settings.
    * @example {folder does not exist} PH1
    */
   fileSystemErrorS: 'File system error: {PH1}',
   /**
-   * @description Error message when reading a remote blob
+   * @description Error message when reading a remote blob.
    */
-  blobCouldNotBeLoaded: 'Blob could not be loaded.',
+  blobCouldNotBeLoaded: 'Blob couldn’t be loaded',
   /**
    * @description Error message when reading a file.
    * @example {c:\dir\file.js} PH1
    * @example {Underlying error} PH2
    */
-  cantReadFileSS: 'Can\'t read file: {PH1}: {PH2}',
+  cantReadFileSS: 'Can’t read file: {PH1}: {PH2}',
   /**
-   * @description Text to show something is linked to another
+   * @description Text to show something is linked to another.
    * @example {example.url} PH1
    */
   linkedToS: 'Linked to {PH1}',
   /**
-   * @description Error message shown when devtools failed to create a file system directory.
+   * @description Error message shown when DevTools failed to create a file system directory.
    * @example {path/} PH1
    */
-  createDirFailedBecausePathIsFile:
-      'Overrides: Failed to create directory {PH1} because the path exists and is a file.',
+  createDirFailedBecausePathIsFile: 'Overrides: Failed to create directory {PH1} because the path exists and is a file',
   /**
-   * @description Error message shown when devtools failed to create a file system directory.
+   * @description Error message shown when DevTools failed to create a file system directory.
    * @example {path/} PH1
    */
-  createDirFailed: 'Overrides: Failed to create directory {PH1}. Are the workspace or overrides configured correctly?'
+  createDirFailed: 'Overrides: Failed to create directory {PH1}. Are the workspace or overrides configured correctly?',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('models/persistence/IsolatedFileSystem.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -58,36 +57,34 @@ export class IsolatedFileSystem extends PlatformFileSystem {
   readonly #initialGitFolders = new Set<Platform.DevToolsPath.EncodedPathString>();
   private readonly fileLocks = new Map<Platform.DevToolsPath.EncodedPathString, Promise<unknown>>();
 
-  constructor(
-      manager: IsolatedFileSystemManager, path: Platform.DevToolsPath.UrlString,
-      embedderPath: Platform.DevToolsPath.RawPathString, domFileSystem: FileSystem, type: PlatformFileSystemType,
-      automatic: boolean) {
+  constructor(manager: IsolatedFileSystemManager, path: Platform.DevToolsPath.UrlString,
+              embedderPath: Platform.DevToolsPath.RawPathString, domFileSystem: FileSystem,
+              type: PlatformFileSystemType, automatic: boolean, settings: Common.Settings.Settings) {
     super(path, type, automatic);
     this.manager = manager;
     this.#embedderPath = embedderPath;
     this.domFileSystem = domFileSystem;
-    this.excludedFoldersSetting =
-        Common.Settings.Settings.instance().createLocalSetting('workspace-excluded-folders', {});
+    this.excludedFoldersSetting = settings.createLocalSetting('workspace-excluded-folders', {});
     this.#excludedFolders = new Set(this.excludedFoldersSetting.get()[path] || []);
   }
 
-  static async create(
-      manager: IsolatedFileSystemManager, path: Platform.DevToolsPath.UrlString,
-      embedderPath: Platform.DevToolsPath.RawPathString, type: PlatformFileSystemType, name: string, rootURL: string,
-      automatic: boolean): Promise<IsolatedFileSystem|null> {
+  static async create(manager: IsolatedFileSystemManager, path: Platform.DevToolsPath.UrlString,
+                      embedderPath: Platform.DevToolsPath.RawPathString, type: PlatformFileSystemType, name: string,
+                      rootURL: string, automatic: boolean,
+                      settings: Common.Settings.Settings): Promise<IsolatedFileSystem|null> {
     const domFileSystem = Host.InspectorFrontendHost.InspectorFrontendHostInstance.isolatedFileSystem(name, rootURL);
     if (!domFileSystem) {
       return null;
     }
 
-    const fileSystem = new IsolatedFileSystem(manager, path, embedderPath, domFileSystem, type, automatic);
+    const fileSystem = new IsolatedFileSystem(manager, path, embedderPath, domFileSystem, type, automatic, settings);
     return await fileSystem.initializeFilePaths().then(() => fileSystem).catch(error => {
       console.error(error);
       return null;
     });
   }
 
-  static errorMessage(error: DOMError): string {
+  static errorMessage(error: DOMException|Error): string {
     return i18nString(UIStrings.fileSystemErrorS, {PH1: error.message});
   }
 
@@ -108,7 +105,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       entry.getMetadata(resolve, errorHandler);
     }
 
-    function errorHandler(error: DOMError): void {
+    function errorHandler(error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when getting file metadata \'' + path);
       resolve(null);
@@ -259,10 +256,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       resolve(true);
     }
 
-    /**
-     * TODO(jsbell): Update externs replacing DOMError with DOMException. https://crbug.com/496901
-     */
-    function errorHandler(this: IsolatedFileSystem, error: DOMError): void {
+    function errorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when deleting file \'' + (this.path() + '/' + path) + '\'');
       resolve(false);
@@ -284,10 +278,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       resolve(true);
     }
 
-    /**
-     * TODO(jsbell): Update externs replacing DOMError with DOMException. https://crbug.com/496901
-     */
-    function errorHandler(this: IsolatedFileSystem, error: DOMError): void {
+    function errorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when deleting directory \'' + (this.path() + '/' + path) + '\'');
       resolve(false);
@@ -300,7 +291,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
         entry.file(resolve, errorHandler.bind(this));
       }, errorHandler.bind(this));
 
-      function errorHandler(this: IsolatedFileSystem, error: DOMError): void {
+      function errorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
         if (error.name === 'NotFoundError') {
           resolve(null);
           return;
@@ -339,9 +330,9 @@ export class IsolatedFileSystem extends PlatformFileSystem {
   override async setFileContent(path: Platform.DevToolsPath.EncodedPathString, content: string, isBase64: boolean):
       Promise<void> {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FileSavedInWorkspace);
-    let resolve: (result: ProgressEvent<EventTarget>|undefined) => void;
-    const innerSetFileContent = (): Promise<ProgressEvent<EventTarget>|undefined> => {
-      const promise = new Promise<ProgressEvent<EventTarget>|undefined>(x => {
+    let resolve: () => void;
+    const innerSetFileContent = (): Promise<void> => {
+      const promise = new Promise<void>(x => {
         resolve = x;
       });
       this.domFileSystem.root.getFile(
@@ -357,7 +348,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
     }
 
     async function fileWriterCreated(this: IsolatedFileSystem, fileWriter: FileWriter): Promise<void> {
-      fileWriter.onerror = errorHandler.bind(this);
+      fileWriter.onerror = () => errorHandler.call(this, fileWriter.error);
       fileWriter.onwriteend = fileWritten;
       let blob: Blob;
       if (isBase64) {
@@ -368,16 +359,15 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       fileWriter.write(blob);
 
       function fileWritten(): void {
-        fileWriter.onwriteend = resolve;
+        fileWriter.onwriteend = () => resolve();
         fileWriter.truncate(blob.size);
       }
     }
 
-    function errorHandler(this: IsolatedFileSystem, error: DOMError|ProgressEvent<EventTarget>): void {
-      // @ts-expect-error TODO(crbug.com/1172300) Properly type this after jsdoc to ts migration
+    function errorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when setting content for file \'' + (this.path() + '/' + path) + '\'');
-      resolve(undefined);
+      resolve();
     }
   }
 
@@ -415,7 +405,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       callback(false);
     }
 
-    function newFileEntryLoadErrorHandler(this: IsolatedFileSystem, error: DOMError): void {
+    function newFileEntryLoadErrorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
       if (error.name !== 'NotFoundError') {
         callback(false);
         return;
@@ -427,7 +417,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       callback(true, entry.name);
     }
 
-    function errorHandler(this: IsolatedFileSystem, error: DOMError): void {
+    function errorHandler(this: IsolatedFileSystem, error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when renaming file \'' + (this.path() + '/' + path) + '\' to \'' + newName + '\'');
       callback(false);
@@ -453,7 +443,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
 
     dirReader.readEntries(innerCallback, errorHandler);
 
-    function errorHandler(error: DOMError): void {
+    function errorHandler(error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when reading directory \'' + dirEntry.fullPath + '\'');
       callback([]);
@@ -467,7 +457,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       this.readDirectory(dirEntry, callback);
     }
 
-    function errorHandler(error: DOMError): void {
+    function errorHandler(error: DOMException|Error): void {
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when requesting entry \'' + path + '\'');
       callback([]);
@@ -598,7 +588,7 @@ const SCRIPT_EXTENSIONS = new Set<string>([
 
 const IMAGE_EXTENSIONS = new Set<string>(['jpeg', 'jpg', 'svg', 'gif', 'webp', 'png', 'ico', 'tiff', 'tif', 'bmp']);
 
-export const BinaryExtensions = new Set<string>([
+export const BinaryExtensions: Set<string> = new Set<string>([
   // Executable extensions, roughly taken from https://en.wikipedia.org/wiki/Comparison_of_executable_file_formats
   'cmd',
   'com',

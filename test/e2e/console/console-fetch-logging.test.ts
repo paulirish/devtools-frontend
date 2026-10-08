@@ -19,17 +19,17 @@ describe('The Console Tab', () => {
     await toggleShowLogXmlHttpRequests(devToolsPage);
     const expectedResults = [
       `Fetch finished loading: GET "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/xhr-exists.html".`,
+          inspectedPage.serverPort}/test/e2e/resources/console/xhr-exists.html"`,
       `Fetch failed loading: GET "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/xhr-does-not-exist.html".`,
+          inspectedPage.serverPort}/test/e2e/resources/console/xhr-does-not-exist.html"`,
       `Fetch finished loading: POST "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/post-target.rawresponse".`,
-      'Fetch failed loading: GET "http://localhost:8000/devtools/resources/xhr-exists.html".',
+          inspectedPage.serverPort}/test/e2e/resources/console/post-target.rawresponse"`,
+      'Fetch failed loading: GET "http://localhost:8000/devtools/resources/xhr-exists.html"',
     ];
 
-    await typeIntoConsoleAndWaitForResult('await makeRequests();', 4, Level.Info, devToolsPage);
+    await typeIntoConsoleAndWaitForResult(devToolsPage, 'await makeRequests();', 4, Level.Info);
 
-    const result = await getCurrentConsoleMessages(false, Level.Info, undefined, devToolsPage);
+    const result = await getCurrentConsoleMessages(devToolsPage, false, Level.Info, undefined);
     assert.deepEqual(result.slice(0, -1), expectedResults, 'Fetching was not logged correctly');
   });
 
@@ -38,17 +38,17 @@ describe('The Console Tab', () => {
     await navigateToConsoleTab(devToolsPage);
     const expectedResults = [
       `Fetch finished loading: GET "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/xhr-exists.html".`,
+          inspectedPage.serverPort}/test/e2e/resources/console/xhr-exists.html"`,
       `Fetch failed loading: GET "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/xhr-does-not-exist.html".`,
+          inspectedPage.serverPort}/test/e2e/resources/console/xhr-does-not-exist.html"`,
       `Fetch finished loading: POST "https://localhost:${
-          inspectedPage.serverPort}/test/e2e/resources/console/post-target.rawresponse".`,
-      'Fetch failed loading: GET "http://localhost:8000/devtools/resources/xhr-exists.html".',
+          inspectedPage.serverPort}/test/e2e/resources/console/post-target.rawresponse"`,
+      'Fetch failed loading: GET "http://localhost:8000/devtools/resources/xhr-exists.html"',
     ];
 
-    await typeIntoConsoleAndWaitForResult('await makeRequests();', 1, Level.Info, devToolsPage);
+    await typeIntoConsoleAndWaitForResult(devToolsPage, 'await makeRequests();', 1, Level.Info);
 
-    const result = await getCurrentConsoleMessages(false, Level.Info, undefined, devToolsPage);
+    const result = await getCurrentConsoleMessages(devToolsPage, false, Level.Info, undefined);
     // Check that fetching is not logged
     assert.isEmpty(
         result.slice(0, -1).filter(value => expectedResults.includes(value)),

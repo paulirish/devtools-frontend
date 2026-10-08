@@ -43,6 +43,7 @@ export class Item {
   private shortcut?: string;
   #tooltip: Common.UIString.LocalizedString|undefined;
   protected jslogContext: string|undefined;
+  #hoverHandler?: (hovered: boolean) => void;
 
   constructor(
       contextMenu: ContextMenu|null, type: 'checkbox'|'item'|'separator'|'subMenu', label?: string,
@@ -138,6 +139,9 @@ export class Item {
             result.isDevToolsPerformanceMenuItem = true;
           }
         }
+        if (this.#hoverHandler) {
+          result.onHover = this.#hoverHandler;
+        }
         return result;
       }
       case 'separator': {
@@ -159,10 +163,17 @@ export class Item {
         if (this.customElement) {
           result.element = this.customElement;
         }
+        if (this.#hoverHandler) {
+          result.onHover = this.#hoverHandler;
+        }
         return result;
       }
     }
     throw new Error('Invalid item type:' + this.typeInternal);
+  }
+
+  setHoverHandler(handler?: (hovered: boolean) => void): void {
+    this.#hoverHandler = handler;
   }
 
   /**
@@ -226,6 +237,7 @@ export class Section {
     tooltip?: Platform.UIString.LocalizedString,
     jslogContext?: string,
     featureName?: string,
+    onHover?: (hovered: boolean) => void,
   }): Item {
     let item;
     if (labelOrItem instanceof Item) {
@@ -236,6 +248,9 @@ export class Section {
           options?.accelerator, options?.tooltip, options?.jslogContext, options?.featureName);
       if (options?.additionalElement) {
         item.customElement = options?.additionalElement;
+      }
+      if (options?.onHover) {
+        item.setHoverHandler(options.onHover);
       }
     }
     this.items.push(item);
@@ -331,6 +346,7 @@ export class Section {
     tooltip?: Platform.UIString.LocalizedString,
     jslogContext?: string,
     featureName?: string,
+    onHover?: (hovered: boolean) => void,
   }): Item {
     const item = new Item(
         this.contextMenu, 'checkbox', label, options?.experimental, options?.disabled, options?.checked, undefined,
@@ -341,6 +357,9 @@ export class Section {
     }
     if (options?.additionalElement) {
       item.customElement = options.additionalElement;
+    }
+    if (options?.onHover) {
+      item.setHoverHandler(options.onHover);
     }
     return item;
   }
@@ -946,9 +965,19 @@ export class ContextMenu extends SubMenu {
 
   private static pendingMenu: ContextMenu|null = null;
   private static useSoftMenu = false;
-  static readonly groupWeights = [
-    'header', 'new', 'reveal', 'edit', 'clipboard', 'debug', 'view', 'default', 'override', 'save', 'annotation',
-    'footer'
+  static readonly groupWeights: string[] = [
+    'header',
+    'new',
+    'reveal',
+    'edit',
+    'clipboard',
+    'debug',
+    'view',
+    'default',
+    'override',
+    'save',
+    'annotation',
+    'footer',
   ];
 }
 
@@ -960,6 +989,7 @@ export class ContextMenu extends SubMenu {
  * @property keepOpen -Reflects the `"keep-open"` attribute.
  * @property iconName - Reflects the `"icon-name"` attribute.
  * @property disabled - Reflects the `"disabled"` attribute.
+ * @property accessibleLabel - Sets the accessible name and tooltip on the internal button.
  * @attribute soft-menu - Whether to use the soft menu implementation.
  * @attribute keep-open - Whether the menu should stay open after an item is clicked.
  * @attribute icon-name - Name of the icon to display on the button.
@@ -968,10 +998,11 @@ export class ContextMenu extends SubMenu {
  *
  */
 export class MenuButton extends HTMLElement {
-  static readonly observedAttributes = ['icon-name', 'disabled'];
+  static readonly observedAttributes: string[] = ['icon-name', 'disabled'];
   readonly #shadow = this.attachShadow({mode: 'open'});
   #triggerTimeoutId?: number;
   #populateMenuCall?: (arg0: ContextMenu) => void;
+  #accessibleLabel?: string;
 
   /**
    * Sets the callback function used to populate the context menu when the button is clicked.
@@ -979,6 +1010,17 @@ export class MenuButton extends HTMLElement {
    */
   set populateMenuCall(populateCall: (arg0: ContextMenu) => void) {
     this.#populateMenuCall = populateCall;
+  }
+
+  set accessibleLabel(accessibleLabel: string|undefined) {
+    this.#accessibleLabel = accessibleLabel;
+    if (this.iconName) {
+      this.#render();
+    }
+  }
+
+  get accessibleLabel(): string|undefined {
+    return this.#accessibleLabel;
   }
 
   /**
@@ -1091,13 +1133,15 @@ export class MenuButton extends HTMLElement {
     if (!this.iconName) {
       throw new Error('<devtools-menu-button> expects an icon.');
     }
+    const accessibleLabel = this.accessibleLabel ?? this.title;
 
     // clang-format off
     render(html`
         <devtools-button .disabled=${this.disabled}
                          .iconName=${this.iconName}
                          .variant=${Buttons.Button.Variant.ICON}
-                         .title=${this.title}
+                         .accessibleLabel=${accessibleLabel}
+                         .buttonTitle=${accessibleLabel}
                          aria-haspopup='menu'
                          @click=${this.#triggerContextMenu}>
         </devtools-button>`,

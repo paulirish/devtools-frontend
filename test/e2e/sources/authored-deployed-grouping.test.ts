@@ -11,8 +11,8 @@ import {
   openSourcesPanel,
   readSourcesTreeView,
 } from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 const groupedExpectedTree = [
   'Authored',
@@ -210,8 +210,8 @@ describe('Source Panel grouping', function() {
   const scriptFile = 'multi-workers.min.js';
 
   function workerFileSelectors(workerIndex: number, inspectedPage: InspectedPage) {
-    return createSelectorsForWorkerFile(
-        scriptFile, 'test/e2e/resources/sources', scriptFile, workerIndex, inspectedPage);
+    return createSelectorsForWorkerFile(inspectedPage, scriptFile, 'test/e2e/resources/sources', scriptFile,
+                                        workerIndex);
   }
 
   async function validateNavigationTree(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
@@ -219,16 +219,16 @@ describe('Source Panel grouping', function() {
   }
 
   async function validateNavigationTreeNoSourcemaps(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-    await devToolsPage.waitFor(
-        createSelectorsForWorkerFile(
-            'multi-workers.js', 'test/e2e/resources/sources', 'multi-workers.js', 10, inspectedPage)
-            .rootSelector);
+    await devToolsPage.waitFor(createSelectorsForWorkerFile(inspectedPage, 'multi-workers.js',
+                                                            'test/e2e/resources/sources', 'multi-workers.js', 10)
+                                   .rootSelector);
   }
-  const authoredMenuText = 'Group by Authored/Deployed';
+  const authoredMenuText = 'Group by authored/deployed';
   const folderMenuText = 'Group by folder';
 
   async function enableGroupByAuthored(devToolsPage: DevToolsPage, inspectedPage: InspectedPage, noAuthored?: boolean) {
     await devToolsPage.click('[title="More options"]');
+    await devToolsPage.waitFor('.soft-context-menu');
     await devToolsPage.click(`[aria-label="${authoredMenuText}, unchecked"]`);
     await devToolsPage.waitForNone('.soft-context-menu');
     await devToolsPage.waitFor('.navigator-deployed-tree-item');
@@ -243,6 +243,7 @@ describe('Source Panel grouping', function() {
 
   async function disableGroupByAuthored(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await devToolsPage.click('[title="More options"]');
+    await devToolsPage.waitFor('.soft-context-menu');
     await devToolsPage.click(`[aria-label="${authoredMenuText}, checked"]`);
     await devToolsPage.waitForNone('.soft-context-menu');
     await devToolsPage.waitForNone('.navigator-deployed-tree-item');
@@ -252,6 +253,7 @@ describe('Source Panel grouping', function() {
 
   async function enableGroupByFolder(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await devToolsPage.click('[title="More options"]');
+    await devToolsPage.waitFor('.soft-context-menu');
     await devToolsPage.click(`[aria-label="${folderMenuText}, unchecked"]`);
     await devToolsPage.waitForNone('.soft-context-menu');
     await devToolsPage.waitFor('[aria-label="test/e2e/resources/sources, nw-folder"]');
@@ -260,10 +262,22 @@ describe('Source Panel grouping', function() {
 
   async function disableGroupByFolder(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await devToolsPage.click('[title="More options"]');
+    await devToolsPage.waitFor('.soft-context-menu');
     await devToolsPage.click(`[aria-label="${folderMenuText}, checked"]`);
     await devToolsPage.waitForNone('.soft-context-menu');
     await devToolsPage.waitForNone('[aria-label="test/e2e/resources/sources, nw-folder"]:not(.is-from-source-map)');
     await validateNavigationTree(devToolsPage, inspectedPage);
+  }
+
+  async function waitForSourcesTreeView(devToolsPage: DevToolsPage, expectedTree: string[]) {
+    await devToolsPage.waitForFunction(async () => {
+      const tree = await readSourcesTreeView(devToolsPage);
+      if (tree.length !== expectedTree.length) {
+        return false;
+      }
+      return tree.every((item, index) => item === expectedTree[index]);
+    });
+    assert.deepEqual(await readSourcesTreeView(devToolsPage), expectedTree);
   }
 
   it('can enable and disable group by authored/deployed', async ({devToolsPage, inspectedPage}) => {
@@ -273,20 +287,20 @@ describe('Source Panel grouping', function() {
 
     // Switch to grouped
     await enableGroupByAuthored(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), groupedExpectedTree);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
+    await waitForSourcesTreeView(devToolsPage, groupedExpectedTree);
 
     // Switch back
     await disableGroupByAuthored(devToolsPage, inspectedPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), defaultExpectedTree);
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
+    await waitForSourcesTreeView(devToolsPage, defaultExpectedTree);
 
     // And switch to grouped again...
     await enableGroupByAuthored(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), groupedExpectedTree);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
+    await waitForSourcesTreeView(devToolsPage, groupedExpectedTree);
   });
 
   it('can handle authored script in page and worker', async ({devToolsPage, inspectedPage}) => {
@@ -296,9 +310,9 @@ describe('Source Panel grouping', function() {
 
     // Switch to grouped
     await enableGroupByAuthored(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), groupedRedundantExpectedTree);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
+    await waitForSourcesTreeView(devToolsPage, groupedRedundantExpectedTree);
   });
 
   it('can load new page with group by authored/deployed', async ({devToolsPage, inspectedPage}) => {
@@ -312,11 +326,13 @@ describe('Source Panel grouping', function() {
     // Reload the page.
     await inspectedPage.goToResource(targetPage);
     // Validate source tree
+    await devToolsPage.waitFor('.navigator-deployed-tree-item');
+    await devToolsPage.waitFor('.navigator-authored-tree-item');
     await validateNavigationTree(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
 
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), groupedExpectedTree);
+    await waitForSourcesTreeView(devToolsPage, groupedExpectedTree);
   });
 
   it('can mix group by authored/deployed and group by folder', async ({devToolsPage, inspectedPage}) => {
@@ -326,23 +342,22 @@ describe('Source Panel grouping', function() {
 
     // Switch to folderless
     await disableGroupByFolder(devToolsPage, inspectedPage);
-    await expandSourceTreeItem(workerFileSelectors(6, inspectedPage).rootSelector, devToolsPage);
-    await expandSourceTreeItem(
-        workerFileSelectors(6, inspectedPage).rootSelector +
-            ' + ol > [aria-label="test/e2e/resources/sources, nw-folder"]',
-        devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), folderlessExpectedTree);
+    await expandSourceTreeItem(devToolsPage, workerFileSelectors(6, inspectedPage).rootSelector);
+    await expandSourceTreeItem(devToolsPage,
+                               workerFileSelectors(6, inspectedPage).rootSelector +
+                                   ' + ol > [aria-label="test/e2e/resources/sources, nw-folder"]');
+    await waitForSourcesTreeView(devToolsPage, folderlessExpectedTree);
 
     // Switch to group by authored, folderless
     await enableGroupByAuthored(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandSourceTreeItem(workerFileSelectors(6, inspectedPage).rootSelector, devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), folderlessGroupedExpectedTree);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandSourceTreeItem(devToolsPage, workerFileSelectors(6, inspectedPage).rootSelector);
+    await waitForSourcesTreeView(devToolsPage, folderlessGroupedExpectedTree);
 
     // Reenable folders
     await enableGroupByFolder(devToolsPage, inspectedPage);
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]', devToolsPage);
-    await expandFileTree(workerFileSelectors(6, inspectedPage), devToolsPage);
-    assert.deepEqual(await readSourcesTreeView(devToolsPage), groupedExpectedTree);
+    await expandSourceTreeItem(devToolsPage, '[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await expandFileTree(devToolsPage, workerFileSelectors(6, inspectedPage));
+    await waitForSourcesTreeView(devToolsPage, groupedExpectedTree);
   });
 });

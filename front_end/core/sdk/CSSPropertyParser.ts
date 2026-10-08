@@ -87,9 +87,8 @@ export class SyntaxTree {
   readonly tree: CodeMirror.SyntaxNode;
   readonly trailingNodes: CodeMirror.SyntaxNode[];
   readonly propertyName: string|undefined;
-  constructor(
-      propertyValue: string, rule: string, tree: CodeMirror.SyntaxNode, propertyName?: string,
-      trailingNodes: CodeMirror.SyntaxNode[] = []) {
+  constructor(propertyValue: string, rule: string, tree: CodeMirror.SyntaxNode, propertyName?: string,
+              trailingNodes: CodeMirror.SyntaxNode[] = []) {
     this.propertyName = propertyName;
     this.propertyValue = propertyValue;
     this.rule = rule;
@@ -135,8 +134,8 @@ export abstract class TreeWalker {
     }
     return instance;
   }
-  static walk<T extends TreeWalker, ArgTs extends unknown[]>(
-      this: {new(ast: SyntaxTree, ...args: ArgTs): T}, propertyValue: SyntaxTree, ...args: ArgTs): T {
+  static walk<T extends TreeWalker, ArgTs extends unknown[]>(this: {new(ast: SyntaxTree, ...args: ArgTs): T},
+                                                             propertyValue: SyntaxTree, ...args: ArgTs): T {
     const instance = new this(propertyValue, ...args);
     if (propertyValue.tree.name === 'Declaration') {
       instance.iterateDeclaration(propertyValue.tree);
@@ -189,8 +188,10 @@ export interface Matcher<MatchT extends Match> {
   matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): MatchT|null;
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export function matcherBase<MatchT extends Match>(matchT: Platform.Constructor.ConstructorOrAbstract<MatchT>) {
+export type MatcherClass<MatchT extends Match> = Platform.Constructor.Constructor<Matcher<MatchT>>;
+
+export function matcherBase<MatchT extends Match>(matchT: Platform.Constructor.ConstructorOrAbstract<MatchT>):
+    MatcherClass<MatchT> {
   class MatcherBase implements Matcher<MatchT> {
     matchType = matchT;
     accepts(_propertyName: string): boolean {
@@ -277,9 +278,8 @@ export class BottomUpTreeMatching extends TreeWalker {
     return this.getComputedTextRange(from ?? this.ast.tree, to ?? this.ast.tree, substitutionHook);
   }
 
-  getComputedTextRange(
-      from: CodeMirror.SyntaxNode|undefined, to: CodeMirror.SyntaxNode|undefined,
-      substitutionHook?: (match: Match) => string | null): string {
+  getComputedTextRange(from: CodeMirror.SyntaxNode|undefined, to: CodeMirror.SyntaxNode|undefined,
+                       substitutionHook?: (match: Match) => string | null): string {
     if (!from || !to) {
       return '';
     }
@@ -479,10 +479,9 @@ export class ComputedText {
 
   countTopLevelValues(begin: number, end: number): number {
     const pieces = Array.from(this.#getPieces(begin, end));
-    const counts = pieces.map(
-        chunk =>
-            (chunk instanceof ComputedTextChunk ? chunk.topLevelValueCount :
-                                                  this.#countTopLevelValuesInStringPiece(chunk)));
+    const counts =
+        pieces.map(chunk => (chunk instanceof ComputedTextChunk ? chunk.topLevelValueCount :
+                                                                  this.#countTopLevelValuesInStringPiece(chunk)));
     const count = counts.reduce((sum, v) => sum + v, 0);
     return count;
   }
@@ -494,9 +493,7 @@ export class ComputedText {
  * sequences that make up the pieces of text may contain non-text nodes/trees. Any such element in between the texts is
  * ignored for the spacing requirement.
  **/
-export function requiresSpace(a: string, b: string): boolean;
-export function requiresSpace(a: Node[], b: Node[]): boolean;
-export function requiresSpace(a: Node[]|string|undefined, b: Node[]|string|undefined): boolean {
+export function requiresSpace(a: string, b: string): boolean {
   const tail = Array.isArray(a) ? a.findLast(node => node.textContent)?.textContent : a;
   const head = Array.isArray(b) ? b.find(node => node.textContent)?.textContent : b;
   const trailingChar = tail ? tail[tail.length - 1] : '';
@@ -508,8 +505,6 @@ export function requiresSpace(a: Node[]|string|undefined, b: Node[]|string|undef
       !noSpaceBefore.includes(leadingChar);
 }
 
-export const CSSControlMap = Map<string, HTMLElement[]>;
-export type CSSControlMap = Map<string, HTMLElement[]>;
 export namespace ASTUtils {
   export function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
     const result = [];

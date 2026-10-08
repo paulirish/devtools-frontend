@@ -5,14 +5,26 @@
 import {
   checkStyleAttributes,
   expandSelectedNodeRecursively,
-  uncheckStylesPaneCheckbox,
   waitForElementsStyleSection,
 } from '../helpers/elements-helpers.js';
+import {
+  expectVeEvents,
+  veImpression,
+} from '../helpers/visual-logging-helpers.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 describe('The Elements tab', function() {
-  // Skip since this test seems to be consistently failing on mac and linux.
-  it.skip(
-      '[crbug.com/440335793] does not break further style inspection if inherited style property was disabled',
+  const uncheckStylesPaneCheckbox = async (checkboxLabel: string, devToolsPage: DevToolsPage) => {
+    await expectVeEvents(devToolsPage,
+                         [veImpression(`Panel: elements > Pane: styles > Section: style-properties > Tree > TreeItem: ${
+                             checkboxLabel.split(' ')[0]} > Key`)],
+                         undefined);
+    await devToolsPage.hover(`.enabled-button[aria-label="${checkboxLabel}"]`);
+    await devToolsPage.click(`.enabled-button[aria-label="${checkboxLabel}"]`);
+  };
+
+  it(
+      'does not break further style inspection if inherited style property was disabled',
       async ({devToolsPage, inspectedPage}) => {
         await inspectedPage.goToResource('elements/styles-disable-inherited.html');
         await expandSelectedNodeRecursively(devToolsPage);
@@ -20,8 +32,8 @@ describe('The Elements tab', function() {
         await devToolsPage.click('text/nested', {
           root: elementsContentPanel,
         });
-        await waitForElementsStyleSection(null, devToolsPage);
-        await checkStyleAttributes(['display: block;', 'font-weight: bold;'], devToolsPage);
+        await waitForElementsStyleSection(devToolsPage, null);
+        await checkStyleAttributes(devToolsPage, ['display: block;', 'font-weight: bold;']);
         await devToolsPage.click('text/container', {
           root: elementsContentPanel,
         });
@@ -29,6 +41,6 @@ describe('The Elements tab', function() {
         await devToolsPage.click('text/nested', {
           root: elementsContentPanel,
         });
-        await checkStyleAttributes(['display: block;'], devToolsPage);
+        await checkStyleAttributes(devToolsPage, ['display: block;']);
       });
 });

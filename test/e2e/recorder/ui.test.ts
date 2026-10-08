@@ -6,9 +6,6 @@ import {assert} from 'chai';
 
 import type {StepType} from '../../../front_end/panels/recorder/models/Schema.js';
 import {
-  selectOption,
-} from '../../../test/shared/helper.js';
-import {
   clickSelectButtonItem,
   createAndStartRecording,
   enableAndOpenRecorderPanel,
@@ -18,15 +15,15 @@ import {
   stopRecording,
   toggleCodeView,
 } from '../helpers/recorder-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 async function openRecorderAndStartRecording(
     devToolsPage: DevToolsPage,
     inspectedPage: InspectedPage,
 ) {
-  await enableAndOpenRecorderPanel('recorder/recorder.html', devToolsPage, inspectedPage);
-  await createAndStartRecording(undefined, undefined, devToolsPage);
+  await enableAndOpenRecorderPanel(devToolsPage, inspectedPage, 'recorder/recorder.html');
+  await createAndStartRecording(devToolsPage, undefined, undefined);
 }
 
 describe('Recorder', function() {
@@ -105,7 +102,7 @@ describe('Recorder', function() {
           );
           return successfulSteps.length === 3;
         });
-        await clickSelectButtonItem('Normal (Default)', '.select-button', devToolsPage);
+        await clickSelectButtonItem(devToolsPage, 'Normal (Default)', '.select-button');
         await inspectedPage.bringToFront();
         await promise;
         assert.strictEqual(
@@ -189,7 +186,7 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder2.html',
-                title: ''
+                title: '',
               }],
               target: 'main',
               selectors: [
@@ -198,8 +195,8 @@ describe('Recorder', function() {
                 'xpath///*[@id="test-button"]',
                 'pierce/#test-button',
                 'text/Test button',
-              ]
-            }]
+              ],
+            }],
           });
         });
 
@@ -226,7 +223,7 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder2.html',
-                title: ''
+                title: '',
               }],
               target: 'main',
               selectors: [
@@ -235,8 +232,8 @@ describe('Recorder', function() {
                 'xpath///*[@id="test-button"]',
                 'pierce/#test-button',
                 'text/Test button',
-              ]
-            }]
+              ],
+            }],
           });
 
           await pickSelectorsForQuery(
@@ -252,7 +249,7 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder2.html',
-                title: ''
+                title: '',
               }],
               target: 'main',
               selectors: [
@@ -261,8 +258,8 @@ describe('Recorder', function() {
                 'xpath//html/body/a',
                 'pierce/a',
                 'text/Back to Page',
-              ]
-            }]
+              ],
+            }],
           });
         });
 
@@ -291,7 +288,7 @@ describe('Recorder', function() {
                   assertedEvents: [{
                     type: 'navigation',
                     url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder2.html',
-                    title: ''
+                    title: '',
                   }],
                   target: 'main',
                   selectors: [
@@ -300,8 +297,8 @@ describe('Recorder', function() {
                     'xpath///*[@id="test-button"]',
                     'pierce/#test-button',
                     'text/Test button',
-                  ]
-                }]
+                  ],
+                }],
               },
           );
         });
@@ -327,7 +324,7 @@ describe('Recorder', function() {
             '.editable-setting select',
         );
 
-        void selectOption(await selectMenu.toElement('select'), '3G');
+        void (await selectMenu.toElement('select')).select('3G');
 
         const recording = await getCurrentRecording(devToolsPage);
 
@@ -347,7 +344,7 @@ describe('Recorder', function() {
               deviceScaleFactor: 1,
               isMobile: false,
               hasTouch: false,
-              isLandscape: false
+              isLandscape: false,
             },
             {
               type: 'navigate',
@@ -355,8 +352,8 @@ describe('Recorder', function() {
               assertedEvents: [{
                 type: 'navigation',
                 url: 'https://localhost:<test-port>/test/e2e/resources/recorder/recorder.html',
-                title: ''
-              }]
+                title: '',
+              }],
             },
             {
               type: 'click',
@@ -367,9 +364,9 @@ describe('Recorder', function() {
                 ['xpath///*[@id="test"]'],
                 ['pierce/#test'],
                 ['text/Test Button'],
-              ]
-            }
-          ]
+              ],
+            },
+          ],
         });
       });
 
@@ -427,7 +424,7 @@ describe('Recorder', function() {
   describe('Header', () => {
     describe('Shortcut Dialog', () => {
       it('should open the shortcut dialog', async ({devToolsPage, inspectedPage}) => {
-        await enableAndOpenRecorderPanel('recorder/recorder.html', devToolsPage, inspectedPage);
+        await enableAndOpenRecorderPanel(devToolsPage, inspectedPage, 'recorder/recorder.html');
         await devToolsPage.bringToFront();
         const shortcutDialog = await devToolsPage.waitFor('devtools-shortcut-dialog');
         const buttonDialog = await devToolsPage.waitFor('devtools-button-dialog', shortcutDialog);
@@ -451,7 +448,7 @@ describe('Recorder', function() {
       await devToolsPage.page.select('pierce/select', 'AllRecordingsPage');
       await devToolsPage.click('pierce/.delete-recording-button');
 
-      await devToolsPage.page.waitForSelector('pierce/.empty-state');
+      await devToolsPage.waitFor('.empty-state');
     });
   });
 });

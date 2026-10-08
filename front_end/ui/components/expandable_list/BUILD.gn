@@ -15,19 +15,17 @@ generate_css("css_files") {
 devtools_ui_module("expandable_list") {
   sources = [ "ExpandableList.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../lit:bundle",
     "../../visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "expandable_list.ts"
 
-  deps = [
-    ":css_files",
-    ":expandable_list",
-  ]
+  ts_deps = [ ":expandable_list" ]
 
   visibility = default_components_visibility
 }
@@ -37,7 +35,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "ExpandableList.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../testing",
     "../../lit:bundle",

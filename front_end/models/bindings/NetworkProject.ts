@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as Workspace from '../workspace/workspace.js';
@@ -11,23 +12,43 @@ const uiSourceCodeToAttributionMap = new WeakMap<Workspace.UISourceCode.UISource
                                                    frame: SDK.ResourceTreeModel.ResourceTreeFrame,
                                                    count: number,
                                                  }>>();
-const projectToTargetMap = new WeakMap<Workspace.Workspace.Project, SDK.Target.Target>();
-
-let networkProjectManagerInstance: NetworkProjectManager;
 
 export class NetworkProjectManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
-  private constructor() {
-    super();
-  }
+  readonly #projectToTargetMap = new WeakMap<Workspace.Workspace.Project, SDK.Target.Target>();
+  readonly #sourceURLSynthesizedUISourceCodes = new WeakSet<Workspace.UISourceCode.UISourceCode>();
 
   static instance({forceNew}: {
     forceNew: boolean,
   } = {forceNew: false}): NetworkProjectManager {
-    if (!networkProjectManagerInstance || forceNew) {
-      networkProjectManagerInstance = new NetworkProjectManager();
+    if (!Root.DevToolsContext.globalInstance().has(NetworkProjectManager) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(NetworkProjectManager, new NetworkProjectManager());
     }
 
-    return networkProjectManagerInstance;
+    return Root.DevToolsContext.globalInstance().get(NetworkProjectManager);
+  }
+
+  static removeInstance(): void {
+    Root.DevToolsContext.globalInstance().delete(NetworkProjectManager);
+  }
+
+  setTargetForProject(project: Workspace.Workspace.Project, target: SDK.Target.Target): void {
+    this.#projectToTargetMap.set(project, target);
+  }
+
+  getTargetForProject(project: Workspace.Workspace.Project): SDK.Target.Target|null {
+    return this.#projectToTargetMap.get(project) ?? null;
+  }
+
+  getTargetForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SDK.Target.Target|null {
+    return this.#projectToTargetMap.get(uiSourceCode.project()) ?? null;
+  }
+
+  setSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    this.#sourceURLSynthesizedUISourceCodes.add(uiSourceCode);
+  }
+
+  isSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    return this.#sourceURLSynthesizedUISourceCodes.has(uiSourceCode);
   }
 }
 
@@ -47,6 +68,27 @@ export interface EventTypes {
 }
 
 export class NetworkProject {
+  /**
+   * Records that `uiSourceCode` was synthesized from a `//# sourceURL=` annotation,
+   * and therefore doesn't correspond to an actual network resource.
+   */
+  static setSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().setSourceURLSynthesized(uiSourceCode);
+  }
+
+  /**
+   * Whether `uiSourceCode` was synthesized from a `//# sourceURL=` annotation.
+   *
+   * Both the URL and the content of such a source are fully controlled by the page,
+   * so it must never be treated like a genuine network resource (for example it must
+   * not be persisted as a local override, see b/553931271).
+   */
+  static isSourceURLSynthesized(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().isSourceURLSynthesized(uiSourceCode);
+  }
+
   static resolveFrame(uiSourceCode: Workspace.UISourceCode.UISourceCode, frameId: Protocol.Page.FrameId):
       SDK.ResourceTreeModel.ResourceTreeFrame|null {
     const target = NetworkProject.targetForUISourceCode(uiSourceCode);
@@ -108,6 +150,7 @@ export class NetworkProject {
     }
 
     const data = {uiSourceCode, frame};
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
     NetworkProjectManager.instance().dispatchEventToListeners(Events.FRAME_ATTRIBUTION_ADDED, data);
   }
 
@@ -128,19 +171,23 @@ export class NetworkProject {
     }
     frameAttribution.delete(frameId);
     const data = {uiSourceCode, frame: attributionInfo.frame};
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
     NetworkProjectManager.instance().dispatchEventToListeners(Events.FRAME_ATTRIBUTION_REMOVED, data);
   }
 
   static targetForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SDK.Target.Target|null {
-    return projectToTargetMap.get(uiSourceCode.project()) || null;
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().getTargetForUISourceCode(uiSourceCode);
   }
 
   static setTargetForProject(project: Workspace.Workspace.Project, target: SDK.Target.Target): void {
-    projectToTargetMap.set(project, target);
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    NetworkProjectManager.instance().setTargetForProject(project, target);
   }
 
   static getTargetForProject(project: Workspace.Workspace.Project): SDK.Target.Target|null {
-    return projectToTargetMap.get(project) || null;
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    return NetworkProjectManager.instance().getTargetForProject(project);
   }
 
   static framesForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode):

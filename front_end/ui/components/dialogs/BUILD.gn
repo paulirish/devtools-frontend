@@ -11,7 +11,9 @@ generate_css("css_files") {
   sources = [
     "buttonDialog.css",
     "dialog.css",
+    "freDialog.css",
     "shortcutDialog.css",
+    "typeToAllowDialog.css",
   ]
 }
 
@@ -19,11 +21,15 @@ devtools_ui_module("dialogs") {
   sources = [
     "ButtonDialog.ts",
     "Dialog.ts",
+    "FreDialog.ts",
     "ShortcutDialog.ts",
+    "TypeToAllowDialog.ts",
   ]
-  deps = [
+  ts_deps = [
+    "../../../core/host:bundle",
     "../../../core/i18n:bundle",
     "../../../core/platform:bundle",
+    "../../geometry:bundle",
     "../../legacy:bundle",
     "../../lit:bundle",
     "../../visual_logging:bundle",
@@ -31,15 +37,13 @@ devtools_ui_module("dialogs") {
     "../helpers:bundle",
     "../render_coordinator:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "dialogs.ts"
 
-  deps = [
-    ":css_files",
-    ":dialogs",
-  ]
+  ts_deps = [ ":dialogs" ]
 
   visibility = [ "*" ]
 }
@@ -53,7 +57,7 @@ devtools_ui_module("unittests") {
     "ShortcutDialog.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/platform:bundle",
     "../../../testing",

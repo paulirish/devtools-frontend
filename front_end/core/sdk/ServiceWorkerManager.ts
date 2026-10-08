@@ -8,53 +8,54 @@ import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
 
+import {MultitargetNetworkManager} from './NetworkManager.js';
 import {Events as RuntimeModelEvents, type ExecutionContext, RuntimeModel} from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
 import {Capability, type Target, Type} from './Target.js';
 
 const UIStrings = {
   /**
-   * @description Service worker running status displayed in the Service Workers view in the Application panel
+   * @description Service worker running status displayed in the Service Workers view in the Application panel.
    */
   running: 'running',
   /**
-   * @description Service worker running status displayed in the Service Workers view in the Application panel
+   * @description Service worker running status displayed in the Service Workers view in the Application panel.
    */
   starting: 'starting',
   /**
-   * @description Service worker running status displayed in the Service Workers view in the Application panel
+   * @description Service worker running status displayed in the Service Workers view in the Application panel.
    */
   stopped: 'stopped',
   /**
-   * @description Service worker running status displayed in the Service Workers view in the Application panel
+   * @description Service worker running status displayed in the Service Workers view in the Application panel.
    */
   stopping: 'stopping',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   activated: 'activated',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   activating: 'activating',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   installed: 'installed',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   installing: 'installing',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   new: 'new',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    */
   redundant: 'redundant',
   /**
-   * @description Service worker version status displayed in the Threads view of the Debugging side pane in the Sources panel
+   * @description Service worker version status displayed in the Threads view of the Debugging sidebar in the Sources panel.
    * @example {sw.js} PH1
    * @example {117} PH2
    * @example {activated} PH3
@@ -70,21 +71,34 @@ export class ServiceWorkerManager extends SDKModel<EventTypes> {
   readonly #registrations = new Map<string, ServiceWorkerRegistration>();
   #enabled = false;
   readonly #forceUpdateSetting: Common.Settings.Setting<boolean>;
+  readonly #networkManager: MultitargetNetworkManager;
 
   constructor(target: Target) {
     super(target);
+    this.#networkManager = target.targetManager().getNetworkManager();
     target.registerServiceWorkerDispatcher(new ServiceWorkerDispatcher(this));
     this.#agent = target.serviceWorkerAgent();
     void this.enable();
-    this.#forceUpdateSetting = this.target()
-                                   .targetManager()
-                                   .context.get(Common.Settings.Settings)
-                                   .createSetting('service-worker-update-on-reload', false);
+    this.#forceUpdateSetting = target.targetManager().settings.createSetting('service-worker-update-on-reload', false);
     if (this.#forceUpdateSetting.get()) {
       this.forceUpdateSettingChanged();
     }
     this.#forceUpdateSetting.addChangeListener(this.forceUpdateSettingChanged, this);
+    this.#networkManager.addEventListener(
+        MultitargetNetworkManager.Events.CONDITIONS_CHANGED,
+        this.forceUpdateSettingChanged,
+        this,
+    );
     new ServiceWorkerContextNamer(target, this);
+  }
+
+  override dispose(): void {
+    this.#networkManager.removeEventListener(
+        MultitargetNetworkManager.Events.CONDITIONS_CHANGED,
+        this.forceUpdateSettingChanged,
+        this,
+    );
+    super.dispose();
   }
 
   async enable(): Promise<void> {
@@ -237,7 +251,7 @@ export class ServiceWorkerManager extends SDKModel<EventTypes> {
   }
 
   private forceUpdateSettingChanged(): void {
-    const forceUpdateOnPageLoad = this.#forceUpdateSetting.get();
+    const forceUpdateOnPageLoad = this.#forceUpdateSetting.get() && !this.#networkManager.isOffline();
     void this.#agent.invoke_setForceUpdateOnPageLoad({forceUpdateOnPageLoad});
   }
 }
@@ -344,7 +358,9 @@ export class ServiceWorkerVersion {
     }
     this.targetId = payload.targetId || null;
     this.routerRules = null;
-    if (payload.routerRules) {
+    if (payload.typedRouterRules) {
+      this.routerRules = this.parseTypedRules(payload.typedRouterRules);
+    } else if (payload.routerRules) {
       this.routerRules = this.parseJSONRules(payload.routerRules);
     }
   }
@@ -441,24 +457,80 @@ export class ServiceWorkerVersion {
       return null;
     }
   }
+
+  /**
+   * `urlPattern` can be either plain text (e.g. '/foo/*') or a JSON-serialized URLPattern/URLPatternInit object.
+   * Parses it to an object if valid JSON, otherwise falls back to the original string.
+   */
+  private parseURLPatternCondition(urlPattern: string): string|Record<string, unknown>|null {
+    try {
+      const parsed = JSON.parse(urlPattern);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        // URLPattern or URLPatternInit
+        return parsed as Record<string, unknown>;
+      }
+      if (typeof parsed !== 'string') {
+        return null;
+      }
+    } catch {
+      // fallthrough
+    }
+    return urlPattern;
+  }
+
+  private parseTypedRules(rules: Protocol.ServiceWorker.ServiceWorkerRouterRule[]): ServiceWorkerRouterRule[]|null {
+    const routerRules: ServiceWorkerRouterRule[] = [];
+    for (const rule of rules) {
+      const condition: Record<string, unknown> = {...rule.condition};
+      // "urlPattern" condition can have structural URLPatternInit encoded into a JSON string.
+      // If `condition` is directly stringified, such JSON strings are double-escaped (`"abc"` -> `\"abc\""`).
+      // Expand "urlPattern" condition to native object and stringify whole conditions in such cases to avoid this.
+      if (rule.condition.urlPattern) {
+        condition.urlPattern = this.parseURLPatternCondition(rule.condition.urlPattern);
+        if (condition.urlPattern === null) {
+          console.error('Parse error: Invalid "urlPattern" condition in `typedRouterRules` in ServiceWorkerVersion');
+          return null;
+        }
+      }
+      let source: Protocol.ServiceWorker.ServiceWorkerRouterSourceType|
+          Protocol.ServiceWorker.ServiceWorkerRouterSourceDict;
+      if (rule.source.type === Protocol.ServiceWorker.ServiceWorkerRouterSourceType.SourceDict) {
+        if (!rule.source.sourceDict) {
+          console.error('Parse error: `sourceDict` is missing in `typedRouterRules` source');
+          return null;
+        }
+        source = rule.source.sourceDict;
+      } else {
+        if (rule.source.sourceDict !== undefined) {
+          console.error('Parse error: Unexpected `sourceDict` in `typedRouterRules` source');
+          return null;
+        }
+        source = rule.source.type;
+      }
+      routerRules.push(new ServiceWorkerRouterRule(JSON.stringify(condition), JSON.stringify(source), rule.id));
+    }
+    return routerRules;
+  }
 }
 
 export namespace ServiceWorkerVersion {
-  export const RunningStatus = {
-    [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Running]: i18nLazyString(UIStrings.running),
-    [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Starting]: i18nLazyString(UIStrings.starting),
-    [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Stopped]: i18nLazyString(UIStrings.stopped),
-    [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Stopping]: i18nLazyString(UIStrings.stopping),
-  };
+  export const RunningStatus:
+      Record<Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus, () => Platform.UIString.LocalizedString> = {
+        [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Running]: i18nLazyString(UIStrings.running),
+        [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Starting]: i18nLazyString(UIStrings.starting),
+        [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Stopped]: i18nLazyString(UIStrings.stopped),
+        [Protocol.ServiceWorker.ServiceWorkerVersionRunningStatus.Stopping]: i18nLazyString(UIStrings.stopping),
+      };
 
-  export const Status = {
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activated]: i18nLazyString(UIStrings.activated),
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activating]: i18nLazyString(UIStrings.activating),
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Installed]: i18nLazyString(UIStrings.installed),
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Installing]: i18nLazyString(UIStrings.installing),
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.New]: i18nLazyString(UIStrings.new),
-    [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Redundant]: i18nLazyString(UIStrings.redundant),
-  };
+  export const Status:
+      Record<Protocol.ServiceWorker.ServiceWorkerVersionStatus, () => Platform.UIString.LocalizedString> = {
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activated]: i18nLazyString(UIStrings.activated),
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activating]: i18nLazyString(UIStrings.activating),
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Installed]: i18nLazyString(UIStrings.installed),
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Installing]: i18nLazyString(UIStrings.installing),
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.New]: i18nLazyString(UIStrings.new),
+        [Protocol.ServiceWorker.ServiceWorkerVersionStatus.Redundant]: i18nLazyString(UIStrings.redundant),
+      };
 
   export const enum Modes {
     INSTALLING = 'installing',
@@ -474,7 +546,7 @@ export class ServiceWorkerRegistration {
   scopeURL!: Platform.DevToolsPath.UrlString;
   securityOrigin!: Platform.DevToolsPath.UrlString;
   isDeleted!: boolean;
-  versions = new Map<string, ServiceWorkerVersion>();
+  versions: Map<string, ServiceWorkerVersion> = new Map<string, ServiceWorkerVersion>();
   deleting = false;
   errors: Protocol.ServiceWorker.ServiceWorkerErrorMessage[] = [];
 

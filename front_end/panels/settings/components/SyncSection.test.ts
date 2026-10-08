@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
 import * as Root from '../../../core/root/root.js';
@@ -63,7 +64,7 @@ describeWithEnvironment('SyncSection', () => {
   }
 
   describe('rendering', () => {
-    it('shows "not signed in" when no user is signed into Chrome', async () => {
+    it('shows "not signed in" when no user is signed in to Chrome', async () => {
       const {view, widget} = await createWidget();
       widget.syncInfo = MOCK_SYNC_INFO_NOT_SIGNED_IN;
       const input = await view.nextInput;
@@ -82,21 +83,21 @@ describeWithEnvironment('SyncSection', () => {
       const {view, widget} = await createWidget();
       widget.syncInfo = MOCK_SYNC_INFO_SIGNED_IN_SYNC_OFF;
       const input = await view.nextInput;
-      assert.isTrue(input.syncSetting.disabled());
+      assert.isTrue(input.checkboxDisabled);
     });
 
     it('disables sync checkbox when preferences sync is off', async () => {
       const {view, widget} = await createWidget();
       widget.syncInfo = MOCK_SYNC_INFO_SIGNED_IN_PREFERENCES_OFF;
       const input = await view.nextInput;
-      assert.isTrue(input.syncSetting.disabled());
+      assert.isTrue(input.checkboxDisabled);
     });
 
     it('enables sync checkbox when sync is fully on', async () => {
       const {view, widget} = await createWidget();
       widget.syncInfo = MOCK_SYNC_INFO_SIGNED_IN_SYNC_ON;
       const input = await view.nextInput;
-      assert.isFalse(input.syncSetting.disabled());
+      assert.isFalse(input.checkboxDisabled);
     });
 
     it('passes SYNC_DISABLED warning type when sync is off', async () => {

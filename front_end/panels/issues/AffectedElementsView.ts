@@ -6,12 +6,13 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AffectedResourcesView} from './AffectedResourcesView.js';
 
 const UIStrings = {
   /**
-   * @description Noun for singular or plural number of affected element resource indication in issue view.
+   * @description Label in the Issues panel for the number of affected elements.
    */
   nElements: '{n, plural, =1 {# element} other {# elements}}',
 } as const;
@@ -34,6 +35,13 @@ export class AffectedElementsView extends AffectedResourcesView {
   async #appendAffectedElement(element: IssuesManager.Issue.AffectedElement): Promise<void> {
     const cellElement = await this.createElementCell(element, this.issue.getCategory());
     const rowElement = document.createElement('tr');
+    rowElement.setAttribute('jslog', `${VisualLogging.tableRow('affected-element')}`);
+    if (element.backendNodeId) {
+      rowElement.setAttribute('data-backend-node-id', String(element.backendNodeId));
+      if (element.target) {
+        rowElement.setAttribute('data-target-id', element.target.id());
+      }
+    }
     rowElement.appendChild(cellElement);
     this.affectedResources.appendChild(rowElement);
   }

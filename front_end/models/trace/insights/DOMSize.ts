@@ -43,7 +43,7 @@ export const UIStrings = {
    */
   totalElements: 'Total elements',
   /**
-   * @description Label for a value representing the maximum depth of the Document Object Model (DOM). "DOM" is a acronym and should not be translated.
+   * @description Label for a value representing the maximum depth of the Document Object Model (DOM). "DOM" is an acronym and should not be translated.
    */
   maxDOMDepth: 'DOM depth',
   /**
@@ -72,7 +72,7 @@ export const UIStrings = {
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DOMSize.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const DOM_SIZE_DURATION_THRESHOLD = Helpers.Timing.milliToMicro(Types.Timing.Milli(40));
 
@@ -117,7 +117,7 @@ export function generateInsight(data: Handlers.Types.HandlerData, context: Insig
   const largeLayoutUpdates: Types.Events.Layout[] = [];
   const largeStyleRecalcs: Types.Events.RecalcStyle[] = [];
 
-  const threads = Handlers.Threads.threadsInRenderer(data.Renderer, data.AuctionWorklets);
+  const threads = Handlers.Threads.threadsInRenderer(data.Renderer);
   for (const thread of threads) {
     if (thread.type !== Handlers.Threads.ThreadType.MAIN_THREAD) {
       continue;

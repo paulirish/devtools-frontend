@@ -5,19 +5,23 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
-import type {ContentDataOrError} from '../text_utils/ContentData.js';
-import type {SearchMatch} from '../text_utils/ContentProvider.js';
+import * as Root from '../../core/root/root.js';
+import type * as SDK from '../../core/sdk/sdk.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {
   type AutomaticFileSystem,
   type AutomaticFileSystemManager,
-  Events as AutomaticFileSystemManagerEvents
+  Events as AutomaticFileSystemManagerEvents,
 } from './AutomaticFileSystemManager.js';
 import {
   Events as IsolatedFileSystemManagerEvents,
-  type IsolatedFileSystemManager
+  type IsolatedFileSystemManager,
 } from './IsolatedFileSystemManager.js';
+
+type ContentDataOrError = TextUtils.ContentData.ContentDataOrError;
+type SearchMatch = TextUtils.ContentProvider.SearchMatch;
 
 /**
  * Placeholder project that acts as an empty file system within the workspace,
@@ -55,8 +59,12 @@ export class FileSystem implements Workspace.Workspace.Project {
     return false;
   }
 
+  securityOrigin(): SDK.SecurityOrigin.SecurityOrigin|null {
+    return null;
+  }
+
   displayName(): string {
-    const {root} = this.automaticFileSystem;
+    const root = this.automaticFileSystem.root.replace(Host.Platform.isWin() ? /[/\\]+$/ : /\/+$/, '');
     let slash = root.lastIndexOf('/');
     if (slash === -1 && Host.Platform.isWin()) {
       slash = root.lastIndexOf('\\');
@@ -141,14 +149,23 @@ export class FileSystem implements Workspace.Workspace.Project {
     return [];
   }
 
-  async findFilesMatchingSearchRequest(
-      _searchConfig: Workspace.SearchConfig.SearchConfig,
-      _filesMatchingFileQuery: Workspace.UISourceCode.UISourceCode[],
-      _progress: Common.Progress.Progress): Promise<Map<Workspace.UISourceCode.UISourceCode, SearchMatch[]|null>> {
+  async findFilesMatchingSearchRequest(_searchConfig: Workspace.SearchConfig.SearchConfig,
+                                       _filesMatchingFileQuery: Workspace.UISourceCode.UISourceCode[],
+                                       progress: Common.Progress.Progress):
+      Promise<Map<Workspace.UISourceCode.UISourceCode, SearchMatch[]|null>> {
+    // Defer completion to the next microtask to avoid triggering premature
+    // completion events in CompositeProgress setup loops.
+    await Promise.resolve();
+    progress.done = true;
     return new Map();
   }
 
-  indexContent(_progress: Common.Progress.Progress): void {
+  indexContent(progress: Common.Progress.Progress): void {
+    // Defer completion to the next microtask to avoid triggering premature
+    // completion events in CompositeProgress setup loops.
+    queueMicrotask(() => {
+      progress.done = true;
+    });
   }
 
   uiSourceCodeForURL(_url: Platform.DevToolsPath.UrlString): Workspace.UISourceCode.UISourceCode|null {
@@ -159,8 +176,6 @@ export class FileSystem implements Workspace.Workspace.Project {
     return [];
   }
 }
-
-let automaticFileSystemWorkspaceBindingInstance: AutomaticFileSystemWorkspaceBinding|undefined;
 
 /**
  * Provides a transient workspace `Project` that doesn't contain any `UISourceCode`s,
@@ -177,7 +192,7 @@ export class AutomaticFileSystemWorkspaceBinding {
   /**
    * @internal
    */
-  private constructor(
+  constructor(
       automaticFileSystemManager: AutomaticFileSystemManager,
       isolatedFileSystemManager: IsolatedFileSystemManager,
       workspace: Workspace.Workspace.WorkspaceImpl,
@@ -210,29 +225,33 @@ export class AutomaticFileSystemWorkspaceBinding {
     isolatedFileSystemManager: null,
     workspace: null,
   }): AutomaticFileSystemWorkspaceBinding {
-    if (!automaticFileSystemWorkspaceBindingInstance || forceNew) {
+    if (!Root.DevToolsContext.globalInstance().has(AutomaticFileSystemWorkspaceBinding) || forceNew) {
       if (!automaticFileSystemManager || !isolatedFileSystemManager || !workspace) {
         throw new Error(
             'Unable to create AutomaticFileSystemWorkspaceBinding: ' +
             'automaticFileSystemManager, isolatedFileSystemManager, ' +
             'and workspace must be provided');
       }
-      automaticFileSystemWorkspaceBindingInstance = new AutomaticFileSystemWorkspaceBinding(
+      const automaticFileSystemWorkspaceBinding = new AutomaticFileSystemWorkspaceBinding(
           automaticFileSystemManager,
           isolatedFileSystemManager,
           workspace,
       );
+      Root.DevToolsContext.globalInstance().set(AutomaticFileSystemWorkspaceBinding,
+                                                automaticFileSystemWorkspaceBinding);
     }
-    return automaticFileSystemWorkspaceBindingInstance;
+    return Root.DevToolsContext.globalInstance().get(AutomaticFileSystemWorkspaceBinding);
   }
 
   /**
    * Clears the `AutomaticFileSystemWorkspaceBinding` singleton (if any);
    */
   static removeInstance(): void {
-    if (automaticFileSystemWorkspaceBindingInstance) {
-      automaticFileSystemWorkspaceBindingInstance.#dispose();
-      automaticFileSystemWorkspaceBindingInstance = undefined;
+    if (Root.DevToolsContext.globalInstance().has(AutomaticFileSystemWorkspaceBinding)) {
+      const automaticFileSystemWorkspaceBinding =
+          Root.DevToolsContext.globalInstance().get(AutomaticFileSystemWorkspaceBinding);
+      automaticFileSystemWorkspaceBinding.#dispose();
+      Root.DevToolsContext.globalInstance().delete(AutomaticFileSystemWorkspaceBinding);
     }
   }
 

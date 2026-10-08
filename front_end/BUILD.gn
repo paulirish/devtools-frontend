@@ -19,8 +19,6 @@ group("front_end") {
     "entrypoints/device_mode_emulation_frame",
     "entrypoints/devtools_app:entrypoint",
     "entrypoints/formatter_worker:worker_entrypoint",
-    "entrypoints/greendev_floaty:copy_floaty_resources",
-    "entrypoints/greendev_floaty:floaty_entrypoint",
     "entrypoints/heap_snapshot_worker:worker_entrypoint",
     "entrypoints/inspector:entrypoint",
     "entrypoints/js_app:entrypoint",
@@ -48,6 +46,7 @@ copy_to_gen("integration_test_runner") {
 
 group("web_test_resources") {
   public_deps = [
+    ":color_tokens",
     ":integration_test_runner",
     "legacy_test_runner",
   ]
@@ -111,6 +110,7 @@ copy_to_gen_with_grd("embedder-scripts") {
 }
 
 group("unittests") {
+  testonly = true
   deps = [
     ":foundation_unittests",
     "Images:optimize_images",
@@ -120,39 +120,6 @@ group("unittests") {
     "entrypoints/node_app/app:unittests",
     "entrypoints/wasmparser_worker:unittests",
     "models/ai_assistance:unittests",
-    "models/ai_code_completion:unittests",
-    "models/ai_code_generation:unittests",
-    "models/autofill_manager:unittests",
-    "models/badges:unittests",
-    "models/bindings:unittests",
-    "models/breakpoints:unittests",
-    "models/computed_style:unittests",
-    "models/cpu_profile:unittests",
-    "models/emulation:unittests",
-    "models/extensions:unittests",
-    "models/geometry:unittests",
-    "models/har:unittests",
-    "models/issues_manager:unittests",
-    "models/javascript_metadata:unittests",
-    "models/live-metrics:unittests",
-    "models/logs:unittests",
-    "models/persistence:unittests",
-    "models/project_settings:unittests",
-    "models/source_map_scopes:unittests",
-    "models/text_utils:unittests",
-    "models/trace:unittests",
-    "models/trace/extras:unittests",
-    "models/trace/handlers:unittests",
-    "models/trace/helpers:unittests",
-    "models/trace/insights:unittests",
-    "models/trace/lantern/core:unittests",
-    "models/trace/lantern/graph:unittests",
-    "models/trace/lantern/metrics:unittests",
-    "models/trace/lantern/simulation:unittests",
-    "models/trace/types:unittests",
-    "models/trace_source_maps_resolver:unittests",
-    "models/web_mcp:unittests",
-    "models/workspace_diff:unittests",
     "panels/accessibility:unittests",
     "panels/ai_assistance:unittests",
     "panels/animation:unittests",
@@ -163,6 +130,7 @@ group("unittests") {
     "panels/autofill:unittests",
     "panels/browser_debugger:unittests",
     "panels/changes:unittests",
+    "panels/comments:unittests",
     "panels/common:unittests",
     "panels/console:unittests",
     "panels/console_counters:unittests",
@@ -184,9 +152,9 @@ group("unittests") {
     "panels/network:unittests",
     "panels/network/components:unittests",
     "panels/performance_monitor:unittests",
+    "panels/profiler:unittests",
     "panels/protocol_monitor:unittests",
     "panels/recorder:unittests",
-    "panels/recorder/components:unittests",
     "panels/recorder/converters:unittests",
     "panels/recorder/injected/selectors:unittests",
     "panels/recorder/models:unittests",
@@ -198,6 +166,7 @@ group("unittests") {
     "panels/sensors:unittests",
     "panels/settings:unittests",
     "panels/settings/components:unittests",
+    "panels/settings/emulation:unittests",
     "panels/settings/emulation/components:unittests",
     "panels/settings/emulation/utils:unittests",
     "panels/snippets:unittests",
@@ -215,11 +184,13 @@ group("unittests") {
     "panels/web_audio:unittests",
     "panels/webauthn:unittests",
     "panels/whats_new:unittests",
+    "services/puppeteer:unittests",
     "services/trace_bounds:unittests",
     "services/tracing:unittests",
     "testing:unittests",
     "third_party/chromium/client-variations:unittests",
     "third_party/i18n:unittests",
+    "ui/comments:unittests",
     "ui/components/adorners:unittests",
     "ui/components/buttons:unittests",
     "ui/components/code_highlighter:unittests",
@@ -248,12 +219,14 @@ group("unittests") {
     "ui/components/tooltips:unittests",
     "ui/components/tree_outline:unittests",
     "ui/dom_extension:unittests",
+    "ui/geometry:unittests",
     "ui/helpers:unittests",
     "ui/i18n:unittests",
     "ui/kit:unittests",
     "ui/legacy:copy_stylesheets_for_server",
     "ui/legacy:unittests",
     "ui/legacy/components/color_picker:unittests",
+    "ui/legacy/components/cookie_table:unittests",
     "ui/legacy/components/data_grid:unittests",
     "ui/legacy/components/inline_editor:unittests",
     "ui/legacy/components/object_ui:unittests",
@@ -264,33 +237,90 @@ group("unittests") {
     "ui/legacy/components/utils:unittests",
     "ui/legacy/theme_support:unittests",
     "ui/lit:unittests",
+    "ui/settings:unittests",
     "ui/visual_logging:unittests",
   ]
 }
 
 group("foundation_unittests") {
+  testonly = true
   deps = [
     "core/common:foundation_unittests",
     "core/host:foundation_unittests",
     "core/i18n:foundation_unittests",
-    "core/platform:unittests",
-    "core/protocol_client:unittests",
+    "core/platform:foundation_unittests",
+    "core/protocol_client:foundation_unittests",
     "core/root:foundation_unittests",
     "core/sdk:foundation_unittests",
+    "core/text_utils:foundation_unittests",
     "entrypoints/formatter_worker:unittests",
     "entrypoints/heap_snapshot_worker:unittests",
     "foundation:unittests",
     "models/ai_assistance:foundation_unittests",
+    "models/ai_code_completion:foundation_unittests",
+    "models/ai_code_generation:foundation_unittests",
+    "models/autofill_manager:foundation_unittests",
+    "models/badges:foundation_unittests",
+    "models/bindings:foundation_unittests",
+    "models/breakpoints:foundation_unittests",
+    "models/change_tracker:foundation_unittests",
+    "models/comment_manager:foundation_unittests",
+    "models/computed_style:foundation_unittests",
+    "models/cpu_profile:foundation_unittests",
     "models/crux-manager:foundation_unittests",
-    "models/formatter:unittests",
-    "models/heap_snapshot:unittests",
+    "models/elements:foundation_unittests",
+    "models/emulation:foundation_unittests",
+    "models/extensions:foundation_unittests",
+    "models/formatter:foundation_unittests",
+    "models/har:foundation_unittests",
+    "models/heap_snapshot:foundation_unittests",
     "models/issues_manager:foundation_unittests",
-    "models/stack_trace:unittests",
+    "models/javascript_metadata:foundation_unittests",
+    "models/live-metrics:foundation_unittests",
+    "models/logs:foundation_unittests",
+    "models/persistence:foundation_unittests",
+    "models/project_settings:foundation_unittests",
+    "models/source_map_scopes:foundation_unittests",
+    "models/stack_trace:foundation_unittests",
+    "models/trace:foundation_unittests",
+    "models/trace/extras:foundation_unittests",
+    "models/trace/handlers:foundation_unittests",
+    "models/trace/helpers:foundation_unittests",
+    "models/trace/insights:foundation_unittests",
+    "models/trace/lantern/core:foundation_unittests",
+    "models/trace/lantern/graph:foundation_unittests",
+    "models/trace/lantern/metrics:foundation_unittests",
+    "models/trace/lantern/simulation:foundation_unittests",
+    "models/trace/types:foundation_unittests",
+    "models/trace_source_maps_resolver:foundation_unittests",
+    "models/web_mcp:foundation_unittests",
     "models/workspace:foundation_unittests",
+    "models/workspace_diff:foundation_unittests",
+    "testing:foundation_unittests",
   ]
 }
 
+group("api_tests") {
+  testonly = true
+  deps = [
+    "core/sdk:api_tests",
+    "entrypoints/heap_snapshot_worker:api_tests",
+    "foundation:api_tests",
+    "models/source_map_scopes:api_tests",
+  ]
+}
+
+generated_file("api_test_inputs") {
+  testonly = true
+  outputs = [ "$target_gen_dir/api_tests.txt" ]
+  data_keys = [ "tests" ]
+  rebase = target_gen_dir
+
+  deps = [ ":api_tests" ]
+}
+
 generated_file("foundation_test_inputs") {
+  testonly = true
   outputs = [ "$target_gen_dir/foundation_tests.txt" ]
   data_keys = [ "tests" ]
   rebase = target_gen_dir
@@ -299,6 +329,7 @@ generated_file("foundation_test_inputs") {
 }
 
 generated_file("test_inputs") {
+  testonly = true
   outputs = [ "$target_gen_dir/tests.txt" ]
   data_keys = [ "tests" ]
   rebase = target_gen_dir
@@ -321,6 +352,7 @@ group("docs") {
     "ui/kit:docs",
     "ui/legacy:copy_stylesheets_for_server",
     "ui/legacy:docs",
+    "ui/legacy/components/inline_editor:docs",
     "ui/legacy/theme_support:docs",
   ]
 }

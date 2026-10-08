@@ -5,14 +5,12 @@
  */
 import { CDPSessionEvent, } from '../api/CDPSession.js';
 import { CallbackRegistry } from '../common/CallbackRegistry.js';
-import { debug } from '../common/Debug.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { ConnectionClosedError, TargetCloseError } from '../common/Errors.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { createProtocolErrorMessage } from '../util/ErrorLike.js';
 import { createIncrementalIdGenerator, } from '../util/incremental-id-generator.js';
 import { CdpCDPSession } from './CdpSession.js';
-const debugProtocolSend = debug('puppeteer:protocol:SEND ►');
-const debugProtocolReceive = debug('puppeteer:protocol:RECV ◀');
 /**
  * @public
  */
@@ -28,12 +26,21 @@ export class Connection extends EventEmitter {
     #callbacks;
     #rawErrors = false;
     #idGenerator;
-    constructor(url, transport, delay = 0, timeout, rawErrors = false, idGenerator = createIncrementalIdGenerator()) {
+    #debugProtocolSend;
+    #debugProtocolReceive;
+    #logger;
+    /**
+     * @internal
+     */
+    constructor(url, transport, delay = 0, timeout = undefined, rawErrors = false, idGenerator = createIncrementalIdGenerator(), logger) {
         super();
+        this.#logger = logger;
         this.#rawErrors = rawErrors;
         this.#idGenerator = idGenerator;
-        this.#callbacks = new CallbackRegistry(idGenerator);
+        this.#callbacks = new CallbackRegistry(idGenerator, logger);
         this.#url = url;
+        this.#debugProtocolSend = logger?.(DEBUG_PREFIXES.cdpSend);
+        this.#debugProtocolReceive = logger?.(DEBUG_PREFIXES.cdpReceive);
         this.#delay = delay;
         this.#timeout = timeout ?? 180_000;
         this.#transport = transport;
@@ -122,7 +129,7 @@ export class Connection extends EventEmitter {
                 id,
                 sessionId,
             });
-            debugProtocolSend(stringifiedMessage);
+            this.#debugProtocolSend?.(stringifiedMessage);
             this.#transport.send(stringifiedMessage);
         });
     }
@@ -141,11 +148,11 @@ export class Connection extends EventEmitter {
                 return setTimeout(r, this.#delay);
             });
         }
-        debugProtocolReceive(message);
+        this.#debugProtocolReceive?.(message);
         const object = JSON.parse(message);
         if (object.method === 'Target.attachedToTarget') {
             const sessionId = object.params.sessionId;
-            const session = new CdpCDPSession(this, object.params.targetInfo.type, sessionId, object.sessionId, this.#rawErrors);
+            const session = new CdpCDPSession(this, object.params.targetInfo.type, sessionId, object.sessionId, this.#rawErrors, this.#logger);
             this.#sessions.set(sessionId, session);
             this.emit(CDPSessionEvent.SessionAttached, session);
             const parentSession = this.#sessions.get(object.sessionId);

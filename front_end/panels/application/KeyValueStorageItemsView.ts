@@ -28,8 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /* eslint no-return-assign: "off" */
+import '../../ui/components/buttons/buttons.js';
+
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Geometry from '../../models/geometry/geometry.js';
+import * as AIAssistance from '../../models/ai_assistance/ai_assistance.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
+import dataGridAiButtonStyles from '../../ui/legacy/components/data_grid/dataGridAiButton.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives as LitDirectives, html, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -37,35 +41,37 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as ApplicationComponents from './components/components.js';
 import {StorageItemsToolbar} from './StorageItemsToolbar.js';
 
+const STORAGE_FLOATING_BUTTON_ACTION_ID = 'ai-assistance.storage-floating-button';
+
 const {ARIAUtils} = UI;
 const {EmptyWidget} = UI.EmptyWidget;
 const {VBox, widget} = UI.Widget;
 const {Size} = Geometry;
-const {repeat} = LitDirectives;
+const {repeat, ifDefined} = LitDirectives;
 
 type Widget = UI.Widget.Widget;
 type VBox = UI.Widget.VBox;
 
 const UIStrings = {
   /**
-   * @description Text that shows in the Application Panel if no value is selected for preview
+   * @description Empty state header in the storage items view of the Application panel when no value is selected.
    */
   noPreviewSelected: 'No value selected',
   /**
-   * @description Preview text when viewing storage in Application panel
+   * @description Empty state text in the storage items view of the Application panel when no value is selected.
    */
   selectAValueToPreview: 'Select a value to preview',
   /**
-   * @description Text for announcing number of entries after filtering
+   * @description Screen reader announcement for the number of entries shown in the storage table of the Application panel.
    * @example {5} PH1
    */
   numberEntries: 'Number of entries shown in table: {PH1}',
   /**
-   * @description Text in DOMStorage Items View of the Application panel
+   * @description Column header for key in the storage items datagrid of the Application panel.
    */
   key: 'Key',
   /**
-   * @description Text for the value of something
+   * @description Column header for value in the storage items datagrid of the Application panel.
    */
   value: 'Value',
 } as const;
@@ -85,8 +91,12 @@ export interface ViewInput {
   onDelete: (key: string) => void;
   onDeleteSelected: () => void;
   onDeleteAll: () => void;
+  onContextMenu?: (item: {key: string, value: string}, contextMenu: UI.ContextMenu.ContextMenu) => void;
   jslog?: string;
   classes?: string[];
+  aiButtonTitle?: string;
+  showAiButton?: boolean;
+  onAiButtonClick?: (item: {key: string, value: string}, event: Event) => void;
 }
 
 interface ViewOutput {
@@ -143,6 +153,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
                 <devtools-data-grid
                   .name=${`${id}-datagrid-with-preview`}
                   striped
+                  deletable
                   style="flex: auto"
                   @sort=${(e: CustomEvent<{columnId: string, ascending: boolean}>) => input.onSort(e.detail.ascending)}
                   @refresh=${input.onRefresh}
@@ -150,6 +161,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
                   @deselect=${() => input.onSelect(null)}
                 >
                   <table>
+                    ${input.showAiButton ? html`<style>${dataGridAiButtonStyles}</style>`: nothing}
                     <tr>
                       <th id="key" sortable ?editable=${input.editable}>
                         ${i18nString(UIStrings.key)}
@@ -164,8 +176,17 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
                           @edit=${(e: CustomEvent<{columnId: string, valueBeforeEditing: string, newText: string}>) =>
                             input.onEdit(item.key, item.value, e.detail.columnId, e.detail.valueBeforeEditing, e.detail.newText)}
                           @delete=${() => input.onDelete(item.key)}
+                          @contextmenu=${(e: CustomEvent<UI.ContextMenu.ContextMenu>) => input.onContextMenu?.(item, e.detail)}
                           selected=${(input.selectedKey === item.key) || nothing}>
-                        <td>${item.key}</td>
+                        <td>${input.showAiButton ? html`
+                            <span class="ai-button-container">
+                              <devtools-floating-button
+                                icon-name=${AIAssistance.AiUtils.getIconName()}
+                                title=${ifDefined(input.aiButtonTitle)}
+                                @click=${(e: Event) => input.onAiButtonClick?.(item, e)}
+                              ></devtools-floating-button>
+                            </span>
+                          ` : nothing}${item.key}</td>
                         <td>${item.value.substr(0, MAX_VALUE_LENGTH)}</td>
                       </tr>`)}
                       <tr placeholder></tr>
@@ -179,8 +200,8 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
                ${input.preview?.element}
               </devtools-widget>
             </devtools-split-view>`,
-            // clang-format on
-            target, {container: {attributes: {jslog: input.jslog}, classes: input.classes}});
+               // clang-format on
+               target, {container: {attributes: {jslog: input.jslog}, classes: input.classes}});
       };
     }
     super();
@@ -208,7 +229,7 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
     const viewOutput = {
       set toolbar(toolbar: StorageItemsToolbar) {
         that.#toolbar = toolbar;
-      }
+      },
     };
     const viewInput = {
       items: this.#items,
@@ -217,14 +238,23 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
       preview: this.#preview,
       jslog: this.#jslog,
       classes: this.#classes,
+      showAiButton: this.isAiButtonEnabled(),
+      aiButtonTitle: this.isAiButtonEnabled() &&
+              UI.ActionRegistry.ActionRegistry.instance().hasAction(STORAGE_FLOATING_BUTTON_ACTION_ID) ?
+          UI.ActionRegistry.ActionRegistry.instance().getAction(STORAGE_FLOATING_BUTTON_ACTION_ID).title() :
+          undefined,
       onSelect: (item: {key: string, value: string}|null) => {
         this.#toolbar?.setCanDeleteSelected(Boolean(item));
-        if (!item) {
-          void this.#previewEntry(null);
-        } else {
-          void this.#previewEntry(item);
-        }
+        void this.#previewEntry(item);
         this.selectedItemChanged(item);
+      },
+      onAiButtonClick: this.isAiButtonEnabled() ?
+          (item: {key: string, value: string}, event: Event) => {
+            this.onAiButtonClick(item, event);
+          } :
+          undefined,
+      onContextMenu: (item: {key: string, value: string}, contextMenu: UI.ContextMenu.ContextMenu) => {
+        this.populateContextMenu(item, contextMenu);
       },
 
       onSort: (ascending: boolean) => {
@@ -250,6 +280,17 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
       },
     };
     this.#view(viewInput, viewOutput, this.contentElement);
+    this.doResize();
+  }
+
+  protected isAiButtonEnabled(): boolean {
+    return false;
+  }
+
+  protected populateContextMenu(_item: {key: string, value: string}, _contextMenu: UI.ContextMenu.ContextMenu): void {
+  }
+
+  protected onAiButtonClick(_item: {key: string, value: string}, _event: Event): void {
   }
 
   protected get toolbar(): StorageItemsToolbar|undefined {
@@ -394,6 +435,18 @@ export abstract class KeyValueStorageItemsView extends UI.Widget.VBox {
       this.#selectedKey = null;
       this.showPreview(null, null);
     }
+  }
+
+  protected set jslog(jslog: string|undefined) {
+    if (this.#jslog === jslog) {
+      return;
+    }
+    this.#jslog = jslog;
+    this.performUpdate();
+  }
+
+  protected get jslog(): string|undefined {
+    return this.#jslog;
   }
 
   set editable(editable: boolean) {

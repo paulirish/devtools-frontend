@@ -13,13 +13,13 @@ devtools_foundation_module("root") {
     "Runtime.ts",
   ]
 
-  deps = [ "../../core/platform:bundle" ]
+  ts_deps = [ "../../core/platform:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "root.ts"
 
-  deps = [ ":root" ]
+  ts_deps = [ ":root" ]
 
   visibility = [ "*" ]
 }
@@ -29,8 +29,5 @@ devtools_foundation_module("foundation_unittests") {
 
   sources = [ "Runtime.test.ts" ]
 
-  deps = [
-    ":bundle",
-    "../platform:bundle",
-  ]
+  ts_deps = [ ":bundle" ]
 }

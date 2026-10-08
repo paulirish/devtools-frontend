@@ -5,12 +5,14 @@
 /* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
+import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import type * as NetworkTimeCalculator from '../../../../models/network_time_calculator/network_time_calculator.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
+import {html, nothing, render, type TemplateResult} from '../../../lit/lit.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -34,52 +36,59 @@ const SUBTITLE_FONT_SIZE_AND_STYLE = 'italic 10px';
 
 const UIStrings = {
   /**
-   * @description Aria alert used to notify the user when an event has been selected because they tabbed into a group.
+   * @description Accessible announcement when an event is selected by tabbing into a group in the flame chart.
    * @example {Paint} PH1
    * @example {Main thread} PH2
-   *
    */
-  eventSelectedFromGroup: 'Selected a {PH1} event within {PH2}. Press "enter" to focus this event.',
+  eventSelectedFromGroup: 'Selected a {PH1} event within {PH2}. Press Enter to focus this event.',
   /**
-   * @description Aria accessible name in Flame Chart of the Performance panel
+   * @description Accessible name for the flame chart canvas.
    */
-  flameChart: 'Flame Chart',
+  flameChart: 'Flame chart',
   /**
-   * @description Text for the screen reader to announce a hovered group
+   * @description Accessible announcement when hovering over a group in the flame chart.
    * @example {Network} PH1
    */
   sHovered: '{PH1} hovered',
   /**
-   * @description Text for screen reader to announce a selected group.
+   * @description Accessible announcement when selecting a group in the flame chart.
    * @example {Network} PH1
    */
   sSelected: '{PH1} selected',
   /**
-   * @description Text for screen reader to announce an expanded group
+   * @description Accessible announcement when expanding a group in the flame chart.
    * @example {Network} PH1
    */
   sExpanded: '{PH1} expanded',
   /**
-   * @description Text for screen reader to announce a collapsed group
+   * @description Accessible announcement when collapsing a group in the flame chart.
    * @example {Network} PH1
    */
   sCollapsed: '{PH1} collapsed',
   /**
-   * @description Text for an action that adds a label annotation to an entry in the Flame Chart
+   * @description Context menu option to add a label annotation to an entry in the flame chart.
    */
   labelEntry: 'Label entry',
   /**
-   * @description Text for an action that adds link annotation between entries in the Flame Chart
+   * @description Context menu option to add a link annotation between entries in the flame chart.
    */
   linkEntries: 'Link entries',
   /**
-   * @description Shown in the context menu when right clicking on a track header to enable the user to enter the track configuration mode.
+   * @description Context menu option to enter track configuration mode in the flame chart.
    */
   enterTrackConfigurationMode: 'Configure tracks',
   /**
-   * @description Shown in the context menu when right clicking on a track header to allow the user to exit track configuration mode.
+   * @description Context menu option to exit track configuration mode in the flame chart.
    */
   exitTrackConfigurationMode: 'Finish configuring tracks',
+  /**
+   * @description Context menu option to copy the track name in the flame chart.
+   */
+  copyTrackName: 'Copy track name',
+  /**
+   * @description Context menu option to copy the track URL in the flame chart.
+   */
+  copyTrackUrl: 'Copy track URL',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/perf_ui/FlameChart.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -151,7 +160,7 @@ export const enum HoverType {
 export const enum GroupCollapsibleState {
   ALWAYS = 0,
   NEVER = 1,
-  IF_MULTI_ROW = 2
+  IF_MULTI_ROW = 2,
 }
 
 export interface FlameChartDelegate {
@@ -236,8 +245,12 @@ export type DrawOverride =
     (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number,
      timeToPosition: (time: number) => number, transformColor: (color: string) => string) => PositionOverride;
 
-export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
-    implements NetworkTimeCalculator.Calculator, ChartViewportDelegate {
+const FlameChartBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.Calculator, ChartViewportDelegate {
   private readonly flameChartDelegate: FlameChartDelegate;
   private chartViewport: ChartViewport;
   private dataProvider: FlameChartDataProvider;
@@ -276,7 +289,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private lastMouseOffsetX: number;
   private selectedGroupIndex: number;
   private keyboardFocusedGroup: number;
-  private offsetWidth!: number;
+  offsetWidth!: number;
   private offsetHeight!: number;
   private dragStartX!: number;
   private dragStartY!: number;
@@ -314,6 +327,29 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   #indexToDrawOverride = new Map<number, DrawOverride>();
   #persistedGroupConfig: PersistedGroupConfig[]|null = null;
+  /**
+   * Caches the middle-truncated display names of track header labels to avoid recalculating
+   * truncation during draw operations. The cache is invalidated when the panel is resized,
+   * when track configuration edit mode is toggled, or when the trace data is reset.
+   *
+   * The `names` map uses the static `groupIndex` (which is invariant to track reordering)
+   * as the key, and maps it to the truncated string drawn on the canvas.
+   */
+  #urlTruncations = {
+    names: new Map<number, string>(),
+    lastWidth: 0,
+  };
+  /**
+   * Caches middle-truncated entry titles keyed by entry index.
+   * Stores the `width` (maximum available text width in pixels) and `text` (trimmed string or null).
+   */
+  #entryTitleCache = new Map<number, {width: number, text: string|null}>();
+  /**
+   * Tracks the previous window device pixel ratio.
+   * When the ratio changes (e.g. browser zoom changes), subpixel font metrics can shift,
+   * requiring #entryTitleCache to be invalidated.
+   */
+  #lastDpr = 0;
   readonly #boundOnThemeChanged = this.#onThemeChanged.bind(this);
 
   constructor(
@@ -417,6 +453,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   #onThemeChanged(): void {
+    // Clear title cache because theme changes can alter font families and metrics,
+    // invalidating previously measured middle-truncated text.
+    this.#entryTitleCache.clear();
     this.scheduleUpdate();
   }
 
@@ -468,10 +507,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (this.popoverElement.children.length) {
       this.updatePopoverOffset();
     }
-  }
-
-  getBarHeight(): number {
-    return this.barHeight;
   }
 
   setBarHeight(value: number): void {
@@ -562,6 +597,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   #transformColor(entryIndex: number, color: string): string {
+    if (!color) {
+      return '';
+    }
+
     if (this.#shouldDimEvent(entryIndex)) {
       let dimmed = this.colorDimmingCache.get(color);
       if (dimmed) {
@@ -599,7 +638,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   hideHighlight(): void {
     if (this.#searchResultEntryIndex === null) {
-      this.popoverElement.removeChildren();
+      this.#renderPopover(nothing);
       this.lastPopoverState = {
         entryIndex: -1,
         groupIndex: -1,
@@ -638,6 +677,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   private resetCanvas(): void {
     const ratio = window.devicePixelRatio;
+    if (this.#lastDpr !== ratio) {
+      this.#entryTitleCache.clear();
+      this.#lastDpr = ratio;
+    }
     const width = Math.round(this.offsetWidth * ratio);
     const height = Math.round(this.offsetHeight * ratio);
     this.canvas.width = width;
@@ -772,7 +815,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         this.viewportElement.style.cursor = 'pointer';
         const iconTooltipElement = this.#prepareIconInfo(groupIndex, hoverType);
         if (iconTooltipElement) {
-          this.popoverElement.appendChild(iconTooltipElement);
+          this.#renderPopover(iconTooltipElement);
           this.updatePopoverOffset();
         }
         return;
@@ -901,9 +944,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     };
   }
 
-  updatePopoverContents(popoverElement: Element): void {
-    this.popoverElement.removeChildren();
-    this.popoverElement.appendChild(popoverElement);
+  #renderPopover(content: Element|TemplateResult|string|typeof nothing): void {
+    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+    render(html`${content}`, this.popoverElement);
+  }
+
+  updatePopoverContents(popoverElement: Element|TemplateResult): void {
+    this.#renderPopover(popoverElement);
     // Must update the offset AFTER the new content has been added.
     this.updatePopoverOffset();
     this.lastPopoverState.entryIndex = -1;
@@ -919,15 +966,26 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (groupIndex === this.lastPopoverState.groupIndex) {
       return this.updatePopoverOffset();
     }
-    this.popoverElement.removeChildren();
     const data = this.timelineData();
     if (!data) {
+      this.#renderPopover(nothing);
       return;
     }
     const group = data.groups.at(groupIndex);
-    if (group?.description) {
-      this.popoverElement.innerText = (group?.description);
+    if (!group) {
+      this.#renderPopover(nothing);
+      return;
+    }
+    // Only show a popover tooltip if the group has a pre-defined `fullTrackName`
+    // (e.g. main thread tracks that are named after their URL, which are middle-truncated on the canvas).
+    // All other tracks have short, static titles that fit without truncation and do not need a tooltip.
+    const fullTrackName = group.fullTrackName;
+
+    if (fullTrackName) {
+      this.#renderPopover(fullTrackName);
       this.updatePopoverOffset();
+    } else {
+      this.#renderPopover(nothing);
     }
     this.lastPopoverState = {
       groupIndex,
@@ -947,7 +1005,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       mouseX = coordinate?.x ? coordinate.x - canvasViewportOffsetX : mouseX;
       mouseY = coordinate?.y ? coordinate.y - canvasViewportOffsetY : mouseY;
     }
-    // The parent dimensions are the maximum the popover can use.
     const parentWidth = this.popoverElement.parentElement ? this.popoverElement.parentElement.clientWidth : 0;
     const parentHeight = this.popoverElement.parentElement ? this.popoverElement.parentElement.clientHeight : 0;
     const infoWidth = this.popoverElement.clientWidth;
@@ -957,40 +1014,18 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const offsetX = 10;
     // Incorporate any network flamechart height into dynamic positioning
     const offsetY = 6 + this.#tooltipPopoverYAdjustment;
-    let x;
-    let y;
 
-    /**
-     * Fancy positioning algorithm. It optimizes for consistent positioning, not obstructing any of the popover, and not positioning atop the mouse cursor.
-     *
-     * Take the mouse cursor position (mouseX/mouseY) and split up the area into four quadrants
-     *     0: bottom-right. 1: top-right. 2: bottom-left. 3: top-left.
-     *
-     * We attempt this in two passes, first is for keeping the whole popover visible, the second is slightly relaxed.
-     *   If we hit the second pass, its because the tooltip size is close to the size of the available (parent*) space.
-     * In each pass, we loop through the quadrants
-     *   If the tooltip can fit (after some adjustments) within a quadrant, we `break` and that x,y is used.
-     */
-    for (let pass = 0; pass < 2; ++pass) {
-      for (let quadrant = 0; quadrant < 4; ++quadrant) {
-        // The bitwise AND operator is used to generate the 4 unique combinations of two booleans. (true+false, true+true, etc)
-        const dx = quadrant & 2 ? -offsetX - infoWidth : offsetX;
-        const dy = quadrant & 1 ? -offsetY - infoHeight : offsetY;
-        // mouseX+dx is ideal, but clamp against the available space (It will be adapted to fit)
-        x = Platform.NumberUtilities.clamp(mouseX + dx, 0, parentWidth - infoWidth);
-        y = Platform.NumberUtilities.clamp(mouseY + dy, 0, parentHeight - infoHeight);
+    const {x, y} = calculatePopoverOffset({
+      mouseX,
+      mouseY,
+      parentWidth,
+      parentHeight,
+      infoWidth,
+      infoHeight,
+      offsetX,
+      offsetY,
+    });
 
-        const popoverFits = pass === 0 ?
-            // Will the whole popover be visible?
-            (x >= mouseX || mouseX >= x + infoWidth) && (y >= mouseY || mouseY >= y + infoHeight) :
-            // Will the popover fit well in 1 dimension? (Though we typically see it fit in both, here. Shrug.)
-            x >= mouseX || mouseX >= x + infoWidth || y >= mouseY || mouseY >= y + infoHeight;
-
-        if (popoverFits) {
-          break;
-        }
-      }
-    }
     this.popoverElement.style.left = x + 'px';
     this.popoverElement.style.top = y + 'px';
   }
@@ -1185,6 +1220,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
 
     this.expandGroup(groupIndex, !this.rawTimelineData.groups[groupIndex].expanded /* setExpanded */);
+  }
+
+  blurCanvasForTesting(): void {
+    this.canvas.blur();
   }
 
   bulkExpandGroups(indexes: number[]): void {
@@ -1430,21 +1469,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.update();
   }
 
-  #buildEnterEditModeContextMenu(event: MouseEvent): void {
-    if (this.#inTrackConfigEditMode) {
-      return;
-    }
-
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
-    const label = i18nString(UIStrings.enterTrackConfigurationMode);
-    this.contextMenu.defaultSection().appendItem(label, () => {
-      this.enterTrackConfigurationMode();
-    }, {
-      jslogContext: 'track-configuration-enter',
-    });
-    void this.contextMenu.show();
-  }
-
   #buildExitEditModeContextMenu(event: MouseEvent): void {
     if (this.#inTrackConfigEditMode === false) {
       return;
@@ -1456,6 +1480,45 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }, {
       jslogContext: 'track-configuration-exit',
     });
+    void this.contextMenu.show();
+  }
+
+  #buildTrackHeaderContextMenu(event: MouseEvent, groupIndex: number): void {
+    const data = this.timelineData();
+    if (!data) {
+      return;
+    }
+    const group = data.groups.at(groupIndex);
+    if (!group) {
+      return;
+    }
+
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
+
+    this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.copyTrackName), () => {
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(group.name);
+    }, {
+      jslogContext: 'timeline.copy-track-name',
+    });
+
+    if (group.url) {
+      this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.copyTrackUrl), () => {
+        Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(group.url);
+      }, {
+        jslogContext: 'timeline.copy-track-url',
+      });
+    }
+
+    if (this.#hasTrackConfigurationMode()) {
+      this.contextMenu.defaultSection().appendSeparator();
+      const label = i18nString(UIStrings.enterTrackConfigurationMode);
+      this.contextMenu.defaultSection().appendItem(label, () => {
+        this.enterTrackConfigurationMode();
+      }, {
+        jslogContext: 'track-configuration-enter',
+      });
+    }
+
     void this.contextMenu.show();
   }
 
@@ -1480,8 +1543,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // extra check. For example, in the DevTools Performance Panel the network
     // data provider & flame chart does not support this mode, but the main one
     // does.
-    if (hoverType === HoverType.INSIDE_TRACK_HEADER && this.#hasTrackConfigurationMode()) {
-      this.#buildEnterEditModeContextMenu(event);
+    if (hoverType === HoverType.INSIDE_TRACK_HEADER) {
+      this.#buildTrackHeaderContextMenu(event, groupIndex);
+      return;
     }
 
     // The user can create context menus in two ways:
@@ -1606,60 +1670,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   bindCanvasEvent(eventName: string, onEvent: (arg0: Event) => void): void {
     this.canvas.addEventListener(eventName, onEvent);
-  }
-
-  drawTrackOnCanvas(trackName: string, context: CanvasRenderingContext2D, minWidth: number):
-      {top: number, height: number, visibleEntries: Set<number>}|null {
-    const timelineData = this.timelineData();
-    if (!timelineData) {
-      return null;
-    }
-    const canvasWidth = this.offsetWidth;
-    const canvasHeight = this.offsetHeight;
-    context.save();
-    const ratio = window.devicePixelRatio;
-    context.scale(ratio, ratio);
-    context.fillStyle = 'rgba(0, 0, 0, 0)';
-    context.fillRect(0, 0, canvasWidth, canvasHeight);
-    context.font = this.#font;
-
-    const groups = this.rawTimelineData?.groups || [];
-    const groupOffsets = this.groupOffsets;
-    if (!groups.length || !groupOffsets) {
-      return null;
-    }
-    const trackIndex = groups.findIndex(g => g.name.includes(trackName));
-    if (trackIndex < 0) {
-      return null;
-    }
-    this.scrollGroupIntoView(trackIndex);
-    const group = groups[trackIndex];
-    const startLevel = group.startLevel;
-    const endLevel = groups[trackIndex + 1].startLevel;
-    const groupTop = groupOffsets[trackIndex];
-    const nextOffset = groupOffsets[trackIndex + 1];
-
-    const {drawBatches, titleIndices} = this.getDrawBatches(context, timelineData);
-
-    const entryIndexIsInTrack = (index: number): boolean => {
-      const barWidth = Math.min(this.#eventBarWidth(timelineData, index), canvasWidth);
-      return timelineData.entryLevels[index] >= startLevel && timelineData.entryLevels[index] < endLevel &&
-          barWidth > minWidth;
-    };
-    let allFilteredIndexes: number[] = [];
-    for (const [{color, outline}, {indexes}] of drawBatches) {
-      const filteredIndexes = indexes.filter(entryIndexIsInTrack);
-      allFilteredIndexes = [...allFilteredIndexes, ...filteredIndexes];
-      this.#drawBatchEvents(context, timelineData, color, filteredIndexes, outline);
-    }
-    const filteredTitleIndices = titleIndices.filter(entryIndexIsInTrack);
-    this.drawEventTitles(context, timelineData, filteredTitleIndices, canvasWidth);
-    context.restore();
-    return {
-      top: groupOffsets[trackIndex],
-      height: nextOffset - groupTop,
-      visibleEntries: new Set(allFilteredIndexes),
-    };
   }
 
   private handleKeyboardGroupNavigation(event: Event): boolean {
@@ -2136,12 +2146,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         if (y >= this.groupOffsets[groupIndex] && y < this.groupOffsets[nextIndex]) {
           // This section is used to calculate the position of current group's header
           // If we are in edit mode, the track label is pushed right to make room for the icons.
-          const context = this.context;
-          context.save();
-          context.font = this.#font;
           const headerRight = HEADER_LEFT_PADDING + (this.#inTrackConfigEditMode ? EDIT_MODE_TOTAL_ICON_WIDTH : 0) +
-              this.labelWidthForGroup(context, groups[groupIndex]);
-          context.restore();
+              this.labelWidthForGroup(this.context, groups[groupIndex]);
 
           const mouseInHeaderRow =
               y >= this.groupOffsets[groupIndex] && y < this.groupOffsets[groupIndex] + groups[groupIndex].style.height;
@@ -2185,6 +2191,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (!this.#hasTrackConfigurationMode()) {
       return;
     }
+    this.#urlTruncations.names.clear();
     const div = document.createElement('div');
     div.classList.add('flame-chart-edit-confirm');
     const button = new Buttons.Button.Button();
@@ -2218,6 +2225,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   #exitEditMode(): void {
+    this.#urlTruncations.names.clear();
     this.#removeEditModeButton();
     this.#inTrackConfigEditMode = false;
     this.dispatchEventToListeners(Events.TRACKS_REORDER_STATE_CHANGED, false);
@@ -2289,7 +2297,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.drawMarkers(context, timelineData, markerIndices);
     }
 
-    this.drawEventTitles(context, timelineData, titleIndices, canvasWidth);
+    this.drawEventTitles(context, timelineData, titleIndices);
 
     // If there is a `forceDecoration` function, it will be called in `drawEventTitles`, which will overwrite the
     // default decorations, so we need to call this function after the `drawEventTitles`.
@@ -2551,14 +2559,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return barHeight;
   }
 
-  entryWidth(entryIndex: number): number {
-    const timelineData = this.timelineData();
-    if (!timelineData) {
-      return 0;
-    }
-    return this.#eventBarWidth(timelineData, entryIndex);
-  }
-
   #eventBarWidth(timelineData: FlameChartTimelineData, entryIndex: number): number {
     const {entryTotalTimes, entryStartTimes} = timelineData;
     const duration = entryTotalTimes[entryIndex];
@@ -2717,6 +2717,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
+    if (width !== this.#urlTruncations.lastWidth) {
+      this.#urlTruncations.names.clear();
+      this.#urlTruncations.lastWidth = width;
+    }
+
     const groups = this.rawTimelineData.groups || [];
     if (!groups.length) {
       return;
@@ -2810,20 +2815,35 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       // |ICON_WIDTH|expansionArrowIndent * (nesting level + 1)|
       // |headerLeftPadding|EDIT  ICON|                     |Arrow|LabelXPadding|Title|LabelXPadding|
       //                                                                        ^ titleStart
-      const titleStart = iconsWidth + EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1) + ARROW_SIDE / 2 +
-          HEADER_LABEL_X_PADDING;
+      const nestingLevel = group.style.nestingLevel || 0;
+      const titleStart =
+          iconsWidth + EXPANSION_ARROW_INDENT * (nestingLevel + 1) + ARROW_SIDE / 2 + HEADER_LABEL_X_PADDING;
       const y = offset + group.style.height - this.textBaseline;
-      context.fillText(group.name, titleStart, y);
+      let displayName = this.#urlTruncations.names.get(groupIndex);
+      if (displayName === undefined) {
+        displayName = group.name;
+        // Calculate the maximum width available for the text. We subtract the X coordinate where the text starts
+        // (titleStart) and the padding at the end of the line (HEADER_LABEL_X_PADDING) from the total width of the canvas.
+        // We then apply a 0.85 (85%) factor as a safety margin to prevent the text from running too close to the edge of
+        // the canvas or overlapping other potential visual elements on the right.
+        const maxTextWidth = (width - titleStart - HEADER_LABEL_X_PADDING) * 0.85;
+        if (context.measureText(displayName).width > maxTextWidth) {
+          displayName = UI.UIUtils.trimTextMiddle(context, displayName, maxTextWidth);
+        }
+        this.#urlTruncations.names.set(groupIndex, displayName);
+      }
+
+      context.fillText(displayName, titleStart, y);
       if (group.subtitle) {
-        const titleMetrics = context.measureText(group.name);
+        const titleMetrics = context.measureText(displayName);
         context.font = this.#subtitleFont;
         context.fillText(group.subtitle, titleStart + titleMetrics.width + PADDING_BETWEEN_TITLE_AND_SUBTITLE, y - 1);
         context.font = this.#font;
       }
       if (this.#inTrackConfigEditMode && group.hidden) {
         // Draw a strikethrough line for the hidden tracks.
-        context.fillRect(
-            titleStart, offset + group.style.height / 2, UI.UIUtils.measureTextWidth(context, group.name), 1);
+        context.fillRect(titleStart, offset + group.style.height / 2, UI.UIUtils.measureTextWidth(context, displayName),
+                         1);
       }
 
       // The icon and track title will look like this
@@ -2973,60 +2993,90 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * Draws the titles of trace events in the timeline. Also calls `decorateEntry` on the data
    * provider, which can do any custom drawing on the corresponding entry's area (e.g. draw screenshots
    * in the Performance Panel timeline).
-   *
-   * Takes in the width of the entire canvas so that we know if an event does
-   * not fit into the viewport entirely, the max width we can draw is that
-   * width, not the width of the event itself.
    */
-  private drawEventTitles(
-      context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, titleIndices: number[],
-      canvasWidth: number): void {
+  private drawEventTitles(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData,
+                          titleIndices: number[]): void {
     const timeToPixel = this.chartViewport.timeToPixel();
     const textPadding = this.textPadding;
     context.save();
     context.beginPath();
-    const {entryStartTimes, entryLevels} = timelineData;
+    const {entryStartTimes, entryLevels, entryTotalTimes} = timelineData;
     for (let i = 0; i < titleIndices.length; ++i) {
       const entryIndex = titleIndices[i];
       const entryStartTime = entryStartTimes[entryIndex];
-      const barX = this.timeToPositionClipped(entryStartTime);
-      // Ensure that the title does not go off screen, if the width of the
-      // event is wider than the width of the canvas, use the canvas width as
-      // our maximum width.
-      const barWidth = Math.min(this.#eventBarWidth(timelineData, entryIndex), canvasWidth);
+      const duration = entryTotalTimes[entryIndex];
+      const unclippedStartX = this.chartViewport.timeToPosition(entryStartTime);
+      const barX = this.#clampX(unclippedStartX);
+      const unclippedEndX = this.chartViewport.timeToPosition(entryStartTime + duration);
+      const barWidth = Math.min(this.#eventBarWidth(timelineData, entryIndex), this.offsetWidth);
+      // For unclipped events, compute text width directly from duration and timeToPixel.
+      // Because chartViewport.timeToPosition uses Math.floor, coordinate subtraction fluctuates
+      // by +/-1px across subpixel pan offsets. Calculating width directly from duration keeps
+      // maxBarWidth stable during horizontal panning, ensuring hits in #entryTitleCache and
+      // avoiding expensive trimTextMiddle / measureText recomputations.
+      const isUnclipped = unclippedStartX >= 0 && unclippedEndX <= this.offsetWidth;
+      const textBarWidth = isUnclipped ? Math.max(1, Math.round(duration * timeToPixel)) : barWidth;
       const barLevel = entryLevels[entryIndex];
       const barY = this.levelToOffset(barLevel);
-      let text = this.dataProvider.entryTitle(entryIndex);
       const barHeight = this.#eventBarHeight(timelineData, entryIndex);
-      if (text?.length) {
-        context.font = this.#font;
-        const hasArrowDecoration =
-            this.entryHasDecoration(entryIndex, FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW);
-        // Set the max width to be the width of the bar plus some padding. If the bar has an arrow decoration and the bar is wide enough for the larger
-        // version of the decoration that is a square button, also subtract the width of the decoration.
-        // Because the decoration is square, it's width is equal to this.barHeight
-        const maxBarWidth = (hasArrowDecoration && barWidth > barHeight * 2) ? barWidth - textPadding - this.barHeight :
-                                                                               barWidth - 2 * textPadding;
-        text = UI.UIUtils.trimTextMiddle(
-            context,
-            text,
-            maxBarWidth,
-        );
-      }
-      const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
-      if (this.dataProvider.decorateEntry(
-              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel,
-              color => this.#transformColor(entryIndex, color))) {
+      const hasArrowDecoration = this.entryHasDecoration(entryIndex, FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW);
+      // Set the max width to be the width of the bar plus some padding. If the bar has an arrow decoration and
+      // the bar is wide enough for the larger version of the decoration that is a square button, also subtract
+      // the width of the decoration. Because the decoration is square, its width is equal to this.barHeight.
+      const maxBarWidth = (hasArrowDecoration && textBarWidth > barHeight * 2) ?
+          textBarWidth - textPadding - this.barHeight :
+          textBarWidth - 2 * textPadding;
+      // Re-assert this.#font on every iteration. dataProvider.decorateEntry() on a previous iteration
+      // may have modified context.font on the shared 2D context. Even on cache hits, context.font must
+      // be restored before context.fillText() so titles are rendered in the correct font.
+      context.font = this.#font;
+
+      const text = this.#getEntryTitle(entryIndex, maxBarWidth, context);
+      if (this.dataProvider.decorateEntry(entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedStartX,
+                                          timeToPixel, color => this.#transformColor(entryIndex, color))) {
         continue;
       }
       if (!text?.length) {
         continue;
       }
+      context.font = this.#font;
       context.fillStyle = this.#transformColor(entryIndex, this.dataProvider.textColor(entryIndex));
       context.fillText(text, barX + textPadding, barY + barHeight - this.textBaseline);
     }
 
     context.restore();
+  }
+
+  /**
+   * Returns the middle-trimmed title for an entry at the specified width, utilizing the
+   * entry title cache to avoid repeated text measurements and trimming during animation frames.
+   */
+  #getEntryTitle(entryIndex: number, maxBarWidth: number, context: CanvasRenderingContext2D): string|null {
+    if (maxBarWidth <= 0) {
+      return null;
+    }
+    const cached = this.#entryTitleCache.get(entryIndex);
+    if (cached && cached.width === maxBarWidth) {
+      return cached.text;
+    }
+    let text: string|null = null;
+    const rawText = this.dataProvider.entryTitle(entryIndex);
+    if (rawText?.length) {
+      text = UI.UIUtils.trimTextMiddle(
+          context,
+          rawText,
+          maxBarWidth,
+      );
+    }
+    // Mutate existing cache record in place if present to avoid object allocation churn
+    // on every animation frame during continuous zooming.
+    if (cached) {
+      cached.width = maxBarWidth;
+      cached.text = text;
+    } else {
+      this.#entryTitleCache.set(entryIndex, {width: maxBarWidth, text});
+    }
+    return text;
   }
 
   /**
@@ -3143,8 +3193,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * @returns the width of the label of the group.
    */
   labelWidthForGroup(context: CanvasRenderingContext2D, group: Group): number {
-    return EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1) + ARROW_SIDE / 2 + HEADER_LABEL_X_PADDING +
+    context.save();
+    context.font = this.#font;
+    const width = EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1) + ARROW_SIDE / 2 + HEADER_LABEL_X_PADDING +
         UI.UIUtils.measureTextWidth(context, group.name) + HEADER_LABEL_X_PADDING - HEADER_LEFT_PADDING;
+    context.restore();
+    return width;
   }
 
   private drawCollapsedOverviewForGroup(group: Group, y: number, endLevel: number): void {
@@ -3425,6 +3479,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private processTimelineData(timelineData: FlameChartTimelineData|null): void {
+    this.#urlTruncations.names.clear();
+    this.#entryTitleCache.clear();
     if (!timelineData) {
       this.timelineLevels = null;
       this.visibleLevelOffsets = null;
@@ -3913,21 +3969,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   /**
-   * Update position of an Element. By default, the element is treated as a full entry and it's dimensions are set to the full entry width/length/height.
-   * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
+   * Retrieves the bounding box coordinates and dimensions of an entry relative to the flame chart viewport canvas.
+   * Coordinates account for horizontal time-to-pixel mapping and vertical scroll offset.
+   * Returns null if entryIndex is invalid or if the entry lies entirely outside the visible viewport bounds.
    */
-  private updateElementPosition(element: HTMLElement|null, entryIndex: number, isDecoration?: boolean): void {
-    if (!element) {
-      return;
-    }
-    const elementMinWidthPx = 2;
-    element.classList.add('hidden');
-    if (entryIndex === -1) {
-      return;
+  getEntryDimensions(entryIndex: number): EntryDimensions|null {
+    if (entryIndex < 0) {
+      return null;
     }
     const timelineData = this.timelineData();
-    if (!timelineData) {
-      return;
+    if (!timelineData || entryIndex >= timelineData.entryStartTimes.length) {
+      return null;
     }
 
     const startTime = timelineData.entryStartTimes[entryIndex];
@@ -3954,30 +4006,61 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       barWidth = duration * this.chartViewport.timeToPixel();
     }
     if (barX + barWidth <= 0 || barX >= this.offsetWidth) {
-      return;
+      return null;
     }
+    const elementMinWidthPx = 2;
     const barCenter = barX + barWidth / 2;
     barWidth = Math.max(barWidth, elementMinWidthPx);
     barX = barCenter - barWidth / 2;
     const entryLevel = timelineData.entryLevels[entryIndex];
     const barY = this.levelToOffset(entryLevel) - this.chartViewport.scrollOffset();
     const barHeight = this.levelHeight(entryLevel);
+    if (this.offsetHeight && (barY + barHeight <= 0 || barY >= this.offsetHeight)) {
+      return null;
+    }
+
+    return {
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight - 1,
+      visible,
+    };
+  }
+
+  /**
+   * Update position of an Element. By default, the element is treated as a full entry and it's dimensions are set to the full entry width/length/height.
+   * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
+   */
+  private updateElementPosition(element: HTMLElement|null, entryIndex: number, isDecoration?: boolean): void {
+    if (!element) {
+      return;
+    }
+    element.classList.add('hidden');
+    if (entryIndex === -1) {
+      return;
+    }
+    const dimensions = this.getEntryDimensions(entryIndex);
+    if (!dimensions) {
+      return;
+    }
+
     const style = element.style;
+    style.top = dimensions.y + 'px';
+    const entryHeight = dimensions.height + 1;
 
     // TODO(paulirish): make these changes within a RenderCoordinator.write callback.
     // Currently these (plus the scrollOffset() right above) trigger layout thrashing.
     if (isDecoration) {
-      style.top = barY + 'px';
-      style.width = barHeight + 'px';
-      style.height = barHeight + 'px';
-      style.left = barX + barWidth - barHeight + 'px';
+      style.width = entryHeight + 'px';
+      style.height = entryHeight + 'px';
+      style.left = dimensions.x + dimensions.width - entryHeight + 'px';
     } else {
-      style.top = barY + 'px';
-      style.width = barWidth + 'px';
-      style.height = barHeight - 1 + 'px';
-      style.left = barX + 'px';
+      style.width = dimensions.width + 'px';
+      style.height = dimensions.height + 'px';
+      style.left = dimensions.x + 'px';
     }
-    element.classList.toggle('hidden', !visible);
+    element.classList.toggle('hidden', !dimensions.visible);
     this.viewportElement.appendChild(element);
   }
 
@@ -3995,8 +4078,18 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateElementPosition(this.revealDescendantsArrowHighlightElement, entryIndex, true);
   }
 
+  /**
+   * Clamps a horizontal pixel position to the visible bounds of the flame chart canvas.
+   */
+  #clampX(x: number): number {
+    return Platform.NumberUtilities.clamp(x, 0, this.offsetWidth);
+  }
+
+  /**
+   * Converts a timeline timestamp to a horizontal pixel position clamped to the visible canvas bounds.
+   */
   private timeToPositionClipped(time: number): number {
-    return Platform.NumberUtilities.clamp(this.chartViewport.timeToPosition(time), 0, this.offsetWidth);
+    return this.#clampX(this.chartViewport.timeToPosition(time));
   }
 
   /**
@@ -4016,6 +4109,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    */
   setEditModeForTest(editMode: boolean): void {
     this.#inTrackConfigEditMode = editMode;
+  }
+
+  getPopoverElementForTest(): HTMLElement {
+    return this.popoverElement;
   }
 
   /**
@@ -4098,6 +4195,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.#removeEditModeButton();
       this.#inTrackConfigEditMode = false;
     }
+    this.#urlTruncations.names.clear();
+    this.#urlTruncations.lastWidth = 0;
+    this.#entryTitleCache.clear();
 
     this.chartViewport.reset();
     this.rawTimelineData = null;
@@ -4315,7 +4415,7 @@ export interface FlameChartDataProvider {
    */
   timelineData(rebuild?: boolean): FlameChartTimelineData|null;
 
-  preparePopoverElement(entryIndex: number): Element|null;
+  preparePopoverElement(entryIndex: number): Element|TemplateResult|null;
 
   preparePopoverForCollapsedArrow?(entryIndex: number): Element|null;
 
@@ -4428,6 +4528,19 @@ export const enum Events {
   MOUSE_MOVE = 'MouseMove',
 }
 
+export interface EntryDimensions {
+  /** X coordinate in pixels relative to the flame chart viewport canvas. */
+  x: number;
+  /** Y coordinate in pixels relative to the flame chart viewport canvas, adjusted for vertical scroll. */
+  y: number;
+  /** Rendered width in pixels (minimum 2px). */
+  width: number;
+  /** Rendered height in pixels excluding the 1px inter-level border gap. */
+  height: number;
+  /** Indicates whether the entry is currently visible within the timeline data. */
+  visible: boolean;
+}
+
 export interface EventTypes {
   [Events.ENTRY_LABEL_ANNOTATION_ADDED]: {
     entryIndex: number,
@@ -4467,7 +4580,10 @@ export interface Group {
   /** Should be turned on if the track supports user editable stacks. */
   showStackContextMenu?: boolean;
   jslogContext?: string;
-  description?: string;
+  /** A full, non-truncated description of the track (e.g. full title with URL) to be shown in the tooltip on hover. */
+  fullTrackName?: string;
+  /** The raw URL of the track, if applicable, used for right-click copy actions. */
+  url?: string;
 }
 
 export interface GroupStyle {
@@ -4501,4 +4617,72 @@ export interface PersistedGroupConfig {
   expanded: boolean;
   originalIndex: number;
   visualIndex: number;
+}
+
+export interface PopoverOffsetOptions {
+  /** The horizontal offset of the mouse relative to the flame chart. */
+  mouseX: number;
+  /** The vertical offset of the mouse relative to the flame chart. */
+  mouseY: number;
+  /** The width of the parent container holding the popover. */
+  parentWidth: number;
+  /** The height of the parent container holding the popover. */
+  parentHeight: number;
+  /** The measured width of the popover element itself. */
+  infoWidth: number;
+  /** The measured height of the popover element itself. */
+  infoHeight: number;
+  /** The horizontal offset spacing to keep between the popover and the mouse position. */
+  offsetX: number;
+  /** The vertical offset spacing to keep between the popover and the mouse position. */
+  offsetY: number;
+}
+
+/**
+ * Calculates the positioning coordinates (x, y) for a popover window relative to the mouse.
+ *
+ * It uses a two-pass quadrant placement algorithm:
+ * - Pass 0: Tries to find a quadrant where the popover fits fully on screen without overlapping the mouse.
+ * - Pass 1: Relaxed fit; allows overlapping the mouse if the popover is too large for the available space,
+ *   clamping it strictly to remain within the parent bounds [0, parentWidth - infoWidth].
+ *
+ * Quadrants:
+ * 0: bottom-right (x + offsetX, y + offsetY)
+ * 1: top-right (x + offsetX, y - offsetY - height)
+ * 2: bottom-left (x - offsetX - width, y + offsetY)
+ * 3: top-left (x - offsetX - width, y - offsetY - height)
+ */
+export function calculatePopoverOffset(options: PopoverOffsetOptions): {x: number, y: number} {
+  const {mouseX, mouseY, parentWidth, parentHeight, infoWidth, infoHeight, offsetX, offsetY} = options;
+
+  const quadrants = [
+    {left: false, top: false},  // 0: Bottom-Right
+    {left: false, top: true},   // 1: Top-Right
+    {left: true, top: false},   // 2: Bottom-Left
+    {left: true, top: true},    // 3: Top-Left
+  ];
+
+  let x = 0;
+  let y = 0;
+
+  for (let pass = 0; pass < 2; ++pass) {
+    for (const {left, top} of quadrants) {
+      const dx = left ? -offsetX - infoWidth : offsetX;
+      const dy = top ? -offsetY - infoHeight : offsetY;
+
+      // Ensure upper bound of clamp is never negative (minimum of 0) to avoid errors when infoWidth/infoHeight > parent container bounds
+      x = Platform.NumberUtilities.clamp(mouseX + dx, 0, Math.max(0, parentWidth - infoWidth));
+      y = Platform.NumberUtilities.clamp(mouseY + dy, 0, Math.max(0, parentHeight - infoHeight));
+
+      const mouseOverlapsX = mouseX > x && mouseX < x + infoWidth;
+      const mouseOverlapsY = mouseY > y && mouseY < y + infoHeight;
+
+      const popoverFits = pass === 0 ? (!mouseOverlapsX && !mouseOverlapsY) : !(mouseOverlapsX && mouseOverlapsY);
+
+      if (popoverFits) {
+        return {x, y};
+      }
+    }
+  }
+  return {x, y};
 }

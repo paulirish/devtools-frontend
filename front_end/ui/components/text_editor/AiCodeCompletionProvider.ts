@@ -8,12 +8,13 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
 import * as AiCodeCompletion from '../../../models/ai_code_completion/ai_code_completion.js';
 import * as AiCodeGeneration from '../../../models/ai_code_generation/ai_code_generation.js';
-import * as PanelCommon from '../../../panels/common/common.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
 import * as UI from '../../legacy/legacy.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
 import {AccessiblePlaceholder} from './AccessiblePlaceholder.js';
+import type {DisclaimerTextVariant} from './AiCodeCompletionDisclaimer.js';
+import {AiCodeCompletionTeaser} from './AiCodeCompletionTeaser.js';
 import {type AiCodeGenerationConfig, AiCodeGenerationProvider} from './AiCodeGenerationProvider.js';
 import {
   acceptAiAutoCompleteSuggestion,
@@ -32,14 +33,16 @@ export enum AiCodeCompletionTeaserMode {
   ONLY_SHOW_ON_EMPTY = 'onlyShowOnEmpty',
 }
 
-export const setAiCodeCompletionTeaserMode = CodeMirror.StateEffect.define<AiCodeCompletionTeaserMode>();
+export const setAiCodeCompletionTeaserMode: CodeMirror.StateEffectType<AiCodeCompletionTeaserMode> =
+    CodeMirror.StateEffect.define<AiCodeCompletionTeaserMode>();
 
-export const aiCodeCompletionTeaserModeState = CodeMirror.StateField.define<AiCodeCompletionTeaserMode>({
-  create: () => AiCodeCompletionTeaserMode.OFF,
-  update(value, tr) {
-    return tr.effects.find(effect => effect.is(setAiCodeCompletionTeaserMode))?.value ?? value;
-  },
-});
+export const aiCodeCompletionTeaserModeState: CodeMirror.StateField<AiCodeCompletionTeaserMode> =
+    CodeMirror.StateField.define<AiCodeCompletionTeaserMode>({
+      create: () => AiCodeCompletionTeaserMode.OFF,
+      update(value, tr) {
+        return tr.effects.find(effect => effect.is(setAiCodeCompletionTeaserMode))?.value ?? value;
+      },
+    });
 
 export interface AiCodeCompletionConfig {
   completionContext: {
@@ -56,12 +59,13 @@ export interface AiCodeCompletionConfig {
   onSuggestionAccepted: (citations: Host.AidaClient.Citation[]) => void;
   onRequestTriggered: () => void;
   onResponseReceived: () => void;
-  panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
+  disclaimerTooltipId: string;
+  disclaimerTextVariant: DisclaimerTextVariant;
 }
 
 export const DELAY_BEFORE_SHOWING_RESPONSE_MS = 500;
 export const AIDA_REQUEST_DEBOUNCE_TIMEOUT_MS = 200;
-const MAX_PREFIX_SUFFIX_LENGTH = 20_000;
+export const MAX_PREFIX_SUFFIX_LENGTH = 20_000;
 
 export class AiCodeCompletionProvider {
   #aidaClient: Host.AidaClient.AidaClient = new Host.AidaClient.AidaClient();
@@ -70,7 +74,7 @@ export class AiCodeCompletionProvider {
   #aiCodeCompletionTeaserDismissedSetting =
       Common.Settings.Settings.instance().createSetting('ai-code-completion-teaser-dismissed', false);
   #teaserCompartment = new CodeMirror.Compartment();
-  #teaser?: PanelCommon.AiCodeCompletionTeaser;
+  #teaser?: AiCodeCompletionTeaser;
   #suggestionRenderingTimeout?: number;
   #editor?: TextEditor;
   #aiCodeCompletionCitations: Host.AidaClient.Citation[] = [];
@@ -78,7 +82,16 @@ export class AiCodeCompletionProvider {
   #aiCodeGenerationConfig?: AiCodeGenerationConfig;
   #aiCodeGenerationProvider?: AiCodeGenerationProvider;
 
-  #boundOnUpdateAiCodeCompletionState = this.#updateAiCodeCompletionState.bind(this);
+  #boundOnAidaAvailabilityChange =
+      (ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>): void => {
+        this.#updateAiCodeCompletionStateWithAvailability(ev.data);
+      };
+  #boundOnSettingChange = (): void => {
+    const aidaAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (aidaAvailability !== undefined) {
+      this.#updateAiCodeCompletionStateWithAvailability(aidaAvailability);
+    }
+  };
 
   private constructor(aiCodeCompletionConfig: AiCodeCompletionConfig) {
     if (!AiCodeCompletion.AiCodeCompletion.AiCodeCompletion.isAiCodeCompletionAvailable()) {
@@ -94,7 +107,8 @@ export class AiCodeCompletionProvider {
         onSuggestionAccepted: this.#aiCodeCompletionConfig.onSuggestionAccepted.bind(this),
         onRequestTriggered: this.#aiCodeCompletionConfig.onRequestTriggered.bind(this),
         onResponseReceived: this.#aiCodeCompletionConfig.onResponseReceived.bind(this),
-        panel: this.#aiCodeCompletionConfig.panel,
+        disclaimerTooltipId: this.#aiCodeCompletionConfig.disclaimerTooltipId,
+        disclaimerTextVariant: this.#aiCodeCompletionConfig.disclaimerTextVariant,
       };
       this.#aiCodeGenerationProvider = AiCodeGenerationProvider.createInstance(this.#aiCodeGenerationConfig);
     }
@@ -122,9 +136,9 @@ export class AiCodeCompletionProvider {
   dispose(): void {
     this.#detachTeaser();
     this.#teaser = undefined;
-    this.#aiCodeCompletionSetting.removeChangeListener(this.#boundOnUpdateAiCodeCompletionState);
-    Host.AidaClient.HostConfigTracker.instance().removeEventListener(
-        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeCompletionState);
+    this.#aiCodeCompletionSetting.removeChangeListener(this.#boundOnSettingChange);
+    Host.AidaClient.HostConfigTracker.instance().removeEventListener(Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED,
+                                                                     this.#boundOnAidaAvailabilityChange);
     this.#cleanupAiCodeCompletion();
     this.#aiCodeGenerationProvider?.dispose();
   }
@@ -132,17 +146,20 @@ export class AiCodeCompletionProvider {
   editorInitialized(editor: TextEditor): void {
     this.#editor = editor;
     if (!this.#aiCodeCompletionSetting.get() && !this.#aiCodeCompletionTeaserDismissedSetting.get()) {
-      this.#teaser = new PanelCommon.AiCodeCompletionTeaser({
+      this.#teaser = new AiCodeCompletionTeaser({
         onDetach: () => this.#detachTeaser.bind(this),
-        panel: this.#aiCodeCompletionConfig?.panel,
+        disclaimerTextVariant: this.#aiCodeCompletionConfig?.disclaimerTextVariant,
       });
       this.#editor.editor.dispatch(
           {effects: this.#teaserCompartment.reconfigure([aiCodeCompletionTeaserExtension(this.#teaser)])});
     }
-    Host.AidaClient.HostConfigTracker.instance().addEventListener(
-        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeCompletionState);
-    this.#aiCodeCompletionSetting.addChangeListener(this.#boundOnUpdateAiCodeCompletionState);
-    void this.#updateAiCodeCompletionState();
+    Host.AidaClient.HostConfigTracker.instance().addEventListener(Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED,
+                                                                  this.#boundOnAidaAvailabilityChange);
+    this.#aiCodeCompletionSetting.addChangeListener(this.#boundOnSettingChange);
+    const initialAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (initialAvailability !== undefined) {
+      this.#updateAiCodeCompletionStateWithAvailability(initialAvailability);
+    }
     this.#aiCodeGenerationProvider?.editorInitialized(editor);
   }
 
@@ -163,7 +180,7 @@ export class AiCodeCompletionProvider {
           aidaClient: this.#aidaClient,
           serverSideLoggingEnabled: !Root.Runtime.hostConfig.aidaAvailability?.disallowLogging,
         },
-        this.#aiCodeCompletionConfig.panel, undefined, this.#aiCodeCompletionConfig.completionContext.stopSequences);
+        undefined, this.#aiCodeCompletionConfig.completionContext.stopSequences);
     this.#aiCodeCompletionConfig.onFeatureEnabled();
   }
 
@@ -183,8 +200,7 @@ export class AiCodeCompletionProvider {
     this.#aiCodeCompletionConfig?.onFeatureDisabled();
   }
 
-  async #updateAiCodeCompletionState(): Promise<void> {
-    const aidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+  #updateAiCodeCompletionStateWithAvailability(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): void {
     const isAvailable = aidaAvailability === Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
     const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance().locale;
     const aiCodeCompletionEnabled =
@@ -321,10 +337,10 @@ export class AiCodeCompletionProvider {
     const startTime = performance.now();
     this.#aiCodeCompletionConfig?.onRequestTriggered();
     // Registering AiCodeCompletionRequestTriggered metric even if the request is served from cache
-    const panel = this.#aiCodeCompletionConfig?.panel;
-    if (panel === AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE) {
+    const disclaimerTextVariant = this.#aiCodeCompletionConfig?.disclaimerTextVariant;
+    if (disclaimerTextVariant === 'console') {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeCompletionRequestTriggeredFromConsole);
-    } else if (panel === AiCodeCompletion.AiCodeCompletion.ContextFlavor.SOURCES) {
+    } else if (disclaimerTextVariant === 'sources') {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeCompletionRequestTriggeredFromSources);
     }
 
@@ -374,7 +390,7 @@ export class AiCodeCompletionProvider {
               clearCachedRequest: this.clearCache.bind(this),
               onImpression: this.#aiCodeCompletion?.registerUserImpression.bind(this.#aiCodeCompletion),
               source: AiSuggestionSource.COMPLETION,
-            })
+            }),
           });
         }
         if (fromCache) {
@@ -473,9 +489,9 @@ export class AiCodeCompletionProvider {
   }
 }
 
-function aiCodeCompletionTeaserExtension(teaser: PanelCommon.AiCodeCompletionTeaser): CodeMirror.Extension {
+function aiCodeCompletionTeaserExtension(teaser: AiCodeCompletionTeaser): CodeMirror.Extension {
   return CodeMirror.ViewPlugin.fromClass(class {
-    teaser: PanelCommon.AiCodeCompletionTeaser;
+    teaser: AiCodeCompletionTeaser;
     #teaserDecoration: CodeMirror.DecorationSet = CodeMirror.Decoration.none;
     #teaserMode: AiCodeCompletionTeaserMode;
     #teaserDisplayTimeout?: number;
@@ -580,7 +596,7 @@ function aiCodeCompletionTeaserExtension(teaser: PanelCommon.AiCodeCompletionTea
           return true;
         }
         return false;
-      }
+      },
     },
   });
 }

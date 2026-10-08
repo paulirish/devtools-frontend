@@ -3,30 +3,22 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as Protocol from '../../generated/protocol.js';
 import * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {
-  deinitializeGlobalVars,
-  describeWithEnvironment,
-} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {deinitializeGlobalVars, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
 import {setUpEnvironment} from '../../testing/OverridesHelpers.js';
 
 import * as NetworkForward from './forward/forward.js';
 import * as Network from './network.js';
 
-const {urlString} = Platform.DevToolsPath;
-
 function renderNetworkItemView(request?: SDK.NetworkRequest.NetworkRequest): Network.NetworkItemView.NetworkItemView {
   if (!request) {
-    request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/foo.html`, urlString``, null, null,
-        null);
+    request = createNetworkRequest({url: 'https://www.example.com/foo.html'});
   }
   const networkItemView =
       new Network.NetworkItemView.NetworkItemView(request, new NetworkTimeCalculator.NetworkTimeCalculator(true));
@@ -44,7 +36,7 @@ function getOverrideIndicator(view: Network.NetworkItemView.NetworkItemView, tab
   return statusDot ? statusDot as HTMLElement : null;
 }
 
-describeWithMockConnection('NetworkItemView', () => {
+describeWithEnvironment('NetworkItemView', () => {
   beforeEach(() => {
     setUpEnvironment();
   });
@@ -73,9 +65,10 @@ describeWithEnvironment('NetworkItemView', () => {
   let request: SDK.NetworkRequest.NetworkRequest;
 
   beforeEach(async () => {
-    request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com`, urlString``, null, null, null);
-    request.statusCode = 200;
+    request = createNetworkRequest({
+      url: 'https://www.example.com',
+      statusCode: 200,
+    });
   });
 
   it('shows indicator for overridden headers and responses', () => {
@@ -157,7 +150,7 @@ describeWithEnvironment('NetworkItemView', () => {
         sendBufferSize: 1002,
         receiveBufferSize: 1003,
         dnsQueryType: undefined,
-      }
+      },
     };
 
     const networkItemView = renderNetworkItemView(request);

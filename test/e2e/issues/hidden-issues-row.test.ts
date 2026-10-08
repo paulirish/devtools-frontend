@@ -20,9 +20,9 @@ describe('Hide issues row', () => {
     await navigateToIssuesTab(devToolsPage);
 
     const issueTitle = 'Page layout may be unexpected due to Quirks Mode';
-    const issueHeader = await getIssueHeaderByTitle(issueTitle, devToolsPage);
+    const issueHeader = await getIssueHeaderByTitle(devToolsPage, issueTitle);
     await issueHeader!.hover();
-    const hideIssuesMenuBtn = await getHideIssuesMenu(undefined, devToolsPage);
+    const hideIssuesMenuBtn = await getHideIssuesMenu(devToolsPage, undefined);
     await hideIssuesMenuBtn.click();
     const menuItem = await getHideIssuesMenuItem(devToolsPage);
     await menuItem!.click();
@@ -37,12 +37,13 @@ describe('Hide issues row', () => {
     await navigateToIssuesTab(devToolsPage);
 
     const issueTitle = 'Page layout may be unexpected due to Quirks Mode';
-    const issueHeader = await getIssueHeaderByTitle(issueTitle, devToolsPage);
+    const issueHeader = await getIssueHeaderByTitle(devToolsPage, issueTitle);
     await issueHeader!.hover();
-    const hideIssuesMenuBtn = await getHideIssuesMenu(undefined, devToolsPage);
+    const hideIssuesMenuBtn = await getHideIssuesMenu(devToolsPage, undefined);
     await hideIssuesMenuBtn.click();
     const menuItem = await getHideIssuesMenuItem(devToolsPage);
     await menuItem!.click();
+    await devToolsPage.waitFor('.hidden-issue');
     const hiddenIssuesRow = await getHiddenIssuesRow(devToolsPage);
     let isHidden = await hiddenIssuesRow?.evaluate(node => node.classList.contains('hidden'));
     assert.isFalse(isHidden);
@@ -59,9 +60,9 @@ describe('Hide issues row', () => {
     await navigateToIssuesTab(devToolsPage);
 
     const issueTitle = 'Page layout may be unexpected due to Quirks Mode';
-    const issueHeader = await getIssueHeaderByTitle(issueTitle, devToolsPage);
+    const issueHeader = await getIssueHeaderByTitle(devToolsPage, issueTitle);
     await issueHeader!.hover();
-    const hideIssuesMenuBtn = await getHideIssuesMenu(undefined, devToolsPage);
+    const hideIssuesMenuBtn = await getHideIssuesMenu(devToolsPage, undefined);
     await hideIssuesMenuBtn.click();
     const menuItem = await getHideIssuesMenuItem(devToolsPage);
     await menuItem!.click();
@@ -83,12 +84,13 @@ describe('Hide issues row', () => {
     await navigateToIssuesTab(devToolsPage);
 
     const issueTitle = 'Page layout may be unexpected due to Quirks Mode';
-    const issueHeader = await getIssueHeaderByTitle(issueTitle, devToolsPage);
+    const issueHeader = await getIssueHeaderByTitle(devToolsPage, issueTitle);
     await issueHeader!.hover();
-    const hideIssuesMenuBtn = await getHideIssuesMenu(undefined, devToolsPage);
+    const hideIssuesMenuBtn = await getHideIssuesMenu(devToolsPage, undefined);
     await hideIssuesMenuBtn.click();
     const menuItem = await getHideIssuesMenuItem(devToolsPage);
     await menuItem!.click();
+    await devToolsPage.waitFor('.hidden-issue');
     const hiddenIssuesRow = await getHiddenIssuesRow(devToolsPage);
     const isHidden = await hiddenIssuesRow?.evaluate(node => node.classList.contains('hidden'));
     assert.isFalse(isHidden);
@@ -103,17 +105,18 @@ describe('Hide issues row', () => {
        await navigateToIssuesTab(devToolsPage);
 
        const issueTitle = 'Page layout may be unexpected due to Quirks Mode';
-       const issueHeader = await getIssueHeaderByTitle(issueTitle, devToolsPage);
+       const issueHeader = await getIssueHeaderByTitle(devToolsPage, issueTitle);
        await issueHeader!.hover();
-       const hideIssuesMenuBtn = await getHideIssuesMenu(undefined, devToolsPage);
+       const hideIssuesMenuBtn = await getHideIssuesMenu(devToolsPage, undefined);
        await hideIssuesMenuBtn.click();
        const menuItem = await getHideIssuesMenuItem(devToolsPage);
        await menuItem!.click();
+       await devToolsPage.waitFor('.hidden-issue');
        const unhideAllIssuesbtn = await devToolsPage.waitFor('.unhide-all-issues-button');
        await unhideAllIssuesbtn.click();
+       await devToolsPage.waitFor(ISSUE);
        const hiddenIssuesRow = await getHiddenIssuesRow(devToolsPage);
        const isHidden = await hiddenIssuesRow?.evaluate(node => node.classList.contains('hidden'));
        assert.isTrue(isHidden);
-       await devToolsPage.waitFor(ISSUE);
      });
 });

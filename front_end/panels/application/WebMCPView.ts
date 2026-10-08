@@ -16,6 +16,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import type * as Bindings from '../../models/bindings/bindings.js';
 import type * as StackTrace from '../../models/stack_trace/stack_trace.js';
 import * as WebMCP from '../../models/web_mcp/web_mcp.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
@@ -33,168 +34,182 @@ import {
   type TemplateResult,
 } from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as Console from '../console/console.js';
+import symbolizedErrorWidgetStyles from '../console/symbolizedErrorWidget.css.js';
 import * as ProtocolMonitor from '../protocol_monitor/protocol_monitor.js';
 
 import webMCPViewStyles from './webMCPView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text for the header of the tool registry section
+   * @description Section header for the available tools list in the WebMCP view of the Application panel.
    */
-  toolRegistry: 'Available Tools',
+  toolRegistry: 'Available tools',
   /**
-   * @description Title of text to display when no tools are registered
+   * @description Header text displayed when no tools are registered in the WebMCP view of the Application panel.
    */
-  noToolsPlaceholderTitle: 'Available `WebMCP` Tools',
+  noToolsPlaceholderTitle: 'Available `WebMCP` tools',
   /**
-   * @description Text to display when no tools are registered
+   * @description Informational text displayed when no tools are registered in the WebMCP view of the Application panel.
    */
   noToolsPlaceholder:
       'Registered `WebMCP` tools for this page will appear here. No tools have been registered or detected yet.',
   /**
-   * @description Title of text to display when no calls have been made
+   * @description Header text displayed when no tool calls have been made in the WebMCP view of the Application panel.
    */
-  noCallsPlaceholderTitle: 'Tool Activity',
+  noCallsPlaceholderTitle: 'Tool activity',
   /**
-   * @description Text to display when no calls have been made
+   * @description Informational text displayed when no tool calls have been made in the WebMCP view of the Application panel.
    */
-  noCallsPlaceholder: 'Start interacting with your `WebMCP` agent to see real-time tool calls and executions here.',
+  noCallsPlaceholder: 'Start interacting with your `WebMCP` agent to see real-time tool calls and executions here',
   /**
-   * @description Text for the header of the tool details section
+   * @description Tab title and section header for the tool details in the WebMCP view of the Application panel.
    */
   toolDetails: 'Details',
   /**
-   * @description Text for the link to reveal the tool's DOM node in the Elements panel
+   * @description Tooltip and aria label for the button to reveal the tool's DOM node in the Elements panel.
    */
   viewInElementsPanel: 'View in Elements panel',
   /**
-   * @description Text for the frame of a tool
+   * @description Label for the frame where a tool is registered in the WebMCP view of the Application panel.
    */
   frame: 'Frame',
   /**
-   * @description Text for the name of a tool call
+   * @description Table column header and details label for the tool name in the WebMCP view of the Application panel.
    */
   name: 'Name',
   /**
-   * @description Text for the status of a tool call
+   * @description Table column header for the tool call status in the WebMCP view of the Application panel.
    */
   status: 'Status',
   /**
-   * @description Text for the input of a tool call
+   * @description Table column header and tab title for the tool call input in the WebMCP view of the Application panel.
    */
   input: 'Input',
   /**
-   * @description Text for the output of a tool call
+   * @description Table column header and tab title for the tool call output in the WebMCP view of the Application panel.
    */
   output: 'Output',
   /**
-   * @description Text for the status of a tool call that is in progress
+   * @description Status text for a tool call that is in progress in the WebMCP view of the Application panel.
    */
-  inProgress: 'In Progress',
+  inProgress: 'In progress',
   /**
-   * @description Tooltip for the clear log button
+   * @description Tooltip text for the clear log button in the toolbar of the WebMCP view in the Application panel.
    */
   clearLog: 'Clear log',
   /**
-   * @description Text to close something
+   * @description Tooltip text for the close button in the sidebar of the WebMCP view in the Application panel.
    */
   close: 'Close',
   /**
-   * @description Placeholder for the filter input
+   * @description Placeholder text for the filter input in the toolbar of the WebMCP view in the Application panel.
    */
   filter: 'Filter',
   /**
-   * @description Tooltip for the tool types dropdown
+   * @description Tooltip text and button label for the tool types filter dropdown in the WebMCP view of the Application panel.
    */
   toolTypes: 'Tool types',
   /**
-   * @description Tooltip for the status types dropdown
+   * @description Tooltip text and button label for the status types filter dropdown in the WebMCP view of the Application panel.
    */
   statusTypes: 'Status types',
   /**
-   * @description Tooltip for the clear filters button
+   * @description Tooltip text for the clear filters button in the toolbar of the WebMCP view in the Application panel.
    */
   clearFilters: 'Clear filters',
   /**
-   * @description Filter option for imperative tools
+   * @description Filter option label for imperative tools in the WebMCP view of the Application panel.
    */
   imperative: 'Imperative',
   /**
-   * @description Filter option for declarative tools
+   * @description Filter option label for declarative tools in the WebMCP view of the Application panel.
    */
   declarative: 'Declarative',
   /**
-   * @description Text for the status of a tool call that has failed
+   * @description Status text and filter option for a tool call that ended in an error in the WebMCP view of the Application panel.
    */
   error: 'Error',
   /**
-   * @description Text for the status of a tool call that was canceled
+   * @description Status text and filter option for a tool call that was canceled in the WebMCP view of the Application panel.
    */
   canceled: 'Canceled',
   /**
-   * @description Text for the status of a tool call that succeeded
+   * @description Status text and filter option for a tool call that completed successfully in the WebMCP view of the Application panel.
    */
   completed: 'Completed',
   /**
-   * @description Text for the status of a tool call that has failed
+   * @description Filter option for a tool call that is in progress in the WebMCP view of the Application panel.
    */
-  pending: 'In Progress',
+  pending: 'In progress',
   /**
-   * @description Text for the total number of tool calls
+   * @description Summary text displaying the total number of tool calls in the WebMCP view of the Application panel.
    * @example {2} PH1
    */
-  totalCalls: '{PH1} Total calls',
+  totalCalls: '{PH1} total calls',
   /**
-   * @description Text for the number of failed tool calls
+   * @description Summary text displaying the number of failed tool calls in the WebMCP view of the Application panel.
    * @example {1} PH1
    */
-  failed: '{PH1} Failed',
+  failed: '{PH1} failed',
   /**
-   * @description Text for the number of canceled tool calls
+   * @description Summary text displaying the number of canceled tool calls in the WebMCP view of the Application panel.
    * @example {1} PH1
    */
-  canceledCount: '{PH1} Canceled',
+  canceledCount: '{PH1} canceled',
   /**
-   * @description Text for the number of in progress tool calls
+   * @description Summary text displaying the number of in-progress tool calls in the WebMCP view of the Application panel.
    * @example {1} PH1
    */
-  inProgressCount: '{PH1} In Progress',
+  inProgressCount: '{PH1} in progress',
   /**
-   * @description Context menu action to copy the name of a tool
+   * @description Context menu action to copy the name of a tool in the WebMCP view of the Application panel.
    */
   copyName: 'Copy name',
   /**
-   * @description Context menu action to copy the description of a tool
+   * @description Context menu action to copy the description of a tool in the WebMCP view of the Application panel.
    */
   copyDescription: 'Copy description',
   /**
-   * @description Context menu action to cancel an in-progress tool call
+   * @description Context menu action to cancel an in-progress tool call in the WebMCP view of the Application panel.
    */
   cancelCall: 'Cancel',
   /**
-   * @description Text for the header of the tool run section
+   * @description Section header and button label to run a tool in the WebMCP view of the Application panel.
    */
-  runTool: 'Run Tool',
+  runTool: 'Run tool',
   /**
-   * @description Context menu action to reveal the tool in the tool list
+   * @description Context menu action to reveal a tool in the tool list in the WebMCP view of the Application panel.
    */
   revealTool: 'Reveal tool',
   /**
-   * @description Context menu action to edit and run the tool
+   * @description Context menu action, button title, and aria label to edit and run a tool in the WebMCP view of the Application panel.
    */
   editAndRun: 'Edit and run',
   /**
-   * @description Tooltip for the paste button
+   * @description Button label for the paste button in the WebMCP view of the Application panel.
    */
   paste: 'Paste',
   /**
-   * @description Notice to display when a tool has been unregistered
+   * @description Tooltip text for the paste button in the WebMCP view of the Application panel.
+   */
+  pasteTooltip: 'Paste tool parameters from clipboard as JSON',
+  /**
+   * @description Notice displayed when a tool has been unregistered in the WebMCP view of the Application panel.
    */
   toolUnregisteredNotice: 'This tool has been unregistered',
   /**
-   * @description Text preceding a nested error in a stack trace
+   * @description Label for tool flags in the tool details section of the WebMCP view in the Application panel.
    */
-  causedBy: 'Caused by:',
+  flags: 'Flags',
+  /**
+   * @description Label for the tool description in the tool details section of the WebMCP view in the Application panel.
+   */
+  description: 'Description',
+  /**
+   * @description Label for the tool origin in the tool details section of the WebMCP view in the Application panel.
+   */
+  origin: 'Origin',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/WebMCPView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -240,6 +255,7 @@ export interface ViewInput {
   selectedCall: WebMCP.WebMCPModel.Call|null;
   selectedTab?: TabId;
   onCallSelect: (call: WebMCP.WebMCPModel.Call|null, tabId?: TabId) => void;
+  onTabSelect: (tabId: TabId) => void;
   filters: FilterState;
   filterButtons: FilterMenuButtons;
   onClearLogClick: () => void;
@@ -249,8 +265,8 @@ export interface ViewInput {
   onPaste: () => void;
 }
 
-export function filterToolCalls(
-    toolCalls: WebMCP.WebMCPModel.Call[], filterState: FilterState): WebMCP.WebMCPModel.Call[] {
+export function filterToolCalls(toolCalls: WebMCP.WebMCPModel.Call[],
+                                filterState: FilterState): WebMCP.WebMCPModel.Call[] {
   let filtered = [...toolCalls];
 
   const statusTypes = filterState.statusTypes;
@@ -291,7 +307,7 @@ export function filterToolCalls(
     const regex = Platform.StringUtilities.createPlainTextSearchRegex(filterState.text, 'i');
     filtered = filtered.filter(call => {
       return regex.test(call.tool.name) || regex.test(call.input) ||
-          (call.result?.output && regex.test(JSON.stringify(call.result.output))) ||
+          (call.result?.output !== undefined && regex.test(JSON.stringify(call.result.output))) ||
           (call.result?.errorText && regex.test(call.result.errorText));
     });
   }
@@ -335,8 +351,10 @@ function toolStatsIcon(status: Protocol.WebMCP.InvocationStatus|undefined): {ico
 function getIconGroupsFromStats(toolStats?: ToolStats):
     Array<IconButton.IconButton.IconWithTextData&{status: Protocol.WebMCP.InvocationStatus | undefined}> {
   const status = [
-    Protocol.WebMCP.InvocationStatus.Completed, Protocol.WebMCP.InvocationStatus.Error,
-    Protocol.WebMCP.InvocationStatus.Canceled, undefined
+    Protocol.WebMCP.InvocationStatus.Completed,
+    Protocol.WebMCP.InvocationStatus.Error,
+    Protocol.WebMCP.InvocationStatus.Canceled,
+    undefined,
   ];
   return status
       .map(status => ({
@@ -449,13 +467,14 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
   render(html`
     <style>${webMCPViewStyles}</style>
     <style>${UI.FilterBar.filterStyles}</style>
-    <devtools-split-view class="webmcp-view" direction="row" sidebar-position="second" name="webmcp-split-view">
-      <div slot="main" class="call-log">
+    <devtools-split-view class="webmcp-view" direction="row" sidebar-position="second" name="webmcp-split-view" jslog=${VisualLogging.pane('webmcp-view')}>
+      <div slot="main" class="call-log" jslog=${VisualLogging.section('call-log')}>
         <div class="webmcp-toolbar-container" role="toolbar" jslog=${VisualLogging.toolbar()}>
           <devtools-toolbar class="webmcp-toolbar" role="presentation" wrappable>
             <devtools-button title=${i18nString(UIStrings.clearLog)}
                              .iconName=${'clear'}
                              .variant=${Buttons.Button.Variant.TOOLBAR}
+                             .jslogContext=${'clear'}
                              @click=${input.onClearLogClick}></devtools-button>
             <div class="toolbar-divider"></div>
             <devtools-toolbar-input type="filter"
@@ -472,6 +491,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             <devtools-button title=${i18nString(UIStrings.clearFilters)}
                              .iconName=${'filter-clear'}
                              .variant=${Buttons.Button.Variant.TOOLBAR}
+                             .jslogContext=${'clear-filter'}
                              @click=${() => input.onFilterChange({text: ''})}
                              ?hidden=${!isFilterActive}></devtools-button>
           </devtools-toolbar>
@@ -501,7 +521,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                       'status-error': call.result?.status === Protocol.WebMCP.InvocationStatus.Error,
                       'status-cancelled': call.result?.status === Protocol.WebMCP.InvocationStatus.Canceled,
                       selected: call === input.selectedCall,
-                    })} @click=${() => input.onCallSelect(call)}
+                    })} jslog=${VisualLogging.tableRow().track({click: true})} @click=${() => input.onCallSelect(call)}
                         @contextmenu=${(e: CustomEvent<UI.ContextMenu.ContextMenu>) => {
                           const contextMenu = e.detail;
                           const isUnregistered = !input.tools.includes(call.tool);
@@ -527,6 +547,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                           <button class="run-tool-action-button"
                                   title=${i18nString(UIStrings.editAndRun)}
                                   aria-label=${i18nString(UIStrings.editAndRun)}
+                                  jslog=${VisualLogging.action('edit-and-run').track({click: true})}
                                   @click=${(e: Event) => {
                                     e.stopPropagation();
                                     const payload = parsePayload(call.input);
@@ -555,7 +576,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                         <td @click=${(e: Event) => {
                           e.stopPropagation();
                           input.onCallSelect(call, TabId.OUTPUT);
-                        }}>${call.result?.output ? JSON.stringify(call.result.output)
+                        }}>${call.result?.output !== undefined ? JSON.stringify(call.result.output)
                                                     : call.result?.errorText ?? ''}</td>
                         ` : nothing}
                     </tr>
@@ -564,41 +585,44 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               </devtools-data-grid>
             </div>
             <div slot="sidebar" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
-              <devtools-tabbed-pane class="call-details-tabbed-pane">
+              <devtools-tabbed-pane
+                class="call-details-tabbed-pane"
+                @select=${(e: Event) => input.onTabSelect((e as CustomEvent<{tabId: TabId}>).detail.tabId)}>
                 <devtools-button
                   slot="left"
                   .iconName=${'cross'}
                   .size=${Buttons.Button.Size.SMALL}
                   .variant=${Buttons.Button.Variant.ICON}
+                  .jslogContext=${'close'}
                   title=${i18nString(UIStrings.close)}
                   @click=${() => input.onCallSelect(null)}
                 ></devtools-button>
                 <devtools-widget
                   id=${TabId.DETAILS}
-                  ?selected=${input.selectedTab === TabId.DETAILS}
+                  ?selected=${Directives.live(input.selectedTab === TabId.DETAILS)}
                   title=${i18nString(UIStrings.toolDetails)}
                   ${widget(ToolDetailsWidget, {tool: input.selectedCall?.tool, isUnregistered: input.selectedCall ? !input.tools.includes(input.selectedCall.tool) : false})}>
                 </devtools-widget>
                 <devtools-widget
                   id=${TabId.INPUT}
-                  ?selected=${input.selectedTab === TabId.INPUT}
+                  ?selected=${Directives.live(input.selectedTab === TabId.INPUT)}
                   title=${i18nString(UIStrings.input)}
                   ${widget(PayloadWidget, parsePayload(input.selectedCall?.input))}>
                 </devtools-widget>
                 <devtools-widget
                   id=${TabId.OUTPUT}
-                  ?selected=${input.selectedTab === TabId.OUTPUT}
+                  ?selected=${Directives.live(input.selectedTab === TabId.OUTPUT)}
                   title=${i18nString(UIStrings.output)}
                   ${widget(PayloadWidget, {
                           valueObject: input.selectedCall?.result?.output,
                           errorText: input.selectedCall?.result?.errorText,
-                          exceptionDetails: input.selectedCall?.result?.exceptionDetails,
+                          symbolizedError: input.selectedCall?.result?.symbolizedError,
                   })}>
                 </devtools-widget>
               </devtools-tabbed-pane>
             </div>
           </devtools-split-view>
-          <div class="webmcp-toolbar-container" role="toolbar">
+          <div class="webmcp-toolbar-container" role="toolbar" jslog=${VisualLogging.toolbar('summary')}>
             <devtools-toolbar class="webmcp-toolbar" role="presentation" wrappable>
               <span class="toolbar-text">${i18nString(UIStrings.totalCalls, {PH1: input.toolCalls.length})}</span>
               <div class="toolbar-divider"></div>
@@ -624,7 +648,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                            sidebar-position="second"
                            name="webmcp-details-split-view"
                            sidebar-visibility=${input.selectedTool ? 'show' : 'hidden'}>
-        <div slot="main" class="tool-list">
+        <div slot="main" class="tool-list" jslog=${VisualLogging.section('tool-list')}>
           <div class="section-title">${i18nString(UIStrings.toolRegistry)}</div>
           ${tools.length === 0 ? html`
           ${UI.Widget.widget(UI.EmptyWidget.EmptyWidget, {header: i18nString(UIStrings.noToolsPlaceholderTitle),
@@ -633,6 +657,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             <devtools-list class="square-corners">
               ${tools.map(tool => html`
                     <div class=${Directives.classMap({'tool-item': true, selected: tool === input.selectedTool?.tool})}
+                         jslog=${VisualLogging.item().track({click: true}).context('tool')}
                          @click=${() => input.onToolSelect(tool)}
                          @contextmenu=${(e: Event) => onToolContextMenu(e, tool)}>
                     <div class="tool-name-container">
@@ -645,6 +670,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                             compact: false,
                             clickHandler: () => onIconClick(tool.name, group.status),
                           } as IconButton.IconButton.IconButtonData}
+                          jslog=${VisualLogging.action('filter-by-status').track({click: true})}
                           @click=${(e: Event) => e.stopPropagation()}></icon-button>`)}
                     </div>
                     </div>
@@ -653,12 +679,13 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
             </devtools-list>
           `}
         </div>
-        <div slot="sidebar" class="tool-details">
+        <div slot="sidebar" class="tool-details" jslog=${VisualLogging.section('tool-details')}>
           <div class="section-title">
             <devtools-button
               .iconName=${'cross'}
               .size=${Buttons.Button.Size.SMALL}
               .variant=${Buttons.Button.Variant.ICON}
+              .jslogContext=${'close'}
               title=${i18nString(UIStrings.close)}
               @click=${() => input.onToolSelect(null)}
             ></devtools-button>
@@ -675,7 +702,8 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                 .iconName=${'import'}
                 .size=${Buttons.Button.Size.SMALL}
                 .variant=${Buttons.Button.Variant.TEXT}
-                title=${i18nString(UIStrings.paste)}
+                .jslogContext=${'paste'}
+                title=${i18nString(UIStrings.pasteTooltip)}
                 @click=${input.onPaste}
               >${i18nString(UIStrings.paste)}</devtools-button>
             </div>
@@ -688,7 +716,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                 ...getJSONEditorParameters(input.selectedTool.tool),
                 commandToDisplay: {
                   command: input.selectedTool.tool.name,
-                  parameters: input.selectedTool.parameters || {}
+                  parameters: input.selectedTool.parameters || {},
                 },
                 })}
               ${UI.Widget.widgetRef(ProtocolMonitor.JSONEditor.JSONEditor, e => { editorWidget = e; })}
@@ -698,7 +726,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               class="webmcp-run-tool-button"
               .variant=${Buttons.Button.Variant.OUTLINED}
               .size=${Buttons.Button.Size.SMALL}
-              jslogContext="webmcp.run-tool"
+              .jslogContext=${'run-tool'}
               @click=${() => {
                 if (editorWidget && input.selectedTool) {
                   const params = editorWidget.getParameters();
@@ -706,10 +734,10 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                     data: {
                       command: input.selectedTool.tool.name,
                       parameters: params,
-                    } as ProtocolMonitor.JSONEditor.Command
+                    } as ProtocolMonitor.JSONEditor.Command,
                   });
                 }
-              }}>Run tool</devtools-button>
+              }}>${i18nString(UIStrings.runTool)}</devtools-button>
           ` : nothing}
         </div>
       </devtools-split-view>
@@ -731,35 +759,32 @@ export class WebMCPView extends UI.Widget.VBox {
 
   #filterButtons: FilterMenuButtons;
 
-  static createFilterButtons(
-      onToolTypesClick: (contextMenu: UI.ContextMenu.ContextMenu) => void,
-      onStatusTypesClick: (contextMenu: UI.ContextMenu.ContextMenu) => void): FilterMenuButtons {
-    const createButton =
-        (label: string, onContextMenu: (contextMenu: UI.ContextMenu.ContextMenu) => void, jsLogContext: string):
-            FilterMenuButton => {
-              const button = new UI.Toolbar.ToolbarMenuButton(
-                  onContextMenu,
-                  /* isIconDropdown=*/ false, /* useSoftMenu=*/ true, jsLogContext,
-                  /* iconName=*/ undefined,
-                  /* keepOpen=*/ true);
-              button.setText(label);
+  static createFilterButtons(onToolTypesClick: (contextMenu: UI.ContextMenu.ContextMenu) => void,
+                             onStatusTypesClick: (contextMenu: UI.ContextMenu.ContextMenu) => void): FilterMenuButtons {
+    const createButton = (label: string, onContextMenu: (contextMenu: UI.ContextMenu.ContextMenu) => void,
+                          jsLogContext: string): FilterMenuButton => {
+      const button = new UI.Toolbar.ToolbarMenuButton(onContextMenu,
+                                                      /* isIconDropdown=*/ false, /* useSoftMenu=*/ true, jsLogContext,
+                                                      /* iconName=*/ undefined,
+                                                      /* keepOpen=*/ true);
+      button.setText(label);
 
-              /* eslint-disable-next-line @devtools/no-imperative-dom-api */
-              const adorner = new Adorners.Adorner.Adorner();
-              adorner.name = 'countWrapper';
-              const countElement = document.createElement('span');
-              adorner.append(countElement);
-              adorner.classList.add('active-filters-count');
-              adorner.classList.add('hidden');
-              button.setAdorner(adorner);
+      /* eslint-disable-next-line @devtools/no-imperative-dom-api */
+      const adorner = new Adorners.Adorner.Adorner();
+      adorner.name = 'countWrapper';
+      const countElement = document.createElement('span');
+      adorner.append(countElement);
+      adorner.classList.add('active-filters-count');
+      adorner.classList.add('hidden');
+      button.setAdorner(adorner);
 
-              const setCount = (count: number): void => {
-                countElement.textContent = `${count}`;
-                count === 0 ? adorner.hide() : adorner.show();
-              };
+      const setCount = (count: number): void => {
+        countElement.textContent = `${count}`;
+        count === 0 ? adorner.hide() : adorner.show();
+      };
 
-              return {button, setCount};
-            };
+      return {button, setCount};
+    };
 
     return {
       toolTypes: createButton(i18nString(UIStrings.toolTypes), onToolTypesClick, 'webmcp.tool-types'),
@@ -906,8 +931,12 @@ export class WebMCPView extends UI.Widget.VBox {
           this.#selectedTab = tabId;
         } else {
           this.#selectedCall = call;
+          this.#selectedTab = undefined;
         }
         this.requestUpdate();
+      },
+      onTabSelect: tabId => {
+        this.#selectedTab = tabId;
       },
       toolCalls: filteredCalls,
       filters: this.#filterState,
@@ -953,11 +982,12 @@ export interface PayloadViewInput {
   valueObject?: unknown;
   valueString?: string;
   errorText?: string;
-  exceptionDetails?: WebMCP.WebMCPModel.ExceptionDetails;
+  symbolizedError?: Bindings.SymbolizedError.SymbolizedError|null;
 }
 
 export const PAYLOAD_DEFAULT_VIEW = (input: PayloadViewInput, output: object, target: HTMLElement): void => {
-  if (!input.valueObject && !input.valueString && !input.errorText && !input.exceptionDetails) {
+  if (input.valueObject === undefined && input.valueString === undefined && !input.errorText &&
+      !input.symbolizedError) {
     render(nothing, target);
     return;
   }
@@ -965,20 +995,19 @@ export const PAYLOAD_DEFAULT_VIEW = (input: PayloadViewInput, output: object, ta
 
   const createPayload = (parsedInput: unknown): TemplateResult => {
     const object = new SDK.RemoteObject.LocalJSONObject(parsedInput);
-    const section =
-        new ObjectUI.ObjectPropertiesSection.RootElement(new ObjectUI.ObjectPropertiesSection.ObjectTree(object, {
-          readOnly: true,
-          propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
-        }));
-    section.title = document.createTextNode(object.description);
-    section.listItemElement.classList.add('source-code', 'object-properties-section');
-    section.childrenListElement.classList.add('source-code', 'object-properties-section');
-    section.expand();
+    const objectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(object, {
+      readOnly: true,
+      propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
+    });
+    objectTree.expanded = true;
     return html`<devtools-tree .template=${html`
           <style>${ObjectUI.ObjectPropertiesSection.objectValueStyles}</style>
           <style>${ObjectUI.ObjectPropertiesSection.objectPropertiesSectionStyles}</style>
           <ul role="tree">
-            <devtools-tree-wrapper .treeElement=${section}></devtools-tree-wrapper>
+            <li role=treeitem class="object-properties-section-root-element object-properties-section source-code" open>
+              ${object.description}
+              ${object.hasChildren ? ObjectUI.ObjectPropertiesSection.renderObjectTree(objectTree) : nothing}
+            </li>
           </ul>
         `}></devtools-tree>`;
   };
@@ -988,77 +1017,48 @@ export const PAYLOAD_DEFAULT_VIEW = (input: PayloadViewInput, output: object, ta
       html`<div class="payload-value source-code error-text">${text}</div>`;
 
   const createException = (
-      details: WebMCP.WebMCPModel.ExceptionDetails,
-      linkifier: Components.Linkifier.Linkifier = new Components.Linkifier.Linkifier(),
-      ): TemplateResult => {
-    const renderFrame = (
-        frame: StackTrace.ErrorStackParser.ParsedErrorFrame,
-        index: number,
-        array: StackTrace.ErrorStackParser.ParsedErrorFrame[],
-        ): TemplateResult => {
-      const newline = index < array.length - 1 ? '\n' : '';
-      const {line, link, isCallFrame} = frame;
-
-      if (!isCallFrame) {
-        return html`<span>${line}${newline}</span>`;
-      }
-
-      if (!link) {
-        return html`<span class="formatted-builtin-stack-frame">${line}${newline}</span>`;
-      }
-
-      const scriptLocationLink = linkifier.linkifyScriptLocation(
-          details.error.runtimeModel().target(),
-          link.scriptId || null,
-          link.url,
-          link.lineNumber,
-          {
-            columnNumber: link.columnNumber,
-            inlineFrameIndex: 0,
-            showColumnNumber: true,
-          },
-      );
-      scriptLocationLink.tabIndex = -1;
-
-      return html`<span class="formatted-stack-frame">${link.prefix}${scriptLocationLink}${link.suffix}${
-          newline}</span>`;
-    };
-
+      error: Bindings.SymbolizedError.SymbolizedError|null,
+      ): TemplateResult|typeof nothing => {
+    if (!error) {
+      return nothing;
+    }
     return html`
       <div class="payload-value source-code error-text">
-        ${details.frames.length === 0 && details.description ? html`<span>${details.description}\n</span>` : nothing}
-        <div>${details.frames.map(renderFrame)}</div>
-        ${
-        details.cause ? html`\n${i18nString(UIStrings.causedBy)}\n${createException(details.cause, linkifier)}` :
-                        nothing}</div>`;
+        <devtools-widget
+          ${UI.Widget.widget(Console.SymbolizedErrorWidget.SymbolizedErrorWidget, {error})}
+        ></devtools-widget>
+      </div>
+    `;
   };
 
-  render(
-      html`
+  render(html`
     <style>${webMCPViewStyles}</style>
+    <style>${symbolizedErrorWidgetStyles}</style>
     <div class="call-payload-view">
       <div class="call-payload-content">
             ${
-          isParsable ? createPayload(input.valueObject) :
-                       (input.valueString !== undefined ?
-                            createSourceText(input.valueString) :
-                            (input.exceptionDetails ? createException(input.exceptionDetails) :
-                                                      (input.errorText ? createErrorText(input.errorText) : nothing)))}
+             isParsable ?
+                 createPayload(input.valueObject) :
+                 (input.valueString !== undefined ?
+                      createSourceText(input.valueString) :
+                      (input.symbolizedError ? createException(input.symbolizedError) :
+                                               (input.errorText ? createErrorText(input.errorText) : nothing)))}
       </div>
     </div>
   `,
-      target);
+         target);
 };
 
 export class PayloadWidget extends UI.Widget.Widget {
   #valueObject?: unknown;
   #valueString?: string;
   #errorText?: string;
-  #exceptionDetailsPromise?: Promise<WebMCP.WebMCPModel.ExceptionDetails|undefined>;
-  #exceptionDetails?: WebMCP.WebMCPModel.ExceptionDetails;
+  #symbolizedErrorPromise?: Promise<Bindings.SymbolizedError.SymbolizedError|null>;
+  #symbolizedError?: Bindings.SymbolizedError.SymbolizedError|null;
   #view: typeof PAYLOAD_DEFAULT_VIEW;
 
-  constructor(element?: HTMLElement, view = PAYLOAD_DEFAULT_VIEW) {
+  constructor(element?: HTMLElement,
+              view: (input: PayloadViewInput, output: object, target: HTMLElement) => void = PAYLOAD_DEFAULT_VIEW) {
     super(element);
     this.#view = view;
   }
@@ -1090,27 +1090,27 @@ export class PayloadWidget extends UI.Widget.Widget {
     return this.#errorText;
   }
 
-  async #updateExceptionDetails(
-      exceptionDetailsPromise: Promise<WebMCP.WebMCPModel.ExceptionDetails|undefined>|undefined): Promise<void> {
-    if (this.#exceptionDetailsPromise === exceptionDetailsPromise) {
+  async #updateSymbolizedError(symbolizedErrorPromise: Promise<Bindings.SymbolizedError.SymbolizedError|null>|
+                               undefined): Promise<void> {
+    if (this.#symbolizedErrorPromise === symbolizedErrorPromise) {
       return;
     }
-    this.#exceptionDetailsPromise = exceptionDetailsPromise;
-    this.#exceptionDetails = undefined;
+    this.#symbolizedErrorPromise = symbolizedErrorPromise;
+    this.#symbolizedError = undefined;
     this.requestUpdate();
-    const exceptionDetails = await exceptionDetailsPromise;
-    if (this.#exceptionDetailsPromise === exceptionDetailsPromise) {
-      this.#exceptionDetails = exceptionDetails;
+    const symbolizedError = await symbolizedErrorPromise;
+    if (this.#symbolizedErrorPromise === symbolizedErrorPromise) {
+      this.#symbolizedError = symbolizedError || null;
       this.requestUpdate();
     }
   }
 
-  set exceptionDetails(exceptionDetailsPromise: Promise<WebMCP.WebMCPModel.ExceptionDetails|undefined>|undefined) {
-    void this.#updateExceptionDetails(exceptionDetailsPromise);
+  set symbolizedError(symbolizedErrorPromise: Promise<Bindings.SymbolizedError.SymbolizedError|null>|undefined) {
+    void this.#updateSymbolizedError(symbolizedErrorPromise);
   }
 
-  get exceptionDetails(): Promise<WebMCP.WebMCPModel.ExceptionDetails|undefined>|undefined {
-    return this.#exceptionDetailsPromise;
+  get symbolizedError(): Promise<Bindings.SymbolizedError.SymbolizedError|null>|undefined {
+    return this.#symbolizedErrorPromise;
   }
   override wasShown(): void {
     super.wasShown();
@@ -1122,7 +1122,7 @@ export class PayloadWidget extends UI.Widget.Widget {
       valueObject: this.#valueObject,
       valueString: this.#valueString,
       errorText: this.#errorText,
-      exceptionDetails: this.#exceptionDetails,
+      symbolizedError: this.#symbolizedError,
     };
     this.#view(input, {}, this.contentElement);
   }
@@ -1145,19 +1145,29 @@ const TOOL_DETAILS_VIEW = (input: ToolDetailsViewInput, output: undefined, targe
   }
   const tool = input.tool;
   const origin = input.origin;
+  const flags = tool.flags;
+  const formatter = new Intl.ListFormat(i18n.DevToolsLocale.DevToolsLocale.instance().locale, {
+    style: 'short',
+    type: 'unit',
+  });
+  const formattedFlags = formatter.format(flags);
   render(html`
     <style>${webMCPViewStyles}</style>
     <div class="tool-details-grid">
-      <div class="label">Name</div>
+      <div class="label">${i18nString(UIStrings.name)}</div>
       <div class="value source-code">${tool.name}</div>
-      <div class="label">Description</div>
+      <div class="label">${i18nString(UIStrings.description)}</div>
       <div class="value">${tool.description}</div>
+      ${flags.length > 0 ? html`
+      <div class="label">${i18nString(UIStrings.flags)}</div>
+      <div class="value">${formattedFlags}</div>
+      ` : nothing}
       ${tool.frame ? html`
       <div class="label">${i18nString(UIStrings.frame)}</div>
       <div class="value">${Components.Linkifier.Linkifier.linkifyRevealable(tool.frame, tool.frame.displayName())}</div>
       ` : nothing}
       ${origin instanceof SDK.DOMModel.DOMNode ? html`
-      <div class="label">Origin</div>
+      <div class="label">${i18nString(UIStrings.origin)}</div>
       <div class="value tool-origin-container">
         <span
             class="node-text-container source-code tool-origin-node"
@@ -1167,7 +1177,7 @@ const TOOL_DETAILS_VIEW = (input: ToolDetailsViewInput, output: undefined, targe
           <devtools-node-text .data=${{
               nodeId: origin.getAttribute('id') || undefined,
               nodeTitle: origin.nodeNameInCorrectCase(),
-              nodeClasses: origin.getAttribute('class')?.split(/\s+/).filter(s => Boolean(s))
+              nodeClasses: origin.getAttribute('class')?.split(/\s+/).filter(s => Boolean(s)),
             } as NodeText.NodeText.NodeTextData}>
           </devtools-node-text>
         </span>
@@ -1181,7 +1191,7 @@ const TOOL_DETAILS_VIEW = (input: ToolDetailsViewInput, output: undefined, targe
            @click=${() => input.revealNode(origin)}
            ></devtools-button>
       </div>` : origin ? html`
-      <div class="label">Origin</div>
+      <div class="label">${i18nString(UIStrings.origin)}</div>
       <div class="value stack-trace">
         ${widget(Components.JSPresentationUtils.StackTracePreviewContent,
                  {stackTrace: origin, options: { expandable: true}})}
@@ -1254,7 +1264,7 @@ export class ToolDetailsWidget extends UI.Widget.Widget {
   };
 
   #clearHighlight = (): void => {
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
   };
 
   #revealNode = (node: SDK.DOMModel.DOMNode): void => {
@@ -1368,8 +1378,8 @@ export function parseToolSchema(schema: JSONSchema7): ParsedToolSchema {
     }
   }
 
-  function parseProperty(
-      name: string, propDef: JSONSchema7Definition, optional: boolean): ProtocolMonitor.JSONEditor.Parameter {
+  function parseProperty(name: string, propDef: JSONSchema7Definition,
+                         optional: boolean): ProtocolMonitor.JSONEditor.Parameter {
     if (typeof propDef === 'boolean') {
       return {
         name,

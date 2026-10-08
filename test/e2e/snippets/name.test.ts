@@ -6,13 +6,13 @@ import {assert} from 'chai';
 
 import {getAvailableSnippets, openCommandMenu, showSnippetsAutocompletion} from '../helpers/quick_open-helpers.js';
 import {createNewSnippet, getOpenSources, openSnippetsSubPane, openSourcesPanel} from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 describe('Snippets subpane', () => {
   async function runTest(name: string, devToolsPage: DevToolsPage) {
     await openSourcesPanel(devToolsPage);
     await openSnippetsSubPane(devToolsPage);
-    await createNewSnippet(name, undefined, devToolsPage);
+    await createNewSnippet(devToolsPage, name, undefined);
 
     // Title matches
     const openSources = await devToolsPage.waitForFunction(async () => {

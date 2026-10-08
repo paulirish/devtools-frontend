@@ -15,24 +15,22 @@ generate_css("css_files") {
 devtools_ui_module("spinner") {
   sources = [ "Spinner.ts" ]
 
-  deps = [ "../../../ui/lit:bundle" ]
+  ts_deps = [ "../../lit:bundle" ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "spinners.ts"
 
-  deps = [
-    ":css_files",
-    ":spinner",
-  ]
+  ts_deps = [ ":spinner" ]
 
   visibility = default_components_visibility
 }
 
 component_doc("docs") {
   sources = [ "Spinners.docs.ts" ]
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../../ui/lit:bundle",
+    "../../lit:bundle",
   ]
 }

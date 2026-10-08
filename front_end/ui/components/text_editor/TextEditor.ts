@@ -37,6 +37,33 @@ export class TextEditor extends HTMLElement {
     }
   };
   #devtoolsResizeObserver = new ResizeObserver(this.#resizeListener);
+  #themeListener = (): void => {
+    const editor = this.#activeEditor;
+    if (!editor) {
+      return;
+    }
+    const isDark = ThemeSupport.ThemeSupport.instance().themeName() === 'dark';
+    const currentTheme = themeSelection.get(editor.state);
+    // Skip if the compartment isn't part of this editor's configuration or already matches.
+    if (currentTheme === undefined || (currentTheme === dummyDarkTheme) === isDark) {
+      return;
+    }
+    editor.dispatch({effects: themeSelection.reconfigure(isDark ? dummyDarkTheme : [])});
+  };
+
+  static get observedAttributes(): string[] {
+    return ['data-file-path'];
+  }
+
+  attributeChangedCallback(name: string, _oldValue: string|null, newValue: string|null): void {
+    if (name === 'data-file-path' && this.#activeEditor) {
+      if (newValue !== null) {
+        this.#activeEditor.dom.setAttribute('data-file-path', newValue);
+      } else {
+        this.#activeEditor.dom.removeAttribute('data-file-path');
+      }
+    }
+  }
 
   constructor(pendingState?: CodeMirror.EditorState) {
     super();
@@ -59,6 +86,11 @@ export class TextEditor extends HTMLElement {
       scrollTo: this.#lastScrollSnapshot,
     });
 
+    const filePath = this.getAttribute('data-file-path');
+    if (filePath) {
+      this.#activeEditor.dom.setAttribute('data-file-path', filePath);
+    }
+
     this.#activeEditor.scrollDOM.addEventListener('scroll', () => {
       if (!this.#activeEditor) {
         return;
@@ -73,12 +105,9 @@ export class TextEditor extends HTMLElement {
 
     this.#ensureSettingListeners();
     this.#startObservingResize();
-    ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
-      const currentTheme = ThemeSupport.ThemeSupport.instance().themeName() === 'dark' ? dummyDarkTheme : [];
-      this.editor.dispatch({
-        effects: themeSelection.reconfigure(currentTheme),
-      });
-    });
+    ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, this.#themeListener);
+    // The theme may have changed while this editor was disconnected.
+    this.#themeListener();
     return this.#activeEditor;
   }
 
@@ -130,6 +159,8 @@ export class TextEditor extends HTMLElement {
       this.#pendingState = this.#activeEditor.state;
       this.#devtoolsResizeObserver.disconnect();
       window.removeEventListener('resize', this.#resizeListener);
+      ThemeSupport.ThemeSupport.instance().removeEventListener(ThemeSupport.ThemeChangeEvent.eventName,
+                                                               this.#themeListener);
       this.#activeEditor.destroy();
       this.#activeEditor = undefined;
       this.#ensureSettingListeners();
@@ -161,7 +192,9 @@ export class TextEditor extends HTMLElement {
           this.#activeEditor.dispatch({effects: change});
         }
       };
-      const setting = Common.Settings.Settings.instance().moduleSetting(dynamicSetting.settingName);
+      const setting = typeof dynamicSetting.setting === 'string' ?
+          Common.Settings.Settings.instance().moduleSetting(dynamicSetting.setting) :
+          Common.Settings.Settings.instance().resolve(dynamicSetting.setting);
       setting.addChangeListener(handler);
       this.#activeSettingListeners.push([setting, handler]);
     }

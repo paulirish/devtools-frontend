@@ -14,7 +14,9 @@ generate_css("css_files") {
 devtools_ui_module("suggestion_input") {
   sources = [ "SuggestionInput.ts" ]
 
-  deps = [
+  deps = [ ":css_files" ]
+
+  ts_deps = [
     "../../../ui/components/code_highlighter:bundle",
     "../../../ui/lit:bundle",
     "../../../ui/visual_logging:bundle",
@@ -24,10 +26,7 @@ devtools_ui_module("suggestion_input") {
 devtools_entrypoint("bundle") {
   entrypoint = "suggestion_input.ts"
 
-  deps = [
-    ":css_files",
-    ":suggestion_input",
-  ]
+  ts_deps = [ ":suggestion_input" ]
 
   visibility = default_components_visibility
 }

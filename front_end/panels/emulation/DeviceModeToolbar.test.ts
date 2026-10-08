@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -41,7 +42,6 @@ function createFakeSetting<T>(defaultValue: T): Common.Settings.Setting<T> {
         listeners.splice(index, 1);
       }
     },
-    setDisabled: () => {},
     setTitle: () => {},
     title: () => '',
     asRegExp: () => null,
@@ -55,7 +55,6 @@ describeWithEnvironment('DeviceModeToolbar', () => {
   setupLocaleHooks();
 
   let tabTarget: SDK.Target.Target|undefined;
-  let prerenderTarget: SDK.Target.Target|undefined;
   let target: SDK.Target.Target;
   let deviceModeModel: EmulationModel.DeviceModeModel.DeviceModeModel;
   let toolbar: Emulation.DeviceModeToolbar.DeviceModeToolbar;
@@ -78,35 +77,28 @@ describeWithEnvironment('DeviceModeToolbar', () => {
         return createFakeSetting(false as T);
       },
       createLocalSetting: <T>(_name: string, defaultValue: T) => createFakeSetting(defaultValue),
+      resolve: <T>(_descriptor: unknown) => createFakeSetting(false as T),
     } as unknown as Common.Settings.Settings);
 
     tabTarget = createTarget({type: SDK.Target.Type.TAB});
-    prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+    createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
     deviceModeModel = EmulationModel.DeviceModeModel.DeviceModeModel.instance({forceNew: true});
 
     // Stub ThrottlingManager to avoid dependency on network condition settings.
-    const fakeMenuButton = new UI.Toolbar.ToolbarMenuButton(() => {}, undefined, undefined, 'throttle-menu');
     const fakeSelectElement = document.createElement('select');
     sinon.stub(MobileThrottling.ThrottlingManager.ThrottlingManager, 'instance').returns({
-      createMobileThrottlingButton: () => fakeMenuButton,
       createSaveDataOverrideSelector: () => fakeSelectElement,
     } as unknown as MobileThrottling.ThrottlingManager.ThrottlingManager);
 
-    toolbar = new Emulation.DeviceModeToolbar.DeviceModeToolbar(
-        deviceModeModel,
-        createFakeSetting(false),
-        createFakeSetting(false),
-    );
+    toolbar = new Emulation.DeviceModeToolbar.DeviceModeToolbar();
+    toolbar.model = deviceModeModel;
   });
 
   afterEach(async () => {
     await UI.Widget.Widget.allUpdatesComplete;
     toolbar?.detach();
     deviceModeModel?.dispose();
-    target?.dispose('test');
-    prerenderTarget?.dispose('test');
-    tabTarget?.dispose('test');
   });
 
   /**
@@ -126,11 +118,8 @@ describeWithEnvironment('DeviceModeToolbar', () => {
     beforeEach(() => {
       renderSpy = sinon.spy(Emulation.DeviceModeToolbar.DeviceModeToolbar.prototype, 'performUpdate');
       // Re-create toolbar so that it registers the spied update method.
-      toolbar = new Emulation.DeviceModeToolbar.DeviceModeToolbar(
-          deviceModeModel,
-          createFakeSetting(false),
-          createFakeSetting(false),
-      );
+      toolbar = new Emulation.DeviceModeToolbar.DeviceModeToolbar();
+      toolbar.model = deviceModeModel;
       renderSpy.resetHistory();
     });
 
@@ -245,12 +234,77 @@ describeWithEnvironment('DeviceModeToolbar', () => {
     });
   });
 
+  describe('device mode switching', () => {
+    it('tests toolbar state when switching modes', async () => {
+      const fakePhone = EmulationModel.EmulatedDevices.EmulatedDevicesList.instance().standard()[0];
+
+      deviceModeModel.emulate(EmulationModel.DeviceModeModel.Type.None, null, null);
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.None);
+      assert.isNull(deviceModeModel.device());
+
+      const select = toolbar.element.querySelector('.toolbar-has-dropdown-shrinkable') as HTMLSelectElement;
+
+      select.value = 'Responsive';
+      select.dispatchEvent(new Event('change'));
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.Responsive);
+      assert.isNull(deviceModeModel.device());
+      let rotateButton = findRotateButton();
+      assert.isFalse(rotateButton.disabled);
+      let widthInput = toolbar.element.querySelector('.device-mode-size-input') as HTMLInputElement;
+      assert.isFalse(widthInput.disabled);
+
+      deviceModeModel.emulate(EmulationModel.DeviceModeModel.Type.None, null, null);
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.None);
+      assert.isNull(deviceModeModel.device());
+
+      select.value = fakePhone.title;
+      select.dispatchEvent(new Event('change'));
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.Device);
+      assert.strictEqual(deviceModeModel.device(), fakePhone);
+      rotateButton = findRotateButton();
+      assert.isFalse(rotateButton.disabled);
+      widthInput = toolbar.element.querySelector('.device-mode-size-input') as HTMLInputElement;
+      assert.isTrue(widthInput.disabled);
+
+      select.value = 'Responsive';
+      select.dispatchEvent(new Event('change'));
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.Responsive);
+      assert.isNull(deviceModeModel.device());
+      rotateButton = findRotateButton();
+      assert.isFalse(rotateButton.disabled);
+      widthInput = toolbar.element.querySelector('.device-mode-size-input') as HTMLInputElement;
+      assert.isFalse(widthInput.disabled);
+
+      select.value = fakePhone.title;
+      select.dispatchEvent(new Event('change'));
+      await toolbar.updateComplete;
+
+      assert.strictEqual(deviceModeModel.type(), EmulationModel.DeviceModeModel.Type.Device);
+      assert.strictEqual(deviceModeModel.device(), fakePhone);
+      rotateButton = findRotateButton();
+      assert.isFalse(rotateButton.disabled);
+      widthInput = toolbar.element.querySelector('.device-mode-size-input') as HTMLInputElement;
+      assert.isTrue(widthInput.disabled);
+    });
+  });
+
   it('resets the device dropdown to the current device when "Edit" is selected', async () => {
     deviceModeModel.emulate(EmulationModel.DeviceModeModel.Type.Responsive, null, null);
     toolbar.requestUpdate();
     await toolbar.updateComplete;
 
-    const select = toolbar.element.querySelector('select') as HTMLSelectElement;
+    const select = toolbar.element.querySelector('select');
+    assert.instanceOf(select, HTMLSelectElement);
     assert.strictEqual(select.value, 'Responsive');
 
     // Simulate selecting "Edit"
@@ -261,5 +315,40 @@ describeWithEnvironment('DeviceModeToolbar', () => {
 
     // It should have reverted to "Responsive"
     assert.strictEqual(select.value, 'Responsive');
+  });
+
+  it('shows "Fit to window" at top of zoom menu and no auto-adjust zoom button', async () => {
+    deviceModeModel.emulate(EmulationModel.DeviceModeModel.Type.Responsive, null, null);
+    toolbar.requestUpdate();
+    await toolbar.updateComplete;
+
+    // Ensure no auto-adjust zoom toolbar button exists.
+    const buttons = toolbar.element.querySelectorAll<Buttons.Button.Button>('devtools-button.toolbar-button');
+    const autoAdjustButton = [...buttons].find(b => b.title === 'Auto-adjust zoom');
+    assert.isUndefined(autoAdjustButton, 'Auto-adjust zoom button should be removed from toolbar');
+
+    // Check zoom dropdown menu options.
+    const selects = toolbar.element.querySelectorAll<HTMLSelectElement>('select');
+    const zoomSelect = [...selects].find(s => s.getAttribute('aria-label') === 'Zoom');
+    assert.exists(zoomSelect, 'Zoom select should exist');
+
+    const options = [...zoomSelect.options].map(o => o.text);
+    assert.strictEqual(options[0], 'Fit to window', 'First option should be "Fit to window" without percentage');
+  });
+
+  it('renders standard devices grouped into optgroups by form factor', async () => {
+    deviceModeModel.emulate(EmulationModel.DeviceModeModel.Type.Responsive, null, null);
+    toolbar.requestUpdate();
+    await toolbar.updateComplete;
+
+    const deviceSelect = toolbar.element.querySelector<HTMLSelectElement>('select[aria-label="Device type"]');
+    assert.exists(deviceSelect);
+
+    const optgroups = deviceSelect.querySelectorAll('optgroup');
+    const labels = [...optgroups].map(og => og.label);
+    assert.include(labels, 'Mobile');
+    assert.include(labels, 'Foldables');
+    assert.include(labels, 'Tablets & Desktops');
+    assert.include(labels, 'Smart Displays');
   });
 });

@@ -7,8 +7,7 @@ import("../../../../scripts/build/ninja/devtools_module.gni")
 
 devtools_ui_module("extensions") {
   sources = [ "ExtensionManager.ts" ]
-
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../models/extensions:bundle",
     "../../../panels/common:bundle",
@@ -19,8 +18,7 @@ devtools_ui_module("extensions") {
 
 devtools_entrypoint("bundle") {
   entrypoint = "extensions.ts"
-
-  deps = [ ":extensions" ]
+  ts_deps = [ ":extensions" ]
 
   visibility = [
     ":*",

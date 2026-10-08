@@ -10,15 +10,15 @@ devtools_module("node") {
 
   es_target = "es2023"
   es_libs = []
-  runs_in = "node_esm"
+  runs_in = "node"
 
-  deps = [ "../api:bundle" ]
+  ts_deps = [ "../api" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "node.ts"
 
-  deps = [ ":node" ]
+  ts_deps = [ ":node" ]
 
   visibility = [ "../*" ]
 }

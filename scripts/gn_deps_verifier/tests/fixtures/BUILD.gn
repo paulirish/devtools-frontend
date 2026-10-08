@@ -1,0 +1,164 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/ninja/devtools_entrypoint.gni")
+import("../../../scripts/build/ninja/devtools_module.gni")
+import("../../../scripts/build/ninja/generate_css.gni")
+import("../../../scripts/build/typescript/typescript.gni")
+import("../visibility.gni")
+
+_helper_sources = [ "Helper.ts" ]
+
+generate_css("css_files") {
+  sources = [ "animationTimeline.css" ]
+}
+
+devtools_ui_module("animation") {
+  sources = [
+    "AnimationGroupPreviewUI.ts",
+    "AnimationTimeline.ts",
+    "AnimationUI.ts",
+  ]
+
+  ts_deps = [
+    "../../core/common:bundle",
+    "../../core/host:bundle",
+    "../../core/i18n:bundle",
+    "../../core/platform:bundle",
+    "../../core/sdk:bundle",
+    "../../generated",
+    "../../models/geometry:bundle",
+    "../../ui/components/buttons:bundle",
+    "../../ui/legacy:bundle",
+    "../../ui/legacy/components/inline_editor:bundle",
+    "../../ui/lit:bundle",
+    "../../ui/visual_logging:bundle",
+    "../common:bundle",
+  ]
+}
+
+devtools_ui_module("helpers") {
+  sources = _helper_sources + [ "Extra.ts" ]
+
+  ts_deps = [ ":bundle" ]
+}
+
+devtools_ui_module("filtered") {
+  sources = _helper_sources - [ "Excluded.ts" ]
+
+  ts_deps = [ ":bundle" ]
+}
+
+devtools_entrypoint("bundle") {
+  entrypoint = "animation.ts"
+
+  ts_deps = [
+    ":animation",
+    ":css_files",
+  ]
+
+  visibility = [
+    ":*",
+    "../../entrypoints/*",
+  ]
+
+  visibility += devtools_panels_visibility
+}
+
+devtools_entrypoint("meta") {
+  entrypoint = "animation-meta.ts"
+
+  ts_deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../core/i18n:bundle",
+    "../../core/sdk:bundle",
+    "../../ui/legacy:bundle",
+  ]
+
+  visibility = [ "../../entrypoints/*" ]
+}
+
+devtools_ui_module("unittests") {
+  testonly = true
+
+  sources = [ "AnimationTimeline.test.ts" ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/sdk:bundle",
+    "../../generated",
+    "../../testing",
+  ]
+}
+
+devtools_foundation_module("platform") {
+  sources = [ "HostRuntime.ts" ]
+
+  ts_deps = [ "./api:bundle" ]
+
+  public_deps = [ ":typecheck" ]
+}
+
+custom_target("complex_assignments") {
+  _local_files = [
+    "local1.ts",
+    "local2.ts",
+    "excluded.ts",
+  ]
+  sources = _local_files
+  sources -= [ "excluded.ts" ]
+  inputs = [ "input1.json" ]
+  entrypoint = "main.ts"
+  ts_deps = [ ":dep1" ]
+  ts_deps += [ ":dep2" ]
+}
+
+devtools_ui_module("subtraction_target") {
+  sources = [ "sub.ts" ]
+  ts_deps = [
+    ":keep_dep",
+    ":sub_dep",
+  ]
+  ts_deps -= [ ":sub_dep" ]
+}
+
+devtools_ui_module("only_subtraction") {
+  sources = [ "only_sub.ts" ]
+  ts_deps -= [ ":excluded_dep" ]
+}
+
+devtools_ui_module("conditional_deps") {
+  sources = [ "cond.ts" ]
+  ts_deps = [ ":base_dep" ]
+
+  if (is_chromeos) {
+    ts_deps += [ ":cros_dep" ]
+  }
+}
+
+devtools_ui_module("only_conditional_deps") {
+  sources = [ "only_cond.ts" ]
+
+  if (is_chromeos) {
+    ts_deps = [ ":cros_dep" ]
+  }
+}
+
+_shared_deps = [ ":shared_dep" ]
+
+devtools_ui_module("variable_deps") {
+  sources = [ "var.ts" ]
+  ts_deps = _shared_deps
+}
+
+devtools_ui_module("variable_plus_assign_deps") {
+  sources = [ "var_plus.ts" ]
+  ts_deps = _shared_deps
+  ts_deps += [ ":explicit_dep" ]
+}
+
+devtools_ui_module("root_rel_target") {
+  sources = [ "//scripts/gn_deps_verifier/tests/fixtures/root_rel.ts" ]
+}

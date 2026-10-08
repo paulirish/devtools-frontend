@@ -8,8 +8,7 @@ import("../../../visibility.gni")
 
 devtools_ui_module("helper") {
   sources = [ "PreloadingForward.ts" ]
-
-  deps = [
+  ts_deps = [
     "../../../../core/sdk:bundle",
     "../../../../generated",
     "../../../../models/logs:bundle",
@@ -18,8 +17,7 @@ devtools_ui_module("helper") {
 
 devtools_entrypoint("bundle") {
   entrypoint = "helper.ts"
-
-  deps = [ ":helper" ]
+  ts_deps = [ ":helper" ]
 
   visibility = [
     ":*",

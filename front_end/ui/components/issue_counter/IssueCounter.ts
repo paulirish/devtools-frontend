@@ -15,15 +15,15 @@ import issueCounterStyles from './issueCounter.css.js';
 
 const UIStrings = {
   /**
-   * @description Label for link to Issues tab, specifying how many issues there are.
+   * @description Label for link to the Issues tab, specifying how many page errors there are.
    */
   pageErrors: '{issueCount, plural, =1 {# page error} other {# page errors}}',
   /**
-   * @description Label for link to Issues tab, specifying how many issues there are.
+   * @description Label for link to the Issues tab, specifying how many breaking changes there are.
    */
   breakingChanges: '{issueCount, plural, =1 {# breaking change} other {# breaking changes}}',
   /**
-   * @description Label for link to Issues tab, specifying how many issues there are.
+   * @description Label for link to the Issues tab, specifying how many possible improvements there are.
    */
   possibleImprovements: '{issueCount, plural, =1 {# possible improvement} other {# possible improvements}}',
 } as const;
@@ -96,7 +96,7 @@ export function getIssueCountsEnumeration(
 }
 
 export class IssueCounter extends HTMLElement {
-  readonly #shadow = this.attachShadow({mode: 'open'});
+  readonly #shadow = this.attachShadow({mode: 'open', delegatesFocus: true});
   #clickHandler?: () => void;
   #tooltipCallback?: () => void;
   #leadingText = '';
@@ -179,6 +179,8 @@ export class IssueCounter extends HTMLElement {
       }
     };
     const iconSize = '2ex';
+    const accessibleName = this.#accessibleName ??
+        getIssueCountsEnumeration(this.#issuesManager, this.#displayMode !== DisplayMode.SHOW_ALWAYS);
     const data: IconButton.IconButton.IconButtonData = {
       groups: [
         {
@@ -196,7 +198,7 @@ export class IssueCounter extends HTMLElement {
       ],
       clickHandler: this.#clickHandler,
       leadingText: this.#leadingText,
-      accessibleName: this.#accessibleName,
+      accessibleName,
       compact: this.#compact,
     };
     render(

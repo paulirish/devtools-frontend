@@ -8,12 +8,17 @@
   opacity: 60%;
 }
 
+:host {
+  display: block;
+}
+
 .object-properties-section {
   padding: 0;
+  margin: 0;
   color: var(--sys-color-on-surface);
   display: flex;
   flex-direction: column;
-  overflow-x: auto;
+  overflow: auto hidden;
 }
 
 .object-properties-section li,
@@ -22,20 +27,9 @@ li.object-properties-section  {
 
   &::before {
     flex-shrink: 0;
-    margin-right: 2px;
+    margin-right: var(--sys-size-2);
     align-self: flex-start;
   }
-}
-
-.object-properties-section li.editing-sub-part {
-  padding: 3px 12px 8px 6px;
-  margin: -1px -6px -8px;
-  text-overflow: clip;
-}
-
-.object-properties-section li.editing {
-  margin-left: 10px;
-  text-overflow: clip;
 }
 
 .tree-outline ol.title-less-mode {
@@ -59,12 +53,8 @@ li.object-properties-section  {
   flex-direction: row;
 }
 
-.object-properties-section .editable-div {
-  overflow: hidden;
-}
-
 .name-and-value {
-  line-height: 16px;
+  line-height: var(--sys-size-8);
   display: flex;
   white-space: nowrap;
 }
@@ -74,25 +64,18 @@ li.object-properties-section  {
   flex-shrink: 0;
 }
 
-.editing-sub-part .name-and-value {
-  overflow: visible;
-  display: inline-flex;
-}
-
-.property-prompt {
-  margin-left: 4px;
-}
-
 .tree-outline.hide-selection-when-blurred .selected:focus-visible {
   background: none;
+  outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+  outline-offset: calc(-1 * var(--sys-size-2));
 }
 
 .tree-outline.hide-selection-when-blurred .selected:focus-visible ::slotted(*),
-.tree-outline.hide-selection-when-blurred .selected:focus-visible .tree-element-title,
+.tree-outline.hide-selection-when-blurred .selected:focus-visible .tree-element-title:not(:has(.name-and-value, .gray-info-message)),
 .tree-outline.hide-selection-when-blurred .selected:focus-visible .name-and-value,
 .tree-outline.hide-selection-when-blurred .selected:focus-visible .gray-info-message {
   background: var(--sys-color-state-focus-highlight);
-  border-radius: 2px;
+  border-radius: var(--sys-size-2);
 }
 
 @media (forced-colors: active) {
@@ -109,8 +92,7 @@ li.object-properties-section  {
     color: ButtonText;
   }
 
-  .tree-outline.hide-selection-when-blurred .selected:focus-visible .tree-element-title,
-  .tree-outline.hide-selection-when-blurred .selected:focus-visible .name-and-value {
+  .tree-outline.hide-selection-when-blurred .selected:focus-visible .tree-element-title {
     background: transparent;
     box-shadow: none;
   }

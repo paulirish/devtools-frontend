@@ -19,30 +19,28 @@ devtools_ui_module("animation") {
     "AnimationUI.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated",
-    "../../models/geometry:bundle",
     "../../ui/components/buttons:bundle",
+    "../../ui/geometry:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/inline_editor:bundle",
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
     "../common:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "animation.ts"
 
-  deps = [
-    ":animation",
-    ":css_files",
-  ]
+  ts_deps = [ ":animation" ]
 
   visibility = [
     ":*",
@@ -55,9 +53,11 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "animation-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/i18n:bundle",
+    "../../core/sdk:bundle",
     "../../ui/legacy:bundle",
   ]
 
@@ -69,7 +69,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "AnimationTimeline.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/sdk:bundle",
     "../../generated",

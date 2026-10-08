@@ -6,9 +6,7 @@
 
 import type {ChildProcessWithoutNullStreams} from 'node:child_process';
 import {spawn, spawnSync} from 'node:child_process';
-import fs from 'node:fs';
 import os from 'node:os';
-import {dirname} from 'node:path';
 import {PassThrough} from 'node:stream';
 
 import type {OperatorFunction} from '../../third_party/rxjs/rxjs.js';
@@ -26,15 +24,43 @@ import {
 import {CDPSessionEvent} from '../api/CDPSession.js';
 import type {BoundingBox} from '../api/ElementHandle.js';
 import type {Page, VideoFormat} from '../api/Page.js';
-import {debug} from '../common/Debug.js';
-import {debugError, fromEmitterEvent} from '../common/util.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
+import {fromEmitterEvent} from '../common/util.js';
 import {guarded} from '../util/decorators.js';
 import {asyncDisposeSymbol} from '../util/disposable.js';
 
 const CRF_VALUE = 30;
 const DEFAULT_FPS = 30;
 
-const debugFfmpeg = debug('puppeteer:ffmpeg');
+/**
+ * Computes how many encoder frames to emit for a captured frame that spans
+ * `[previousTimestamp, timestamp]`, so that the cumulative number of emitted
+ * frames tracks a constant-`fps` grid anchored at `startTimestamp`.
+ *
+ * Counting each interval independently with
+ * `Math.round(fps * (timestamp - previousTimestamp))` is wrong when frames are
+ * captured faster than `fps`: every sub-`1/fps` interval still rounds up to a
+ * whole frame, so the emitted frame count grows with the capture rate instead
+ * of staying at `fps * duration`, which stretches playback (and, for very high
+ * capture rates, the per-interval value rounds down to 0 and frames are
+ * dropped). Differencing the rounded cumulative position keeps the total at
+ * `Math.round(fps * (lastTimestamp - startTimestamp))`, independent of the
+ * capture rate.
+ *
+ * Timestamps are in seconds (CDP `Page.screencastFrame` metadata timestamps).
+ *
+ * @internal
+ */
+export function countFrames(
+  startTimestamp: number,
+  previousTimestamp: number,
+  timestamp: number,
+  fps: number,
+): number {
+  const end = Math.round((timestamp - startTimestamp) * fps);
+  const start = Math.round((previousTimestamp - startTimestamp) * fps);
+  return Math.max(0, end - start);
+}
 
 /**
  * @internal
@@ -50,8 +76,6 @@ export interface ScreenRecorderOptions {
   quality?: number;
   colors?: number;
   scale?: number;
-  path?: `${string}.${VideoFormat}`;
-  overwrite?: boolean;
 }
 
 /**
@@ -66,6 +90,7 @@ export class ScreenRecorder extends PassThrough {
   #lastFrame: Promise<readonly [Buffer, number]>;
 
   #fps: number;
+  #logger?: Logger;
 
   /**
    * @internal
@@ -85,11 +110,12 @@ export class ScreenRecorder extends PassThrough {
       delay,
       quality,
       colors,
-      path,
-      overwrite,
     }: ScreenRecorderOptions = {},
+    logger?: Logger,
   ) {
     super({allowHalfOpen: false});
+
+    this.#logger = logger;
 
     ffmpegPath ??= 'ffmpeg';
     format ??= 'webm';
@@ -99,7 +125,6 @@ export class ScreenRecorder extends PassThrough {
     delay ??= -1;
     quality ??= CRF_VALUE;
     colors ??= 256;
-    overwrite ??= true;
 
     this.#fps = fps;
 
@@ -136,11 +161,6 @@ export class ScreenRecorder extends PassThrough {
       filters.push(formatArgs.splice(vf, 2).at(-1) ?? '');
     }
 
-    // Ensure provided output directory path exists.
-    if (path) {
-      fs.mkdirSync(dirname(path), {recursive: overwrite});
-    }
-
     this.#process = spawn(
       ffmpegPath,
       // See https://trac.ffmpeg.org/wiki/Encode/VP9 for more information on flags.
@@ -160,15 +180,17 @@ export class ScreenRecorder extends PassThrough {
           'nobuffer',
         ],
         // Forces input to be read from standard input, and forces png input
-        // image format.
-        ['-f', 'image2pipe', '-vcodec', 'png', '-i', 'pipe:0'],
+        // image format. `-framerate` is an input option and must appear before
+        // `-i`; otherwise ffmpeg ignores it and the image2pipe demuxer falls
+        // back to its default 25fps, stretching the output timeline relative to
+        // the frames we feed it at `fps`.
+        // prettier-ignore
+        ['-framerate', `${fps}`, '-f', 'image2pipe', '-vcodec', 'png', '-i', 'pipe:0'],
         // No audio
         ['-an'],
         // This drastically reduces stalling when cpu is overbooked. By default
         // VP9 tries to use all available threads?
         ['-threads', '1'],
-        // Specifies the frame rate we are giving ffmpeg.
-        ['-framerate', `${fps}`],
         // Disable bitrate.
         ['-b:v', '0'],
         // Specifies the encoding and format we are using.
@@ -176,24 +198,26 @@ export class ScreenRecorder extends PassThrough {
         // Filters to ensure the images are piped correctly,
         // combined with any format-specific filters.
         ['-vf', filters.join()],
-        // Overwrite output, or exit immediately if file already exists.
-        [overwrite ? '-y' : '-n'],
         'pipe:1',
       ].flat(),
       {stdio: ['pipe', 'pipe', 'pipe']},
     );
     this.#process.stdout.pipe(this);
     this.#process.stderr.on('data', (data: Buffer) => {
-      debugFfmpeg(data.toString('utf8'));
+      this.#logger?.(DEBUG_PREFIXES.ffmpeg)?.(data.toString('utf8'));
     });
 
     this.#page = page;
 
     const {client} = this.#page.mainFrame();
     client.once(CDPSessionEvent.Disconnected, () => {
-      void this.stop().catch(debugError);
+      void this.stop().catch(err => {
+        this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+      });
     });
 
+    // Anchor for the constant-fps grid; set to the first frame's timestamp.
+    let startTimestamp: number | undefined;
     this.#lastFrame = lastValueFrom(
       fromEmitterEvent(client, 'Page.screencastFrame').pipe(
         tap(event => {
@@ -218,9 +242,10 @@ export class ScreenRecorder extends PassThrough {
           ]
         >,
         concatMap(([{timestamp: previousTimestamp, buffer}, {timestamp}]) => {
+          startTimestamp ??= previousTimestamp;
           return from(
             Array<Buffer>(
-              Math.round(fps * Math.max(timestamp - previousTimestamp, 0)),
+              countFrames(startTimestamp, previousTimestamp, timestamp, fps),
             ).fill(buffer),
           );
         }),
@@ -316,7 +341,9 @@ export class ScreenRecorder extends PassThrough {
       return;
     }
     // Stopping the screencast will flush the frames.
-    await this.#page._stopScreencast().catch(debugError);
+    await this.#page._stopScreencast().catch(err => {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+    });
 
     this.#controller.abort();
 
@@ -340,9 +367,6 @@ export class ScreenRecorder extends PassThrough {
     });
   }
 
-  /**
-   * @internal
-   */
   override async [asyncDisposeSymbol](): Promise<void> {
     await this.stop();
     await super[asyncDisposeSymbol]();

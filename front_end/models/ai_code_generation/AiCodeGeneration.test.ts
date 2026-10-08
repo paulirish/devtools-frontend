@@ -3,16 +3,19 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../core/host/host.js';
-import {
-  describeWithEnvironment,
-  updateHostConfig,
-} from '../../testing/EnvironmentHelpers.js';
+import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
 
 import * as AiCodeGeneration from './ai_code_generation.js';
 
-describeWithEnvironment('AiCodeGeneration', () => {
+describe('AiCodeGeneration', () => {
+  setupLocaleHooks();
+  setupRuntimeHooks();
+
   beforeEach(() => {
     updateHostConfig({
       devToolsAiCodeGeneration: {
@@ -26,7 +29,7 @@ describeWithEnvironment('AiCodeGeneration', () => {
 
   it('builds a request and calls the AIDA client', async () => {
     const mockAidaClient = sinon.createStubInstance(Host.AidaClient.AidaClient, {
-      generateCode: Promise.resolve(null),
+      generateCode: Promise.resolve({samples: [], metadata: {rpcGlobalId: 1}}),
     });
     const aiCodeGeneration = new AiCodeGeneration.AiCodeGeneration.AiCodeGeneration(
         {aidaClient: mockAidaClient},

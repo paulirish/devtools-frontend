@@ -16,10 +16,10 @@ import {
 
 describe('The Extension API', () => {
   it('can open wasm resources with offset', async ({devToolsPage, inspectedPage}) => {
-    await waitForSourceFiles(
-        SourceFileEvents.ADDED_TO_SOURCE_TREE, files => files.some(f => f.endsWith('scopes.wasm')),
-        () => openFileInSourcesPanel('wasm/scopes.html', devToolsPage, inspectedPage), devToolsPage);
-    const extension = await loadExtension('TestExtension', undefined, undefined, devToolsPage, inspectedPage);
+    await waitForSourceFiles(devToolsPage, SourceFileEvents.ADDED_TO_SOURCE_TREE,
+                             files => files.some(f => f.endsWith('scopes.wasm')),
+                             () => openFileInSourcesPanel(devToolsPage, inspectedPage, 'wasm/scopes.html'));
+    const extension = await loadExtension(devToolsPage, inspectedPage, 'TestExtension', undefined, undefined);
     const resource = `${inspectedPage.getResourcesPath()}/sources/wasm/scopes.wasm`;
 
     await extension.waitForFunction(async (resource: string) => {
@@ -30,15 +30,15 @@ describe('The Extension API', () => {
 
     // Accepts a wasm offset as column
     await extension.evaluate(resource => window.chrome.devtools.panels.openResource(resource, 0, 0x4b), resource);
-    await waitForHighlightedLine(0x4b, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 0x4b);
 
     // Selects the right wasm line on an inexact match
     await extension.evaluate(resource => window.chrome.devtools.panels.openResource(resource, 0, 0x4e), resource);
-    await waitForHighlightedLine(0x4d, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 0x4d);
 
     // Accepts a missing columnNumber
     await extension.evaluate(resource => window.chrome.devtools.panels.openResource(resource, 0), resource);
-    await waitForHighlightedLine(0, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 0);
 
     // Accepts a wasm offset as column and a callback
     {
@@ -47,25 +47,43 @@ describe('The Extension API', () => {
           resource);
       assert.deepEqual(r, 1);
     }
-    await waitForHighlightedLine(0x4b, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 0x4b);
 
-    // Is backwards compatible: accepts a callback with a missing columnNumber
+    // Accepts a callback with an explicitly undefined columnNumber
     {
       const r = await extension.evaluate(
-          // @ts-expect-error Legacy API
-          resource => new Promise(r => window.chrome.devtools.panels.openResource(resource, 0, () => r(1))), resource);
+          resource =>
+              new Promise(r => window.chrome.devtools.panels.openResource(
+                              resource, /* lineNumber */ 0, /* columnNumber */ undefined, /* callback */ () => r(1))),
+          resource);
       assert.deepEqual(r, 1);
     }
-    await waitForHighlightedLine(0, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 0);
+
+    // Is backwards compatible for JavaScript callers: accepts a callback with a missing `columnNumber`
+    {
+      const r = await extension.evaluate(resource => new Promise(r => {
+                                           // Cast to `any` is required to bypass TypeScript compiler errors.
+                                           // We are verifying the legacy runtime behavior for JavaScript callers
+                                           // who skip the `columnNumber` argument, which is no longer statically
+                                           // allowed in TypeScript.
+                                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                           (window.chrome.devtools.panels as any)
+                                               .openResource(resource, /* lineNumber */ 0, /* callback */ () => r(1));
+                                         }),
+                                         resource);
+      assert.deepEqual(r, 1);
+    }
+    await waitForHighlightedLine(devToolsPage, 0);
   });
 
   it('can open page resources with column numbers', async ({devToolsPage, inspectedPage}) => {
     const resource = `${inspectedPage.getResourcesPath()}/sources/wasm/scopes.html`;
-    await waitForSourceFiles(
-        SourceFileEvents.ADDED_TO_SOURCE_TREE, files => files.some(f => f.endsWith('scopes.wasm')),
-        () => openFileInSourcesPanel('wasm/scopes.html', devToolsPage, inspectedPage), devToolsPage);
+    await waitForSourceFiles(devToolsPage, SourceFileEvents.ADDED_TO_SOURCE_TREE,
+                             files => files.some(f => f.endsWith('scopes.wasm')),
+                             () => openFileInSourcesPanel(devToolsPage, inspectedPage, 'wasm/scopes.html'));
 
-    const extension = await loadExtension('TestExtension', undefined, undefined, devToolsPage, inspectedPage);
+    const extension = await loadExtension(devToolsPage, inspectedPage, 'TestExtension', undefined, undefined);
 
     await extension.waitForFunction(async (resource: string) => {
       const resources =
@@ -75,14 +93,14 @@ describe('The Extension API', () => {
 
     // Accepts a missing columnNumber
     await extension.evaluate(resource => window.chrome.devtools.panels.openResource(resource, 2), resource);
-    await waitForHighlightedLine(3, devToolsPage);
+    await waitForHighlightedLine(devToolsPage, 3);
 
     // Accepts a column number
     {
       await extension.evaluate(resource => window.chrome.devtools.panels.openResource(resource, 29, 160), resource);
-      await waitForHighlightedLine(30, devToolsPage);
+      await waitForHighlightedLine(devToolsPage, 30);
       const toolbarText = await getToolbarText(devToolsPage);
-      assert.isTrue(toolbarText.includes('Line 30, Column 161'));
+      assert.isTrue(toolbarText.includes('Line 30, column 161'));
     }
 
     // Accepts a column number and a callback
@@ -91,19 +109,37 @@ describe('The Extension API', () => {
           resource => new Promise(r => window.chrome.devtools.panels.openResource(resource, 1, 2000, () => r(1))),
           resource);
       assert.deepEqual(r, 1);
-      await waitForHighlightedLine(2, devToolsPage);
+      await waitForHighlightedLine(devToolsPage, 2);
       const toolbarText = await getToolbarText(devToolsPage);
       // Column 38 is the last column in the 2nd line.
-      assert.isTrue(toolbarText.includes('Line 2, Column 38'));
+      assert.isTrue(toolbarText.includes('Line 2, column 38'));
     }
 
-    // Is backwards compatible: accepts a callback with a missing columnNumber
+    // Accepts a callback with an explicitly undefined columnNumber
     {
       const r = await extension.evaluate(
-          // @ts-expect-error Legacy API
-          resource => new Promise(r => window.chrome.devtools.panels.openResource(resource, 2, () => r(1))), resource);
+          resource =>
+              new Promise(r => window.chrome.devtools.panels.openResource(
+                              resource, /* lineNumber */ 2, /* columnNumber */ undefined, /* callback */ () => r(1))),
+          resource);
       assert.deepEqual(r, 1);
-      await waitForHighlightedLine(3, devToolsPage);
+      await waitForHighlightedLine(devToolsPage, 3);
+    }
+
+    // Is backwards compatible for JavaScript callers: accepts a callback with a missing `columnNumber`
+    {
+      const r = await extension.evaluate(resource => new Promise(r => {
+                                           // Cast to `any` is required to bypass TypeScript compiler errors.
+                                           // We are verifying the legacy runtime behavior for JavaScript callers
+                                           // who skip the `columnNumber` argument, which is no longer statically
+                                           // allowed in TypeScript.
+                                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                           (window.chrome.devtools.panels as any)
+                                               .openResource(resource, /* lineNumber */ 2, /* callback */ () => r(1));
+                                         }),
+                                         resource);
+      assert.deepEqual(r, 1);
+      await waitForHighlightedLine(devToolsPage, 3);
     }
   });
 });

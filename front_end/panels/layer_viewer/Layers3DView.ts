@@ -7,11 +7,12 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as Geometry from '../../models/geometry/geometry.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import * as uiI18n from '../../ui/i18n/i18n.js';
 import {Link} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import layers3DViewStyles from './layers3DView.css.js';
@@ -31,48 +32,38 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description Text of a DOM element in DView of the Layers panel
+   * @description Text of a DOM element in 3D view of the Layers panel.
    */
   noLayerInformation: 'No layers detected yet',
   /**
-   * @description Text of a DOM element in DView of the Layers panel that explains the panel
+   * @description Text of a DOM element in 3D view of the Layers panel that explains the panel.
    */
-  layerExplanation: 'On this page you will be able to view and inspect document layers.',
+  layerExplanation: 'On this page you will be able to view and inspect document layers',
   /**
-   * @description Accessibility label for canvas view in Layers tool
+   * @description Accessibility label for canvas view in Layers panel.
    */
-  dLayersView: '3D Layers View',
+  dLayersView: '3D layers view',
   /**
-   * @description Text in DView of the Layers panel
+   * @description Text in 3D view of the Layers panel.
    */
-  cantDisplayLayers: 'Can\'t display layers',
+  cantDisplayLayers: 'Can’t display layers',
   /**
-   * @description Text in DView of the Layers panel
+   * @description Text in 3D view of the Layers panel.
    */
-  webglSupportIsDisabledInYour: 'WebGL support is disabled in your browser.',
+  webglSupportIsDisabledInYour: 'WebGL support is disabled in your browser',
   /**
-   * @description Text in DView of the Layers panel
+   * @description Text in 3D view of the Layers panel.
    * @example {about:gpu} PH1
    */
-  checkSForPossibleReasons: 'Check {PH1} for possible reasons.',
+  checkSForPossibleReasons: 'Check {PH1} for possible reasons',
   /**
-   * @description Text for a checkbox in the toolbar of the Layers panel to show the area of slow scroll rect
+   * @description Context menu item in the 3D view of the Layers panel.
    */
-  slowScrollRects: 'Slow scroll rects',
+  resetView: 'Reset view',
   /**
-   * @description Text for a checkbox in the toolbar of the Layers panel. This is a noun, for a
-   * setting meaning 'display paints in the layers viewer'. 'Paints' here means 'paint events' i.e.
-   * when the browser draws pixels to the screen.
+   * @description Context menu item in the 3D view of the Layers panel.
    */
-  paints: 'Paints',
-  /**
-   * @description A context menu item in the DView of the Layers panel
-   */
-  resetView: 'Reset View',
-  /**
-   * @description A context menu item in the DView of the Layers panel
-   */
-  showPaintProfiler: 'Show Paint Profiler',
+  showPaintProfiler: 'Show paint profiler',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/layer_viewer/Layers3DView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -103,7 +94,9 @@ export interface ViewOutput {
   canvasElement?: HTMLCanvasElement;
 }
 
-export const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLElement): void => {
+export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input: ViewInput, output: ViewOutput, target: HTMLElement): void => {
   // clang-format off
   render(html`<style>
       ${layers3DViewStyles}
@@ -111,25 +104,24 @@ export const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLE
     ${input.panelToolbar}
     ${input.error === 'missing-root' ? html`<div>${widget(UI.EmptyWidget.EmptyWidget, {
       header: i18nString(UIStrings.noLayerInformation),
-      text: i18nString(UIStrings.layerExplanation)
+      text: i18nString(UIStrings.layerExplanation),
     })}</div>` : Lit.nothing}
-    ${input.error === 'webgl-disabled' ? html`<div>${widget(UI.EmptyWidget.EmptyWidget, {
+    ${input.error === 'webgl-disabled' ? html`<div><devtools-widget ${widget(UI.EmptyWidget.EmptyWidget, {
       header: i18nString(UIStrings.cantDisplayLayers),
       text: i18nString(UIStrings.webglSupportIsDisabledInYour),
-      extraElements: [
-        uiI18n.getFormatLocalizedString(
-          str_, UIStrings.checkSForPossibleReasons,
-          {
-            PH1: Link.create('about:gpu', undefined, undefined, 'about-gpu')
-          }
-        )
-      ],
-    })}</div>` : Lit.nothing}
+    })}>
+      ${uiI18n.getFormatLocalizedString(
+        str_, UIStrings.checkSForPossibleReasons,
+        {
+          PH1: Link.create('chrome://gpu', undefined, undefined, 'about-gpu', 0, true),
+        },
+      )}
+    </devtools-widget></div>` : Lit.nothing}
     <canvas
       tabindex="0"
       jslog=${VisualLogging.canvas('layers').track({
         click: true,
-        drag: true
+        drag: true,
       })}
       aria-label=${i18nString(UIStrings.dLayersView)}
       @dblclick=${input.onDoubleClick}
@@ -148,7 +140,14 @@ export const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLE
   // clang-format onn
 };
 
-export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
+const Layers3DViewBase: Common.ObjectWrapper.EventMixin<
+  EventTypes,
+  typeof UI.Widget.VBox
+> = Common.ObjectWrapper.eventMixin(
+  UI.Widget.VBox,
+);
+
+export class Layers3DView extends Layers3DViewBase
     implements LayerView {
   private readonly layerViewHost: LayerViewHost;
   private transformController: TransformController;
@@ -177,11 +176,11 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private mouseDownX?: number;
   private mouseDownY?: number;
 
-  #view: typeof DEFAULT_VIEW;
+  #view: View;
   #error?: 'missing-root' | 'webgl-disabled';
   #canvasElement!: HTMLCanvasElement;
 
-  constructor(layerViewHost: LayerViewHost, view = DEFAULT_VIEW) {
+  constructor(layerViewHost: LayerViewHost, view: View = DEFAULT_VIEW) {
     super();
     this.#view = view;
 
@@ -195,12 +194,12 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.transformController.addEventListener(TransformControllerEvents.TRANSFORM_CHANGED, this.updateData, this);
     this.panelToolbar = this.transformController.toolbar();
     this.showPaintsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.paints), 'frame-viewer-show-paints', false, this.panelToolbar);
+        SettingsUI.LayerViewerSettings.showPaintsSettingDescriptor, this.panelToolbar);
     this.showSlowScrollRectsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.slowScrollRects), 'frame-viewer-show-slow-scroll-rects', true, this.panelToolbar);
+        SettingsUI.LayerViewerSettings.showSlowScrollRectsSettingDescriptor, this.panelToolbar);
     this.showPaintsSetting.addChangeListener(this.updatePaints, this);
     Common.Settings.Settings.instance()
-      .moduleSetting('frame-viewer-chrome-window')
+        .resolve(SettingsUI.LayerViewerSettings.chromeWindowSettingDescriptor)
         .addChangeListener(this.updateData, this);
 
     this.performUpdate();
@@ -732,7 +731,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       return;
     }
 
-    const drawChrome = Common.Settings.Settings.instance().moduleSetting('frame-viewer-chrome-window').get() &&
+    const drawChrome =
+        Common.Settings.Settings.instance().resolve(SettingsUI.LayerViewerSettings.chromeWindowSettingDescriptor).get() &&
         this.chromeTextures.length >= 3 && this.chromeTextures.indexOf(undefined) < 0;
     const z = (this.maxDepth + 1) * LayerSpacing;
     const borderWidth = Math.ceil(ViewportBorderWidth * this.scale);
@@ -875,10 +875,9 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 
   private createVisibilitySetting(
-      caption: Common.UIString.LocalizedString, name: string, value: boolean,
+      descriptor: Common.Settings.SettingDescriptor<boolean>,
       toolbar: UI.Toolbar.Toolbar): Common.Settings.Setting<boolean> {
-    const setting = Common.Settings.Settings.instance().createSetting(name, value);
-    setting.setTitle(caption);
+    const setting = Common.Settings.Settings.instance().resolve(descriptor);
     setting.addChangeListener(this.updateData, this);
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(setting));
     return setting;
@@ -973,7 +972,7 @@ export const enum ChromeTexture {
   RIGHT = 2,
 }
 
-export const FragmentShader = '' +
+export const FragmentShader: string = '' +
     'precision mediump float;\n' +
     'varying vec4 vColor;\n' +
     'varying vec2 vTextureCoord;\n' +
@@ -983,7 +982,7 @@ export const FragmentShader = '' +
     '    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t)) * vColor;\n' +
     '}';
 
-export const VertexShader = '' +
+export const VertexShader: string = '' +
     'attribute vec3 aVertexPosition;\n' +
     'attribute vec2 aTextureCoord;\n' +
     'attribute vec4 aVertexColor;\n' +
@@ -997,12 +996,12 @@ export const VertexShader = '' +
     'vTextureCoord = aTextureCoord;\n' +
     '}';
 
-export const HoveredBorderColor = [0, 0, 255, 1];
-export const SelectedBorderColor = [0, 255, 0, 1];
-export const BorderColor = [0, 0, 0, 1];
-export const ViewportBorderColor = [160, 160, 160, 1];
-export const ScrollRectBackgroundColor = [178, 100, 100, 0.6];
-export const HoveredImageMaskColor = [200, 200, 255, 1];
+export const HoveredBorderColor: number[] = [0, 0, 255, 1];
+export const SelectedBorderColor: number[] = [0, 255, 0, 1];
+export const BorderColor: number[] = [0, 0, 0, 1];
+export const ViewportBorderColor: number[] = [160, 160, 160, 1];
+export const ScrollRectBackgroundColor: number[] = [178, 100, 100, 0.6];
+export const HoveredImageMaskColor: number[] = [200, 200, 255, 1];
 export const BorderWidth = 1;
 export const SelectedBorderWidth = 2;
 export const ViewportBorderWidth = 3;

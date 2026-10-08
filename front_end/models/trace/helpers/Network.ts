@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as Protocol from '../../../generated/protocol.js';
-import type {RenderBlocking, SyntheticNetworkRequest} from '../types/TraceEvents.js';
+import type * as Types from '../types/types.js';
+
+type RenderBlocking = Types.Events.RenderBlocking;
+type SyntheticNetworkRequest = Types.Events.SyntheticNetworkRequest;
 
 // Important: we purposefully treat `potentially_blocking` as
 // non-render-blocking here because:
@@ -45,10 +48,10 @@ export interface CacheControl {
   'private'?: boolean;
 }
 
-export const CACHEABLE_STATUS_CODES = new Set([200, 203, 206]);
+export const CACHEABLE_STATUS_CODES: Set<number> = new Set([200, 203, 206]);
 
 /** @type {Set<LH.Crdp.Network.ResourceType>} */
-export const STATIC_RESOURCE_TYPES = new Set([
+export const STATIC_RESOURCE_TYPES: Set<Protocol.Network.ResourceType> = new Set([
   Protocol.Network.ResourceType.Font,
   Protocol.Network.ResourceType.Image,
   Protocol.Network.ResourceType.Media,
@@ -56,7 +59,7 @@ export const STATIC_RESOURCE_TYPES = new Set([
   Protocol.Network.ResourceType.Stylesheet,
 ]);
 
-export const NON_NETWORK_SCHEMES = [
+export const NON_NETWORK_SCHEMES: string[] = [
   'blob',        // @see https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
   'data',        // @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URIs
   'intent',      // @see https://developer.chrome.com/docs/multidevice/android/intents/

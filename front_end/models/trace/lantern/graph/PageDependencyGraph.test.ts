@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
+import {assert} from 'chai';
 
 import * as Lantern from '../lantern.js';
 
@@ -93,8 +93,8 @@ describe('PageDependencyGraph', () => {
 
       const networkNodeOutput = PageDependencyGraph.getNetworkNodeOutput(recordsWithWorker);
 
-      expect(networkNodeOutput.nodes).to.have.lengthOf(3);
-      expect(networkNodeOutput.nodes.map(node => node.request)).not.contain(workerRequest);
+      assert.lengthOf(networkNodeOutput.nodes, 3);
+      assert.notInclude(networkNodeOutput.nodes.map(node => node.request), workerRequest);
     });
 
     it('should index nodes by ID', () => {
@@ -143,7 +143,7 @@ describe('PageDependencyGraph', () => {
 
       const nodes = networkNodeOutput.nodes;
       const indexedByFrame = networkNodeOutput.frameIdToNodeMap;
-      expect([...indexedByFrame.entries()]).deep.equals([
+      assert.deepEqual([...indexedByFrame.entries()], [
         ['A', nodes[0]],
         ['D', nodes[3]],
         ['collision', null],
@@ -209,6 +209,16 @@ describe('PageDependencyGraph', () => {
       assert.strictEqual(node2.event, traceEvents[3]);
       assert.lengthOf(node2.childEvents, 1);
       assert.strictEqual(node2.childEvents[0].name, 'OverlappingEvent');
+    });
+
+    it('should not produce negative duration when two tasks have the same start timestamp', () => {
+      addTaskEvents(100, 50, []);
+      addTaskEvents(100, 50, []);
+
+      const nodes = PageDependencyGraph.getCPUNodes(traceEvents);
+      assert.lengthOf(nodes, 2);
+      assert.strictEqual(nodes[0].duration, 0);
+      assert.strictEqual(nodes[1].duration, 50_000);
     });
   });
 
@@ -459,13 +469,14 @@ describe('PageDependencyGraph', () => {
       const cpuNodes: Lantern.Graph.CPUNode[] = [];
       graph.traverse(node => node.type === 'cpu' && cpuNodes.push(node));
 
-      expect(cpuNodes.map(node => {
-        return {
-          id: node.id,
-          name: node.childEvents[0].name,
-        };
-      }))
-          .deep.equals([
+      assert.deepEqual(
+          cpuNodes.map(node => {
+            return {
+              id: node.id,
+              name: node.childEvents[0].name,
+            };
+          }),
+          [
             {
               id: '1.0',
               name: 'Paint',
@@ -667,6 +678,28 @@ describe('PageDependencyGraph', () => {
       assert.deepEqual(nodes.map(node => node.id), ['2']);
       assert.deepEqual(nodes[0].getDependencies(), []);
       assert.deepEqual(nodes[0].getDependents(), []);
+    });
+
+    it('should link CPU node to earlier request even when the same URL is requested again after the CPU task', () => {
+      const request1 = createRequest(1, 'https://example.com/', 0);
+      const earlyScript = createRequest(2, 'https://example.com/app.js', 10);
+      const lateRepeatScript = createRequest(3, 'https://example.com/app.js', 500);
+      const networkRequests = [request1, earlyScript, lateRepeatScript];
+
+      addTaskEvents(50, 20, [
+        {name: 'EvaluateScript', data: {url: 'https://example.com/app.js'}},
+      ]);
+
+      const graph = PageDependencyGraph.createGraph(traceEvents, networkRequests, url);
+      const cpuNodes: Lantern.Graph.CPUNode[] = [];
+      graph.traverse(node => {
+        if (node.type === 'cpu') {
+          cpuNodes.push(node);
+        }
+      });
+
+      assert.lengthOf(cpuNodes, 1);
+      assert.deepEqual(cpuNodes[0].getDependencies().map(n => n.id), ['2']);
     });
   });
 });

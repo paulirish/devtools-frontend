@@ -33,11 +33,11 @@ const UIStrings = {
    * @description Tooltip to explain lack of raw headers for a particular network request
    */
   onlyProvisionalHeadersAre:
-      'Only provisional headers are available because this request was not sent over the network and instead was served from a local cache, which doesn’t store the original request headers. Disable cache to see full request headers.',
+      'Only provisional headers are available because this request wasn’t sent over the network and instead was served from a local cache, which doesn’t store the original request headers. Disable cache to see full request headers.',
   /**
    * @description Message to explain lack of raw headers for a particular network request
    */
-  provisionalHeadersAreShown: 'Provisional headers are shown.',
+  provisionalHeadersAreShown: 'Provisional headers are shown',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/network/components/RequestHeaderSection.ts', UIStrings);
@@ -83,9 +83,8 @@ function renderProvisionalHeadersWarning(isRequestCached: boolean): Lit.LitTempl
   return html`
     <div class="call-to-action">
       <div class="call-to-action-body">
+        <devtools-icon class="inline-icon medium" name='warning-filled'></devtools-icon>
         <div class="explanation" title=${cautionTitle}>
-          <devtools-icon class="inline-icon medium" name='warning-filled'>
-          </devtools-icon>
           ${cautionText} <devtools-link href="https://developer.chrome.com/docs/devtools/network/reference/#provisional-headers" class="link">${i18nString(UIStrings.learnMore)}</devtools-link>
         </div>
       </div>

@@ -7,14 +7,13 @@ import type * as Platform from '../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Protocol from '../../generated/protocol.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../bindings/bindings.js';
 import * as Formatter from '../formatter/formatter.js';
 import * as SourceMapScopes from '../source_map_scopes/source_map_scopes.js';
-import type * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
-let breakpointManagerInstance: BreakpointManager;
 const INITIAL_RESTORE_BREAKPOINT_COUNT = 100;
 
 export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
@@ -35,10 +34,9 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   readonly #breakpointByStorageId = new Map<string, Breakpoint>();
   #updateBindingsCallbacks: Array<(uiSourceCode: Workspace.UISourceCode.UISourceCode) => Promise<void>> = [];
 
-  private constructor(
-      targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl,
-      debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding,
-      settings: Common.Settings.Settings, restoreInitialBreakpointCount?: number) {
+  constructor(targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl,
+              debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding,
+              settings: Common.Settings.Settings, restoreInitialBreakpointCount?: number) {
     super();
     this.#workspace = workspace;
     this.targetManager = targetManager;
@@ -85,18 +83,20 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   }): BreakpointManager {
     const {forceNew, targetManager, workspace, debuggerWorkspaceBinding, settings, restoreInitialBreakpointCount} =
         opts;
-    if (!breakpointManagerInstance || forceNew) {
+    if (!Root.DevToolsContext.globalInstance().has(BreakpointManager) || forceNew) {
       if (!targetManager || !workspace || !debuggerWorkspaceBinding || !settings) {
         throw new Error(
             `Unable to create settings: targetManager, workspace, debuggerWorkspaceBinding, and settings must be provided: ${
                 new Error().stack}`);
       }
 
-      breakpointManagerInstance = new BreakpointManager(
-          targetManager, workspace, debuggerWorkspaceBinding, settings, restoreInitialBreakpointCount);
+      Root.DevToolsContext.globalInstance().set(
+          BreakpointManager,
+          new BreakpointManager(targetManager, workspace, debuggerWorkspaceBinding, settings,
+                                restoreInitialBreakpointCount));
     }
 
-    return breakpointManagerInstance;
+    return Root.DevToolsContext.globalInstance().get(BreakpointManager);
   }
 
   modelAdded(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
@@ -510,7 +510,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
   /** Bound locations */
   readonly #uiLocations = new Set<Workspace.UISourceCode.UILocation>();
   /** All known UISourceCodes with this url. This also includes UISourceCodes for the inline scripts embedded in a resource with this URL. */
-  readonly uiSourceCodes = new Set<Workspace.UISourceCode.UISourceCode>();
+  readonly uiSourceCodes: Set<Workspace.UISourceCode.UISourceCode> = new Set<Workspace.UISourceCode.UISourceCode>();
   #storageState!: BreakpointStorageState;
   #origin: BreakpointOrigin;
   isRemoved = false;
@@ -608,7 +608,6 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
     debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerWasEnabled, this.#onDebuggerEnabled, this);
     debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerWasDisabled, this.#onDebuggerDisabled, this);
-    debuggerModel.addEventListener(SDK.DebuggerModel.Events.ScriptSourceWasEdited, this.#onScriptWasEdited, this);
   }
 
   modelRemoved(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
@@ -622,7 +621,6 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
   #removeDebuggerModelListeners(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
     debuggerModel.removeEventListener(SDK.DebuggerModel.Events.DebuggerWasEnabled, this.#onDebuggerEnabled, this);
     debuggerModel.removeEventListener(SDK.DebuggerModel.Events.DebuggerWasDisabled, this.#onDebuggerDisabled, this);
-    debuggerModel.removeEventListener(SDK.DebuggerModel.Events.ScriptSourceWasEdited, this.#onScriptWasEdited, this);
   }
 
   #onDebuggerEnabled(event: Common.EventTarget.EventTargetEvent<SDK.DebuggerModel.DebuggerModel>): void {
@@ -637,29 +635,6 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
     const debuggerModel = event.data;
     const model = this.#modelBreakpoints.get(debuggerModel);
     model?.cleanUpAfterDebuggerIsGone();
-  }
-
-  async #onScriptWasEdited(
-      event: Common.EventTarget
-          .EventTargetEvent<{script: SDK.Script.Script, status: Protocol.Debugger.SetScriptSourceResponseStatus}>):
-      Promise<void> {
-    const {source: debuggerModel, data: {script, status}} = event;
-    if (status !== Protocol.Debugger.SetScriptSourceResponseStatus.Ok) {
-      return;
-    }
-
-    // V8 throws away breakpoints on all functions in a live edited script. Here we attempt to re-set them again at the
-    // same position. This is because we don't know what was edited and how the breakpoint should move, e.g. if the file
-    // was originally changed on the filesystem (via workspace).
-    // If the live edit originated in DevTools (in CodeMirror), then the `DebuggerPlugin` will remove the breakpoint
-    // wholesale and re-apply based on the diff.
-
-    console.assert(debuggerModel instanceof SDK.DebuggerModel.DebuggerModel);
-    const model = this.#modelBreakpoints.get(debuggerModel as SDK.DebuggerModel.DebuggerModel);
-    if (model?.wasSetIn(script.scriptId)) {
-      await model.resetBreakpoint();
-      void this.#updateModel(model);
-    }
   }
 
   modelBreakpoint(debuggerModel: SDK.DebuggerModel.DebuggerModel): ModelBreakpoint|undefined {
@@ -837,7 +812,8 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
     };
 
     if (location) {
-      return SourceMapScopes.NamesResolver.allVariablesAtPosition(location)
+      return SourceMapScopes.NamesResolver
+          .allVariablesAtPosition(location, this.breakpointManager.debuggerWorkspaceBinding)
           .then(nameMap => Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(condition, nameMap))
           .catch(() => condition)
           .then(subsitutedCondition => addSourceUrl(subsitutedCondition), () => addSourceUrl(condition));
@@ -965,11 +941,6 @@ export class ModelBreakpoint {
   #cancelCallback = false;
   #currentState: Breakpoint.State|null = null;
   #breakpointIds: Protocol.Debugger.BreakpointId[] = [];
-  /**
-   * We track all the script IDs this ModelBreakpoint was actually set in. This allows us
-   * to properly reset this ModelBreakpoint after a script was live edited.
-   */
-  #resolvedScriptIds = new Set<Protocol.Runtime.ScriptId>();
 
   constructor(
       debuggerModel: SDK.DebuggerModel.DebuggerModel, breakpoint: Breakpoint,
@@ -990,7 +961,6 @@ export class ModelBreakpoint {
 
     this.#uiLocations.clear();
     this.#liveLocations.disposeAll();
-    this.#resolvedScriptIds.clear();
   }
 
   async scheduleUpdateInDebugger(): Promise<ScheduleUpdateResult> {
@@ -1020,16 +990,6 @@ export class ModelBreakpoint {
     return result;
   }
 
-  private scriptDiverged(): boolean {
-    for (const uiSourceCode of this.#breakpoint.getUiSourceCodes()) {
-      const scriptFile = this.#debuggerWorkspaceBinding.scriptFile(uiSourceCode, this.#debuggerModel);
-      if (scriptFile?.hasDivergedFromVM()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   async #updateInDebugger(): Promise<DebuggerUpdateResult> {
     if (this.#debuggerModel.target().isDisposed()) {
       this.cleanUpAfterDebuggerIsGone();
@@ -1041,7 +1001,7 @@ export class ModelBreakpoint {
 
     // Calculate the new state.
     let newState: Breakpoint.State|null = null;
-    if (!this.#breakpoint.getIsRemoved() && this.#breakpoint.enabled() && !this.scriptDiverged()) {
+    if (!this.#breakpoint.getIsRemoved() && this.#breakpoint.enabled()) {
       let debuggerLocations: SDK.DebuggerModel.Location[] = [];
       for (const uiSourceCode of this.#breakpoint.getUiSourceCodes()) {
         const {lineNumber: uiLineNumber, columnNumber: uiColumnNumber} =
@@ -1225,7 +1185,6 @@ export class ModelBreakpoint {
   }
 
   private async addResolvedLocation(location: SDK.DebuggerModel.Location): Promise<ResolveLocationResult> {
-    this.#resolvedScriptIds.add(location.scriptId);
     const uiLocation = await this.#debuggerWorkspaceBinding.rawLocationToUILocation(location);
     if (!uiLocation) {
       return ResolveLocationResult.OK;
@@ -1247,11 +1206,6 @@ export class ModelBreakpoint {
     if (this.#breakpointIds.length) {
       this.didRemoveFromDebugger();
     }
-  }
-
-  /** @returns true, iff this `ModelBreakpoint` was set (at some point) in `scriptId` */
-  wasSetIn(scriptId: Protocol.Runtime.ScriptId): boolean {
-    return this.#resolvedScriptIds.has(scriptId);
   }
 }
 

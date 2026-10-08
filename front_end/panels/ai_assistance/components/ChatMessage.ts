@@ -9,37 +9,31 @@ import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
-import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import type {
-  AiWidget, BottomUpTreeAiWidget, ComputedStyleAiWidget, CoreVitalsAiWidget, DomTreeAiWidget, LighthouseReportAiWidget,
-  NetworkRequestGeneralHeadersAiWidget, PerfInsightAiWidget, PerformanceTraceAiWidget, SourceCodeAiWidget,
-  SourceFileAiWidget, SourceFilesListAiWidget, StylePropertiesAiWidget, TimelineEventSummaryAiWidget,
-  TimelineRangeSummaryAiWidget} from '../../../models/ai_assistance/agents/AiAgent.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as ComputedStyle from '../../../models/computed_style/computed_style.js';
 import * as Formatter from '../../../models/formatter/formatter.js';
-import * as TextUtils from '../../../models/text_utils/text_utils.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as Workspace from '../../../models/workspace/workspace.js';
 import * as PanelsCommon from '../../../panels/common/common.js';
 import * as TraceBounds from '../../../services/trace_bounds/trace_bounds.js';
-import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
-import type * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
-import type {MarkdownLitRenderer} from '../../../ui/components/markdown_view/MarkdownView.js';
+import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
+import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
 import * as UIHelpers from '../../../ui/helpers/helpers.js';
+import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+import * as Application from '../../application/application.js';
 import * as Elements from '../../elements/elements.js';
 import * as Lighthouse from '../../lighthouse/lighthouse.js';
 import * as NetworkForward from '../../network/forward/forward.js';
 import * as Network from '../../network/network.js';
 import * as TimelineComponents from '../../timeline/components/components.js';
-import type {BaseInsightComponent} from '../../timeline/components/insights/BaseInsightComponent.js';
 import * as TimelineInsights from '../../timeline/components/insights/insights.js';
 import * as Timeline from '../../timeline/timeline.js';
 import * as TimelineUtils from '../../timeline/utils/utils.js';
@@ -55,7 +49,6 @@ const {widget} = UI.Widget;
 
 const REPORT_URL = 'https://crbug.com/508304827' as Platform.DevToolsPath.UrlString;
 const SCROLL_ROUNDING_OFFSET = 1;
-const MAX_NUM_LINES_IN_CODEBLOCK = 11;
 
 /*
 * Strings that don't need to be translated at this time.
@@ -106,14 +99,14 @@ const UIStringsNotTranslate = {
    */
   scrollToPrevious: 'Scroll to previous suggestions',
   /**
-   * @description The title of the button that copies the AI-generated response to the clipboard.
-   */
-  copyResponse: 'Copy response',
-  /**
    * @description The error message when the request to the LLM failed for some reason.
    */
   systemError:
       'Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue. If this keeps happening, update Chrome to the latest version.',
+  /**
+   * @description The error message when the user is out of quota or rate limited.
+   */
+  quotaError: 'You reached your limit for AI assistance requests. Try again later.',
   /**
    * @description The error message when the LLM gets stuck in a loop (max steps reached).
    */
@@ -121,7 +114,11 @@ const UIStringsNotTranslate = {
   /**
    * @description The error message when the LLM selects context from a different origin.
    */
-  crossOriginError: 'I have selected the new context but you will have to start a new chat.',
+  crossOriginError: 'I have selected the new context but you will have to start a new chat',
+  /**
+   * @description The error message when the request payload is too large.
+   */
+  payloadTooLargeError: 'The request payload is too large. Please try a smaller image or a screenshot.',
   /**
    * @description Displayed when the user stop the response
    */
@@ -135,13 +132,25 @@ const UIStringsNotTranslate = {
    */
   declineActionRequestApproval: 'Cancel',
   /**
-   * @description The generic name of the AI agent (do not translate)
+   * @description Button text in the permission prompt that skips the tool call.
    */
-  ai: 'AI',
+  skipToolCall: 'Skip',
   /**
-   * @description Gemini (do not translate)
+   * @description Button text in the permission prompt that allows the tool call once.
    */
-  gemini: 'Gemini',
+  allowThisTime: 'Yes, allow this time',
+  /**
+   * @description Button text in the permission prompt that allows the tool call now and in the future.
+   */
+  allowAlways: 'Yes, always allow',
+  /**
+   * @description Fallback title of the permission prompt when the tool has no title.
+   */
+  allowThisAction: 'Allow this action?',
+  /**
+   * @description Footer of the permission prompt.
+   */
+  relevantDataIsSentToGoogle: 'Relevant data is sent to Google. Change permissions in settings at any time.',
   /**
    * @description The fallback text when a step has no title yet
    */
@@ -223,13 +232,13 @@ const UIStringsNotTranslate = {
    */
   revealRenderBlockingBreakdown: 'Reveal render-blocking requests',
   /**
-   * @description Accessible label for the reveal button in the LCP element widget.
-   */
-  revealLcpElement: 'Reveal LCP element',
-  /**
    * @description Accessible label for the reveal button in the performance summary widget.
    */
   revealPerformanceSummary: 'Reveal performance summary',
+  /**
+   * @description Accessible label for the reveal button in the network track widget.
+   */
+  revealNetworkActivity: 'Reveal network activity',
   /**
    * @description Accessible label for the reveal button in the bottom up thread activity widget.
    */
@@ -287,13 +296,13 @@ const UIStringsNotTranslate = {
    */
   thirdParties: '3rd parties',
   /**
-   * @description Title for the LCP element widget.
-   */
-  lcpElement: 'LCP element',
-  /**
    * @description Title for the performance summary widget.
    */
   performanceSummary: 'Performance summary',
+  /**
+   * @description Title for the network activity summary widget.
+   */
+  networkActivitySummary: 'Network activity',
   /**
    * @description The title of the button that allows exporting the conversation for agents.
    */
@@ -415,26 +424,92 @@ const UIStringsNotTranslate = {
    */
   characterSet: 'Character set declaration',
   /**
+   * @description Title for the network requests list widget.
+   */
+  networkRequests: 'Network requests',
+  /**
+   * @description Accessible label for the reveal button in the network requests list widget.
+   */
+  revealFirstNetworkRequest: 'Reveal first network request in Network panel',
+  /**
    * @description Title for the source files list widget.
    */
   inspectedFileNames: 'Inspected file names',
+  /**
+   * @description Title for the storage breakdown widget.
+   */
+  storageBreakdown: 'Storage breakdown',
+  /**
+   * @description Accessible label for the reveal button in the storage breakdown widget.
+   */
+  revealStorageBreakdown: 'Reveal storage breakdown in Application panel',
 } as const;
 
-export interface Step {
-  isLoading: boolean;
-  thought?: string;
-  title?: string;
-  code?: string;
-  output?: string;
-  widgets?: AiWidget[];
-  canceled?: boolean;
-  requestApproval?: ConfirmSideEffectDialog;
-  contextDetails?: [AiAssistanceModel.AiAgent.ContextDetail, ...AiAssistanceModel.AiAgent.ContextDetail[]];
+/**
+ * Payload and confirmation handler for side-effect operations requiring user approval.
+ */
+export interface ConfirmSideEffectDialog {
+  /**
+   * Human-readable description explaining the pending side-effect action, or null if omitted.
+   */
+  description: string|null;
+  /**
+   * Callback invoked when the user resolves the dialog with their decision.
+   */
+  onAnswer: (decision: AiAssistanceModel.Tool.PermissionDecision) => void;
+  /**
+   * Which choices the permission prompt offers. Behaves as `ALLOW_ONCE` when unset.
+   */
+  permissionPrompt?: AiAssistanceModel.Tool.PermissionPrompt;
+  /**
+   * Title of the permission prompt, e.g. "Allow reading cookie values?".
+   */
+  permissionTitle?: string;
 }
 
-export interface ConfirmSideEffectDialog {
-  description: string|null;
-  onAnswer: (result: boolean) => void;
+/**
+ * Represents the execution state of an individual agent action step:
+ * - `in_progress`: The step is actively querying context or parsing stream content.
+ * - `needs_approval`: The step is awaiting user confirmation for a side-effecting operation.
+ * - `canceled`: The step was canceled before execution.
+ * - `completed`: The step completed execution successfully.
+ */
+export type StepState = {
+  type: 'in_progress',
+}|{type: 'needs_approval', sideEffectDialog: ConfirmSideEffectDialog}|{type: 'canceled'}|{type: 'completed'};
+
+/**
+ * Represents an individual execution step within an agent response.
+ */
+export interface Step {
+  /**
+   * The current lifecycle state of this step.
+   */
+  state: StepState;
+  /**
+   * The agent's intermediate thought or rationale for taking this step.
+   */
+  thought?: string;
+  /**
+   * The human-readable title describing the step action.
+   */
+  title?: string;
+  /**
+   * Executable JavaScript code generated or executed in this step.
+   */
+  code?: string;
+  /**
+   * Raw string output or data returned by code execution.
+   */
+  output?: string;
+  /**
+   * Visual widgets rendered alongside this step (e.g. core web vitals, network traces).
+   */
+  widgets?: AiAssistanceModel.AiAgent.AiWidget[];
+  /**
+   * Context item details gathered or inspected during this step.
+   */
+  contextDetails?: [AiAssistanceModel.AiAgent.ContextDetail, ...AiAssistanceModel.AiAgent.ContextDetail[]];
 }
 
 export const enum ChatMessageEntity {
@@ -461,7 +536,7 @@ export interface StepPart {
  */
 export interface WidgetPart {
   type: 'widget';
-  widgets: AiWidget[];
+  widgets: AiAssistanceModel.AiAgent.AiWidget[];
 }
 
 export type ModelMessagePart = AnswerPart|StepPart|WidgetPart;
@@ -528,14 +603,12 @@ export interface MessageInput {
   isLastMessage: boolean;
   isFirstMessage: boolean;
   prompt: string;
-  shouldShowCSSChangeSummary: boolean;
   canShowFeedbackForm: boolean;
-  markdownRenderer: MarkdownLitRenderer;
+  markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer;
   onSuggestionClick: (suggestion: string) => void;
   onFeedbackSubmit: (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void;
   onCopyResponseClick: (message: ModelChatMessage) => void;
   onExportClick?: () => void;
-  changeSummary?: string;
   walkthrough: {
     onOpen: (message: ModelChatMessage) => void,
     isExpanded: boolean,
@@ -547,7 +620,6 @@ export interface MessageInput {
 }
 
 export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, target: HTMLElement): void => {
-  const hasAiV2 = Boolean(Root.Runtime.hostConfig.devToolsAiAssistanceV2?.enabled);
   const message = input.message;
 
   if (message.entity === ChatMessageEntity.USER) {
@@ -560,22 +632,16 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
       query: true,
       'is-last-message': input.isLastMessage,
       'is-first-message': input.isFirstMessage,
-      'ai-v2': hasAiV2,
     });
 
-    const userQueryWrapperClasses = Lit.Directives.classMap({
-      // Don't need to style at all unless we are on the V2 flag.
-      // Once we ship this can be removed entirely.
-      'user-query-wrapper': hasAiV2
-    });
     // clang-format off
     Lit.render(html`
       <style>${Input.textInputStyles}</style>
       <style>${chatMessageStyles}</style>
-      <div class=${userQueryWrapperClasses}>
+      <div class="user-query-wrapper">
         <section class=${messageClasses} jslog=${VisualLogging.section('question')}>
           ${imageInput}
-          <div class="message-content">${renderTextAsMarkdown(message.text, input.markdownRenderer)}</div>
+          <div class="message-content">${MarkdownView.MarkdownView.renderTextAsMarkdown(message.text, input.markdownRenderer)}</div>
         </section>
       </div>
     `, target);
@@ -584,28 +650,19 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
   }
 
   const steps = message.parts.filter(part => part.type === 'step').map(part => part.step);
-  const icon = AiAssistanceModel.AiUtils.getIconName();
 
   const messageClasses = Lit.Directives.classMap({
     'chat-message': true,
     answer: true,
     'is-last-message': input.isLastMessage,
     'is-first-message': input.isFirstMessage,
-    'ai-v2': hasAiV2,
   });
   // clang-format off
   Lit.render(html`
     <style>${Input.textInputStyles}</style>
     <style>${chatMessageStyles}</style>
     <section class=${messageClasses} jslog=${VisualLogging.section('answer')}>
-      ${hasAiV2 ? Lit.nothing : html`
-        <div class="message-info">
-          <devtools-icon name=${icon}></devtools-icon>
-          <div class="message-name">
-            <h2>${AiAssistanceModel.AiUtils.isGeminiBranding() ? lockedString(UIStringsNotTranslate.gemini) : lockedString(UIStringsNotTranslate.ai)}</h2>
-          </div>
-        </div>`}
-      ${hasAiV2 ? renderWalkthroughUI(input, steps) : Lit.nothing}
+      ${renderWalkthroughUI(input, steps)}
       <div class="answer-body-wrapper">
         ${Lit.Directives.repeat(
           message.parts,
@@ -613,35 +670,18 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
           (part, index) => {
             const isLastPart = index === message.parts.length - 1;
             if (part.type === 'answer') {
-              return html`<p>${renderTextAsMarkdown(part.text, input.markdownRenderer, { animate: !input.isReadOnly && input.isLoading && isLastPart && input.isLastMessage })}</p>`;
+              return html`<p>${MarkdownView.MarkdownView.renderTextAsMarkdown(part.text, input.markdownRenderer, { animate: !input.isReadOnly && input.isLoading && isLastPart && input.isLastMessage })}</p>`;
             }
             if (part.type === 'widget') {
               return html`${Lit.Directives.until(renderWidgets(part.widgets, {wrapperClass: 'main-widgets-wrapper'}))}`;
-            }
-            if (!hasAiV2 && part.type === 'step') {
-              return renderStep({
-                step: part.step,
-                isLoading: input.isLoading,
-                markdownRenderer: input.markdownRenderer,
-                isLast: isLastPart,
-              });
             }
             return Lit.nothing;
           },
         )}
         ${renderError(message)}
-        ${input.shouldShowCSSChangeSummary && hasAiV2 && input.changeSummary ? html`
-          <devtools-code-block
-            .code=${input.changeSummary}
-            .codeLang=${'css'}
-            .displayLimit=${MAX_NUM_LINES_IN_CODEBLOCK}
-            .displayNotice=${true}
-            class="ai-css-change"
-          ></devtools-code-block>
-        ` : Lit.nothing}
         ${input.showActions ? renderActions(input, output) : Lit.nothing}
       </div>
-      ${hasAiV2 ? renderSideEffectStepsUI(input, steps) : Lit.nothing}
+      ${renderSideEffectStepsUI(input, steps)}
     </section>
   `, target);
   // clang-format on
@@ -649,41 +689,12 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
 
 export type View = typeof DEFAULT_VIEW;
 
-function renderTextAsMarkdown(text: string, markdownRenderer: MarkdownLitRenderer, {animate, ref: refFn}: {
-  animate?: boolean,
-  ref?: (element?: Element) => void,
-} = {}): Lit.TemplateResult {
-  let tokens = [];
-  try {
-    tokens = Marked.Marked.lexer(text);
-    for (const token of tokens) {
-      // Try to render all the tokens to make sure that
-      // they all have a template defined for them. If there
-      // isn't any template defined for a token, we'll fallback
-      // to rendering the text as plain text instead of markdown.
-      markdownRenderer.renderToken(token);
-    }
-  } catch {
-    // The tokens were not parsed correctly or
-    // one of the tokens are not supported, so we
-    // continue to render this as text.
-    return html`${text}`;
-  }
-
-  // clang-format off
-  return html`<devtools-markdown-view
-    .data=${{tokens, renderer: markdownRenderer, animationEnabled: animate} as MarkdownView.MarkdownView.MarkdownViewData}
-    ${refFn ? ref(refFn) : Lit.nothing}>
-  </devtools-markdown-view>`;
-  // clang-format on
-}
-
 export function titleForStep(step: Step): string {
   return step.title ?? `${lockedString(UIStringsNotTranslate.investigating)}…`;
 }
 
 function renderTitle(step: Step): Lit.LitTemplate {
-  const paused = step.requestApproval ?
+  const paused = step.state.type === 'needs_approval' ?
       html`<span class="paused">${lockedString(UIStringsNotTranslate.paused)}: </span>` :
       Lit.nothing;
 
@@ -697,8 +708,9 @@ function renderStepCode(step: Step): Lit.LitTemplate {
 
   // If there is no "output" yet, it means we didn't execute the code yet (e.g. maybe it is still waiting for confirmation from the user)
   // thus we show "Code to execute" text rather than "Code executed" text on the heading of the code block.
-  const codeHeadingText = (step.output && !step.canceled) ? lockedString(UIStringsNotTranslate.codeExecuted) :
-                                                            lockedString(UIStringsNotTranslate.codeToExecute);
+  const codeHeadingText = (step.output && step.state.type !== 'canceled') ?
+      lockedString(UIStringsNotTranslate.codeExecuted) :
+      lockedString(UIStringsNotTranslate.codeToExecute);
 
   // If there is output, we don't show notice on this code block and instead show
   // it in the data returned code block.
@@ -734,11 +746,14 @@ function renderStepDetails({
   isLast,
 }: {
   step: Step,
-  markdownRenderer: MarkdownLitRenderer,
+  markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer,
   isLast: boolean,
 }): Lit.LitTemplate {
-  const sideEffects = isLast && step.requestApproval ? renderSideEffectConfirmationUi(step) : Lit.nothing;
-  const thought = step.thought ? html`<p>${renderTextAsMarkdown(step.thought, markdownRenderer)}</p>` : Lit.nothing;
+  const sideEffects =
+      isLast && step.state.type === 'needs_approval' ? renderSideEffectConfirmationUi(step) : Lit.nothing;
+  const thought = step.thought ?
+      html`<p>${MarkdownView.MarkdownView.renderTextAsMarkdown(step.thought, markdownRenderer)}</p>` :
+      Lit.nothing;
 
   // clang-format off
   const contextDetails = step.contextDetails ?
@@ -813,12 +828,12 @@ function renderWalkthroughSidebarButton(
       <devtools-button
         .variant=${variant}
         .size=${Buttons.Button.Size.SMALL}
-        .title=${lastStep.isLoading ? titleForStep(lastStep) : title}
+        .title=${lastStep.state.type === 'in_progress' ? titleForStep(lastStep) : title}
         .accessibleLabel=${accessibleLabel}
         .jslogContext=${walkthrough.isExpanded ? 'ai-hide-walkthrough-sidebar' : 'ai-show-walkthrough-sidebar'}
         data-show-walkthrough
         @click=${() => {
-          if(walkthrough.activeSidebarMessage?.id === input.message.id && walkthrough.isExpanded) {
+          if (walkthrough.activeSidebarMessage?.id === input.message.id && walkthrough.isExpanded) {
             walkthrough.onToggle(false, message as ModelChatMessage);
           } else {
             // Can't just toggle the visibility here; we need to ensure we
@@ -880,42 +895,125 @@ function renderWalkthroughUI(input: ChatMessageViewInput, steps: Step[]): Lit.Li
 }
 
 function renderSideEffectStepsUI(input: ChatMessageViewInput, steps: Step[]): Lit.LitTemplate {
-  const sideEffectSteps = steps.filter(s => s.requestApproval);
+  const sideEffectSteps = steps.filter(s => s.state.type === 'needs_approval' || s.state.type === 'canceled');
   if (sideEffectSteps.length === 0) {
     return Lit.nothing;
   }
+  // With the natural language interface the approval is rendered as a
+  // dedicated permission prompt instead of the side-effect confirmation UI.
+  const showPermissionPrompt = (step: Step): boolean =>
+      AiAssistanceModel.AiUtils.isNaturalLanguageInterfaceEnabled() && step.state.type === 'needs_approval';
   // clang-format off
   return html`
     ${sideEffectSteps.map(step => html`
       <div class="side-effect-container">
-        ${renderStep({
-           step,
-           isLoading: input.isLoading,
-           markdownRenderer: input.markdownRenderer,
-           isLast: true
-        })}
+        ${showPermissionPrompt(step) ?
+          renderPermissionPrompt(step) :
+          renderStep({
+            step,
+            markdownRenderer: input.markdownRenderer,
+            isLast: true,
+          })}
       </div> `)}
   `;
   // clang-format on
 }
 
-function renderStepBadge({step, isLoading, isLast}: {
+/**
+ * Renders the permission prompt for a step that needs approval. Used when
+ * `AiUtils.isNaturalLanguageInterfaceEnabled()` is on; otherwise
+ * `renderSideEffectStepsUI` falls back to `renderStep`, which shows the
+ * legacy Allow / Deny buttons inside the `renderSideEffectConfirmationUi`.
+ *
+ * A separate UI is needed because the natural language interface runs tools
+ * that need richer consent than "run this code?": a tool-specific title and
+ * description, and an "Allow always" option (`sideEffectDialog.permissionPrompt`).
+ * It is a standalone card rather than a collapsible step so the user sees the
+ * question without expanding anything.
+ *
+ * TODO(b/516828269): Remove `renderSideEffectConfirmationUi` once the natural
+ * language interface launches.
+ */
+function renderPermissionPrompt(step: Step): Lit.LitTemplate {
+  if (step.state.type !== 'needs_approval') {
+    return Lit.nothing;
+  }
+  const dialog = step.state.sideEffectDialog;
+  const title = dialog.permissionTitle ?? lockedString(UIStringsNotTranslate.allowThisAction);
+
+  const description =
+      dialog.description ? html`<p class="permission-prompt-description">${dialog.description}</p>` : Lit.nothing;
+
+  const code = step.code ? html`<devtools-code-block
+      class="permission-prompt-code"
+      .code=${step.code.trim()}
+      .codeLang=${'js'}
+      .displayNotice=${true}
+      .header=${lockedString(UIStringsNotTranslate.codeToExecute)}
+    ></devtools-code-block>` :
+                           Lit.nothing;
+
+  const allowAlwaysButton = dialog.permissionPrompt === AiAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE_OR_ALWAYS ?
+      html`<devtools-button
+      .data=${{
+        variant: Buttons.Button.Variant.OUTLINED,
+        jslogContext: 'always-allow-execute-code',
+      } as Buttons.Button.ButtonData}
+      @click=${() => dialog.onAnswer(AiAssistanceModel.Tool.PermissionDecision.ALLOW_ALWAYS)}
+    >${lockedString(UIStringsNotTranslate.allowAlways)}</devtools-button>` :
+      Lit.nothing;
+
+  // clang-format off
+  return html`
+  <div class="permission-prompt"
+    jslog=${VisualLogging.section('side-effect-confirmation')}>
+    <div class="permission-prompt-header">
+      <devtools-icon name="lock"></devtools-icon>
+      <h3 class="permission-prompt-title">${title}</h3>
+    </div>
+    ${description}
+    ${code}
+    <p class="permission-prompt-footer">${lockedString(UIStringsNotTranslate.relevantDataIsSentToGoogle)}</p>
+    <div class="permission-prompt-buttons">
+      <devtools-button
+        .data=${{
+          variant: Buttons.Button.Variant.TEXT,
+          jslogContext: 'decline-execute-code',
+        } as Buttons.Button.ButtonData}
+        @click=${() => dialog.onAnswer(AiAssistanceModel.Tool.PermissionDecision.REJECT)}
+      >${lockedString(UIStringsNotTranslate.skipToolCall)}</devtools-button>
+      ${allowAlwaysButton}
+      <devtools-button
+        .data=${{
+          variant: Buttons.Button.Variant.PRIMARY,
+          jslogContext: 'accept-execute-code',
+        } as Buttons.Button.ButtonData}
+        @click=${() => dialog.onAnswer(AiAssistanceModel.Tool.PermissionDecision.ALLOW_ONCE)}
+      >${lockedString(UIStringsNotTranslate.allowThisTime)}</devtools-button>
+    </div>
+  </div>`;
+  // clang-format on
+}
+
+function renderStepBadge({step, isLast}: {
   step: Step,
-  isLoading: boolean,
   isLast: boolean,
 }): Lit.LitTemplate {
-  if (isLoading && isLast && !step.requestApproval) {
+  if (isLast && step.state.type === 'in_progress') {
     return html`<devtools-spinner aria-label=${lockedString(UIStringsNotTranslate.inProgress)}></devtools-spinner>`;
   }
 
   let iconName = 'checkmark';
   let ariaLabel: string|undefined = lockedString(UIStringsNotTranslate.completed);
   let role: 'button'|undefined = 'button';
-  if (isLast && step.requestApproval) {
+  if (step.state.type === 'needs_approval') {
+    if (!isLast) {
+      console.error('A step in needs_approval state must be the last step.');
+    }
     role = undefined;
     ariaLabel = lockedString(UIStringsNotTranslate.paused);
     iconName = 'pause-circle';
-  } else if (step.canceled) {
+  } else if (step.state.type === 'canceled') {
     ariaLabel = lockedString(UIStringsNotTranslate.aborted);
     iconName = 'cross';
   }
@@ -928,26 +1026,25 @@ function renderStepBadge({step, isLoading, isLast}: {
     ></devtools-icon>`;
 }
 
-export function renderStep({step, isLoading, markdownRenderer, isLast}: {
+export function renderStep({step, markdownRenderer, isLast}: {
   step: Step,
-  isLoading: boolean,
-  markdownRenderer: MarkdownLitRenderer,
+  markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer,
   isLast: boolean,
 }): Lit.LitTemplate {
   const stepClasses = Lit.Directives.classMap({
     step: true,
-    empty: !step.thought && !step.code && !step.contextDetails && !step.requestApproval,
-    paused: Boolean(step.requestApproval),
-    canceled: Boolean(step.canceled),
+    empty: !step.thought && !step.code && !step.contextDetails && step.state.type !== 'needs_approval',
+    paused: step.state.type === 'needs_approval',
+    canceled: step.state.type === 'canceled',
   });
   // clang-format off
   return html`
     <details class=${stepClasses}
       jslog=${VisualLogging.expand('step').track({click: true})}
-      .open=${Boolean(step.requestApproval)}>
+      .open=${step.state.type === 'needs_approval'}>
       <summary>
         <div class="summary">
-          ${renderStepBadge({ step, isLoading, isLast })}
+          ${renderStepBadge({ step, isLast })}
           ${renderTitle(step)}
           <devtools-icon
             class="arrow"
@@ -970,7 +1067,7 @@ interface WidgetMakerResponse {
   // Can be null if the widget is only used to add the Reveal CTA.
   title: Lit.LitTemplate|Platform.UIString.LocalizedString|null;
   jslogContext?: string;
-  accessibleRevealLabel: string;
+  accessibleRevealLabel: Platform.UIString.LocalizedString;
 }
 
 const nodeCache = new Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode>();
@@ -994,7 +1091,54 @@ async function resolveNode(backendNodeId: Protocol.DOM.BackendNodeId): Promise<S
   return resolved;
 }
 
-async function makeComputedStyleWidget(widgetData: ComputedStyleAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeStorageBreakdownWidget(widgetData: AiAssistanceModel.AiAgent.StorageBreakdownAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+  if (!target) {
+    return null;
+  }
+
+  const breakdown = widgetData.data.usageBreakdown;
+  const total = breakdown.reduce((sum, item) => sum + item.bytes, 0);
+
+  const slices = breakdown.map(item => {
+    const color = Application.StorageView.storagePieColors.get(item.storageType as Protocol.Storage.StorageType) ||
+        'rgb(180, 180, 180)';
+    const title = Application.StorageView.StorageView.getStorageTypeNameForWidget(item.storageType);
+
+    return {
+      value: item.bytes,
+      color,
+      title,
+    };
+  });
+
+  const chartData: PerfUI.PieChart.PieChartData = {
+    chartName: lockedString(UIStringsNotTranslate.storageBreakdown),
+    size: 110,
+    formatter: val => AiAssistanceModel.UnitFormatters.bytes(val),
+    showLegend: true,
+    total,
+    slices,
+  };
+
+  const renderedWidget = html`
+    <div class="storage-breakdown-widget">
+      <devtools-perf-piechart .data=${chartData}></devtools-perf-piechart>
+    </div>
+  `;
+
+  return {
+    renderedWidget,
+    title: lockedString(UIStringsNotTranslate.storageBreakdown),
+    revealable: new Application.StorageView.StorageRevealable(target),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealStorageBreakdown),
+    jslogContext: 'storage-breakdown-widget',
+  };
+}
+
+async function makeComputedStyleWidget(widgetData: AiAssistanceModel.AiAgent.ComputedStyleAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const domNodeForId = await resolveNode(widgetData.data.backendNodeId);
   if (!domNodeForId) {
     return null;
@@ -1044,7 +1188,8 @@ async function makeComputedStyleWidget(widgetData: ComputedStyleAiWidget): Promi
   };
 }
 
-async function makeCoreWebVitalsWidget(widgetData: CoreVitalsAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeCoreWebVitalsWidget(widgetData: AiAssistanceModel.AiAgent.CoreVitalsAiWidget):
+    Promise<WidgetMakerResponse|null> {
   // clang-format off
   const renderedWidget = html`<devtools-widget class="core-vitals-widget" ${widget(TimelineComponents.CWVMetrics.CWVMetrics, {data: widgetData.data, skipBottomBorder: true})}>
   </devtools-widget>`;
@@ -1059,7 +1204,8 @@ async function makeCoreWebVitalsWidget(widgetData: CoreVitalsAiWidget): Promise<
   };
 }
 
-async function makeStylePropertiesWidget(widgetData: StylePropertiesAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeStylePropertiesWidget(widgetData: AiAssistanceModel.AiAgent.StylePropertiesAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const domNodeForId = await resolveNode(widgetData.data.backendNodeId);
   if (!domNodeForId) {
     return null;
@@ -1098,7 +1244,7 @@ async function makeStylePropertiesWidget(widgetData: StylePropertiesAiWidget): P
 }
 
 const INSIGHT_METADATA: Record<string, {
-  component: new () => BaseInsightComponent<Trace.Insights.Types.InsightModel>,
+  component: new () => TimelineInsights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>,
   accessibleLabel: string,
   title: string,
   jslog: string,
@@ -1220,15 +1366,21 @@ const INSIGHT_METADATA: Record<string, {
 };
 
 function renderInsightWidget<T extends Trace.Insights.Types.InsightModel>(
-    component: new () => BaseInsightComponent<T>, insight: T, jslog: string, accessibleLabel: string, title: string,
-    bounds?: Trace.Types.Timing.TraceWindowMicro): WidgetMakerResponse {
+    component: new () => TimelineInsights.BaseInsightComponent.BaseInsightComponent<T>,
+    insight: T,
+    jslog: string,
+    accessibleLabel: string,
+    title: string,
+    bounds?: Trace.Types.Timing.TraceWindowMicro,
+    ): WidgetMakerResponse {
   const renderedWidget = html`<devtools-widget
     class=${jslog}
     ${widget(component, {
     model: insight,
     minimal: true,
     bounds: bounds ?? null,
-  })}></devtools-widget>`;
+  })}
+  ></devtools-widget>`;
 
   return {
     renderedWidget,
@@ -1239,7 +1391,8 @@ function renderInsightWidget<T extends Trace.Insights.Types.InsightModel>(
   };
 }
 
-async function makePerfInsightWidget(widgetData: PerfInsightAiWidget): Promise<WidgetMakerResponse|null> {
+async function makePerfInsightWidget(widgetData: AiAssistanceModel.AiAgent.PerfInsightAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const insightKey = widgetData.data.insight;
   const insight = widgetData.data.insightData;
 
@@ -1260,7 +1413,8 @@ async function makePerfInsightWidget(widgetData: PerfInsightAiWidget): Promise<W
   return renderInsightWidget(meta.component, insight, meta.jslog, meta.accessibleLabel, meta.title, bounds);
 }
 
-async function makeBottomUpTimelineTreeWidget(widgetData: BottomUpTreeAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeBottomUpTimelineTreeWidget(widgetData: AiAssistanceModel.AiAgent.BottomUpTreeAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const bottomUpRootNode = AiAssistanceModel.AIQueries.AIQueries.mainThreadActivityBottomUp(
       widgetData.data.bounds, widgetData.data.parsedTrace);
   if (!bottomUpRootNode) {
@@ -1300,7 +1454,12 @@ function renderWidgetResponse(response: WidgetMakerResponse|null): Lit.LitTempla
     if (response === null) {
       return;
     }
-    void Common.Revealer.reveal(response?.revealable);
+    Common.Revealer.reveal(response?.revealable).catch((error: Error) => {
+      if (!error.message) {
+        return;
+      }
+      Snackbars.Snackbar.Snackbar.show({message: error.message});
+    });
   }
 
   const classes = Lit.Directives.classMap({
@@ -1346,7 +1505,8 @@ function renderWidgetResponse(response: WidgetMakerResponse|null): Lit.LitTempla
   // clang-format on
 }
 
-async function makePerformanceTraceWidget(widgetData: PerformanceTraceAiWidget): Promise<WidgetMakerResponse|null> {
+async function makePerformanceTraceWidget(widgetData: AiAssistanceModel.AiAgent.PerformanceTraceAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const customRevealTitle = lockedString(UIStringsNotTranslate.revealTrace);
   return {
     renderedWidget: null,
@@ -1358,7 +1518,8 @@ async function makePerformanceTraceWidget(widgetData: PerformanceTraceAiWidget):
   };
 }
 
-async function makeSourceFileWidget(widgetData: SourceFileAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeSourceFileWidget(widgetData: AiAssistanceModel.AiAgent.SourceFileAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const file = widgetData.data.uiSourceCode;
   const customRevealTitle = i18n.i18n.lockedString(`Show ${file.name()}`);
   return {
@@ -1371,7 +1532,8 @@ async function makeSourceFileWidget(widgetData: SourceFileAiWidget): Promise<Wid
   };
 }
 
-async function makeSourceCodeWidget(widgetData: SourceCodeAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeSourceCodeWidget(widgetData: AiAssistanceModel.AiAgent.SourceCodeAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const url = widgetData.data.url;
   const filename = url.split('/').pop() || url;
   const line = widgetData.data.line;
@@ -1391,7 +1553,8 @@ async function makeSourceCodeWidget(widgetData: SourceCodeAiWidget): Promise<Wid
   let code = widgetData.data.code;
   if (TextUtils.TextUtils.isMinified(code)) {
     const canonicalMimeType = uiSourceCode?.contentType().canonicalMimeType() || 'text/javascript';
-    const formatted = await Formatter.ScriptFormatter.formatScriptContent(canonicalMimeType, code, '  ');
+    const formatted = await Formatter.ScriptFormatter.formatScriptContent(Common.Settings.Settings.instance(),
+                                                                          canonicalMimeType, code, '  ');
     code = formatted.formattedContent;
   }
 
@@ -1401,7 +1564,7 @@ async function makeSourceCodeWidget(widgetData: SourceCodeAiWidget): Promise<Wid
       .displayLimit=${20}
       .code=${code}
       .codeLang=${fileExtension}
-      .header=${' '}
+      .displayToolbar=${false}
       .displayNotice=${false}
     ></devtools-code-block>
   `;
@@ -1436,7 +1599,8 @@ function renderFileRevealButton(
   `;
 }
 
-async function makeSourceFilesListWidget(widgetData: SourceFilesListAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeSourceFilesListWidget(widgetData: AiAssistanceModel.AiAgent.SourceFilesListAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const files = widgetData.data.uiSourceCodes;
   if (files.length === 0) {
     return null;
@@ -1466,7 +1630,81 @@ async function makeSourceFilesListWidget(widgetData: SourceFilesListAiWidget): P
   };
 }
 
-function renderNetworkRequestPreview(networkRequest: NonNullable<DomTreeAiWidget['data']['networkRequest']>):
+const expandedNetworkRequestsWidgets = new WeakSet<AiAssistanceModel.AiAgent.NetworkRequestsListAiWidget>();
+
+// A widget with a table of the list of network requests sent to the agent.
+// Only show 15 requests maximum in collapsed version. The rest of the requests
+// will be hidden unless the user clicks "Show all".
+async function makeNetworkRequestsListWidget(widgetData: AiAssistanceModel.AiAgent.NetworkRequestsListAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  const requests = widgetData.data.requests;
+  if (requests.length === 0) {
+    return null;
+  }
+
+  const isExpanded = expandedNetworkRequestsWidgets.has(widgetData);
+  // We only want just expanded widget to be expanded, if the user closed and reopened the walkthrought, the widget should be collapsed again.
+  // Therefore, after rendering the widget, we remove the widget from the set of expanded widgets so that it is collapsed on next render.
+  if (isExpanded) {
+    expandedNetworkRequestsWidgets.delete(widgetData);
+  }
+  const displayedRequests = isExpanded ? requests : requests.slice(0, 15);
+
+  // The table contains same fields as the ones sent to the agent.
+  // clang-format off
+  const renderedWidget = html`
+    <div class="network-requests-widget">
+      <devtools-data-grid striped inline>
+        <table>
+          <tr>
+            <th id="name" weight="4">${i18n.i18n.lockedString('Name')}</th>
+            <th id="status" weight="1">${i18n.i18n.lockedString('Status')}</th>
+            <th id="size" weight="1">${i18n.i18n.lockedString('Size')}</th>
+            <th id="time" weight="1">${i18n.i18n.lockedString('Time')}</th>
+          </tr>
+          ${displayedRequests.map(request => html`
+            <tr>
+              <td>${request.name()}</td>
+              <td>${request.statusCode}</td>
+              <td>${i18n.ByteUtilities.formatBytesToKb(request.transferSize)}</td>
+              <td>${i18n.TimeUtilities.secondsToString(request.duration)}</td>
+            </tr>
+          `)}
+        </table>
+      </devtools-data-grid>
+      ${!isExpanded && requests.length > 15 ? html`
+        <div class="show-all-container">
+          <button class="show-all-widget-requests-button text-button"
+            jslog=${VisualLogging.action('show-all-widget-requests-button').track({click: true})}
+            @click=${(e: Event) => {
+              expandedNetworkRequestsWidgets.add(widgetData);
+              const widgetEl = (e.target as HTMLElement).closest('.widget');
+              if (widgetEl) {
+                const widget = UI.Widget.Widget.get(widgetEl) as ChatMessage;
+                if (widget && widget.performUpdate) {
+                  void widget.performUpdate();
+                }
+              }
+            }}>
+            ${i18n.i18n.lockedString(`Show all ${requests.length} network requests`)}
+          </button>
+        </div>
+      ` : Lit.nothing}
+    </div>
+  `;
+  // clang-format on
+
+  return {
+    renderedWidget,
+    title: lockedString(UIStringsNotTranslate.networkRequests),
+    revealable: requests[0],
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealFirstNetworkRequest),
+    jslogContext: 'network-requests-list-widget',
+  };
+}
+
+function renderNetworkRequestPreview(
+    networkRequest: NonNullable<AiAssistanceModel.AiAgent.DomTreeAiWidget['data']['networkRequest']>):
     Lit.TemplateResult {
   const filename = networkRequest.url.split('/').pop() || networkRequest.url;
   const size = i18n.ByteUtilities.bytesToString(networkRequest.size);
@@ -1496,7 +1734,8 @@ function renderNetworkRequestPreview(networkRequest: NonNullable<DomTreeAiWidget
   // clang-format on
 }
 
-async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMakerResponse|null> {
+async function makeDomTreeWidget(widgetData: AiAssistanceModel.AiAgent.DomTreeAiWidget):
+    Promise<WidgetMakerResponse|null> {
   const root = widgetData.data.root;
   if (!(root instanceof SDK.DOMModel.DOMNodeSnapshot)) {
     return null;
@@ -1507,7 +1746,7 @@ async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMak
   // clang-format off
   const renderedWidget = html`
     ${networkRequest ? renderNetworkRequestPreview(networkRequest) : Lit.nothing}
-    <devtools-widget class="dom-tree-widget" ${widget(Elements.ElementsTreeOutline.DOMTreeWidget, {
+    <devtools-widget class="dom-tree-widget" ${widget(Elements.DOMTreeWidget.DOMTreeWidget, {
       maxTreeDepth: 2,
       enableContextMenu: false,
       showComments: false,
@@ -1525,8 +1764,8 @@ async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMak
   return {
     renderedWidget,
     revealable: new SDK.DOMModel.DeferredDOMNode(root.domModel().target(), root.backendNodeId()),
-    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealLcpElement),
-    title: lockedString(UIStringsNotTranslate.lcpElement),
+    accessibleRevealLabel: widgetData.data.accessibleRevealLabel,
+    title: widgetData.data.title,
     jslogContext: 'dom-snapshot',
   };
 }
@@ -1549,10 +1788,10 @@ async function makeDomTreeWidget(widgetData: DomTreeAiWidget): Promise<WidgetMak
  * corresponding `make...Widget` functions and handling them here.
  */
 /**
- * Generates a deterministic unique identifier for a given AiWidget based on
+ * Generates a deterministic unique identifier for a given AiAssistanceModel.AiAgent.AiWidget based on
  * its name and identifying data. This signature is used for widget deduplication.
  */
-export function getWidgetSignature(widget: AiWidget): string {
+export function getWidgetSignature(widget: AiAssistanceModel.AiAgent.AiWidget): string {
   switch (widget.name) {
     case 'COMPUTED_STYLES':
       return `${widget.name}:${widget.data.backendNodeId}`;
@@ -1571,6 +1810,8 @@ export function getWidgetSignature(widget: AiWidget): string {
       return `${widget.name}:${widget.data.track}:${widget.data.bounds.min}-${widget.data.bounds.max}`;
     case 'BOTTOM_UP_TREE':
       return `${widget.name}:${widget.data.bounds.min}-${widget.data.bounds.max}`;
+    case 'NETWORK_TRACK':
+      return `${widget.name}:${widget.data.bounds.min}-${widget.data.bounds.max}`;
     case 'SOURCE_FILE':
       return `${widget.name}:${widget.data.uiSourceCode.url()}`;
     case 'SOURCE_FILES_LIST':
@@ -1583,8 +1824,13 @@ export function getWidgetSignature(widget: AiWidget): string {
       return `${widget.name}:${widget.data.request.requestId()}`;
     case 'SOURCE_CODE':
       return `${widget.name}:${widget.data.url}:${widget.data.line ?? ''}:${widget.data.column ?? ''}`;
+    case 'NETWORK_REQUESTS_LIST':
+      return `${widget.name}:${widget.data.requests.map(r => r.requestId()).join(',')}`;
+    case 'STORAGE_BREAKDOWN':
+      return `${widget.name}:${widget.data.totalUsageBytes}:${
+          widget.data.usageBreakdown.map(e => `${e.storageType}_${e.bytes}`).join(',')}`;
     default:
-      Platform.assertNever(widget, 'Unknown AiWidget name');
+      Platform.assertNever(widget, 'Unknown AiAssistanceModel.AiAgent.AiWidget name');
   }
 }
 
@@ -1596,7 +1842,7 @@ export function getWidgetSignature(widget: AiWidget): string {
 export function getDeduplicatedWidgetsMessage(message: ModelChatMessage): ModelChatMessage {
   const seenWidgets = new Set<string>();
 
-  const filterWidgets = (widgets: AiWidget[]): AiWidget[] => {
+  const filterWidgets = (widgets: AiAssistanceModel.AiAgent.AiWidget[]): AiAssistanceModel.AiAgent.AiWidget[] => {
     return widgets.filter(widget => {
       const signature = getWidgetSignature(widget);
       if (seenWidgets.has(signature)) {
@@ -1634,9 +1880,9 @@ export function getDeduplicatedWidgetsMessage(message: ModelChatMessage): ModelC
   };
 }
 
-async function renderWidgets(
-    widgets: AiWidget[]|undefined, options: {wrapperClass?: string} = {}): Promise<Lit.LitTemplate> {
-  if (!Root.Runtime.hostConfig.devToolsAiAssistanceV2?.enabled || !widgets || widgets.length === 0) {
+async function renderWidgets(widgets: AiAssistanceModel.AiAgent.AiWidget[]|undefined,
+                             options: {wrapperClass?: string} = {}): Promise<Lit.LitTemplate> {
+  if (!widgets || widgets.length === 0) {
     return Lit.nothing;
   }
   const ui = await Promise.all(widgets.map(async widgetData => {
@@ -1666,11 +1912,17 @@ async function renderWidgets(
       case 'BOTTOM_UP_TREE':
         response = await makeBottomUpTimelineTreeWidget(widgetData);
         break;
+      case 'NETWORK_TRACK':
+        response = await makeNetworkTrackWidget(widgetData);
+        break;
       case 'SOURCE_FILE':
         response = await makeSourceFileWidget(widgetData);
         break;
       case 'SOURCE_FILES_LIST':
         response = await makeSourceFilesListWidget(widgetData);
+        break;
+      case 'NETWORK_REQUESTS_LIST':
+        response = await makeNetworkRequestsListWidget(widgetData);
         break;
       case 'LIGHTHOUSE_REPORT':
         response = await makeLighthouseReportWidget(widgetData);
@@ -1684,30 +1936,41 @@ async function renderWidgets(
       case 'SOURCE_CODE':
         response = await makeSourceCodeWidget(widgetData);
         break;
+      case 'STORAGE_BREAKDOWN':
+        response = await makeStorageBreakdownWidget(widgetData);
+        break;
       default:
-        Platform.assertNever(widgetData, 'Unknown AiWidget name');
+        Platform.assertNever(widgetData, 'Unknown AiAssistanceModel.AiAgent.AiWidget name');
     }
     return renderWidgetResponse(response);
   }));
 
-  if (options.wrapperClass) {
-    return html`<div class=${options.wrapperClass}>${ui}</div>`;
+  // Omit the wrapper element entirely if every widget maker resolved to Lit.nothing
+  // so empty container elements do not occupy vertical layout space in the chat stream.
+  const renderedItems = ui.filter(item => item !== Lit.nothing);
+  if (renderedItems.length === 0) {
+    return Lit.nothing;
   }
 
-  return html`${ui}`;
+  if (options.wrapperClass) {
+    return html`<div class=${options.wrapperClass}>${renderedItems}</div>`;
+  }
+
+  return html`${renderedItems}`;
 }
 
 function renderSideEffectConfirmationUi(step: Step): Lit.LitTemplate {
-  if (!step.requestApproval) {
+  if (step.state.type !== 'needs_approval') {
     return Lit.nothing;
   }
+  const dialog = step.state.sideEffectDialog;
 
   // clang-format off
   return html`<div
     class="side-effect-confirmation"
     jslog=${VisualLogging.section('side-effect-confirmation')}
   >
-    ${step.requestApproval.description ? html`<p>${step.requestApproval.description}</p>` : Lit.nothing}
+    ${dialog.description ? html`<p>${dialog.description}</p>` : Lit.nothing}
     <div class="side-effect-buttons-container">
       <devtools-button
         .data=${
@@ -1716,7 +1979,7 @@ function renderSideEffectConfirmationUi(step: Step): Lit.LitTemplate {
             jslogContext: 'decline-execute-code',
           } as Buttons.Button.ButtonData
         }
-        @click=${() => step.requestApproval?.onAnswer(false)}
+        @click=${() => dialog.onAnswer(AiAssistanceModel.Tool.PermissionDecision.REJECT)}
       >${lockedString(
         UIStringsNotTranslate.declineActionRequestApproval,
       )}</devtools-button>
@@ -1728,7 +1991,7 @@ function renderSideEffectConfirmationUi(step: Step): Lit.LitTemplate {
             iconName: 'play',
           } as Buttons.Button.ButtonData
         }
-        @click=${() => step.requestApproval?.onAnswer(true)}
+        @click=${() => dialog.onAnswer(AiAssistanceModel.Tool.PermissionDecision.ALLOW_ONCE)}
       >${
           lockedString(UIStringsNotTranslate.confirmActionRequestApproval)
       }</devtools-button>
@@ -1745,11 +2008,17 @@ function renderError(message: ModelChatMessage): Lit.LitTemplate {
       case AiAssistanceModel.AiAgent.ErrorType.BLOCK:
         errorMessage = UIStringsNotTranslate.systemError;
         break;
+      case AiAssistanceModel.AiAgent.ErrorType.QUOTA:
+        errorMessage = UIStringsNotTranslate.quotaError;
+        break;
       case AiAssistanceModel.AiAgent.ErrorType.MAX_STEPS:
         errorMessage = UIStringsNotTranslate.maxStepsError;
         break;
       case AiAssistanceModel.AiAgent.ErrorType.CROSS_ORIGIN:
         errorMessage = UIStringsNotTranslate.crossOriginError;
+        break;
+      case AiAssistanceModel.AiAgent.ErrorType.PAYLOAD_TOO_LARGE:
+        errorMessage = UIStringsNotTranslate.payloadTooLargeError;
         break;
       case AiAssistanceModel.AiAgent.ErrorType.ABORT:
         return html`<p class="aborted" jslog=${VisualLogging.section('aborted')}>${
@@ -1782,14 +2051,9 @@ function renderImageChatMessage(inlineData: Host.AidaClient.MediaBlob): Lit.LitT
 }
 
 function renderActions(input: ChatMessageViewInput, output: ViewOutput): Lit.LitTemplate {
-  const aiAssistanceV2 = Root.Runtime.hostConfig.devToolsAiAssistanceV2?.enabled;
-  const rowClasses = Lit.Directives.classMap({
-    'ai-assistance-feedback-row': true,
-    'not-v2': !aiAssistanceV2,
-  });
   // clang-format off
   return html`
-    <div class=${rowClasses}>
+    <div class="ai-assistance-feedback-row">
       <div class="action-buttons">
         ${input.showRateButtons ? html`
           <devtools-button
@@ -1818,7 +2082,6 @@ function renderActions(input: ChatMessageViewInput, output: ViewOutput): Lit.Lit
             } as Buttons.Button.ButtonData}
             @click=${() => input.onRatingClick(Host.AidaClient.Rating.NEGATIVE)}
           ></devtools-button>
-          ${aiAssistanceV2 ? Lit.nothing : html`<div class="vertical-separator"></div>`}
         `: Lit.nothing}
         <devtools-button
           .data=${
@@ -1832,20 +2095,7 @@ function renderActions(input: ChatMessageViewInput, output: ViewOutput): Lit.Lit
           }
           @click=${input.onReportClick}
         ></devtools-button>
-        ${aiAssistanceV2 ? Lit.nothing : html`
-          <div class="vertical-separator"></div>
-          <devtools-button
-            .data=${{
-              variant: Buttons.Button.Variant.ICON,
-              size: Buttons.Button.Size.SMALL,
-              title: lockedString(UIStringsNotTranslate.copyResponse),
-              iconName: 'copy',
-              jslogContext: 'copy-ai-response',
-            } as Buttons.Button.ButtonData}
-            aria-label=${lockedString(UIStringsNotTranslate.copyResponse)}
-            @click=${input.onCopyResponseClick}></devtools-button>
-        `}
-        ${input.onExportClick && aiAssistanceV2 && input.isLastMessage ? html`
+        ${input.onExportClick && input.isLastMessage ? html`
           <devtools-button
             class="export-for-agents-button"
             .jslogContext=${'ai-export-for-agents'}
@@ -1961,14 +2211,12 @@ export class ChatMessage extends UI.Widget.Widget {
   canShowFeedbackForm = false;
   isLastMessage = false;
   isFirstMessage = false;
-  shouldShowCSSChangeSummary = false;
-  markdownRenderer!: MarkdownLitRenderer;
+  markdownRenderer!: MarkdownView.MarkdownView.MarkdownLitRenderer;
   onSuggestionClick: (suggestion: string) => void = () => {};
   onFeedbackSubmit:
       (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void = () => {};
   onCopyResponseClick: (message: ModelChatMessage) => void = () => {};
   onExportClick: () => void = () => {};
-  changeSummary?: string;
   walkthrough: MessageInput['walkthrough'] = {
     onOpen: () => {},
     onToggle: () => {},
@@ -2015,7 +2263,6 @@ export class ChatMessage extends UI.Widget.Widget {
           isLastMessage: this.isLastMessage,
           isFirstMessage: this.isFirstMessage,
           prompt: this.prompt,
-          shouldShowCSSChangeSummary: this.shouldShowCSSChangeSummary,
           onSuggestionClick: this.onSuggestionClick,
           onRatingClick: this.#handleRateClick.bind(this),
           onReportClick: () => UIHelpers.openInNewTab(REPORT_URL),
@@ -2041,7 +2288,6 @@ export class ChatMessage extends UI.Widget.Widget {
           currentRating: this.#currentRating,
           isShowingFeedbackForm: this.#isShowingFeedbackForm,
           onFeedbackSubmit: this.onFeedbackSubmit,
-          changeSummary: this.changeSummary,
           walkthrough: this.walkthrough,
         },
         this.#viewOutput, this.contentElement);
@@ -2147,7 +2393,7 @@ export class ChatMessage extends UI.Widget.Widget {
   }
 }
 
-async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAiWidget):
+async function makeTimelineRangeSummaryWidget(widgetData: AiAssistanceModel.AiAgent.TimelineRangeSummaryAiWidget):
     Promise<WidgetMakerResponse|null> {
   const {bounds, parsedTrace, track} = widgetData.data;
   let events: readonly Trace.Types.Events.Event[] = [];
@@ -2170,13 +2416,14 @@ async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAi
     const mainThread = AiAssistanceModel.AIQueries.AIQueries.findMainThread(navigationId, parsedTrace);
     if (mainThread) {
       events = mainThread.entries;
-      AiAssistanceModel.Debug.debugLog(
-          `TimelineRangeSummaryAiWidget found main thread. PID:`, mainThread.pid, 'TID:', mainThread.tid,
-          'Number of entries:', mainThread.entries.length);
+      AiAssistanceModel.Debug.debugLog(`AiAssistanceModel.AiAgent.TimelineRangeSummaryAiWidget found main thread. PID:`,
+                                       mainThread.pid, 'TID:', mainThread.tid,
+                                       'Number of entries:', mainThread.entries.length);
     }
   }
   if (!events) {
-    AiAssistanceModel.Debug.debugLog(`Warning: could not find events for TimelineRangeSummaryAiWidget`, widgetData);
+    AiAssistanceModel.Debug.debugLog(
+        `Warning: could not find events for AiAssistanceModel.AiAgent.TimelineRangeSummaryAiWidget`, widgetData);
     return null;
   }
 
@@ -2224,25 +2471,60 @@ async function makeTimelineRangeSummaryWidget(widgetData: TimelineRangeSummaryAi
   };
 }
 
-async function makeLighthouseReportWidget(widgetData: LighthouseReportAiWidget): Promise<WidgetMakerResponse|null> {
-  const reportEl =
-      Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(widgetData.data.report);
-  if (!reportEl) {
-    return null;
-  }
+async function makeNetworkTrackWidget(widgetData: AiAssistanceModel.AiAgent.NetworkTrackAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  const {parsedTrace, bounds} = widgetData.data;
+  const dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
 
-  const snapshotReport = widgetData.data.snapshotReport;
+  // clang-format off
+  const template = html`
+    <devtools-performance-agent-network-track
+      .data=${{
+        parsedTrace,
+        bounds,
+        dataProvider,
+      } as TimelineComponents.NetworkTrackWidget.NetworkTrackWidgetData}
+    ></devtools-performance-agent-network-track>`;
+  // clang-format on
 
   return {
-    renderedWidget: html`<div class="lighthouse-report-widget">${reportEl}</div>`,
+    renderedWidget: template,
+    revealable: new TimelineUtils.Helpers.RevealableTimeRange(bounds),
+    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealNetworkActivity),
+    title: lockedString(UIStringsNotTranslate.networkActivitySummary),
+    jslogContext: 'network-track-widget',
+  };
+}
+
+async function makeLighthouseReportWidget(widgetData: AiAssistanceModel.AiAgent.LighthouseReportAiWidget):
+    Promise<WidgetMakerResponse|null> {
+  let reportEl: HTMLElement|null = null;
+  try {
+    reportEl =
+        Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(widgetData.data.report);
+  } catch {
+    reportEl = null;
+  }
+  const snapshotReport = widgetData.data.snapshotReport;
+  const revealLighthouseLabel = lockedString(UIStringsNotTranslate.revealLighthouse);
+
+  // When score gauges are rendered, the widget header displays the title "Lighthouse report"
+  // and the header button defaults to "Reveal". When score gauges are absent, no header is
+  // rendered, so customRevealTitle labels the standalone button ("Reveal Lighthouse report").
+  const title = reportEl ? lockedString(UIStringsNotTranslate.lighthouseReport) : null;
+  const customRevealTitle = reportEl ? undefined : revealLighthouseLabel;
+
+  return {
+    renderedWidget: reportEl ? html`<div class="lighthouse-report-widget">${reportEl}</div>` : null,
     revealable: new Lighthouse.LighthousePanel.ActiveLighthouseReport(widgetData.data.report),
-    accessibleRevealLabel: lockedString(UIStringsNotTranslate.revealLighthouse),
-    title: lockedString(UIStringsNotTranslate.lighthouseReport),
+    accessibleRevealLabel: revealLighthouseLabel,
+    customRevealTitle,
+    title,
     jslogContext: snapshotReport ? 'lighthouse-snapshot-report-widget' : 'lighthouse-report-widget',
   };
 }
 
-async function makeTimelineEventSummaryWidget(widgetData: TimelineEventSummaryAiWidget):
+async function makeTimelineEventSummaryWidget(widgetData: AiAssistanceModel.AiAgent.TimelineEventSummaryAiWidget):
     Promise<WidgetMakerResponse|null> {
   const renderedWidget = html`<devtools-widget class="timeline-event-summary-widget" ${widget(() => {
     return Timeline.TimelineDetailsView.TimelineDetailsPane.makeEventWidget(
@@ -2260,8 +2542,8 @@ async function makeTimelineEventSummaryWidget(widgetData: TimelineEventSummaryAi
   };
 }
 
-async function makeNetworkRequestGeneralHeadersWidget(widgetData: NetworkRequestGeneralHeadersAiWidget):
-    Promise<WidgetMakerResponse|null> {
+async function makeNetworkRequestGeneralHeadersWidget(
+    widgetData: AiAssistanceModel.AiAgent.NetworkRequestGeneralHeadersAiWidget): Promise<WidgetMakerResponse|null> {
   const renderedWidget = html`<devtools-widget class="network-request-general-headers-widget" ${widget(() => {
     return Network.RequestHeadersView.RequestHeadersView.createGeneralHeadersView(widgetData.data.request);
   })}></devtools-widget>`;

@@ -15,8 +15,8 @@ import {
   toggleRegExButtonBottomUp,
   uploadTraceFile,
 } from '../../helpers/performance-helpers.js';
-import type {DevToolsPage} from '../../shared/frontend-helper.js';
-import type {InspectedPage} from '../../shared/target-helper.js';
+import type {DevToolsPage} from '../../shared/DevToolsPage.js';
+import type {InspectedPage} from '../../shared/InspectedPage.js';
 
 async function expandNodeRecursively(rootActivity: puppeteer.ElementHandle, devToolsPage: DevToolsPage) {
   // Trigger an alt-click on the disclosure triangle. Requires getting the event.pageX correctly placed.
@@ -24,7 +24,7 @@ async function expandNodeRecursively(rootActivity: puppeteer.ElementHandle, devT
 
   await devToolsPage.clickElement(rootActivity, {
     clickOptions: {offset: {x: -DISTANCE_BETWEEN_DISCLOSURE_TRIANGLE_AND_ACTIVITY_NAME_PX, y: 0}},
-    modifiers: {alt: true}
+    modifiers: {alt: true},
   });
 }
 
@@ -42,7 +42,7 @@ describe('The Performance tool, Bottom-up panel', function() {
   setup({dockingMode: 'undocked'});
   /** navigate to the Performance tab and upload performance profile **/
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-    await navigateToPerformanceTab('empty', devToolsPage, inspectedPage);
+    await navigateToPerformanceTab(devToolsPage, inspectedPage, 'empty');
     await uploadTraceFile(devToolsPage, 'test/e2e/resources/performance/timeline/treeView-test-trace.json');
   }
 
@@ -54,7 +54,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     const timelineTree = (await devToolsPage.$<HTMLSelectElement>('.timeline-tree-view'))!;
     await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
     await toggleCaseSensitive(devToolsPage);
-    await setFilter('H2', devToolsPage);
+    await setFilter(devToolsPage, 'H2');
     const foundActivities = await enumerateTreeItems(devToolsPage);
     assert.deepEqual(foundActivities, ['H2']);
   });
@@ -68,7 +68,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     const timelineTree = (await devToolsPage.$<HTMLSelectElement>('.timeline-tree-view'))!;
     await devToolsPage.waitForElementWithTextContent(allActivities[0], timelineTree);
     await toggleRegExButtonBottomUp(devToolsPage);
-    await setFilter('h2$', devToolsPage);
+    await setFilter(devToolsPage, 'h2$');
     const foundActivities = await enumerateTreeItems(devToolsPage);
     assert.deepEqual(foundActivities, ['H2', 'h2']);
   });
@@ -82,7 +82,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     const timelineTree = (await devToolsPage.$<HTMLSelectElement>('.timeline-tree-view'))!;
     await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
     await toggleMatchWholeWordButtonBottomUp(devToolsPage);
-    await setFilter('function', devToolsPage);
+    await setFilter(devToolsPage, 'function');
 
     const foundActivities = await enumerateTreeItems(devToolsPage);
     assert.deepEqual(foundActivities, ['Function call']);
@@ -95,7 +95,7 @@ describe('The Performance tool, Bottom-up panel', function() {
 
     const timelineTree = (await devToolsPage.$<HTMLSelectElement>('.timeline-tree-view'))!;
     await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
-    await setFilter('h2', devToolsPage);
+    await setFilter(devToolsPage, 'h2');
     const foundActivities = await enumerateTreeItems(devToolsPage);
     assert.deepEqual(foundActivities, expectedActivities);
   });
@@ -126,7 +126,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     const timelineTree = (await devToolsPage.$<HTMLSelectElement>('.timeline-tree-view'))!;
     await toggleRegExButtonBottomUp(devToolsPage);
     await toggleCaseSensitive(devToolsPage);
-    await setFilter('h2_', devToolsPage);
+    await setFilter(devToolsPage, 'h2_');
     const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
     assert.isOk(rootActivity, `Could not find ${expectedActivities[0]} in DevTools.`);
 

@@ -6,20 +6,23 @@ import {assert} from 'chai';
 
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
-import {TraceLoader} from '../../../testing/TraceLoader.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import * as Trace from '../trace.js';
 
-import type {PreconnectedOrigin} from './NetworkDependencyTree.js';
-import type {InsightSetContextWithNavigation, RelatedEventsMap} from './types.js';
+import type * as Insights from './insights.js';
+
+type PreconnectedOrigin = Insights.Models.NetworkDependencyTree.PreconnectedOrigin;
+type InsightSetContextWithNavigation = Insights.Types.InsightSetContextWithNavigation;
+type RelatedEventsMap = Insights.Types.RelatedEventsMap;
 
 const {urlString} = Platform.DevToolsPath;
 
-describeWithEnvironment('NetworkDependencyTree', function() {
+describe('NetworkDependencyTree', function() {
+  setupLocaleHooks();
   let insight: Trace.Insights.Types.InsightModels['NetworkDependencyTree'];
 
-  before(async function() {
+  beforeEach(async function() {
     const {data, insights} = await processTrace(this, 'lcp-multiple-frames.json.gz');
     const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
     insight = getInsightOrError('NetworkDependencyTree', insights, firstNav);
@@ -106,7 +109,9 @@ describeWithEnvironment('NetworkDependencyTree', function() {
   });
 
   it('Calculates the relatedEvents map (event to warning map)', async function() {
-    TraceLoader.setTestTimeout(this);
+    if (this.timeout() > 0) {
+      this.timeout(45_000);
+    }
     // Need to load a file with longer dependency chain for this test.
     // Only those requests whose depth >= 2 will be added to the related events.
     const {data, insights} = await processTrace(this, 'web-dev-screenshot-source-ids.json.gz');
@@ -134,6 +139,8 @@ describeWithEnvironment('NetworkDependencyTree', function() {
 });
 
 describe('generatePreconnectedOrigins', () => {
+  setupLocaleHooks();
+
   describe('generatePreconnectedOriginsFromDom', () => {
     const mockParsedTrace = {
       NetworkRequests: {
@@ -173,7 +180,7 @@ describe('generatePreconnectedOrigins', () => {
                          url: 'https://example.com',
                          unused: false,
                          crossorigin: false,
-                         source: 'DOM'
+                         source: 'DOM',
                        }]);
     });
 
@@ -202,7 +209,7 @@ describe('generatePreconnectedOrigins', () => {
                          url: 'https://example.com',
                          unused: true,
                          crossorigin: false,
-                         source: 'DOM'
+                         source: 'DOM',
                        }]);
     });
 
@@ -227,7 +234,7 @@ describe('generatePreconnectedOrigins', () => {
                          url: 'https://example.com',
                          unused: true,
                          crossorigin: true,
-                         source: 'DOM'
+                         source: 'DOM',
                        }]);
     });
 
@@ -252,16 +259,16 @@ describe('generatePreconnectedOrigins', () => {
                          url: 'https://example.com',
                          unused: true,
                          crossorigin: false,
-                         source: 'DOM'
+                         source: 'DOM',
                        }]);
     });
   });
 
-  describeWithEnvironment('PreconnectedOriginFromResponseHeader', function() {
+  describe('PreconnectedOriginFromResponseHeader', function() {
     let insight: Trace.Insights.Types.InsightModels['NetworkDependencyTree'];
     let documentRequest: Trace.Types.Events.SyntheticNetworkRequest|undefined;
 
-    before(async function() {
+    beforeEach(async function() {
       const {data, insights} = await processTrace(this, 'preconnect-advice.json.gz');
       const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
       insight = getInsightOrError('NetworkDependencyTree', insights, firstNav);
@@ -358,7 +365,8 @@ describe('generatePreconnectedOrigins', () => {
       assert.deepEqual(
           result, [{
             url: 'https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry',
-            headerText: '<https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry>; rel="preconnect"'
+            headerText:
+                '<https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry>; rel="preconnect"',
           }]);
     });
 
@@ -395,7 +403,8 @@ describe('generatePreconnectedOrigins', () => {
   });
 });
 
-describeWithEnvironment('generatePreconnectCandidates', () => {
+describe('generatePreconnectCandidates', () => {
+  setupLocaleHooks();
   const mockParsedTrace = {
     NetworkRequests: {
       incompleteInitiator: new Map<Trace.Types.Events.SyntheticNetworkRequest, Trace.Types.Events.Event>(),
@@ -408,7 +417,7 @@ describeWithEnvironment('generatePreconnectCandidates', () => {
     },
     Samples: {
       entryToNode: new Map(),
-    }
+    },
   } as Trace.Handlers.Types.HandlerData;
 
   const mockContext = {
@@ -448,14 +457,14 @@ describeWithEnvironment('generatePreconnectCandidates', () => {
         url: 'https://main.com',
         requestId: 'main-request',
         syntheticData: {finishTime: 1_000},
-        timing: {connectEnd: 0, connectStart: 0}
+        timing: {connectEnd: 0, connectStart: 0},
       },
     },
     ts: 0,
     rawSourceEvent: {
       cat: 'devtools.timeline',
       name: 'ResourceSendRequest',
-    }
+    },
   } as unknown as Trace.Types.Events.SyntheticNetworkRequest;
 
   const validRequest: Trace.Types.Events.SyntheticNetworkRequest = {
@@ -470,7 +479,7 @@ describeWithEnvironment('generatePreconnectCandidates', () => {
     rawSourceEvent: {
       cat: 'devtools.timeline',
       name: 'ResourceSendRequest',
-    }
+    },
   } as unknown as Trace.Types.Events.SyntheticNetworkRequest;
 
   beforeEach(() => {

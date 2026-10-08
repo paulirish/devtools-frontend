@@ -3,26 +3,36 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as Media from './media.js';
 
 const PLAYER_ID = 'PLAYER_ID' as Protocol.Media.PlayerId;
 
-describeWithMockConnection('MediaMainView', () => {
+describeWithEnvironment('MediaMainView', () => {
   let target: SDK.Target.Target;
 
   beforeEach(() => {
     target = createTarget();
   });
+
+  function assertEmptyState(mainView: Media.MainView.MainView, expectedHeader: string, expectedDescription: string) {
+    const emptyWidgetElement = mainView.contentElement.querySelector('.empty-widget-container');
+    assert.exists(emptyWidgetElement);
+    const emptyWidgetShadowRoot = emptyWidgetElement.shadowRoot;
+    assert.exists(emptyWidgetShadowRoot);
+    assert.deepEqual(emptyWidgetShadowRoot.querySelector('.empty-state-header')?.textContent, expectedHeader);
+    assert.deepEqual(emptyWidgetShadowRoot.querySelector('.empty-state-description span')?.textContent,
+                     expectedDescription);
+  }
 
   const testUiUpdate = <T extends keyof Media.MediaModel.EventTypes>(
       event: Platform.TypeScriptUtilities.NoUnion<T>, expectedMethod: keyof Media.MainView.PlayerDataDownloadManager,
@@ -62,11 +72,7 @@ describeWithMockConnection('MediaMainView', () => {
 
   it('shows a placeholder if no player is available', () => {
     const mainView = new Media.MainView.MainView();
-    assert.exists(mainView.contentElement.querySelector('.empty-state'));
-    assert.deepEqual(mainView.contentElement.querySelector('.empty-state-header')?.textContent, 'No media player');
-    assert.deepEqual(
-        mainView.contentElement.querySelector('.empty-state-description span')?.textContent,
-        'On this page you can view and export media player details.');
+    assertEmptyState(mainView, 'No media player', 'On this page you can view and export media player details');
     mainView.detach();
   });
 
@@ -79,12 +85,7 @@ describeWithMockConnection('MediaMainView', () => {
     renderElementIntoDOM(mainView);
 
     model.dispatchEventToListeners(Media.MediaModel.Events.PLAYER_CREATED, {playerId: PLAYER_ID});
-    assert.exists(mainView.contentElement.querySelector('.empty-state'));
-    assert.deepEqual(
-        mainView.contentElement.querySelector('.empty-state-header')?.textContent, 'No media player selected');
-    assert.deepEqual(
-        mainView.contentElement.querySelector('.empty-state-description span')?.textContent,
-        'Select a media player to inspect its details.');
+    assertEmptyState(mainView, 'No media player selected', 'Select a media player to inspect its details');
     mainView.detach();
   });
 
@@ -99,11 +100,7 @@ describeWithMockConnection('MediaMainView', () => {
     model.dispatchEventToListeners(Media.MediaModel.Events.PLAYER_CREATED, {playerId: PLAYER_ID});
     mainView.markPlayerForDeletion(PLAYER_ID);
 
-    assert.exists(mainView.contentElement.querySelector('.empty-state'));
-    assert.deepEqual(mainView.contentElement.querySelector('.empty-state-header')?.textContent, 'No media player');
-    assert.deepEqual(
-        mainView.contentElement.querySelector('.empty-state-description span')?.textContent,
-        'On this page you can view and export media player details.');
+    assertEmptyState(mainView, 'No media player', 'On this page you can view and export media player details');
     mainView.detach();
   });
 
@@ -117,13 +114,10 @@ describeWithMockConnection('MediaMainView', () => {
 
     model.dispatchEventToListeners(Media.MediaModel.Events.PLAYER_CREATED, {playerId: PLAYER_ID});
     mainView.renderMainPanel(PLAYER_ID);
-    assert.isNull(mainView.contentElement.querySelector('.empty-state'));
+    assert.isNull(mainView.contentElement.querySelector('.empty-widget-container'));
     mainView.markPlayerForDeletion(PLAYER_ID);
 
-    assert.deepEqual(mainView.contentElement.querySelector('.empty-state-header')?.textContent, 'No media player');
-    assert.deepEqual(
-        mainView.contentElement.querySelector('.empty-state-description span')?.textContent,
-        'On this page you can view and export media player details.');
+    assertEmptyState(mainView, 'No media player', 'On this page you can view and export media player details');
     mainView.detach();
   });
 

@@ -7,34 +7,51 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
-devtools_module("ai_assistance") {
+# injected.ts contains page-evaluated functions and scripts that require DOM
+# types. It is isolated in a separate ts_library so DOM types do not leak into
+# the rest of models/ai_assistance.
+ts_library("injected") {
+  sources = [ "injected.ts" ]
+}
+
+# DOMHelpers.ts contains generic browser DOM helpers (e.g. CSSStyleSheet
+# sanitization, CustomEvent dispatching) that require DOM types. It is isolated
+# in a separate ts_library so DOM types do not leak into the rest of
+# models/ai_assistance.
+ts_library("dom_helpers") {
+  sources = [ "DOMHelpers.ts" ]
+
+  ts_deps = [ "../../core/platform:bundle" ]
+}
+
+devtools_foundation_module("ai_assistance") {
   sources = [
-    "AgentProject.ts",
     "AiAgent2.ts",
     "AiConversation.ts",
     "AiHistoryStorage.ts",
-    "AiOrigins.ts",
+    "AiSetting.ts",
     "AiUtils.ts",
-    "BuiltInAi.ts",
     "ChangeManager.ts",
+    "ConversationSummary.ts",
     "EvaluateAction.ts",
     "ExtensionScope.ts",
+    "PerformanceAnnotations.ts",
     "StorageItem.ts",
     "agents/AccessibilityAgent.ts",
     "agents/AiAgent.ts",
     "agents/ContextSelectionAgent.ts",
-    "agents/ConversationSummaryAgent.ts",
     "agents/ExecuteJavascript.ts",
     "agents/FileAgent.ts",
-    "agents/GreenDevAgent.ts",
-    "agents/GreenDevAgentAntigravityCliSocketClient.ts",
-    "agents/GreenDevAgentGeminiCliSocketClient.ts",
     "agents/NetworkAgent.ts",
-    "agents/PatchAgent.ts",
     "agents/PerformanceAgent.ts",
-    "agents/PerformanceAnnotationsAgent.ts",
     "agents/StorageAgent.ts",
     "agents/StylingAgent.ts",
+    "contexts/DOMNodeContext.ts",
+    "contexts/FileContext.ts",
+    "contexts/LighthouseContext.ts",
+    "contexts/PerformanceTraceContext.ts",
+    "contexts/RequestContext.ts",
+    "contexts/StorageContext.ts",
     "data_formatters/FileFormatter.ts",
     "data_formatters/LighthouseFormatter.ts",
     "data_formatters/NetworkRequestFormatter.ts",
@@ -42,70 +59,115 @@ devtools_module("ai_assistance") {
     "data_formatters/PerformanceTraceFormatter.ts",
     "data_formatters/UnitFormatters.ts",
     "debug.ts",
-    "injected.ts",
     "performance/AICallTree.ts",
     "performance/AIContext.ts",
     "performance/AIQueries.ts",
     "skills/Skill.ts",
     "skills/SkillRegistry.ts",
+    "tools/CookieUtils.ts",
+    "tools/DOMStorageUtils.ts",
+    "tools/ExecuteJavaScript.ts",
+    "tools/GetCookieValues.ts",
+    "tools/GetDetailedCallTree.ts",
+    "tools/GetElementAccessibilityDetails.ts",
+    "tools/GetInsightDetails.ts",
+    "tools/GetLighthouseAudits.ts",
+    "tools/GetNetworkRequestDetails.ts",
+    "tools/GetSourceContent.ts",
+    "tools/GetStorageBreakdown.ts",
+    "tools/GetStorageValues.ts",
+    "tools/GetStyles.ts",
+    "tools/GetTraceEventByKey.ts",
+    "tools/GetTraceFunctionCode.ts",
+    "tools/GetTraceMainThreadSummary.ts",
+    "tools/GetTraceNetworkSummary.ts",
+    "tools/GetTraceResourceContent.ts",
+    "tools/ListCookies.ts",
+    "tools/ListNetworkRequests.ts",
+    "tools/ListPageOrigins.ts",
+    "tools/ListSources.ts",
+    "tools/ListStorageKeys.ts",
+    "tools/RecordPerformanceTrace.ts",
+    "tools/ResolveDevtoolsNodePath.ts",
+    "tools/RunLighthouse.ts",
+    "tools/SelectTraceEventByKey.ts",
+    "tools/Tool.ts",
+    "tools/ToolRegistry.ts",
   ]
 
-  # We use public_deps here to avoid ts_library.py looking for a tsconfig
+  # We use public_deps here to avoid ts_library looking for a tsconfig
   # for the generated skills files. This is a deviation from standard practice
   # because the generated files are .js and types are provided globally.
   public_deps = [ "skills:generate_skills" ]
 
-  deps = [
+  ts_deps = [
+    ":dom_helpers",
+    ":injected",
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
     "../../models/network_time_calculator:bundle",
-    "../../models/persistence:bundle",
     "../../services/tracing:bundle",
-    "../../third_party/diff:bundle",
-    "../annotations:bundle",
     "../bindings:bundle",
-    "../breakpoints:bundle",
     "../crux-manager:bundle",
-    "../emulation:bundle",
     "../formatter:bundle",
-    "../greendev:bundle",
     "../lighthouse:bundle",
     "../logs:bundle",
     "../network_time_calculator:bundle",
     "../source_map_scopes:bundle",
-    "../text_utils:bundle",
     "../trace:bundle",
     "../trace_source_maps_resolver:bundle",
     "../workspace:bundle",
   ]
 }
 
+# BuiltInAi.ts interacts with browser-only APIs (window.LanguageModel and canvas
+# WebGL GPU detection). It is isolated in a separate ts_library so DOM/window
+# types do not leak into the rest of models/ai_assistance.
+ts_library("built_in_ai") {
+  sources = [ "BuiltInAi.ts" ]
+
+  ts_deps = [
+    "../../core/common:bundle",
+    "../../core/host:bundle",
+    "../../core/root:bundle",
+  ]
+}
+
 devtools_entrypoint("bundle") {
   entrypoint = "ai_assistance.ts"
 
-  deps = [ ":ai_assistance" ]
+  deps = [ "skills:generate_skills" ]
+
+  ts_deps = [
+    ":ai_assistance",
+    ":built_in_ai",
+    ":dom_helpers",
+    ":injected",
+  ]
 
   visibility = [
     ":*",
-    "../../entrypoints/greendev_floaty/*",
     "../../entrypoints/main/*",
+    "../../foundation/*",
     "../../panels/ai_assistance/*",
     "../../panels/application/*",
     "../../panels/common/*",
     "../../panels/console/*",
     "../../panels/elements/*",
-    "../../panels/greendev/*",
+    "../../panels/explain/*",
     "../../panels/network/*",
     "../../panels/settings/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",
+    "../../testing/*",
+    "../../ui/components/text_editor/*",
     "../ai_code_completion",
-    "./data_formatters:*",
   ]
 
   visibility += devtools_models_visibility
@@ -115,54 +177,103 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
-    "AgentProject.test.ts",
-    "AiAgent2.test.ts",
-    "AiConversation.test.ts",
-    "AiHistoryStorage.test.ts",
-    "AiOrigins.test.ts",
-    "AiUtils.test.ts",
     "BuiltInAi.test.ts",
-    "ChangeManager.test.ts",
-    "EvaluateAction.test.ts",
-    "ExtensionScope.test.ts",
-    "agents/AccessibilityAgent.test.ts",
-    "agents/AiAgent.test.ts",
-    "agents/ContextSelectionAgent.test.ts",
-    "agents/ConversationSummaryAgent.test.ts",
-    "agents/FileAgent.test.ts",
-    "agents/GreenDevAgent.test.ts",
-    "agents/NetworkAgent.test.ts",
-    "agents/PatchAgent.test.ts",
-    "agents/PerformanceAgent.test.ts",
-    "agents/PerformanceAnnotationsAgent.test.ts",
-    "agents/StorageAgent.test.ts",
-    "agents/StylingAgent.test.ts",
-    "performance/AICallTree.test.ts",
-    "performance/AIQueries.test.ts",
+    "DOMHelpers.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
-    "../../core/common:bundle",
-    "../../core/host:bundle",
-    "../../core/platform:bundle",
-    "../../core/root:bundle",
-    "../../core/sdk:bundle",
-    "../../generated",
     "../../testing",
-    "../../ui/components/render_coordinator:bundle",
-    "../bindings:bundle",
-    "../greendev:bundle",
-    "../lighthouse:bundle",
-    "../logs:bundle",
-    "../network_time_calculator:bundle",
-    "../text_utils:bundle",
-    "../trace:bundle",
-    "../trace/types:bundle",
-    "../workspace:bundle",
   ]
 }
 
-group("foundation_unittests") {
-  deps = [ "./data_formatters:foundation_unittests" ]
+devtools_foundation_module("foundation_unittests") {
+  testonly = true
+
+  sources = [
+    "AiAgent2.test.ts",
+    "AiConversation.test.ts",
+    "AiHistoryStorage.test.ts",
+    "AiSetting.test.ts",
+    "AiUtils.test.ts",
+    "ChangeManager.test.ts",
+    "ConversationSummary.test.ts",
+    "EvaluateAction.test.ts",
+    "ExtensionScope.test.ts",
+    "PerformanceAnnotations.test.ts",
+    "agents/AccessibilityAgent.test.ts",
+    "agents/AiAgent.test.ts",
+    "agents/ContextSelectionAgent.test.ts",
+    "agents/FileAgent.test.ts",
+    "agents/NetworkAgent.test.ts",
+    "agents/PerformanceAgent.test.ts",
+    "agents/StorageAgent.test.ts",
+    "agents/StylingAgent.test.ts",
+    "contexts/DOMNodeContext.test.ts",
+    "contexts/FileContext.test.ts",
+    "contexts/LighthouseContext.test.ts",
+    "contexts/PerformanceTraceContext.test.ts",
+    "contexts/RequestContext.test.ts",
+    "data_formatters/FileFormatter.test.ts",
+    "data_formatters/LighthouseFormatter.test.ts",
+    "data_formatters/NetworkRequestFormatter.test.ts",
+    "data_formatters/PerformanceInsightFormatter.test.ts",
+    "data_formatters/PerformanceTraceFormatter.test.ts",
+    "data_formatters/UnitFormatters.test.ts",
+    "performance/AICallTree.test.ts",
+    "performance/AIContext.test.ts",
+    "performance/AIQueries.test.ts",
+    "tools/CookieUtils.test.ts",
+    "tools/DOMStorageUtils.test.ts",
+    "tools/ExecuteJavaScript.test.ts",
+    "tools/GetCookieValues.test.ts",
+    "tools/GetDetailedCallTree.test.ts",
+    "tools/GetElementAccessibilityDetails.test.ts",
+    "tools/GetInsightDetails.test.ts",
+    "tools/GetLighthouseAudits.test.ts",
+    "tools/GetNetworkRequestDetails.test.ts",
+    "tools/GetSourceContent.test.ts",
+    "tools/GetStorageBreakdown.test.ts",
+    "tools/GetStorageValues.test.ts",
+    "tools/GetStyles.test.ts",
+    "tools/GetTraceEventByKey.test.ts",
+    "tools/GetTraceFunctionCode.test.ts",
+    "tools/GetTraceMainThreadSummary.test.ts",
+    "tools/GetTraceNetworkSummary.test.ts",
+    "tools/GetTraceResourceContent.test.ts",
+    "tools/ListCookies.test.ts",
+    "tools/ListNetworkRequests.test.ts",
+    "tools/ListPageOrigins.test.ts",
+    "tools/ListSources.test.ts",
+    "tools/ListStorageKeys.test.ts",
+    "tools/RecordPerformanceTrace.test.ts",
+    "tools/ResolveDevtoolsNodePath.test.ts",
+    "tools/RunLighthouse.test.ts",
+    "tools/SelectTraceEventByKey.test.ts",
+    "tools/Tool.test.ts",
+    "tools/ToolRegistry.test.ts",
+  ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../core/host:bundle",
+    "../../core/i18n:bundle",
+    "../../core/platform:bundle",
+    "../../core/root:bundle",
+    "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
+    "../../generated",
+    "../../services/tracing:bundle",
+    "../../testing",
+    "../bindings:bundle",
+    "../crux-manager:bundle",
+    "../formatter:bundle",
+    "../lighthouse:bundle",
+    "../logs:bundle",
+    "../network_time_calculator:bundle",
+    "../source_map_scopes:bundle",
+    "../trace:bundle",
+    "../workspace:bundle",
+  ]
 }

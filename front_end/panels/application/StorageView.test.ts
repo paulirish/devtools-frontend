@@ -3,22 +3,24 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
+import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {dispatchFocusOutEvent} from '../../testing/DOMHelpers.js';
-import {createTarget, expectConsoleLogs} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {dispatchFocusOutEvent, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {SECURITY_ORIGIN} from '../../testing/ResourceTreeHelpers.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as Resources from './application.js';
 
-describeWithMockConnection('StorageView', () => {
+describeWithEnvironment('StorageView', () => {
   const testKey = 'test-storage-key';
   let target: SDK.Target.Target;
   let domStorageModel: SDK.DOMStorageModel.DOMStorageModel|null;
   let storageKeyManager: SDK.StorageKeyManager.StorageKeyManager|null;
+  let view: Resources.StorageView.StorageView|null = null;
 
   beforeEach(() => {
     const tabTarget = createTarget({type: SDK.Target.Type.TAB});
@@ -33,8 +35,12 @@ describeWithMockConnection('StorageView', () => {
     });
   });
 
-  expectConsoleLogs({
-    error: ['Error: No LanguageSelector instance exists yet.'],
+  afterEach(() => {
+    if (view) {
+      SDK.TargetManager.TargetManager.instance().unobserveTargets(view);
+      view.detach();
+      view = null;
+    }
   });
 
   it('emits correct events on clear', () => {
@@ -61,7 +67,7 @@ describeWithMockConnection('StorageView', () => {
   it('changes subtitle on MainStorageKeyChanged event', () => {
     assert.exists(domStorageModel);
     assert.exists(storageKeyManager);
-    const view = new Resources.StorageView.StorageView();
+    view = new Resources.StorageView.StorageView();
 
     storageKeyManager.dispatchEventToListeners(
         SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED, {mainStorageKey: testKey});
@@ -70,6 +76,125 @@ describeWithMockConnection('StorageView', () => {
     assert.strictEqual(subtitle?.textContent, testKey);
   });
 
+  it('groups site-data checkboxes into columns and indents third-party cookies under cookies', () => {
+    view = new Resources.StorageView.StorageView();
+    const container = view.element.shadowRoot?.querySelector('.clear-storage-header') || null;
+    assert.instanceOf(container, HTMLDivElement);
+
+    const checkboxesRow = container.shadowRoot!.querySelector('.clear-site-data-checkboxes-row');
+    assert.instanceOf(checkboxesRow, HTMLDivElement);
+    const columns = checkboxesRow.querySelectorAll('.clear-site-data-checkbox-column');
+    assert.lengthOf(columns, 2);
+
+    const cookiesCheckbox = container.shadowRoot!.querySelector('.cookies-checkbox');
+    assert.instanceOf(cookiesCheckbox, HTMLElement);
+
+    const includeThirdPartyCookiesRow = container.shadowRoot!.querySelector('.include-third-party-cookies-row');
+    assert.instanceOf(includeThirdPartyCookiesRow, HTMLDivElement);
+    assert.strictEqual(cookiesCheckbox.nextElementSibling, includeThirdPartyCookiesRow);
+
+    const clearButton = container.shadowRoot!.querySelector('#storage-view-clear-button');
+    assert.instanceOf(clearButton, HTMLElement);
+    assert.strictEqual(clearButton.textContent, 'Clear selected');
+  });
+
+  it('makes include-third-party-cookies dependent on cookies', async () => {
+    const cookiesSetting = Common.Settings.Settings.instance().createSetting('clear-storage-cookies', true);
+    const includeThirdPartyCookiesSetting =
+        Common.Settings.Settings.instance().createSetting('clear-storage-include-third-party-cookies', false);
+    cookiesSetting.set(true);
+    includeThirdPartyCookiesSetting.set(false);
+
+    view = new Resources.StorageView.StorageView();
+    const container = view.element.shadowRoot?.querySelector('.clear-storage-header') || null;
+    assert.instanceOf(container, HTMLDivElement);
+
+    const includeThirdPartyCookiesCheckbox =
+        container.shadowRoot!.querySelector('.third-party-cookies-checkbox') as HTMLElement;
+    assert.instanceOf(includeThirdPartyCookiesCheckbox, HTMLElement);
+    const includeThirdPartyCookiesCheckboxInput =
+        includeThirdPartyCookiesCheckbox.shadowRoot!.querySelector('input') as HTMLInputElement;
+    assert.instanceOf(includeThirdPartyCookiesCheckboxInput, HTMLInputElement);
+
+    includeThirdPartyCookiesSetting.set(true);
+    await RenderCoordinator.done();
+    assert.isTrue(cookiesSetting.get());
+    assert.isTrue(includeThirdPartyCookiesSetting.get());
+
+    includeThirdPartyCookiesSetting.set(false);
+    await RenderCoordinator.done();
+    assert.isTrue(cookiesSetting.get());
+    assert.isFalse(includeThirdPartyCookiesSetting.get());
+
+    includeThirdPartyCookiesSetting.set(true);
+    await RenderCoordinator.done();
+    assert.isTrue(includeThirdPartyCookiesSetting.get());
+
+    cookiesSetting.set(false);
+    await RenderCoordinator.done();
+    assert.isFalse(cookiesSetting.get());
+    assert.isFalse(includeThirdPartyCookiesSetting.get());
+    assert.isTrue(includeThirdPartyCookiesCheckboxInput.disabled);
+
+    cookiesSetting.set(true);
+    await RenderCoordinator.done();
+    assert.isTrue(cookiesSetting.get());
+    assert.isFalse(includeThirdPartyCookiesCheckboxInput.disabled);
+  });
+
+  for (const checked of [true, false]) {
+    it(`${checked ? 'includes' : 'excludes'} file systems when the checkbox is ${checked ? 'checked' : 'unchecked'}`,
+        async () => {
+          assert.exists(storageKeyManager);
+          const securityOriginManager = target.model(SDK.SecurityOriginManager.SecurityOriginManager);
+          assert.exists(securityOriginManager);
+
+          sinon.stub(securityOriginManager, 'mainSecurityOrigin').returns(SECURITY_ORIGIN);
+          sinon.stub(storageKeyManager, 'mainStorageKey').returns(testKey);
+
+          const clearDataStub = sinon.stub(target.storageAgent(), 'invoke_clearDataForStorageKey');
+
+          const view = new Resources.StorageView.StorageView();
+          renderElementIntoDOM(view);
+          try {
+            await RenderCoordinator.done();
+
+            const container = view.element.shadowRoot?.querySelector('.clear-storage-header') || null;
+            assert.instanceOf(container, HTMLDivElement);
+
+            const checkbox = container.shadowRoot!.querySelector('.file-systems-checkbox');
+            assert.instanceOf(checkbox, HTMLElement);
+
+            const input = checkbox.shadowRoot!.querySelector('input');
+            assert.instanceOf(input, HTMLInputElement);
+            assert.isTrue(input.checked);
+
+            if (!checked) {
+              checkbox.click();
+              await RenderCoordinator.done();
+            }
+            assert.strictEqual(input.checked, checked);
+
+            const clearButton = container.shadowRoot!.querySelector('#storage-view-clear-button');
+            assert.instanceOf(clearButton, HTMLElement);
+            clearButton.click();
+
+            sinon.assert.calledOnce(clearDataStub);
+            const request = clearDataStub.firstCall.args[0];
+            assert.strictEqual(request.storageKey, testKey);
+
+            const storageTypes = request.storageTypes.split(',');
+            if (checked) {
+              assert.include(storageTypes, Protocol.Storage.StorageType.File_systems);
+            } else {
+              assert.notInclude(storageTypes, Protocol.Storage.StorageType.File_systems);
+            }
+          } finally {
+            view.detach();
+          }
+        });
+  }
+
   it('shows a warning message when entering a too big custom quota', async () => {
     assert.exists(domStorageModel);
     assert.exists(storageKeyManager);
@@ -77,7 +202,7 @@ describeWithMockConnection('StorageView', () => {
     assert.exists(securityOriginManager);
     sinon.stub(securityOriginManager, 'mainSecurityOrigin').returns(SECURITY_ORIGIN);
 
-    const view = new Resources.StorageView.StorageView();
+    view = new Resources.StorageView.StorageView();
     const container = view.element.shadowRoot?.querySelector('.clear-storage-header') || null;
     assert.instanceOf(container, HTMLDivElement);
     const customQuotaCheckbox =
@@ -158,5 +283,40 @@ describeWithMockConnection('StorageView', () => {
     Resources.StorageView.StorageView.clear(target, testKey, '', [Protocol.Storage.StorageType.Cache_storage], false);
 
     assert.isEmpty(cacheStorageModel.caches());
+  });
+
+  describe('getStorageTypeName', () => {
+    it('returns correct titles for storage types', () => {
+      assert.strictEqual(
+          Resources.StorageView.StorageView.getStorageTypeName(Protocol.Storage.StorageType.File_systems),
+          'File system');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeName(Protocol.Storage.StorageType.Indexeddb),
+                         'IndexedDB');
+      assert.strictEqual(
+          Resources.StorageView.StorageView.getStorageTypeName(Protocol.Storage.StorageType.Cache_storage),
+          'Cache storage');
+      assert.strictEqual(
+          Resources.StorageView.StorageView.getStorageTypeName(Protocol.Storage.StorageType.Service_workers),
+          'Service workers');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeName(Protocol.Storage.StorageType.Cookies),
+                         'Other');
+    });
+  });
+
+  describe('getStorageTypeNameForWidget', () => {
+    it('returns correct titles for widget storage types', () => {
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('session_storage'),
+                         'Session storage');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('local_storage'),
+                         'Local storage');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('cookies'), 'Cookies');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('indexeddb'), 'IndexedDB');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('cache_storage'),
+                         'Cache storage');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('service_workers'),
+                         'Service workers');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('file_systems'), 'File system');
+      assert.strictEqual(Resources.StorageView.StorageView.getStorageTypeNameForWidget('unknown'), 'Other');
+    });
   });
 });

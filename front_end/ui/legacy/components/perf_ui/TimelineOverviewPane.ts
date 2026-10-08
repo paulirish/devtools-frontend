@@ -6,7 +6,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as TraceBounds from '../../../../services/trace_bounds/trace_bounds.js';
-import * as VisualLoggging from '../../../visual_logging/visual_logging.js';
+import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -14,8 +14,12 @@ import {Events as OverviewGridEvents, OverviewGrid, type WindowChangedWithPositi
 import {TimelineOverviewCalculator} from './TimelineOverviewCalculator.js';
 import timelineOverviewInfoStyles from './timelineOverviewInfo.css.js';
 
-export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) {
+const TimelineOverviewPaneBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class TimelineOverviewPane extends TimelineOverviewPaneBase {
   readonly overviewCalculator: TimelineOverviewCalculator;
   private readonly overviewGrid: OverviewGrid;
   private readonly cursorArea: HTMLElement;
@@ -41,7 +45,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewCalculator = new TimelineOverviewCalculator();
     this.overviewGrid = new OverviewGrid(prefix, this.overviewCalculator);
     this.overviewGrid.element.setAttribute(
-        'jslog', `${VisualLoggging.timeline(`${prefix}-overview`).track({click: true, drag: true, hover: true})}`);
+        'jslog', `${VisualLogging.timeline(`${prefix}-overview`).track({click: true, drag: true, hover: true})}`);
     this.element.appendChild(this.overviewGrid.element);
     this.cursorArea = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-area');
     this.cursorElement = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-position');
@@ -311,10 +315,6 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowStartTime = startTime;
     this.windowEndTime = endTime;
     this.updateWindow();
-    this.dispatchEventToListeners(Events.OVERVIEW_PANE_WINDOW_CHANGED, {
-      startTime: Trace.Types.Timing.Milli(startTime),
-      endTime: Trace.Types.Timing.Milli(endTime),
-    });
   }
 
   private updateWindow(): void {

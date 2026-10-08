@@ -2,17 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as PlatformApi from '../../core/platform/api/api.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line @devtools/es-modules-import
+import * as FormatterActions from '../../entrypoints/formatter_actions/formatter_actions.js';
 
-export {DefinitionKind, ScopeKind, type ScopeTreeNode} from '../../entrypoints/formatter_worker/FormatterActions.js';
+export {
+  DefinitionKind,
+  ScopeKind,
+  type ScopeTreeNode,
+  type ScopeVariableMapping,
+} from '../../entrypoints/formatter_actions/formatter_actions.js';
 
 let formatterWorkerPoolInstance: FormatterWorkerPool|undefined;
 
 export class FormatterWorkerPool {
   private taskQueue: Task[];
-  private workerTasks: Map<PlatformApi.HostRuntime.Worker, Task|null>;
+  private workerTasks: Map<Platform.HostRuntime.Worker, Task|null>;
   private entrypointURL: string;
 
   constructor(entrypointURL?: string) {
@@ -46,7 +50,7 @@ export class FormatterWorkerPool {
     formatterWorkerPoolInstance = undefined;
   }
 
-  private createWorker(): PlatformApi.HostRuntime.Worker {
+  private createWorker(): Platform.HostRuntime.Worker {
     const worker = Platform.HostRuntime.HOST_RUNTIME.createWorker(this.entrypointURL);
     worker.onmessage = this.onWorkerMessage.bind(this, worker);
     worker.onerror = this.onWorkerError.bind(this, worker);
@@ -75,8 +79,7 @@ export class FormatterWorkerPool {
     }
   }
 
-  private onWorkerMessage(worker: PlatformApi.HostRuntime.Worker, event: PlatformApi.HostRuntime.WorkerMessageEvent):
-      void {
+  private onWorkerMessage(worker: Platform.HostRuntime.Worker, event: Platform.HostRuntime.WorkerMessageEvent): void {
     const task = this.workerTasks.get(worker);
     if (!task) {
       return;
@@ -91,7 +94,7 @@ export class FormatterWorkerPool {
     task.callback(event.data ? event.data : null);
   }
 
-  private onWorkerError(worker: PlatformApi.HostRuntime.Worker, event: Event): void {
+  private onWorkerError(worker: Platform.HostRuntime.Worker, event: Event): void {
     console.error(event);
     const task = this.workerTasks.get(worker);
     worker.terminate();
@@ -136,12 +139,17 @@ export class FormatterWorkerPool {
     return this.runTask(FormatterActions.FormatterActions.FORMAT, parameters) as Promise<FormatterActions.FormatResult>;
   }
 
-  javaScriptSubstitute(expression: string, mapping: Map<string, string|null>): Promise<string> {
-    if (mapping.size === 0) {
+  javaScriptSubstitute(expression: string, mapping: FormatterActions.ScopeVariableMapping[]): Promise<string> {
+    if (mapping.every(scope => scope.bindings.size === 0)) {
       return Promise.resolve(expression);
     }
     return this.runTask(FormatterActions.FormatterActions.JAVASCRIPT_SUBSTITUTE, {content: expression, mapping})
-        .then(result => result || '');
+        .then((result: string|{error: string}|null) => {
+          if (result && typeof result === 'object') {
+            throw new Error(result.error);
+          }
+          return result || '';
+        });
   }
 
   javaScriptScopeTree(expression: string, sourceType: 'module'|'script' = 'script'):

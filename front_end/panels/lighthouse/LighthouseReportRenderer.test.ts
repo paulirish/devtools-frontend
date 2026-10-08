@@ -3,20 +3,20 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as LighthouseModel from '../../models/lighthouse/lighthouse.js';
 import {stripLitHtmlCommentNodes} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {html} from '../../ui/lit/lit.js';
 import * as PanelsCommon from '../common/common.js';
 
 import type * as LighthouseModule from './lighthouse.js';
 
-describeWithMockConnection('LighthouseReportRenderer', () => {
+describeWithEnvironment('LighthouseReportRenderer', () => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   let Lighthouse: typeof LighthouseModule;
   let target: SDK.Target.Target;
@@ -129,25 +129,75 @@ describeWithMockConnection('LighthouseReportRenderer', () => {
     assert.strictEqual(sourceElement.innerHTML, originalHtml);
   });
 
-  it('renders lighthouse scores and strips out topbar', async () => {
-    const lhr = {
+  describe('renderLighthouseScores', () => {
+    const baseReport = {
       finalDisplayedUrl: 'http://example.com',
       configSettings: {},
       audits: {},
-      categories: {
-        performance: {auditRefs: [], id: 'performance', score: 0.8},
-        accessibility: {auditRefs: [], id: 'accessibility', score: 0.9},
-      },
       lighthouseVersion: '',
       userAgent: '',
       fetchTime: 0,
       environment: {benchmarkIndex: 0},
       i18n: {rendererFormattedStrings: {}},
-    } as unknown as LighthouseModel.ReporterTypes.ReportJSON;
+    };
 
-    const el = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(lhr);
-    assert.isNotNull(el);
-    assert.isNotNull(el?.querySelector('.lh-scores-header'));
-    assert.isNull(el?.querySelector('.lh-topbar'));
+    it('renders lighthouse scores and strips out topbar', async () => {
+      const lhr = {
+        ...baseReport,
+        categories: {
+          performance: {auditRefs: [], id: 'performance', score: 0.8},
+          accessibility: {auditRefs: [], id: 'accessibility', score: 0.9},
+        },
+      } as unknown as LighthouseModel.ReporterTypes.ReportJSON;
+
+      const el = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(lhr);
+      assert.isNotNull(el);
+      assert.isNotNull(el?.querySelector('.lh-scores-header'));
+      assert.isNull(el?.querySelector('.lh-topbar'));
+    });
+
+    it('renders the category gauge for a single-category report', async () => {
+      const lhr = {
+        ...baseReport,
+        categories: {
+          accessibility: {auditRefs: [], id: 'accessibility', score: 0.9},
+        },
+      } as unknown as LighthouseModel.ReporterTypes.ReportJSON;
+
+      const el = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(lhr);
+      assert.isNotNull(el);
+      assert.lengthOf(el.querySelectorAll('.lh-gauge__wrapper'), 1);
+      assert.isNull(el.querySelector('.lh-scores-header'));
+      assert.isNull(el.querySelector('.lh-category'));
+      assert.isNull(el.querySelector('.lh-topbar'));
+    });
+
+    it('renders the category fraction for a single-category snapshot report', async () => {
+      const lhr = {
+        ...baseReport,
+        gatherMode: 'snapshot',
+        categories: {
+          accessibility: {auditRefs: [], id: 'accessibility', score: 0.9},
+        },
+      } as unknown as LighthouseModel.ReporterTypes.ReportJSON;
+
+      const el = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(lhr);
+      assert.isNotNull(el);
+      assert.lengthOf(el.querySelectorAll('.lh-fraction__wrapper'), 1);
+      assert.isNull(el.querySelector('.lh-gauge__wrapper'));
+    });
+
+    it('returns null for a single-category performance report in navigation mode', async () => {
+      const lhr = {
+        ...baseReport,
+        gatherMode: 'navigation',
+        categories: {
+          performance: {auditRefs: [], id: 'performance', score: 0.8},
+        },
+      } as unknown as LighthouseModel.ReporterTypes.ReportJSON;
+
+      const el = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(lhr);
+      assert.isNull(el);
+    });
   });
 });

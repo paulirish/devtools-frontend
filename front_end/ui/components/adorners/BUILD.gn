@@ -15,19 +15,17 @@ generate_css("css_files") {
 devtools_ui_module("adorners") {
   sources = [ "Adorner.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../../ui/legacy:bundle",
     "../../../ui/lit:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "adorners.ts"
 
-  deps = [
-    ":adorners",
-    ":css_files",
-  ]
+  ts_deps = [ ":adorners" ]
 
   visibility = default_components_visibility + [ "../../legacy/*" ]
 }
@@ -37,7 +35,7 @@ devtools_ui_module("unittests") {
 
   sources = [ "Adorner.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/platform:bundle",
   ]

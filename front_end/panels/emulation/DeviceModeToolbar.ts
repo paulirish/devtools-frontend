@@ -12,6 +12,7 @@ import * as EmulationModel from '../../models/emulation/emulation.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directive, Directives, html, i18nTemplate, type LitTemplate, noChange, render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
@@ -65,170 +66,153 @@ const autoWidthSelect = Directive.directive(AutoWidthSelectDirective);
 
 const UIStrings = {
   /**
-   * @description Title of the device dimensions selection item in the Device Mode Toolbar.
-   * webpage in pixels.
+   * @description Title of the device dimensions selection item in the device mode toolbar.
    * @example {Responsive} PH1
    */
   dimensions: 'Dimensions: {PH1}',
   /**
-   * @description Title of the device pixel ratio selection item in the Device Mode Toolbar.
+   * @description Title of the device pixel ratio selection item in the device mode toolbar.
    * @example {2.0} PH1
    */
   dpr: 'DPR: {PH1}',
   /**
-   * @description Title of the width input textbox in the Device Mode Toolbar, for the width of the
+   * @description Title of the width input textbox in the device mode toolbar, for the width of the
    * webpage in pixels.
    */
   width: 'Width',
   /**
-   * @description Title of the height input textbox in the Device Mode Toolbar, for the height of the
+   * @description Title of the height input textbox in the device mode toolbar, for the height of the
    * webpage in pixels. 'leave empty for full' is an instruction to the user - the webpage will be
    * full-height if this textbox is left empty.
    */
   heightLeaveEmptyForFull: 'Height (leave empty for full)',
   /**
-   * @description Tooltip text for a drop-down menu where the user can select the zoom percentage of
+   * @description Tooltip for a drop-down menu where the user can select the zoom percentage of
    * the webpage preview.
    */
   zoom: 'Zoom',
   /**
-   * @description Tooltip tip for a drop-down menu where the user can select the device pixel ratio
-   * (the ratio between the physical pixels on a screen and CSS logical pixels) of the webpage
+   * @description Tooltip for a drop-down menu where the user can select the device pixel ratio
+   * (the ratio between physical pixels on a screen and CSS logical pixels) of the webpage
    * preview.
    */
   devicePixelRatio: 'Device pixel ratio',
   /**
-   * @description Tooltip tip for a drop-down menu where the user can select the device type e.g.
-   * Mobile, Desktop.
+   * @description Tooltip for a drop-down menu where the user can select the device type (e.g.
+   * Mobile or Desktop).
    */
   deviceType: 'Device type',
   /**
-   * @description Tooltip text for a 'three dots' style menu button which shows an expanded set of options.
+   * @description Tooltip text for a three dots menu button which shows an expanded set of options.
    */
   moreOptions: 'More options',
   /**
    * @description A menu item in the drop-down box that allows the user to select the zoom level.
-   * Labels the value which corresponds to the 'fit to window' zoom level, represented by the
-   * placeholder, which is a number. In the Device Mode Toolbar.
-   * @example {30.0} PH1
+   * Labels the option to automatically fit the preview to the available window space in the device mode toolbar.
    */
-  fitToWindowPercentage: '{PH1}% (fit to window)',
-  /**
-   * @description A checkbox setting that appears in the context menu for the zoom level, in the
-   * Device Mode Toolbar.
-   */
-  autoadjustZoom: 'Auto-adjust zoom',
+  fitToWindow: 'Fit to window',
   /**
    * @description A menu item in the drop-down box that allows the user to select the device pixel
    * ratio. Labels the default value which varies between device types, represented by the
-   * placeholder, which is a number. In the Device Mode Toolbar.
+   * placeholder, which is a number, in the device mode toolbar.
    * @example {4.3} PH1
    */
   defaultF: '{PH1} (default)',
+
   /**
-   * @description Command to hide the frame (like a picture frame) around the mobile device screen.
-   */
-  hideDeviceFrame: 'Hide device frame',
-  /**
-   * @description Command to show the frame (like a picture frame) around the mobile device screen.
-   */
-  showDeviceFrame: 'Show device frame',
-  /**
-   * @description Command to hide a display in the Device Mode Toolbar that shows the different media
+   * @description Command to hide a display in the device mode toolbar that shows the different media
    * queries for the device, above the device screen.
-   * https://developer.mozilla.org/en-US/docs/Web/CSS/Media_Queries/Using_media_queries
+   * https://web.dev/learn/design/media-queries
    */
   hideMediaQueries: 'Hide media queries',
   /**
-   * @description Command to show a display in the Device Mode Toolbar that shows the different media
+   * @description Command to show a display in the device mode toolbar that shows the different media
    * queries for the device, above the device screen.
-   * https://developer.mozilla.org/en-US/docs/Web/CSS/Media_Queries/Using_media_queries
+   * https://web.dev/learn/design/media-queries
    */
   showMediaQueries: 'Show media queries',
   /**
-   * @description Command in the Device Mode Toolbar to hide a virtual ruler (for measuring),
+   * @description Command in the device mode toolbar to hide a virtual ruler,
    * displayed above and next to the device screen.
    */
   hideRulers: 'Hide rulers',
   /**
-   * @description Command in the Device Mode Toolbar to show a virtual ruler (for measuring),
+   * @description Command in the device mode toolbar to show a virtual ruler,
    * displayed above and next to the device screen.
    */
   showRulers: 'Show rulers',
   /**
-   * @description Command in the Device Mode Toolbar to remove the drop-down menu from the toolbar
+   * @description Command in the device mode toolbar to remove the drop-down menu from the toolbar
    * that lets the user override the device pixel ratio of the emulated device.
    */
   removeDevicePixelRatio: 'Remove device pixel ratio',
   /**
-   * @description Command in the Device Mode Toolbar to add the drop-down menu to the toolbar
+   * @description Command in the device mode toolbar to add the drop-down menu to the toolbar
    * that lets the user override the device pixel ratio of the emulated device.
    */
   addDevicePixelRatio: 'Add device pixel ratio',
   /**
-   * @description Command in the Device Mode Toolbar to add the drop-down menu to the toolbar
+   * @description Command in the device mode toolbar to remove the drop-down menu from the toolbar
    * that lets the user set the device type (e.g. Desktop or Mobile).
    */
   removeDeviceType: 'Remove device type',
   /**
-   * @description Command in the Device Mode Toolbar to add the drop-down menu to the toolbar
-   * that lets the user add the device type (e.g. Desktop or Mobile).
+   * @description Command in the device mode toolbar to add the drop-down menu to the toolbar
+   * that lets the user set the device type (e.g. Desktop or Mobile).
    */
   addDeviceType: 'Add device type',
   /**
-   * @description A context menu item in the Device Mode Toolbar that resets all settings back to
+   * @description A context menu item in the device mode toolbar that resets all settings back to
    * their default values.
    */
   resetToDefaults: 'Reset to defaults',
   /**
-   * @description A menu command in the Device Mode Toolbar that closes DevTools.
+   * @description A menu command in the device mode toolbar that closes DevTools.
    */
   closeDevtools: 'Close DevTools',
   /**
-   * @description Title of the device selected in the Device Mode Toolbar. The 'response' device is
-   * not a specific phone/tablet model but a virtual device that can change its height and width
-   * dynamically by clicking and dragging the sides. 'Response' refers to response design:
-   * https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
+   * @description Title of the device selected in the device mode toolbar. The responsive device is
+   * not a specific phone or tablet model but a virtual device that can change its height and width
+   * dynamically by clicking and dragging the sides. Responsive refers to responsive design:
+   * https://web.dev/learn/design
    */
   responsive: 'Responsive',
   /**
-   * @description A context menu item in the Device Mode Toolbar that takes the user to a new screen
-   * where they can add/edit/remove custom devices.
+   * @description A context menu item in the device mode toolbar that takes the user to a screen
+   * where they can add, edit, or remove custom devices.
    */
   edit: 'Edit…',
   /**
-   * @description Text describing the current orientation of the phone/device (vs. landscape).
+   * @description Text describing the portrait orientation of the emulated device.
    */
   portrait: 'Portrait',
   /**
-   * @description Text describing the current orientation of the phone/device (vs. portrait).
+   * @description Text describing the landscape orientation of the emulated device.
    */
   landscape: 'Landscape',
   /**
-   * @description Title of button in the Device Mode Toolbar which rotates the device 90 degrees.
+   * @description Title of a button in the device mode toolbar which rotates the device 90 degrees.
    */
   rotate: 'Rotate',
   /**
-   * @description Tooltip of the rotate/screen orientation button.
+   * @description Tooltip of the rotate screen orientation button.
    */
   screenOrientationOptions: 'Screen orientation options',
   /**
-   * @description Tooltip shown on the rotate button when screen orientation is locked by the page
-   * via screen.orientation.lock().
+   * @description Tooltip shown on the rotate button when screen orientation is locked by the page.
    */
   screenOrientationLocked: 'Screen orientation is locked by the page',
   /**
-   * @description Tooltip for a button which turns on/off dual-screen mode, which emulates devices
-   * like tablets which have two screens.
+   * @description Tooltip for a button which toggles dual-screen mode to emulate devices with two screens.
    */
   toggleDualscreenMode: 'Toggle dual-screen mode',
   /**
-   * @description Tooltip tip for a drop-down menu where the user can select the device
-   * posture e.g. Continuous, Folded.
+   * @description Tooltip for a drop-down menu where the user can select the device
+   * posture (e.g. Continuous or Folded).
    */
   devicePosture: 'Device posture',
   /**
-   * @description Title of the network throttling selection in the Device Mode Toolbar.
+   * @description Title of the network throttling selection in the device mode toolbar.
    */
   throttling: 'Throttling',
 } as const;
@@ -236,13 +220,17 @@ const str_ = i18n.i18n.registerUIStrings('panels/emulation/DeviceModeToolbar.ts'
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {ifDefined, live} = Directives;
 const {widget} = UI.Widget;
-const {bindToSetting} = UI.UIUtils;
 
 export interface DeviceModeOption {
   device: EmulationModel.EmulatedDevices.EmulatedDevice;
   title: string;
   selected: boolean;
   jslogContext: string;
+}
+
+export interface DeviceGroup {
+  category: EmulationModel.EmulatedDevices.Category;
+  options: DeviceModeOption[];
 }
 
 export interface ViewInput {
@@ -257,7 +245,7 @@ export interface ViewInput {
   showPostureItem: boolean;
   deviceModeOptions: {
     responsive: {title: string, selected: boolean, jslogContext: string},
-    standard: DeviceModeOption[],
+    standard: DeviceGroup[],
     custom: DeviceModeOption[],
     edit: {title: string, jslogContext: string},
   };
@@ -333,11 +321,11 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
           <option value="Responsive" ?selected=${input.deviceModeOptions.responsive.selected} jslog=${VisualLogging.item(input.deviceModeOptions.responsive.jslogContext).track({click: true})}>
             ${input.deviceModeOptions.responsive.title}
           </option>
-          ${input.deviceModeOptions.standard.length > 0 ? html`
-            <optgroup label="Standard">
-              ${input.deviceModeOptions.standard.map(o => html`<option value=${o.title} ?selected=${o.selected} jslog=${VisualLogging.item(o.jslogContext).track({click: true})}>${o.title}</option>`)}
+          ${input.deviceModeOptions.standard.map(group => html`
+            <optgroup label=${EmulationModel.EmulatedDevices.getCategoryTitle(group.category)}>
+              ${group.options.map(o => html`<option value=${o.title} ?selected=${o.selected} jslog=${VisualLogging.item(o.jslogContext).track({click: true})}>${o.title}</option>`)}
             </optgroup>
-          ` : ''}
+          `)}
           ${input.deviceModeOptions.custom.length > 0 ? html`
             <optgroup label="Custom">
               ${input.deviceModeOptions.custom.map(o => html`<option value=${o.title} ?selected=${o.selected} jslog=${VisualLogging.item(o.jslogContext).track({click: true})}>${o.title}</option>`)}
@@ -359,16 +347,10 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
               title=${i18nString(UIStrings.zoom)}
               aria-label=${i18nString(UIStrings.zoom)}
               @change=${input.onScaleChange}
-              .value=${String(input.scaleOptions.find(o => o.selected)?.value || '')}
+              .value=${String(input.scaleOptions.find(o => o.selected)?.value ?? '')}
               jslog=${VisualLogging.dropDown().track({change: true}).context('scale')}>
         ${input.scaleOptions.map(o => html`<option value=${o.value} ?selected=${o.selected} jslog=${VisualLogging.item(o.jslogContext).track({click: true})}>${o.title}</option>`)}
       </select>
-
-      <devtools-button .data=${{variant: Buttons.Button.Variant.TOOLBAR, iconName: 'center-focus-weak',
-                                toggledIconName: 'center-focus-weak', toggleType: Buttons.Button.ToggleType.PRIMARY} as Buttons.Button.ButtonData}
-                       class="toolbar-button" title=${i18nString(UIStrings.autoadjustZoom)}
-                       ${bindToSetting(input.autoAdjustScaleSetting)}>
-      </devtools-button>
 
       <div class="device-mode-empty-toolbar-element"></div>
 
@@ -381,11 +363,11 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
                     title=${i18nString(UIStrings.devicePixelRatio)}
                     aria-label=${i18nString(UIStrings.devicePixelRatio)}
                     @change=${input.onDeviceScaleChange}
-                    .value=${String(input.dprOptions.find(o => o.selected)?.value || '')}
+                    .value=${String(input.dprOptions.find(o => o.selected)?.value ?? '')}
                     jslog=${VisualLogging.dropDown().track({change: true}).context('device-pixel-ratio')}
                     ?disabled=${!input.isResponsive}>
                 ${input.dprOptions.map(o => html`<option value=${o.value} ?selected=${o.selected} jslog=${VisualLogging.item(o.jslogContext).track({click: true})}>${o.title}</option>`)}
-              </select>`
+              </select>`,
           })}
         </div>` : ''}
 
@@ -449,16 +431,15 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
   `, target, {container: {
       classes: ['device-mode-toolbar'],
       attributes: {jslog: `${VisualLogging.toolbar('device-mode').track({resize: true})}`,
-    }
+    },
   }});
   // clang-format on
 };
 
 export class DeviceModeToolbar extends UI.Widget.Widget {
-  private model: EmulationModel.DeviceModeModel.DeviceModeModel;
+  #model?: EmulationModel.DeviceModeModel.DeviceModeModel;
   private readonly showMediaInspectorSetting: Common.Settings.Setting<boolean>;
   private readonly showRulersSetting: Common.Settings.Setting<boolean>;
-  private readonly deviceOutlineSetting: Common.Settings.Setting<boolean>;
   private readonly showDeviceScaleFactorSetting: Common.Settings.Setting<boolean>;
   private readonly showUserAgentTypeSetting: Common.Settings.Setting<boolean>;
   private autoAdjustScaleSetting: Common.Settings.Setting<boolean>;
@@ -467,17 +448,16 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   private readonly persistenceSetting: Common.Settings.Setting<{device: string, orientation: string, mode: string}>;
   private readonly view: View;
 
-  constructor(
-      model: EmulationModel.DeviceModeModel.DeviceModeModel,
-      showMediaInspectorSetting: Common.Settings.Setting<boolean>, showRulersSetting: Common.Settings.Setting<boolean>,
-      view: View = DEFAULT_VIEW) {
-    super();
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element);
     this.view = view;
-    this.model = model;
-    this.showMediaInspectorSetting = showMediaInspectorSetting;
-    this.showRulersSetting = showRulersSetting;
 
-    this.deviceOutlineSetting = this.model.deviceOutlineSetting();
+    this.showMediaInspectorSetting = Common.Settings.Settings.instance().resolve(
+        SettingsUI.EmulationSettings.showMediaQueryInspectorSettingDescriptor);
+    this.showMediaInspectorSetting.addChangeListener(this.requestUpdate, this);
+    this.showRulersSetting =
+        Common.Settings.Settings.instance().resolve(SettingsUI.EmulationSettings.showRulersSettingDescriptor);
+    this.showRulersSetting.addChangeListener(this.requestUpdate, this);
     this.showDeviceScaleFactorSetting =
         Common.Settings.Settings.instance().createSetting('emulation.show-device-scale-factor', false);
     this.showDeviceScaleFactorSetting.addChangeListener(this.requestUpdate, this);
@@ -488,6 +468,7 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
 
     this.autoAdjustScaleSetting =
         Common.Settings.Settings.instance().createSetting('emulation.auto-adjust-scale', true);
+    this.autoAdjustScaleSetting.addChangeListener(this.requestUpdate, this);
 
     this.lastMode = new Map();
 
@@ -499,17 +480,42 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
 
     this.persistenceSetting = Common.Settings.Settings.instance().createSetting(
         'emulation.device-mode-value', {device: '', orientation: '', mode: ''});
-
-    this.model.toolbarControlsEnabledSetting().addChangeListener(this.requestUpdate, this);
-    this.model.scaleSetting().addChangeListener(this.requestUpdate, this);
-    this.model.uaSetting().addChangeListener(this.requestUpdate, this);
-    this.model.deviceScaleFactorSetting().addChangeListener(this.requestUpdate, this);
-    this.model.addEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.requestUpdate, this);
-
-    this.performUpdate();
   }
 
+  get model(): EmulationModel.DeviceModeModel.DeviceModeModel|undefined {
+    return this.#model;
+  }
+
+  set model(model: EmulationModel.DeviceModeModel.DeviceModeModel) {
+    if (this.#model === model) {
+      return;
+    }
+    if (this.#model) {
+      this.#model.toolbarControlsEnabledSetting().removeChangeListener(this.requestUpdate, this);
+      this.#model.scaleSetting().removeChangeListener(this.requestUpdate, this);
+      this.#model.uaSetting().removeChangeListener(this.requestUpdate, this);
+      this.#model.deviceScaleFactorSetting().removeChangeListener(this.requestUpdate, this);
+      this.#model.removeEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.requestUpdate, this);
+    }
+    this.#model = model;
+    this.#model.toolbarControlsEnabledSetting().addChangeListener(this.requestUpdate, this);
+    this.#model.scaleSetting().addChangeListener(this.requestUpdate, this);
+    this.#model.uaSetting().addChangeListener(this.requestUpdate, this);
+    this.#model.deviceScaleFactorSetting().addChangeListener(this.requestUpdate, this);
+    this.#model.addEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.requestUpdate, this);
+    this.requestUpdate();
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    // TODO(crbug.com/407750803): Revisit once DeviceModeView is migrated.
+    this.performUpdate();  // Trigger a manual update eagerly, DeviceModeView needs to measure our height.
+    this.restore();
+  }
   override performUpdate(): void {
+    if (!this.model) {
+      return;
+    }
     const isResponsive = this.model.type() === EmulationModel.DeviceModeModel.Type.Responsive;
     const isFullHeight = isResponsive && this.model.isFullHeight();
     const size = this.model.appliedDeviceSize();
@@ -519,22 +525,24 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
 
     const device = this.model.device();
 
-    if (this.model.type() === EmulationModel.DeviceModeModel.Type.Device && device) {
-      this.lastMode.set(device, (this.model.mode() as EmulationModel.EmulatedDevices.Mode));
-    }
+    if (this.model.type() !== EmulationModel.DeviceModeModel.Type.None) {
+      if (this.model.type() === EmulationModel.DeviceModeModel.Type.Device && device) {
+        this.lastMode.set(device, (this.model.mode() as EmulationModel.EmulatedDevices.Mode));
+      }
 
-    const value = this.persistenceSetting.get();
-    const currentMode = this.model.mode();
-    if (device) {
-      value.device = device.title;
-      value.orientation = currentMode ? currentMode.orientation : '';
-      value.mode = currentMode ? currentMode.title : '';
-    } else {
-      value.device = '';
-      value.orientation = '';
-      value.mode = '';
+      const value = this.persistenceSetting.get();
+      const currentMode = this.model.mode();
+      if (device) {
+        value.device = device.title;
+        value.orientation = currentMode ? currentMode.orientation : '';
+        value.mode = currentMode ? currentMode.title : '';
+      } else {
+        value.device = '';
+        value.orientation = '';
+        value.mode = '';
+      }
+      this.persistenceSetting.set(value);
     }
-    this.persistenceSetting.set(value);
 
     let modeButtonTitle = i18nString(UIStrings.rotate);
     let modeButtonDisabled = false;
@@ -561,9 +569,10 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
     const uaOptions = this.getUserAgentOptions();
     const postureOptions = this.getDevicePostureOptions();
 
+    const standardOptions = deviceModeOptions.standard.flatMap(g => g.options);
     const selectedDeviceOption = [
       deviceModeOptions.responsive,
-      ...deviceModeOptions.standard,
+      ...standardOptions,
       ...deviceModeOptions.custom,
     ].find(o => o.selected);
     const deviceText = selectedDeviceOption ? selectedDeviceOption.title : deviceModeOptions.responsive.title;
@@ -609,17 +618,17 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
       onWidthChange: (event: Event) => {
         const width = Number((event.target as HTMLInputElement).value);
         if (this.autoAdjustScaleSetting.get()) {
-          this.model.setWidthAndScaleToFit(width);
+          this.model?.setWidthAndScaleToFit(width);
         } else {
-          this.model.setWidth(width);
+          this.model?.setWidth(width);
         }
       },
       onHeightChange: (event: Event) => {
         const height = Number((event.target as HTMLInputElement).value);
         if (this.autoAdjustScaleSetting.get()) {
-          this.model.setHeightAndScaleToFit(height);
+          this.model?.setHeightAndScaleToFit(height);
         } else {
-          this.model.setHeight(height);
+          this.model?.setHeight(height);
         }
       },
       onScaleChange: this.onScaleChange.bind(this),
@@ -654,7 +663,7 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private currentDevicePosture(): string {
-    const mode = this.model.mode();
+    const mode = this.model?.mode();
     if (mode &&
         (mode.orientation === EmulationModel.EmulatedDevices.VerticalSpanned ||
          mode.orientation === EmulationModel.EmulatedDevices.HorizontalSpanned)) {
@@ -664,44 +673,67 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private getScaleOptions(): Array<{title: string, value: number, selected: boolean, jslogContext: string}> {
+    if (!this.model) {
+      return [];
+    }
     const values = [0.5, 0.75, 1, 1.25, 1.5, 2];
-    let fitValue: number|null = null;
-    if (this.model.type() === EmulationModel.DeviceModeModel.Type.Device) {
-      fitValue = this.model.fitScale();
-      const fitValuePct = (fitValue * 100).toFixed(0);
-      let found = false;
-      for (let i = 0; i < values.length; ++i) {
-        if ((values[i] * 100).toFixed(0) === fitValuePct) {
-          found = true;
-          values[i] = fitValue;
-          break;
-        }
-      }
-      if (!found) {
-        values.push(fitValue);
-        values.sort((a, b) => a - b);
-      }
+    const isAutoAdjusting = this.autoAdjustScaleSetting.get();
+    const currentScale = this.model.scaleSetting().get();
+
+    if (!isAutoAdjusting && !values.includes(currentScale)) {
+      values.push(currentScale);
+      values.sort((a, b) => a - b);
     }
 
-    const currentScale = this.model.scaleSetting().get();
-    return values.map(value => {
-      let title = (value * 100).toFixed(0) + '%';
-      let jslogContext = title;
-      if (value === fitValue) {
-        title = i18nString(UIStrings.fitToWindowPercentage, {PH1: (value * 100).toFixed(0)});
-        jslogContext = 'fit-to-window';
-      }
-      return {title, value, selected: currentScale === value, jslogContext};
-    });
+    const options: Array<{title: string, value: number, selected: boolean, jslogContext: string}> = [
+      {
+        title: i18nString(UIStrings.fitToWindow),
+        value: 0,
+        selected: isAutoAdjusting,
+        jslogContext: 'fit-to-window',
+      },
+    ];
+
+    for (const value of values) {
+      const title = (value * 100).toFixed(0) + '%';
+      options.push({
+        title,
+        value,
+        selected: !isAutoAdjusting && currentScale === value,
+        jslogContext: title,
+      });
+    }
+    return options;
   }
 
   private onScaleChange(event: Event): void {
+    if (!this.model) {
+      return;
+    }
     const value = Number((event.target as HTMLSelectElement).value);
-    this.model.scaleSetting().set(value);
+    if (value === 0) {
+      this.autoAdjustScaleSetting.set(true);
+      if (this.model.type() === EmulationModel.DeviceModeModel.Type.Responsive) {
+        const appliedSize = this.model.appliedDeviceSize();
+        this.model.setSizeAndScaleToFit(appliedSize.width, appliedSize.height);
+      } else {
+        const device = this.model.device();
+        const mode = this.model.mode();
+        if (device && mode) {
+          this.model.emulate(EmulationModel.DeviceModeModel.Type.Device, device, mode, undefined);
+        }
+      }
+    } else {
+      this.autoAdjustScaleSetting.set(false);
+      this.model.scaleSetting().set(value);
+    }
   }
 
   private getDeviceScaleFactorOptions():
       Array<{title: string, value: number, selected: boolean, jslogContext: string}> {
+    if (!this.model) {
+      return [];
+    }
     const deviceScaleFactorSetting = this.model.deviceScaleFactorSetting();
     const defaultValue = this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.MOBILE ||
             this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH ?
@@ -725,18 +757,21 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
         title,
         value: value === defaultValue ? 0 : value,
         selected: currentDPR === value || (value === defaultValue && currentDPR === 0),
-        jslogContext
+        jslogContext,
       };
     });
   }
 
   private onDeviceScaleChange(event: Event): void {
     const value = Number((event.target as HTMLSelectElement).value);
-    this.model.deviceScaleFactorSetting().set(value);
+    this.model?.deviceScaleFactorSetting().set(value);
   }
 
   private getUserAgentOptions():
       Array<{title: string, value: EmulationModel.DeviceModeModel.UA, selected: boolean, jslogContext: string}> {
+    if (!this.model) {
+      return [];
+    }
     const uaSetting = this.model.uaSetting();
     const currentUserAgent = uaSetting.get();
     return [
@@ -748,21 +783,21 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
             title: value,
             value,
             selected: currentUserAgent === value,
-            jslogContext: Platform.StringUtilities.toKebabCase(value)
+            jslogContext: Platform.StringUtilities.toKebabCase(value),
           }));
   }
 
   private onUAChange(event: Event): void {
     const value = (event.target as HTMLSelectElement).value as EmulationModel.DeviceModeModel.UA;
-    this.model.uaSetting().set(value);
+    this.model?.uaSetting().set(value);
   }
 
   private appendOptionsMenuItems(contextMenu: UI.ContextMenu.ContextMenu): void {
+    if (!this.model) {
+      return;
+    }
     const model = this.model;
-    appendToggleItem(
-        contextMenu.headerSection(), this.deviceOutlineSetting, i18nString(UIStrings.hideDeviceFrame),
-        i18nString(UIStrings.showDeviceFrame), model.type() !== EmulationModel.DeviceModeModel.Type.Device,
-        'device-frame');
+
     appendToggleItem(
         contextMenu.headerSection(), this.showMediaInspectorSetting, i18nString(UIStrings.hideMediaQueries),
         i18nString(UIStrings.showMediaQueries), undefined, 'media-queries');
@@ -791,7 +826,7 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
         disabled = model.type() === EmulationModel.DeviceModeModel.Type.None;
       }
 
-      const isEnabled = setting.get();
+      const isEnabled = Boolean(setting.get() && !disabled);
       const jslogContext = `${context}-${isEnabled ? 'disable' : 'enable'}`;
       section.appendItem(
           isEnabled ? title1 : title2, setting.set.bind(setting, !setting.get()), {disabled, jslogContext});
@@ -799,22 +834,23 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private reset(): void {
-    this.deviceOutlineSetting.set(false);
     this.showDeviceScaleFactorSetting.set(false);
     this.showUserAgentTypeSetting.set(false);
     this.showMediaInspectorSetting.set(false);
     this.showRulersSetting.set(false);
-    this.model.reset();
+    this.model?.reset();
   }
 
   private emulateDevice(device: EmulationModel.EmulatedDevices.EmulatedDevice): void {
-    const scale = this.autoAdjustScaleSetting.get() ? undefined : this.model.scaleSetting().get();
-    this.model.emulate(
-        EmulationModel.DeviceModeModel.Type.Device, device, this.lastMode.get(device) || device.modes[0], scale);
+    if (!this.model) {
+      return;
+    }
+    this.model.emulate(EmulationModel.DeviceModeModel.Type.Device, device,
+                       this.lastMode.get(device) || device.modes[0]);
   }
 
   private switchToResponsive(): void {
-    this.model.emulate(EmulationModel.DeviceModeModel.Type.Responsive, null, null);
+    this.model?.emulate(EmulationModel.DeviceModeModel.Type.Responsive, null, null);
   }
 
   private filterDevices(devices: EmulationModel.EmulatedDevices.EmulatedDevice[]):
@@ -840,42 +876,61 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
 
   private getDeviceModeOptions(): {
     responsive: {title: string, selected: boolean, jslogContext: string},
-    standard: Array<{
-      device: EmulationModel.EmulatedDevices.EmulatedDevice,
-      title: string,
-      selected: boolean,
-      jslogContext: string,
-    }>,
-    custom: Array<{
-      device: EmulationModel.EmulatedDevices.EmulatedDevice,
-      title: string,
-      selected: boolean,
-      jslogContext: string,
-    }>,
+    standard: DeviceGroup[],
+    custom: DeviceModeOption[],
     edit: {title: string, jslogContext: string},
   } {
+    if (!this.model) {
+      return {
+        responsive: {title: i18nString(UIStrings.responsive), selected: false, jslogContext: 'responsive'},
+        standard: [],
+        custom: [],
+        edit: {title: i18nString(UIStrings.edit), jslogContext: 'edit'},
+      };
+    }
+    const currentDevice = this.model.device();
+    const optionsByCategory = new Map<EmulationModel.EmulatedDevices.Category, DeviceModeOption[]>();
+
+    for (const device of this.standardDevices()) {
+      const cat = EmulationModel.EmulatedDevices.deviceCategory(device);
+      let list = optionsByCategory.get(cat);
+      if (!list) {
+        list = [];
+        optionsByCategory.set(cat, list);
+      }
+      list.push({
+        device,
+        title: device.title,
+        selected: currentDevice === device,
+        jslogContext: Platform.StringUtilities.toKebabCase(device.title),
+      });
+    }
+
+    const groupedStandard: DeviceGroup[] = [];
+    for (const category of EmulationModel.EmulatedDevices.CATEGORY_ORDER) {
+      const options = optionsByCategory.get(category);
+      if (options && options.length > 0) {
+        groupedStandard.push({category, options});
+      }
+    }
+
     return {
       responsive: {
         title: i18nString(UIStrings.responsive),
         selected: this.model.type() === EmulationModel.DeviceModeModel.Type.Responsive,
-        jslogContext: 'responsive'
+        jslogContext: 'responsive',
       },
-      standard: this.standardDevices().map(device => ({
-                                             device,
-                                             title: device.title,
-                                             selected: this.model.device() === device,
-                                             jslogContext: Platform.StringUtilities.toKebabCase(device.title)
-                                           })),
+      standard: groupedStandard,
       custom: this.customDevices().map(device => ({
                                          device,
                                          title: device.title,
-                                         selected: this.model.device() === device,
-                                         jslogContext: Platform.StringUtilities.toKebabCase(device.title)
+                                         selected: this.model?.device() === device,
+                                         jslogContext: Platform.StringUtilities.toKebabCase(device.title),
                                        })),
       edit: {
         title: i18nString(UIStrings.edit),
         jslogContext: 'edit',
-      }
+      },
     };
   }
 
@@ -898,6 +953,9 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
 
   private deviceListChanged(): void {
     this.requestUpdate();
+    if (!this.model) {
+      return;
+    }
     const device = this.model.device();
     if (!device) {
       return;
@@ -916,6 +974,9 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private spanClicked(): void {
+    if (!this.model) {
+      return;
+    }
     const device = this.model.device();
 
     if (!device || (!device.isDualScreen && !device.isFoldableScreen)) {
@@ -937,6 +998,9 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private modeMenuClicked(event: Event): void {
+    if (!this.model) {
+      return;
+    }
     if (this.model.isScreenOrientationLocked()) {
       return;
     }
@@ -1014,14 +1078,17 @@ export class DeviceModeToolbar extends UI.Widget.Widget {
   }
 
   private getPrettyFitZoomPercentage(): string {
-    return `${(this.model.fitScale() * 100).toFixed(0)}`;
+    return !this.model ? '' : `${(this.model.fitScale() * 100).toFixed(0)}`;
   }
 
   private getPrettyZoomPercentage(): string {
-    return `${(this.model.scale() * 100).toFixed(0)}`;
+    return !this.model ? '' : `${(this.model.scale() * 100).toFixed(0)}`;
   }
 
-  restore(): void {
+  private restore(): void {
+    if (!this.model) {
+      return;
+    }
     for (const device of this.allDevices()) {
       if (device.title === this.persistenceSetting.get().device) {
         for (const mode of device.modes) {

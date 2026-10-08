@@ -12,11 +12,12 @@ import * as Root from '../../core/root/root.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import type * as Tooltips from '../../ui/components/tooltips/tooltips.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
+import * as Settings from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
-import * as PanelCommon from '../common/common.js';
 
 import consoleInsightTeaserStyles from './consoleInsightTeaser.css.js';
 import {ConsoleViewMessage} from './ConsoleViewMessage.js';
@@ -52,7 +53,7 @@ const UIStringsNotTranslate = {
    * @description Explainer for which data is being sent by the console insights feature
    */
   consoleInsightsSendsDataNoLogging:
-      'To generate explanations, the console message, associated stack trace, related source code, and the associated network headers are sent to Google. This data will not be used to improve Google’s AI models. Your organization may change these settings at any time.',
+      'To generate explanations, the console message, associated stack trace, related source code, and the associated network headers are sent to Google. This data won’t be used to improve Google’s AI models. Your organization may change these settings at any time.',
   /**
    * @description Third item in the first-run experience dialog
    */
@@ -101,7 +102,7 @@ const UIStringsNotTranslate = {
   /**
    * @description Call to action for downloading an AI model
    */
-  toUseDownload: 'To use Chrome’s Built-in AI here and elsewhere, download the AI model (~4 GB).',
+  toUseDownload: 'To use Chrome’s Built-in AI here and elsewhere, download the AI model (~4 GB)',
   /**
    * @description Button text to trigger model download
    */
@@ -409,7 +410,8 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
   #isSlow = false;
   #timeoutId: ReturnType<typeof setTimeout>|null = null;
   #aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
-  #boundOnAidaAvailabilityChange: () => Promise<void>;
+  #boundOnAidaAvailabilityChange:
+      (ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>) => void;
   #boundOnDownloadProgressChange: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   #boundOnSessionCreation: () => void;
   #downloadProgress: number|null = null;
@@ -419,7 +421,8 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
   #callShowTooltip = false;
   #startTime = 0;
 
-  constructor(uuid: string, consoleViewMessage: ConsoleViewMessage, element?: HTMLElement, view?: View) {
+  constructor(uuid: string, consoleViewMessage: ConsoleViewMessage, element?: HTMLElement, view?: View,
+              builtInAi: AiAssistanceModel.BuiltInAi.BuiltInAi = AiAssistanceModel.BuiltInAi.BuiltInAi.instance()) {
     super(element);
     this.#view = view ?? DEFAULT_VIEW;
     this.#uuid = uuid;
@@ -429,30 +432,33 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
     this.#boundOnAidaAvailabilityChange = this.#onAidaAvailabilityChange.bind(this);
     this.#boundOnDownloadProgressChange = this.#onDownloadProgressChange.bind(this);
     this.#boundOnSessionCreation = this.#onSessionCreation.bind(this);
-    this.#builtInAi = AiAssistanceModel.BuiltInAi.BuiltInAi.instance();
+    this.#builtInAi = builtInAi;
     this.#state = this.#builtInAi.hasSession() ? State.READY : State.NO_MODEL;
     this.#callShowTooltip = true;
     this.requestUpdate();
   }
 
-  #getConsoleInsightsEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
-    try {
-      return Common.Settings.moduleSetting('console-insights-enabled') as Common.Settings.Setting<boolean>;
-    } catch {
-      return;
-    }
+  #getConsoleInsightsEnabledSetting(): AiAssistanceModel.AiSetting.AiSetting<boolean> {
+    return new AiAssistanceModel.AiSetting.AiSetting(
+        AiAssistanceModel.AiUtils.consoleInsightsEnabledSettingDescriptor,
+        Host.AidaClient.HostConfigTracker.instance(),
+        Common.Settings.Settings.instance(),
+    );
   }
 
   #getOnboardingCompletedSetting(): Common.Settings.Setting<boolean> {
     return Common.Settings.Settings.instance().createLocalSetting('console-insights-onboarding-finished', true);
   }
 
-  async #onAidaAvailabilityChange(): Promise<void> {
-    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
-    if (currentAidaAvailability !== this.#aidaAvailability) {
-      this.#aidaAvailability = currentAidaAvailability;
+  #updateAidaAvailability(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): void {
+    if (aidaAvailability !== this.#aidaAvailability) {
+      this.#aidaAvailability = aidaAvailability;
       this.requestUpdate();
     }
+  }
+
+  #onAidaAvailabilityChange(ev: Common.EventTarget.EventTargetEvent<Host.AidaClient.AidaAccessPreconditions>): void {
+    this.#updateAidaAvailability(ev.data);
   }
 
   #executeConsoleInsightAction(): void {
@@ -463,8 +469,7 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
 
   #onTellMeMoreClick(event: Event): void {
     event.stopPropagation();
-    if (this.#getConsoleInsightsEnabledSetting()?.getIfNotDisabled() &&
-        this.#getOnboardingCompletedSetting()?.getIfNotDisabled()) {
+    if (this.#getConsoleInsightsEnabledSetting()?.getIfNotDisabled() && this.#getOnboardingCompletedSetting()?.get()) {
       this.#executeConsoleInsightAction();
       return;
     }
@@ -496,7 +501,7 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
     const noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
     const iconName = AiAssistanceModel.AiUtils.getIconName();
-    const result = await PanelCommon.FreDialog.show({
+    const result = await Dialogs.FreDialog.FreDialog.show({
       header: {iconName, text: lockedString(UIStringsNotTranslate.freDisclaimerHeader)},
       reminderItems: [
         {
@@ -517,7 +522,7 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
             jslogcontext="explain.teaser.code-snippets-explainer"
           >${lockedString(UIStringsNotTranslate.freDisclaimerTextUseWithCaution)}</devtools-link>`,
           // clang-format on
-        }
+        },
       ],
       onLearnMoreClick: () => {
         void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
@@ -536,7 +541,9 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
   maybeGenerateTeaser(): void {
     const startGeneratingTeaser = (): void => {
       if (!this.#isInactive &&
-          Common.Settings.Settings.instance().moduleSetting('console-insight-teasers-enabled').get()) {
+          Common.Settings.Settings.instance()
+              .resolve(Settings.ConsoleSettings.consoleInsightTeasersEnabledSettingDescriptor)
+              .get()) {
         void this.#generateTeaserText();
       }
     };
@@ -682,7 +689,9 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
 
   #dontShowChanged(e: Event): void {
     const showTeasers = !(e.target as HTMLInputElement).checked;
-    Common.Settings.Settings.instance().moduleSetting('console-insight-teasers-enabled').set(showTeasers);
+    Common.Settings.Settings.instance()
+        .resolve(Settings.ConsoleSettings.consoleInsightTeasersEnabledSettingDescriptor)
+        .set(showTeasers);
   }
 
   #hasTellMeMoreButton(): boolean {
@@ -700,23 +709,24 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
 
   override performUpdate(): Promise<void>|void {
     const output: ViewOutput = {};
-    this.#view(
-        {
-          onTellMeMoreClick: this.#onTellMeMoreClick.bind(this),
-          uuid: this.#uuid,
-          headerText: this.#headerText,
-          mainText: this.#mainText,
-          isInactive: this.#isInactive ||
-              !Common.Settings.Settings.instance().moduleSetting('console-insight-teasers-enabled').get(),
-          dontShowChanged: this.#dontShowChanged.bind(this),
-          hasTellMeMoreButton: this.#hasTellMeMoreButton(),
-          isSlowGeneration: this.#isSlow,
-          onDownloadModelClick: this.#onDownloadModelClick.bind(this),
-          downloadProgress: this.#downloadProgress,
-          state: this.#state,
-          isForWarning: this.#isForWarning,
-        },
-        output, this.contentElement);
+    this.#view({
+      onTellMeMoreClick: this.#onTellMeMoreClick.bind(this),
+      uuid: this.#uuid,
+      headerText: this.#headerText,
+      mainText: this.#mainText,
+      isInactive: this.#isInactive ||
+          !Common.Settings.Settings.instance()
+               .resolve(Settings.ConsoleSettings.consoleInsightTeasersEnabledSettingDescriptor)
+               .get(),
+      dontShowChanged: this.#dontShowChanged.bind(this),
+      hasTellMeMoreButton: this.#hasTellMeMoreButton(),
+      isSlowGeneration: this.#isSlow,
+      onDownloadModelClick: this.#onDownloadModelClick.bind(this),
+      downloadProgress: this.#downloadProgress,
+      state: this.#state,
+      isForWarning: this.#isForWarning,
+    },
+               output, this.contentElement);
     if (this.#callShowTooltip && output.tooltip?.hasAttribute('popover')) {
       // The ConsoleInsightTeaser is created on hover, which means the tooltip's
       // event listener is created after the hover event is received. We therefore
@@ -730,7 +740,10 @@ export class ConsoleInsightTeaser extends UI.Widget.Widget {
     super.wasShown();
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
-    void this.#onAidaAvailabilityChange();
+    const initialAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (initialAvailability !== undefined) {
+      this.#updateAidaAvailability(initialAvailability);
+    }
   }
 
   override willHide(): void {

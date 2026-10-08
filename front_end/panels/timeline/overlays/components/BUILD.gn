@@ -24,7 +24,7 @@ devtools_ui_module("components") {
     "TimespanBreakdownOverlay.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/host:bundle",
     "../../../../core/i18n:bundle",
@@ -32,8 +32,8 @@ devtools_ui_module("components") {
     "../../../../core/root:bundle",
     "../../../../models/ai_assistance:bundle",
     "../../../../models/trace:bundle",
-    "../../../../panels/common:bundle",
     "../../../../ui/components/buttons:bundle",
+    "../../../../ui/components/dialogs:bundle",
     "../../../../ui/components/helpers:bundle",
     "../../../../ui/components/spinners:bundle",
     "../../../../ui/components/tooltips:bundle",
@@ -44,15 +44,13 @@ devtools_ui_module("components") {
     "../../../../ui/lit:bundle",
     "../../../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "components.ts"
 
-  deps = [
-    ":components",
-    ":css_files",
-  ]
+  ts_deps = [ ":components" ]
 
   visibility = [
     ":*",
@@ -65,9 +63,12 @@ devtools_entrypoint("bundle") {
 devtools_ui_module("unittests") {
   testonly = true
 
-  sources = [ "TimespanBreakdownOverlay.test.ts" ]
+  sources = [
+    "TimeRangeOverlay.test.ts",
+    "TimespanBreakdownOverlay.test.ts",
+  ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../../models/trace:bundle",
     "../../../../testing",

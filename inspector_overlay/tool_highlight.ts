@@ -20,6 +20,7 @@ import {
   type PathCommands,
   type ResetData,
 } from './common.js';
+import {type AnchorHighlight, drawAnchorHighlight} from './highlight_anchor.js';
 import {drawPath, emptyBounds, formatColor, formatRgba, type PathBounds} from './highlight_common.js';
 import {type ContainerQueryHighlight, drawContainerQueryHighlight} from './highlight_container_query.js';
 import {
@@ -87,6 +88,7 @@ interface Highlight {
   flexItemInfo: FlexItemHighlight[];
   containerQueryInfo: ContainerQueryHighlight[];
   isolatedElementInfo: IsolatedElementHighlight[];
+  imcbInfo?: AnchorHighlight[];
 }
 
 export class HighlightOverlay extends Overlay {
@@ -94,7 +96,7 @@ export class HighlightOverlay extends Overlay {
   private persistentOverlay?: PersistentOverlay;
   private gridLabelState = {gridLayerCounter: 0};
 
-  override reset(resetData: ResetData) {
+  override reset(resetData: ResetData): void {
     super.reset(resetData);
     this.tooltip.innerHTML = '';
     this.gridLabelState.gridLayerCounter = 0;
@@ -103,7 +105,7 @@ export class HighlightOverlay extends Overlay {
     }
   }
 
-  override install() {
+  override install(): void {
     this.document.body.classList.add('fill');
 
     const canvas = this.document.createElement('canvas');
@@ -125,14 +127,14 @@ export class HighlightOverlay extends Overlay {
     super.install();
   }
 
-  override uninstall() {
+  override uninstall(): void {
     this.document.body.classList.remove('fill');
     this.document.body.innerHTML = '';
 
     super.uninstall();
   }
 
-  drawHighlight(highlight: Highlight) {
+  drawHighlight(highlight: Highlight): {bounds: PathBounds} {
     this.context.save();
 
     const bounds = emptyBounds();
@@ -219,32 +221,38 @@ export class HighlightOverlay extends Overlay {
         drawLayoutFlexItemHighlight(flexItem, path, this.context, this.emulationScaleFactor);
       }
     }
+
+    if (highlight.imcbInfo) {
+      for (const anchor of highlight.imcbInfo) {
+        drawAnchorHighlight(anchor, this.context, this.emulationScaleFactor, this.canvasWidth, this.canvasHeight);
+      }
+    }
     this.context.restore();
 
     return {bounds};
   }
 
-  drawGridHighlight(highlight: GridHighlight) {
+  drawGridHighlight(highlight: GridHighlight): void {
     if (this.persistentOverlay) {
       this.persistentOverlay.drawGridHighlight(highlight);
     }
   }
 
-  drawFlexContainerHighlight(highlight: FlexContainerHighlight) {
+  drawFlexContainerHighlight(highlight: FlexContainerHighlight): void {
     if (this.persistentOverlay) {
       this.persistentOverlay.drawFlexContainerHighlight(highlight);
     }
   }
 
-  drawScrollSnapHighlight(highlight: ScrollSnapHighlight) {
+  drawScrollSnapHighlight(highlight: ScrollSnapHighlight): void {
     this.persistentOverlay?.drawScrollSnapHighlight(highlight);
   }
 
-  drawContainerQueryHighlight(highlight: ContainerQueryHighlight) {
+  drawContainerQueryHighlight(highlight: ContainerQueryHighlight): void {
     this.persistentOverlay?.drawContainerQueryHighlight(highlight);
   }
 
-  drawIsolatedElementHighlight(highlight: IsolatedElementHighlight) {
+  drawIsolatedElementHighlight(highlight: IsolatedElementHighlight): void {
     this.persistentOverlay?.drawIsolatedElementHighlight(highlight);
   }
 

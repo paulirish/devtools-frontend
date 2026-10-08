@@ -4,18 +4,19 @@
 
 import {assert} from 'chai';
 
-import type {RecursivePartial} from '../../../core/platform/TypescriptUtilities.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as Protocol from '../../../generated/protocol.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightSetOrError, processTrace} from '../../../testing/InsightHelpers.js';
-import {microsecondsTraceWindow} from '../../../testing/TraceHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
+import {microsecondsTraceWindow} from '../../../testing/TraceHelpersCore.js';
 import type * as Types from '../types/types.js';
 
 import * as Insights from './insights.js';
 
 const {calculateMetricWeightsForSorting, estimateCompressedContentSize} = Insights.Common;
 
-describeWithEnvironment('Common', function() {
+describe('Common', function() {
+  setupLocaleHooks();
   describe('calculateMetricWeightsForSorting', () => {
     async function process(testContext: Mocha.Suite|Mocha.Context, traceFile: string) {
       const {data, insights, metadata} = await processTrace(testContext, traceFile);
@@ -65,14 +66,14 @@ describeWithEnvironment('Common', function() {
                           resourceSize?: number,
                           responseHeaders?: Array<{name: string, value: string}>,
                         }): Types.Events.SyntheticNetworkRequest => {
-      const request: RecursivePartial<Types.Events.SyntheticNetworkRequest> = {
+      const request: Platform.TypeScriptUtilities.RecursivePartial<Types.Events.SyntheticNetworkRequest> = {
         args: {
           data: {
             encodedDataLength: partial.transferSize ?? 0,
             decodedBodyLength: partial.resourceSize ?? 0,
             resourceType: partial.resourceType,
             responseHeaders: partial.responseHeaders ?? [],
-          }
+          },
         },
       };
       return request as Types.Events.SyntheticNetworkRequest;
@@ -134,7 +135,7 @@ describeWithEnvironment('Common', function() {
             label: 'test',
             showDuration: true,
           }];
-        }
+        },
       } as unknown as Insights.Types.InsightModel;
       const bounds = Insights.Common.insightBounds(fakeInsight, INSIGHT_SET_BOUNDS);
       assert.deepEqual(bounds, microsecondsTraceWindow(100, 500));
@@ -155,9 +156,9 @@ describeWithEnvironment('Common', function() {
               bounds: microsecondsTraceWindow(50, 400),
               label: 'test',
               showDuration: true,
-            }
+            },
           ];
-        }
+        },
       } as unknown as Insights.Types.InsightModel;
       const bounds = Insights.Common.insightBounds(fakeInsight, INSIGHT_SET_BOUNDS);
       assert.deepEqual(bounds, microsecondsTraceWindow(50, 500));
@@ -167,7 +168,7 @@ describeWithEnvironment('Common', function() {
       const fakeInsight = {
         createOverlays(): Types.Overlays.Overlay[] {
           return [];
-        }
+        },
       } as unknown as Insights.Types.InsightModel;
       const bounds = Insights.Common.insightBounds(fakeInsight, INSIGHT_SET_BOUNDS);
       assert.deepEqual(bounds, INSIGHT_SET_BOUNDS);

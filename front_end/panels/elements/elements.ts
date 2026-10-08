@@ -5,11 +5,12 @@
 import './InspectElementModeController.js';
 import './ColorSwatchPopoverIcon.js';
 import './DOMPath.js';
+import './DOMTreeContextMenu.js';
 import './ElementsSidebarPane.js';
 import './ElementsTreeElement.js';
 import './AdoptedStyleSheetTreeElement.js';
 import './TopLayerContainer.js';
-import './ElementsTreeOutline.js';
+import './DOMTreeWidget.js';
 import './ImagePreviewPopover.js';
 import './EventListenersWidget.js';
 import './MarkerDecorator.js';
@@ -23,6 +24,7 @@ import './StylesAiCodeCompletionProvider.js';
 import './StylePropertyTreeElement.js';
 import './ComputedStyleWidget.js';
 import './CSSRuleValidator.js';
+import './CSSSpecificityBreakdown.js';
 import './ElementsPanel.js';
 import './ClassesPaneWidget.js';
 import './ElementStatePaneWidget.js';
@@ -36,14 +38,15 @@ import * as ClassesPaneWidget from './ClassesPaneWidget.js';
 import * as ColorSwatchPopoverIcon from './ColorSwatchPopoverIcon.js';
 import * as ComputedStyleWidget from './ComputedStyleWidget.js';
 import * as CSSRuleValidator from './CSSRuleValidator.js';
+import * as CSSSpecificityBreakdown from './CSSSpecificityBreakdown.js';
 import * as CSSValueTraceView from './CSSValueTraceView.js';
 import * as DOMPath from './DOMPath.js';
+import * as DOMTreeContextMenu from './DOMTreeContextMenu.js';
+import * as DOMTreeWidget from './DOMTreeWidget.js';
 import * as ElementsPanel from './ElementsPanel.js';
 import * as ElementsSidebarPane from './ElementsSidebarPane.js';
 import * as ElementStatePaneWidget from './ElementStatePaneWidget.js';
 import * as ElementsTreeElement from './ElementsTreeElement.js';
-import * as ElementsTreeOutline from './ElementsTreeOutline.js';
-import * as ElementsTreeOutlineRenderer from './ElementsTreeOutlineRenderer.js';
 import * as EventListenersWidget from './EventListenersWidget.js';
 import * as ImagePreviewPopover from './ImagePreviewPopover.js';
 import * as InspectElementModeController from './InspectElementModeController.js';
@@ -73,14 +76,15 @@ export {
   ColorSwatchPopoverIcon,
   ComputedStyleWidget,
   CSSRuleValidator,
+  CSSSpecificityBreakdown,
   CSSValueTraceView,
   DOMPath,
+  DOMTreeContextMenu,
+  DOMTreeWidget,
   ElementsPanel,
   ElementsSidebarPane,
   ElementStatePaneWidget,
   ElementsTreeElement,
-  ElementsTreeOutline,
-  ElementsTreeOutlineRenderer,
   EventListenersWidget,
   ImagePreviewPopover,
   InspectElementModeController,

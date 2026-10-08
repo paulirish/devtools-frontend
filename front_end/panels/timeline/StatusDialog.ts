@@ -6,7 +6,7 @@ import '../../ui/legacy/legacy.js';
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Trace from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
@@ -19,26 +19,25 @@ import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 
 const UIStrings = {
   /**
-   * @description Text to download the trace file after an error
+   * @description Button label to download the trace file after an error in the status dialog.
    */
   downloadAfterError: 'Download trace',
   /**
-   * @description Text for the status of something
+   * @description Label for the status field in the status dialog.
    */
   status: 'Status',
   /**
-   * @description Text that refers to the time
+   * @description Label for the elapsed time field in the status dialog.
    */
   time: 'Time',
   /**
-   * @description Text for the description of something
+   * @description Label for the description field in the status dialog.
    */
   description: 'Description',
   /**
-   * @description Text of an item that stops the running task
+   * @description Button label to stop recording in the status dialog.
    */
   stop: 'Stop',
-
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/StatusDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);

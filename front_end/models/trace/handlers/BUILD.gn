@@ -7,12 +7,11 @@ import("../../../../scripts/build/ninja/devtools_module.gni")
 import("../../../../scripts/build/typescript/typescript.gni")
 import("../../visibility.gni")
 
-devtools_module("handlers") {
+devtools_foundation_module("handlers") {
   sources = [
     "AnimationFramesHandler.ts",
     "AnimationHandler.ts",
     "AsyncJSCallsHandler.ts",
-    "AuctionWorkletsHandler.ts",
     "DOMStatsHandler.ts",
     "ExtensionTraceDataHandler.ts",
     "FlowsHandler.ts",
@@ -45,7 +44,7 @@ devtools_module("handlers") {
     "types.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/platform:bundle",
     "../../../core/sdk:bundle",
@@ -59,7 +58,7 @@ devtools_module("handlers") {
 
 devtools_entrypoint("bundle") {
   entrypoint = "handlers.ts"
-  deps = [ ":handlers" ]
+  ts_deps = [ ":handlers" ]
   visibility = [
     ":*",
     "../*",
@@ -68,14 +67,13 @@ devtools_entrypoint("bundle") {
   visibility += devtools_models_visibility
 }
 
-ts_library("unittests") {
+devtools_foundation_module("foundation_unittests") {
   testonly = true
 
   sources = [
     "AnimationFramesHandler.test.ts",
     "AnimationHandler.test.ts",
     "AsyncJSCallsHandler.test.ts",
-    "AuctionWorkletsHandler.test.ts",
     "DOMStatsHandler.test.ts",
     "ExtensionTraceDataHandler.test.ts",
     "FlowsHandler.test.ts",
@@ -106,7 +104,7 @@ ts_library("unittests") {
     "helpers.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../core/sdk:bundle",
     "../../../generated",
     "../../../models/trace:bundle",

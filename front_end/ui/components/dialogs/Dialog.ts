@@ -19,7 +19,7 @@ const {html} = Lit;
 const UIStrings = {
 
   /**
-   * @description Title of close button for the shortcuts dialog.
+   * @description Title of the close button in a dialog.
    */
   close: 'Close',
 } as const;
@@ -51,7 +51,7 @@ export const DIALOG_VERTICAL_PADDING = 3;
  * remain clearly visible. This constant accounts for the padding of the dialog's
  * content (20 px) and a 5px gap left on each extreme of the dialog from the viewport.
  **/
-export const DIALOG_PADDING_FROM_WINDOW = 3 * CONNECTOR_HEIGHT;
+export const DIALOG_PADDING_FROM_WINDOW: number = 3 * CONNECTOR_HEIGHT;
 interface DialogData {
   /**
    * Position or point the dialog is shown relative to.
@@ -118,6 +118,9 @@ type DialogAnchor = HTMLElement|DOMRect|DOMPoint;
 export const MODAL = 'MODAL';
 
 export type DialogOrigin = DialogAnchor|null|(() => DialogAnchor)|typeof MODAL;
+/**
+ * @deprecated in favor of UI.Dialog.Dialog.
+ */
 export class Dialog extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #forceDialogCloseInDevToolsBound = this.#forceDialogCloseInDevToolsMutation.bind(this);
@@ -773,7 +776,7 @@ export const enum DialogVerticalPosition {
 export const enum DialogState {
   EXPANDED = 'expanded',
   COLLAPSED = 'collapsed',
-  DISABLED = 'disabled'
+  DISABLED = 'disabled',
 }
 
 export const enum DialogHorizontalAlignment {

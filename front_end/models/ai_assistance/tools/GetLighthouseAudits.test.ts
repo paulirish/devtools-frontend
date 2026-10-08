@@ -1,0 +1,105 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import {assert} from 'chai';
+
+import {assertIsError, assertIsResult} from '../../../testing/AiAssistanceHelpers.js';
+import type * as LHModel from '../../lighthouse/lighthouse.js';
+import * as AiAssistance from '../ai_assistance.js';
+
+describe('GetLighthouseAuditsTool', () => {
+  const mockReport = {
+    finalDisplayedUrl: 'https://example.com',
+    categories: {
+      accessibility: {
+        title: 'Accessibility',
+        score: 0.8,
+        auditRefs: [{id: 'color-contrast', weight: 1}],
+      },
+    },
+    audits: {
+      'color-contrast': {
+        id: 'color-contrast',
+        score: 0,
+        title: 'Low contrast',
+        description: 'Fix color contrast.',
+        details: {type: 'opportunity', items: []},
+      },
+    },
+  } as unknown as LHModel.ReporterTypes.ReportJSON;
+
+  const tool = new AiAssistance.GetLighthouseAudits.GetLighthouseAuditsTool();
+  const context: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseReportCapability = {
+    getLighthouseReport: () => mockReport,
+  };
+
+  it('returns formatted audits for a given category', async () => {
+    const result = await tool.handler({categoryId: 'accessibility'}, context);
+    assertIsResult(result);
+    assert.include(result.result.audits, '# Audits for Accessibility');
+    assert.include(result.result.audits, 'Low contrast');
+    assert.include(result.result.audits, '- **Low contrast**: 0');
+    assert.isUndefined(result.widgets);
+  });
+
+  it('returns error when Lighthouse report is not available', async () => {
+    const invalidContext: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseReportCapability = {
+      getLighthouseReport: () => null,
+    };
+    const result = await tool.handler({categoryId: 'accessibility'}, invalidContext);
+    assertIsError(result);
+    assert.strictEqual(result.error, 'Error: Active context is not a Lighthouse report.');
+  });
+
+  it('returns category not found message when category does not exist', async () => {
+    const result = await tool.handler({categoryId: 'performance'}, context);
+    assertIsResult(result);
+    assert.strictEqual(result.result.audits, 'Category "performance" not found.');
+  });
+
+  it('returns audits for all categories without the summary when categoryId is "all"', async () => {
+    const multiCategoryReport = {
+      finalDisplayedUrl: 'https://example.com',
+      categories: {
+        accessibility: {
+          title: 'Accessibility',
+          score: 0.8,
+          auditRefs: [{id: 'color-contrast', weight: 1}],
+        },
+        performance: {
+          title: 'Performance',
+          score: 0.9,
+          auditRefs: [{id: 'first-contentful-paint', weight: 1}],
+        },
+      },
+      audits: {
+        'color-contrast': {
+          id: 'color-contrast',
+          score: 0,
+          title: 'Low contrast',
+          description: 'Fix color contrast.',
+          details: {type: 'opportunity', items: []},
+        },
+        'first-contentful-paint': {
+          id: 'first-contentful-paint',
+          score: 0.5,
+          title: 'First Contentful Paint',
+          description: 'Keep FCP fast.',
+          details: {type: 'opportunity', items: []},
+        },
+      },
+    } as unknown as LHModel.ReporterTypes.ReportJSON;
+    const multiCategoryContext: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseReportCapability = {
+      getLighthouseReport: () => multiCategoryReport,
+    };
+
+    const result = await tool.handler({categoryId: 'all'}, multiCategoryContext);
+    assertIsResult(result);
+    assert.notInclude(result.result.audits, '# Lighthouse Report Summary');
+    assert.notInclude(result.result.audits, '## Category Scores');
+    assert.include(result.result.audits, '# Audits for Accessibility');
+    assert.include(result.result.audits, '# Audits for Performance');
+    assert.isUndefined(result.widgets);
+  });
+});

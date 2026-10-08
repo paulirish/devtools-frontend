@@ -13,12 +13,12 @@ import type {ResourcesPanel} from './ResourcesPanel.js';
 
 const UIStrings = {
   /**
-   * @description Hover text for the Bounce Tracking Mitigations element in the Application Panel sidebar.
+   * @description Label for the bounce tracking mitigations tree element in the Application panel sidebar.
    */
   bounceTrackingMitigations: 'Bounce tracking mitigations',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/BounceTrackingMitigationsTreeElement.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class BounceTrackingMitigationsTreeElement extends ApplicationPanelTreeElement {
   private view?: ApplicationComponents.BounceTrackingMitigationsView.BounceTrackingMitigationsView;

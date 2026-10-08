@@ -58,7 +58,7 @@ code this way.
 To listen to the frontend's console:
 
 ```ts
-getBrowserAndPages().frontend.on('console', msg => console.log(msg.text()));
+devToolsPage.page.on('console', msg => console.log(msg.text()));
 ```
 
 ### Debugging E2E tests with VSCode
@@ -75,101 +75,6 @@ Current limitations when using VSCode for e2e tests:
 - VSCode only attaches to the node portion of the code (mostly the test files
   and the test helpers), not to Chrome.
 - VSCode debugging only works with headless mode.
-
-## Dealing with flaky E2E tests
-
-To skip a flaky E2E test, create a new bug on [crbug.com](https://crbug.com) in the
-`Chromium > Platform > DevTools` component, and modify the `it` or `describe`
-block accordingly by adding `.skip` to it, adding a preceeding comment
-why the test is skipp and adding the `crbug.com` reference to the test
-block string. For example
-
-```ts
-describe('Foo', () => {
-  it('can return bar', () => {
-    assert.strictEqual((new Foo()).bar(), 'bar');
-  });
-
-  ...
-});
-```
-
-would be changed to look like this
-
-```ts
-describe('Foo', () => {
-  // Flaking on multiple bots on CQ after recent CL xyz.
-  it.skip('[crbug.com/12345678] can return bar', () => {
-    assert.strictEqual((new Foo()).bar(), 'bar');
-  });
-
-  ...
-});
-```
-
-if only the one test case should be skipped, or like this
-
-```ts
-// Flaking on multiple bots on CQ after recent CL xyz.
-describe.skip('[crbug.com/12345678] Foo', () => {
-  it('can return bar', () => {
-    assert.strictEqual((new Foo()).bar(), 'bar');
-  });
-
-  ...
-});
-```
-
-if all the tests for `Foo` should be skipped. Note that it is preferable to
-skip individual tests so that test results list the skipped tests, rather than
-skipping groups of tests.
-
-If you are disabling a flaky test, consider disabling it only on the affected
-platforms. For example:
-
-```ts
-// Consistently flakes on Mac and Windows bots.
-it.skipOnPlatforms(['mac', 'win32'], '[crbug.com/xxx] ...', () => {...});
-
-// Skipped on Linux because the world isn't round.
-it.skipOnPlatforms(['linux'], '[crbug.com/xxx] ...', () => {...});
-```
-
-### De-flaking E2E tests
-
-To reproduce a flaky test locally, mark the test with `it.only` and use the `--repeat=X` command line flag:
-
-```sh
-npm run test -- --repeat=20 test/e2e/sources/navigator-view.test.ts
-```
-
-To see if certain tests are flaky you can use the E2E stressor bots. Open a CL with your test changes and run the following command specifying your test file:
-
-```sh
-git cl try -B devtools-frontend/try -b e2e_stressor_linux -b e2e_stressor_win64 -b e2e_stressor_mac -p runner_args='test/e2e/sources/navigator-view.test.ts --repeat=80'
-```
-
-or multiple test files:
-
-```sh
-git cl try -B devtools-frontend/try -b e2e_stressor_linux -b e2e_stressor_win64 -b e2e_stressor_mac -p runner_args='test/e2e/sources/navigator-view.test.ts test/e2e/sources/snippets.test.ts --repeat=80'
-```
-
-This will run the specified tests on dedicated bots with the specified number of iterations. Note that in order for iterations to work the test should be using `it` from `mocha_extensions.ts`.
-
-The following command runs the stressor bot on all files of the latest commit with reasonable settings:
-
-```sh
-git cl try -B devtools-frontend/try \
-  -b e2e_stressor_linux \
-  -p runner_args="\
-    $(git diff-tree --no-commit-id --name-only HEAD -r | grep test/e2e | grep -v e2e/helpers | cut -c 10- - | tr "\n" " ") \
-    --repeat=20"
-```
-
-> By default, tests are run using the debug build. To run it with the release build, append `-p builder_config=Release` to the end of the command.
-
-Please use a reasonable number of iterations and include the minimal amount of test files to avoid overloading the bots. This bot is experimental and the parameters might change in the future.
 
 ## General implementation details
 

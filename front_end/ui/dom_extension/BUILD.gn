@@ -9,13 +9,13 @@ import("../../../scripts/build/typescript/typescript.gni")
 devtools_module("dom_extension") {
   sources = [ "DOMExtension.ts" ]
 
-  deps = [ "../../core/platform:bundle" ]
+  ts_deps = [ "../../core/platform:bundle" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "dom_extension.ts"
 
-  deps = [ ":dom_extension" ]
+  ts_deps = [ ":dom_extension" ]
 
   visibility = [
     ":*",
@@ -29,7 +29,7 @@ ts_library("unittests") {
 
   sources = [ "DOMExtension.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../testing",
   ]

@@ -7,6 +7,14 @@ import type {ProtocolMapping} from '../../generated/protocol-mapping.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as puppeteer from '../../third_party/puppeteer/puppeteer.js';
 
+// Matches the ProtocolError found in node_modules/puppeteer-core/src/common/Errors.ts
+class ProtocolError extends Error {
+  constructor(message: string, public code?: number, public data?: string) {
+    super(message);
+    this.name = 'ProtocolError';
+  }
+}
+
 /**
  * This class serves as a puppeteer.Connection while sending/receiving CDP messages
  * over DevTools' own SessionRouter.
@@ -16,7 +24,7 @@ import * as puppeteer from '../../third_party/puppeteer/puppeteer.js';
  *
  * Since we see all CDPEvents, we filter out the ones whose session we don't know about.
  */
-class PuppeteerConnectionAdapter extends puppeteer.Connection implements
+export class PuppeteerConnectionAdapter extends puppeteer.Connection implements
     ProtocolClient.CDPConnection.CDPConnectionObserver {
   readonly #connection: ProtocolClient.CDPConnection.CDPConnection;
   readonly #sessionId: Protocol.Target.SessionID;
@@ -25,7 +33,15 @@ class PuppeteerConnectionAdapter extends puppeteer.Connection implements
     // url is an empty string in this case parallel to:
     // https://github.com/puppeteer/puppeteer/blob/f63a123ecef86693e6457b07437a96f108f3e3c5/src/common/BrowserConnector.ts#L72
     // Pass a 'null' transport, it should never actually be used, otherwise we do something wrong overwriting connection.
-    super('', {close: () => undefined} as puppeteer.ConnectionTransport);
+    super(
+        '' /* url */,
+        {close: () => undefined} as puppeteer.ConnectionTransport,
+        undefined /* delay */,
+        undefined /* timeout */,
+        undefined /* rawErrors */,
+        undefined /* idGenerator */,
+        () => undefined /* logger */,
+    );
     this.#connection = connection;
     this.#connection.observe(this);
     this.#sessionId = sessionId;
@@ -41,7 +57,13 @@ class PuppeteerConnectionAdapter extends puppeteer.Connection implements
             method as ProtocolClient.CDPConnection.Command,
             params as ProtocolClient.CDPConnection.CommandParams<ProtocolClient.CDPConnection.Command>,
             sessionId ?? this.#sessionId)
-        .then(response => 'result' in response ? response.result : {});
+        .then(response => {
+          if ('error' in response) {
+            throw new ProtocolError(response.error.message, response.error.code, response.error.data);
+          }
+
+          return response.result;
+        });
   }
 
   onEvent<T extends keyof ProtocolMapping.Events>(event: ProtocolClient.CDPConnection.CDPEvent<T>): void {
@@ -91,8 +113,16 @@ export class PuppeteerConnectionHelper {
         undefined /* process */,
         undefined /* closeCallback */,
         undefined /* targetFilterCallback */,
-        target => isPageTargetCallback((target as puppeteer.Target)._getTargetInfo() as Protocol.Target.TargetInfo),
+        target => isPageTargetCallback(
+            (target as puppeteer.Target)._getTargetInfo() as Protocol.Target.TargetInfo,
+            ),
         false /* waitForInitiallyDiscoveredTargets */,
+        undefined /* networkEnabled */,
+        undefined /* issuesEnabled */,
+        undefined /* handleDevToolsAsPage */,
+        undefined /* blocklist */,
+        undefined /* allowlist */,
+        () => undefined /* logger */,
     );
 
     const [, browser] = await Promise.all([

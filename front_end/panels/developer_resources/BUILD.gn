@@ -21,29 +21,27 @@ devtools_ui_module("developer_resources") {
     "DeveloperResourcesView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
+    "../../core/text_utils:bundle",
     "../../generated",
-    "../../models/text_utils:bundle",
     "../../ui/components/highlighting:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "developer_resources.ts"
 
-  deps = [
-    ":css_files",
-    ":developer_resources",
-  ]
+  ts_deps = [ ":developer_resources" ]
 
   visibility = [
     ":*",
@@ -56,9 +54,11 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "developer_resources-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/i18n:bundle",
+    "../../core/sdk:bundle",
     "../../ui/legacy:bundle",
   ]
 
@@ -73,7 +73,7 @@ devtools_ui_module("unittests") {
     "developer_resources.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",

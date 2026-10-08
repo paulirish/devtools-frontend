@@ -13,6 +13,7 @@ out the individual guides below:
 
 - [Unit Testing Guide](./unit/README.md)
 - [E2E Testing Guide](./e2e/README.md)
+- [API Testing Guide](./api/README.md)
 - [Performance Testing Guide](./perf/README.md)
 
 You can use
@@ -32,6 +33,10 @@ npm test \
 
 The current test status can be seen at the
 [test waterfall](https://ci.chromium.org/p/devtools-frontend/g/main/console).
+
+### Testing guidance
+
+For guidance on choosing the appropriate test suite when writing new tests, see the [Testing Guidance Skill](../.agents/skills/devtools-testing-guidance/SKILL.md).
 
 ### Obtaining code coverage
 
@@ -86,7 +91,7 @@ for more details.
 ## Type checks
 
 The DevTools front-end is written in TypeScript and uses `tsc` (TypeScript Compiler) to check type consistency.
-Unless you specify `devtools_skip_typecheck = true` in your `out/Default/args.gn`, running
+Running
 
 ```bash
 autoninja -C out/Default
@@ -145,6 +150,88 @@ whereas ESLint is configured via a toplevel flat config in [`eslint.config.mjs`]
 
 The custom ESLint rules live in the [`scripts/eslint_rules` directory](../scripts/eslint_rules/) and are used
 to implement checks for DevTools specifics.
+
+## Dealing with flaky tests
+
+To skip a flaky test, create a new bug on [crbug.com](https://crbug.com) in the
+`Chromium > Platform > DevTools` component, and add an entry to the `test/TestExpectations` file.
+For example, to skip the `can return bar` test in `test/e2e/foo.test.ts`, add:
+
+```
+# Flaking on multiple bots on CQ after recent CL xyz.
+crbug.com/12345678 test/e2e/foo.test.ts:Foo:can_return_bar [ Skip ]
+```
+
+If the test is only flaky on specific platforms, you can specify them:
+```
+crbug.com/12345678 [ mac win32 ] test/e2e/foo.test.ts:Foo:can_return_bar [ Skip ]
+```
+
+If you need to skip the entire file:
+```
+crbug.com/12345678 test/e2e/foo.test.ts [ Skip ]
+```
+
+Note that it is preferable to skip individual tests so that test results list the skipped tests, rather than skipping entire files.
+
+Also, when dealing with flaky tests, it is highly recommended to use `[ Pass Failure ]` instead of `[ Skip ]`. `[ Skip ]` is a last resort, as skipped tests won't run at all and will not report coverage. Using `[ Pass Failure ]` allows the test to run and fail without turning the tree red, but still provides signal and coverage.
+
+For example, to mark a test as flaky:
+
+```
+# Flaking on multiple bots on CQ after recent CL xyz.
+crbug.com/12345678 test/e2e/foo.test.ts:Foo:can_return_bar [ Pass Failure ]
+```
+
+### Skip flake detection in CQ
+
+When a test is updated in a CL that is not related to the test's flakiness, the CQ builder might fail in the Flake Detection steps. You can skip Flake Detection for specific tests by adding the `Skip-Flake-Detection` CL footer with the full path to your test. For example: `Skip-Flake-Detection: test/e2e/foo.test.ts`.
+
+If you need to skip multiple tests, you can repeat the footer for each test:
+```
+Skip-Flake-Detection: test/e2e/foo.test.ts
+Skip-Flake-Detection: test/e2e/bar.test.ts
+```
+
+You can also skip Flake Detection for multiple tests using a glob pattern by adding the `Skip-Flake-Detection-Pattern` CL footer. For example: `Skip-Flake-Detection-Pattern: test/e2e/*`.
+
+### De-flaking tests
+
+Note that despite the bot name all kinds of tests are supported.
+
+To reproduce a flaky test locally, use the exact test ID printed in the test runner output and the `--repeat=X` command line flag:
+
+```sh
+npm run test -- --repeat=20 test/e2e/sources/navigator-view.test.ts:can_show_newly_created_snippets_show_up_in_command_menu
+```
+
+To see if certain tests are flaky you can use the E2E stressor bots (despite the name, these bots also support unit tests). Open a CL with your test changes and run the following command specifying your test file:
+
+```sh
+git cl try -B devtools-frontend/try -b e2e_stressor_linux -b e2e_stressor_win64 -b e2e_stressor_mac -p runner_args='test/e2e/sources/navigator-view.test.ts --repeat=80'
+```
+
+or multiple test files:
+
+```sh
+git cl try -B devtools-frontend/try -b e2e_stressor_linux -b e2e_stressor_win64 -b e2e_stressor_mac -p runner_args='test/e2e/sources/navigator-view.test.ts test/e2e/sources/snippets.test.ts --repeat=80'
+```
+
+This will run the specified tests on dedicated bots with the specified number of iterations. Note that in order for iterations to work the test should be using `it` from `mocha_extensions.ts`.
+
+The following command runs the stressor bot on all files of the latest commit with reasonable settings:
+
+```sh
+git cl try -B devtools-frontend/try \
+  -b e2e_stressor_linux \
+  -p runner_args="\
+    $(git diff-tree --no-commit-id --name-only HEAD -r | grep test/e2e | grep -v e2e/helpers | cut -c 10- - | tr "\n" " ") \
+    --repeat=20"
+```
+
+> By default, tests are run using the debug build. To run it with the release build, append `-p builder_config=Release` to the end of the command.
+
+Please use a reasonable number of iterations and include the minimal amount of test files to avoid overloading the bots. This bot is experimental and the parameters might change in the future.
 
 ## Useful tools
 

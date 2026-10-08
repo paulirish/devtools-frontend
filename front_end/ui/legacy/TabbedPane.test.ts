@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {doubleRaf, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
-import {html, render} from '../../ui/lit/lit.js';
+import {html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 
 import * as UI from './legacy.js';
 
@@ -175,6 +175,15 @@ describeWithEnvironment('TabbedPane', () => {
     assert.deepEqual(tabbedPane.tabIds(), ['0', '7', '1', '2', '3', '4', '5', '6', '8', '9']);
     const domOrder = Array.from(tabbedPane.tabsElement.children).map(el => el.id.replace(/^tab-/, ''));
     assert.deepEqual(domOrder, ['0', '7', '1', '2', '3', '4', '5', '6', '8', '9']);
+  });
+
+  it('does not keep a reference to the last selected tab after it is closed', () => {
+    tabbedPane.selectTab('9');
+    assert.exists((tabbedPane as unknown as {lastSelectedOverflowTab?: unknown}).lastSelectedOverflowTab);
+
+    tabbedPane.closeTabs(tabbedPane.tabIds());
+
+    assert.isUndefined((tabbedPane as unknown as {lastSelectedOverflowTab?: unknown}).lastSelectedOverflowTab);
   });
 });
 
@@ -564,5 +573,190 @@ describeWithEnvironment('TabbedPaneElement', () => {
     await doubleRaf();
 
     assert.strictEqual(count, 0, 'overflow-tabs-changed must not fire when hidden tab set is unchanged');
+  });
+
+  it('clears measured dropDownButton width and updates layout when ZOOM_CHANGED fires', async () => {
+    const container = document.createElement('div');
+    container.style.width = '200px';
+    renderElementIntoDOM(container);
+    render(html`
+      <devtools-tabbed-pane>
+        <devtools-toolbar slot="left" id="left-toolbar" style="width: 40px; min-width: 40px;"></devtools-toolbar>
+        <devtools-toolbar slot="right" id="right-toolbar" style="width: 60px; min-width: 60px;"></devtools-toolbar>
+        <div id="tab1" title="Tab 1">1</div>
+        <div id="tab2" title="Tab 2">2</div>
+      </devtools-tabbed-pane>
+    `,
+           container);
+    const tabbedPaneElement = container.querySelector('devtools-tabbed-pane') as UI.TabbedPane.TabbedPaneElement;
+    const widget = UI.Widget.Widget.get(tabbedPaneElement) as UI.TabbedPane.TabbedPane;
+    await doubleRaf();
+
+    // Verify clearMeasuredWidths clears measuredDropDownButtonWidth on ZOOM_CHANGED
+    (widget as unknown as {measuredDropDownButtonWidth: number}).measuredDropDownButtonWidth = 999;
+    UI.ZoomManager.ZoomManager.instance().dispatchEventToListeners(UI.ZoomManager.Events.ZOOM_CHANGED,
+                                                                   {from: 1.0, to: 1.5});
+    await doubleRaf();
+
+    const measuredWidth = (widget as unknown as {measuredDropDownButtonWidth: number}).measuredDropDownButtonWidth;
+    assert.isNumber(measuredWidth);
+    assert.notStrictEqual(measuredWidth, 999,
+                          'measuredDropDownButtonWidth should be invalidated and re-measured after ZOOM_CHANGED');
+  });
+  it('fires close and taborderchanged events and respects properties on TabbedPaneElement', async () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    render(html`
+      <devtools-tabbed-pane .closeableTabs=${true} .allowTabReorder=${true}>
+        <div id="tab1" title="Tab 1">Content 1</div>
+        <div id="tab2" title="Tab 2" uncloseable>Content 2</div>
+        <div id="tab3" title="Tab 3" closeable>Content 3</div>
+      </devtools-tabbed-pane>
+    `,
+           container);
+    const tabbedPaneElement = container.querySelector('devtools-tabbed-pane') as UI.TabbedPane.TabbedPaneElement;
+    const widget = UI.Widget.Widget.get(tabbedPaneElement) as UI.TabbedPane.TabbedPane;
+    // doubleRaf is needed for some updates but Lit render might just need raf
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    assert.isTrue(widget.allowTabReorder, 'allowTabReorder should be delegated to the widget');
+
+    const tabs = widget.tabsById;
+    assert.isTrue(tabs.get('tab1')?.closeable, 'tab1 should inherit global closeableTabs=true');
+    assert.isFalse(tabs.get('tab2')?.closeable, 'tab2 should respect uncloseable attribute');
+    assert.isTrue(tabs.get('tab3')?.closeable, 'tab3 should respect closeable attribute');
+
+    let orderChangedEventDetail: {tabId: string, tabIds: string[]}|null = null;
+    tabbedPaneElement.addEventListener('taborderchanged', (e: Event) => {
+      orderChangedEventDetail = (e as CustomEvent).detail;
+    });
+    widget.moveTab('tab3', 0);
+
+    const orderChangedEventDetailTyped = orderChangedEventDetail as {tabId: string, tabIds: string[]} | null;
+    assert.isNotNull(orderChangedEventDetailTyped, 'taborderchanged event should have fired');
+    assert.strictEqual(orderChangedEventDetailTyped.tabId, 'tab3');
+    assert.deepEqual(orderChangedEventDetailTyped.tabIds, ['tab3', 'tab1', 'tab2']);
+
+    let closeEventDetail: {tabId: string}|null = null;
+    tabbedPaneElement.addEventListener('close', (e: Event) => {
+      closeEventDetail = (e as CustomEvent).detail;
+    });
+
+    widget.closeTab('tab1');
+    const closeEventDetailTyped = closeEventDetail as {tabId: string} | null;
+    assert.isNotNull(closeEventDetailTyped, 'close event should have fired');
+    assert.strictEqual(closeEventDetailTyped.tabId, 'tab1');
+  });
+
+  describe('icon and suffix', () => {
+    function renderTabbedPane(template: LitTemplate): UI.TabbedPane.TabbedPane {
+      const container = document.createElement('div');
+      renderElementIntoDOM(container);
+      render(html`<devtools-tabbed-pane>${template}</devtools-tabbed-pane>`, container);
+      return UI.Widget.Widget.get(container.querySelector('devtools-tabbed-pane')!) as UI.TabbedPane.TabbedPane;
+    }
+
+    function slotted(widget: UI.TabbedPane.TabbedPane, id: string, kind: 'icon'|'suffix'): Element[] {
+      const slot = widget.tabsById.get(id)!.tabElement.querySelector(`slot[name="${kind}-${id}"]`);
+      assert.instanceOf(slot, HTMLSlotElement);
+      // The slot has `display: contents`, so check the visibility of its container.
+      return slot.parentElement!.checkVisibility() ? slot.assignedElements() : [];
+    }
+
+    it('shows slotted elements in the tab header', async () => {
+      const widget = renderTabbedPane(html`
+        <div id="tab1" title="Tab 1">Content 1</div>
+        <devtools-icon slot="icon-tab1" name="warning" title="Icon"></devtools-icon>
+        <svg slot="suffix-tab1"><circle r="1"></circle></svg>
+        <div id="tab2" title="Tab 2">Content 2</div>`);
+      await doubleRaf();
+
+      const [icon] = slotted(widget, 'tab1', 'icon');
+      assert.strictEqual(icon.localName, 'devtools-icon');
+      assert.strictEqual(icon.getAttribute('title'), 'Icon');
+      const [suffix] = slotted(widget, 'tab1', 'suffix');
+      assert.strictEqual(suffix.localName, 'svg');
+      assert.strictEqual(suffix.childElementCount, 1);
+      assert.isEmpty(slotted(widget, 'tab2', 'icon'));
+      assert.isEmpty(slotted(widget, 'tab2', 'suffix'));
+    });
+
+    it('updates icon and suffix when they change', async () => {
+      const container = document.createElement('div');
+      renderElementIntoDOM(container);
+      const icons: Record<string, LitTemplate> = {
+        A: html`<span slot="icon-tab1">A</span>`,
+        B: html`<devtools-icon slot="icon-tab1" name="B"></devtools-icon>`,
+      };
+      function renderTabs(icon: string|null, suffix: string|null): void {
+        render(html`
+          <devtools-tabbed-pane>
+            <div id="tab1" title="Tab 1">Content 1</div>
+            ${icon ? icons[icon] : nothing}
+            ${suffix ? html`<span slot="suffix-tab1">${suffix}</span>` : nothing}
+          </devtools-tabbed-pane>`,
+               container);
+      }
+      renderTabs('A', 'S1');
+      const widget = UI.Widget.Widget.get(container.querySelector('devtools-tabbed-pane')!) as UI.TabbedPane.TabbedPane;
+      const iconAndSuffix = () => [...slotted(widget, 'tab1', 'icon'), ...slotted(widget, 'tab1', 'suffix')].map(
+          element => element.textContent || element.getAttribute('name'));
+      await doubleRaf();
+      assert.deepEqual(iconAndSuffix(), ['A', 'S1']);
+
+      renderTabs('B', 'S2');
+      await doubleRaf();
+      assert.deepEqual(iconAndSuffix(), ['B', 'S2']);
+
+      renderTabs(null, null);
+      await doubleRaf();
+      assert.deepEqual(iconAndSuffix(), []);
+
+      renderTabs('A', 'S3');
+      await doubleRaf();
+      assert.deepEqual(iconAndSuffix(), ['A', 'S3']);
+    });
+
+    it('reserves space for the icon and suffix in the tab width', async () => {
+      const widget = renderTabbedPane(html`
+        <div id="tab1" title="Tab">Content 1</div>
+        <span slot="icon-tab1">I</span>
+        <span slot="suffix-tab1">S</span>
+        <div id="tab2" title="Tab">Content 2</div>`);
+      await doubleRaf();
+
+      const tab1Width = widget.tabsById.get('tab1')!.tabElement.getBoundingClientRect().width;
+      const tab2Width = widget.tabsById.get('tab2')!.tabElement.getBoundingClientRect().width;
+      assert.isAbove(tab1Width, tab2Width);
+    });
+
+    it('reserves the actual width of the slotted content in the tab width', async () => {
+      const widget = renderTabbedPane(html`
+        <div id="tab1" title="Tab">Content 1</div>
+        <span slot="icon-tab1" style="display: inline-block; width: 100px"></span>
+        <div id="tab2" title="Tab">Content 2</div>`);
+      await doubleRaf();
+
+      // Tab widths are set from measurements of separate measuring elements.
+      const tab1 = widget.tabsById.get('tab1')!;
+      const tab2 = widget.tabsById.get('tab2')!;
+      assert.isAtLeast(tab1.width() - tab2.width(), 100);
+      assert.strictEqual(tab1.tabElement.style.width, `${tab1.width()}px`);
+    });
+
+    it('detaches slots from the tab header when the tab is closed', async () => {
+      const widget = renderTabbedPane(html`<div id="tab1" title="Tab 1">Content 1</div>`);
+      await doubleRaf();
+      const tabElement = widget.tabsById.get('tab1')!.tabElement;
+      const slots = tabElement.querySelectorAll('slot');
+      assert.lengthOf(slots, 2);
+
+      widget.closeTab('tab1');
+
+      for (const slot of slots) {
+        assert.isNull(slot.parentElement);
+      }
+    });
   });
 });

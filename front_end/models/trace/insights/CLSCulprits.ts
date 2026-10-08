@@ -18,7 +18,9 @@ import {
 } from './types.js';
 
 export const UIStrings = {
-  /** Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons"). */
+  /**
+   * @description Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons").
+   */
   title: 'Layout shift culprits',
   /**
    * @description Description of a DevTools insight that identifies the reasons that elements shift on the page.
@@ -64,13 +66,13 @@ export const UIStrings = {
    */
   noLayoutShifts: 'No layout shifts',
   /**
-   * @description Text status when there no layout shifts culprits/root causes were found.
+   * @description Text status when no layout shift culprits or root causes were found.
    */
-  noCulprits: 'Could not detect any layout shift culprits',
+  noCulprits: 'Couldn’t detect any layout shift culprits',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/CLSCulprits.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type CLSCulpritsInsightModel = InsightModel<typeof UIStrings, {
   animationFailures: readonly NoncompositedAnimationFailure[],
@@ -599,9 +601,8 @@ export function generateInsight(data: Handlers.Types.HandlerData, context: Insig
   const domLoadingEvents = data.LayoutShifts.domLoadingEvents.filter(isWithinContext);
   const unsizedImageEvents = data.LayoutShifts.layoutImageUnsizedEvents.filter(isWithinContext);
 
-  const clusterKey = context.navigation ? context.navigationId : Types.Events.NO_NAVIGATION;
-  const clusters = data.LayoutShifts.clustersByNavigationId.get(clusterKey) ?? [];
-  const clustersByScore = [...clusters].sort((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
+  const clusters = data.LayoutShifts.clusters.filter(isWithinContext);
+  const clustersByScore = clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
   const worstCluster = clustersByScore.at(0);
   const layoutShifts = clusters.flatMap(cluster => cluster.events);
   const prePaintEvents = data.LayoutShifts.prePaintEvents.filter(isWithinContext);

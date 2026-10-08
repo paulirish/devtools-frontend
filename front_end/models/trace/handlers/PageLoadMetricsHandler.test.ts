@@ -4,7 +4,6 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
@@ -21,7 +20,7 @@ function countMetricOcurrences(
   }, 0);
 }
 
-describeWithEnvironment('PageLoadMetricsHandler', function() {
+describe('PageLoadMetricsHandler', function() {
   describe('contentful paints', () => {
     it('obtains all the FCP and LCP events for all frames', async function() {
       const {data} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
@@ -48,48 +47,55 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
       assert.strictEqual(lcpCount, 2);
     });
 
-    it('finds the right FCP and LCP events for a trace for a page that was refreshed', async function() {
-      const {data} = await TraceLoader.traceEngine(this, 'reload-and-trace-page.json.gz');
-      const {Meta, PageLoadMetrics} = data;
-      const {mainFrameId} = Meta;
-      const pageLoadMetricsData = PageLoadMetrics.metricScoresByFrameId;
-      // Only one frame to deal with
-      assert.strictEqual(pageLoadMetricsData.size, 1);
+    describe('page refresh', () => {
+      let meta: Trace.Handlers.ModelHandlers.Meta.MetaHandlerData;
+      let pageLoadMetrics: Trace.Handlers.ModelHandlers.PageLoadMetrics.PageLoadMetricsData;
 
-      const pageLoadEventsForMainFrame = pageLoadMetricsData.get(mainFrameId);
-      assert.isOk(pageLoadEventsForMainFrame, 'Page load events for main frame were unexpectedly null.');
-      // Single FCP event that occurred after the refresh.
-      assert.strictEqual(pageLoadEventsForMainFrame.size, 1);
-      const scoresByMetricName = [...pageLoadEventsForMainFrame.values()];
-      const fcpCount =
-          countMetricOcurrences(scoresByMetricName, Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP);
-      const lcpCount =
-          countMetricOcurrences(scoresByMetricName, Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
-      assert.strictEqual(fcpCount, 1);
-      assert.strictEqual(lcpCount, 1);
-    });
+      before(async function() {
+        const result = await TraceLoader.traceEngine(this, 'reload-and-trace-page.json.gz');
+        meta = result.data.Meta;
+        pageLoadMetrics = result.data.PageLoadMetrics;
+      });
 
-    it('stores the navigation event as part of the metric', async function() {
-      const {data} = await TraceLoader.traceEngine(this, 'reload-and-trace-page.json.gz');
-      const {Meta, PageLoadMetrics} = data;
-      const {mainFrameId, navigationsByFrameId} = Meta;
-      const navigationBeforeMetrics = navigationsByFrameId.get(mainFrameId)?.[0];
-      if (!navigationBeforeMetrics) {
-        assert.fail('Could not find expected navigation event');
-      }
-      const pageLoadMetricsData = PageLoadMetrics.metricScoresByFrameId;
-      // Only one frame to deal with
-      assert.strictEqual(pageLoadMetricsData.size, 1);
+      it('finds the right FCP and LCP events for a trace for a page that was refreshed', () => {
+        const {mainFrameId} = meta;
+        const pageLoadMetricsData = pageLoadMetrics.metricScoresByFrameId;
+        // Only one frame to deal with
+        assert.strictEqual(pageLoadMetricsData.size, 1);
 
-      const pageLoadEventsForMainFrame = pageLoadMetricsData.get(mainFrameId);
-      assert.isOk(pageLoadEventsForMainFrame, 'Page load events for main frame were unexpectedly null.');
-      // Single FCP event that occurred after the refresh.
-      assert.strictEqual(pageLoadEventsForMainFrame.size, 1);
-      const events = pageLoadEventsForMainFrame.get(navigationBeforeMetrics);
-      const allFoundMetricScoresForMainFrame = events ? Array.from(events.values()) : [];
-      for (const score of allFoundMetricScoresForMainFrame) {
-        assert.strictEqual(score.navigation, navigationBeforeMetrics);
-      }
+        const pageLoadEventsForMainFrame = pageLoadMetricsData.get(mainFrameId);
+        assert.isOk(pageLoadEventsForMainFrame, 'Page load events for main frame were unexpectedly null.');
+        // Single FCP event that occurred after the refresh.
+        assert.strictEqual(pageLoadEventsForMainFrame.size, 1);
+        const scoresByMetricName = [...pageLoadEventsForMainFrame.values()];
+        const fcpCount =
+            countMetricOcurrences(scoresByMetricName, Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP);
+        const lcpCount =
+            countMetricOcurrences(scoresByMetricName, Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
+        assert.strictEqual(fcpCount, 1);
+        assert.strictEqual(lcpCount, 1);
+      });
+
+      it('stores the navigation event as part of the metric', () => {
+        const {mainFrameId, navigationsByFrameId} = meta;
+        const navigationBeforeMetrics = navigationsByFrameId.get(mainFrameId)?.[0];
+        if (!navigationBeforeMetrics) {
+          assert.fail('Could not find expected navigation event');
+        }
+        const pageLoadMetricsData = pageLoadMetrics.metricScoresByFrameId;
+        // Only one frame to deal with
+        assert.strictEqual(pageLoadMetricsData.size, 1);
+
+        const pageLoadEventsForMainFrame = pageLoadMetricsData.get(mainFrameId);
+        assert.isOk(pageLoadEventsForMainFrame, 'Page load events for main frame were unexpectedly null.');
+        // Single FCP event that occurred after the refresh.
+        assert.strictEqual(pageLoadEventsForMainFrame.size, 1);
+        const events = pageLoadEventsForMainFrame.get(navigationBeforeMetrics);
+        const allFoundMetricScoresForMainFrame = events ? Array.from(events.values()) : [];
+        for (const score of allFoundMetricScoresForMainFrame) {
+          assert.strictEqual(score.navigation, navigationBeforeMetrics);
+        }
+      });
     });
   });
 
@@ -114,6 +120,8 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
 
   describe('metric scores', () => {
     let allMetricScores: Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricScore[];
+    let scoresByMetricName: Array<Map<Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName,
+                                      Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricScore>>;
 
     function getMetricsByName(name: Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName) {
       return allMetricScores.filter(metric => metric.metricName === name);
@@ -124,12 +132,12 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
     }
     const firstNavigationId = '05059ACF683224E6FC7E344F544A4050';
     const secondNavigationId = '550FC08C662EF691E1535F305CBC0FCA';
-    beforeEach(async function() {
+    before(async function() {
       const {data} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
       const {Meta, PageLoadMetrics} = data;
       const pageLoadMetricsData = PageLoadMetrics.metricScoresByFrameId.get(Meta.mainFrameId);
       assert.isOk(pageLoadMetricsData, 'Page load events for main frame were unexpectedly undefined.');
-      const scoresByMetricName = [...pageLoadMetricsData.values()];
+      scoresByMetricName = [...pageLoadMetricsData.values()];
       allMetricScores = scoresByMetricName.flatMap(metricScores => [...metricScores.values()]);
     });
     it('extracts DOMContentLoaded correctly', () => {
@@ -207,14 +215,7 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
       assertMetricNavigationId(firstContentfulPaints[1], secondNavigationId);
     });
 
-    it('provides metric scores sorted in ASC order by their events\' timestamps', async function() {
-      const {data} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
-      const {Meta, PageLoadMetrics} = data;
-
-      const pageLoadMetricsData = PageLoadMetrics.metricScoresByFrameId.get(Meta.mainFrameId);
-      assert.isOk(pageLoadMetricsData, 'Page load events for main frame were unexpectedly null.');
-
-      const scoresByMetricName = [...pageLoadMetricsData.values()];
+    it('provides metric scores sorted in ASC order by their events\' timestamps', () => {
       const flatResults = scoresByMetricName.map(metricScores => [...metricScores.values()])
                               .reduce((acc, metricScore) => acc.concat(metricScore), []);
       const timestamps = [];
@@ -240,38 +241,40 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
   });
 
   describe('Marker events', () => {
-    let mainFrameId: string;
-    let allMarkerEvents: Trace.Types.Events.PageLoadEvent[];
+    describe('with multiple navigations and iframes', () => {
+      let mainFrameId: string;
+      let allMarkerEvents: Trace.Types.Events.PageLoadEvent[];
 
-    beforeEach(async function() {
-      const {data} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
-      const {PageLoadMetrics, Meta} = data;
-      mainFrameId = Meta.mainFrameId;
-      allMarkerEvents = PageLoadMetrics.allMarkerEvents;
-    });
+      before(async function() {
+        const {data} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
+        const {PageLoadMetrics, Meta} = data;
+        mainFrameId = Meta.mainFrameId;
+        allMarkerEvents = PageLoadMetrics.allMarkerEvents;
+      });
 
-    it('extracts all marker events from a trace correctly', () => {
-      for (const metricName of Trace.Types.Events.MarkerName) {
-        if (metricName === Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION ||
-            metricName === Trace.Types.Events.Name.SOFT_NAVIGATION_START) {
-          continue;
+      it('extracts all marker events from a trace correctly', () => {
+        for (const metricName of Trace.Types.Events.MarkerName) {
+          if (metricName === Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION ||
+              metricName === Trace.Types.Events.Name.SOFT_NAVIGATION_START ||
+              metricName === Trace.Types.Events.Name.MARK_SOFT_FCP) {
+            continue;
+          }
+
+          const markerEventsOfThisType = allMarkerEvents.filter(event => event.name === metricName);
+          // There should be 2 events for each marker and all of them should correspond to the main frame
+          assert.lengthOf(markerEventsOfThisType, 2, `failed for ${metricName}`);
+          assert.isTrue(markerEventsOfThisType.every(
+                            marker => Trace.Handlers.ModelHandlers.PageLoadMetrics.getFrameIdForPageLoadEvent(
+                                          marker) === mainFrameId),
+                        `failed for ${metricName}`);
         }
+      });
 
-        const markerEventsOfThisType = allMarkerEvents.filter(event => event.name === metricName);
-        // There should be 2 events for each marker and all of them should correspond to the main frame
-        assert.lengthOf(markerEventsOfThisType, 2, `failed for ${metricName}`);
-        assert.isTrue(
-            markerEventsOfThisType.every(
-                marker =>
-                    Trace.Handlers.ModelHandlers.PageLoadMetrics.getFrameIdForPageLoadEvent(marker) === mainFrameId),
-            `failed for ${metricName}`);
-      }
-    });
-
-    it('only marker events are exported in allMarkerEvents', () => {
-      for (const marker of allMarkerEvents) {
-        assert.isTrue(Trace.Types.Events.isMarkerEvent(marker));
-      }
+      it('only marker events are exported in allMarkerEvents', () => {
+        for (const marker of allMarkerEvents) {
+          assert.isTrue(Trace.Types.Events.isMarkerEvent(marker));
+        }
+      });
     });
 
     it('only stores the largest contentful paint with the highest candidate index', async function() {
@@ -289,10 +292,162 @@ describeWithEnvironment('PageLoadMetricsHandler', function() {
       const {data} = await TraceLoader.traceEngine(this, 'soft-navs.json.gz');
       const {PageLoadMetrics} = data;
       assert.deepEqual(PageLoadMetrics.allMarkerEvents.map(e => e.name), [
-        'SoftNavigationStart', 'largestContentfulPaint::CandidateForSoftNavigation', 'SoftNavigationStart',
-        'largestContentfulPaint::CandidateForSoftNavigation', 'SoftNavigationStart',
-        'largestContentfulPaint::CandidateForSoftNavigation'
+        'SoftNavigationStart',
+        'SyntheticSoftFirstContentfulPaint',
+        'largestContentfulPaint::CandidateForSoftNavigation',
+        'SoftNavigationStart',
+        'SyntheticSoftFirstContentfulPaint',
+        'largestContentfulPaint::CandidateForSoftNavigation',
+        'SoftNavigationStart',
+        'SyntheticSoftFirstContentfulPaint',
+        'largestContentfulPaint::CandidateForSoftNavigation',
       ]);
+    });
+
+    it('correctly associates a MARK_SOFT_FCP event with its soft navigation start event', async () => {
+      Trace.Handlers.ModelHandlers.Meta.reset();
+      Trace.Handlers.ModelHandlers.PageLoadMetrics.reset();
+
+      // We need to tell Meta about process and main frame:
+      const browserProcess: Trace.Types.Events.ProcessName = {
+        name: 'process_name',
+        ph: Trace.Types.Events.Phase.METADATA,
+        pid: Trace.Types.Events.ProcessID(1),
+        tid: Trace.Types.Events.ThreadID(1),
+        ts: Trace.Types.Timing.Micro(0),
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {name: 'Browser'},
+      };
+
+      const mainFrameCommitted: Trace.Types.Events.FrameCommittedInBrowser = {
+        name: 'FrameCommittedInBrowser',
+        ph: Trace.Types.Events.Phase.INSTANT,
+        s: Trace.Types.Events.Scope.THREAD,
+        pid: Trace.Types.Events.ProcessID(1),
+        tid: Trace.Types.Events.ThreadID(1),
+        ts: Trace.Types.Timing.Micro(0),
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {
+          data: {
+            frame: 'main-frame-id',
+            name: 'main-frame',
+            processId: Trace.Types.Events.ProcessID(2),
+            url: 'https://example.com',
+          },
+        },
+      };
+
+      const tracingStarted: Trace.Types.Events.TracingStartedInBrowser = {
+        name: Trace.Types.Events.Name.TRACING_STARTED_IN_BROWSER,
+        ph: Trace.Types.Events.Phase.INSTANT,
+        s: Trace.Types.Events.Scope.THREAD,
+        pid: Trace.Types.Events.ProcessID(1),
+        tid: Trace.Types.Events.ThreadID(1),
+        ts: Trace.Types.Timing.Micro(0),
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {
+          data: {
+            frameTreeNodeId: 1,
+            persistentIds: true,
+            frames: [{
+              frame: 'main-frame-id',
+              name: 'main-frame',
+              processId: Trace.Types.Events.ProcessID(2),
+              url: 'https://example.com',
+            }],
+          },
+        },
+      };
+
+      const softNavStart: Trace.Types.Events.SoftNavigationStart = {
+        name: Trace.Types.Events.Name.SOFT_NAVIGATION_START,
+        ph: Trace.Types.Events.Phase.ASYNC_NESTABLE_INSTANT,
+        pid: Trace.Types.Events.ProcessID(2),
+        tid: Trace.Types.Events.ThreadID(1),
+        ts: Trace.Types.Timing.Micro(10_000),
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {
+          frame: 'main-frame-id',
+          context: {
+            performanceTimelineNavigationId: 42,
+            softNavContextId: 42,
+            URL: 'https://example.com',
+            timeOrigin: 10_000,
+            domModifications: 1,
+            firstContentfulPaint: 15_000,
+            paintedArea: 100,
+            repaintedArea: 100,
+          },
+        },
+      };
+
+      const softFcpEvent: Trace.Types.Events.SyntheticSoftFirstContentfulPaint = {
+        name: Trace.Types.Events.Name.MARK_SOFT_FCP,
+        ph: Trace.Types.Events.Phase.MARK,
+        rawSourceEvent: softNavStart,
+        _tag: 'SyntheticEntryTag',
+        pid: Trace.Types.Events.ProcessID(2),
+        tid: Trace.Types.Events.ThreadID(1),
+        ts: Trace.Types.Timing.Micro(15_000),
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {
+          frame: 'main-frame-id',
+          context: {
+            performanceTimelineNavigationId: 42,
+            softNavContextId: 42,
+            URL: 'https://example.com',
+            timeOrigin: 10_000,
+            domModifications: 1,
+            firstContentfulPaint: 15_000,
+            paintedArea: 100,
+            repaintedArea: 100,
+          },
+        },
+      };
+
+      const events = [browserProcess, tracingStarted, mainFrameCommitted, softNavStart, softFcpEvent];
+      for (const event of events) {
+        Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+        Trace.Handlers.ModelHandlers.PageLoadMetrics.handleEvent(event);
+      }
+
+      await Trace.Handlers.ModelHandlers.Meta.finalize();
+      await Trace.Handlers.ModelHandlers.PageLoadMetrics.finalize();
+
+      const pageLoadMetricsData = Trace.Handlers.ModelHandlers.PageLoadMetrics.data();
+      const metricsForFrame = pageLoadMetricsData.metricScoresByFrameId.get('main-frame-id');
+      assert.isOk(metricsForFrame);
+      const metricsForSoftNav = metricsForFrame.get(softNavStart);
+      assert.isOk(metricsForSoftNav);
+      const fcpScore = metricsForSoftNav.get(Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP);
+      assert.isOk(fcpScore);
+      assert.strictEqual(fcpScore.event, softFcpEvent);
+      assert.strictEqual(fcpScore.navigation, softNavStart);
+      assert.strictEqual(fcpScore.timing, 5_000);  // 15_000 - 10_000
+    });
+
+    it('does not process soft navigations when enableSoftNavigation is false', async function() {
+      Trace.Handlers.ModelHandlers.Meta.reset();
+      Trace.Handlers.ModelHandlers.PageLoadMetrics.reset();
+      const config = Trace.Types.Configuration.defaults();
+      config.enableSoftNavigation = false;
+      Trace.Handlers.ModelHandlers.Meta.handleUserConfig(config);
+      Trace.Handlers.ModelHandlers.PageLoadMetrics.handleUserConfig(config);
+
+      const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+      for (const event of events) {
+        Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+        Trace.Handlers.ModelHandlers.PageLoadMetrics.handleEvent(event);
+      }
+      await Trace.Handlers.ModelHandlers.Meta.finalize();
+      await Trace.Handlers.ModelHandlers.PageLoadMetrics.finalize();
+
+      const pageLoadMetricsData = Trace.Handlers.ModelHandlers.PageLoadMetrics.data();
+      const softNavMarkers = pageLoadMetricsData.allMarkerEvents.filter(
+          event => event.name === Trace.Types.Events.Name.SOFT_NAVIGATION_START ||
+              event.name === Trace.Types.Events.Name.MARK_SOFT_FCP ||
+              event.name === Trace.Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION);
+      assert.lengthOf(softNavMarkers, 0);
     });
   });
 });

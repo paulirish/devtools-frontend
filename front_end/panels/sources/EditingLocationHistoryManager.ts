@@ -7,7 +7,7 @@ import * as Workspace from '../../models/workspace/workspace.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 
-import type {SourcesView} from './SourcesView.js';
+import type {TabbedEditorContainer} from './TabbedEditorContainer.js';
 import type {UISourceCodeFrame} from './UISourceCodeFrame.js';
 
 export const HistoryDepth = 20;
@@ -15,9 +15,9 @@ export const HistoryDepth = 20;
 export class EditingLocationHistoryManager {
   private readonly entries: EditingLocationHistoryEntry[] = [];
   private current = -1;
-  private revealing = false;
+  private revealingCount = 0;
 
-  constructor(private readonly sourcesView: SourcesView) {
+  constructor(private readonly editorContainer: TabbedEditorContainer) {
   }
 
   trackSourceFrameCursorJumps(sourceFrame: UISourceCodeFrame): void {
@@ -31,7 +31,7 @@ export class EditingLocationHistoryManager {
     }
     const prevPos = update.startState.selection.main;
     const newPos = update.state.selection.main;
-    const isJump = !this.revealing && prevPos.anchor !== newPos.anchor && update.transactions.some(tr => {
+    const isJump = this.revealingCount === 0 && prevPos.anchor !== newPos.anchor && update.transactions.some(tr => {
       return Boolean(
           tr.isUserEvent('select.pointer') || tr.isUserEvent('select.reveal') || tr.isUserEvent('select.search'));
     });
@@ -50,7 +50,7 @@ export class EditingLocationHistoryManager {
   }
 
   updateCurrentState(uiSourceCode: Workspace.UISourceCode.UISourceCode, position: number): void {
-    if (!this.revealing) {
+    if (this.revealingCount === 0) {
       const top = this.current >= 0 ? this.entries[this.current] : null;
       if (top?.matches(uiSourceCode)) {
         top.position = position;
@@ -69,9 +69,12 @@ export class EditingLocationHistoryManager {
   private reveal(entry: EditingLocationHistoryEntry): void {
     const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCode(entry.projectId, entry.url);
     if (uiSourceCode) {
-      this.revealing = true;
-      this.sourcesView.showSourceLocation(uiSourceCode, entry.position, false, true);
-      this.revealing = false;
+      this.revealingCount++;
+      try {
+        this.editorContainer.showSourceLocation(uiSourceCode, entry.position, false, true);
+      } finally {
+        this.revealingCount--;
+      }
     }
   }
 

@@ -40,6 +40,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as AiAssistance from '../../models/ai_assistance/ai_assistance.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import {createIcon} from '../../ui/kit/kit.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
@@ -51,6 +52,7 @@ import {BackForwardCacheTreeElement} from './BackForwardCacheTreeElement.js';
 import {BackgroundServiceModel} from './BackgroundServiceModel.js';
 import {BackgroundServiceView} from './BackgroundServiceView.js';
 import {BounceTrackingMitigationsTreeElement} from './BounceTrackingMitigationsTreeElement.js';
+import * as ApplicationComponents from './components/components.js';
 import {DeviceBoundSessionsModel} from './DeviceBoundSessionsModel.js';
 import {RootTreeElement as DeviceBoundSessionsRootTreeElement} from './DeviceBoundSessionsTreeElement.js';
 import {
@@ -68,8 +70,6 @@ import {
   type ObjectStore,
 } from './IndexedDBModel.js';
 import {IDBDatabaseView, IDBDataView} from './IndexedDBViews.js';
-import {Events as InterestGroupModelEvents, InterestGroupStorageModel} from './InterestGroupStorageModel.js';
-import {InterestGroupTreeElement} from './InterestGroupTreeElement.js';
 import {OpenedWindowDetailsView, WorkerDetailsView} from './OpenedWindowDetailsView.js';
 import type * as PreloadingHelper from './preloading/helper/helper.js';
 import {
@@ -80,13 +80,6 @@ import type {ResourcesPanel} from './ResourcesPanel.js';
 import resourcesSidebarStyles from './resourcesSidebar.css.js';
 import {ServiceWorkerCacheTreeElement} from './ServiceWorkerCacheTreeElement.js';
 import {ServiceWorkersView} from './ServiceWorkersView.js';
-import {SharedStorageListTreeElement} from './SharedStorageListTreeElement.js';
-import {
-  Events as SharedStorageModelEvents,
-  type SharedStorageForOrigin,
-  SharedStorageModel,
-} from './SharedStorageModel.js';
-import {SharedStorageTreeElement} from './SharedStorageTreeElement.js';
 import {StorageBucketsTreeParentElement} from './StorageBucketsTreeElement.js';
 import {StorageView} from './StorageView.js';
 import {TrustTokensTreeElement} from './TrustTokensTreeElement.js';
@@ -94,189 +87,207 @@ import {WebMCPTreeElement} from './WebMCPTreeElement.js';
 
 const UIStrings = {
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Context menu item to start a chat with AI in the Application panel sidebar.
+   */
+  startAChat: 'Start a chat',
+  /**
+   * @description Context menu item to explain storage with AI in the Application panel sidebar.
+   */
+  explainStorage: 'Explain storage',
+  /**
+   * @description Context menu item to explain cookies with AI in the Application panel sidebar.
+   */
+  explainCookies: 'Explain cookies',
+  /**
+   * @description Section header for the application section in the sidebar of the Application panel.
    */
   application: 'Application',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for ads in the sidebar of the Application panel.
+   */
+  ads: 'Ads',
+  /**
+   * @description Tooltip for the experimental feature icon next to the ads item in the sidebar of the Application panel.
+   */
+  experimental: 'Experimental',
+  /**
+   * @description Tree item label for storage in the sidebar of the Application panel.
    */
   storage: 'Storage',
   /**
-   * @description Text in Application Panelthat shows if no local storage
-   *             can be shown.
+   * @description Empty state text displayed when no local storage is detected in the Application panel.
    */
   noLocalStorage: 'No local storage detected',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for local storage in the sidebar of the Application panel.
    */
   localStorage: 'Local storage',
   /**
-   * @description Text in the Application panel describing the local storage tab.
+   * @description Informational text describing the local storage view in the Application panel.
    */
-  localStorageDescription: 'On this page you can view, add, edit, and delete local storage key-value pairs.',
+  localStorageDescription: 'On this page you can view, add, edit, and delete local storage key-value pairs',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for session storage in the sidebar of the Application panel.
    */
   sessionStorage: 'Session storage',
   /**
-   * @description Text in Application Panel if no session storage can be shown.
+   * @description Empty state text displayed when no session storage is detected in the Application panel.
    */
   noSessionStorage: 'No session storage detected',
   /**
-   * @description Text in the Application panel describing the session storage tab.
+   * @description Informational text describing the session storage view in the Application panel.
    */
-  sessionStorageDescription: 'On this page you can view, add, edit, and delete session storage key-value pairs.',
+  sessionStorageDescription: 'On this page you can view, add, edit, and delete session storage key-value pairs',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for extension storage in the sidebar of the Application panel.
    */
   extensionStorage: 'Extension storage',
   /**
-   * @description Text in Application Panel if no extension storage can be shown
+   * @description Empty state text displayed when no extension storage is detected in the Application panel.
    */
   noExtensionStorage: 'No extension storage detected',
   /**
-   * @description Text in the Application panel describing the extension storage tab.
+   * @description Informational text describing the extension storage view in the Application panel.
    */
-  extensionStorageDescription: 'On this page you can view, add, edit, and delete extension storage key-value pairs.',
+  extensionStorageDescription: 'On this page you can view, add, edit, and delete extension storage key-value pairs',
   /**
-   * @description Text for extension session storage in Application panel
+   * @description Label for extension session storage in the Application panel.
    */
   extensionSessionStorage: 'Session',
   /**
-   * @description Text for extension local storage in Application panel
+   * @description Label for extension local storage in the Application panel.
    */
   extensionLocalStorage: 'Local',
   /**
-   * @description Text for extension sync storage in Application panel
+   * @description Label for extension sync storage in the Application panel.
    */
   extensionSyncStorage: 'Sync',
   /**
-   * @description Text for extension managed storage in Application panel
+   * @description Label for extension managed storage in the Application panel.
    */
   extensionManagedStorage: 'Managed',
   /**
-   * @description Text for web cookies
+   * @description Tree item label for cookies in the sidebar of the Application panel.
    */
   cookies: 'Cookies',
   /**
-   * @description Text in the Application Panel if no cookies are set
+   * @description Empty state text displayed when no cookies are set in the Application panel.
    */
   noCookies: 'No cookies set',
   /**
-   * @description Text for web cookies
+   * @description Informational text describing the cookies view in the Application panel.
    */
-  cookiesDescription: 'On this page you can view, add, edit, and delete cookies.',
+  cookiesDescription: 'On this page you can view, add, edit, and delete cookies',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for background services in the sidebar of the Application panel.
    */
   backgroundServices: 'Background services',
   /**
-   * @description Text for rendering frames
+   * @description Tree item label for frames in the sidebar of the Application panel.
    */
   frames: 'Frames',
   /**
-   * @description Text that appears on a button for the manifest resource type filter.
+   * @description Tree item label for the web app manifest in the sidebar of the Application panel.
    */
   manifest: 'Manifest',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for IndexedDB in the sidebar of the Application panel.
    */
   indexeddb: 'IndexedDB',
   /**
-   * @description Text in Application Panel if no indexedDB is detected
+   * @description Empty state text displayed when no IndexedDB database is detected in the Application panel.
    */
-  noIndexeddb: 'No indexedDB detected',
+  noIndexeddb: 'No IndexedDB detected',
   /**
-   * @description Text in the Application panel describing the extension storage tab.
+   * @description Informational text describing the IndexedDB view in the Application panel.
    */
-  indexeddbDescription: 'On this page you can view and delete indexedDB key-value pairs and databases.',
+  indexeddbDescription: 'On this page you can view and delete IndexedDB key-value pairs and databases',
   /**
-   * @description A context menu item in the Application Panel Sidebar of the Application panel
+   * @description Context menu item to refresh IndexedDB in the Application panel sidebar.
    */
   refreshIndexeddb: 'Refresh IndexedDB',
   /**
-   * @description Tooltip in Application Panel Sidebar of the Application panel
+   * @description Tooltip for an empty database showing its version in the IndexedDB tree item in the Application panel sidebar.
    * @example {1.0} PH1
    */
   versionSEmpty: 'Version: {PH1} (empty)',
   /**
-   * @description Tooltip in Application Panel Sidebar of the Application panel
+   * @description Tooltip for a database showing its version in the IndexedDB tree item in the Application panel sidebar.
    * @example {1.0} PH1
    */
   versionS: 'Version: {PH1}',
   /**
-   * @description Text to clear content
+   * @description Context menu item to clear data in the Application panel sidebar.
    */
   clear: 'Clear',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tooltip for an object store showing its key path in the IndexedDB tree item in the Application panel sidebar.
    * @example {"key path"} PH1
    */
   keyPathS: 'Key path: {PH1}',
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Tree item label for local files in the sidebar of the Application panel.
    */
-  localFiles: 'Local Files',
+  localFiles: 'Local files',
   /**
-   * @description Tooltip in Application Panel Sidebar of the Application panel
+   * @description Tooltip for a cookie domain showing which frames use its cookies in the Application panel sidebar.
    * @example {https://example.com} PH1
    */
   cookiesUsedByFramesFromS: 'Cookies used by frames from {PH1}',
   /**
-   * @description Text in Frames View of the Application panel
+   * @description Tree item label for opened windows in the sidebar of the Application panel.
    */
-  openedWindows: 'Opened Windows',
+  openedWindows: 'Opened windows',
   /**
-   * @description Text in Frames View of the Application panel
+   * @description Informational text describing the opened windows view in the Application panel.
    */
-  openedWindowsDescription: 'On this page you can view windows opened via window\.open\(\).',
+  openedWindowsDescription: 'On this page you can view windows opened via `window.open()`',
   /**
-   * @description Label for plural of worker type: web workers
+   * @description Tree item label for Web Workers in the sidebar of the Application panel.
    */
   webWorkers: 'Web Workers',
   /**
-   * @description Label in frame tree for unavailable document
+   * @description Tree item label in the frame tree when no document is detected in the Application panel sidebar.
    */
   documentNotAvailable: 'No document detected',
   /**
-   * @description Description of content of unavailable document in Application panel
+   * @description Informational text explaining that a document was generated dynamically via document.write().
    */
-  theContentOfThisDocumentHasBeen:
-      'The content of this document has been generated dynamically via \'document.write()\'.',
+  theContentOfThisDocumentHasBeen: 'The content of this document has been generated dynamically via `document.write()`',
   /**
-   * @description Text in Frames View of the Application panel
+   * @description Tree item label for an opened window without a title in the sidebar of the Application panel.
    */
   windowWithoutTitle: 'Window without title',
   /**
-   * @description Default name for worker
+   * @description Fallback tree item label for a worker without a title or URL in the sidebar of the Application panel.
    */
   worker: 'worker',
   /**
-   * @description Description text for describing the dedicated worker tab.
+   * @description Informational text describing the dedicated workers view in the Application panel.
    */
-  workerDescription: 'On this page you can view dedicated workers that are created by the parent frame.',
+  workerDescription: 'On this page you can view dedicated workers added by the parent frame',
   /**
-   * @description Aria text for screen reader to announce they can scroll to top of manifest if invoked
+   * @description Accessibility announcement indicating that invoking the element scrolls to the top of the manifest.
    */
-  onInvokeManifestAlert: 'Manifest: Invoke to scroll to the top of manifest',
+  onInvokeManifestAlert: 'Manifest: invoke to scroll to the top of manifest',
   /**
-   * @description Aria text for screen reader to announce they can scroll to a section if invoked
+   * @description Accessibility announcement indicating that invoking the element scrolls to a section in the manifest.
    * @example {"Identity"} PH1
    */
-  beforeInvokeAlert: '{PH1}: Invoke to scroll to this section in manifest',
+  beforeInvokeAlert: '{PH1}: invoke to scroll to this section in manifest',
   /**
-   * @description Alert message for screen reader to announce which subsection is being scrolled to
+   * @description Accessibility announcement indicating that the manifest view was scrolled to a section.
    * @example {"Identity"} PH1
    */
   onInvokeAlert: 'Scrolled to {PH1}',
   /**
-   * @description Application sidebar panel
+   * @description Accessibility label for the Application panel sidebar.
    */
   applicationSidebarPanel: 'Application panel sidebar',
   /**
-   * @description Description text in the Application Panel describing a frame's resources
+   * @description Informational text describing a frame's resources in the Application panel.
    */
-  resourceDescription: 'On this page you can view the frame\'s resources.'
+  resourceDescription: 'On this page you can view the frame’s resources',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ApplicationPanelSidebar.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -302,20 +313,6 @@ function nameForExtensionStorageArea(storageArea: Protocol.Extensions.StorageAre
   }
 }
 
-export namespace SharedStorageTreeElementDispatcher {
-  export const enum Events {
-    SHARED_STORAGE_TREE_ELEMENT_ADDED = 'SharedStorageTreeElementAdded',
-  }
-
-  export interface SharedStorageTreeElementAddedEvent {
-    origin: string;
-  }
-
-  export interface EventTypes {
-    [Events.SHARED_STORAGE_TREE_ELEMENT_ADDED]: SharedStorageTreeElementAddedEvent;
-  }
-}
-
 export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.TargetManager.Observer {
   panel: ResourcesPanel;
   private readonly sidebarTree: UI.TreeOutline.TreeOutlineInShadow;
@@ -325,11 +322,9 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   sessionStorageListTreeElement: ExpandableApplicationPanelTreeElement;
   extensionStorageListTreeElement: ExpandableApplicationPanelTreeElement;
   indexedDBListTreeElement: IndexedDBTreeElement;
-  interestGroupTreeElement: InterestGroupTreeElement;
   cookieListTreeElement: ExpandableApplicationPanelTreeElement;
   trustTokensTreeElement: TrustTokensTreeElement;
   cacheStorageListTreeElement: ServiceWorkerCacheTreeElement;
-  sharedStorageListTreeElement: SharedStorageListTreeElement;
   storageBucketsTreeElement: StorageBucketsTreeParentElement|undefined;
   private backForwardCacheListTreeElement?: BackForwardCacheTreeElement;
   backgroundFetchTreeElement: BackgroundServiceTreeElement;
@@ -341,6 +336,8 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   pushMessagingTreeElement: BackgroundServiceTreeElement;
   reportingApiTreeElement: ReportingApiTreeElement;
   webMcpTreeElement?: WebMCPTreeElement;
+  adsTreeElement?: ApplicationPanelTreeElement;
+  storageTreeElement?: StorageTreeElement;
   deviceBoundSessionsRootTreeElement: DeviceBoundSessionsRootTreeElement|undefined;
   deviceBoundSessionsModel: DeviceBoundSessionsModel|undefined;
   preloadingSummaryTreeElement: PreloadingSummaryTreeElement|undefined;
@@ -349,13 +346,10 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   private extensionIdToStorageTreeParentElement: Map<string, ExtensionStorageTreeParentElement>;
   private extensionStorageModels: ExtensionStorageModel[];
   private extensionStorageTreeElements: Map<string, ExtensionStorageTreeElement>;
-  private sharedStorageTreeElements: Map<string, SharedStorageTreeElement>;
   private domains: Record<string, boolean>;
   // Holds main frame target.
   private target?: SDK.Target.Target;
   private previousHoveredElement?: FrameTreeElement;
-  readonly sharedStorageTreeElementDispatcher:
-      Common.ObjectWrapper.ObjectWrapper<SharedStorageTreeElementDispatcher.EventTypes>;
 
   constructor(panel: ResourcesPanel) {
     super();
@@ -383,11 +377,32 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     manifestTreeElement.generateChildren();
     this.serviceWorkersTreeElement = new ServiceWorkersTreeElement(panel);
     this.applicationTreeElement.appendChild(this.serviceWorkersTreeElement);
-    const clearStorageTreeElement = new ClearStorageTreeElement(panel);
-    this.applicationTreeElement.appendChild(clearStorageTreeElement);
-    if (Root.Runtime.hostConfig.devToolsWebMCPSupport?.enabled) {
-      this.webMcpTreeElement = new WebMCPTreeElement(panel);
-      this.applicationTreeElement.appendChild(this.webMcpTreeElement);
+    this.storageTreeElement = new StorageTreeElement(panel);
+    this.applicationTreeElement.appendChild(this.storageTreeElement);
+    this.webMcpTreeElement = new WebMCPTreeElement(panel);
+    this.applicationTreeElement.appendChild(this.webMcpTreeElement);
+
+    if (Root.Runtime.hostConfig.devToolsAdsPanel?.enabled) {
+      const adsTreeElement = new ApplicationPanelTreeElement(panel, i18nString(UIStrings.ads), false, 'ads');
+      adsTreeElement.listItemElement.classList.add('ads-tree-element');
+      const icon = createIcon('ads');
+      adsTreeElement.setLeadingIcons([icon]);
+      const experimentIcon = createIcon('experiment', 'medium');
+      UI.Tooltip.Tooltip.install(experimentIcon, i18nString(UIStrings.experimental));
+      adsTreeElement.setTrailingIcons([experimentIcon]);
+      adsTreeElement.itemURL = 'ads://' as Platform.DevToolsPath.UrlString;
+      let adsView: ApplicationComponents.AdsView.AdsView;
+      adsTreeElement.onselect = (selectedByUser?: boolean): boolean => {
+        ApplicationPanelTreeElement.prototype.onselect.call(adsTreeElement, selectedByUser);
+        if (!adsView) {
+          adsView = new ApplicationComponents.AdsView.AdsView();
+        }
+        adsTreeElement.showView(adsView);
+        UI.UIUserMetrics.UIUserMetrics.instance().panelShown('ads');
+        return false;
+      };
+      this.adsTreeElement = adsTreeElement;
+      this.applicationTreeElement.appendChild(this.adsTreeElement);
     }
 
     const storageSectionTitle = i18nString(UIStrings.storage);
@@ -437,12 +452,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
 
     this.trustTokensTreeElement = new TrustTokensTreeElement(panel);
     storageTreeElement.appendChild(this.trustTokensTreeElement);
-
-    this.interestGroupTreeElement = new InterestGroupTreeElement(panel);
-    storageTreeElement.appendChild(this.interestGroupTreeElement);
-
-    this.sharedStorageListTreeElement = new SharedStorageListTreeElement(panel);
-    storageTreeElement.appendChild(this.sharedStorageListTreeElement);
 
     this.cacheStorageListTreeElement = new ServiceWorkerCacheTreeElement(panel);
     storageTreeElement.appendChild(this.cacheStorageListTreeElement);
@@ -500,7 +509,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.extensionIdToStorageTreeParentElement = new Map();
     this.extensionStorageTreeElements = new Map();
     this.extensionStorageModels = [];
-    this.sharedStorageTreeElements = new Map();
     this.domains = {};
 
     this.sidebarTree.contentElement.addEventListener('mousemove', this.onmousemove.bind(this), false);
@@ -537,29 +545,11 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
         },
         {scoped: true});
     SDK.TargetManager.TargetManager.instance().observeModels(
-        InterestGroupStorageModel, {
-          modelAdded: (model: InterestGroupStorageModel) => this.interestGroupModelAdded(model),
-          modelRemoved: (model: InterestGroupStorageModel) => this.interestGroupModelRemoved(model),
-        },
-        {scoped: true});
-    SDK.TargetManager.TargetManager.instance().observeModels(
-        SharedStorageModel, {
-          modelAdded: (model: SharedStorageModel) => this.sharedStorageModelAdded(model).catch(err => {
-            console.error(err);
-          }),
-          modelRemoved: (model: SharedStorageModel) => this.sharedStorageModelRemoved(model),
-        },
-        {scoped: true});
-    SDK.TargetManager.TargetManager.instance().observeModels(
         SDK.StorageBucketsModel.StorageBucketsModel, {
           modelAdded: (model: SDK.StorageBucketsModel.StorageBucketsModel) => this.storageBucketsModelAdded(model),
           modelRemoved: (model: SDK.StorageBucketsModel.StorageBucketsModel) => this.storageBucketsModelRemoved(model),
         },
         {scoped: true});
-
-    this.sharedStorageTreeElementDispatcher =
-        new Common.ObjectWrapper.ObjectWrapper<SharedStorageTreeElementDispatcher.EventTypes>();
-
     this.contentElement.style.contain = 'layout style';
   }
 
@@ -580,12 +570,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     }
 
     this.target = target;
-
-    const interestGroupModel = target.model(InterestGroupStorageModel);
-    if (interestGroupModel) {
-      interestGroupModel.addEventListener(
-          InterestGroupModelEvents.INTEREST_GROUP_ACCESS, this.interestGroupAccess, this);
-    }
 
     const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
     if (!resourceTreeModel) {
@@ -614,12 +598,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
           SDK.ResourceTreeModel.Events.WillLoadCachedResources, this.resetWithFrames, this);
     }
 
-    const interestGroupModel = target.model(InterestGroupStorageModel);
-    if (interestGroupModel) {
-      interestGroupModel.removeEventListener(
-          InterestGroupModelEvents.INTEREST_GROUP_ACCESS, this.interestGroupAccess, this);
-    }
-
     this.resetWithFrames();
   }
 
@@ -628,15 +606,11 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   }
 
   private initialize(): void {
-    for (const frame of SDK.ResourceTreeModel.ResourceTreeModel.frames()) {
+    for (const frame of SDK.ResourceTreeModel.ResourceTreeModel.frames(this.target?.targetManager() ??
+                                                                       SDK.TargetManager.TargetManager.instance())) {
       this.addCookieDocument(frame);
     }
-    const interestGroupModel = this.target?.model(InterestGroupStorageModel);
-    if (interestGroupModel) {
-      interestGroupModel.enable();
-    }
 
-    this.cacheStorageListTreeElement.initialize();
     const backgroundServiceModel = this.target?.model(BackgroundServiceModel) || null;
     this.backgroundFetchTreeElement.initialize(backgroundServiceModel);
     this.backgroundSyncTreeElement.initialize(backgroundServiceModel);
@@ -690,37 +664,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   private indexedDBModelRemoved(model: IndexedDBModel): void {
     this.indexedDBListTreeElement.removeIndexedDBForModel(model);
   }
-
-  private interestGroupModelAdded(model: InterestGroupStorageModel): void {
-    model.enable();
-    model.addEventListener(InterestGroupModelEvents.INTEREST_GROUP_ACCESS, this.interestGroupAccess, this);
-  }
-
-  private interestGroupModelRemoved(model: InterestGroupStorageModel): void {
-    model.disable();
-    model.removeEventListener(InterestGroupModelEvents.INTEREST_GROUP_ACCESS, this.interestGroupAccess, this);
-  }
-
-  private async sharedStorageModelAdded(model: SharedStorageModel): Promise<void> {
-    await model.enable();
-    for (const storage of model.storages()) {
-      await this.addSharedStorage(storage);
-    }
-    model.addEventListener(SharedStorageModelEvents.SHARED_STORAGE_ADDED, this.sharedStorageAdded, this);
-    model.addEventListener(SharedStorageModelEvents.SHARED_STORAGE_REMOVED, this.sharedStorageRemoved, this);
-    model.addEventListener(SharedStorageModelEvents.SHARED_STORAGE_ACCESS, this.sharedStorageAccess, this);
-  }
-
-  private sharedStorageModelRemoved(model: SharedStorageModel): void {
-    model.disable();
-    for (const storage of model.storages()) {
-      this.removeSharedStorage(storage);
-    }
-    model.removeEventListener(SharedStorageModelEvents.SHARED_STORAGE_ADDED, this.sharedStorageAdded, this);
-    model.removeEventListener(SharedStorageModelEvents.SHARED_STORAGE_REMOVED, this.sharedStorageRemoved, this);
-    model.removeEventListener(SharedStorageModelEvents.SHARED_STORAGE_ACCESS, this.sharedStorageAccess, this);
-  }
-
   private storageBucketsModelAdded(model: SDK.StorageBucketsModel.StorageBucketsModel): void {
     model.enable();
   }
@@ -770,7 +713,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   private reset(): void {
     this.domains = {};
     this.cookieListTreeElement.removeChildren();
-    this.interestGroupTreeElement.clearEvents();
     this.deviceBoundSessionsModel?.clearVisibleSites();
     this.deviceBoundSessionsModel?.clearEvents();
   }
@@ -780,13 +722,17 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
 
     if (frame.isOutermostFrame()) {
       this.reset();
+      const selectedElement = this.sidebarTree.selectedTreeElement;
+      if (selectedElement instanceof ExpandableApplicationPanelTreeElement) {
+        // Only update AI Assistance storage context for expandable category headers,
+        // as all other tree elements are re-rendered on reset.
+        const item = selectedElement.createGenericStorageAiContext();
+        if (item) {
+          UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, item);
+        }
+      }
     }
     this.addCookieDocument(frame);
-  }
-
-  private interestGroupAccess(event: Common.EventTarget.EventTargetEvent<Protocol.Storage.InterestGroupAccessedEvent>):
-      void {
-    this.interestGroupTreeElement.addEvent(event.data);
   }
 
   private addCookieDocument(frame: SDK.ResourceTreeModel.ResourceTreeFrame): void {
@@ -960,50 +906,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.extensionStorageTreeElements.delete(extensionStorage.key);
   }
 
-  private async sharedStorageAdded(event: Common.EventTarget.EventTargetEvent<SharedStorageForOrigin>): Promise<void> {
-    await this.addSharedStorage(event.data);
-  }
-
-  private async addSharedStorage(sharedStorage: SharedStorageForOrigin): Promise<void> {
-    const sharedStorageTreeElement = await SharedStorageTreeElement.createElement(this.panel, sharedStorage);
-
-    // A tree element for `sharedStorage.securityOrigin` may have been added while we were waiting for `sharedStorageTreeElement` to be created.
-    if (this.sharedStorageTreeElements.has(sharedStorage.securityOrigin)) {
-      return;
-    }
-    this.sharedStorageTreeElements.set(sharedStorage.securityOrigin, sharedStorageTreeElement);
-    this.sharedStorageListTreeElement.appendChild(sharedStorageTreeElement);
-    this.sharedStorageTreeElementDispatcher.dispatchEventToListeners(
-        SharedStorageTreeElementDispatcher.Events.SHARED_STORAGE_TREE_ELEMENT_ADDED,
-        {origin: sharedStorage.securityOrigin});
-  }
-
-  private sharedStorageRemoved(event: Common.EventTarget.EventTargetEvent<SharedStorageForOrigin>): void {
-    this.removeSharedStorage(event.data);
-  }
-
-  private removeSharedStorage(sharedStorage: SharedStorageForOrigin): void {
-    const treeElement = this.sharedStorageTreeElements.get(sharedStorage.securityOrigin);
-    if (!treeElement) {
-      return;
-    }
-    const wasSelected = treeElement.selected;
-    const parentListTreeElement = treeElement.parent;
-    if (parentListTreeElement) {
-      parentListTreeElement.removeChild(treeElement);
-      parentListTreeElement.setExpandable(parentListTreeElement.childCount() > 0);
-      if (wasSelected) {
-        parentListTreeElement.select();
-      }
-    }
-    this.sharedStorageTreeElements.delete(sharedStorage.securityOrigin);
-  }
-
-  private sharedStorageAccess(event: Common.EventTarget.EventTargetEvent<Protocol.Storage.SharedStorageAccessedEvent>):
-      void {
-    this.sharedStorageListTreeElement.addEvent(event.data);
-  }
-
   async showResource(resource: SDK.Resource.Resource, line?: number, column?: number): Promise<void> {
     await this.resourcesSection.revealResource(resource, line, column);
   }
@@ -1030,6 +932,11 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     if (bucketsModel) {
       this.storageBucketsTreeElement?.getBucketTreeElement(bucketsModel, bucketInfo)?.revealAndSelect(true);
     }
+  }
+
+  // Selects the Storage tree element in the sidebar (which opens the StorageView component for the main Storage tab).
+  showStorage(): void {
+    this.storageTreeElement?.select();
   }
 
   private onmousemove(event: MouseEvent): void {
@@ -1113,6 +1020,9 @@ export class BackgroundServiceTreeElement extends ApplicationPanelTreeElement {
 
   initialize(model: BackgroundServiceModel|null): void {
     this.model = model;
+    if (this.view && model) {
+      this.view.model = model;
+    }
     // Show the view if the model was initialized after selection.
     if (this.#selected && !this.view) {
       this.onselect(false);
@@ -1139,7 +1049,9 @@ export class BackgroundServiceTreeElement extends ApplicationPanelTreeElement {
     }
 
     if (!this.view) {
-      this.view = new BackgroundServiceView(this.serviceName, this.model);
+      this.view = new BackgroundServiceView();
+      this.view.serviceName = this.serviceName;
+      this.view.model = this.model;
     }
     this.showView(this.view);
     UI.Context.Context.instance().setFlavor(BackgroundServiceView, this.view);
@@ -1235,7 +1147,7 @@ export class AppManifestTreeElement extends ApplicationPanelTreeElement {
   }
 }
 
-export class ClearStorageTreeElement extends ApplicationPanelTreeElement {
+export class StorageTreeElement extends ApplicationPanelTreeElement {
   private view?: StorageView;
   constructor(storagePanel: ResourcesPanel) {
     super(storagePanel, i18nString(UIStrings.storage), false, 'storage');
@@ -1244,7 +1156,7 @@ export class ClearStorageTreeElement extends ApplicationPanelTreeElement {
   }
 
   override get itemURL(): Platform.DevToolsPath.UrlString {
-    return 'clear-storage://' as Platform.DevToolsPath.UrlString;
+    return 'storage://' as Platform.DevToolsPath.UrlString;
   }
 
   override onselect(selectedByUser?: boolean): boolean {
@@ -1759,18 +1671,56 @@ export class DOMStorageTreeElement extends ApplicationPanelTreeElement {
     super.onselect(selectedByUser);
     UI.UIUserMetrics.UIUserMetrics.instance().panelShown('dom-storage');
     this.resourcesPanel.showDOMStorage(this.domStorage);
+    const storageItem = this.#getStorageItem();
+    UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
     return false;
+  }
+
+  /**
+   * Resolves the DOM storage partition context (`localStorage` or `sessionStorage`)
+   * associated with this tree element for AI assistance.
+   */
+  #getStorageItem(): AiAssistance.StorageItem.StorageItem|null {
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const mainPageOrigin =
+        target?.inspectedURL() ? Common.ParsedURL.ParsedURL.extractOrigin(target.inspectedURL()) : '';
+    if (!mainPageOrigin || !this.domStorage.storageKey) {
+      return null;
+    }
+    const origin = SDK.StorageKeyManager.parseStorageKey(this.domStorage.storageKey).origin;
+    const storageType = this.domStorage.isLocalStorage ? 'localStorage' : 'sessionStorage';
+    return new AiAssistance.StorageItem.DOMStorageItem(mainPageOrigin, origin, this.domStorage.storageKey, storageType);
   }
 
   override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
+    const storageItem = this.#getStorageItem();
+    if (storageItem) {
+      this.createAiButton(() => this.#getStorageItem());
+    }
   }
 
   private handleContextMenuEvent(event: MouseEvent): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.defaultSection().appendItem(
         i18nString(UIStrings.clear), () => this.domStorage.clear(), {jslogContext: 'clear'});
+
+    const storageItem = this.#getStorageItem();
+    if (storageItem) {
+      const openAiAssistanceId = 'ai-assistance.application-panel-context';
+      if (UI.ActionRegistry.ActionRegistry.instance().hasAction(openAiAssistanceId)) {
+        UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
+        const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
+        const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
+        submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
+        submenu.defaultSection().appendItem(
+            i18nString(UIStrings.explainStorage),
+            () => action.execute({prompt: 'What is the purpose of this storage bucket?'}),
+            {disabled: !action.enabled(), jslogContext: openAiAssistanceId + '.storage'});
+      }
+    }
+
     void contextMenu.show();
   }
 }
@@ -1851,9 +1801,27 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     return this.#cookieDomain;
   }
 
+  /**
+   * Resolves the cookie domain security context associated with this tree element
+   * for AI assistance.
+   */
+  #getStorageItem(): AiAssistance.StorageItem.StorageItem|null {
+    const primaryTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const mainPageOrigin =
+        primaryTarget?.inspectedURL() ? Common.ParsedURL.ParsedURL.extractOrigin(primaryTarget.inspectedURL()) : '';
+    if (!mainPageOrigin || !this.#cookieDomain) {
+      return null;
+    }
+    return new AiAssistance.StorageItem.CookieItem(mainPageOrigin, this.#cookieDomain);
+  }
+
   override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
+    const storageItem = this.#getStorageItem();
+    if (storageItem) {
+      this.createAiButton(() => this.#getStorageItem());
+    }
   }
 
   private handleContextMenuEvent(event: Event): void {
@@ -1861,6 +1829,22 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     contextMenu.defaultSection().appendItem(
         i18nString(UIStrings.clear), () => this.resourcesPanel.clearCookies(this.target, this.#cookieDomain),
         {jslogContext: 'clear'});
+
+    const storageItem = this.#getStorageItem();
+    if (storageItem) {
+      const openAiAssistanceId = 'ai-assistance.application-panel-context';
+      if (UI.ActionRegistry.ActionRegistry.instance().hasAction(openAiAssistanceId)) {
+        UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
+        const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
+        const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
+        submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
+        submenu.defaultSection().appendItem(
+            i18nString(UIStrings.explainCookies),
+            () => action.execute({prompt: 'What is the purpose of these cookies?'}),
+            {disabled: !action.enabled(), jslogContext: openAiAssistanceId + '.cookies'});
+      }
+    }
+
     void contextMenu.show();
   }
 
@@ -1869,6 +1853,8 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     this.resourcesPanel.showCookies(this.target, this.#cookieDomain);
     UI.UIUserMetrics.UIUserMetrics.instance().panelShown(
         Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.cookies]);
+    const storageItem = this.#getStorageItem();
+    UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
     return false;
   }
 }
@@ -2225,7 +2211,7 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
     this.showView(this.view);
 
     this.listItemElement.classList.remove('hovered');
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     return false;
   }
 
@@ -2235,7 +2221,7 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
       void this.frame.highlight();
     } else {
       this.listItemElement.classList.remove('hovered');
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     }
   }
 

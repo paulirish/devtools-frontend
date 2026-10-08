@@ -23,7 +23,7 @@ devtools_module("inspector_main") {
     "RenderingOptions.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
@@ -37,17 +37,16 @@ devtools_module("inspector_main") {
     "../../ui/legacy/components/settings_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/lit:bundle",
+    "../../ui/settings:bundle",
     "../../ui/visual_logging:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "inspector_main.ts"
 
-  deps = [
-    ":css_files",
-    ":inspector_main",
-  ]
+  ts_deps = [ ":inspector_main" ]
 
   visibility = [
     ":*",
@@ -61,19 +60,18 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "inspector_main-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
-    "../../core/root:bundle",
+    "../../core/sdk:bundle",
     "../../ui/legacy:bundle",
+    "../../ui/settings:bundle",
   ]
 
   visibility = [
-    "../../panels/greendev/*",
     "../../testing/*",
     "../devtools_app/*",
-    "../greendev_floaty/*",
     "../trace_app/*",
   ]
 }
@@ -86,7 +84,7 @@ ts_library("unittests") {
     "OutermostTargetSelector.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/protocol_client:bundle",
     "../../core/root:bundle",

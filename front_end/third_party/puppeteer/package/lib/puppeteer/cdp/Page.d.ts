@@ -13,9 +13,10 @@ import type { Extension } from '../api/Extension.js';
 import type { Frame, WaitForOptions } from '../api/Frame.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { JSHandle } from '../api/JSHandle.js';
-import type { Credentials, HeapSnapshotOptions, ReloadOptions } from '../api/Page.js';
+import type { Credentials, HeapSnapshotOptions, RecordOptions, ReloadOptions } from '../api/Page.js';
 import { Page, type GeolocationOptions, type MediaFeature, type Metrics, type NewDocumentScriptEvaluation, type ScreenshotOptions, type WaitTimeoutOptions } from '../api/Page.js';
 import type { Cookie, DeleteCookiesRequest, CookieParam, CookiePartitionKey, CookieSameSite } from '../common/Cookie.js';
+import { type Logger } from '../common/Debug.js';
 import { FileChooser } from '../common/FileChooser.js';
 import type { PDFOptions } from '../common/PDFOptions.js';
 import type { Viewport } from '../common/Viewport.js';
@@ -25,6 +26,7 @@ import { Coverage } from './Coverage.js';
 import type { CdpFrame } from './Frame.js';
 import { CdpKeyboard, CdpMouse, CdpTouchscreen } from './Input.js';
 import type { NetworkConditions } from './NetworkManager.js';
+import { CdpScreenRecording } from './ScreenRecording.js';
 import type { CdpTarget } from './Target.js';
 import { Tracing } from './Tracing.js';
 import { WebMCP } from './WebMCP.js';
@@ -38,8 +40,8 @@ export declare function convertSameSiteFromPuppeteerToCdp(sameSite: CookieSameSi
  */
 export declare class CdpPage extends Page {
     #private;
-    static _create(client: CdpCDPSession, target: CdpTarget, defaultViewport: Viewport | null): Promise<CdpPage>;
-    constructor(client: CdpCDPSession, target: CdpTarget);
+    static _create(client: CdpCDPSession, target: CdpTarget, defaultViewport: Viewport | null, logger: Logger): Promise<CdpPage>;
+    constructor(client: CdpCDPSession, target: CdpTarget, logger: Logger);
     resize(params: {
         contentWidth: number;
         contentHeight: number;
@@ -104,6 +106,7 @@ export declare class CdpPage extends Page {
     emulateCPUThrottling(factor: number | null): Promise<void>;
     emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
     emulateTimezone(timezoneId?: string): Promise<void>;
+    emulateLocale(locale?: string): Promise<void>;
     emulateIdleState(overrides?: {
         isUserActive: boolean;
         isScreenUnlocked: boolean;
@@ -148,6 +151,10 @@ export declare class CdpPage extends Page {
     waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
     get bluetooth(): BluetoothEmulation;
     extensionRealms(): Realm[];
+    /**
+     * @internal
+     */
+    createScreenRecording(options: Readonly<RecordOptions>): CdpScreenRecording;
 }
 /**
  * @internal

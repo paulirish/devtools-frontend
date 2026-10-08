@@ -1,16 +1,18 @@
 import { Extension } from '../api/api.js';
-import { debugError } from '../common/util.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { isErrorLike } from '../util/ErrorLike.js';
 import { isTargetClosedError } from './Connection.js';
 export class CdpExtension extends Extension {
     // needed to access the CDPSession to trigger an extension action.
     #browser;
+    #logger;
     /*
      * @internal
      */
-    constructor(id, version, name, path, enabled, browser) {
+    constructor(id, version, name, path, enabled, browser, logger) {
         super(id, version, name, path, enabled);
         this.#browser = browser;
+        this.#logger = logger;
     }
     async workers() {
         const targets = this.#browser.targets();
@@ -19,23 +21,21 @@ export class CdpExtension extends Extension {
             return (target.type() === 'service_worker' &&
                 targetUrl.startsWith('chrome-extension://' + this.id));
         });
-        const workers = [];
-        for (const target of extensionWorkers) {
+        const workers = await Promise.all(extensionWorkers.map(async (target) => {
             try {
-                const worker = await target.worker();
-                if (worker) {
-                    workers.push(worker);
-                }
+                return await target.worker();
             }
             catch (err) {
                 if (this.#canIgnoreError(err)) {
-                    debugError(err);
-                    continue;
+                    this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+                    return null;
                 }
                 throw err;
             }
-        }
-        return workers;
+        }));
+        return workers.filter((worker) => {
+            return worker !== null;
+        });
     }
     async pages() {
         const targets = this.#browser.targets();
@@ -50,7 +50,7 @@ export class CdpExtension extends Extension {
             }
             catch (err) {
                 if (this.#canIgnoreError(err)) {
-                    debugError(err);
+                    this.#logger?.(DEBUG_PREFIXES.error)?.(err);
                     return null;
                 }
                 throw err;

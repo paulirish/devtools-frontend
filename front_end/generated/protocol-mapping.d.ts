@@ -301,12 +301,6 @@ export namespace ProtocolMapping {
      */
     'Network.loadingFinished': [Protocol.Network.LoadingFinishedEvent];
     /**
-     * Details of an intercepted HTTP request, which must be either allowed, blocked, modified or
-     * mocked.
-     * Deprecated, use Fetch.requestPaused instead.
-     */
-    'Network.requestIntercepted': [Protocol.Network.RequestInterceptedEvent];
-    /**
      * Fired if request ended up loading from cache.
      */
     'Network.requestServedFromCache': [Protocol.Network.RequestServedFromCacheEvent];
@@ -781,35 +775,12 @@ export namespace ProtocolMapping {
      * The origin's IndexedDB database list has been modified.
      */
     'Storage.indexedDBListUpdated': [Protocol.Storage.IndexedDBListUpdatedEvent];
-    /**
-     * One of the interest groups was accessed. Note that these events are global
-     * to all targets sharing an interest group store.
-     */
-    'Storage.interestGroupAccessed': [Protocol.Storage.InterestGroupAccessedEvent];
-    /**
-     * An auction involving interest groups is taking place. These events are
-     * target-specific.
-     */
-    'Storage.interestGroupAuctionEventOccurred': [Protocol.Storage.InterestGroupAuctionEventOccurredEvent];
-    /**
-     * Specifies which auctions a particular network fetch may be related to, and
-     * in what role. Note that it is not ordered with respect to
-     * Network.requestWillBeSent (but will happen before loadingFinished
-     * loadingFailed).
-     */
-    'Storage.interestGroupAuctionNetworkRequestCreated': [Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent];
-    /**
-     * Shared storage was accessed by the associated page.
-     * The following parameters are included in all events.
-     */
-    'Storage.sharedStorageAccessed': [Protocol.Storage.SharedStorageAccessedEvent];
-    /**
-     * A shared storage run or selectURL operation finished its execution.
-     * The following parameters are included in all events.
-     */
-    'Storage.sharedStorageWorkletOperationExecutionFinished': [Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent];
     'Storage.storageBucketCreatedOrUpdated': [Protocol.Storage.StorageBucketCreatedOrUpdatedEvent];
     'Storage.storageBucketDeleted': [Protocol.Storage.StorageBucketDeletedEvent];
+    /**
+     * Private Verification Tokens have been stored or deleted.
+     */
+    'Storage.privateVerificationTokensUpdated': [];
     /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
@@ -1088,6 +1059,22 @@ export namespace ProtocolMapping {
     'Accessibility.queryAXTree': {
       paramsType: [Protocol.Accessibility.QueryAXTreeRequest?];
       returnType: Protocol.Accessibility.QueryAXTreeResponse;
+    };
+    /**
+     * Retrieves ad metrics for the current page.
+     */
+    'Ads.getAdMetrics': {
+      paramsType: [];
+      returnType: Protocol.Ads.GetAdMetricsResponse;
+    };
+    /**
+     * Retrieves ad scripts for the current page. To minimize payload size, this
+     * only returns the newly tracked ad scripts since the last call to
+     * getAdScripts (i.e., the delta).
+     */
+    'Ads.getAdScripts': {
+      paramsType: [];
+      returnType: Protocol.Ads.GetAdScriptsResponse;
     };
     /**
      * Disables animation domain notifications.
@@ -1440,6 +1427,15 @@ export namespace ProtocolMapping {
       returnType: Protocol.Browser.GetBrowserCommandLineResponse;
     };
     /**
+     * Adds or updates a mock camera in the shared video capture device list for
+     * test automation. The mock camera is not scoped to a particular page or
+     * frame and is removed when the DevTools session that created it disconnects.
+     */
+    'Browser.addMockCamera': {
+      paramsType: [Protocol.Browser.AddMockCameraRequest];
+      returnType: void;
+    };
+    /**
      * Get Chrome histograms.
      */
     'Browser.getHistograms': {
@@ -1504,14 +1500,20 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Configures encryption keys used with a given privacy sandbox API to talk
-     * to a trusted coordinator.  Since this is intended for test automation only,
-     * coordinatorOrigin must be a .test domain. No existing coordinator
-     * configuration for the origin may exist.
+     * Gets the current globally-applied privacy control status
+     * See https://www.w3.org/TR/gpc/#get-global-privacy-control
      */
-    'Browser.addPrivacySandboxCoordinatorKeyConfig': {
-      paramsType: [Protocol.Browser.AddPrivacySandboxCoordinatorKeyConfigRequest];
-      returnType: void;
+    'Browser.getGlobalPrivacyControl': {
+      paramsType: [];
+      returnType: Protocol.Browser.GetGlobalPrivacyControlResponse;
+    };
+    /**
+     * Sets and then gets the current globally-applied privacy control status
+     * See https://www.w3.org/TR/gpc/#set-global-privacy-control
+     */
+    'Browser.setGlobalPrivacyControl': {
+      paramsType: [Protocol.Browser.SetGlobalPrivacyControlRequest];
+      returnType: Protocol.Browser.SetGlobalPrivacyControlResponse;
     };
     /**
      * Inserts a new rule with the given `ruleText` in a stylesheet with given `styleSheetId`, at the
@@ -1563,6 +1565,13 @@ export namespace ProtocolMapping {
      */
     'CSS.forceStartingStyle': {
       paramsType: [Protocol.CSS.ForceStartingStyleRequest];
+      returnType: void;
+    };
+    /**
+     * Forces a position-try option for the given node.
+     */
+    'CSS.forcePositionTryOption': {
+      paramsType: [Protocol.CSS.ForcePositionTryOptionRequest];
       returnType: void;
     };
     'CSS.getBackgroundColors': {
@@ -2300,6 +2309,40 @@ export namespace ProtocolMapping {
       returnType: Protocol.DOM.ForceShowPopoverResponse;
     };
     /**
+     * Returns candidate nodes that are configured as triggers for the given popover.
+     */
+    'DOM.getImplicitAnchorCandidates': {
+      paramsType: [Protocol.DOM.GetImplicitAnchorCandidatesRequest];
+      returnType: Protocol.DOM.GetImplicitAnchorCandidatesResponse;
+    };
+    /**
+     * When enabling, this API forces an element to gain interest in its target,
+     * keeping interest active until disabled.
+     */
+    'DOM.forceShowInterest': {
+      paramsType: [Protocol.DOM.ForceShowInterestRequest];
+      returnType: void;
+    };
+    /**
+     * Sets a spelling or grammar error marker on the given range of text.
+     * See https://github.com/Igalia/explainers/blob/main/force-spelling-grammar-markers/README.md
+     * Note: exactly one between nodeId, backendNodeId and objectId should be passed
+     * to identify the node.
+     */
+    'DOM.setTextMarker': {
+      paramsType: [Protocol.DOM.SetTextMarkerRequest];
+      returnType: void;
+    };
+    /**
+     * Clears the spelling and grammar error text markers overlapping the ranges
+     * set by setTextMarker in this session. These markers are also removed when
+     * the DOM domain is disabled or the session ends.
+     */
+    'DOM.clearTextMarkers': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
      * Returns event listeners of the given object.
      */
     'DOMDebugger.getEventListeners': {
@@ -2476,6 +2519,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Sets the behavior of the virtual wallet for digital credential requests
+     * issued from this frame.
+     */
+    'DigitalCredentials.setVirtualWalletBehavior': {
+      paramsType: [Protocol.DigitalCredentials.SetVirtualWalletBehaviorRequest];
+      returnType: void;
+    };
+    /**
      * Tells whether emulation is supported.
      */
     'Emulation.canEmulate': {
@@ -2538,6 +2589,18 @@ export namespace ProtocolMapping {
      */
     'Emulation.setSafeAreaInsetsOverride': {
       paramsType: [Protocol.Emulation.SetSafeAreaInsetsOverrideRequest];
+      returnType: void;
+    };
+    /**
+     * Overrides virtual keyboard geometry in CSS pixels, relative to the top-level viewport. The
+     * provided rect is used for navigator.virtualKeyboard.boundingRect, geometrychange events, and
+     * env(keyboard-inset-*) values on the inspected frame. The override applies independently of
+     * navigator.virtualKeyboard.overlaysContent so clients can preview overlay geometry without
+     * mutating page state. Values are rounded to the nearest CSS pixel. Omitting the rect clears the
+     * override.
+     */
+    'Emulation.setVirtualKeyboardGeometryOverride': {
+      paramsType: [Protocol.Emulation.SetVirtualKeyboardGeometryOverrideRequest?];
       returnType: void;
     };
     /**
@@ -2754,6 +2817,13 @@ export namespace ProtocolMapping {
     };
     'Emulation.setHardwareConcurrencyOverride': {
       paramsType: [Protocol.Emulation.SetHardwareConcurrencyOverrideRequest];
+      returnType: void;
+    };
+    /**
+     * Overrides the value of navigator.cpuPerformance
+     */
+    'Emulation.setCPUPerformanceOverride': {
+      paramsType: [Protocol.Emulation.SetCPUPerformanceOverrideRequest?];
       returnType: void;
     };
     /**
@@ -3018,6 +3088,37 @@ export namespace ProtocolMapping {
     'FileSystem.getDirectory': {
       paramsType: [Protocol.FileSystem.GetDirectoryRequest];
       returnType: Protocol.FileSystem.GetDirectoryResponse;
+    };
+    /**
+     * Forwards `query` to the find-in-page facility, starting a new find session.
+     * Where exactly the search starts from is implementation-specific.
+     */
+    'FindInPage.findFirst': {
+      paramsType: [Protocol.FindInPage.FindFirstRequest];
+      returnType: void;
+    };
+    /**
+     * Moves to the next match for the query passed to the most recent
+     * findFirst() call.
+     */
+    'FindInPage.findNext': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Moves to the previous match for the query passed to the most recent
+     * findFirst() call.
+     */
+    'FindInPage.findPrev': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Ends the current find session, if any, and clears its highlighting.
+     */
+    'FindInPage.stop': {
+      paramsType: [];
+      returnType: void;
     };
     /**
      * Sends a BeginFrame to the target and returns when the frame was completed. Optionally captures a
@@ -3428,20 +3529,6 @@ export namespace ProtocolMapping {
       returnType: Protocol.Memory.GetSamplingProfileResponse;
     };
     /**
-     * Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
-     */
-    'Network.setAcceptedEncodings': {
-      paramsType: [Protocol.Network.SetAcceptedEncodingsRequest];
-      returnType: void;
-    };
-    /**
-     * Clears accepted encodings set by setAcceptedEncodings
-     */
-    'Network.clearAcceptedEncodingsOverride': {
-      paramsType: [];
-      returnType: void;
-    };
-    /**
      * Tells whether clearing browser cache is supported.
      */
     'Network.canClearBrowserCache': {
@@ -3474,17 +3561,6 @@ export namespace ProtocolMapping {
      */
     'Network.clearBrowserCookies': {
       paramsType: [];
-      returnType: void;
-    };
-    /**
-     * Response to Network.requestIntercepted which either modifies the request to continue with any
-     * modifications, or blocks it, or completes it with the provided response bytes. If a network
-     * fetch occurs as a result which encounters a redirect an additional Network.requestIntercepted
-     * event will be sent with the same InterceptionId.
-     * Deprecated, use Fetch.continueRequest, Fetch.fulfillRequest and Fetch.failRequest instead.
-     */
-    'Network.continueInterceptedRequest': {
-      paramsType: [Protocol.Network.ContinueInterceptedRequestRequest];
       returnType: void;
     };
     /**
@@ -3580,23 +3656,6 @@ export namespace ProtocolMapping {
       returnType: Protocol.Network.GetRequestPostDataResponse;
     };
     /**
-     * Returns content served for the given currently intercepted request.
-     */
-    'Network.getResponseBodyForInterception': {
-      paramsType: [Protocol.Network.GetResponseBodyForInterceptionRequest];
-      returnType: Protocol.Network.GetResponseBodyForInterceptionResponse;
-    };
-    /**
-     * Returns a handle to the stream representing the response body. Note that after this command,
-     * the intercepted request can't be continued as is -- you either need to cancel it or to provide
-     * the response body. The stream only supports sequential read, IO.read will fail if the position
-     * is specified.
-     */
-    'Network.takeResponseBodyForInterceptionAsStream': {
-      paramsType: [Protocol.Network.TakeResponseBodyForInterceptionAsStreamRequest];
-      returnType: Protocol.Network.TakeResponseBodyForInterceptionAsStreamResponse;
-    };
-    /**
      * This method sends a new XMLHttpRequest which is identical to the original one. The following
      * parameters should be identical: method, url, async, request body, extra headers, withCredentials
      * attribute, user, password.
@@ -3659,14 +3718,6 @@ export namespace ProtocolMapping {
      */
     'Network.setAttachDebugStack': {
       paramsType: [Protocol.Network.SetAttachDebugStackRequest];
-      returnType: void;
-    };
-    /**
-     * Sets the requests to intercept that match the provided patterns and optionally resource types.
-     * Deprecated, please use Fetch.enable instead.
-     */
-    'Network.setRequestInterception': {
-      paramsType: [Protocol.Network.SetRequestInterceptionRequest];
       returnType: void;
     };
     /**
@@ -3926,6 +3977,13 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Add a display cutout overlay.
+     */
+    'Overlay.setShowDisplayCutout': {
+      paramsType: [Protocol.Overlay.SetShowDisplayCutoutRequest?];
+      returnType: void;
+    };
+    /**
      * Show elements in isolation mode with overlays.
      */
     'Overlay.setShowIsolatedElements': {
@@ -4145,12 +4203,26 @@ export namespace ProtocolMapping {
       returnType: Protocol.Page.GetManifestIconsResponse;
     };
     /**
-     * Returns the unique (PWA) app id.
+     * Returns the unique (PWA) app id, along with IWA bundle ID and parent app info.
      * Only returns values if the feature flag 'WebAppEnableManifestId' is enabled
      */
     'Page.getAppId': {
       paramsType: [];
       returnType: Protocol.Page.GetAppIdResponse;
+    };
+    /**
+     * Returns the list of installed child Sub-Apps for the inspected parent app.
+     */
+    'Page.getSubApps': {
+      paramsType: [];
+      returnType: Protocol.Page.GetSubAppsResponse;
+    };
+    /**
+     * Returns the list of sibling Sub-Apps sharing the same parent app if the inspected context is a Sub-App.
+     */
+    'Page.getSiblingSubApps': {
+      paramsType: [];
+      returnType: Protocol.Page.GetSiblingSubAppsResponse;
     };
     'Page.getAdScriptAncestry': {
       paramsType: [Protocol.Page.GetAdScriptAncestryRequest];
@@ -4361,6 +4433,20 @@ export namespace ProtocolMapping {
     'Page.startScreencast': {
       paramsType: [Protocol.Page.StartScreencastRequest?];
       returnType: void;
+    };
+    /**
+     * Starts screencast video recording.
+     */
+    'Page.startScreenRecording': {
+      paramsType: [Protocol.Page.StartScreenRecordingRequest?];
+      returnType: Protocol.Page.StartScreenRecordingResponse;
+    };
+    /**
+     * Stops screencast video recording.
+     */
+    'Page.stopScreenRecording': {
+      paramsType: [];
+      returnType: Protocol.Page.StopScreenRecordingResponse;
     };
     /**
      * Force the page stop all navigations and pending resource fetches.
@@ -4899,74 +4985,40 @@ export namespace ProtocolMapping {
       returnType: Protocol.Storage.ClearTrustTokensResponse;
     };
     /**
-     * Gets details for a named interest group.
+     * Returns all stored Private Verification Tokens for the current browsing
+     * context.
      */
-    'Storage.getInterestGroupDetails': {
-      paramsType: [Protocol.Storage.GetInterestGroupDetailsRequest];
-      returnType: Protocol.Storage.GetInterestGroupDetailsResponse;
+    'Storage.getPrivateVerificationTokens': {
+      paramsType: [];
+      returnType: Protocol.Storage.GetPrivateVerificationTokensResponse;
     };
     /**
-     * Enables/Disables issuing of interestGroupAccessed events.
+     * Returns the configured Private Verification Tokens issuers and their redeemer
+     * origins.
      */
-    'Storage.setInterestGroupTracking': {
-      paramsType: [Protocol.Storage.SetInterestGroupTrackingRequest];
+    'Storage.getPrivateVerificationTokensIssuerConfigs': {
+      paramsType: [];
+      returnType: Protocol.Storage.GetPrivateVerificationTokensIssuerConfigsResponse;
+    };
+    /**
+     * Removes all Private Verification Tokens issued by the provided issuerOrigin.
+     */
+    'Storage.clearPrivateVerificationTokens': {
+      paramsType: [Protocol.Storage.ClearPrivateVerificationTokensRequest];
       returnType: void;
     };
     /**
-     * Enables/Disables issuing of interestGroupAuctionEventOccurred and
-     * interestGroupAuctionNetworkRequestCreated.
+     * Removes a specific Private Verification Token by its ID.
      */
-    'Storage.setInterestGroupAuctionTracking': {
-      paramsType: [Protocol.Storage.SetInterestGroupAuctionTrackingRequest];
+    'Storage.deletePrivateVerificationToken': {
+      paramsType: [Protocol.Storage.DeletePrivateVerificationTokenRequest];
       returnType: void;
     };
     /**
-     * Gets metadata for an origin's shared storage.
+     * Set tracking for Private Verification Tokens.
      */
-    'Storage.getSharedStorageMetadata': {
-      paramsType: [Protocol.Storage.GetSharedStorageMetadataRequest];
-      returnType: Protocol.Storage.GetSharedStorageMetadataResponse;
-    };
-    /**
-     * Gets the entries in an given origin's shared storage.
-     */
-    'Storage.getSharedStorageEntries': {
-      paramsType: [Protocol.Storage.GetSharedStorageEntriesRequest];
-      returnType: Protocol.Storage.GetSharedStorageEntriesResponse;
-    };
-    /**
-     * Sets entry with `key` and `value` for a given origin's shared storage.
-     */
-    'Storage.setSharedStorageEntry': {
-      paramsType: [Protocol.Storage.SetSharedStorageEntryRequest];
-      returnType: void;
-    };
-    /**
-     * Deletes entry for `key` (if it exists) for a given origin's shared storage.
-     */
-    'Storage.deleteSharedStorageEntry': {
-      paramsType: [Protocol.Storage.DeleteSharedStorageEntryRequest];
-      returnType: void;
-    };
-    /**
-     * Clears all entries for a given origin's shared storage.
-     */
-    'Storage.clearSharedStorageEntries': {
-      paramsType: [Protocol.Storage.ClearSharedStorageEntriesRequest];
-      returnType: void;
-    };
-    /**
-     * Resets the budget for `ownerOrigin` by clearing all budget withdrawals.
-     */
-    'Storage.resetSharedStorageBudget': {
-      paramsType: [Protocol.Storage.ResetSharedStorageBudgetRequest];
-      returnType: void;
-    };
-    /**
-     * Enables/disables issuing of sharedStorageAccessed events.
-     */
-    'Storage.setSharedStorageTracking': {
-      paramsType: [Protocol.Storage.SetSharedStorageTrackingRequest];
+    'Storage.setPrivateVerificationTokensTracking': {
+      paramsType: [Protocol.Storage.SetPrivateVerificationTokensTrackingRequest];
       returnType: void;
     };
     /**
@@ -4989,18 +5041,6 @@ export namespace ProtocolMapping {
     'Storage.runBounceTrackingMitigations': {
       paramsType: [];
       returnType: Protocol.Storage.RunBounceTrackingMitigationsResponse;
-    };
-    /**
-     * Returns the effective Related Website Sets in use by this profile for the browser
-     * session. The effective Related Website Sets will not change during a browser session.
-     */
-    'Storage.getRelatedWebsiteSets': {
-      paramsType: [];
-      returnType: Protocol.Storage.GetRelatedWebsiteSetsResponse;
-    };
-    'Storage.setProtectedAudienceKAnonymity': {
-      paramsType: [Protocol.Storage.SetProtectedAudienceKAnonymityRequest];
-      returnType: void;
     };
     /**
      * Returns information about the system.
@@ -5597,13 +5637,7 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Edits JavaScript source live.
-     *
-     * In general, functions that are currently on the stack can not be edited with
-     * a single exception: If the edited function is the top-most stack frame and
-     * that is the only activation of that function on the stack. In this case
-     * the live edit will be successful and a `Debugger.restartFrame` for the
-     * top-most function is automatically triggered.
+     * Live edit is no longer supported and this command always fails with a "no longer available" error.
      */
     'Debugger.setScriptSource': {
       paramsType: [Protocol.Debugger.SetScriptSourceRequest];

@@ -1,6 +1,7 @@
 import { firstValueFrom, from, merge, raceWith, } from '../../third_party/rxjs/rxjs.js';
+import { DEBUG_PREFIXES } from '../common/Debug.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { debugError, fromEmitterEvent, filterAsync, timeout, fromAbortSignal, } from '../common/util.js';
+import { fromEmitterEvent, filterAsync, timeout, fromAbortSignal, } from '../common/util.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 /**
  * @internal
@@ -67,11 +68,19 @@ export const WEB_PERMISSION_TO_PROTOCOL_PERMISSION = new Map([
  * @public
  */
 export class Browser extends EventEmitter {
+    #logger;
     /**
      * @internal
      */
-    constructor() {
-        super();
+    constructor(logger) {
+        super(undefined, logger);
+        this.#logger = logger;
+    }
+    /**
+     * @internal
+     */
+    get logger() {
+        return this.#logger;
     }
     /**
      * Waits until a {@link Target | target} matching the given `predicate`
@@ -178,11 +187,11 @@ export class Browser extends EventEmitter {
     async setPermission(origin, ...permissions) {
         return await this.defaultBrowserContext().setPermission(origin, ...permissions);
     }
-    /** @internal */
     [disposeSymbol]() {
-        return void this[asyncDisposeSymbol]().catch(debugError);
+        return void this[asyncDisposeSymbol]().catch(error => {
+            this.#logger?.(DEBUG_PREFIXES.error)?.(error);
+        });
     }
-    /** @internal */
     async [asyncDisposeSymbol]() {
         if (this.process()) {
             await this.close();

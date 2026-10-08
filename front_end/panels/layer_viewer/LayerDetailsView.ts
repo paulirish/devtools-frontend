@@ -24,15 +24,15 @@ const {widget} = UI.Widget;
 
 const UIStrings = {
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   selectALayerToSeeItsDetails: 'Select a layer to see its details',
   /**
-   * @description Text in Layer Details View of the Layers panel if no layer is selected for viewing its content
+   * @description Text in layer details view of the Layers panel if no layer is selected for viewing its content.
    */
   noLayerSelected: 'No layer selected',
   /**
-   * @description Element text content in Layer Details View of the Layers panel
+   * @description Element text content in layer details view of the Layers panel.
    * @example {Touch event handler} PH1
    * @example {10} PH2
    * @example {10} PH3
@@ -41,46 +41,46 @@ const UIStrings = {
    */
   scrollRectangleDimensions: '{PH1} {PH2} × {PH3} (at {PH4}, {PH5})',
   /**
-   * @description Text in Layer Details View of the Layers panel. Used to indicate that a particular
+   * @description Text in layer details view of the Layers panel. Used to indicate that a particular
    * layer of the website is unnamed (was not given a name/doesn't have one).
    */
   unnamed: '<unnamed>',
   /**
-   * @description Text in Layer Details View of the Layers panel
-   * @example {Nearest Layer Shifting Sticky Box} PH1
+   * @description Text in layer details view of the Layers panel.
+   * @example {Nearest layer shifting sticky box} PH1
    * @example {&lt;unnamed&gt;} PH2
    * @example {5} PH3
    */
   stickyAncestorLayersS: '{PH1}: {PH2} ({PH3})',
   /**
-   * @description Sticky box rect element text content in Layer Details View of the Layers panel
+   * @description Sticky box rect element text content in layer details view of the Layers panel.
    * @example {10} PH1
    * @example {10} PH2
    * @example {10} PH3
    * @example {10} PH4
    */
-  stickyBoxRectangleDimensions: 'Sticky Box {PH1} × {PH2} (at {PH3}, {PH4})',
+  stickyBoxRectangleDimensions: 'Sticky box {PH1} × {PH2} (at {PH3}, {PH4})',
   /**
-   * @description Containing block rect element text content in Layer Details View of the Layers panel.
-   * The placeholder are width, height, x position, and y position respectively.
+   * @description Containing block rect element text content in layer details view of the Layers panel.
+   * The placeholders are width, height, x position, and y position respectively.
    * @example {10} PH1
    * @example {10} PH2
    * @example {10} PH3
    * @example {10} PH4
    */
-  containingBlocRectangleDimensions: 'Containing Block {PH1} × {PH2} (at {PH3}, {PH4})',
+  containingBlocRectangleDimensions: 'Containing block {PH1} × {PH2} (at {PH3}, {PH4})',
   /**
-   * @description Text in Layer Details View of the Layers panel. This also means "The nearest sticky
+   * @description Text in layer details view of the Layers panel. This also means "The nearest sticky
    * box that causes a layer shift".
    */
-  nearestLayerShiftingStickyBox: 'Nearest Layer Shifting Sticky Box',
+  nearestLayerShiftingStickyBox: 'Nearest layer shifting sticky box',
   /**
-   * @description Text in Layer Details View of the Layers panel. This also means "The nearest block
+   * @description Text in layer details view of the Layers panel. This also means "The nearest block
    * that causes a layer shift".
    */
-  nearestLayerShiftingContaining: 'Nearest Layer Shifting Containing Block',
+  nearestLayerShiftingContaining: 'Nearest layer shifting containing block',
   /**
-   * @description Size cell text content in Layer Details View of the Layers panel
+   * @description Size cell text content in layer details view of the Layers panel.
    * @example {10} PH1
    * @example {10} PH2
    * @example {10} PH3
@@ -88,53 +88,53 @@ const UIStrings = {
    */
   updateRectangleDimensions: '{PH1} × {PH2} (at {PH3}, {PH4})',
   /**
-   * @description Text for the size of something
+   * @description Text for the size of something.
    */
   size: 'Size',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
-  compositingReasons: 'Compositing Reasons',
+  compositingReasons: 'Compositing reasons',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   memoryEstimate: 'Memory estimate',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   paintCount: 'Paint count',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   slowScrollRegions: 'Slow scroll regions',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   stickyPositionConstraint: 'Sticky position constraint',
   /**
-   * @description Title of the paint profiler, old name of the performance pane
+   * @description Label for button to open the paint profiler in the layer details view of the Layers panel.
    */
-  paintProfiler: 'Paint Profiler',
+  paintProfiler: 'Paint profiler',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   nonFastScrollable: 'Non fast scrollable',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   touchEventHandler: 'Touch event handler',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   wheelEventHandler: 'Wheel event handler',
   /**
-   * @description Text in Layer Details View of the Layers panel. Means that this rectangle needs to
+   * @description Text in layer details view of the Layers panel. Means that this rectangle needs to
    * be repainted when the webpage is scrolled. 'repaints' means that the browser engine needs to
    * draw the pixels for this rectangle to the user's monitor again.
    */
   repaintsOnScroll: 'Repaints on scroll',
   /**
-   * @description Text in Layer Details View of the Layers panel
+   * @description Text in layer details view of the Layers panel.
    */
   mainThreadScrollingReason: 'Main thread scrolling reason',
 } as const;
@@ -215,34 +215,39 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: ViewOutput, target: Docu
     // clang-format on
   };
 
+  const domNode = layer.nodeForSelfOrAncestor();
+
   // clang-format off
   Lit.render(
       html`
-    <div class="layer-details-container">
+    <div class="layer-details-container"
+         data-backend-node-id=${domNode ? domNode.backendNodeId() : nothing}
+         data-target-id=${domNode ? domNode.domModel().target().id() : nothing}
+         jslog=${VisualLogging.section('layer-details')}>
       <table>
         <tbody>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.size)}</td>
             <td>${i18nString(
               UIStrings.updateRectangleDimensions,
               {PH1: layer.width(), PH2: layer.height(), PH3: layer.offsetX(), PH4: layer.offsetY()})}</td>
           </tr>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.compositingReasons)}</td>
             <td>
               ${!compositingReasons.length ? 'n/a' :
                                        html`<ul>${compositingReasons.map(reason => html`<li>${reason}</li>`)}</ul>`}
             </td>
           </tr>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.memoryEstimate)}</td>
             <td>${i18n.ByteUtilities.bytesToString(layer.gpuMemoryUsage())}</td>
           </tr>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.paintCount)}</td>
             <td>${layer.paintCount()}</td>
           </tr>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.slowScrollRegions)}</td>
             <td>
               ${slowScrollRects.map((scrollRect, index) => html`
@@ -259,7 +264,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: ViewOutput, target: Docu
                 </span>`)}
             </td>
           </tr>
-          <tr>
+          <tr jslog=${VisualLogging.tableRow('detail-row')}>
             <td>${i18nString(UIStrings.stickyPositionConstraint)}</td>
             <td>${renderStickyPositionConstraint(stickyPositionConstraint)}</td>
           </tr>
@@ -276,8 +281,12 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: ViewOutput, target: Docu
   // clang-format on
 };
 
-export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.Widget<ShadowRoot>>(
-    UI.Widget.Widget) implements LayerView {
+const LayerDetailsViewBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.Widget<ShadowRoot>> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.Widget,
+    );
+
+export class LayerDetailsView extends LayerDetailsViewBase implements LayerView {
   private readonly layerViewHost: LayerViewHost;
   private layerSnapshotMap: Map<SDK.LayerTreeBase.Layer, SnapshotSelection>;
   private selection: Selection|null;
@@ -375,13 +384,14 @@ export interface EventTypes {
   [Events.PAINT_PROFILER_REQUESTED]: Selection;
 }
 
-export const slowScrollRectNames = new Map([
-  [SDK.LayerTreeBase.Layer.ScrollRectType.NON_FAST_SCROLLABLE, i18nLazyString(UIStrings.nonFastScrollable)],
-  [SDK.LayerTreeBase.Layer.ScrollRectType.TOUCH_EVENT_HANDLER, i18nLazyString(UIStrings.touchEventHandler)],
-  [SDK.LayerTreeBase.Layer.ScrollRectType.WHEEL_EVENT_HANDLER, i18nLazyString(UIStrings.wheelEventHandler)],
-  [SDK.LayerTreeBase.Layer.ScrollRectType.REPAINTS_ON_SCROLL, i18nLazyString(UIStrings.repaintsOnScroll)],
-  [
-    SDK.LayerTreeBase.Layer.ScrollRectType.MAIN_THREAD_SCROLL_REASON,
-    i18nLazyString(UIStrings.mainThreadScrollingReason),
-  ],
-]);
+export const slowScrollRectNames: Map<SDK.LayerTreeBase.Layer.ScrollRectType, () => Common.UIString.LocalizedString> =
+    new Map([
+      [SDK.LayerTreeBase.Layer.ScrollRectType.NON_FAST_SCROLLABLE, i18nLazyString(UIStrings.nonFastScrollable)],
+      [SDK.LayerTreeBase.Layer.ScrollRectType.TOUCH_EVENT_HANDLER, i18nLazyString(UIStrings.touchEventHandler)],
+      [SDK.LayerTreeBase.Layer.ScrollRectType.WHEEL_EVENT_HANDLER, i18nLazyString(UIStrings.wheelEventHandler)],
+      [SDK.LayerTreeBase.Layer.ScrollRectType.REPAINTS_ON_SCROLL, i18nLazyString(UIStrings.repaintsOnScroll)],
+      [
+        SDK.LayerTreeBase.Layer.ScrollRectType.MAIN_THREAD_SCROLL_REASON,
+        i18nLazyString(UIStrings.mainThreadScrollingReason),
+      ],
+    ]);

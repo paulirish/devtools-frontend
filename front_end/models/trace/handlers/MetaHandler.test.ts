@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
+import {assert} from 'chai';
 
-import {defaultTraceEvent} from '../../../testing/TraceHelpers.js';
+import {defaultTraceEvent} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
@@ -439,7 +439,7 @@ describe('MetaHandler', function() {
     const data = Trace.Handlers.ModelHandlers.Meta.data();
     const collected = [...data.threadsInProcess.values()].map(threadInProcess => [...threadInProcess.values()]);
 
-    expect(collected.map(process => process.map(thread => thread.args.name))).to.deep.equal([
+    assert.deepEqual(collected.map(process => process.map(thread => thread.args.name)), [
       [
         'swapper',
         'VizCompositorThread',
@@ -631,5 +631,33 @@ describe('MetaHandler', function() {
     assert.deepEqual([...data.finalDisplayUrlByNavigationId], [
       ['', 'http://localhost:10325/testing/me?0.7574185139653986'],
     ]);
+  });
+
+  it('does not populate softNavigationsById when enableSoftNavigation is false', async function() {
+    const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    Trace.Handlers.ModelHandlers.Meta.reset();
+    const config = Trace.Types.Configuration.defaults();
+    config.enableSoftNavigation = false;
+    Trace.Handlers.ModelHandlers.Meta.handleUserConfig(config);
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Meta.finalize();
+    const data = Trace.Handlers.ModelHandlers.Meta.data();
+    assert.strictEqual(data.softNavigationsById.size, 0);
+  });
+
+  it('populates softNavigationsById when enableSoftNavigation is true', async function() {
+    const events = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    Trace.Handlers.ModelHandlers.Meta.reset();
+    const config = Trace.Types.Configuration.defaults();
+    config.enableSoftNavigation = true;
+    Trace.Handlers.ModelHandlers.Meta.handleUserConfig(config);
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Meta.finalize();
+    const data = Trace.Handlers.ModelHandlers.Meta.data();
+    assert.isAbove(data.softNavigationsById.size, 0);
   });
 });

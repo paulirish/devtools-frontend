@@ -2,260 +2,493 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Copyright 2019 The Chromium Authors  All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-import("//build/toolchain/rbe.gni")
-import("//build/toolchain/siso.gni")
 import("../ninja/vars.gni")
+import("./ts_type_check.gni")
+import("./typescript_vars.gni")
 
-declare_args() {
-  devtools_skip_typecheck = build_with_chromium && !is_official_build
-}
+# Architecture Overview:
+# ======================
+# ts_library decouples declaration generation from type-checking and
+# JavaScript emission into 4 discrete sub-targets per library:
+#
+#   1) ${target_name}-dts:
+#      Fast, parallel declaration emit (.d.ts) using:
+#      `tsc --declaration --emitDeclarationOnly --isolatedDeclarations --noCheck --noResolve`
+#      Zero dependency on upstream targets.
+#
+#   2) ${target_name}_tsconfig_ref:
+#      Generated reference descriptor (`*-tsconfig.ref.json`) consumed by
+#      downstream tsconfigs.
+#
+#   3) ${target_name}_tsconfig:
+#      Generated compilation descriptor (`*-tsconfig.json`) configured with
+#      `disableSourceOfProjectReferenceRedirect = true` pointing to upstream
+#      `*-tsconfig.ref.json` project references.
+#
+#   4) ${target_name}_checked:
+#      Full type-checking and runtime JavaScript transpilation (.js, .js.map)
+#      using `tsc -p *-tsconfig.json`.
+#
+#   Primary group(${target_name}):
+#      Assembles compile-time `public_deps` (.d.ts + tsconfig.ref) and
+#      runtime `data_deps` (JS).
+#
+# Dependency Graph Example:
+# -------------------------
+# Suppose `module_b` depends on `module_a` (`ts_deps = [ "../a:module_a" ]`):
+#
+#   +-----------------------------------------------------------------------+
+#   |                              module_a                                 |
+#   |                                                                       |
+#   |  [1] module_a-dts (Action)                                            |
+#   |      sources -> module_a/*.d.ts (via --isolatedDeclarations)          |
+#   |         ^                                                             |
+#   |         |                                                             |
+#   |  [2] module_a_tsconfig_ref (generated_file)                           |
+#   |      -> module_a-tsconfig.ref.json                                    |
+#   |         ^                                                             |
+#   |         | (public_deps)                                               |
+#   |  [group("module_a")] --------------------------------+                |
+#   |         | (data_deps)                                |                |
+#   |         v                                            |                |
+#   |  [3] module_a_tsconfig (generated_file)              | (ts_deps)      |
+#   |      -> module_a-tsconfig.json                       |                |
+#   |         ^                                            |                |
+#   |         |                                            |                |
+#   |  [4] module_a_checked (Action)                       |                |
+#   |      module_a/*.ts -> module_a/*.js                  |                |
+#   +------------------------------------------------------|----------------+
+#                                                          |
+#                                                          v
+#   +-----------------------------------------------------------------------+
+#   |                              module_b                                 |
+#   |                                                                       |
+#   |  [1] module_b-dts (Action)                                            |
+#   |      sources -> module_b/*.d.ts (no wait for module_a!)               |
+#   |                                                                       |
+#   |  [2] module_b_tsconfig_ref (generated_file)                           |
+#   |      -> module_b-tsconfig.ref.json                                    |
+#   |                                                                       |
+#   |  [3] module_b_tsconfig (generated_file)                               |
+#   |      references = [ "../a/module_a-tsconfig.ref.json" ]               |
+#   |         ^                                                             |
+#   |         |                                                             |
+#   |  [4] module_b_checked (Action: tsc -p module_b-tsconfig.json)         |
+#   |      deps = [ :module_b-dts, :module_b_tsconfig, "../a:module_a" ]    |
+#   |      Resolves module_a types from module_a/*.d.ts                     |
+#   |                                                                       |
+#   |  [group("module_b")]                                                  |
+#   |      public_deps = [ :module_b-dts, :module_b_tsconfig_ref,           |
+#   |                      "../a:module_a" ]                                |
+#   |      data_deps   = [ :module_b_checked ]                              |
+#   +-----------------------------------------------------------------------+
+#
+# Compilation Flow & Ninja Restat:
+# --------------------------------
+# 1. (Parallel Emit)  :module_a-dts and :module_b-dts execute concurrently
+#    without blocking on upstream JS compilation.
+# 2. (Type-Checking)  :module_b_checked waits for :module_a-dts (via public_deps
+#    of module_a) and consumes `module_a/*.d.ts`.
+# 3. (Pruned Cascades) If module_a implementation changes without modifying
+#    public signatures, `run_with_restat.py` keeps the .d.ts mtime unchanged,
+#    causing Ninja to prune recompilation of :module_b_checked.
 
-assert(!devtools_skip_typecheck || !is_official_build,
-       "Official build should not skip typecheck")
-
-# Defines a target that compiles .ts files using TypeScript.
-# A temporary tsconfig.json is generated which uses the
-# tsconfig.json in this folder as basis.
-#
-# Either `sources` or `deps` must be listed (or both).
-#
-# For tests, you must specify the `testonly = true` argument:
-#
-# Variables:
-#   sources (optional):
-#     List of TypeScript files to typecheck and generate
-#   deps (optional):
-#     List of dependencies that are ts_libraries or export a tsconfig.json
-# Example:
-#   ts_library("main") {
-#     sources = ["bar.js", "foo.ts"]
-#     deps = ["../common"]
-#   }
-#
-#   ts_library("unittest") {
-#     testonly = true
-#     sources = [ "bar.test.ts" ]
-#     deps = [ "../../../../front_end/common" ]
-#   }
-#
+# Defines a TypeScript library target using tsc v7+.
 template("ts_library") {
-  action(target_name) {
-    script =
-        devtools_location_prepend + "scripts/build/typescript/ts_library.py"
+  assert(defined(invoker.sources),
+         "You must specify 'sources' for $target_name")
 
-    forward_variables_from(invoker,
-                           [
-                             "sources",
-                             "visibility",
-                             "deps",
-                             "public_deps",
-                             "inputs",
-                             "data_deps",
-                             "metadata",
-                           ])
-    if (!defined(inputs)) {
-      inputs = []
-    }
+  _rootdir = "."
+  if (defined(invoker.rootdir)) {
+    _rootdir = invoker.rootdir
+  }
 
-    inputs += [
-      "//third_party/node/node.py",
-      devtools_location_prepend + "scripts/devtools_paths.py",
-      devtools_location_prepend + "config/typescript/tsconfig.base.json",
-      devtools_location_prepend + "node_modules/typescript/lib/tsc.js",
-      devtools_location_prepend + "front_end/legacy/legacy-defs.d.ts",
-      devtools_location_prepend + "front_end/global_typings/global_defs.d.ts",
-      devtools_location_prepend + "node_modules/@types/filesystem/index.d.ts",
-    ]
+  _tsconfig_name = target_name
+  if (defined(invoker.tsconfig_name)) {
+    _tsconfig_name = invoker.tsconfig_name
+  }
 
-    # When use_remoteexec=true, node actions run on remote Linux worker.
-    # So it should include linux node binary in inputs.
-    if (use_remoteexec) {
-      inputs += [ "//third_party/node/linux/node-linux-x64/bin/node" ]
-    }
+  _dts_target = "${target_name}-dts"
+  _tsconfig_ref_target = "${target_name}_tsconfig_ref"
+  _tsconfig_ref_file = "$target_gen_dir/$_tsconfig_name-tsconfig.ref.json"
+  _tsconfig_target = "${target_name}_tsconfig"
+  _tsconfig_file = "$target_gen_dir/$_tsconfig_name-tsconfig.json"
+  _js_target = "${target_name}_checked"
 
-    args = [
-      "--tsconfig_output_location",
-      rebase_path(target_gen_dir, root_build_dir) +
-          "/$target_name-tsconfig.json",
-    ]
+  _all_sources = invoker.sources + typescript_global_definition_files
+  if (defined(invoker.additional_type_definitions)) {
+    _all_sources += invoker.additional_type_definitions
+  }
 
-    assert(
-        defined(sources) || defined(deps) || defined(invoker.sourceslist),
-        "You must either specify an array of 'sources' or 'deps' or a 'sourceslist' for $target_name")
-
-    if (defined(invoker.es_target)) {
-      args += [
-        "--es-target",
-        invoker.es_target,
+  _ts_references = []
+  _ts_deps = []
+  _sources_deps = []
+  if (defined(invoker.ts_deps)) {
+    _ts_deps = invoker.ts_deps
+    foreach(dep, _ts_deps) {
+      _dep_name = get_label_info(dep, "name")
+      _dep_dir = get_label_info(dep, "dir")
+      _dep_gen_dir = get_label_info(dep, "target_gen_dir")
+      _ts_references += [
+        {
+          path = rebase_path("$_dep_gen_dir/$_dep_name-tsconfig.ref.json",
+                             target_gen_dir)
+        },
       ]
+      _sources_deps += [ "$_dep_dir:${_dep_name}_sources" ]
     }
+  }
 
-    if (defined(invoker.es_libs)) {
-      args += [ "--es-libs" ] + invoker.es_libs
-    }
+  _non_ts_deps = []
+  if (defined(invoker.deps)) {
+    _non_ts_deps = invoker.deps
+  }
 
-    _test_only = defined(invoker.testonly) && invoker.testonly
-    _no_emit = defined(invoker.no_emit) && invoker.no_emit
-    _tsconfig_only = defined(invoker.tsconfigonly) && invoker.tsconfigonly
-    _verify_lib_check =
-        defined(invoker.verify_lib_check) && invoker.verify_lib_check
-    _rootdir = "."
+  # tsc resolves the module type from package.json in the build root,
+  # which //tools/typescript:copy_package_json produces. Depend on it so the
+  # copy runs first; otherwise a concurrent copy can fail the read on Windows
+  # with a sharing violation. The target only exists in a Chromium checkout.
+  if (build_with_chromium) {
+    _non_ts_deps += [ "//tools/typescript:copy_package_json" ]
+  }
 
-    if (defined(invoker.rootdir)) {
-      _rootdir = invoker.rootdir
-    }
+  _es_target = "ES2023"
+  if (defined(invoker.es_target)) {
+    _es_target = invoker.es_target
+  }
 
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
+  _module = "esnext"
+  _module_resolution = "bundler"
 
-    if (defined(deps)) {
-      args += [ "--deps" ]
-      foreach(dep, deps) {
-        args += [ rebase_path(get_label_info(dep, "dir"), ".") + "/" +
-                  get_label_info(dep, "name") + "-tsconfig.json" ]
-      }
+  _no_js_emit = false
+  if (defined(invoker.no_js_emit)) {
+    _no_js_emit = invoker.no_js_emit
+  }
 
-      # We need to expose our deps in the Ninja chain, to allow
-      # `generate_devtools_grd` to eventually roll up all files. If these are
-      # not public, Ninja complains that the files are not reachable.
-      public_deps += deps
-    }
+  _outdir = "."
 
-    # Here we assume that all sources are in this folder listed,
-    # as there is no way of retrieving the folder the template
-    # is in with Ninja.
-    args += [
-      "--front_end_directory",
-      rebase_path(_rootdir, root_build_dir),
+  _compiler_options = default_ts_compiler_options
+  _compiler_options.target = _es_target
+  _compiler_options.module = _module
+  _compiler_options.moduleResolution = _module_resolution
+  _compiler_options.rootDir = rebase_path(_rootdir, target_gen_dir)
+  _compiler_options.outDir = _outdir
+  _compiler_options.rootDirs = [
+    rebase_path(devtools_location_prepend, target_gen_dir),
+    rebase_path("$root_gen_dir/$devtools_location", target_gen_dir),
+  ]
+  _compiler_options.allowJs = false
+  _compiler_options.checkJs = false
+  if (_no_js_emit) {
+    _compiler_options.noEmit = true
+  }
+
+  _test_only = defined(invoker.testonly) && invoker.testonly
+  _runs_in_node = defined(invoker.runs_in) && invoker.runs_in == "node"
+
+  if (_test_only || _runs_in_node) {
+    _compiler_options.typeRoots = [
+      rebase_path(devtools_location_prepend + "node_modules/@types",
+                  target_gen_dir),
+      rebase_path(devtools_location_prepend + "node_modules", target_gen_dir),
     ]
-
     if (_test_only) {
-      args += [ "--test-only" ]
-      inputs += [
-        devtools_location_prepend + "node_modules/@types/mocha/index.d.ts",
-        devtools_location_prepend + "node_modules/@types/sinon/index.d.ts",
+      _compiler_options.types += [ "mocha" ]
+    }
+    if (_runs_in_node) {
+      _compiler_options.types += [
+        "node",
+        "undici-types",
       ]
     }
+  }
 
-    if (_tsconfig_only) {
-      args += [ "--tsconfig-only" ]
-    }
+  _es_libs = default_ts_dom_libs
+  if (defined(invoker.es_libs)) {
+    _es_libs = []
+    _es_libs = invoker.es_libs
+  }
+  _compiler_options.lib = _es_libs + default_ts_base_libs
 
-    if (defined(invoker.additional_type_definitions)) {
-      args += [ "--additional-type-definitions" ] +
-              rebase_path(invoker.additional_type_definitions, root_build_dir)
-    }
-
-    if (defined(invoker.sourceslist)) {
-      args += [
-        "--sources-list",
-        rebase_path(invoker.sourceslist, root_build_dir),
-      ]
-    }
-
-    if (_no_emit) {
-      args += [ "--no-emit" ]
-    }
-
-    if (_verify_lib_check) {
-      args += [ "--verify-lib-check" ]
-    }
-
-    if (defined(invoker.runs_in)) {
-      assert(invoker.runs_in == "node_cjs" || invoker.runs_in == "node_esm")
-      args += [ "--runs-in=" + invoker.runs_in ]
-    }
-
-    if (defined(invoker.reset_timestamps) && invoker.reset_timestamps) {
-      args += [ "--reset_timestamps" ]
-    }
-
-    if (devtools_skip_typecheck) {
-      args += [ "--use-esbuild" ]
-      _esbuild = devtools_location_prepend + "third_party/esbuild/esbuild"
-      if (host_os == "win") {
-        inputs += [ _esbuild + ".exe" ]
-      } else {
-        inputs += [ _esbuild ]
-      }
-    }
-
-    output_files = [ "$target_gen_dir/$target_name-tsconfig.json" ]
-
-    if (defined(sources)) {
-      args += [ "--sources" ] + rebase_path(sources, root_build_dir)
-
-      foreach(src, sources) {
-        _extension = get_path_info(src, "extension")
-
-        # Any .d.ts file does not generate a corresponding a .js file, but we
-        # copy it over into the generated build folder instead, as tsc doesn't
-        # do that on its own
-        if (_extension == "ts" &&
-            get_path_info(get_path_info(src, "name"), "extension") == "d") {
-          output_files += [ "$target_gen_dir/$src" ]
-          # Any file checked by TypeScript that is jsdoc-typed will be also
-          # generating a js file in the gen folder
-        } else if (_extension == "js" || _extension == "ts") {
-          if (!_no_emit) {
-            _relative_file_name = rebase_path(src, _rootdir)
-            _fileName = get_path_info(_relative_file_name, "dir") + "/" +
-                        get_path_info(_relative_file_name, "name")
-
-            output_files += [
-              "$target_gen_dir/$_fileName.js",
-              "$target_gen_dir/$_fileName.js.map",
-            ]
-          }
-        } else {
-          assert(false,
-                 "Incorrect extension on '$src' with extension '$_extension'")
-        }
-
-        if (!devtools_skip_typecheck && !_no_emit) {
-          output_files += [ "$target_gen_dir/$_fileName.d.ts" ]
-        }
-      }
-    }
-
-    outputs = output_files
-
-    _data = outputs
-    if (defined(invoker.data)) {
-      _data += invoker.data
-    }
-    _javascript_implementation_files = filter_include(_data, [ "*.js" ])
-    _javascript_map_files = filter_include(_data, [ "*.map" ])
-
-    data = _javascript_implementation_files + _javascript_map_files
-
-    ts_files = []
-    if (defined(sources)) {
-      ts_files = rebase_path(sources, root_build_dir)
-    }
-
-    if (!defined(metadata)) {
-      metadata = {
-      }
-    }
-
-    assert(!defined(metadata.typescript_files))
-    assert(!defined(metadata.tests))
-
-    metadata.typescript_files = ts_files
-    metadata.tests = filter_include(output_files,
+  _handwritten_dts = filter_include(invoker.sources,
                                     [
-                                      "*.test.js",
-                                      "*_test.js",
+                                      "*.d.ts",
+                                      "*.d.mts",
+                                      "*.d.cts",
+                                    ])
+  _non_dts_sources = filter_exclude(invoker.sources,
+                                    [
+                                      "*.d.ts",
+                                      "*.d.mts",
+                                      "*.d.cts",
                                     ])
 
-    if (is_debug) {
-      metadata.grd_files = _javascript_implementation_files
+  _has_handwritten_dts = _handwritten_dts != []
+  _copied_dts_outputs = []
+  if (_has_handwritten_dts) {
+    _copy_dts_target = "${target_name}_copy_dts"
+    foreach(src, _handwritten_dts) {
+      _copied_dts_outputs += [ "$target_gen_dir/$src" ]
+    }
+
+    copy(_copy_dts_target) {
+      if (defined(invoker.testonly)) {
+        testonly = invoker.testonly
+      }
+      sources = _handwritten_dts
+      outputs = [ "$target_gen_dir/{{source_target_relative}}" ]
+      if (defined(invoker.visibility)) {
+        visibility = [ ":*" ] + invoker.visibility
+      }
+    }
+  }
+
+  # Compute output file paths (tsc does not emit for .d.ts inputs)
+  _dts_outputs = []
+  if (!_no_js_emit) {
+    _js_outputs = []
+  }
+  foreach(src, invoker.sources) {
+    _ext = get_path_info(src, "extension")
+    _rel_name = rebase_path(src, _rootdir)
+    _rel_dir = get_path_info(_rel_name, "dir")
+    if (_rel_dir == "" || _rel_dir == ".") {
+      _file_base = get_path_info(_rel_name, "name")
+    } else {
+      _file_base = _rel_dir + "/" + get_path_info(_rel_name, "name")
+    }
+
+    if (!(_ext == "ts" &&
+          get_path_info(get_path_info(src, "name"), "extension") == "d")) {
+      _dts_outputs += [ "$target_gen_dir/$_file_base.d.ts" ]
+      if (!_no_js_emit) {
+        _js_outputs += [
+          "$target_gen_dir/$_file_base.js",
+          "$target_gen_dir/$_file_base.js.map",
+        ]
+      }
+    }
+  }
+
+  # Sub-target 1: Type definitions (.d.ts only) via direct tsc
+  action(_dts_target) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    script = devtools_location_prepend + "scripts/build/run_with_restat.py"
+
+    inputs = typescript_base_inputs + _all_sources +
+             [ devtools_location_prepend + "scripts/build/response_file.py" ]
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
+
+    deps = _non_ts_deps
+
+    outputs = _dts_outputs
+
+    response_file_contents =
+        rebase_path(_dts_outputs, root_build_dir) + [ "--" ] + [
+          rebase_path(tsc_binary, root_build_dir),
+          "--ignoreConfig",
+          "--declaration",
+          "--emitDeclarationOnly",
+          "--isolatedDeclarations",
+          "--noCheck",
+          "--noResolve",
+          "--outDir",
+          rebase_path(target_gen_dir, root_build_dir),
+          "--rootDir",
+          rebase_path(_rootdir, root_build_dir),
+        ] + rebase_path(_all_sources, root_build_dir)
+
+    args = [ "@{{response_file_name}}" ]
+
+    if (defined(invoker.visibility)) {
+      visibility = [ ":*" ] + invoker.visibility
+    }
+  }
+
+  _ref_sources = _non_dts_sources + typescript_global_definition_files
+  if (defined(invoker.additional_type_definitions)) {
+    _ref_sources += invoker.additional_type_definitions
+  }
+  _compiled_sources = rebase_path(_ref_sources, target_gen_dir)
+  if (_has_handwritten_dts) {
+    _compiled_sources += rebase_path(_copied_dts_outputs, target_gen_dir)
+  }
+
+  # Sub-target 2: Generate tsconfig.ref.json for downstream consumers.
+  # Downstream dependents point to this tsconfig.ref.json as a project
+  # "reference" in the dependent's tsconfig used for type-checking.
+  generated_file(_tsconfig_ref_target) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    outputs = [ _tsconfig_ref_file ]
+    output_conversion = "json"
+    contents = {
+      compilerOptions = {
+        composite = true
+        declaration = true
+        emitDeclarationOnly = true
+        skipLibCheck = true
+        rootDir = rebase_path(_rootdir, target_gen_dir)
+        rootDirs = [
+          rebase_path(devtools_location_prepend, target_gen_dir),
+          rebase_path("$root_gen_dir/$devtools_location", target_gen_dir),
+        ]
+        outDir = "."
+        declarationDir = "."
+      }
+      files = _compiled_sources
+      references = _ts_references
+    }
+  }
+
+  # Sub-target: Expose implementation .ts files as public_inputs for bundling
+  # without triggering recompilation of downstream type-checking targets.
+  _sources_export_target = "${target_name}_sources"
+
+  group(_sources_export_target) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    public_inputs = filter_include(_all_sources, [ "*.ts" ])
+    if (defined(invoker.inputs)) {
+      public_inputs += invoker.inputs
+    }
+    public_deps = _non_ts_deps + _sources_deps
+  }
+
+  # Sub-target 3: Generate tsconfig.json used by sub-target 4 for
+  # actual type-checking and JS transpilation.
+  generated_file(_tsconfig_target) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    outputs = [ _tsconfig_file ]
+    output_conversion = "json"
+    contents = {
+      compilerOptions = _compiler_options
+      files = _compiled_sources
+      references = _ts_references
+    }
+  }
+
+  # Sub-target 4: JS Transpilation + Type-checking via direct tsc
+  action(_js_target) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    inputs = typescript_base_inputs + _all_sources + [
+               _tsconfig_file,
+               devtools_location_prepend + "scripts/build/response_file.py",
+             ]
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
+
+    if (_has_handwritten_dts) {
+      inputs += _copied_dts_outputs
+    }
+
+    if (_test_only) {
+      inputs += typescript_test_types_inputs
+    }
+
+    if (_runs_in_node) {
+      inputs += typescript_node_types_inputs
+    }
+
+    deps = [
+             ":$_dts_target",
+             ":$_tsconfig_target",
+           ] + _ts_deps + _non_ts_deps
+
+    if (_has_handwritten_dts) {
+      deps += [ ":$_copy_dts_target" ]
+    }
+
+    if (_no_js_emit) {
+      script = devtools_location_prepend + "scripts/build/run_with_stamp.py"
+      _stamp_file = "$target_gen_dir/$_tsconfig_name.stamp"
+      outputs = [ _stamp_file ]
+      response_file_contents = [
+        "--stamp",
+        rebase_path(_stamp_file, root_build_dir),
+        "--",
+        rebase_path(tsc_binary, root_build_dir),
+        "-p",
+        rebase_path(_tsconfig_file, root_build_dir),
+      ]
+    } else {
+      script = devtools_location_prepend + "scripts/build/run_with_restat.py"
+      outputs = _js_outputs
+      response_file_contents =
+          rebase_path(_js_outputs, root_build_dir) + [ "--" ] + [
+            rebase_path(tsc_binary, root_build_dir),
+            "-p",
+            rebase_path(_tsconfig_file, root_build_dir),
+          ]
+    }
+
+    args = [ "@{{response_file_name}}" ]
+  }
+
+  # Primary group target
+  group(target_name) {
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
+    public_deps = [
+                    ":$_dts_target",
+                    ":$_tsconfig_ref_target",
+                  ] + _ts_deps
+    if (_has_handwritten_dts) {
+      public_deps += [ ":$_copy_dts_target" ]
+    }
+    public_inputs = filter_include(_dts_outputs, [ "*.d.ts" ]) +
+                    _copied_dts_outputs + [ _tsconfig_ref_file ]
+    if (defined(invoker.public_deps)) {
+      public_deps += invoker.public_deps
+    }
+
+    if (!_no_js_emit) {
+      data = _js_outputs
+      if (defined(invoker.data)) {
+        data += invoker.data
+      }
+    } else if (defined(invoker.data)) {
+      data = invoker.data
+    }
+
+    data_deps = [ ":$_js_target" ]
+    if (defined(invoker.deps)) {
+      data_deps += invoker.deps
+    }
+    if (defined(invoker.data_deps)) {
+      data_deps += invoker.data_deps
+    }
+
+    metadata = {
+      typescript_files = rebase_path(invoker.sources, root_build_dir)
+      if (!_no_js_emit) {
+        tests = filter_include(_js_outputs,
+                               [
+                                 "*.test.js",
+                                 "*_test.js",
+                                 "*.test.api.js",
+                               ])
+      }
+    }
+
+    if (!_no_js_emit && !devtools_bundle) {
+      metadata.grd_files = filter_include(_js_outputs, [ "*.js" ])
+    }
+
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
     }
   }
 }
@@ -268,12 +501,17 @@ set_defaults("ts_library") {
 
 template("node_ts_library") {
   ts_library(target_name) {
-    runs_in = "node_cjs"
+    runs_in = "node"
     testonly = true
-    reset_timestamps = true
+    if (defined(invoker.testonly)) {
+      testonly = invoker.testonly
+    }
 
     inputs =
         [ devtools_location_prepend + "node_modules/@types/node/index.d.ts" ]
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
 
     forward_variables_from(invoker,
                            [
@@ -283,13 +521,19 @@ template("node_ts_library") {
                              "data_deps",
                              "public_deps",
                              "additional_type_definitions",
+                             "ts_deps",
                            ])
   }
 }
+
 template("ts_e2e_library") {
   node_ts_library(target_name) {
     additional_type_definitions =
         [ devtools_location_prepend + "test/e2e/types.d.ts" ]
+    inputs = typescript_test_types_inputs + typescript_puppeteer_types_inputs
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
     forward_variables_from(invoker,
                            [
                              "sources",
@@ -297,6 +541,8 @@ template("ts_e2e_library") {
                              "deps",
                              "data_deps",
                              "public_deps",
+                             "ts_deps",
+                             "testonly",
                            ])
   }
 }

@@ -31,8 +31,8 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as JSON5 from '../../third_party/json5/json5.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -43,14 +43,13 @@ import {KeyValueStorageItemsView, type View as KeyValueStorageItemsViewFunction}
 
 const UIStrings = {
   /**
-   * @description Name for the "Extension Storage Items" table that shows the content of the extension Storage.
+   * @description Accessible name for the extension storage items datagrid in the Application panel.
    */
-  extensionStorageItems: 'Extension Storage Items',
+  extensionStorageItems: 'Extension storage items',
   /**
-   * @description Text for announcing that the "Extension Storage Items" table was cleared, that is, all
-   * entries were deleted.
+   * @description Screen reader announcement when the extension storage items table is cleared.
    */
-  extensionStorageItemsCleared: 'Extension Storage Items cleared',
+  extensionStorageItemsCleared: 'Extension storage items cleared',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ExtensionStorageItemsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);

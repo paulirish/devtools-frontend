@@ -13,6 +13,7 @@ import * as Tracing from '../../services/tracing/tracing.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as TimelineComponents from './components/components.js';
@@ -35,38 +36,38 @@ import {
   BottomUpTimelineTreeView,
   CallTreeTimelineTreeView,
   TimelineStackView,
-  TimelineTreeView
+  TimelineTreeView,
 } from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {TracingFrameLayerTree} from './TracingLayerTree.js';
 
 const UIStrings = {
   /**
-   * @description Text for the summary view
+   * @description Title for the summary tab in the details view of the Performance panel.
    */
   summary: 'Summary',
   /**
-   * @description Text in Timeline Details View of the Performance panel
+   * @description Title for the bottom-up tab in the details view of the Performance panel.
    */
   bottomup: 'Bottom-up',
   /**
-   * @description Text in Timeline Details View of the Performance panel
+   * @description Title for the call tree tab in the details view of the Performance panel.
    */
   callTree: 'Call tree',
   /**
-   * @description Text in Timeline Details View of the Performance panel
+   * @description Title for the event log tab in the details view of the Performance panel.
    */
   eventLog: 'Event log',
   /**
-   * @description Title of the paint profiler, old name of the performance pane
+   * @description Title for the paint profiler tab in the details view of the Performance panel.
    */
   paintProfiler: 'Paint profiler',
   /**
-   * @description Title of the Layers tool
+   * @description Title for the layers tab in the details view of the Performance panel.
    */
   layers: 'Layers',
   /**
-   * @description Title of the selector stats tab
+   * @description Title for the selector stats tab in the details view of the Performance panel.
    */
   selectorStats: 'Selector stats',
 } as const;
@@ -74,8 +75,12 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineDetailsView.ts
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {widget} = UI.Widget;
 
-export class TimelineDetailsPane extends
-    Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
+const TimelineDetailsPaneBase: Common.ObjectWrapper.EventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class TimelineDetailsPane extends TimelineDetailsPaneBase {
   private readonly detailsLinkifier: Components.Linkifier.Linkifier;
   private tabbedPane: UI.TabbedPane.TabbedPane;
   private readonly defaultDetailsWidget: UI.Widget.VBox;
@@ -86,7 +91,8 @@ export class TimelineDetailsPane extends
   private lazyLayersView?: TimelineLayersView|null;
   private preferredTabId?: string;
   private selection?: TimelineSelection|null;
-  private updateContentsScheduled: boolean;
+  #debouncedUpdateContentsFromWindow: (() => void)&
+      {cancel: () => void} = Common.Debouncer.debounce(() => this.updateContentsFromWindow(), 100);
   private lazySelectorStatsView: TimelineSelectorStatsView|null;
   #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
   #eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null = null;
@@ -147,7 +153,6 @@ export class TimelineDetailsPane extends
     this.setPreferredTab(Tab.Details);
 
     this.rangeDetailViews = new Map();
-    this.updateContentsScheduled = false;
 
     const bottomUpView = new BottomUpTimelineTreeView();
     this.appendTab(Tab.BottomUp, i18nString(UIStrings.bottomup), bottomUpView);
@@ -326,7 +331,7 @@ export class TimelineDetailsPane extends
       view.model = {
         selectedEvents: data.selectedEvents,
         parsedTrace: data.parsedTrace,
-        entityMapper: data.entityMapper
+        entityMapper: data.entityMapper,
       };
     }
     this.#summaryContent.requestUpdate();
@@ -384,13 +389,11 @@ export class TimelineDetailsPane extends
   }
 
   /**
-   * This forces a recalculation and rerendering of the timings
-   * breakdown of a track.
-   * User actions like zooming or scrolling can trigger many updates in
-   * short time windows, so we debounce the calls in those cases. Single
-   * sporadic calls (like selecting a new track) don't need to be
-   * debounced. The forceImmediateUpdate param configures the debouncing
-   * behaviour.
+   * Recalculates and renders the timing breakdown for the active details tab.
+   * Panning or zooming triggers rapid bounds updates, so we debounce this call
+   * using a trailing debounce. This ensures expensive tree recalculations in
+   * detailed views (e.g. Call Tree, Bottom-Up) only run once after user
+   * interaction finishes, preventing main-thread CPU spikes mid-gesture.
    */
   private scheduleUpdateContentsFromWindow(forceImmediateUpdate = false): void {
     if (!this.#parsedTrace) {
@@ -402,17 +405,7 @@ export class TimelineDetailsPane extends
       return;
     }
 
-    // Debounce this update as it's not critical.
-    if (!this.updateContentsScheduled) {
-      this.updateContentsScheduled = true;
-      setTimeout(() => {
-        if (!this.updateContentsScheduled) {
-          return;
-        }
-        this.updateContentsScheduled = false;
-        this.updateContentsFromWindow();
-      }, 100);
-    }
+    this.#debouncedUpdateContentsFromWindow();
   }
 
   private updateContentsFromWindow(): void {
@@ -468,7 +461,7 @@ export class TimelineDetailsPane extends
 
     if (selectionIsEvent(selection)) {
       // Cancel any pending debounced range stats update
-      this.updateContentsScheduled = false;
+      this.#debouncedUpdateContentsFromWindow.cancel();
 
       if (Trace.Types.Events.isLegacyTimelineFrame(selection.event)) {
         this.#addLayerTreeForSelectedFrame(selection.event);
@@ -588,7 +581,9 @@ export class TimelineDetailsPane extends
 
     // Find all recalculate style events data from range
     const isSelectorStatsEnabled =
-        Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false).get();
+        Common.Settings.Settings.instance()
+            .resolve(SettingsUI.TimelineSettings.timelineCaptureSelectorStatsSettingDescriptor)
+            .get();
     if (this.#selectedEvents && isSelectorStatsEnabled) {
       const eventsInRange = Trace.Helpers.Trace.findRecalcStyleEvents(
           this.#selectedEvents,

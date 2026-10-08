@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {platform} from '../../conductor/platform.js';
 import {executionLineHighlighted, PAUSE_INDICATOR_SELECTOR} from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 async function waitForMarkers(devToolsPage: DevToolsPage, selector: string, count: number): Promise<string[]> {
   const markers = await devToolsPage.waitForMany(selector, count);
@@ -133,7 +133,7 @@ async function foo3() {
          'then',
          'bar1',
          'then',
-         'function'
+         'function',
        ]);
 
        assert.deepEqual(

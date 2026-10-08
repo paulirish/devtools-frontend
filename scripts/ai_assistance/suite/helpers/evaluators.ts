@@ -5,11 +5,13 @@
 import * as jsRouge from 'js-rouge';
 import assert from 'node:assert';
 import {AsyncLocalStorage} from 'node:async_hooks';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {hideBin} from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 
 import {loadInstructions} from '../instructions/load.ts';
-import type {Conversation} from '../types.js';
+import type {Trajectory} from '../types.js';
 
 import {generateGeminiContent} from './gemini.ts';
 import {getGolden, getMarkdownConversation, getOutputs, type Output} from './outputs.ts';
@@ -52,10 +54,17 @@ class ConcurrencyLimiter {
 const geminiLimiter = new ConcurrencyLimiter(25);
 
 const allStores: ResultStore[] = [];
+// Maps each task's `task_id` to its weighted rubric score [0.0 - 1.0] computed during `itEval`.
+const scoresByTaskId: Record<string, number> = {};
 
 process.on('exit', () => {
   if (allStores.length > 0) {
     generateReport(allStores);
+    // Persist per-task numeric scores to `eval_scores.json` because `auto-run.ts` executes
+    // `node suite/<target>.eval.ts` in a child process (`execSync`) and needs the structured
+    // `{ [taskId]: score }` map to report per-task scores and pass/fail statuses to GCS
+    // (`eval_task_completed.json`) without parsing `console.table` stdout.
+    fs.writeFileSync(path.join(process.cwd(), 'eval_scores.json'), JSON.stringify(scoresByTaskId, null, 2));
   }
 });
 
@@ -120,15 +129,18 @@ function parseScoringInstructions(instructions: string): {scoringPrompt: string,
 }
 
 export class FunctionCalled extends Evaluator {
-  static nameOnly(example: Conversation, funcName: string): boolean {
-    return example.queries.some(q => {
-      return q.response.functionCallRequests?.some(call => call.name === funcName);
+  static nameOnly(example: Trajectory, funcName: string): boolean {
+    return (example.data ?? []).some(turn => {
+      return turn.role === 'gemini' && turn.tool_calls?.some(call => call.name === funcName);
     });
   }
 
-  static nameAndArguments(example: Conversation, funcName: string, argCheck: Record<string, unknown>): boolean {
-    return example.queries.some(q => {
-      return q.response.functionCallRequests?.some(call => {
+  static nameAndArguments(example: Trajectory, funcName: string, argCheck: Record<string, unknown>): boolean {
+    return (example.data ?? []).some(turn => {
+      if (turn.role !== 'gemini' || !turn.tool_calls) {
+        return false;
+      }
+      return turn.tool_calls.some(call => {
         if (call.name !== funcName) {
           return false;
         }
@@ -141,8 +153,8 @@ export class FunctionCalled extends Evaluator {
 export class LLMComparison extends Evaluator {
   static #cachedScoring: {scoringPrompt: string, rubricWeights: RubricWeights}|null = null;
 
-  static async judge(example: Conversation, prompt: string):
-      Promise<{rubricScores: RubricScore[], rubricWeights: RubricWeights}> {
+  static async judge(example: Trajectory,
+                     prompt: string): Promise<{rubricScores: RubricScore[], rubricWeights: RubricWeights}> {
     if (!this.#cachedScoring) {
       const scoringInstructions = loadInstructions('scoring');
       this.#cachedScoring = parseScoringInstructions(scoringInstructions);
@@ -155,7 +167,7 @@ export class LLMComparison extends Evaluator {
 
 ## Conversation to score:
 ${exampleAsMarkdown}`,
-        'gemini-2.5-flash', {
+        process.env.GEMINI_MODEL || 'gemini-3.6-flash', {
           type: 'object',
           properties: {
             rubricScores: {
@@ -165,13 +177,13 @@ ${exampleAsMarkdown}`,
                 properties: {
                   rubric: {type: 'string', description: 'The name of the rubric.'},
                   score: {type: 'number', description: 'A numerical score assigned by the AI.'},
-                  reason: {type: 'string', description: 'A string containing the reasons for the assigned score.'}
+                  reason: {type: 'string', description: 'A string containing the reasons for the assigned score.'},
                 },
-                required: ['rubric', 'score', 'reason']
-              }
-            }
+                required: ['rubric', 'score', 'reason'],
+              },
+            },
           },
-          required: ['rubricScores']
+          required: ['rubricScores'],
         });
     const r = JSON.parse(response) as {rubricScores: RubricScore[]};
     return {rubricScores: r.rubricScores, rubricWeights};
@@ -318,9 +330,9 @@ const stateStorage = new AsyncLocalStorage<GroupTestState>();
 export type ItEval = {
   test: string,
 }&({
-  succeed: (example: Conversation) => boolean,
+  succeed: (example: Trajectory) => boolean,
 }|{
-  judge: (example: Conversation) => Promise<{rubricScores: RubricScore[], rubricWeights: RubricWeights}>,
+  judge: (example: Trajectory) => Promise<{rubricScores: RubricScore[], rubricWeights: RubricWeights}>,
 }|{
   rouge: true,
 });
@@ -355,14 +367,14 @@ export async function itEval(config: ItEval): Promise<void> {
   let goldenText = '';
   if ('rouge' in config) {
     const golden = await getGolden(state.store.type, state.store.label);
-    goldenText = golden?.queries.at(-1)?.response.text ?? '';
+    goldenText = (golden?.data ?? []).filter(t => t.role === 'gemini').at(-1)?.content?.join('\n') ?? '';
   }
 
   for (const [date, outputs] of Object.entries(state.outputsByDate)) {
     if (!outputs) {
       continue;
     }
-    const conversations = outputs.flatMap(o => o.contents.conversations);
+    const conversations = outputs.map(o => o.contents);
 
     if ('succeed' in config) {
       const details = conversations.map(conversation => ({
@@ -383,6 +395,10 @@ export async function itEval(config: ItEval): Promise<void> {
           })));
       const results = await Promise.all(scoredEvals);
       const rubricWeights = results.length > 0 ? results[0].rubricWeights : {};
+      for (const r of results) {
+        scoresByTaskId[r.conversation.metadata.task_id] =
+            Number(calculateWeightedScore(r.rubricScores, r.rubricWeights).toFixed(2));
+      }
 
       state.store.saveResult(config.test, date, {
         type: 'JUDGE',
@@ -395,7 +411,8 @@ export async function itEval(config: ItEval): Promise<void> {
       });
     } else if ('rouge' in config) {
       const details = conversations.map(conversation => {
-        const candidateText = conversation.queries.at(-1)?.response.text ?? '';
+        const candidateText =
+            (conversation.data ?? []).filter(t => t.role === 'gemini').at(-1)?.content?.join('\n') ?? '';
         return {
           conversation,
           score: ROUGE.score(candidateText, goldenText),
@@ -541,15 +558,15 @@ export interface JudgeStats {
 
 export type Result = {
   type: 'BINARY',
-  details: Array<{success: boolean, conversation: Conversation}>,
+  details: Array<{success: boolean, conversation: Trajectory}>,
 }|{
   type: 'JUDGE',
   repetitionCount: number,
   rubricWeights: RubricWeights,
-  details: Array<{conversation: Conversation, rubricScores: RubricScore[]}>,
+  details: Array<{conversation: Trajectory, rubricScores: RubricScore[]}>,
 }|{
   type: 'ROUGE',
-  details: Array<{conversation: Conversation, score: number, goldenResponse: string}>,
+  details: Array<{conversation: Trajectory, score: number, goldenResponse: string}>,
 };
 
 function calculateBinaryStats(result: Extract<Result, {type: 'BINARY'}>): BinaryStats {
@@ -567,12 +584,12 @@ function calculateJudgeStats(result: Extract<Result, {type: 'JUDGE'}>): JudgeSta
   const statsByRubric: Record<string, RubricStats> = {};
   assert.ok(result.details.length > 0, 'A judge result must have at least one conversation');
 
-  const allRubrics = result.details[0].rubricScores.map(s => s.rubric).sort();
+  const rubricsSet = new Set<string>();
+  Object.keys(result.rubricWeights).forEach(r => rubricsSet.add(r));
   for (const detail of result.details) {
-    const currentRubrics = detail.rubricScores.map(s => s.rubric).sort();
-    assert.deepStrictEqual(
-        currentRubrics, allRubrics, 'All conversations in a judge result must have the same rubrics');
+    detail.rubricScores.forEach(s => rubricsSet.add(s.rubric));
   }
+  const allRubrics = Array.from(rubricsSet).sort();
 
   for (const rubric of allRubrics) {
     const scores = result.details.flatMap(d => d.rubricScores.filter(s => s.rubric === rubric).map(s => s.score));

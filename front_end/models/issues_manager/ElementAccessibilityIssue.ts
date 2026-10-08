@@ -5,11 +5,11 @@
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
-import {Issue, IssueCategory, IssueKind} from './Issue.js';
+import {type AffectedElement, Issue, IssueCategory, IssueKind} from './Issue.js';
 import {
   type LazyMarkdownIssueDescription,
   type MarkdownIssueDescription,
-  resolveLazyDescription
+  resolveLazyDescription,
 } from './MarkdownIssueDescription.js';
 
 export class ElementAccessibilityIssue extends Issue<Protocol.Audits.ElementAccessibilityIssueDetails> {
@@ -21,6 +21,18 @@ export class ElementAccessibilityIssue extends Issue<Protocol.Audits.ElementAcce
       issueDetails.elementAccessibilityIssueReason,
     ].join('::');
     super(issueCode, issueDetails, issuesModel, issueId);
+  }
+
+  override elements(): Iterable<AffectedElement> {
+    const details = this.details();
+    if (details.nodeId) {
+      return [{
+        backendNodeId: details.nodeId,
+        nodeName: '',
+        target: this.model()?.target() ?? null,
+      }];
+    }
+    return [];
   }
 
   primaryKey(): string {

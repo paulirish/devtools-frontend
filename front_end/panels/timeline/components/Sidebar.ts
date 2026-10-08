@@ -7,7 +7,7 @@ import * as Common from '../../../core/common/common.js';
 import type * as Trace from '../../../models/trace/trace.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 
-import {InsightActivated, InsightDeactivated} from './insights/SidebarInsight.js';
+import * as Insights from './insights/insights.js';
 import {SidebarAnnotationsTab} from './SidebarAnnotationsTab.js';
 import {SidebarInsightsTab} from './SidebarInsightsTab.js';
 
@@ -59,7 +59,7 @@ export const enum SidebarTabs {
   INSIGHTS = 'insights',
   ANNOTATIONS = 'annotations',
 }
-export const DEFAULT_SIDEBAR_TAB = SidebarTabs.INSIGHTS;
+export const DEFAULT_SIDEBAR_TAB: SidebarTabs = SidebarTabs.INSIGHTS;
 
 export const DEFAULT_SIDEBAR_WIDTH_PX = 240;
 const MIN_SIDEBAR_WIDTH_PX = 170;
@@ -107,7 +107,7 @@ export class SidebarWidget extends UI.Widget.VBox {
     this.#updateAnnotationsCountBadge();
 
     if (this.#insightToRestoreOnOpen) {
-      this.element.dispatchEvent(new InsightActivated(
+      this.element.dispatchEvent(new Insights.SidebarInsight.InsightActivated(
           this.#insightToRestoreOnOpen.model,
           this.#insightToRestoreOnOpen.insightSetKey,
           ));
@@ -129,7 +129,7 @@ export class SidebarWidget extends UI.Widget.VBox {
     this.#insightToRestoreOnOpen = currentlyActiveInsight;
 
     if (currentlyActiveInsight) {
-      this.element.dispatchEvent(new InsightDeactivated());
+      this.element.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
     }
   }
 

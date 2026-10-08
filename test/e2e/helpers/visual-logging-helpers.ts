@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {AsyncScope} from '../../conductor/async-scope.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 /** Corresponds to the type in front_end/ui/visual_logging/Debugging.ts **/
 interface TestImpressionLogEntry {
@@ -13,7 +13,7 @@ type TestLogEntry = TestImpressionLogEntry|{
   interaction: string,
 };
 
-export function veImpressionsUnder(key: string, children: TestImpressionLogEntry[]) {
+export function veImpressionsUnder(key: string, children: TestImpressionLogEntry[]): TestImpressionLogEntry {
   const result: TestImpressionLogEntry = {impressions: []};
   for (const child of children || []) {
     for (const impression of child.impressions) {
@@ -39,7 +39,9 @@ export function veResize(ve: string): TestLogEntry {
   return {interaction: `Resize: ${ve}`};
 }
 
-export function veImpression(ve: string, context?: string, children?: TestImpressionLogEntry[]) {
+export function veImpression(ve: string, context?: string, children?: TestImpressionLogEntry[]): {
+  impressions: string[],
+} {
   let key = ve;
   if (context) {
     key += ': ' + context;
@@ -55,7 +57,9 @@ export function veImpressionForMainToolbar(options?: {
   selectedPanel?: string,
   expectClosedPanels?: string[],
   dockable?: boolean,
-}) {
+}): {
+  impressions: string[],
+} {
   const panels = [
     'elements',
     'console',
@@ -87,7 +91,9 @@ export function veImpressionForMainToolbar(options?: {
   ]);
 }
 
-export function veImpressionForElementsPanel(options?: {dockable?: boolean, expectExistingPanel?: boolean}) {
+export function veImpressionForElementsPanel(options?: {dockable?: boolean, expectExistingPanel?: boolean}): {
+  impressions: string[],
+} {
   return veImpression('Panel', 'elements', [
     veImpression('Toolbar', 'sidebar', [
       veImpressionForTabHeader('styles'),
@@ -129,7 +135,9 @@ export function veImpressionForElementsPanel(options?: {dockable?: boolean, expe
 
 export function veImpressionForDrawerToolbar(options?: {
   selectedPanel?: string,
-}) {
+}): {
+  impressions: string[],
+} {
   const panels = options?.selectedPanel ? [options?.selectedPanel] : [];
   return veImpression('Toolbar', 'drawer', [
     veImpressionForTabHeader('console'),
@@ -143,7 +151,7 @@ export function veImpressionForDrawerToolbar(options?: {
  * Prints all VE events that haven't been matched by expectVeEvents calls
  * Useful for writing new assertions.
  **/
-export async function dumpVeEvents(label: string, devToolsPage: DevToolsPage) {
+export async function dumpVeEvents(devToolsPage: DevToolsPage, label: string): Promise<void> {
   const events =
       // @ts-expect-error
       await devToolsPage.evaluate(async () => (await globalThis.getUnmatchedVeEvents()) as unknown as string[]);
@@ -155,9 +163,9 @@ export async function dumpVeEvents(label: string, devToolsPage: DevToolsPage) {
  * Verifies that VE events contains all the expected events in given order.
  * Unexpected VE events are ignored.
  **/
-export async function expectVeEvents(
-    expectedEvents: TestLogEntry[], root: string|undefined = undefined, devToolsPage: DevToolsPage,
-    asyncScope = new AsyncScope()) {
+export async function expectVeEvents(devToolsPage: DevToolsPage, expectedEvents: TestLogEntry[],
+                                     root: string|undefined = undefined,
+                                     asyncScope: AsyncScope = new AsyncScope()): Promise<void> {
   collapseConsecutiveImpressions(expectedEvents);
   prependRoot(expectedEvents, root);
   await asyncScope.exec(

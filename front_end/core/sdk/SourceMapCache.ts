@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../platform/platform.js';
+import * as Platform from '../platform/platform.js';
 
 import type {DebugId, SourceMapV3} from './SourceMap.js';
 
 /** A thin wrapper around the Cache API to store source map JSONs keyed on Debug IDs */
 export class SourceMapCache {
-  static readonly #INSTANCE = new SourceMapCache('devtools-source-map-cache');
-
-  static instance(): SourceMapCache {
-    if (typeof window === 'undefined') {
-      // TODO(crbug.com/451502260): Move this behind a `HostRuntime` interface.
+  static create(): SourceMapCache {
+    if (!Platform.HostRuntime.HOST_RUNTIME.getCacheStorage()) {
       return IN_MEMORY_INSTANCE as unknown as
           SourceMapCache;  // TS doesn't like that our in-memory class doesn't have the same private fields.
     }
-    return this.#INSTANCE;
+    return new SourceMapCache('devtools-source-map-cache');
   }
 
   static createForTest(name: string): SourceMapCache {
@@ -24,29 +21,39 @@ export class SourceMapCache {
   }
 
   readonly #name: string;
-  #cachePromise?: Promise<Cache>;
+  #cachePromise?: Promise<Platform.HostRuntime.CacheEntry>;
 
   private constructor(name: string) {
     this.#name = name;
   }
 
   async set(debugId: DebugId, securityOrigin: Platform.DevToolsPath.UrlString, sourceMap: SourceMapV3): Promise<void> {
+    if (!securityOrigin || securityOrigin === 'file://') {
+      return;
+    }
     const cache = await this.#cache();
-    await cache.put(SourceMapCache.#urlForDebugId(debugId, securityOrigin), new Response(JSON.stringify(sourceMap)));
+    await cache?.put(SourceMapCache.#urlForDebugId(debugId, securityOrigin), new Response(JSON.stringify(sourceMap)));
   }
 
   async get(debugId: DebugId, securityOrigin: Platform.DevToolsPath.UrlString): Promise<SourceMapV3|null> {
+    if (!securityOrigin || securityOrigin === 'file://') {
+      return null;
+    }
     const cache = await this.#cache();
-    const response = await cache.match(SourceMapCache.#urlForDebugId(debugId, securityOrigin));
-    return await response?.json() ?? null;
+    const response = await cache?.match(SourceMapCache.#urlForDebugId(debugId, securityOrigin));
+    return (await response?.json() as SourceMapV3 | undefined) ?? null;
   }
 
-  async #cache(): Promise<Cache> {
+  async #cache(): Promise<Platform.HostRuntime.CacheEntry|undefined> {
     if (this.#cachePromise) {
       return await this.#cachePromise;
     }
 
-    this.#cachePromise = window.caches.open(this.#name);
+    const cacheStorage = Platform.HostRuntime.HOST_RUNTIME.getCacheStorage();
+    if (!cacheStorage) {
+      return undefined;
+    }
+    this.#cachePromise = cacheStorage.open(this.#name);
     return await this.#cachePromise;
   }
 
@@ -56,7 +63,7 @@ export class SourceMapCache {
   }
 
   async disposeForTest(): Promise<void> {
-    await window.caches.delete(this.#name);
+    await Platform.HostRuntime.HOST_RUNTIME.getCacheStorage()?.delete(this.#name);
   }
 }
 
@@ -64,10 +71,16 @@ const IN_MEMORY_INSTANCE = new (class implements Pick<SourceMapCache, 'get'|'set
   readonly #cache = new Map<string, SourceMapV3>();
 
   async set(debugId: DebugId, securityOrigin: Platform.DevToolsPath.UrlString, sourceMap: SourceMapV3): Promise<void> {
+    if (!securityOrigin || securityOrigin === 'file://') {
+      return;
+    }
     this.#cache.set(`${debugId}|${securityOrigin}`, sourceMap);
   }
 
   async get(debugId: DebugId, securityOrigin: Platform.DevToolsPath.UrlString): Promise<SourceMapV3|null> {
+    if (!securityOrigin || securityOrigin === 'file://') {
+      return null;
+    }
     return this.#cache.get(`${debugId}|${securityOrigin}`) ?? null;
   }
 

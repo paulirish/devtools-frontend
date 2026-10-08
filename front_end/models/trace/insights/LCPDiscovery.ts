@@ -20,7 +20,7 @@ import {
 
 export const UIStrings = {
   /**
-   * @description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it. Details how the LCP request was discoverable - in other words, the path necessary to load it (ex: network requests, JavaScript)
+   * @description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it. Details how the LCP request was discoverable - in other words, the path necessary to load it (ex: network requests, JavaScript).
    */
   title: 'LCP request discovery',
   /**
@@ -32,7 +32,7 @@ export const UIStrings = {
    * @description Text to tell the user how long after the earliest discovery time their LCP element loaded.
    * @example {401ms} PH1
    */
-  lcpLoadDelay: 'LCP image loaded {PH1} after earliest start point.',
+  lcpLoadDelay: 'LCP image loaded {PH1} after earliest start point',
   /**
    * @description Text to tell the user that a fetchpriority property value of "high" is applied to the LCP request.
    */
@@ -52,19 +52,19 @@ export const UIStrings = {
   /**
    * @description Text to tell the user that LCP resources should avoid using loading=lazy.
    */
-  lazyLoadNotApplied: 'LCP resources should not use loading=lazy',
+  lazyLoadNotApplied: 'LCP resources shouldn’t use loading=lazy',
   /**
-   * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
+   * @description Text status indicating that the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
    */
   noLcp: 'No LCP detected',
   /**
    * @description Text status indicating that the Largest Contentful Paint (LCP) metric was text rather than an image. "LCP" is an acronym and should not be translated.
    */
-  noLcpResource: 'No LCP resource detected because the LCP is not an image',
+  noLcpResource: 'No LCP resource detected because the LCP isn’t an image',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPDiscovery.ts', UIStrings);
-export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString: i18n.LocalizeString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export function isLCPDiscoveryInsight(model: InsightModel): model is LCPDiscoveryInsightModel {
   return model.insightKey === 'LCPDiscovery';
@@ -101,7 +101,7 @@ function finalize(partialModel: PartialInsightModel<LCPDiscoveryInsightModel>): 
 
 export function generateInsight(
     data: Handlers.Types.HandlerData, context: InsightSetContext): LCPDiscoveryInsightModel {
-  if (!context.navigation) {
+  if (!context.navigation || !('navigationId' in context)) {
     return finalize({});
   }
 
@@ -156,7 +156,7 @@ export function generateInsight(
     checklist: {
       priorityHinted: {
         label: priorityHintFound ? i18nString(UIStrings.fetchPriorityApplied) : missingPriorityHintLabel,
-        value: priorityHintFound
+        value: priorityHintFound,
       },
       requestDiscoverable: {label: i18nString(UIStrings.requestDiscoverable), value: imgPreloadedOrFoundInHTML},
       eagerlyLoaded: {label: i18nString(UIStrings.lazyLoadNotApplied), value: lcpNotLazyLoaded},

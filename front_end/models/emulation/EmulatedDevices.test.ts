@@ -3,47 +3,22 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import * as Platform from '../../core/platform/platform.js';
+import {createSettingsForTest, setupSettingsHooks} from '../../testing/SettingsHelpers.js';
 import * as EmulationModel from '../emulation/emulation.js';
 
-const BASE_URL = new URL('../../../front_end/emulated_devices/', import.meta.url).toString();
+describe('emulatedDevices', () => {
+  setupSettingsHooks();
 
-describe('EmulatedDevices can compute CSS image URLs', () => {
-  it('as regular string', () => {
-    const regularString = 'no url here';
-    assert.strictEqual(regularString, EmulationModel.EmulatedDevices.computeRelativeImageURL(regularString));
+  beforeEach(() => {
+    sinon.stub(Platform.HostRuntime.HOST_RUNTIME, 'getUserAgent').returns('Mozilla/5.0 HeadlessChrome/120.0.0.0');
   });
 
-  it('with empty @url', () => {
-    assert.strictEqual(BASE_URL, EmulationModel.EmulatedDevices.computeRelativeImageURL('@url()'));
+  afterEach(() => {
+    sinon.restore();
   });
-
-  it('with single file', () => {
-    assert.strictEqual(`${BASE_URL}file.js`, EmulationModel.EmulatedDevices.computeRelativeImageURL('@url(file.js)'));
-  });
-
-  it('with surrounding text', () => {
-    assert.strictEqual(
-        `before ${BASE_URL}long/path/to/the/file.png after`,
-        EmulationModel.EmulatedDevices.computeRelativeImageURL('before @url(long/path/to/the/file.png) after'));
-  });
-
-  it('with multiple URLs', () => {
-    assert.strictEqual(
-        `${BASE_URL}first.png ${BASE_URL}second.gif`,
-        EmulationModel.EmulatedDevices.computeRelativeImageURL('@url(first.png) @url(second.gif)'));
-  });
-
-  it('with multiple URLs with text around', () => {
-    assert.strictEqual(
-        `a lot of ${BASE_URL}stuff in a ${BASE_URL}singleline and more url() @@url (not/a/resource.gif)`,
-        EmulationModel.EmulatedDevices.computeRelativeImageURL(
-            'a lot of @url(stuff) in a @url(single)line and more url() @@url (not/a/resource.gif)'));
-  });
-});
-
-describeWithEnvironment('emulatedDevices', () => {
   it('before parsing, all Chrome UAs all have %s placeholder for major version patching', () => {
     const devices = EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest();
     const chromeRawDevices = devices.filter(d => d['user-agent'].includes(' Chrome/'));
@@ -53,7 +28,7 @@ describeWithEnvironment('emulatedDevices', () => {
   });
 
   it('after parsing, all Chrome UAs all have %s placeholder for major version patching', () => {
-    const edList = new EmulationModel.EmulatedDevices.EmulatedDevicesList();
+    const edList = new EmulationModel.EmulatedDevices.EmulatedDevicesList(createSettingsForTest());
     const parsedDevices = edList.standard();
     const chromeDevices = parsedDevices.filter(d => d.userAgent.includes(' Chrome/'));
     assert.isAtLeast(chromeDevices.length, 20);
@@ -79,5 +54,201 @@ describeWithEnvironment('emulatedDevices', () => {
 
     const json = device.toJSON();
     assert.isUndefined(json['user-agent-metadata']);
+  });
+
+  it('parses safe-area-insets on a mode into safeAreaInsets', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      'safe-area-insets': {left: 0, top: 59, right: 0, bottom: 34},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    const safeAreaInsets = device?.modes[0].safeAreaInsets;
+    assert.exists(safeAreaInsets);
+    assert.strictEqual(safeAreaInsets?.left, 0);
+    assert.strictEqual(safeAreaInsets?.top, 59);
+    assert.strictEqual(safeAreaInsets?.right, 0);
+    assert.strictEqual(safeAreaInsets?.bottom, 34);
+  });
+
+  it('leaves safeAreaInsets undefined when a mode has no safe-area data and does not throw', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.isUndefined(device?.modes[0].safeAreaInsets);
+  });
+
+  it('round-trips safe-area-insets through toJSON and omits the key when absent', () => {
+    const withSafeArea: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    withSafeArea['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      'safe-area-insets': {left: 1, top: 2, right: 3, bottom: 4},
+    }];
+    const parsed = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(withSafeArea);
+    assert.exists(parsed);
+    const json = parsed?.toJSON();
+    assert.deepEqual(json.modes[0]['safe-area-insets'], {left: 1, top: 2, right: 3, bottom: 4});
+
+    const withoutSafeArea: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    withoutSafeArea['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+    }];
+    const parsedPlain = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(withoutSafeArea);
+    assert.exists(parsedPlain);
+    assert.notProperty(parsedPlain?.toJSON().modes[0], 'safe-area-insets');
+  });
+
+  it('does not throw when a safe-area block carries additional unknown keys', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      'safe-area-insets': {left: 0, top: 59, right: 0, bottom: 34, topMax: 59, bottomMax: 34},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.strictEqual(device?.modes[0].safeAreaInsets?.top, 59);
+  });
+
+  it('round-trips pill cutout geometry through parse and toJSON', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      cutout: {shape: 'pill', x: 153, y: 11, width: 125, height: 37, 'border-radius': 19},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.deepEqual(device?.modes[0].cutout, {
+      shape: EmulationModel.EmulatedDevices.CutoutShape.PILL,
+      x: 153,
+      y: 11,
+      width: 125,
+      height: 37,
+      borderRadius: 19,
+    });
+
+    const json = device?.toJSON();
+    assert.deepEqual(json.modes[0].cutout, {shape: 'pill', x: 153, y: 11, width: 125, height: 37, 'border-radius': 19});
+  });
+
+  it('round-trips notch cutout geometry through parse and toJSON', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      cutout: {shape: 'notch', x: 114, y: 0, width: 162, height: 34, 'upper-radius': 5, 'lower-radius': 22},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.deepEqual(device?.modes[0].cutout, {
+      shape: EmulationModel.EmulatedDevices.CutoutShape.NOTCH,
+      x: 114,
+      y: 0,
+      width: 162,
+      height: 34,
+      upperRadius: 5,
+      lowerRadius: 22,
+    });
+
+    const json = device?.toJSON();
+    assert.deepEqual(json.modes[0].cutout,
+                     {shape: 'notch', x: 114, y: 0, width: 162, height: 34, 'upper-radius': 5, 'lower-radius': 22});
+  });
+
+  it('round-trips circle cutout geometry through parse and toJSON', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      cutout: {shape: 'circle', x: 162, y: 0, width: 37, height: 58, cx: 180, cy: 29, radius: 14},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.deepEqual(device?.modes[0].cutout, {
+      shape: EmulationModel.EmulatedDevices.CutoutShape.CIRCLE,
+      x: 162,
+      y: 0,
+      width: 37,
+      height: 58,
+      cx: 180,
+      cy: 29,
+      radius: 14,
+    });
+
+    const json = device?.toJSON();
+    assert.deepEqual(json.modes[0].cutout,
+                     {shape: 'circle', x: 162, y: 0, width: 37, height: 58, cx: 180, cy: 29, radius: 14});
+  });
+
+  it('round-trips rectangle cutout geometry through parse and toJSON', () => {
+    const rawDevice: Record<string, unknown> =
+        structuredClone(EmulationModel.EmulatedDevices.EmulatedDevicesList.rawEmulatedDevicesForTest()[0]);
+    rawDevice['modes'] = [{
+      title: 'default',
+      orientation: 'vertical',
+      cutout: {shape: 'rectangle', x: 126, y: 0, width: 141, height: 45},
+    }];
+
+    const device = EmulationModel.EmulatedDevices.EmulatedDevice.fromJSONV1(rawDevice);
+    assert.exists(device);
+    assert.deepEqual(device?.modes[0].cutout, {
+      shape: EmulationModel.EmulatedDevices.CutoutShape.RECTANGLE,
+      x: 126,
+      y: 0,
+      width: 141,
+      height: 45,
+    });
+
+    const json = device?.toJSON();
+    assert.deepEqual(json.modes[0].cutout, {shape: 'rectangle', x: 126, y: 0, width: 141, height: 45});
+  });
+
+  it('correctly categorizes devices into form factors', () => {
+    const phoneDevice = new EmulationModel.EmulatedDevices.EmulatedDevice();
+    phoneDevice.title = 'iPhone 16';
+    phoneDevice.type = EmulationModel.EmulatedDevices.Type.Phone;
+    assert.strictEqual(EmulationModel.EmulatedDevices.deviceCategory(phoneDevice),
+                       EmulationModel.EmulatedDevices.Category.MOBILE);
+
+    const foldableDevice = new EmulationModel.EmulatedDevices.EmulatedDevice();
+    foldableDevice.title = 'Pixel Fold';
+    foldableDevice.isFoldableScreen = true;
+    assert.strictEqual(EmulationModel.EmulatedDevices.deviceCategory(foldableDevice),
+                       EmulationModel.EmulatedDevices.Category.FOLDABLE);
+
+    const tabletDevice = new EmulationModel.EmulatedDevices.EmulatedDevice();
+    tabletDevice.title = 'iPad Pro 13';
+    tabletDevice.type = EmulationModel.EmulatedDevices.Type.Tablet;
+    assert.strictEqual(EmulationModel.EmulatedDevices.deviceCategory(tabletDevice),
+                       EmulationModel.EmulatedDevices.Category.TABLET_DESKTOP);
+
+    const smartDisplayDevice = new EmulationModel.EmulatedDevices.EmulatedDevice();
+    smartDisplayDevice.title = 'Nest Hub Max';
+    smartDisplayDevice.type = EmulationModel.EmulatedDevices.Type.SmartDisplay;
+    assert.strictEqual(EmulationModel.EmulatedDevices.deviceCategory(smartDisplayDevice),
+                       EmulationModel.EmulatedDevices.Category.SMART_DISPLAY);
   });
 });

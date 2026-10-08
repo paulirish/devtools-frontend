@@ -11,51 +11,52 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import layoutPaneStyles from './layoutPane.css.js';
 
 const UIStrings = {
   /**
-   * @description Title of the input to select the overlay color for an element using the color picker
+   * @description Title of the input to select the overlay color for an element using the color picker.
    */
   chooseElementOverlayColor: 'Choose the overlay color for this element',
   /**
-   * @description Title of the show element button in the Layout pane of the Elements panel
+   * @description Title of the show element button in the Layout tab of the Elements panel.
    */
   showElementInTheElementsPanel: 'Show element in the Elements panel',
   /**
-   * @description Title of a section on CSS Grid/Grid Lanes tooling
+   * @description Title of a section on CSS Grid/Grid Lanes tooling.
    */
-  gridOrGridLanes: 'Grid / Grid Lanes',
+  gridOrGridLanes: 'Grid / grid lanes',
   /**
-   * @description Title of a section in the Layout Sidebar pane of the Elements panel
+   * @description Title of a section in the Layout tab of the Elements panel.
    */
   overlayDisplaySettings: 'Overlay display settings',
   /**
-   * @description Title of a section in Layout sidebar pane
+   * @description Title of a section in the Layout tab of the Elements panel.
    */
-  gridOrGridLanesOverlays: 'Grid / Grid Lanes overlays',
+  gridOrGridLanesOverlays: 'Grid / grid lanes overlays',
   /**
-   * @description Message in the Layout panel informing users that no CSS Grid/Grid Lanes layouts were found on the page
+   * @description Message in the Layout tab informing users that no CSS Grid/Grid Lanes layouts were found on the page.
    */
   noGridOrGridLanesLayoutsFoundOnThisPage: 'No grid or grid lanes layouts found on this page',
   /**
-   * @description Title of the Flexbox section in the Layout panel
+   * @description Title of the Flexbox section in the Layout tab of the Elements panel.
    */
   flexbox: 'Flexbox',
   /**
-   * @description Title of a section in the Layout panel
+   * @description Title of a section in the Layout tab of the Elements panel.
    */
   flexboxOverlays: 'Flexbox overlays',
   /**
-   * @description Text in the Layout panel, when no flexbox elements are found
+   * @description Text in the Layout tab, when no flexbox elements are found.
    */
   noFlexboxLayoutsFoundOnThisPage: 'No flexbox layouts found on this page',
   /**
    * @description Screen reader announcement when opening color picker tool.
    */
-  colorPickerOpened: 'Color picker opened.',
+  colorPickerOpened: 'Color picker opened',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/LayoutPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -116,7 +117,7 @@ const nodeToLayoutElement = (node: SDK.DOMModel.DOMNode): LayoutElement => {
       node.highlight();
     },
     hideHighlight: () => {
-      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+      SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
     },
     toggle: (_value: boolean) => {
       throw new Error('Not implemented');
@@ -246,7 +247,7 @@ const DEFAULT_VIEW: View = (input, output, target) => {
             <devtools-node-text .data=${{
                 nodeId: element.domId,
                 nodeTitle: element.name,
-                nodeClasses: element.domClasses
+                nodeClasses: element.domClasses,
               }}>
             </devtools-node-text>
           </span>
@@ -259,7 +260,7 @@ const DEFAULT_VIEW: View = (input, output, target) => {
             jslog=${
       VisualLogging.showStyleEditor('color')
           .track({
-            click: true
+            click: true,
           })}>
           <input
               @change=${(e: Event) => input.onColorChange(element, e)}
@@ -359,21 +360,27 @@ const DEFAULT_VIEW: View = (input, output, target) => {
           </details>`
         : ''}
       </div>`,
-      // clang-format on
-      target);
+                  // clang-format on
+                  target);
 };
 
 type View = (input: ViewInput, output: object, element: HTMLElement) => void;
 export class LayoutPane extends UI.Widget.Widget {
-  readonly #settings: readonly Setting[] = [];
+  readonly #settings: ReadonlyArray<Common.Settings.Setting<string|boolean>>;
   readonly #uaShadowDOMSetting: Common.Settings.Setting<boolean>;
   #domModels: SDK.DOMModel.DOMModel[];
   readonly #view: View;
 
   constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
-    this.#settings = this.#makeSettings();
-    this.#uaShadowDOMSetting = Common.Settings.Settings.instance().moduleSetting('show-ua-shadow-dom');
+    const settings = Common.Settings.Settings.instance();
+    this.#settings = [
+      settings.resolve(SDK.SDKSettings.showGridLineLabelsSettingDescriptor),
+      settings.resolve(SDK.SDKSettings.showGridTrackSizesSettingDescriptor),
+      settings.resolve(SDK.SDKSettings.showGridAreasSettingDescriptor),
+      settings.resolve(SDK.SDKSettings.extendGridLinesSettingDescriptor),
+    ];
+    this.#uaShadowDOMSetting = settings.resolve(SettingsUI.ElementsSettings.showUAShadowDOMSettingDescriptor);
     this.#domModels = [];
     this.#view = view;
   }
@@ -444,10 +451,8 @@ export class LayoutPane extends UI.Widget.Widget {
   }
 
   #makeSettings(): Setting[] {
-    const settings = [];
-    for (const settingName
-             of ['show-grid-line-labels', 'show-grid-track-sizes', 'show-grid-areas', 'extend-grid-lines']) {
-      const setting = Common.Settings.Settings.instance().moduleSetting(settingName);
+    const settings: Setting[] = [];
+    for (const setting of this.#settings) {
       const settingValue = setting.get();
       const settingType = setting.type();
       if (!settingType) {
@@ -456,28 +461,31 @@ export class LayoutPane extends UI.Widget.Widget {
       if (settingType !== Common.Settings.SettingType.BOOLEAN && settingType !== Common.Settings.SettingType.ENUM) {
         throw new Error('A setting provided to LayoutSidebarPane does not have a supported setting type');
       }
+      const uiDescriptor = SettingsUI.SettingUIRegistration.maybeResolve(setting.descriptor());
       const mappedSetting = {
         type: settingType,
         name: setting.name,
-        title: setting.title(),
+        title: uiDescriptor?.title ?? '',
       };
+      const options = uiDescriptor?.options ?? [];
+
       if (typeof settingValue === 'boolean') {
         settings.push({
           ...mappedSetting,
           value: settingValue,
-          options: setting.options().map(opt => ({
-                                           ...opt,
-                                           value: (opt.value as boolean),
-                                         })),
+          options: options.map(opt => ({
+                                 ...opt,
+                                 value: (opt.value as boolean),
+                               })),
         });
       } else if (typeof settingValue === 'string') {
         settings.push({
           ...mappedSetting,
           value: settingValue,
-          options: setting.options().map(opt => ({
-                                           ...opt,
-                                           value: (opt.value as string),
-                                         })),
+          options: options.map(opt => ({
+                                 ...opt,
+                                 value: (opt.value as string),
+                               })),
         });
       }
     }
@@ -485,13 +493,13 @@ export class LayoutPane extends UI.Widget.Widget {
   }
 
   onSettingChanged(setting: string, value: string|boolean): void {
-    Common.Settings.Settings.instance().moduleSetting(setting).set(value);
+    this.#settings.find(s => s.name === setting)?.set(value);
   }
 
   override wasShown(): void {
     super.wasShown();
     for (const setting of this.#settings) {
-      Common.Settings.Settings.instance().moduleSetting(setting.name).addChangeListener(this.requestUpdate, this);
+      setting.addChangeListener(this.requestUpdate, this);
     }
     for (const domModel of this.#domModels) {
       this.modelRemoved(domModel);
@@ -506,7 +514,7 @@ export class LayoutPane extends UI.Widget.Widget {
   override willHide(): void {
     super.willHide();
     for (const setting of this.#settings) {
-      Common.Settings.Settings.instance().moduleSetting(setting.name).removeChangeListener(this.requestUpdate, this);
+      setting.removeChangeListener(this.requestUpdate, this);
     }
     SDK.TargetManager.TargetManager.instance().unobserveModels(SDK.DOMModel.DOMModel, this);
     UI.Context.Context.instance().removeFlavorChangeListener(SDK.DOMModel.DOMNode, this.requestUpdate, this);
@@ -533,6 +541,7 @@ export class LayoutPane extends UI.Widget.Widget {
   }
 
   override async performUpdate(): Promise<void> {
+    const settings = this.#makeSettings();
     const input: ViewInput = {
       gridElements: gridNodesToElements(await this.#fetchGridNodes()),
       flexContainerElements: flexContainerNodesToElements(await this.#fetchFlexContainerNodes()),
@@ -543,20 +552,12 @@ export class LayoutPane extends UI.Widget.Widget {
       onMouseEnter: this.#onElementMouseEnter.bind(this),
       onElementToggle: this.#onElementToggle.bind(this),
       onBooleanSettingChange: this.#onBooleanSettingChange.bind(this),
-      enumSettings: this.#getEnumSettings(),
-      booleanSettings: this.#getBooleanSettings(),
+      enumSettings: settings.filter(isEnumSetting),
+      booleanSettings: settings.filter(isBooleanSetting),
       onSummaryKeyDown: this.#onSummaryKeyDown.bind(this),
     };
 
     this.#view(input, {}, this.contentElement);
-  }
-
-  #getEnumSettings(): EnumSetting[] {
-    return this.#settings.filter(isEnumSetting);
-  }
-
-  #getBooleanSettings(): BooleanSetting[] {
-    return this.#settings.filter(isBooleanSetting);
   }
 
   #onBooleanSettingChange(setting: BooleanSetting, event: Event): void {

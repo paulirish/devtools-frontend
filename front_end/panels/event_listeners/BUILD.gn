@@ -17,28 +17,28 @@ devtools_ui_module("event_listeners") {
     "EventListenersView.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
-    "../../generated",
     "../../ui/components/buttons:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/object_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
+    "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
+  ]
+  deps = [
+    ":css_files",
+    "../../ui/legacy/components/object_ui:css_files",
   ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "event_listeners.ts"
 
-  deps = [
-    ":css_files",
-    ":event_listeners",
-    "../../ui/legacy/components/object_ui:css_files",
-  ]
+  ts_deps = [ ":event_listeners" ]
 
   visibility = [
     ":*",
@@ -56,8 +56,10 @@ devtools_ui_module("unittests") {
 
   sources = [ "EventListenersView.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
+    "../../core/sdk:bundle",
+    "../../generated",
     "../../testing",
   ]
 }

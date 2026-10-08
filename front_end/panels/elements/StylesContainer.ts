@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import type * as SDK from '../../core/sdk/sdk.js';
+import type * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as ComputedStyle from '../../models/computed_style/computed_style.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import type * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import type * as Components from '../../ui/legacy/components/utils/utils.js';
 
@@ -25,10 +25,12 @@ export interface StylesContainer {
   node(): SDK.DOMModel.DOMNode|null;
   cssModel(): SDK.CSSModel.CSSModel|null;
   computedStyleModel(): ComputedStyle.ComputedStyleModel.ComputedStyleModel;
-  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement): void;
+  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement,
+                force?: boolean): void;
   filterRegex(): RegExp|null;
   setEditingStyle(editing: boolean): void;
   setUserOperation(userOperation: boolean): void;
+  suppressResets(): void;
   forceUpdate(): void;
   hideAllPopovers(): void;
 
@@ -37,7 +39,7 @@ export interface StylesContainer {
       computedValue: string|null): ElementsComponents.CSSVariableValueView.CSSVariableValueView;
   getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
       ElementsComponents.CSSVariableValueView.CSSVariableParserError|null;
-  jumpToFunctionDefinition(functionName: string): void;
+  jumpToFunctionDefinition(functionName: string, treeScopeDistance: number): void;
   continueEditingElement(sectionIndex: number, propertyIndex: number): void;
   revealProperty(cssProperty: SDK.CSSProperty.CSSProperty): void;
   resetFocus(): void;
@@ -57,4 +59,7 @@ export interface StylesContainer {
   setActiveProperty(treeElement: StylePropertyTreeElement|null): void;
   addStyleUpdateListener(listener: () => void): void;
   removeStyleUpdateListener(listener: () => void): void;
+  trackForLazyRendering(element: Element, callback: () => void): void;
+  untrackForLazyRendering(element: Element): void;
+  shouldRenderLazily(): boolean;
 }

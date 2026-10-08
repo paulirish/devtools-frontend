@@ -17,14 +17,19 @@ import json5  # pylint: disable=import-error
 
 ROOT_DIRECTORY = path.join(path.dirname(__file__), '..', '..')
 GENERATED_LOCATION = path.join(ROOT_DIRECTORY, 'front_end', 'generated',
-                               'SupportedCSSProperties.js')
+                               'SupportedCSSProperties.ts')
 READ_LOCATION = path.join(ROOT_DIRECTORY, 'third_party', 'blink', 'renderer',
                           'core', 'css', 'css_properties.json5')
+RUNTIME_FLAGS_READ_LOCATION = path.join(ROOT_DIRECTORY, 'third_party', 'blink',
+                                        'renderer', 'platform',
+                                        'runtime_enabled_features.json5')
 
 
 def _keep_only_required_keys(entry):
     for key in list(entry.keys()):
-        if key not in ("name", "longhands", "svg", "inherited", "keywords"):
+        if key not in ("name", "longhands", "svg", "inherited", "keywords",
+                       "is_property", "is_descriptor", "runtime_flag",
+                       "runtime_flag_status", "devtools_keywords"):
             del entry[key]
     return entry
 
@@ -32,6 +37,14 @@ def _keep_only_required_keys(entry):
 def properties_from_file(file_name):
     with open(file_name) as json5_file:
         doc = json5.loads(json5_file.read())
+    with open(RUNTIME_FLAGS_READ_LOCATION, 'r') as json5_file:
+        runtime_features_data = json5.loads(json5_file.read())
+
+    # Create a map for easy lookup of feature status
+    runtime_features_map = {
+        item['name']: item.get('status')
+        for item in runtime_features_data['data']
+    }
 
     properties = []
     property_names = {}
@@ -51,9 +64,22 @@ def properties_from_file(file_name):
         if "affected_by_all" not in entry or entry["affected_by_all"]:
             if not 'longhands' in entry:
                 affected_by_all.add(entry['name'])
+        if "runtime_flag" in entry and entry[
+                "runtime_flag"] in runtime_features_map:
+            status = runtime_features_map[entry["runtime_flag"]]
+            entry["runtime_flag_status"] = status
         properties.append(_keep_only_required_keys(entry))
         property_names[entry["name"]] = entry
-        if "keywords" in entry:
+        # If devtools_keywords is specified, it is given precedence over keywords.
+        # This is because there might be values in keywords which are actually not
+        # supported in the browser yet (e.g. due to experimental flags).
+        if "devtools_keywords" in entry:
+            devtools_keywords = [
+                keyword for keyword in entry["devtools_keywords"]
+                if not keyword.startswith("-internal-")
+            ]
+            property_values[entry["name"]] = {"values": devtools_keywords}
+        elif "keywords" in entry:
             keywords = [
                 keyword for keyword in entry["keywords"]
                 if not keyword.startswith("-internal-")
@@ -100,11 +126,30 @@ with open(GENERATED_LOCATION, "w+", newline='\n') as f:
     )
     f.write('// found in the LICENSE file.\n')
     f.write('\n')
-    f.write('/* eslint-disable @stylistic/quotes, @stylistic/quote-props */\n')
-    f.write("export const generatedProperties = %s;\n" %
+    f.write(
+        '/* eslint-disable @stylistic/quotes, @stylistic/quote-props, @stylistic/comma-dangle, @typescript-eslint/naming-convention */\n'
+    )
+    f.write('export interface CSSProperty {\n')
+    f.write('  name: string;\n')
+    f.write('  longhands?: string[];\n')
+    f.write('  inherited?: boolean;\n')
+    f.write('  svg?: boolean;\n')
+    f.write('  keywords?: string[];\n')
+    f.write('  devtools_keywords?: string[];\n')
+    f.write('  is_property?: boolean;\n')
+    f.write('  is_descriptor?: boolean;\n')
+    f.write('  runtime_flag?: string;\n')
+    f.write('  runtime_flag_status?: string | null;\n')
+    f.write('}\n\n')
+    f.write('export interface CSSPropertyValue {\n')
+    f.write('  values: string[];\n')
+    f.write('}\n\n')
+    f.write("export const generatedProperties: CSSProperty[] = %s;\n" %
             json.dumps(properties, sort_keys=True, indent=1))
     # sort keys to ensure entries are generated in a deterministic way to avoid inconsistencies across different OS
-    f.write("export const generatedPropertyValues = %s;\n" %
-            json.dumps(property_values, sort_keys=True, indent=1))
-    f.write("export const generatedAliasesFor = new Map(%s);\n" %
-            json.dumps(aliases_for, sort_keys=True, indent=1))
+    f.write(
+        "export const generatedPropertyValues: Record<string, CSSPropertyValue> = %s;\n"
+        % json.dumps(property_values, sort_keys=True, indent=1))
+    f.write(
+        "export const generatedAliasesFor: Map<string, string> = new Map(%s);\n"
+        % json.dumps(aliases_for, sort_keys=True, indent=1))

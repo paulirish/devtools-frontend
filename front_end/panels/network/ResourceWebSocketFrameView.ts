@@ -1,7 +1,6 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
@@ -25,8 +24,7 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
-import * as UI from '../../ui/legacy/legacy.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {BinaryResourceView} from './BinaryResourceView.js';
@@ -51,39 +49,39 @@ const UIStrings = {
    */
   sOpcodeS: '{PH1} (Opcode {PH2})',
   /**
-   * @description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel
+   * @description WebSocket opcode (operation code) name for a continuation frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type; continuation frames split large messages into multiple chunks.
    */
-  continuationFrame: 'Continuation Frame',
+  continuationFrame: 'Continuation frame',
   /**
-   * @description Op codes text frame of map in Resource Web Socket Frame View of the Network panel
+   * @description WebSocket opcode (operation code) name for a text message frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type.
    */
-  textMessage: 'Text Message',
+  textMessage: 'Text message',
   /**
-   * @description Op codes binary frame of map in Resource Web Socket Frame View of the Network panel
+   * @description WebSocket opcode (operation code) name for a binary message frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type.
    */
-  binaryMessage: 'Binary Message',
+  binaryMessage: 'Binary message',
   /**
-   * @description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel indicating that the web socket connection has been closed.
+   * @description WebSocket opcode (operation code) name for a connection close frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type.
    */
-  connectionCloseMessage: 'Connection Close Message',
+  connectionCloseMessage: 'Connection close message',
   /**
-   * @description Op codes ping frame of map in Resource Web Socket Frame View of the Network panel
+   * @description WebSocket opcode (operation code) name for a ping frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type; ping frames check connection liveness.
    */
-  pingMessage: 'Ping Message',
+  pingMessage: 'Ping message',
   /**
-   * @description Op codes pong frame of map in Resource Web Socket Frame View of the Network panel
+   * @description WebSocket opcode (operation code) name for a pong frame in WebSocket messages view of the Network panel. In the WebSocket protocol, an opcode defines the frame payload type; pong frames reply to ping frames.
    */
-  pongMessage: 'Pong Message',
+  pongMessage: 'Pong message',
   /**
-   * @description Data grid name for Web Socket Frame data grids
+   * @description Accessible name for WebSocket message data grid in WebSocket messages view of the Network panel.
    */
-  webSocketFrame: 'Web Socket Frame',
+  webSocketFrame: 'WebSocket frame',
   /**
-   * @description Text for something not available
+   * @description Text shown when a value is not available in WebSocket messages view of the Network panel.
    */
   na: 'N/A',
   /**
-   * @description Example for placeholder text
+   * @description Placeholder text for filter input in WebSocket messages view of the Network panel.
    */
   filterUsingRegex: 'Filter using regex (example: (web)?socket)',
 } as const;
@@ -93,10 +91,9 @@ const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined
 
 export class ResourceWebSocketFrameView extends ResourceChunkView<SDK.NetworkRequest.WebSocketFrame> {
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
-    super(
-        request, 'network-web-socket-message-filter', 'resource-web-socket-frame-split-view-state',
-        i18nString(UIStrings.webSocketFrame), i18nString(UIStrings.filterUsingRegex));
-    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages').track({resize: true})}`);
+    super(request, 'network-web-socket-message-filter', 'resource-web-socket-frame-split-view-state',
+          i18nString(UIStrings.webSocketFrame), i18nString(UIStrings.filterUsingRegex),
+          {jslog: `${VisualLogging.pane('web-socket-messages').track({resize: true})}`});
   }
 
   override getRequestChunks(): SDK.NetworkRequest.WebSocketFrame[] {
@@ -115,7 +112,7 @@ export class ResourceWebSocketFrameView extends ResourceChunkView<SDK.NetworkReq
 
   override wasShown(): void {
     super.wasShown();
-    this.refresh();
+    this.requestUpdate();
     this.request.addEventListener(SDK.NetworkRequest.Events.WEBSOCKET_FRAME_ADDED, this.onWebSocketFrameAdded, this);
   }
 
@@ -159,18 +156,15 @@ const opCodeDescriptions: Array<() => string> = (function(): Array<() => Common.
 
 class ResourceFrameNode extends DataGridItem {
   readonly frame: SDK.NetworkRequest.WebSocketFrame;
-  private readonly isTextFrame: boolean;
+  override readonly isTextFrame: boolean;
   #dataText: string;
-  #binaryView: BinaryResourceView|null;
+  #binaryView: BinaryResourceView|null = null;
+  override readonly data: Record<string, string|HTMLElement>;
+  override readonly cssClass?: string;
 
   constructor(frame: SDK.NetworkRequest.WebSocketFrame) {
+    super();
     let length = String(frame.text.length);
-    const time = new Date(frame.time * 1000);
-    const timeText = ('0' + time.getHours()).substr(-2) + ':' + ('0' + time.getMinutes()).substr(-2) + ':' +
-        ('0' + time.getSeconds()).substr(-2) + '.' + ('00' + time.getMilliseconds()).substr(-3);
-    const timeNode = document.createElement('div');
-    UI.UIUtils.createTextChild(timeNode, timeText);
-    UI.Tooltip.Tooltip.install(timeNode, time.toLocaleString());
 
     let dataText: string = frame.text;
     let description = ResourceWebSocketFrameView.opCodeDescription(frame.opCode, frame.mask);
@@ -179,39 +173,31 @@ class ResourceFrameNode extends DataGridItem {
     if (frame.type === SDK.NetworkRequest.WebSocketFrameType.Error) {
       description = dataText;
       length = i18nString(UIStrings.na);
-
     } else if (isTextFrame) {
       description = dataText;
-
     } else if (frame.opCode === OpCodes.BINARY_FRAME) {
       length = i18n.ByteUtilities.bytesToString(Platform.StringUtilities.base64ToSize(frame.text));
       description = opCodeDescriptions[frame.opCode]();
-
     } else {
       dataText = description;
     }
-
-    super({data: description, length, time: timeNode});
 
     this.frame = frame;
     this.isTextFrame = isTextFrame;
     this.#dataText = dataText;
 
-    this.#binaryView = null;
-  }
+    this.data = {
+      data: description,
+      length,
+    };
 
-  override createCells(element: Element): void {
-    element.classList.toggle(
-        'resource-chunk-view-row-error', this.frame.type === SDK.NetworkRequest.WebSocketFrameType.Error);
-    element.classList.toggle(
-        'resource-chunk-view-row-send', this.frame.type === SDK.NetworkRequest.WebSocketFrameType.Send);
-    element.classList.toggle(
-        'resource-chunk-view-row-receive', this.frame.type === SDK.NetworkRequest.WebSocketFrameType.Receive);
-    super.createCells(element);
-  }
-
-  override nodeSelfHeight(): number {
-    return 21;
+    if (frame.type === SDK.NetworkRequest.WebSocketFrameType.Error) {
+      this.cssClass = 'resource-chunk-view-row-error';
+    } else if (frame.type === SDK.NetworkRequest.WebSocketFrameType.Send) {
+      this.cssClass = 'resource-chunk-view-row-send';
+    } else if (frame.type === SDK.NetworkRequest.WebSocketFrameType.Receive) {
+      this.cssClass = 'resource-chunk-view-row-receive';
+    }
   }
 
   override dataText(): string {

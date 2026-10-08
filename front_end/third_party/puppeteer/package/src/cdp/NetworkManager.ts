@@ -8,13 +8,14 @@ import type {Protocol} from 'devtools-protocol';
 
 import {CDPSessionEvent, type CDPSession} from '../api/CDPSession.js';
 import type {Frame} from '../api/Frame.js';
-import type {Credentials} from '../api/Page.js';
+import type {Credentials, Page} from '../api/Page.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {EventEmitter} from '../common/EventEmitter.js';
 import {
   NetworkManagerEvent,
   type NetworkManagerEvents,
 } from '../common/NetworkManagerEvents.js';
-import {debugError, isString} from '../common/util.js';
+import {isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
 import {DisposableStack} from '../util/disposable.js';
 import {isErrorLike} from '../util/ErrorLike.js';
@@ -65,6 +66,7 @@ export interface InternalNetworkConditions extends NetworkConditions {
  */
 export interface FrameProvider {
   frame(id: string): Frame | null;
+  page(): Page;
 }
 
 /**
@@ -83,6 +85,8 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
   #userAgent?: string;
   #userAgentMetadata?: Protocol.Emulation.UserAgentMetadata;
   #platform?: string;
+  #acceptLanguage?: string;
+  #userAgentOverrideApplied = false;
 
   readonly #handlers = [
     ['Fetch.requestPaused', this.#onRequestPaused],
@@ -98,12 +102,18 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
   ] as const;
 
   #clients = new Map<CDPSession, DisposableStack>();
-  #networkEnabled = true;
+  #networkEnabled: boolean;
+  #logger: Logger;
 
-  constructor(frameManager: FrameProvider, networkEnabled?: boolean) {
-    super();
+  constructor(
+    frameManager: FrameProvider,
+    networkEnabled = true,
+    logger: Logger,
+  ) {
+    super(undefined, logger);
     this.#frameManager = frameManager;
     this.#networkEnabled = networkEnabled ?? true;
+    this.#logger = logger;
   }
 
   #canIgnoreError(error: unknown) {
@@ -277,16 +287,35 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
     await this.#applyToAllClients(this.#applyUserAgent.bind(this));
   }
 
+  async setAcceptLanguage(acceptLanguage: string | undefined): Promise<void> {
+    this.#acceptLanguage = acceptLanguage;
+    await this.#applyToAllClients(this.#applyUserAgent.bind(this));
+  }
+
   async #applyUserAgent(client: CDPSession) {
-    if (this.#userAgent === undefined) {
+    const nothingToEmulate =
+      this.#userAgent === undefined &&
+      this.#userAgentMetadata === undefined &&
+      this.#acceptLanguage === undefined &&
+      this.#platform === undefined;
+    // Still need to send once to reset a previously-applied override.
+    if (nothingToEmulate && !this.#userAgentOverrideApplied) {
+      return;
+    }
+    const userAgent =
+      this.#userAgent ??
+      (await this.#frameManager.page().browser().userAgent());
+    if (userAgent === undefined) {
       return;
     }
     try {
       await client.send('Network.setUserAgentOverride', {
-        userAgent: this.#userAgent,
+        userAgent,
+        acceptLanguage: this.#acceptLanguage,
         userAgentMetadata: this.#userAgentMetadata,
         platform: this.#platform,
       });
+      this.#userAgentOverrideApplied = !nothingToEmulate;
     } catch (error) {
       if (this.#canIgnoreError(error)) {
         return;
@@ -403,12 +432,14 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       username: undefined,
       password: undefined,
     };
-    client
+    void client
       .send('Fetch.continueWithAuth', {
         requestId: event.requestId,
         authChallengeResponse: {response, username, password},
       })
-      .catch(debugError);
+      .catch(err => {
+        this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+      });
   }
 
   /**
@@ -426,11 +457,13 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       !this.#userRequestInterceptionEnabled &&
       this.#protocolRequestInterceptionEnabled
     ) {
-      client
+      void client
         .send('Fetch.continueRequest', {
           requestId: event.requestId,
         })
-        .catch(debugError);
+        .catch(err => {
+          this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+        });
     }
 
     const {networkId: networkRequestId, requestId: fetchRequestId} = event;
@@ -492,6 +525,7 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       this.#userRequestInterceptionEnabled,
       event,
       [],
+      this.#logger,
     );
     this.emit(NetworkManagerEvent.Request, request);
     void request.finalizeInterceptions();
@@ -557,6 +591,7 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       this.#userRequestInterceptionEnabled,
       event,
       redirectChain,
+      this.#logger,
     );
 
     const extraInfo = this.#networkEventManager
@@ -602,7 +637,7 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       request = this.#networkEventManager.getRequest(event.requestId);
     }
     if (!request) {
-      debugError(
+      this.#logger?.(DEBUG_PREFIXES.error)?.(
         new Error(
           `Request ${event.requestId} was served from cache but we could not find the corresponding request object`,
         ),
@@ -646,7 +681,7 @@ export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
       responseReceived.requestId,
     );
     if (extraInfos.length) {
-      debugError(
+      this.#logger?.(DEBUG_PREFIXES.error)?.(
         new Error(
           'Unexpected extraInfo events for request ' +
             responseReceived.requestId,

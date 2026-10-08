@@ -11,9 +11,9 @@ import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-   * @description Label for a link for third-party cookie Issues.
+   * @description Label for a link for third-party cookie issues.
    */
-  thirdPartyPhaseoutExplained: 'Changes to Chrome\'s treatment of third-party cookies',
+  thirdPartyPhaseoutExplained: 'Changes to Chrome’s treatment of third-party cookies',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/CookieDeprecationMetadataIssue.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -33,20 +33,19 @@ export class CookieDeprecationMetadataIssue extends Issue<Protocol.Audits.Cookie
   }
 
   getDescription(): MarkdownIssueDescription {
-    const fileName =
+    let fileName =
         this.details().operation === 'SetCookie' ? 'cookieWarnMetadataGrantSet.md' : 'cookieWarnMetadataGrantRead.md';
 
-    let optOutText = '';
+    const substitutions = new Map<string, string>();
     if (this.details().isOptOutTopLevel) {
-      optOutText = '\n\n (Top level site opt-out: ' + this.details().optOutPercentage +
-          '% - [learn more](gracePeriodStagedControlExplainer))';
+      fileName = this.details().operation === 'SetCookie' ? 'cookieWarnMetadataGrantSetOptOut.md' :
+                                                            'cookieWarnMetadataGrantReadOptOut.md';
+      substitutions.set('PLACEHOLDER_optOutPercentage', String(this.details().optOutPercentage));
     }
 
     return {
       file: fileName,
-      substitutions: new Map([
-        ['PLACEHOLDER_topleveloptout', optOutText],
-      ]),
+      substitutions,
       links: [
         {
           link: 'https://goo.gle/changes-to-chrome-browsing',

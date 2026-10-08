@@ -49,19 +49,19 @@ const {classMap} = Directives;
 
 const UIStrings = {
   /**
-   * @description Text to stop preventing the debugger from stepping into library code
+   * @description Context menu item on a stack trace link to remove the script from the ignore list.
    */
   removeFromIgnore: 'Remove from ignore list',
   /**
-   * @description Text for scripts that should not be stepped into when debugging
+   * @description Context menu item on a stack trace link to add the script to the ignore list.
    */
   addToIgnore: 'Add script to ignore list',
   /**
-   * @description A link to show more frames when they are available.
+   * @description Link text in a stack trace preview to show ignore-listed frames.
    */
   showMoreFrames: 'Show ignore-listed frames',
   /**
-   * @description A link to rehide frames that are by default hidden.
+   * @description Link text in a stack trace preview to hide ignore-listed frames.
    */
   showLess: 'Show less',
 } as const;
@@ -156,7 +156,6 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               const link = Linkifier.linkifyStackTraceFrame(frame, {
                 showColumnNumber: Boolean(input.showColumnNumber),
                 tabStop: Boolean(input.tabStops),
-                inlineFrameIndex: 0,
                 revealBreakpoint: previousStackFrameWasBreakpointCondition,
                 maxLength: UI.UIUtils.MaxLengthForDisplayedURLsInConsole,
                 ignoreListManager: input.ignoreListManager,
@@ -218,7 +217,7 @@ export class StackTracePreviewContent extends UI.Widget.Widget<ShadowRoot> {
   #expanded = false;
   #showIgnoreListed = false;
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: 'pure'});
     this.#view = view;
   }
@@ -269,9 +268,16 @@ export class StackTracePreviewContent extends UI.Widget.Widget<ShadowRoot> {
     if (Root.DevToolsContext.globalInstance().has(Workspace.IgnoreListManager.IgnoreListManager)) {
       Workspace.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.#updateHasNonIgnoredLinks);
     }
+    if (this.#stackTrace) {
+      this.#stackTrace.addEventListener(StackTrace.StackTrace.Events.UPDATED, this.requestUpdate, this);
+    }
+    this.requestUpdate();
   }
 
   override willHide(): void {
+    if (this.#stackTrace) {
+      this.#stackTrace.removeEventListener(StackTrace.StackTrace.Events.UPDATED, this.requestUpdate, this);
+    }
     if (Root.DevToolsContext.globalInstance().has(Workspace.IgnoreListManager.IgnoreListManager)) {
       Workspace.IgnoreListManager.IgnoreListManager.instance().removeChangeListener(this.#updateHasNonIgnoredLinks);
     }
@@ -292,7 +298,9 @@ export class StackTracePreviewContent extends UI.Widget.Widget<ShadowRoot> {
       this.#stackTrace.removeEventListener(StackTrace.StackTrace.Events.UPDATED, this.requestUpdate, this);
     }
     this.#stackTrace = stackTrace;
-    this.#stackTrace.addEventListener(StackTrace.StackTrace.Events.UPDATED, this.requestUpdate, this);
+    if (this.#stackTrace && this.isShowing()) {
+      this.#stackTrace.addEventListener(StackTrace.StackTrace.Events.UPDATED, this.requestUpdate, this);
+    }
     this.requestUpdate();
   }
 

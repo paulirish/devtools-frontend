@@ -3,19 +3,34 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import {mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
-import {createTarget} from '../../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../../testing/MockConnection.js';
+import {deinitializeGlobalVars} from '../../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../../testing/TestUniverse.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
 import * as AiAssistance from '../ai_assistance.js';
 
-const {urlString} = Platform.DevToolsPath;
+describe('AccessibilityAgent', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
 
-describeWithMockConnection('AccessibilityAgent', () => {
+  let universe: TestUniverse;
+
+  beforeEach(() => {
+    universe = new TestUniverse();
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(universe.targetManager);
+  });
+
+  afterEach(async () => {
+    await deinitializeGlobalVars();
+  });
   const mockReport = {
     lighthouseVersion: '1.0.0',
     userAgent: 'test user agent',
@@ -66,7 +81,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     });
 
     await Array.fromAsync(
-        agent.run('test', {selected: new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport)}));
+        agent.run('test', {selected: new AiAssistance.LighthouseContext.LighthouseContext(mockReport)}));
 
     const call = aidaClient.doConversation.getCall(0);
     assert.exists(call);
@@ -75,6 +90,28 @@ describeWithMockConnection('AccessibilityAgent', () => {
     assert.include(text, '# Lighthouse Report');
     assert.include(text, '# Audits for Accessibility');
     assert.include(text, '**Accessibility Audit**: 50 (Fail)');
+  });
+
+  it('yields context with LIGHTHOUSE_REPORT widget', async () => {
+    const aidaClient = mockAidaClient([[{
+      explanation: 'This is the answer',
+      metadata: {
+        rpcGlobalId: 123,
+      },
+    }]]);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+    });
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const contextResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.CONTEXT);
+    assert.exists(contextResponse);
+    assert.deepEqual(contextResponse.widgets, [{
+                       name: 'LIGHTHOUSE_REPORT',
+                       data: {
+                         report: mockReport,
+                       },
+                     }]);
   });
 
   it('can call the getLighthouseAudits method', async () => {
@@ -88,7 +125,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
     const titleResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.TITLE);
     assert.exists(titleResponse);
@@ -114,7 +151,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
     const titleResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.TITLE);
     assert.exists(titleResponse);
@@ -132,7 +169,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
     const titleResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.TITLE);
     assert.exists(titleResponse);
@@ -140,7 +177,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
   });
 
   it('getElementAccessibilityDetails yields a DomTreeAiWidget containing the node snapshot', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const aidaClient = mockAidaClient([[{
       explanation: '',
       functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
@@ -151,7 +188,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
 
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
     const accessibilityModel = target.model(SDK.AccessibilityModel.AccessibilityModel)!;
@@ -160,9 +197,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     mockNode.id = 42 as Protocol.DOM.NodeId;
     mockNode.backendNodeId.returns(100 as Protocol.DOM.BackendNodeId);
     mockNode.attributes.returns([]);
-    const mockDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mockDocument.documentURL = urlString`https://example.com`;
-    mockNode.ownerDocument = mockDocument;
+    mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
 
     const mockSnapshot = sinon.createStubInstance(SDK.DOMModel.DOMNodeSnapshot);
     mockNode.takeSnapshot.resolves(mockSnapshot);
@@ -171,7 +206,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     sinon.stub(domModel, 'nodeForId').withArgs(42 as Protocol.DOM.NodeId).returns(mockNode);
 
     const mainDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mainDocument.documentURL = urlString`https://example.com`;
+    mainDocument.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
     sinon.stub(domModel, 'existingDocument').returns(mainDocument);
 
     sinon.stub(accessibilityModel, 'requestAndLoadSubTreeToNode').resolves();
@@ -192,11 +227,13 @@ describeWithMockConnection('AccessibilityAgent', () => {
     assert.exists(actions[0].widgets);
     const widget = actions[0].widgets?.find(w => w.name === 'DOM_TREE') as AiAssistance.AiAgent.DomTreeAiWidget;
     assert.exists(widget);
+    assert.strictEqual(widget.data.title, 'Element details');
+    assert.strictEqual(widget.data.accessibleRevealLabel, 'Reveal element');
     assert.strictEqual(widget.data.root, mockSnapshot);
   });
 
   it('getElementAccessibilityDetails returns an error if the node is in a different origin', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const aidaClient = mockAidaClient([[{
       explanation: '',
       functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
@@ -207,22 +244,20 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
 
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
 
     const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
     mockNode.domModel.returns(domModel);
     mockNode.id = 42 as Protocol.DOM.NodeId;
-    const mockDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mockDocument.documentURL = urlString`https://cross-origin.com`;
-    mockNode.ownerDocument = mockDocument;
+    mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://cross-origin.com'));
 
     sinon.stub(domModel, 'pushNodeByPathToFrontend').resolves(42 as Protocol.DOM.NodeId);
     sinon.stub(domModel, 'nodeForId').withArgs(42 as Protocol.DOM.NodeId).returns(mockNode);
 
     const mainDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mainDocument.documentURL = urlString`https://example.com`;
+    mainDocument.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
     sinon.stub(domModel, 'existingDocument').returns(mainDocument);
 
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -231,8 +266,8 @@ describeWithMockConnection('AccessibilityAgent', () => {
     assert.strictEqual(actionResponse.output, 'Could not find the element with path: 1,HTML,1,BODY');
   });
 
-  it('getElementAccessibilityDetails proceeds if both are identical data URLs', async () => {
-    const target = createTarget();
+  it('getElementAccessibilityDetails returns an error if the node is in a different file:// origin', async () => {
+    const target = universe.createTarget();
     const aidaClient = mockAidaClient([[{
       explanation: '',
       functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
@@ -243,7 +278,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
 
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
 
@@ -252,15 +287,49 @@ describeWithMockConnection('AccessibilityAgent', () => {
     mockNode.id = 42 as Protocol.DOM.NodeId;
     mockNode.backendNodeId.returns(100 as Protocol.DOM.BackendNodeId);
     mockNode.attributes.returns([]);
-    const mockDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mockDocument.documentURL = urlString`data:text/html,foo`;
-    mockNode.ownerDocument = mockDocument;
+    mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('file:///tmp/victim.html'));
 
     sinon.stub(domModel, 'pushNodeByPathToFrontend').resolves(42 as Protocol.DOM.NodeId);
     sinon.stub(domModel, 'nodeForId').withArgs(42 as Protocol.DOM.NodeId).returns(mockNode);
 
     const mainDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mainDocument.documentURL = urlString`data:text/html,foo`;
+    mainDocument.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('file:///tmp/attacker.html'));
+    sinon.stub(domModel, 'existingDocument').returns(mainDocument);
+
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+    assert.strictEqual(actionResponse.output, 'Could not find the element with path: 1,HTML,1,BODY');
+  });
+
+  it('getElementAccessibilityDetails proceeds if both are the same file:// origin', async () => {
+    const target = universe.createTarget();
+    const aidaClient = mockAidaClient([[{
+      explanation: '',
+      functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
+      metadata: {
+        rpcGlobalId: 123,
+      },
+    }]]);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+    });
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
+
+    const domModel = target.model(SDK.DOMModel.DOMModel)!;
+
+    const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    mockNode.domModel.returns(domModel);
+    mockNode.id = 42 as Protocol.DOM.NodeId;
+    mockNode.backendNodeId.returns(100 as Protocol.DOM.BackendNodeId);
+    mockNode.attributes.returns([]);
+    mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('file:///tmp/index.html'));
+
+    sinon.stub(domModel, 'pushNodeByPathToFrontend').resolves(42 as Protocol.DOM.NodeId);
+    sinon.stub(domModel, 'nodeForId').withArgs(42 as Protocol.DOM.NodeId).returns(mockNode);
+
+    const mainDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
+    mainDocument.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('file:///tmp/index.html'));
     sinon.stub(domModel, 'existingDocument').returns(mainDocument);
 
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -270,7 +339,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
   });
 
   it('getElementAccessibilityDetails returns an error if they are different data URLs', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const aidaClient = mockAidaClient([[{
       explanation: '',
       functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
@@ -281,7 +350,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
       aidaClient,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
 
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
 
@@ -290,15 +359,13 @@ describeWithMockConnection('AccessibilityAgent', () => {
     mockNode.id = 42 as Protocol.DOM.NodeId;
     mockNode.backendNodeId.returns(100 as Protocol.DOM.BackendNodeId);
     mockNode.attributes.returns([]);
-    const mockDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mockDocument.documentURL = urlString`data:text/html,bar`;
-    mockNode.ownerDocument = mockDocument;
+    mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('data:text/html,bar'));
 
     sinon.stub(domModel, 'pushNodeByPathToFrontend').resolves(42 as Protocol.DOM.NodeId);
     sinon.stub(domModel, 'nodeForId').withArgs(42 as Protocol.DOM.NodeId).returns(mockNode);
 
     const mainDocument = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
-    mainDocument.documentURL = urlString`data:text/html,foo`;
+    mainDocument.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('data:text/html,foo'));
     sinon.stub(domModel, 'existingDocument').returns(mainDocument);
 
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -320,7 +387,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
       aidaClient,
       lighthouseRecording,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
     const titleResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.TITLE);
     assert.exists(titleResponse);
@@ -347,7 +414,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
   }
 
   it('can call the executeJavaScript method', async () => {
-    const target = createTarget();
+    const target = universe.createTarget();
     const aidaClient = mockAidaClient([
       [{
         explanation: 'thought',
@@ -358,7 +425,7 @@ describeWithMockConnection('AccessibilityAgent', () => {
       }],
       [{
         explanation: 'answer',
-      }]
+      }],
     ]);
 
     const execJs = sinon.stub().resolves('test data');
@@ -367,7 +434,48 @@ describeWithMockConnection('AccessibilityAgent', () => {
       execJs,
       createExtensionScope,
     });
-    const context = new AiAssistance.AccessibilityAgent.AccessibilityContext(mockReport);
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
+
+    const domModel = target.model(SDK.DOMModel.DOMModel)!;
+    const documentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    documentNode.domModel.returns(domModel);
+    documentNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
+    const document = sinon.createStubInstance(SDK.DOMModel.DOMDocument);
+    document.body = documentNode;
+    sinon.stub(domModel, 'existingDocument').returns(document);
+
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+    assert.strictEqual(actionResponse.output, 'test data');
+    sinon.assert.calledOnce(execJs);
+  });
+
+  it('cannot call executeJavaScript if the report is imported', async () => {
+    const target = universe.createTarget();
+    const aidaClient = mockAidaClient([
+      [{
+        explanation: 'thought',
+        functionCalls: [{
+          name: 'executeJavaScript',
+          args: {code: 'document.body.id', explanation: 'explaining', title: 'titling'},
+        }],
+      }],
+    ]);
+
+    const execJs = sinon.stub().resolves('test data');
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+      execJs,
+      createExtensionScope,
+    });
+
+    const importedReport: LHModel.ReporterTypes.ReportJSON = {
+      ...mockReport,
+      isImported: true,
+    };
+
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(importedReport);
 
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
     const documentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
@@ -379,7 +487,114 @@ describeWithMockConnection('AccessibilityAgent', () => {
     const responses = await Array.fromAsync(agent.run('test', {selected: context}));
     const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
     assert.exists(actionResponse);
-    assert.strictEqual(actionResponse.output, 'test data');
-    sinon.assert.calledOnce(execJs);
+    assert.strictEqual(actionResponse.output, 'Cannot use this tool on an imported file.');
+    sinon.assert.notCalled(execJs);
+  });
+
+  it('cannot call runAccessibilityAudits if the report is imported', async () => {
+    const aidaClient = mockAidaClient([[{
+      explanation: '',
+      functionCalls: [{name: 'runAccessibilityAudits', args: {explanation: 'testing'}}],
+    }]]);
+    const lighthouseRecording = sinon.stub().resolves(mockReport);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+      lighthouseRecording,
+    });
+
+    const importedReport: LHModel.ReporterTypes.ReportJSON = {
+      ...mockReport,
+      isImported: true,
+    };
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(importedReport);
+
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+    assert.strictEqual(actionResponse.output, 'Cannot use this tool on an imported file.');
+    sinon.assert.notCalled(lighthouseRecording);
+  });
+
+  it('cannot call getStyles if the report is imported', async () => {
+    const aidaClient = mockAidaClient([[{
+      explanation: '',
+      functionCalls:
+          [{name: 'getStyles', args: {path: '1,HTML,1,BODY', styleProperties: ['color'], explanation: 'testing'}}],
+    }]]);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+    });
+
+    const importedReport: LHModel.ReporterTypes.ReportJSON = {
+      ...mockReport,
+      isImported: true,
+    };
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(importedReport);
+
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+    assert.strictEqual(actionResponse.output, 'Cannot use this tool on an imported file.');
+  });
+
+  it('cannot call getElementAccessibilityDetails if the report is imported', async () => {
+    const aidaClient = mockAidaClient([[{
+      explanation: '',
+      functionCalls: [{name: 'getElementAccessibilityDetails', args: {path: '1,HTML,1,BODY', explanation: 'testing'}}],
+    }]]);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+    });
+
+    const importedReport: LHModel.ReporterTypes.ReportJSON = {
+      ...mockReport,
+      isImported: true,
+    };
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(importedReport);
+
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+    assert.strictEqual(actionResponse.output, 'Cannot use this tool on an imported file.');
+  });
+
+  it('can still call getLighthouseAudits if the report is imported', async () => {
+    const aidaClient = mockAidaClient([[{
+      explanation: '',
+      functionCalls: [{name: 'getLighthouseAudits', args: {categoryId: 'accessibility'}}],
+      metadata: {
+        rpcGlobalId: 123,
+      },
+    }]]);
+    const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+      aidaClient,
+    });
+
+    const importedReport: LHModel.ReporterTypes.ReportJSON = {
+      ...mockReport,
+      isImported: true,
+    };
+
+    const context = new AiAssistance.LighthouseContext.LighthouseContext(importedReport);
+    const responses = await Array.fromAsync(agent.run('test', {selected: context}));
+    const titleResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.TITLE);
+    assert.exists(titleResponse);
+    assert.strictEqual(titleResponse.title, 'Getting Lighthouse audits for accessibility');
+
+    const actionResponse = responses.find(response => response.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.exists(actionResponse);
+  });
+
+  describe('enhanceQuery', () => {
+    it('adds the context to the query', async () => {
+      const agent = new AiAssistance.AccessibilityAgent.AccessibilityAgent({
+        aidaClient: mockAidaClient([]),
+      });
+
+      const context = new AiAssistance.LighthouseContext.LighthouseContext(mockReport);
+      const enhancedQuery = await agent.enhanceQuery('user query', context);
+      assert.include(enhancedQuery, '# Lighthouse Report');
+      assert.include(enhancedQuery, 'user query');
+    });
   });
 });

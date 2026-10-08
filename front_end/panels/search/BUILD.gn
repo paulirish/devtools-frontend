@@ -22,12 +22,14 @@ devtools_ui_module("search") {
     "SearchView.ts",
   ]
 
-  deps = [
+  deps = [ ":css_files" ]
+
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
-    "../../models/text_utils:bundle",
+    "../../core/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../ui/components/buttons:bundle",
     "../../ui/kit:bundle",
@@ -40,10 +42,7 @@ devtools_ui_module("search") {
 devtools_entrypoint("bundle") {
   entrypoint = "search.ts"
 
-  deps = [
-    ":css_files",
-    ":search",
-  ]
+  ts_deps = [ ":search" ]
 
   visibility = [
     ":*",
@@ -63,10 +62,10 @@ devtools_ui_module("unittests") {
     "SearchView.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
-    "../../models/text_utils:bundle",
+    "../../core/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../testing",
     "../../ui/legacy:bundle",

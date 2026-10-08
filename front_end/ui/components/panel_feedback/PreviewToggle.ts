@@ -25,7 +25,7 @@ const UIStrings = {
   /**
    * @description Link text the user can click to provide feedback to the team.
    */
-  previewTextFeedbackLink: 'Send us your feedback.',
+  previewTextFeedbackLink: 'Send us your feedback',
   /**
    * @description Link text the user can click to provide feedback to the team.
    */
@@ -33,7 +33,7 @@ const UIStrings = {
   /**
    * @description Link text the user can click to see documentation.
    */
-  learnMoreLink: 'Learn More',
+  learnMoreLink: 'Learn more',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('ui/components/panel_feedback/PreviewToggle.ts', UIStrings);

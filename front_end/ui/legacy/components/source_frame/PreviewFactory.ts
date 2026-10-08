@@ -5,7 +5,7 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
-import * as TextUtils from '../../../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../../../core/text_utils/text_utils.js';
 import * as UI from '../../legacy.js';
 
 import {FontView} from './FontView.js';
@@ -16,11 +16,11 @@ import {XMLView} from './XMLView.js';
 
 const UIStrings = {
   /**
-   * @description Text in Preview Factory of the Sources panel if the data to preview can't be shown due to an error
+   * @description Text shown in the empty widget when data fails to load in the preview factory of the Sources panel.
    */
   failedToLoadData: 'Failed to load data',
   /**
-   * @description Text in Preview Factory of the Sources panel if there's no data to preview
+   * @description Text shown in the empty widget when there is no content to preview in the preview factory of the Sources panel.
    */
   nothingToPreview: 'Nothing to preview',
 } as const;

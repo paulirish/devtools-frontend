@@ -4,9 +4,10 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
+import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingUIRegistration from '../../ui/settings/settings.js';
 
 import type * as AiAssistance from './ai_assistance.js';
 
@@ -31,40 +32,21 @@ const UIStrings = {
   enableAiAssistance: 'Enable AI assistance',
   /**
    * @description Text of a context menu item to redirect to the AI assistance panel with
-   * the current context
+   * the current context.
    */
   debugWithAi: 'Debug with AI',
   /**
-   * @description The title of the Gemini panel.
-   */
-  gemini: 'Gemini',
-  /**
    * @description The title of the command menu action for showing the Gemini panel.
    */
-  showGemini: 'Show Gemini',
+  showGemini: 'Show `Gemini`',
   /**
    * @description The setting title to enable the Gemini via the settings tab.
    */
-  enableGemini: 'Enable Gemini',
+  enableGemini: 'Enable `Gemini`',
   /**
-   * @description Text of a context menu item to redirect to the Gemini panel with the current context
+   * @description Text of a context menu item to redirect to the Gemini panel with the current context.
    */
-  debugWithGemini: 'Debug with Gemini',
-  /**
-   * @description Message shown to the user if the DevTools locale is not
-   * supported.
-   */
-  wrongLocale: 'To use this feature, set your language preference to English in DevTools settings.',
-  /**
-   * @description Message shown to the user if the user's region is not
-   * supported.
-   */
-  geoRestricted: 'This feature is unavailable in your region.',
-  /**
-   * @description Message shown to the user if the enterprise policy does
-   * not allow this feature.
-   */
-  policyRestricted: 'This setting is managed by your administrator.',
+  debugWithGemini: 'Debug with `Gemini`',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/ai_assistance/ai_assistance-meta.ts', UIStrings);
@@ -74,13 +56,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 function i18nAiBrandedString(gemini: string, assistance: string) {
   // eslint-disable-next-line @devtools/l10n-i18nString-call-only-with-uistrings
   return () => Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled ? i18nString(gemini) : i18nString(assistance);
-}
-
-const setting = 'ai-assistance-enabled';
-
-function isLocaleRestricted(): boolean {
-  const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
-  return !devtoolsLocale.locale.startsWith('en-');
 }
 
 function isGeoRestricted(config?: Root.Runtime.HostConfig): boolean {
@@ -129,7 +104,8 @@ UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.DRAWER_VIEW,
   id: 'freestyler',
   commandPrompt: i18nAiBrandedString(UIStrings.showGemini, UIStrings.showAiAssistance),
-  title: i18nAiBrandedString(UIStrings.gemini, UIStrings.aiAssistance),
+  title: () => Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled ? i18n.i18n.lockedString('Gemini') :
+                                                                           i18nString(UIStrings.aiAssistance),
   order: 10,
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   hasToolbar: false,
@@ -140,37 +116,9 @@ UI.ViewManager.registerViewExtension({
   },
 });
 
-Common.Settings.registerSettingExtension({
+SettingUIRegistration.SettingUIRegistration.register(AiAssistanceModel.AiUtils.aiAssistanceEnabledSettingDescriptor, {
   category: Common.Settings.SettingCategory.AI,
-  settingName: setting,
-  settingType: Common.Settings.SettingType.BOOLEAN,
   title: i18nAiBrandedString(UIStrings.enableGemini, UIStrings.enableAiAssistance),
-  defaultValue: false,
-  reloadRequired: false,
-  condition: isAnyFeatureAvailable,
-  disabledCondition: config => {
-    const reasons: Platform.UIString.LocalizedString[] = [];
-    if (isGeoRestricted(config)) {
-      reasons.push(i18nString(UIStrings.geoRestricted));
-    }
-    if (isPolicyRestricted(config)) {
-      reasons.push(i18nString(UIStrings.policyRestricted));
-    }
-    if (isLocaleRestricted()) {
-      reasons.push(i18nString(UIStrings.wrongLocale));
-    }
-    if (reasons.length > 0) {
-      return {disabled: true, reasons};
-    }
-    return {disabled: false};
-  },
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.AI,
-  settingName: 'ai-assistance-v2-opt-in-change-dialog-seen',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
 });
 
 UI.ActionRegistration.registerActionExtension({
@@ -296,4 +244,36 @@ UI.ActionRegistration.registerActionExtension({
     return new AiAssistance.ActionDelegate();
   },
   condition: config => isFileAgentFeatureAvailable(config) && !isPolicyRestricted(config) && !isGeoRestricted(config),
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'ai-assistance.storage-floating-button',
+  contextTypes(): [] {
+    return [];
+  },
+  category: UI.ActionRegistration.ActionCategory.GLOBAL,
+  title: i18nAiBrandedString(UIStrings.debugWithGemini, UIStrings.debugWithAi),
+  configurableBindings: false,
+  async loadActionDelegate() {
+    const AiAssistance = await loadAiAssistanceModule();
+    return new AiAssistance.ActionDelegate();
+  },
+  condition: config =>
+      isStorageAgentFeatureAvailable(config) && !isPolicyRestricted(config) && !isGeoRestricted(config),
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'ai-assistance.application-panel-context',
+  contextTypes(): [] {
+    return [];
+  },
+  category: UI.ActionRegistration.ActionCategory.GLOBAL,
+  title: i18nAiBrandedString(UIStrings.debugWithGemini, UIStrings.debugWithAi),
+  configurableBindings: false,
+  async loadActionDelegate() {
+    const AiAssistance = await loadAiAssistanceModule();
+    return new AiAssistance.ActionDelegate();
+  },
+  condition: config =>
+      isStorageAgentFeatureAvailable(config) && !isPolicyRestricted(config) && !isGeoRestricted(config),
 });

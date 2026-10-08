@@ -3,19 +3,27 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
 import type * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
-import {createNetworkRequest, mockAidaClient} from '../../testing/AiAssistanceHelpers.js';
 import {
-  createTarget,
-  describeWithEnvironment,
+  assertSkillLoaded,
+  assertSkillNotLoaded,
+  mockAidaClient,
+} from '../../testing/AiAssistanceHelpers.js';
+import {
+  deinitializeGlobalVars,
   updateHostConfig,
 } from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import * as Bindings from '../bindings/bindings.js';
 import * as Logs from '../logs/logs.js';
 import * as NetworkTimeCalculator from '../network_time_calculator/network_time_calculator.js';
@@ -23,19 +31,27 @@ import * as Workspace from '../workspace/workspace.js';
 
 import * as AiAssistance from './ai_assistance.js';
 
-describeWithEnvironment('AiConversation', () => {
+describe('AiConversation', () => {
+  setupLocaleHooks();
+  setupRuntimeHooks();
+
+  after(async () => {
+    await deinitializeGlobalVars();
+  });
+
+  let universe: TestUniverse;
+
   beforeEach(() => {
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-    const targetManager = SDK.TargetManager.TargetManager.instance();
-    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-    const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
-    Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
-      forceNew: true,
-      resourceMapping,
-      targetManager,
-      ignoreListManager,
-      workspace,
-    });
+    universe = new TestUniverse();
+    const {targetManager, workspace, settings, networkLog, ignoreListManager, debuggerWorkspaceBinding} = universe;
+
+    sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(workspace);
+    sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(targetManager);
+    sinon.stub(Common.Settings.Settings, 'instance').returns(settings);
+    sinon.stub(Logs.NetworkLog.NetworkLog, 'instance').returns(networkLog);
+    sinon.stub(Workspace.IgnoreListManager.IgnoreListManager, 'instance').returns(ignoreListManager);
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(debuggerWorkspaceBinding);
   });
 
   it('should be able to switch agent type based on context', async () => {
@@ -43,12 +59,230 @@ describeWithEnvironment('AiConversation', () => {
 
     const conversation =
         new AiAssistance.AiConversation.AiConversation({type: AiAssistance.AiHistoryStorage.ConversationType.STYLING});
-    const networkRequest = new AiAssistance.NetworkAgent.RequestContext(
+    const networkRequest = new AiAssistance.RequestContext.RequestContext(
         createNetworkRequest(), new NetworkTimeCalculator.NetworkTransferTimeCalculator());
 
     conversation.setContext(networkRequest);
 
     assert(conversation.type === AiAssistance.AiHistoryStorage.ConversationType.NETWORK);
+  });
+
+  it('updates conversation type across context changes when devToolsAiV2Architecture is enabled', async () => {
+    updateHostConfig({
+      devToolsAiV2Architecture: {enabled: true},
+    });
+
+    const conversation =
+        new AiAssistance.AiConversation.AiConversation({type: AiAssistance.AiHistoryStorage.ConversationType.NONE});
+
+    const networkRequest = new AiAssistance.RequestContext.RequestContext(
+        createNetworkRequest(), new NetworkTimeCalculator.NetworkTransferTimeCalculator());
+    conversation.setContext(networkRequest);
+    assert.strictEqual(conversation.type, AiAssistance.AiHistoryStorage.ConversationType.NETWORK);
+
+    conversation.setContext(null);
+    assert.strictEqual(conversation.type, AiAssistance.AiHistoryStorage.ConversationType.NONE);
+  });
+
+  it('resets context state when context is removed across conversation turns', async () => {
+    updateHostConfig({
+      devToolsAiV2Architecture: {enabled: true},
+    });
+
+    const origin = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    const listNetworkRequestsTool = AiAssistance.ToolRegistry.ToolRegistry.get('listNetworkRequests');
+    assert.exists(listNetworkRequestsTool);
+    const stub = sinon.stub(listNetworkRequestsTool, 'handler').resolves({result: {requests: []}});
+
+    const aidaClient = mockAidaClient([
+      // Turn 1: Model loads network skill and executes listNetworkRequests.
+      [{
+        explanation: '',
+        functionCalls: [{name: 'learnSkills', args: {skills: ['network']}}],
+      }],
+      [{
+        explanation: 'Listing requests.',
+        functionCalls: [{name: 'listNetworkRequests', args: {}}],
+      }],
+      [{
+        explanation: 'Turn 1 done.',
+      }],
+      // Turn 2: Query with cleared context. Model calls listNetworkRequests again.
+      [{
+        explanation: 'Listing requests on turn 2.',
+        functionCalls: [{name: 'listNetworkRequests', args: {}}],
+      }],
+      [{
+        explanation: 'Turn 2 done.',
+      }],
+    ]);
+
+    const conversation = new AiAssistance.AiConversation.AiConversation({
+      type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      aidaClient,
+    });
+
+    const networkRequest = createNetworkRequest({
+      url: Platform.DevToolsPath.urlString`https://example.com/test`,
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
+    });
+    sinon.stub(networkRequest, 'requestContentData')
+        .resolves(new TextUtils.ContentData.ContentData('test content', false, 'text/plain'));
+    const requestContext = new AiAssistance.RequestContext.RequestContext(
+        networkRequest, new NetworkTimeCalculator.NetworkTransferTimeCalculator());
+
+    // Turn 1: Query with active RequestContext.
+    conversation.setContext(requestContext);
+    await Array.fromAsync(conversation.run('turn 1'));
+    assert.strictEqual(conversation.selectedContext, requestContext);
+    assert.strictEqual(conversation.type, AiAssistance.AiHistoryStorage.ConversationType.NETWORK);
+    sinon.assert.calledOnce(stub);
+
+    // Turn 2: Query with cleared context.
+    conversation.setContext(null);
+    await Array.fromAsync(conversation.run('turn 2'));
+    assert.isUndefined(conversation.selectedContext);
+    assert.strictEqual(conversation.type, AiAssistance.AiHistoryStorage.ConversationType.NONE);
+    sinon.assert.calledTwice(stub);
+  });
+
+  it('preserves activeSkills across context changes when devToolsAiV2Architecture is enabled', async () => {
+    updateHostConfig({
+      devToolsAiV2Architecture: {enabled: true},
+    });
+
+    const origin = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    const aidaClient = mockAidaClient([
+      // Turn 1: Model loads 'network' skill.
+      [{
+        explanation: '',
+        functionCalls: [{name: 'learnSkills', args: {skills: ['network']}}],
+      }],
+      [{
+        explanation: 'Loaded network skill.',
+      }],
+      // Turn 2: Response after context change.
+      [{
+        explanation: 'Second turn response.',
+      }],
+    ]);
+
+    const conversation = new AiAssistance.AiConversation.AiConversation({
+      type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      aidaClient,
+    });
+
+    // Turn 1: Load 'network' skill.
+    await Array.fromAsync(conversation.run('load network skill'));
+
+    // Context changes between turns.
+    const networkRequest = createNetworkRequest({
+      url: Platform.DevToolsPath.urlString`https://example.com/test`,
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
+    });
+    sinon.stub(networkRequest, 'requestContentData')
+        .resolves(new TextUtils.ContentData.ContentData('test content', false, 'text/plain'));
+    const requestContext = new AiAssistance.RequestContext.RequestContext(
+        networkRequest, new NetworkTimeCalculator.NetworkTransferTimeCalculator());
+    conversation.setContext(requestContext);
+
+    // Turn 2: Query again.
+    await Array.fromAsync(conversation.run('analyze'));
+
+    // 'network' should remain active on the agent across context changes, so it is omitted from
+    // the unloaded skills manifest, while other unloaded skills like 'styling' remain listed.
+    const lastRequest = aidaClient.doConversation.lastCall.firstArg;
+    const promptText = 'text' in lastRequest.current_message.parts[0] ? lastRequest.current_message.parts[0].text : '';
+    assertSkillLoaded(promptText, 'network');
+    assertSkillNotLoaded(promptText, 'styling');
+  });
+
+  it('disables server-side logging when running with a context that disallows logging', async () => {
+    updateHostConfig({
+      devToolsAiV2Architecture: {enabled: true},
+    });
+
+    const origin = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    const aidaClient = mockAidaClient([
+      [{explanation: 'Storage query response.'}],
+    ]);
+
+    const conversation = new AiAssistance.AiConversation.AiConversation({
+      type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      aidaClient,
+    });
+
+    const cookieItem = new AiAssistance.StorageItem.CookieItem(origin, origin, 'session_id');
+    const storageContext = new AiAssistance.StorageContext.StorageContext(cookieItem);
+    conversation.setContext(storageContext);
+
+    await Array.fromAsync(conversation.run('inspect cookie'));
+
+    sinon.assert.calledOnce(aidaClient.doConversation);
+    const request = aidaClient.doConversation.firstCall.firstArg;
+    assert.isTrue(request.metadata?.disable_user_content_logging);
+  });
+
+  it('does not re-enable server-side logging across context transitions once disabled', async () => {
+    updateHostConfig({
+      devToolsAiV2Architecture: {enabled: true},
+    });
+
+    const origin = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    const aidaClient = mockAidaClient([
+      [{explanation: 'Turn 1 storage response.'}],
+      [{explanation: 'Turn 2 network response.'}],
+    ]);
+
+    const conversation = new AiAssistance.AiConversation.AiConversation({
+      type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      aidaClient,
+    });
+
+    // Turn 1: Run with sensitive StorageContext that disallows logging.
+    const cookieItem = new AiAssistance.StorageItem.CookieItem(origin, origin, 'session_id');
+    const storageContext = new AiAssistance.StorageContext.StorageContext(cookieItem);
+    conversation.setContext(storageContext);
+    await Array.fromAsync(conversation.run('turn 1'));
+
+    const turn1Request = aidaClient.doConversation.firstCall.firstArg;
+    assert.isTrue(turn1Request.metadata?.disable_user_content_logging);
+
+    // Turn 2: Switch to RequestContext which allows logging.
+    const networkRequest = createNetworkRequest({
+      url: Platform.DevToolsPath.urlString`https://example.com/test`,
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
+    });
+    sinon.stub(networkRequest, 'requestContentData')
+        .resolves(new TextUtils.ContentData.ContentData('test content', false, 'text/plain'));
+    const requestContext = new AiAssistance.RequestContext.RequestContext(
+        networkRequest, new NetworkTimeCalculator.NetworkTransferTimeCalculator());
+    conversation.setContext(requestContext);
+    await Array.fromAsync(conversation.run('turn 2'));
+
+    sinon.assert.calledTwice(aidaClient.doConversation);
+    const turn2Request = aidaClient.doConversation.secondCall.firstArg;
+    assert.isTrue(turn2Request.metadata?.disable_user_content_logging);
   });
 
   it('should be able to switch agent type when context is removed', async () => {
@@ -64,7 +298,13 @@ describeWithEnvironment('AiConversation', () => {
 
   it('should update context when agent returns CONTEXT_CHANGE', async () => {
     updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const origin = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+    const workspace = universe.workspace;
     const project = {
       id: () => 'test-project',
       type: () => Workspace.Workspace.projectTypes.Network,
@@ -76,6 +316,7 @@ describeWithEnvironment('AiConversation', () => {
         Common.ResourceType.resourceTypes.Script);
     sinon.stub(workspace, 'projects').returns([project]);
 
+    const nextId = AiAssistance.ContextSelectionAgent.ContextSelectionAgent.lastSourceId + 1;
     const conversation = new AiAssistance.AiConversation.AiConversation({
       type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
       data: [],
@@ -86,7 +327,7 @@ describeWithEnvironment('AiConversation', () => {
           functionCalls: [{
             name: 'selectSourceFile',
             args: {
-              id: 1,
+              id: nextId,
             },
           }],
           explanation: '',
@@ -98,7 +339,7 @@ describeWithEnvironment('AiConversation', () => {
     await Array.fromAsync(conversation.run('test'));
 
     assert.exists(conversation.selectedContext);
-    assert.instanceOf(conversation.selectedContext, AiAssistance.FileAgent.FileContext);
+    assert.instanceOf(conversation.selectedContext, AiAssistance.FileContext.FileContext);
   });
 
   it('should yield UserQuery when run is called', async () => {
@@ -146,6 +387,12 @@ describeWithEnvironment('AiConversation', () => {
   it('should update conversation origin when agent returns CONTEXT_CHANGE', async () => {
     updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
 
+    const originUrl = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${originUrl}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(originUrl));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
     const aidaClient = mockAidaClient([
       [
         {
@@ -172,22 +419,89 @@ describeWithEnvironment('AiConversation', () => {
     });
 
     const networkRequest = createNetworkRequest({
+      requestId: 'requestId-0',
       url: Platform.DevToolsPath.urlString`https://example.com/test`,
-      documentURL: Platform.DevToolsPath.urlString`https://example.com`
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
     });
     const contentData = new TextUtils.ContentData.ContentData('test content', false, 'text/plain');
     sinon.stub(networkRequest, 'requestContentData').resolves(contentData);
-    sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'requests').returns([networkRequest]);
+    sinon.stub(universe.networkLog, 'requests').returns([networkRequest]);
 
-    assert.isUndefined(conversation.origin);
+    const initialOrigin = conversation.origin;
+    assert.isUndefined(initialOrigin);
 
     await Array.fromAsync(conversation.run('test query'));
 
-    assert.strictEqual(conversation.origin, 'https://example.com');
+    const origin = conversation.origin;
+    assert.isOk(origin);
+    assert.isTrue(origin.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')));
   });
+
+  it('does not leak network requests or lock origin when primary page origin is undefined (uncommitted navigation)',
+     async () => {
+       updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
+
+       const target = sinon.createStubInstance(SDK.Target.Target);
+       target.inspectedURL.returns(Platform.DevToolsPath.EmptyUrlString);
+       sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+       const networkRequest = createNetworkRequest({
+         requestId: 'requestId-0',
+         url: Platform.DevToolsPath.urlString`https://idp.example/auth?saml_assertion=secret`,
+         documentURL: Platform.DevToolsPath.urlString`https://idp.example/login`,
+       });
+       sinon.stub(universe.networkLog, 'requests').returns([networkRequest]);
+
+       const aidaClient = mockAidaClient([
+         [{
+           explanation: '',
+           functionCalls: [{name: 'listNetworkRequests', args: {}}],
+         }],
+         [{
+           explanation: '',
+           functionCalls: [{name: 'selectNetworkRequest', args: {id: 'requestId-0'}}],
+         }],
+         [{explanation: 'Done'}],
+       ]);
+
+       const conversation = new AiAssistance.AiConversation.AiConversation({
+         type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+         data: [],
+         id: 'test-id',
+         isReadOnly: false,
+         aidaClient,
+       });
+
+       await Array.fromAsync(conversation.run('what requests are slow?'));
+
+       assert.isUndefined(conversation.origin);
+       assert.isUndefined(conversation.selectedContext);
+
+       const listCall = aidaClient.doConversation.getCall(1).firstArg;
+       const listPart = listCall.current_message.parts[0];
+       assert(listPart && 'functionResponse' in listPart);
+       assert.deepEqual(listPart.functionResponse.response, {
+         error: 'No requests recorded by DevTools',
+         widgets: undefined,
+       });
+
+       const selectCall = aidaClient.doConversation.getCall(2).firstArg;
+       const selectPart = selectCall.current_message.parts[0];
+       assert(selectPart && 'functionResponse' in selectPart);
+       assert.deepEqual(selectPart.functionResponse.response, {
+         error: 'No request found',
+         widgets: undefined,
+       });
+     });
 
   it('should forward history to the new agent when switching agents', async () => {
     updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
+
+    const originUrl = Platform.DevToolsPath.urlString`https://example.com`;
+    const target = sinon.createStubInstance(SDK.Target.Target);
+    target.inspectedURL.returns(Platform.DevToolsPath.urlString`${originUrl}/`);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(originUrl));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
 
     function hasFunctionCalls(request: Host.AidaClient.DoConversationRequest): boolean {
       return request.historical_contexts?.some(history => {
@@ -220,7 +534,7 @@ describeWithEnvironment('AiConversation', () => {
         {
           explanation: 'Works 3',
         },
-      ]
+      ],
     ]);
 
     const conversation = new AiAssistance.AiConversation.AiConversation({
@@ -231,13 +545,14 @@ describeWithEnvironment('AiConversation', () => {
       aidaClient,
     });
     const networkRequest = createNetworkRequest({
+      requestId: 'requestId-0',
       url: Platform.DevToolsPath.urlString`https://example.com`,
-      documentURL: Platform.DevToolsPath.urlString`https://example.com`
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
     });
     sinon.stub(networkRequest, 'requestContentData')
         .resolves(new TextUtils.ContentData.ContentData('test content', false, 'text/plain'));
 
-    sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'requests').returns([networkRequest]);
+    sinon.stub(universe.networkLog, 'requests').returns([networkRequest]);
 
     await Array.fromAsync(conversation.run('test query 1'));
     // Called two time as we pass the convestation to the new agent.
@@ -252,7 +567,7 @@ describeWithEnvironment('AiConversation', () => {
     assert.isFalse(hasFunctionCalls(secondRequest));
     assert.lengthOf(secondRequest.historical_contexts ?? [], 1);
 
-    conversation.setContext(new AiAssistance.NetworkAgent.RequestContext(
+    conversation.setContext(new AiAssistance.RequestContext.RequestContext(
         networkRequest, new NetworkTimeCalculator.NetworkTransferTimeCalculator()));
 
     await Array.fromAsync(conversation.run('test query 2'));
@@ -270,33 +585,28 @@ describeWithEnvironment('AiConversation', () => {
 
     const target = sinon.createStubInstance(SDK.Target.Target);
     target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
-    sinon.stub(SDK.TargetManager.TargetManager.instance(), 'primaryPageTarget').returns(target);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
 
-    const sameOriginRequest = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId1' as Protocol.Network.RequestId,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        null,
-        null,
-        null,
-    );
-    sameOriginRequest.statusCode = 200;
+    const sameOriginRequest = createNetworkRequest({
+      requestId: 'requestId1',
+      url: `${origin}/foo`,
+      documentURL: `${origin}/foo`,
+      statusCode: 200,
+    });
     sameOriginRequest.setIssueTime(0, 0);
     sameOriginRequest.endTime = 1;
 
-    const crossOriginRequest = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId2' as Protocol.Network.RequestId,
-        Platform.DevToolsPath.urlString`${otherOrigin}/bar`,
-        Platform.DevToolsPath.urlString`${otherOrigin}/bar`,
-        null,
-        null,
-        null,
-    );
-    crossOriginRequest.statusCode = 200;
+    const crossOriginRequest = createNetworkRequest({
+      requestId: 'requestId2',
+      url: `${otherOrigin}/bar`,
+      documentURL: `${otherOrigin}/bar`,
+      statusCode: 200,
+    });
     crossOriginRequest.setIssueTime(0, 0);
     crossOriginRequest.endTime = 1;
 
-    const networkLog = Logs.NetworkLog.NetworkLog.instance();
+    const networkLog = universe.networkLog;
     sinon.stub(networkLog, 'requests').returns([sameOriginRequest, crossOriginRequest]);
 
     const aidaClient = mockAidaClient([
@@ -329,7 +639,7 @@ describeWithEnvironment('AiConversation', () => {
         id: 'requestId1',
         url: `${origin}/foo`,
         statusCode: 200,
-        duration: '1.00\xA0s',
+        duration: '1\xA0s',
         transferSize: '0.0\xA0kB',
       },
     ]);
@@ -343,21 +653,19 @@ describeWithEnvironment('AiConversation', () => {
 
     const target = sinon.createStubInstance(SDK.Target.Target);
     target.inspectedURL.returns(Platform.DevToolsPath.urlString`${origin}/`);
-    sinon.stub(SDK.TargetManager.TargetManager.instance(), 'primaryPageTarget').returns(target);
+    target.inspectedSecurityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(origin));
+    sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
 
-    const request1 = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId1' as Protocol.Network.RequestId,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        null,
-        null,
-        null,
-    );
-    request1.statusCode = 200;
+    const request1 = createNetworkRequest({
+      requestId: 'requestId1',
+      url: `${origin}/foo`,
+      documentURL: `${origin}/foo`,
+      statusCode: 200,
+    });
     request1.setIssueTime(0, 0);
     request1.endTime = 1;
 
-    const networkLog = Logs.NetworkLog.NetworkLog.instance();
+    const networkLog = universe.networkLog;
     const requestsStub = sinon.stub(networkLog, 'requests').returns([request1]);
 
     const aidaClient = mockAidaClient([
@@ -390,15 +698,12 @@ describeWithEnvironment('AiConversation', () => {
 
     target.inspectedURL.returns(Platform.DevToolsPath.urlString`${otherOrigin}/`);
 
-    const request2 = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId2' as Protocol.Network.RequestId,
-        Platform.DevToolsPath.urlString`${otherOrigin}/bar`,
-        Platform.DevToolsPath.urlString`${otherOrigin}/bar`,
-        null,
-        null,
-        null,
-    );
-    request2.statusCode = 200;
+    const request2 = createNetworkRequest({
+      requestId: 'requestId2',
+      url: `${otherOrigin}/bar`,
+      documentURL: `${otherOrigin}/bar`,
+      statusCode: 200,
+    });
     request2.setIssueTime(0, 0);
     request2.endTime = 1;
     requestsStub.returns([request2]);
@@ -430,7 +735,14 @@ describeWithEnvironment('AiConversation', () => {
     const contextResponse: AiAssistance.AiAgent.ContextResponse = {
       type: AiAssistance.AiAgent.ResponseType.CONTEXT,
       details: [{title: 'Detail', text: 'Text'}],
-      widgets: [{name: 'DOM_TREE', data: {root: {} as SDK.DOMModel.DOMNodeSnapshot}}],
+      widgets: [{
+        name: 'DOM_TREE',
+        data: {
+          root: {} as SDK.DOMModel.DOMNodeSnapshot,
+          title: 'Title' as Platform.UIString.LocalizedString,
+          accessibleRevealLabel: 'Label' as Platform.UIString.LocalizedString,
+        },
+      }],
     };
 
     const actionResponse: AiAssistance.AiAgent.ActionResponse = {
@@ -476,33 +788,71 @@ describeWithEnvironment('AiConversation', () => {
     assert.isUndefined((serialized.history[2] as AiAssistance.AiAgent.ActionResponse).widgets);
   });
 
+  it('redacts action outputs of tools annotated with REDACT_FROM_HISTORY', () => {
+    const conversation =
+        new AiAssistance.AiConversation.AiConversation({type: AiAssistance.AiHistoryStorage.ConversationType.STYLING});
+
+    const dummyTool = {
+      name: 'dummyTool' as AiAssistance.Tool.ToolName,
+      annotations: [AiAssistance.Tool.ToolAnnotation.REDACT_FROM_HISTORY],
+    } as unknown as AiAssistance.Tool.Tool;
+    sinon.stub(AiAssistance.ToolRegistry.ToolRegistry, 'get').withArgs('dummyTool').returns(dummyTool);
+
+    const actionResponseWithRedaction: AiAssistance.AiAgent.ActionResponse = {
+      type: AiAssistance.AiAgent.ResponseType.ACTION,
+      code: 'code',
+      output: 'secret storage value',
+      canceled: false,
+      toolName: 'dummyTool',
+    };
+
+    const actionResponseWithoutRedaction: AiAssistance.AiAgent.ActionResponse = {
+      type: AiAssistance.AiAgent.ResponseType.ACTION,
+      code: 'code',
+      output: 'normal output',
+      canceled: false,
+      toolName: 'otherTool',
+    };
+
+    conversation.history.push(actionResponseWithRedaction, actionResponseWithoutRedaction);
+
+    const serialized = conversation.serialize();
+
+    assert.lengthOf(serialized.history, 2);
+
+    assert.strictEqual(serialized.history[0].type, AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.strictEqual((serialized.history[0] as AiAssistance.AiAgent.ActionResponse).output, '<redacted>');
+
+    assert.strictEqual(serialized.history[1].type, AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.strictEqual((serialized.history[1] as AiAssistance.AiAgent.ActionResponse).output, 'normal output');
+  });
+
   async function testNavigationDuringRun({
     navigationUrl,
     expectBlocked,
+    initialUrl = Platform.DevToolsPath.urlString`https://example.com/`,
   }: {
     navigationUrl: Platform.DevToolsPath.UrlString,
     expectBlocked: boolean,
+    initialUrl?: Platform.DevToolsPath.UrlString,
   }) {
     updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
 
     const origin = Platform.DevToolsPath.urlString`https://example.com`;
 
-    const target = createTarget({url: Platform.DevToolsPath.urlString`${origin}/`});
-    target.setInspectedURL(Platform.DevToolsPath.urlString`${origin}/`);
+    const target = universe.createTarget({url: initialUrl});
+    target.setInspectedURL(initialUrl);
 
-    const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId1' as Protocol.Network.RequestId,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        Platform.DevToolsPath.urlString`${origin}/foo`,
-        null,
-        null,
-        null,
-    );
-    request.statusCode = 200;
+    const request = createNetworkRequest({
+      requestId: 'requestId1',
+      url: `${origin}/foo`,
+      documentURL: `${origin}/foo`,
+      statusCode: 200,
+    });
     request.setIssueTime(0, 0);
     request.endTime = 1;
 
-    const networkLog = Logs.NetworkLog.NetworkLog.instance();
+    const networkLog = universe.networkLog;
     sinon.stub(networkLog, 'requests').returns([request]);
 
     const aidaClient = mockAidaClient([
@@ -537,8 +887,10 @@ describeWithEnvironment('AiConversation', () => {
       frame: {
         resourceTreeModel: () => resourceTreeModel,
         unreachableUrl: () => '',
+        url: navigationUrl,
+        securityOrigin: () => SDK.SecurityOrigin.SecurityOrigin.create(navigationUrl),
       } as unknown as SDK.ResourceTreeModel.ResourceTreeFrame,
-      type: SDK.ResourceTreeModel.PrimaryPageChangeType.NAVIGATION
+      type: SDK.ResourceTreeModel.PrimaryPageChangeType.NAVIGATION,
     });
 
     // Continue running the generator to completion
@@ -566,10 +918,64 @@ describeWithEnvironment('AiConversation', () => {
     });
   });
 
-  it('does NOT block tool calls if navigation is to about://', async () => {
+  it('blocks tool calls if navigation occurs between different file:// URLs during run', async () => {
     await testNavigationDuringRun({
-      navigationUrl: Platform.DevToolsPath.urlString`about://`,
+      initialUrl: Platform.DevToolsPath.urlString`file:///home/user/Downloads/attacker.html`,
+      navigationUrl: Platform.DevToolsPath.urlString`file:///home/user/.ssh/config`,
+      expectBlocked: true,
+    });
+  });
+
+  it('blocks tool calls if navigation occurs between local files in the same directory during run', async () => {
+    await testNavigationDuringRun({
+      initialUrl: Platform.DevToolsPath.urlString`file:///Users/dev/site/index.html`,
+      navigationUrl: Platform.DevToolsPath.urlString`file:///Users/dev/site/about.html`,
+      expectBlocked: true,
+    });
+  });
+
+  it('does NOT block tool calls if navigation occurs to the same file:// URL during run', async () => {
+    await testNavigationDuringRun({
+      initialUrl: Platform.DevToolsPath.urlString`file:///home/user/app.html`,
+      navigationUrl: Platform.DevToolsPath.urlString`file:///home/user/app.html#section2`,
       expectBlocked: false,
+    });
+  });
+
+  it('does not block tool calls if navigation occurs to a different path on the same https:// origin', async () => {
+    await testNavigationDuringRun({
+      initialUrl: Platform.DevToolsPath.urlString`https://example.com/page1.html`,
+      navigationUrl: Platform.DevToolsPath.urlString`https://example.com/page2.html`,
+      expectBlocked: false,
+    });
+  });
+
+  it('blocks tool calls if navigation occurs between opaque blob:null URLs during run', async () => {
+    await testNavigationDuringRun({
+      initialUrl: Platform.DevToolsPath.urlString`blob:null/11111111-1111-1111-1111-111111111111`,
+      navigationUrl: Platform.DevToolsPath.urlString`blob:null/22222222-2222-2222-2222-222222222222`,
+      expectBlocked: true,
+    });
+  });
+
+  it('does NOT block tool calls if navigation is to about:blank', async () => {
+    await testNavigationDuringRun({
+      navigationUrl: Platform.DevToolsPath.urlString`about:blank`,
+      expectBlocked: false,
+    });
+  });
+
+  it('blocks tool calls if navigation is to about:flags', async () => {
+    await testNavigationDuringRun({
+      navigationUrl: Platform.DevToolsPath.urlString`about:flags`,
+      expectBlocked: true,
+    });
+  });
+
+  it('blocks tool calls if navigation occurs to an empty URL during run', async () => {
+    await testNavigationDuringRun({
+      navigationUrl: Platform.DevToolsPath.EmptyUrlString,
+      expectBlocked: true,
     });
   });
 
@@ -586,8 +992,9 @@ describeWithEnvironment('AiConversation', () => {
     });
 
     class OpaqueContext extends AiAssistance.AiAgent.ConversationContext<unknown> {
-      override getURL(): string {
-        return 'null';
+      override readonly jslogContext = 'ai-context-dom-node' as const;
+      override getOrigin(): SDK.SecurityOrigin.SecurityOrigin {
+        return SDK.SecurityOrigin.SecurityOrigin.createUniqueOpaque();
       }
       override getItem(): unknown {
         return null;
@@ -606,5 +1013,203 @@ describeWithEnvironment('AiConversation', () => {
       assert.instanceOf(err, Error);
       assert.strictEqual(err.message, 'cross-origin context data should not be included');
     }
+  });
+
+  it('should clear history when transitioning from storage to different agent', async () => {
+    updateHostConfig({devToolsAiAssistanceContextSelectionAgent: {enabled: true}});
+
+    const aidaClient = mockAidaClient([
+      [{explanation: 'Storage analysis'}],
+      [{explanation: 'Network analysis'}],
+    ]);
+
+    const conversation = new AiAssistance.AiConversation.AiConversation({
+      type: AiAssistance.AiHistoryStorage.ConversationType.STORAGE,
+      data: [],
+      id: 'test-id',
+      isReadOnly: false,
+      aidaClient,
+    });
+
+    await Array.fromAsync(conversation.run('test storage query'));
+    assert.lengthOf(aidaClient.doConversation.getCalls(), 1);
+
+    const networkRequest = createNetworkRequest({
+      url: Platform.DevToolsPath.urlString`https://example.com`,
+      documentURL: Platform.DevToolsPath.urlString`https://example.com`,
+    });
+    sinon.stub(networkRequest, 'requestContentData')
+        .resolves(new TextUtils.ContentData.ContentData('test content', false, 'text/plain'));
+    sinon.stub(universe.networkLog, 'requests').returns([networkRequest]);
+
+    conversation.setContext(new AiAssistance.RequestContext.RequestContext(
+        networkRequest, new NetworkTimeCalculator.NetworkTransferTimeCalculator()));
+
+    await Array.fromAsync(conversation.run('test network query'));
+    assert.lengthOf(aidaClient.doConversation.getCalls(), 2);
+    const secondRequest = aidaClient.doConversation.getCall(1).firstArg;
+    assert.isEmpty(secondRequest.historical_contexts ?? []);
+  });
+
+  describe('getOriginLock', () => {
+    function assertOriginIsEstablished(
+        state: AiAssistance.Tool.OriginLockState,
+        ): asserts state is {status: 'ESTABLISHED_ORIGIN', origin: SDK.SecurityOrigin.SecurityOrigin} {
+      assert.strictEqual(state.status, 'ESTABLISHED_ORIGIN');
+    }
+
+    it('returns uninitialized when no target or inspected URL exists', () => {
+      sinon.stub(universe.targetManager, 'primaryPageTarget').returns(null);
+      const conversation = new AiAssistance.AiConversation.AiConversation({
+        type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      });
+
+      const lockState = conversation.getOriginLock();
+      assert.deepEqual(lockState, {status: 'UNINITIALIZED'});
+    });
+
+    it('returns locked with the primary page origin when available', () => {
+      const target = sinon.createStubInstance(SDK.Target.Target);
+      target.inspectedURL.returns(Platform.DevToolsPath.urlString`https://example.com/`);
+      sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+      const conversation = new AiAssistance.AiConversation.AiConversation({
+        type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      });
+
+      const lockState = conversation.getOriginLock();
+      assertOriginIsEstablished(lockState);
+      assert.isTrue(lockState.origin.isSameOriginWith(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com')));
+    });
+
+    it('returns blocked when navigation occurred during a run', async () => {
+      const origin = Platform.DevToolsPath.urlString`https://example.com`;
+      const target = universe.createTarget({url: Platform.DevToolsPath.urlString`${origin}/`});
+      target.setInspectedURL(Platform.DevToolsPath.urlString`${origin}/`);
+      sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+      const aidaClient = mockAidaClient([
+        [{
+          functionCalls: [{
+            name: 'listNetworkRequests',
+            args: {},
+          }],
+          explanation: '',
+        }],
+        [{explanation: 'Done.'}],
+      ]);
+
+      const conversation = new AiAssistance.AiConversation.AiConversation({
+        type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+        data: [],
+        id: 'test-id',
+        isReadOnly: false,
+        aidaClient,
+      });
+
+      const generator = conversation.run('test');
+      await generator.next();
+
+      const newOrigin = Platform.DevToolsPath.urlString`https://other.com/`;
+      target.setInspectedURL(newOrigin);
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assert.exists(resourceTreeModel);
+      const mockFrame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+      mockFrame.resourceTreeModel.returns(resourceTreeModel);
+      mockFrame.unreachableUrl.returns(Platform.DevToolsPath.EmptyUrlString);
+      sinon.stub(mockFrame, 'url').value(newOrigin);
+      mockFrame.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(newOrigin));
+      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.PrimaryPageChanged, {
+        frame: mockFrame,
+        type: SDK.ResourceTreeModel.PrimaryPageChangeType.NAVIGATION,
+      });
+
+      const capturedLockState = conversation.getOriginLock();
+      assert.deepEqual(capturedLockState, {status: 'BLOCKED_BY_NAVIGATION'});
+
+      // Consume remaining generator items to complete cleanup.
+      await Array.fromAsync(generator);
+    });
+
+    it('ignores PrimaryPageChanged events from non-primary page targets', async () => {
+      const origin = Platform.DevToolsPath.urlString`https://example.com`;
+      const primaryTarget = universe.createTarget({url: Platform.DevToolsPath.urlString`${origin}/`});
+      primaryTarget.setInspectedURL(Platform.DevToolsPath.urlString`${origin}/`);
+      sinon.stub(universe.targetManager, 'primaryPageTarget').returns(primaryTarget);
+
+      const auxiliaryTarget = universe.createTarget({url: Platform.DevToolsPath.urlString`https://auxiliary.com/`});
+
+      const aidaClient = mockAidaClient([
+        [{
+          functionCalls: [{
+            name: 'listNetworkRequests',
+            args: {},
+          }],
+          explanation: '',
+        }],
+        [{explanation: 'Done.'}],
+      ]);
+
+      const conversation = new AiAssistance.AiConversation.AiConversation({
+        type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+        data: [],
+        id: 'test-id',
+        isReadOnly: false,
+        aidaClient,
+      });
+
+      const generator = conversation.run('test');
+      await generator.next();
+
+      const auxOrigin = Platform.DevToolsPath.urlString`https://auxiliary-other.com/`;
+      const auxResourceTreeModel = auxiliaryTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assert.exists(auxResourceTreeModel);
+      const mockAuxFrame = sinon.createStubInstance(SDK.ResourceTreeModel.ResourceTreeFrame);
+      mockAuxFrame.resourceTreeModel.returns(auxResourceTreeModel);
+      mockAuxFrame.unreachableUrl.returns(Platform.DevToolsPath.EmptyUrlString);
+      sinon.stub(mockAuxFrame, 'url').value(auxOrigin);
+      mockAuxFrame.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create(auxOrigin));
+
+      // Dispatch PrimaryPageChanged on the auxiliary target's ResourceTreeModel.
+      auxResourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.PrimaryPageChanged, {
+        frame: mockAuxFrame,
+        type: SDK.ResourceTreeModel.PrimaryPageChangeType.NAVIGATION,
+      });
+
+      // Conversation must not be blocked because the navigation was on a non-primary target.
+      const lockState = conversation.getOriginLock();
+      assert.strictEqual(lockState.status, 'ESTABLISHED_ORIGIN');
+
+      await Array.fromAsync(generator);
+    });
+
+    it('locks to canonical SecurityOrigin from ResourceTreeModel mainFrame for opaque origins', () => {
+      const dataUrl = Platform.DevToolsPath.urlString`data:text/html,<h1>Hello</h1>`;
+      const target = universe.createTarget({url: dataUrl});
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assert.exists(resourceTreeModel);
+      const mainFrame = resourceTreeModel.frameAttached('main' as Protocol.Page.FrameId, null);
+      assert.exists(mainFrame);
+      mainFrame.navigate({
+        id: 'main' as Protocol.Page.FrameId,
+        loaderId: 'loaderId' as Protocol.Network.LoaderId,
+        url: dataUrl,
+        domainAndRegistry: '',
+        securityOrigin: 'null',
+        mimeType: 'text/html',
+        secureContextType: 'Secure' as Protocol.Page.SecureContextType,
+        crossOriginIsolatedContextType: 'NotIsolated' as Protocol.Page.CrossOriginIsolatedContextType,
+        gatedAPIFeatures: [],
+      });
+      sinon.stub(universe.targetManager, 'primaryPageTarget').returns(target);
+
+      const conversation = new AiAssistance.AiConversation.AiConversation({
+        type: AiAssistance.AiHistoryStorage.ConversationType.NONE,
+      });
+
+      const lockState = conversation.getOriginLock();
+      assertOriginIsEstablished(lockState);
+      assert.strictEqual(lockState.origin, mainFrame.securityOrigin());
+    });
   });
 });

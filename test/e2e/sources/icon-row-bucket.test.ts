@@ -7,8 +7,8 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {navigateToIssuesTab} from '../helpers/issues-helpers.js';
 import {openSourcesPanel} from '../helpers/sources-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 const PRETTY_PRINT_BUTTON = '[aria-label="Pretty print"]';
 const PRETTY_PRINTED_TOGGLE = 'devtools-text-editor.pretty-printed';
@@ -119,7 +119,7 @@ describe('The row\'s icon bucket', function() {
     const issueMessages: string[] = [];
     const expectedIssueMessages = [
       'Trusted Type policy creation blocked by Content Security Policy',
-      'Trusted Type expected, but String received',
+      'Trusted Type expected, but got String',
     ];
     for (const issueIconComponent of issueIconComponents) {
       await devToolsPage.hoverElement(issueIconComponent);
@@ -164,9 +164,6 @@ describe('The row\'s icon bucket', function() {
   });
 
   it('should reveal the Issues tab if the icon in the popover is clicked', async ({devToolsPage, inspectedPage}) => {
-    if (this.timeout()) {
-      this.timeout(20000);
-    }
     await navigateToIssuesTab(devToolsPage);
     await openFileInSourceTab(devToolsPage, inspectedPage, 'trusted-type-violations-report-only.rawresponse');
 

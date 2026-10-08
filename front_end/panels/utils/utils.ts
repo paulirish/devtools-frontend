@@ -21,35 +21,35 @@ const {ref, styleMap, ifDefined} = Directives;
 
 const UIStrings = {
   /**
-   * @description Tooltip to explain the resource's overridden status
+   * @description Tooltip to explain the resource's overridden status.
    */
   requestContentHeadersOverridden: 'Both request content and headers are overridden',
   /**
-   * @description Tooltip to explain the resource's overridden status
+   * @description Tooltip to explain the resource's overridden status.
    */
   requestContentOverridden: 'Request content is overridden',
   /**
-   * @description Tooltip to explain the resource's overridden status
+   * @description Tooltip to explain the resource's overridden status.
    */
   requestHeadersOverridden: 'Request headers are overridden',
   /**
-   * @description Tooltip to explain why the request has warning icon
+   * @description Tooltip to explain why the request has a warning icon.
    */
   thirdPartyPhaseout:
       'Cookies for this request are blocked either because of Chrome flags or browser configuration. Learn more in the Issues panel.',
   /**
-   * @description Tooltip to explain that a request was throttled
+   * @description Tooltip to explain that a request was throttled.
    * @example {Image} PH1
    * @example {3G} PH2
    */
   resourceTypeWithThrottling: '{PH1} (throttled to {PH2})',
   /**
-   * @description Tooltip for a failed request
+   * @description Tooltip for a failed request.
    * @example {Document} PH1
    */
   requestFailed: '{PH1} request failed',
   /**
-   * @description Tooltip for a failed request
+   * @description Tooltip for a failed prefetch request.
    * @example {Document} PH1
    */
   prefetchFailed: '{PH1} prefetch request failed',
@@ -86,10 +86,14 @@ export class PanelUtils {
     if (PanelUtils.isFailedNetworkRequest(request)) {
       let iconName: string;
       let title: string;
-      // Failed prefetch network requests are displayed as warnings instead of errors.
-      if (request.resourceType() === Common.ResourceType.resourceTypes.Prefetch) {
-        title = i18nString(UIStrings.prefetchFailed, {PH1: type.title()});
+      // Failed prefetch and preload network requests are displayed as warnings instead of errors.
+      if (request.resourceType() === Common.ResourceType.resourceTypes.Prefetch || request.isPreloadRequest()) {
         iconName = 'warning-filled';
+        if (request.resourceType() === Common.ResourceType.resourceTypes.Prefetch) {
+          title = i18nString(UIStrings.prefetchFailed, {PH1: type.title()});
+        } else {
+          title = i18nString(UIStrings.requestFailed, {PH1: type.title()});
+        }
       } else {
         title = i18nString(UIStrings.requestFailed, {PH1: type.title()});
         iconName = 'cross-circle-filled';
@@ -118,21 +122,15 @@ export class PanelUtils {
 
     const isHeaderOverridden = request.hasOverriddenHeaders();
     const isContentOverridden = request.hasOverriddenContent;
+    let overrideTitle: Common.UIString.LocalizedString|undefined;
     if (isHeaderOverridden || isContentOverridden) {
-      let title: Common.UIString.LocalizedString;
       if (isHeaderOverridden && isContentOverridden) {
-        title = i18nString(UIStrings.requestContentHeadersOverridden);
+        overrideTitle = i18nString(UIStrings.requestContentHeadersOverridden);
       } else if (isContentOverridden) {
-        title = i18nString(UIStrings.requestContentOverridden);
+        overrideTitle = i18nString(UIStrings.requestContentOverridden);
       } else {
-        title = i18nString(UIStrings.requestHeadersOverridden);
+        overrideTitle = i18nString(UIStrings.requestHeadersOverridden);
       }
-
-      // clang-format off
-      return html`<div class="network-override-marker">
-          <devtools-icon class="icon" name="document" role=img title=${title}></devtools-icon>
-        </div>`;
-      // clang-format on
     }
 
     // Pick icon based on MIME type in the following cases:
@@ -153,9 +151,10 @@ export class PanelUtils {
       }
     }
 
+    let iconElement: TemplateResult;
     if (type === Common.ResourceType.resourceTypes.Image) {
       // clang-format off
-      return html`<div class="image icon">
+      iconElement = html`<div class="image icon">
         <img
           class="image-network-icon-preview"
           title=${iconTitleForRequest(request)}
@@ -168,29 +167,35 @@ export class PanelUtils {
         />
       </div>`;
       // clang-format on
-    }
-
     // Exclude Manifest here because it has mimeType:application/json but it has its own icon
-    if (type !== Common.ResourceType.resourceTypes.Manifest &&
-        Common.ResourceType.ResourceType.simplifyContentType(request.mimeType) === 'application/json') {
+    } else if (type !== Common.ResourceType.resourceTypes.Manifest &&
+               Common.ResourceType.ResourceType.simplifyContentType(request.mimeType) === 'application/json') {
       // clang-format off
-      return html`<devtools-icon
+      iconElement = html`<devtools-icon
           class="icon" name="file-json" title=${iconTitleForRequest(request)} role=img
           style="color:var(--icon-file-script)">
         </devtools-icon>`;
       // clang-format on
+    } else {
+      // Others
+      const {iconName, color} = PanelUtils.iconDataForResourceType(type);
+      // clang-format off
+      iconElement = html`<devtools-icon
+          class="icon" name=${iconName} title=${iconTitleForRequest(request)}
+          style=${styleMap({color})}>
+        </devtools-icon>`;
+      // clang-format on
     }
 
-    // Others
-    const {iconName, color} = PanelUtils.iconDataForResourceType(type);
-    // clang-format off
-    return html`<devtools-icon
-        class="icon" name=${iconName} title=${iconTitleForRequest(request)}
-        style=${styleMap({color})}>
-      </devtools-icon>`;
-    // clang-format on
+    if (overrideTitle) {
+      return html`<div class="network-override-marker">${iconElement}</div>`;
+    }
+    return iconElement;
 
     function iconTitleForRequest(request: SDK.NetworkRequest.NetworkRequest): string {
+      if (overrideTitle) {
+        return overrideTitle;
+      }
       const throttlingConditions =
           SDK.NetworkManager.MultitargetNetworkManager.instance().appliedRequestConditions(request);
       if (!throttlingConditions?.urlPattern) {

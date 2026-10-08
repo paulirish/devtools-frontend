@@ -82,7 +82,7 @@ declare var ne: {
             stickyHeaderEl: any;
             highlightEl: any;
             _updateStickyHeader(): void;
-        };
+        } | null;
         onMediaQueryChange(e: any): void;
         initFeatures(e: any): void;
         json: any;
@@ -107,7 +107,7 @@ declare namespace St {
 declare function kt(r: any, e?: {}): HTMLElement;
 declare function Et(r: any, e: any): {
     lhr: any;
-    missingIcuMessageIds: any[];
+    missingIcuMessageIds: never[];
 };
 declare function Lt(r: any, e: any): void;
 declare function Ct(r: any): boolean;

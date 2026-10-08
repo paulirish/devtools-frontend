@@ -8,10 +8,9 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 devtools_module("puppeteer_connection") {
   sources = [ "PuppeteerConnection.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../core/protocol_client:bundle",
     "../../generated",
-    "../../generated:protocol",
     "../../third_party/puppeteer:bundle",
   ]
 }
@@ -19,7 +18,19 @@ devtools_module("puppeteer_connection") {
 devtools_entrypoint("bundle") {
   entrypoint = "puppeteer.ts"
 
-  deps = [ ":puppeteer_connection" ]
+  ts_deps = [ ":puppeteer_connection" ]
 
   visibility = [ "*" ]
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [ "PuppeteerConnection.test.ts" ]
+
+  ts_deps = [
+    ":bundle",
+    "../../core/protocol_client:bundle",
+    "../../generated",
+  ]
 }

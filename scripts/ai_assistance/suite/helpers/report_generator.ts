@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type {Conversation} from '../types.js';
+import type {Trajectory} from '../types.js';
 
 import {
   type BinaryStats,
@@ -99,18 +99,18 @@ const RESULT_RENDERERS: {[K in Result['type']]: (result: Extract<Result, {type: 
 /**
  * Renders a standard expandable card for a conversation.
  */
-function renderConversationCard(
-    conversation: Conversation, headerLabel: string, scoreElement: string, detailsHtml: string): string {
+function renderConversationCard(conversation: Trajectory, headerLabel: string, scoreElement: string,
+                                detailsHtml: string): string {
   return `
     <div class="card">
       <div class="card-header" onclick="toggleCard(this)">
-        <span>${headerLabel} <code>${conversation.id}</code></span>
+        <span>${headerLabel} <code>${conversation.metadata.session_id}</code></span>
         ${scoreElement}
       </div>
       <div class="card-content">
         <div class="metadata">
-          <span><strong>Model:</strong> ${conversation.model.id} (${conversation.model.version})</span>
-          <span><strong>Chrome:</strong> ${conversation.chromeVersion}</span>
+          <span><strong>Model:</strong> ${conversation.metadata.model}</span>
+          <span><strong>Chrome:</strong> ${conversation.metadata.chrome_version}</span>
         </div>
         ${renderConversationTranscript(conversation)}
         ${detailsHtml}
@@ -121,27 +121,29 @@ function renderConversationCard(
 /**
  * Renders the transcript of a conversation.
  */
-function renderConversationTranscript(conversation: Conversation): string {
-  return conversation.queries
-      .map(query => {
+function renderConversationTranscript(conversation: Trajectory): string {
+  return (conversation.data ?? [])
+      .map(turn => {
         let html = '';
-        if (query.request.prompt || query.request.functionCallResponse) {
+        if (turn.role === 'user') {
           html += '<div class="transcript-header">Request</div>';
-          if (query.request.prompt) {
-            html += `<pre><strong>Query:</strong>\n${query.request.prompt}</pre>`;
+          if (turn.content?.length) {
+            html += `<pre><strong>Query:</strong>\n${turn.content.join('\n')}</pre>`;
           }
-          if (query.request.functionCallResponse) {
-            html += `<pre><strong>Function Response:</strong>\n${query.request.functionCallResponse}</pre>`;
-          }
-        }
-
-        if (query.response.text || query.response.functionCallRequests?.length) {
+        } else {
           html += '<div class="transcript-header">Response</div>';
-          if (query.response.text) {
-            html += `<pre><strong>Explanation:</strong>\n${query.response.text}</pre>`;
+          if (turn.content?.length) {
+            html += `<pre><strong>Explanation:</strong>\n${turn.content.join('\n')}</pre>`;
           }
-          if (query.response.functionCallRequests?.length) {
-            const calls = query.response.functionCallRequests.map(r => `${r.name}(${JSON.stringify(r.args, null, 2)})`)
+          if (turn.tool_calls?.length) {
+            const calls = turn.tool_calls
+                              .map(r => {
+                                let callStr = `${r.name}(${JSON.stringify(r.args, null, 2)})`;
+                                if (r.result) {
+                                  callStr += `\n\n<strong>Response:</strong>\n${JSON.stringify(r.result, null, 2)}`;
+                                }
+                                return callStr;
+                              })
                               .join('\n\n');
             html += `<pre><strong>Function Calls:</strong>\n${calls}</pre>`;
           }
@@ -255,7 +257,7 @@ export function generateReport(stores: ResultStore|ResultStore[]): void {
 /**
  * Renders a summary table comparing results across different dates for a specific test.
  */
-function renderSummaryTable(dateToResult: Map<string, Result>, sortedDates: string[]): string {
+function renderSummaryTable(dateToResult: ReadonlyMap<string, Result>, sortedDates: string[]): string {
   const results = Array.from(dateToResult.values());
   if (results.length === 0) {
     return '';

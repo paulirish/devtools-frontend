@@ -5,14 +5,16 @@
 import("../../../scripts/build/typescript/typescript.gni")
 
 ts_e2e_library("shared") {
-  deps = [
+  testonly = false
+  ts_deps = [
     "../../../front_end/core/root:bundle",
     "../../conductor:implementation",
   ]
   sources = [
-    "browser-helper.ts",
-    "frontend-helper.ts",
-    "page-wrapper.ts",
-    "target-helper.ts",
+    "BrowserWrapper.ts",
+    "DevToolsPage.ts",
+    "InspectedPage.ts",
+    "PageWrapper.ts",
+    "auth-helper.ts",
   ]
 }

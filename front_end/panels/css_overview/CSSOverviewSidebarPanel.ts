@@ -16,25 +16,25 @@ const {classMap} = Directives;
 
 const UIStrings = {
   /**
-   * @description Label for the 'Clear overview' button in the CSS overview report
+   * @description Label for the 'Clear overview' button in the CSS overview report.
    */
   clearOverview: 'Clear overview',
   /**
-   * @description Accessible label for the CSS overview panel sidebar
+   * @description Accessible label for the CSS overview panel sidebar.
    */
   cssOverviewPanelSidebar: 'CSS overview panel sidebar',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/css_overview/CSSOverviewSidebarPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-interface ViewInput {
+export interface ViewInput {
   items: Array<{name: string, id: string}>;
   selectedId?: string;
   onReset: () => void;
   onItemClick: (id: string) => void;
   onItemKeyDown: (id: string, key: string) => void;
 }
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   const onClick = (event: Event): void => {
@@ -94,7 +94,7 @@ export class CSSOverviewSidebarPanel extends UI.Widget.VBox {
   #onItemSelected = (_id: string, _shouldFocus: boolean): void => {};
   #onReset = (): void => {};
 
-  constructor(element?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true, delegatesFocus: true});
     this.#view = view;
   }
@@ -105,7 +105,7 @@ export class CSSOverviewSidebarPanel extends UI.Widget.VBox {
       selectedId: this.#selectedId,
       onReset: this.#onReset,
       onItemClick: this.#onItemClick.bind(this),
-      onItemKeyDown: this.#onItemKeyDown.bind(this)
+      onItemKeyDown: this.#onItemKeyDown.bind(this),
     };
     this.#view(viewInput, {}, this.contentElement);
   }

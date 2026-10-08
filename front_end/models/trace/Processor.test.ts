@@ -3,25 +3,28 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {makeCompleteEvent} from '../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as Trace from '../trace/trace.js';
 
-describeWithEnvironment('TraceProcessor', function() {
-  it('can use a trace processor', async function() {
+describe('TraceProcessor', function() {
+  setupLocaleHooks();
+  it('can use a trace processor', async () => {
     const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
-    const file = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    const file = [makeCompleteEvent('Program', 0, 10)];
 
     // Check parsing after instantiation.
     assert.isNull(processor.data);
-    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     assert.isNotNull(processor.data);
 
     // Check parsing without a reset.
     let thrown;
     try {
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     } catch (e) {
       thrown = e as Error;
     }
@@ -32,7 +35,7 @@ describeWithEnvironment('TraceProcessor', function() {
     processor.reset();
     assert.isNull(processor.data);
     assert.isNull(processor.insights);
-    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     assert.isNotNull(processor.data);
     assert.isNotNull(processor.insights);
     // Cleanup.
@@ -41,8 +44,8 @@ describeWithEnvironment('TraceProcessor', function() {
     // Check simultaneous parsing without waiting.
     let promise;
     try {
-      promise = processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      promise = processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
 
     } catch (e) {
       thrown = e as Error;
@@ -56,7 +59,7 @@ describeWithEnvironment('TraceProcessor', function() {
     // Check if data is null immediately after resetting.
     assert.isNull(processor.data);
     assert.isNull(processor.insights);
-    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     assert.isNotNull(processor.data);
     assert.isNotNull(processor.insights);
     processor.reset();
@@ -65,7 +68,7 @@ describeWithEnvironment('TraceProcessor', function() {
 
     // Check resetting while parsing.
     try {
-      promise = processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      promise = processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
       processor.reset();
     } catch (e) {
       thrown = e as Error;
@@ -79,7 +82,7 @@ describeWithEnvironment('TraceProcessor', function() {
     // Check parsing after resetting while parsing.
     assert.isNull(processor.data);
     assert.isNull(processor.insights);
-    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+    await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     assert.isNotNull(processor.data);
     assert.isNotNull(processor.insights);
   });
@@ -89,7 +92,7 @@ describeWithEnvironment('TraceProcessor', function() {
       Animations: Trace.Handlers.ModelHandlers.Animations,
     });
     const events = await TraceLoader.rawEvents(this, 'animation.json.gz');
-    await processor.parse(events, {isFreshRecording: true, isCPUProfile: false});
+    await processor.parse(events, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
     assert.isNotNull(processor.data);
     assert.deepEqual(Object.keys(processor.data || {}), ['Meta', 'Animations']);
   });
@@ -119,7 +122,6 @@ describeWithEnvironment('TraceProcessor', function() {
         {
           Renderer: Trace.Handlers.ModelHandlers.Renderer,
           Samples: Trace.Handlers.ModelHandlers.Samples,
-          AuctionWorklets: Trace.Handlers.ModelHandlers.AuctionWorklets,
           NetworkRequests: Trace.Handlers.ModelHandlers.NetworkRequests,
         },
         Trace.Types.Configuration.defaults());
@@ -250,7 +252,7 @@ describeWithEnvironment('TraceProcessor', function() {
       const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
       const file = await TraceLoader.rawEvents(this, 'nested-interactions.json.gz');
 
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
       if (!processor.insights) {
         throw new Error('No insights');
       }
@@ -284,7 +286,7 @@ describeWithEnvironment('TraceProcessor', function() {
       const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
       const file = await TraceLoader.rawEvents(this, 'load-simple.json.gz');
 
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
       if (!processor.insights) {
         throw new Error('No insights');
       }
@@ -299,7 +301,7 @@ describeWithEnvironment('TraceProcessor', function() {
       const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
       const file = await TraceLoader.rawEvents(this, 'load-simple.json.gz');
 
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
       if (!processor.insights) {
         throw new Error('No insights');
       }
@@ -322,7 +324,7 @@ describeWithEnvironment('TraceProcessor', function() {
       const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
       const file = await TraceLoader.rawEvents(this, 'multiple-navigations.json.gz');
 
-      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false});
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
       if (!processor.insights) {
         throw new Error('No insights');
       }
@@ -345,17 +347,53 @@ describeWithEnvironment('TraceProcessor', function() {
       assert.lengthOf(insightSets[3].model.RenderBlocking.renderBlockingRequests, 1);
     });
 
+    it('returns insights for soft navigations', async function() {
+      const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
+      const file = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
+      if (!processor.insights) {
+        throw new Error('No insights');
+      }
+
+      assert.deepEqual([...processor.insights.keys()], [
+        Trace.Types.Events.NO_NAVIGATION,
+        'NAVIGATION_1',
+        'NAVIGATION_2',
+        'NAVIGATION_3',
+      ]);
+
+      const insightSets = Array.from(processor.insights.values());
+      assert.isTrue(Trace.Types.Events.isSoftNavigationStart(insightSets[1].navigation as Trace.Types.Events.Event));
+      assert.isTrue(Trace.Types.Events.isSoftNavigationStart(insightSets[2].navigation as Trace.Types.Events.Event));
+      assert.isTrue(Trace.Types.Events.isSoftNavigationStart(insightSets[3].navigation as Trace.Types.Events.Event));
+    });
+
+    it('does not return insights for soft navigations if they are disabled via config', async function() {
+      const config = Trace.Types.Configuration.defaults();
+      config.enableSoftNavigation = false;
+      const processor = new Trace.Processor.TraceProcessor(Trace.Handlers.ModelHandlers, config);
+      const file = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
+      if (!processor.insights) {
+        throw new Error('No insights');
+      }
+
+      assert.deepEqual([...processor.insights.keys()], [
+        Trace.Types.Events.NO_NAVIGATION,
+      ]);
+    });
+
     it('sorts insights by estimated savings and field data', async function() {
+      const file = await TraceLoader.rawEvents(this, 'image-delivery.json.gz');
+      const loadedMetadata = await TraceLoader.metadata(this, 'image-delivery.json.gz');
+
       const getInsightOrder = async (includeMetadata: boolean) => {
         const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
-        const file = await TraceLoader.rawEvents(this, 'image-delivery.json.gz');
+        const metadata = includeMetadata ? loadedMetadata : undefined;
 
-        let metadata;
-        if (includeMetadata) {
-          metadata = await TraceLoader.metadata(this, 'image-delivery.json.gz');
-        }
-
-        await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, metadata});
+        await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, metadata, yieldToMain: false});
         if (!processor.insights) {
           throw new Error('No insights');
         }

@@ -10,9 +10,9 @@ import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import * as Geometry from '../../models/geometry/geometry.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import * as Geometry from '../../ui/geometry/geometry.js';
 import {createIcon, type Icon} from '../../ui/kit/kit.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
@@ -30,11 +30,11 @@ const UIStrings = {
   /**
    * @description Swatch icon element title in CSSPlugin of the Sources panel
    */
-  openColorPicker: 'Open color picker.',
+  openColorPicker: 'Open color picker',
   /**
    * @description Text to open the cubic bezier editor
    */
-  openCubicBezierEditor: 'Open cubic bezier editor.',
+  openCubicBezierEditor: 'Open cubic bezier editor',
   /**
    * @description Text for a context menu item for attaching a sourcemap to the currently open css file
    */
@@ -504,5 +504,16 @@ const theme = CodeMirror.EditorView.baseTheme({
     'box-shadow': 'var(--sys-elevation-level2)',
     'background-color': 'var(--sys-color-base-container-elevated)',
     'border-radius': 'var(--sys-shape-corner-extra-small)',
+  },
+  'devtools-icon.bezier-swatch-icon': {
+    position: 'relative',
+    transform: 'scale(0.7)',
+    margin: '-5px calc(-1 * var(--sys-size-2)) -3px calc(-1 * var(--sys-size-3))',
+    'user-select': 'none',
+    color: 'var(--icon-css)',
+    cursor: 'default',
+    '&:hover': {
+      color: 'var(--icon-css-hover)',
+    },
   },
 });

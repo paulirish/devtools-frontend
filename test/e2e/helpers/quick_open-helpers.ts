@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import type {ElementHandle} from 'puppeteer-core';
 
-import type {DevToolsPage} from '../shared/frontend-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
 
 import {SourceFileEvents, waitForSourceFiles} from './sources-helpers.js';
 
@@ -13,15 +14,13 @@ const QUICK_OPEN_ITEMS_SELECTOR = '.filtered-list-widget-item';
 
 const QUICK_OPEN_SELECTED_ITEM_SELECTOR = `${QUICK_OPEN_ITEMS_SELECTOR}.selected`;
 
-export const openCommandMenu = async (
-    devToolsPage: DevToolsPage,
-    ) => {
+export const openCommandMenu = async(devToolsPage: DevToolsPage): Promise<void> => {
   await devToolsPage.pressKey('P', {control: true, shift: true});
 
   await devToolsPage.waitFor(QUICK_OPEN_SELECTOR);
 };
 
-export const openFileQuickOpen = async (devtoolsPage: DevToolsPage) => {
+export const openFileQuickOpen = async(devtoolsPage: DevToolsPage): Promise<void> => {
   await devtoolsPage.pressKey('P', {control: true});
   await devtoolsPage.waitFor(QUICK_OPEN_SELECTOR);
 };
@@ -32,21 +31,22 @@ export async function readQuickOpenResults(devtoolsPage: DevToolsPage): Promise<
 }
 
 /** Does not play well with pptr:evaluate scripts. crbug.com/391533572 */
-export const openFileWithQuickOpen = async (sourceFile: string, filePosition = 0, devtoolsPage: DevToolsPage) => {
+export const openFileWithQuickOpen =
+    async(devtoolsPage: DevToolsPage, sourceFile: string, filePosition = 0): Promise<void> => {
   await waitForSourceFiles(
+      devtoolsPage,
       SourceFileEvents.SOURCE_FILE_LOADED,
       files => files.some(f => f.endsWith(sourceFile)),
       async () => {
         await openFileQuickOpen(devtoolsPage);
-        await typeIntoQuickOpen(sourceFile, undefined, devtoolsPage);
-        const firstItem = await getMenuItemAtPosition(filePosition, devtoolsPage);
+        await typeIntoQuickOpen(devtoolsPage, sourceFile);
+        const firstItem = await getMenuItemAtPosition(devtoolsPage, filePosition);
         await firstItem.click();
       },
-      devtoolsPage,
   );
 };
 
-export async function runCommandWithQuickOpen(command: string, devtoolsPage: DevToolsPage): Promise<void> {
+export async function runCommandWithQuickOpen(devtoolsPage: DevToolsPage, command: string): Promise<void> {
   await openCommandMenu(devtoolsPage);
   await devtoolsPage.typeText(command);
   // TODO: it should actually wait for rendering to finish.
@@ -54,7 +54,7 @@ export async function runCommandWithQuickOpen(command: string, devtoolsPage: Dev
   await devtoolsPage.pressKey('Enter');
 }
 
-export const openGoToLineQuickOpen = async (devtoolsPage: DevToolsPage) => {
+export const openGoToLineQuickOpen = async(devtoolsPage: DevToolsPage): Promise<void> => {
   // This shortcut explicitly uses Control rather then meta on Mac
   // So we can't use our Helper.
   await devtoolsPage.page.keyboard.down('Control');
@@ -63,21 +63,22 @@ export const openGoToLineQuickOpen = async (devtoolsPage: DevToolsPage) => {
   await devtoolsPage.waitFor(QUICK_OPEN_SELECTOR);
 };
 
-export const showSnippetsAutocompletion = async (devtoolsPage: DevToolsPage) => {
+export const showSnippetsAutocompletion = async(devtoolsPage: DevToolsPage): Promise<void> => {
   // Clear the `>` character, as snippets use a `!` instead
   await devtoolsPage.pressKey('Backspace');
 
   await devtoolsPage.typeText('!');
 };
 
-export async function getAvailableSnippets(devtoolsPage: DevToolsPage) {
+export async function getAvailableSnippets(devtoolsPage: DevToolsPage): Promise<string[]> {
   const quickOpenElement = await devtoolsPage.waitFor(QUICK_OPEN_SELECTOR);
   const snippetsDOMElements = await devtoolsPage.$$(QUICK_OPEN_ITEMS_SELECTOR, quickOpenElement);
   const snippets = await Promise.all(snippetsDOMElements.map(elem => elem.evaluate(elem => elem.textContent)));
   return snippets;
 }
 
-export async function getMenuItemAtPosition(position: number, devtoolsPage: DevToolsPage) {
+export async function getMenuItemAtPosition(devtoolsPage: DevToolsPage,
+                                            position: number): Promise<ElementHandle<Element>> {
   const quickOpenElement = await devtoolsPage.waitFor(QUICK_OPEN_SELECTOR);
   await devtoolsPage.waitFor(QUICK_OPEN_ITEMS_SELECTOR);
   const itemsHandles = await devtoolsPage.$$(QUICK_OPEN_ITEMS_SELECTOR, quickOpenElement);
@@ -86,7 +87,7 @@ export async function getMenuItemAtPosition(position: number, devtoolsPage: DevT
   return item;
 }
 
-export async function getMenuItemTitleAtPosition(position: number, devtoolsPage: DevToolsPage) {
+export async function getMenuItemTitleAtPosition(devtoolsPage: DevToolsPage, position: number): Promise<string> {
   const quickOpenElement = await devtoolsPage.waitFor(QUICK_OPEN_SELECTOR);
   await devtoolsPage.waitFor(QUICK_OPEN_ITEMS_SELECTOR);
   const itemsHandles = await devtoolsPage.$$(QUICK_OPEN_ITEMS_SELECTOR, quickOpenElement);
@@ -96,11 +97,11 @@ export async function getMenuItemTitleAtPosition(position: number, devtoolsPage:
   return title;
 }
 
-export const closeDrawer = async (devToolsPage: DevToolsPage) => {
+export const closeDrawer = async(devToolsPage: DevToolsPage): Promise<void> => {
   await devToolsPage.click('[aria-label="Close drawer"]');
 };
 
-export const getSelectedItemText = async (devToolsPage: DevToolsPage) => {
+export const getSelectedItemText = async(devToolsPage: DevToolsPage): Promise<string> => {
   const quickOpenElement = await devToolsPage.waitFor(QUICK_OPEN_SELECTOR);
   const selectedRow = await devToolsPage.waitFor(QUICK_OPEN_SELECTED_ITEM_SELECTOR, quickOpenElement);
   const textContent = await selectedRow.getProperty('textContent');
@@ -108,7 +109,8 @@ export const getSelectedItemText = async (devToolsPage: DevToolsPage) => {
   return await textContent.jsonValue();
 };
 
-export async function typeIntoQuickOpen(query: string, expectEmptyResults = false, devtoolsPage: DevToolsPage) {
+export async function typeIntoQuickOpen(devtoolsPage: DevToolsPage, query: string,
+                                        expectEmptyResults = false): Promise<void> {
   await openFileQuickOpen(devtoolsPage);
   const prompt = await devtoolsPage.waitFor('[aria-label="Quick open prompt"]');
   await prompt.type(query);

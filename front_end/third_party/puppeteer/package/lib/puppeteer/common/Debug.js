@@ -3,20 +3,19 @@
  * Copyright 2020 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import { isNode } from '../environment.js';
+import { isNode, environment } from '../environment.js';
 /**
- * @internal
+ * @public
+ * @experimental
  */
-let debugModule = null;
-/**
- * @internal
- */
-export async function importDebug() {
-    if (!debugModule) {
-        debugModule = (await import('node:util')).debuglog;
-    }
-    return debugModule;
-}
+export const DEBUG_PREFIXES = {
+    cdpSend: 'puppeteer:protocol:SEND ►',
+    cdpReceive: 'puppeteer:protocol:RECV ◀',
+    bidiSend: 'puppeteer:webDriverBiDi:SEND ►',
+    bidiReceive: 'puppeteer:webDriverBiDi:RECV ◀',
+    error: 'puppeteer:error',
+    ffmpeg: 'puppeteer:ffmpeg',
+};
 /**
  * A debug function that can be used in any environment.
  *
@@ -44,7 +43,7 @@ export async function importDebug() {
  * @example
  *
  * ```
- * const log = debug('Page');
+ * const log = debug(DEBUG_PREFIXES.error);
  *
  * log('new page created')
  * // logs "Page: new page created"
@@ -57,53 +56,33 @@ export async function importDebug() {
  */
 export const debug = (prefix) => {
     if (isNode) {
-        return async (...logArgs) => {
-            if (captureLogs) {
-                capturedLogs.push(prefix + logArgs);
-            }
-            (await importDebug())(prefix)(...logArgs);
+        const nodeDebug = environment.value.debuglog?.(prefix);
+        if (!nodeDebug || !nodeDebug.enabled) {
+            return;
+        }
+        return (...logArgs) => {
+            nodeDebug(...logArgs);
         };
     }
+    const debugLevel = globalThis.__PUPPETEER_DEBUG;
+    if (!debugLevel) {
+        return;
+    }
+    const everythingShouldBeLogged = debugLevel === '*';
+    const prefixMatchesDebugLevel = everythingShouldBeLogged ||
+        /**
+         * If the debug level is `foo*`, that means we match any prefix that
+         * starts with `foo`. If the level is `foo`, we match only the prefix
+         * `foo`.
+         */
+        (debugLevel.endsWith('*')
+            ? prefix.startsWith(debugLevel.slice(0, -1))
+            : prefix === debugLevel);
+    if (!prefixMatchesDebugLevel) {
+        return;
+    }
     return (...logArgs) => {
-        const debugLevel = globalThis.__PUPPETEER_DEBUG;
-        if (!debugLevel) {
-            return;
-        }
-        const everythingShouldBeLogged = debugLevel === '*';
-        const prefixMatchesDebugLevel = everythingShouldBeLogged ||
-            /**
-             * If the debug level is `foo*`, that means we match any prefix that
-             * starts with `foo`. If the level is `foo`, we match only the prefix
-             * `foo`.
-             */
-            (debugLevel.endsWith('*')
-                ? prefix.startsWith(debugLevel)
-                : prefix === debugLevel);
-        if (!prefixMatchesDebugLevel) {
-            return;
-        }
         console.log(`${prefix}:`, ...logArgs);
     };
 };
-/**
- * @internal
- */
-let capturedLogs = [];
-/**
- * @internal
- */
-let captureLogs = false;
-/**
- * @internal
- */
-export function setLogCapture(value) {
-    capturedLogs = [];
-    captureLogs = value;
-}
-/**
- * @internal
- */
-export function getCapturedLogs() {
-    return capturedLogs;
-}
 //# sourceMappingURL=Debug.js.map

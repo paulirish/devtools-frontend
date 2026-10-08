@@ -9,7 +9,7 @@ import("../../../../scripts/build/typescript/typescript.gni")
 devtools_ui_module("extensions") {
   sources = [ "ExtensionUI.ts" ]
 
-  deps = [
+  ts_deps = [
     "../../../models/trace:bundle",
     "../../../ui/legacy/theme_support:bundle",
   ]
@@ -18,7 +18,7 @@ devtools_ui_module("extensions") {
 devtools_entrypoint("bundle") {
   entrypoint = "extensions.ts"
 
-  deps = [ ":extensions" ]
+  ts_deps = [ ":extensions" ]
 
   visibility = [
     "..:*",

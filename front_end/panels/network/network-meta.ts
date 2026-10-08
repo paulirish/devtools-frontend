@@ -7,14 +7,77 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Logs from '../../models/logs/logs.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as PanelCommon from '../../panels/common/common.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as SettingsUI from '../../ui/settings/settings.js';
 
 import * as NetworkForward from './forward/forward.js';
 import type * as Network from './network.js';
 
 const UIStrings = {
+  /**
+   * @description Text to keep the log after refreshing.
+   */
+  keepLog: 'Keep log',
+  /**
+   * @description A term that can be used to search in the command menu, and will find the search
+   * result 'Keep log on page reload / navigation'. This is an additional search term to help
+   * the user find the setting even when they don't know the exact name of it.
+   */
+  keep: 'keep',
+  /**
+   * @description A term that can be used to search in the command menu, and will find the search
+   * result 'Keep log on page reload / navigation'. This is an additional search term to help
+   * the user find the setting even when they don't know the exact name of it.
+   */
+  preserve: 'preserve',
+  /**
+   * @description A term that can be used to search in the command menu, and will find the search
+   * result 'Keep log on page reload / navigation'. This is an additional search term to help
+   * the user find the setting even when they don't know the exact name of it.
+   */
+  clearTag: 'clear',
+  /**
+   * @description A term that can be used to search in the command menu, and will find the search
+   * result 'Keep log on page reload / navigation'. This is an additional search term to help
+   * the user find the setting even when they don't know the exact name of it.
+   */
+  reset: 'reset',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  keepLogOnPageReload: 'Keep log on page reload / navigation',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  doNotKeepLogOnPageReload: 'Don’t keep log on page reload / navigation',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  enableCache: 'Enable cache',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  disableCache: 'Disable cache while DevTools is open',
+  /**
+   * @description Tooltip text for a setting that controls the network cache. Disabling the network cache can simulate the network connections of users that are visiting a page for the first time.
+   */
+  networkCacheExplanation:
+      'Disabling the network cache will simulate a network experience similar to a first time visitor',
+  /**
+   * @description Title of a setting under the Network category.
+   */
+  requestBlockingAndThrottling: 'Request blocking and throttling',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  enableRequestBlockingAndThrottling: 'Enable request blocking and throttling',
+  /**
+   * @description Title of a setting under the Network category that can be invoked through the Command Menu.
+   */
+  disableRequestBlockingAndThrottling: 'Disable request blocking and throttling',
   /**
    * @description Command for showing the 'Network' tool
    */
@@ -24,9 +87,9 @@ const UIStrings = {
    */
   network: 'Network',
   /**
-   * @description Command for showing the 'Network request blocking' tool
+   * @description Command for showing the 'Request conditions' tool
    */
-  showRequestConditions: 'Show Request conditions',
+  showRequestConditions: 'Show request conditions',
   /**
    * @description Title of the 'Request conditions' tool in the bottom drawer
    */
@@ -110,17 +173,17 @@ const UIStrings = {
   /**
    * @description Title of a setting under the Network category that can be invoked through the Command Menu
    */
-  dontGroupNetworkLogItemsByFrame: 'Don\'t group network log items by frame',
+  dontGroupNetworkLogItemsByFrame: 'Don’t group network log items by frame',
   /**
    * @description Title of a button for clearing the network log
    */
   clear: 'Clear network log',
   /**
-   * @description Title of an action in the Network request blocking panel to add a new URL pattern to the blocklist.
+   * @description Title of an action in the Request conditions panel to add a new URL pattern to the blocklist.
    */
   addNetworkRequestBlockingOrThrottlingPattern: 'Add network request blocking or throttling pattern',
   /**
-   * @description Title of an action in the Network request blocking panel to clear all URL patterns.
+   * @description Title of an action in the Request conditions panel to clear all URL patterns.
    */
   removeAllNetworkRequestBlockingOrThrottlingPatterns: 'Remove all network request blocking or throttling patterns',
   /**
@@ -132,13 +195,13 @@ const UIStrings = {
    * @description Title of an action in the Network panel that disables options in the UI to copy or export
    *              HAR (not translatable) with sensitive data.
    */
-  dontAllowToGenerateHarWithSensitiveData: 'Don\'t allow to generate `HAR` with sensitive data',
+  dontAllowToGenerateHarWithSensitiveData: 'Don’t allow to generate `HAR` with sensitive data',
   /**
    * @description Tooltip shown as documentation when hovering the (?) icon next to the "Allow to generate
    *              HAR with sensitive data" option in the Settings panel.
    */
   allowToGenerateHarWithSensitiveDataDocumentation:
-      'By default generated HAR logs are sanitized and don\'t include `Cookie`, `Set-Cookie`, or `Authorization` HTTP headers. When this setting is enabled, options to export/copy HAR with sensitive data are provided.',
+      'By default generated HAR logs are sanitized and don’t include `Cookie`, `Set-Cookie`, or `Authorization` HTTP headers. When this setting is enabled, options to export/copy HAR with sensitive data are provided.',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/network-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -355,39 +418,32 @@ UI.ActionRegistration.registerActionExtension({
   },
 });
 
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.NETWORK,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
-  title: i18nLazyString(UIStrings.allowToGenerateHarWithSensitiveData),
-  settingName: 'network.show-options-to-generate-har-with-sensitive-data',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
-  tags: [
-    i18n.i18n.lockedLazyString('HAR'),
-  ],
-  options: [
-    {
-      value: true,
+SettingsUI.SettingUIRegistration.register(
+    SettingsUI.NetworkSettings.showOptionsToGenerateHarWithSensitiveDataSettingDescriptor, {
+      category: Common.Settings.SettingCategory.NETWORK,
       title: i18nLazyString(UIStrings.allowToGenerateHarWithSensitiveData),
-    },
-    {
-      value: false,
-      title: i18nLazyString(UIStrings.dontAllowToGenerateHarWithSensitiveData),
-    },
-  ],
-  learnMore: {
-    url: 'https://goo.gle/devtools-export-hars' as Platform.DevToolsPath.UrlString,
-    tooltip: i18nLazyString(UIStrings.allowToGenerateHarWithSensitiveDataDocumentation),
-  },
-});
+      tags: [
+        i18n.i18n.lockedLazyString('HAR'),
+      ],
+      options: [
+        {
+          value: true,
+          title: i18nLazyString(UIStrings.allowToGenerateHarWithSensitiveData),
+        },
+        {
+          value: false,
+          title: i18nLazyString(UIStrings.dontAllowToGenerateHarWithSensitiveData),
+        },
+      ],
+      learnMore: {
+        url: 'https://goo.gle/devtools-export-hars' as Platform.DevToolsPath.UrlString,
+        tooltip: i18nLazyString(UIStrings.allowToGenerateHarWithSensitiveDataDocumentation),
+      },
+    });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.NetworkSettings.colorCodeResourceTypesSettingDescriptor, {
   category: Common.Settings.SettingCategory.NETWORK,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.colorcodeResourceTypes),
-  settingName: 'network-color-code-resource-types',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
   tags: [
     i18nLazyString(UIStrings.colorCode),
     i18nLazyString(UIStrings.resourceType),
@@ -404,13 +460,9 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
-Common.Settings.registerSettingExtension({
+SettingsUI.SettingUIRegistration.register(SettingsUI.NetworkSettings.groupByFrameSettingDescriptor, {
   category: Common.Settings.SettingCategory.NETWORK,
-  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.groupNetworkLogByFrame),
-  settingName: 'network.group-by-frame',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
   tags: [
     i18nLazyString(UIStrings.netWork),
     i18nLazyString(UIStrings.frame),
@@ -426,6 +478,66 @@ Common.Settings.registerSettingExtension({
       title: i18nLazyString(UIStrings.dontGroupNetworkLogItemsByFrame),
     },
   ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.requestBlockingEnabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.NETWORK,
+  title: i18nLazyString(UIStrings.requestBlockingAndThrottling),
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.enableRequestBlockingAndThrottling),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.disableRequestBlockingAndThrottling),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.cacheDisabledSettingDescriptor, {
+  category: Common.Settings.SettingCategory.NETWORK,
+  title: i18nLazyString(UIStrings.disableCache),
+  order: 0,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.disableCache),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.enableCache),
+    },
+  ],
+  learnMore: {
+    tooltip: i18nLazyString(UIStrings.networkCacheExplanation),
+  },
+});
+
+SettingsUI.SettingUIRegistration.register(SDK.SDKSettings.preserveNetworkLogSettingDescriptor, {
+  category: Common.Settings.SettingCategory.NETWORK,
+  title: i18nLazyString(UIStrings.keepLog),
+  tags: [
+    i18nLazyString(UIStrings.keep),
+    i18nLazyString(UIStrings.preserve),
+    i18nLazyString(UIStrings.clearTag),
+    i18nLazyString(UIStrings.reset),
+  ],
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.keepLogOnPageReload),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotKeepLogOnPageReload),
+    },
+  ],
+});
+
+SettingsUI.SettingUIRegistration.register(Logs.NetworkLog.recordNetworkLogSettingDescriptor, {
+  category: Common.Settings.SettingCategory.NETWORK,
+  title: i18nLazyString(UIStrings.recordNetworkLog),
 });
 
 UI.ViewManager.registerLocationResolver({

@@ -6,7 +6,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Geometry from '../../../../models/geometry/geometry.js';
+import * as Geometry from '../../../geometry/geometry.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
@@ -14,24 +14,23 @@ import cssShadowEditorStyles from './cssShadowEditor.css.js';
 
 const UIStrings = {
   /**
-   * @description Text that refers to some types
+   * @description Label for the shadow type selector in the CSS shadow editor.
    */
   type: 'Type',
   /**
-   * @description Text in CSSShadow Editor of the inline editor in the Styles tab
+   * @description Label for the X offset input in the CSS shadow editor.
    */
   xOffset: 'X offset',
   /**
-   * @description Text in CSSShadow Editor of the inline editor in the Styles tab
+   * @description Label for the Y offset input in the CSS shadow editor.
    */
   yOffset: 'Y offset',
   /**
-   * @description Text in CSSShadow Editor of the inline editor in the Styles tab. Noun which is a
-   * label for an input that allows the user to specify how blurred the box-shadow should be.
+   * @description Label for the blur radius input in the CSS shadow editor.
    */
   blur: 'Blur',
   /**
-   * @description Text in CSSShadow Editor of the inline editor in the Styles tab
+   * @description Label for the spread radius input in the CSS shadow editor.
    */
   spread: 'Spread',
 } as const;
@@ -93,8 +92,12 @@ export class CSSLength {
   }
 }
 
-export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) {
+const CSSShadowEditorBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class CSSShadowEditor extends CSSShadowEditorBase {
   private readonly typeField: HTMLElement;
   private readonly outsetButton: HTMLElement;
   private readonly insetButton: HTMLElement;

@@ -34,7 +34,6 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {createIcon} from '../../ui/kit/kit.js';
-// eslint-disable-next-line @devtools/es-modules-import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {render} from '../../ui/lit/lit.js';
@@ -43,7 +42,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import {
   DetachedElementsProfileHeader,
   DetachedElementsProfileType,
-  DetachedElementsProfileView
+  DetachedElementsProfileView,
 } from './HeapDetachedElementsView.js';
 import heapProfilerStyles from './heapProfiler.css.js';
 import {HeapProfileView, SamplingHeapProfileHeader, SamplingHeapProfileType} from './HeapProfileView.js';
@@ -51,7 +50,7 @@ import {
   HeapProfileHeader,
   HeapSnapshotProfileType,
   HeapSnapshotView,
-  TrackingHeapSnapshotProfileType
+  TrackingHeapSnapshotProfileType,
 } from './HeapSnapshotView.js';
 import {
   type DataDisplayDelegate,
@@ -64,34 +63,34 @@ import {ProfileSidebarTreeElement} from './ProfileSidebarTreeElement.js';
 import profilesPanelStyles from './profilesPanel.css.js';
 import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
 import type {ProfileTypeRegistry} from './ProfileTypeRegistry.js';
-import {WritableProfileHeader} from './ProfileView.js';
+import {WritableProfileHeader} from './WritableProfileHeader.js';
 
 const UIStrings = {
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Error message when attempting to load an unsupported profile file format.
    * @example {'.js', '.json'} PH1
    */
   cantLoadFileSupportedFile: 'Can’t load file. Supported file extensions: \'\'{PH1}\'\'.',
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Error message when trying to load a profile while a recording is currently active.
    */
-  cantLoadProfileWhileAnother: 'Can’t load profile while another profile is being recorded.',
+  cantLoadProfileWhileAnother: 'Can’t load profile while another profile is being recorded',
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Error header when loading a profile file fails.
    */
   profileLoadingFailed: 'Profile loading failed',
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Detailed error reason string shown when profile loading fails.
    * @example {cannot open file} PH1
    */
-  failReason: 'Reason: {PH1}.',
+  failReason: 'Reason: {PH1}',
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Header for a profile run iteration in the Profiles sidebar.
    * @example {2} PH1
    */
   runD: 'Run {PH1}',
   /**
-   * @description Text in Profiles Panel of a profiler tool
+   * @description Sidebar section header for collected profiles.
    */
   profiles: 'Profiles',
 } as const;
@@ -125,6 +124,13 @@ function createView(profiler: ProfileHeader, dataDisplayDelegate: DataDisplayDel
   throw new Error('Not implemented.');
 }
 
+/**
+ * Some profile views expose a searchable view and some, such as the launcher, do not.
+ */
+interface MaybeSearchableView {
+  searchableView?(): UI.SearchableView.SearchableView|null;
+}
+
 export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisplayDelegate {
   profilesItemTreeElement: ProfilesSidebarTreeElement;
   sidebarTree: UI.TreeOutline.TreeOutlineInShadow;
@@ -144,12 +150,18 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   typeIdToSidebarSection: Record<string, ProfileTypeSidebarSection>;
   fileSelectorElement!: HTMLInputElement;
   selectedProfileType?: ProfileType;
-  static registry: ProfileTypeRegistry = {
-    heapSnapshotProfileType: new HeapSnapshotProfileType(),
-    trackingHeapSnapshotProfileType: new TrackingHeapSnapshotProfileType(),
-    samplingHeapProfileType: new SamplingHeapProfileType(),
-    detachedElementProfileType: new DetachedElementsProfileType(),
-  };
+  static #registry: ProfileTypeRegistry|null = null;
+  static get registry(): ProfileTypeRegistry {
+    if (!ProfilesPanel.#registry) {
+      ProfilesPanel.#registry = {
+        heapSnapshotProfileType: new HeapSnapshotProfileType(),
+        trackingHeapSnapshotProfileType: new TrackingHeapSnapshotProfileType(),
+        samplingHeapProfileType: new SamplingHeapProfileType(),
+        detachedElementProfileType: new DetachedElementsProfileType(),
+      };
+    }
+    return ProfilesPanel.#registry;
+  }
 
   constructor(
       name: string,
@@ -247,9 +259,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   }
 
   override searchableView(): UI.SearchableView.SearchableView|null {
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const visibleView = (this.visibleView as any);
+    const visibleView = this.visibleView as MaybeSearchableView | undefined;
     return visibleView?.searchableView ? visibleView.searchableView() : null;
   }
 
@@ -357,7 +367,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   reset(): void {
     this.profileTypes.forEach(type => type.reset());
 
-    delete this.visibleView;
+    this.closeVisibleView();
 
     this.profileGroups = {};
     this.updateToggleRecordAction(false);
@@ -365,8 +375,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
 
     this.sidebarTree.element.classList.remove('some-expandable');
 
-    this.launcherView.detach();
-    this.profileViews.removeChildren();
     this.profileViewToolbar.removeToolbarItems();
 
     this.profilesItemTreeElement.select();
@@ -474,12 +482,8 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.profileViewToolbar.removeToolbarItems();
 
     void (view as unknown as UI.View.View).toolbarItems().then(items => {
-      if (Array.isArray(items)) {
-        items.map(item => this.profileViewToolbar.appendToolbarItem(item));
-      } else {
-        // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-        render(items, this.profileViewToolbar);
-      }
+      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
+      render(items, this.profileViewToolbar);
     });
 
     return view;

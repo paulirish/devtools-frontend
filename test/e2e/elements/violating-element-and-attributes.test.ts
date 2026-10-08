@@ -5,12 +5,12 @@
 import {assert} from 'chai';
 
 import {expandSelectedNodeRecursively, goToResourceAndWaitForStyleSection} from '../helpers/elements-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('Element has violating properties', function() {
   async function expandFormWithIssues(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
-    await goToResourceAndWaitForStyleSection('elements/form-with-issues.html', devToolsPage, inspectedPage);
+    await goToResourceAndWaitForStyleSection(devToolsPage, inspectedPage, 'elements/form-with-issues.html');
     await expandSelectedNodeRecursively(devToolsPage);
   }
 
@@ -45,7 +45,7 @@ describe('Element has violating properties', function() {
       return popup.innerText;
     });
 
-    assert.strictEqual(popupText, 'View Issue:\nA form field element should have an id or name attribute');
+    assert.strictEqual(popupText, 'View issue:\nA form field element should have an ID or name attribute');
     // Open the issue panel and look for the title;
     await devToolsPage.click('div.widget devtools-link');
     const highlitedIssue = await devToolsPage.waitFor('.issue .header .title');

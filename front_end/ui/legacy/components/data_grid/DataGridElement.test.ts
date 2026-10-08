@@ -5,9 +5,10 @@
 import './data_grid.js';
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import {renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
+import {createFakeSetting, describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
 import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import * as UI from '../../legacy.js';
@@ -40,7 +41,7 @@ describeWithEnvironment('DataGrid', () => {
   function getAlertAnnouncement(element: HTMLElement): string[] {
     element.blur();
     element.focus();
-    return liveAnnouncerAlertStub.args.map(arg => arg[0]);
+    return liveAnnouncerAlertStub.args.map((arg: string[]) => arg[0]);
   }
 
   beforeEach(() => {
@@ -55,8 +56,13 @@ describeWithEnvironment('DataGrid', () => {
 
   async function renderDataGrid(template: Lit.TemplateResult): Promise<HTMLElement> {
     render(template, container, {host: {}});
-    await RenderCoordinator.done({waitForWork: true});
-    return container.querySelector('devtools-data-grid')!;
+    const element = container.querySelector('devtools-data-grid')!;
+    if (element?.getAttribute('row-height') === 'auto') {
+      await RenderCoordinator.done();
+    } else {
+      await RenderCoordinator.done({waitForWork: true});
+    }
+    return element;
   }
 
   async function renderDataGridContent(template: Lit.TemplateResult): Promise<HTMLElement> {
@@ -76,7 +82,7 @@ describeWithEnvironment('DataGrid', () => {
     element.blur();
     element.focus();
     if (liveAnnouncerAlertStub.called) {
-      assert.isTrue(liveAnnouncerAlertStub.args[0][0].startsWith('Display Name Rows: 0'));
+      assert.isTrue(liveAnnouncerAlertStub.args[0][0].startsWith('Display Name rows: 0'));
     }
   });
 
@@ -98,10 +104,37 @@ describeWithEnvironment('DataGrid', () => {
     const alerts = getAlertAnnouncement(element);
     const expectedRowData = 'Column 1: Value 1, Column 2: Value 2';
     const expectedGridDesc =
-        'Display Name Rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+        'Display Name rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
     assert.isTrue(
         alerts[0] === expectedRowData || alerts[0] === expectedGridDesc,
         `Expected alert to be row data or grid description, got: ${alerts[0]}`);
+  });
+
+  it('supports row-height="auto"', async () => {
+    const element = await renderDataGrid(html`
+        <devtools-data-grid row-height="auto" name="Display Name">
+          <table>
+            <tr>
+              <th id="column-1">Column 1</th>
+              <th id="column-2">Column 2</th>
+            </tr>
+            <tr>
+              <td>Value 1</td>
+              <td>Value 2</td>
+            </tr>
+          </table>
+        </devtools-data-grid>`);
+
+    const shadowRoot = element.shadowRoot;
+    assert.isNotNull(shadowRoot);
+    const dataGridElement = shadowRoot!.querySelector('.data-grid');
+    assert.isNotNull(dataGridElement);
+    assert.isTrue(dataGridElement!.classList.contains('auto-row-height'));
+
+    sendKeydown(element, 'ArrowDown');
+    const alerts = getAlertAnnouncement(element);
+    const expectedRowData = 'Column 1: Value 1, Column 2: Value 2';
+    assert.isTrue(alerts.some(alert => alert.includes(expectedRowData)));
   });
 
   it('can update data from template', async () => {
@@ -135,7 +168,7 @@ describeWithEnvironment('DataGrid', () => {
     const alerts = getAlertAnnouncement(element);
     const expectedRowData = 'Column 3: Value 3, Column 4: Value 4';
     const expectedGridDesc =
-        'Display Name Rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+        'Display Name rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
     assert.isTrue(
         alerts[0] === expectedRowData || alerts[0] === expectedGridDesc,
         `Expected alert to be row data or grid description, got: ${alerts[0]}`);
@@ -182,7 +215,7 @@ describeWithEnvironment('DataGrid', () => {
     // clang-format on
     const alerts = getAlertAnnouncement(element);
     if (alerts.length > 0) {
-      assert.isTrue(alerts[0].startsWith('Display Name Rows: 1'));
+      assert.isTrue(alerts[0].startsWith('Display Name rows: 1'));
     }
     liveAnnouncerAlertStub.resetHistory();
     sendKeydown(element, 'ArrowDown');
@@ -213,7 +246,7 @@ describeWithEnvironment('DataGrid', () => {
     // clang-format off
     const alerts = getAlertAnnouncement(element);
     if (alerts.length > 0) {
-        assert.strictEqual(alerts[0], 'Display Name Row  Column 1: Value 3, Column 2: Value 4');
+        assert.strictEqual(alerts[0], 'Display Name row  Column 1: Value 3, Column 2: Value 4');
     }
 
     element = await renderDataGrid(html`
@@ -236,8 +269,8 @@ describeWithEnvironment('DataGrid', () => {
     // clang-format off
     const alerts2 = getAlertAnnouncement(element);
     if (alerts2.length > 0) {
-        const expectedRowData = 'Display Name Row  Column 1: Value 3, Column 2: Value 4';
-        const expectedGridDesc = 'Display Name Rows: 2, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+        const expectedRowData = 'Display Name row  Column 1: Value 3, Column 2: Value 4';
+        const expectedGridDesc = 'Display Name rows: 2, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
         assert.isTrue(alerts2[0] === expectedRowData || alerts2[0] === expectedGridDesc, `Expected alert to be row data or grid description, got: ${alerts2[0]}`);
     }
   });
@@ -373,8 +406,8 @@ describeWithEnvironment('DataGrid', () => {
     sendKeydown(element, 'ArrowDown');
     // It should identify it as a parent and collapsed.
     const alerts = getAlertAnnouncement(element);
-    const expectedRowData = 'level 1, Column 1: Parent Value 1, Column 2: Parent Value 2, collapsed';
-    const expectedGridDesc = 'Display Name Rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+    const expectedRowData = 'Level 1, Column 1: Parent Value 1, Column 2: Parent Value 2, collapsed';
+    const expectedGridDesc = 'Display Name rows: 1, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
     assert.isTrue(alerts[0] === expectedRowData || alerts[0] === expectedGridDesc, `Expected alert to be row data or grid description, got: ${alerts[0]}`);
 
     // Expand parent row.
@@ -383,14 +416,14 @@ describeWithEnvironment('DataGrid', () => {
     await RenderCoordinator.done({waitForWork: true});
     assert.strictEqual(
         getAlertAnnouncement(element)[0],
-        'level 1, Column 1: Parent Value 1, Column 2: Parent Value 2, collapsed');
+        'Level 1, Column 1: Parent Value 1, Column 2: Parent Value 2, collapsed');
 
     // Navigate to child row.
     liveAnnouncerAlertStub.resetHistory();
     sendKeydown(element, 'ArrowDown');
     assert.strictEqual(
         getAlertAnnouncement(element)[0],
-        'level 2, Column 1: Child Value 1, Column 2: Child Value 2');
+        'Level 2, Column 1: Child Value 1, Column 2: Child Value 2');
   });
 
   it('dispatches open event on expanding', async () => {
@@ -473,7 +506,7 @@ describeWithEnvironment('DataGrid', () => {
     sendKeydown(element, 'ArrowDown');
     let alerts = getAlertAnnouncement(element);
     const expectedRowData = 'Column 1: Value C';
-    const expectedGridDesc = 'Display Name Rows: 3, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+    const expectedGridDesc = 'Display Name rows: 3, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
     assert.isTrue(alerts[0] === expectedRowData || alerts[0] === expectedGridDesc, `Expected alert to be row data or grid description, got: ${alerts[0]}`);
     liveAnnouncerAlertStub.resetHistory();
     sendKeydown(element, 'ArrowDown');
@@ -483,6 +516,35 @@ describeWithEnvironment('DataGrid', () => {
     sendKeydown(element, 'ArrowDown');
     alerts = getAlertAnnouncement(element);
     assert.strictEqual(alerts[0], 'Column 1: Value A');
+  });
+
+  it('supports numeric sorting', async () => {
+    const element = await renderDataGrid(html`
+        <devtools-data-grid striped name="Display Name">
+          <table>
+            <tr>
+              <th id="column-1" sortable sort="ascending" type="numeric">Column 1</th>
+            </tr>
+            <tr><td data-value="10">10</td></tr>
+            <tr><td data-value="2">2</td></tr>
+            <tr><td data-value="3">3</td></tr>
+          </table>
+        </devtools-data-grid>`);
+    // After initial render, rows should be sorted ascending numerically by column-1.
+    // So 2, 3, 10 (not 10, 2, 3 which would be string sorting).
+    sendKeydown(element, 'ArrowDown');
+    let alerts = getAlertAnnouncement(element);
+    const expectedRowData = 'Column 1: 2';
+    const expectedGridDesc = 'Display Name rows: 3, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
+    assert.isTrue(alerts[0] === expectedRowData || alerts[0] === expectedGridDesc, `Expected alert to be row data or grid description, got: ${alerts[0]}`);
+    liveAnnouncerAlertStub.resetHistory();
+    sendKeydown(element, 'ArrowDown');
+    alerts = getAlertAnnouncement(element);
+    assert.strictEqual(alerts[0], 'Column 1: 3');
+    liveAnnouncerAlertStub.resetHistory();
+    sendKeydown(element, 'ArrowDown');
+    alerts = getAlertAnnouncement(element);
+    assert.strictEqual(alerts[0], 'Column 1: 10');
   });
 
   it('can be styled with a style tag', async () => {
@@ -520,7 +582,7 @@ describeWithEnvironment('DataGrid', () => {
     sendKeydown(element, 'ArrowDown');
     let alerts = getAlertAnnouncement(element);
     const expectedRowData = 'Column 1: Value 1';
-    const expectedGridDesc = 'Display Name Rows: 2, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.';
+    const expectedGridDesc = 'Display Name rows: 2, use the up and down arrow keys to navigate and interact with the rows of the table; use browse mode to read cell by cell';
     assert.isTrue(alerts[0] === expectedRowData || alerts[0] === expectedGridDesc, `Expected alert to be row data or grid description, got: ${alerts[0]}`);
     liveAnnouncerAlertStub.resetHistory();
     sendKeydown(element, 'ArrowDown');
@@ -547,5 +609,150 @@ describeWithEnvironment('DataGrid', () => {
     sendKeydown(element, 'ArrowDown');
     alerts = getAlertAnnouncement(element);
     assert.strictEqual(alerts[0], 'Column 1: Value 5');
+  });
+
+  describe('deletable attribute', () => {
+    function captureContextMenu(): () => UI.ContextMenu.ContextMenu | null {
+      let capturedMenu: UI.ContextMenu.ContextMenu|null = null;
+      sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').callsFake(function(this: UI.ContextMenu.ContextMenu) {
+        capturedMenu = this;
+        return Promise.resolve();
+      });
+      return () => capturedMenu;
+    }
+
+    async function renderGrid(deletable: boolean, onDelete: () => void): Promise<HTMLElement> {
+      return await renderDataGrid(html`
+          <devtools-data-grid striped name="Display Name" ?deletable=${deletable}>
+            <table>
+              <tr>
+                <th id="column-1">Column 1</th>
+              </tr>
+              <tr @delete=${onDelete}>
+                <td>Value 1</td>
+              </tr>
+            </table>
+          </devtools-data-grid>`);
+    }
+
+    function openContextMenuOnFirstRow(element: HTMLElement): void {
+      const cell = element.shadowRoot!.querySelector('tbody tr:not(.filler-row) td');
+      assert.isNotNull(cell);
+      // `button: 2`, since a context menu with `button: 0` is interpreted as
+      // being invoked through the context menu key on the selected node.
+      cell!.dispatchEvent(
+          new MouseEvent('contextmenu', {bubbles: true, cancelable: true, composed: true, button: 2}));
+    }
+
+    it('adds a delete item to the row context menu and dispatches `delete` on the row', async () => {
+      const onDelete = sinon.stub();
+      const element = await renderGrid(/* deletable=*/ true, onDelete);
+      const getMenu = captureContextMenu();
+
+      openContextMenuOnFirstRow(element);
+
+      const menu = getMenu();
+      assert.isNotNull(menu);
+      const deleteItem = menu!.defaultSection().items.find(item => item.buildDescriptor().label === 'Delete');
+      assert.isDefined(deleteItem);
+
+      menu!.invokeHandler(deleteItem!.id());
+      sinon.assert.calledOnce(onDelete);
+    });
+
+    it('does not add a delete item to the row context menu without the attribute', async () => {
+      const onDelete = sinon.stub();
+      const element = await renderGrid(/* deletable=*/ false, onDelete);
+      const getMenu = captureContextMenu();
+
+      openContextMenuOnFirstRow(element);
+
+      const menu = getMenu();
+      assert.isNotNull(menu);
+      assert.isUndefined(menu!.defaultSection().items.find(item => item.buildDescriptor().label === 'Delete'));
+    });
+
+    it('dispatches `delete` on the row when pressing the Delete key', async () => {
+      const onDelete = sinon.stub();
+      const element = await renderGrid(/* deletable=*/ true, onDelete);
+
+      sendKeydown(element, 'ArrowDown');
+      // The data grid checks `keyCode`, which isn't inferred from `key`.
+      element.focus();
+      getFocusedElement().dispatchEvent(
+          new KeyboardEvent('keydown', {key: 'Delete', keyCode: 46, bubbles: true, composed: true}));
+
+      sinon.assert.calledOnce(onDelete);
+    });
+  });
+
+  describe('column visibility setting', () => {
+    it('restores column visibility from setting on initialization', async () => {
+      const setting = createFakeSetting<Record<string, {visible: boolean}>>(
+          'protocol-monitor-columns',
+          {'column-1': {visible: false}},
+      );
+
+      const element = await renderDataGrid(html`
+          <devtools-data-grid striped name="Display Name" .columnsVisibilitySetting=${setting}>
+            <table>
+              <tr>
+                <th id="column-1" hideable>Column 1</th>
+                <th id="column-2" hideable>Column 2</th>
+              </tr>
+              <tr><td>Value 1</td><td>Value 2</td></tr>
+            </table>
+          </devtools-data-grid>`);
+
+      const shadowRoot = element.shadowRoot;
+      assert.isNotNull(shadowRoot);
+      const dataGridElement = shadowRoot!.querySelector('.data-grid');
+      assert.isNotNull(dataGridElement);
+      // Wait for rendering
+      await RenderCoordinator.done();
+
+      assert.isNull(shadowRoot!.querySelector('th.column-1-column'));
+      assert.isNotNull(shadowRoot!.querySelector('th.column-2-column'));
+    });
+
+    it('updates column settings when columns are toggled', async () => {
+      const setting = createFakeSetting<Record<string, {visible: boolean}>>(
+          'protocol-monitor-columns',
+          {},
+      );
+
+      const element = await renderDataGrid(html`
+          <devtools-data-grid striped name="Display Name" .columnsVisibilitySetting=${setting}>
+            <table>
+              <tr>
+                <th id="column-1" hideable>Column 1</th>
+                <th id="column-2" hideable>Column 2</th>
+              </tr>
+              <tr><td>Value 1</td><td>Value 2</td></tr>
+            </table>
+          </devtools-data-grid>`);
+
+      const shadowRoot = element.shadowRoot;
+      assert.isNotNull(shadowRoot);
+      const thead = shadowRoot!.querySelector('thead');
+      assert.isNotNull(thead);
+
+      let capturedMenu: UI.ContextMenu.ContextMenu|null = null;
+      sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').callsFake(function(this: UI.ContextMenu.ContextMenu) {
+        capturedMenu = this;
+        return Promise.resolve();
+      });
+
+      thead!.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, composed: true}));
+      assert.isNotNull(capturedMenu);
+
+      const menu: UI.ContextMenu.ContextMenu = capturedMenu!;
+      const item1 = menu.defaultSection().items.find(item => item.buildDescriptor().label === 'Column 1');
+      assert.isDefined(item1);
+
+      menu.invokeHandler(item1!.id());
+
+      assert.isFalse(setting.get()['column-1']?.visible);
+    });
   });
 });

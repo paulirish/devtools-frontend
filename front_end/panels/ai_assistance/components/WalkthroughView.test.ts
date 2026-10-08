@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import type * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import {querySelectorErrorOnMissing, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
@@ -74,9 +75,9 @@ describeWithEnvironment('WalkthroughView', () => {
       parts: [{
         type: 'step',
         step: {
-          isLoading: false,
+          state: {type: 'completed'},
           title: 'Test step 1',
-        }
+        },
       }],
     };
     const view = await makeWalkthrough({
@@ -101,21 +102,23 @@ describeWithEnvironment('WalkthroughView', () => {
         {
           type: 'step',
           step: {
-            isLoading: false,
+            state: {type: 'completed'},
             title: 'Normal step',
-          }
+          },
         },
         {
           type: 'step',
           step: {
-            isLoading: false,
-            title: 'Approval step',
-            requestApproval: {
-              description: 'Confirm this action',
-              onAnswer: () => {},
+            state: {
+              type: 'needs_approval',
+              sideEffectDialog: {
+                description: 'Confirm this action',
+                onAnswer: () => {},
+              },
             },
-          }
-        }
+            title: 'Approval step',
+          },
+        },
       ],
     };
     const view = await makeWalkthrough({
@@ -139,21 +142,23 @@ describeWithEnvironment('WalkthroughView', () => {
         {
           type: 'step',
           step: {
-            isLoading: false,
+            state: {type: 'completed'},
             title: 'Analyzing data',
-          }
+          },
         },
         {
           type: 'step',
           step: {
-            isLoading: false,
-            title: 'Running JS',
-            requestApproval: {
-              description: 'Confirm this action',
-              onAnswer: () => {},
+            state: {
+              type: 'needs_approval',
+              sideEffectDialog: {
+                description: 'Confirm this action',
+                onAnswer: () => {},
+              },
             },
-          }
-        }
+            title: 'Running JS',
+          },
+        },
       ],
     };
 
@@ -175,9 +180,9 @@ describeWithEnvironment('WalkthroughView', () => {
       parts: [{
         type: 'step',
         step: {
-          isLoading: false,
+          state: {type: 'completed'},
           title: 'Test step 1',
-        }
+        },
       }],
     };
     const view = await makeWalkthrough({
@@ -202,9 +207,9 @@ describeWithEnvironment('WalkthroughView', () => {
       parts: [{
         type: 'step',
         step: {
-          isLoading: true,
+          state: {type: 'in_progress'},
           title: 'Test step 1',
-        }
+        },
       }],
     };
     const view = await makeWalkthrough({
@@ -230,9 +235,9 @@ describeWithEnvironment('WalkthroughView', () => {
       parts: [{
         type: 'step',
         step: {
-          isLoading: false,
+          state: {type: 'completed'},
           title: 'Test step 1',
-        }
+        },
       }],
     };
     const view = await makeWalkthrough({
@@ -254,7 +259,7 @@ describeWithEnvironment('WalkthroughView', () => {
         {
           type: 'step',
           step: {
-            isLoading: false,
+            state: {type: 'completed'},
             title: 'Step 1',
             widgets: [
               {
@@ -264,10 +269,10 @@ describeWithEnvironment('WalkthroughView', () => {
                   parsedTrace: makeFakeParsedTrace(),
                 },
               } as unknown as AiAssistanceModel.AiAgent.AiWidget,
-            ]
-          }
+            ],
+          },
         },
-        {type: 'step', step: {isLoading: false, title: 'Step 2', widgets: []}}
+        {type: 'step', step: {state: {type: 'completed'}, title: 'Step 2', widgets: []}},
       ],
     };
 
@@ -301,7 +306,7 @@ describeWithEnvironment('WalkthroughView', () => {
       entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
       id: '1',
       parts: [
-        {type: 'step', step: {isLoading: false, title: 'Step 1', widgets: []}},
+        {type: 'step', step: {state: {type: 'completed'}, title: 'Step 1', widgets: []}},
       ],
     };
 
@@ -327,7 +332,7 @@ describeWithEnvironment('WalkthroughView', () => {
 
   describe('walkthrough titles', () => {
     it('returns the correct walkthrough title when not loading', () => {
-      const lastStep = {isLoading: false, title: 'Step 1'};
+      const lastStep: AiAssistance.ChatMessage.Step = {state: {type: 'completed'}, title: 'Step 1'};
       assert.strictEqual(
           AiAssistance.WalkthroughView.walkthroughTitle({
             isLoading: false,
@@ -346,7 +351,7 @@ describeWithEnvironment('WalkthroughView', () => {
     });
 
     it('returns the step title when loading', () => {
-      const lastStep = {isLoading: true, title: 'Investigating...'};
+      const lastStep: AiAssistance.ChatMessage.Step = {state: {type: 'in_progress'}, title: 'Investigating...'};
       assert.strictEqual(
           AiAssistance.WalkthroughView.walkthroughTitle({
             isLoading: true,
@@ -393,7 +398,6 @@ describeWithEnvironment('WalkthroughView', () => {
       Lit.render(
           AiAssistance.ChatMessage.renderStep({
             step,
-            isLoading: false,
             markdownRenderer: new AiAssistance.MarkdownRendererWithCodeBlock(),
             isLast: true,
           }),
@@ -406,29 +410,27 @@ describeWithEnvironment('WalkthroughView', () => {
     }
 
     it('renders pause icon with Paused label', () => {
-      testStepBadge(
-          {
-            isLoading: false,
-            requestApproval: {description: 'Confirm', onAnswer: () => {}},
-          },
-          'Paused', 'pause-circle');
+      testStepBadge({
+        state: {
+          type: 'needs_approval',
+          sideEffectDialog: {description: 'Confirm', onAnswer: () => {}},
+        },
+      },
+                    'Paused', 'pause-circle');
     });
 
     it('renders cross icon with Aborted label when canceled', () => {
-      testStepBadge(
-          {
-            isLoading: false,
-            canceled: true,
-          },
-          'Aborted', 'cross');
+      testStepBadge({
+        state: {type: 'canceled'},
+      },
+                    'Aborted', 'cross');
     });
 
     it('renders checkmark icon with Completed label', () => {
-      testStepBadge(
-          {
-            isLoading: false,
-          },
-          'Completed', 'checkmark');
+      testStepBadge({
+        state: {type: 'completed'},
+      },
+                    'Completed', 'checkmark');
     });
   });
 });

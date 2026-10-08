@@ -23,48 +23,48 @@ const {Direction} = TextEditor.TextEditorHistory;
 
 const UIStrings = {
   /**
-   * @description Screen reader label for a select box that chooses the breakpoint type in the Sources panel when editing a breakpoint
+   * @description Screen reader label for a select box that chooses the breakpoint type in the Sources panel when editing a breakpoint.
    */
   breakpointType: 'Breakpoint type',
   /**
-   * @description Text in Breakpoint Edit Dialog of the Sources panel
+   * @description Text in Breakpoint edit dialog of the Sources panel.
    */
   breakpoint: 'Breakpoint',
   /**
-   * @description Tooltip text in Breakpoint Edit Dialog of the Sources panel that shows up when hovering over the close icon
+   * @description Tooltip text in Breakpoint edit dialog of the Sources panel that shows up when hovering over the close icon.
    */
   closeDialog: 'Close edit dialog and save changes',
   /**
-   * @description Text in Breakpoint Edit Dialog of the Sources panel
+   * @description Text in Breakpoint edit dialog of the Sources panel.
    */
   conditionalBreakpoint: 'Conditional breakpoint',
   /**
-   * @description Text in Breakpoint Edit Dialog of the Sources panel
+   * @description Text in Breakpoint edit dialog of the Sources panel.
    */
   logpoint: 'Logpoint',
   /**
-   * @description Text in Breakpoint Edit Dialog of the Sources panel
+   * @description Text in Breakpoint edit dialog of the Sources panel.
    */
   expressionToCheckBeforePausingEg: 'Expression to check before pausing, e.g. x > 5',
   /**
-   * @description Type selector element title in Breakpoint Edit Dialog of the Sources panel
+   * @description Type selector element title in Breakpoint edit dialog of the Sources panel.
    */
   pauseOnlyWhenTheConditionIsTrue: 'Pause only when the condition is true',
   /**
-   * @description Link text in the Breakpoint Edit Dialog of the Sources panel
+   * @description Link text in the Breakpoint edit dialog of the Sources panel.
    */
-  learnMoreOnBreakpointTypes: 'Learn more: Breakpoint Types',
+  learnMoreOnBreakpointTypes: 'Learn more: Breakpoint types',
   /**
-   * @description Text in Breakpoint Edit Dialog of the Sources panel. It is used as
-   *the placeholder for a text input field before the user enters text. Provides the user with
-   *an example on how to use Logpoints. 'Log' is a verb and 'message' is a noun.
-   *See: https://developer.chrome.com/blog/new-in-devtools-73/#logpoints
+   * @description Text in Breakpoint edit dialog of the Sources panel. It is used as
+   * the placeholder for a text input field before the user enters text. Provides the user with
+   * an example on how to use Logpoints. 'Log' is a verb and 'message' is a noun.
+   * See: https://developer.chrome.com/blog/new-in-devtools-73/#logpoints
    */
   logMessageEgXIsX: 'Log message, e.g. `\'x is\', x`',
   /**
-   * @description Type selector element title in Breakpoint Edit Dialog of the Sources panel
+   * @description Type selector element title in Breakpoint edit dialog of the Sources panel.
    */
-  logAMessageToConsoleDoNotBreak: 'Log a message to Console, do not break',
+  logAMessageToConsoleDoNotBreak: 'Log a message to Console, don’t break',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/BreakpointEditDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -161,10 +161,11 @@ export class BreakpointEditDialog extends UI.Widget.Widget {
   #breakpointType: SDK.DebuggerModel.BreakpointType.LOGPOINT|SDK.DebuggerModel.BreakpointType.CONDITIONAL_BREAKPOINT =
       SDK.DebuggerModel.BreakpointType.CONDITIONAL_BREAKPOINT;
   #onFinish: (result: BreakpointEditDialogResult) => void = () => {};
+  #location?: () => Promise<SDK.DebuggerModel.Location|null>;
   #editor?: TextEditor.TextEditor.TextEditor;
   #state?: CodeMirror.EditorState;
 
-  constructor(target?: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(target?: HTMLElement, view: View = DEFAULT_VIEW) {
     super({
       jslog: `${VisualLogging.dialog('edit-breakpoint')}`,
       useShadowDom: true,
@@ -207,6 +208,13 @@ export class BreakpointEditDialog extends UI.Widget.Widget {
     this.#onFinish = onFinish;
     this.requestUpdate();
   }
+  get location(): (() => Promise<SDK.DebuggerModel.Location|null>)|undefined {
+    return this.#location;
+  }
+  set location(location: (() => Promise<SDK.DebuggerModel.Location|null>)|undefined) {
+    this.#location = location;
+    this.requestUpdate();
+  }
 
   override focus(): void {
     void this.updateComplete.then(() => {
@@ -229,7 +237,7 @@ export class BreakpointEditDialog extends UI.Widget.Widget {
       },
       set editor(editor) {
         that.#editor = editor;
-      }
+      },
     };
     this.#view(input, output, this.contentElement);
   }
@@ -279,10 +287,13 @@ export class BreakpointEditDialog extends UI.Widget.Widget {
         run: () => {
           this.finishEditing(false, '');
           return true;
-        }
+        },
       },
     ];
 
+    const completionOptions: TextEditor.JavaScript.CompletionOptions = {
+      location: () => this.#location ? this.#location() : Promise.resolve(null),
+    };
     const editorConfig = [
       CodeMirror.javascript.javascriptLanguage,
       TextEditor.Config.baseConfiguration(this.oldCondition),
@@ -292,8 +303,9 @@ export class BreakpointEditDialog extends UI.Widget.Widget {
       TextEditor.Config.showCompletionHint,
       TextEditor.Config.conservativeCompletion,
       CodeMirror.javascript.javascriptLanguage.data.of({autocomplete}),
+      TextEditor.JavaScript.completion(completionOptions),
       CodeMirror.autocompletion(),
-      TextEditor.JavaScript.argumentHints(),
+      TextEditor.JavaScript.argumentHints(completionOptions),
     ];
 
     this.#state = CodeMirror.EditorState.create({

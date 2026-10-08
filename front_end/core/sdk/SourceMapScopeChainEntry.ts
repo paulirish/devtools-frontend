@@ -8,7 +8,7 @@ import * as i18n from '../i18n/i18n.js';
 
 import type {CallFrame, LocationRange, ScopeChainEntry} from './DebuggerModel.js';
 import {type GetPropertiesResult, type RemoteObject, RemoteObjectImpl, RemoteObjectProperty} from './RemoteObject.js';
-import {contains} from './SourceMapScopesInfo.js';
+import {findExpression, scriptRelativePosition} from './SourceMapScopesInfo.js';
 
 const UIStrings = {
   /**
@@ -16,7 +16,7 @@ const UIStrings = {
    */
   local: 'Local',
   /**
-   * @description Text that refers to closure as a programming term
+   * @description Text that refers to closure as a programming term.
    */
   closure: 'Closure',
   /**
@@ -28,7 +28,11 @@ const UIStrings = {
    */
   global: 'Global',
   /**
-   * @description Text in Scope Chain Sidebar Pane of the Sources panel
+   * @description Text in Scope Chain section of the Sources panel.
+   */
+  exception: 'Exception',
+  /**
+   * @description Text in Scope Chain section of the Sources panel.
    */
   returnValue: 'Return value',
 } as const;
@@ -41,28 +45,42 @@ export class SourceMapScopeChainEntry implements ScopeChainEntry {
   readonly #range?: ScopesCodec.GeneratedRange;
   readonly #isInnerMostFunction: boolean;
   readonly #returnValue?: RemoteObject;
+  readonly #scopeNumber?: number;
+  #object?: SourceMapScopeRemoteObject;
 
   /**
    * @param isInnerMostFunction If `scope` is the innermost 'function' scope. Only used for labeling as we name the
    * scope of the paused function 'Local', while other outer 'function' scopes are named 'Closure'.
+   * @param scopeNumber The V8 scope in which `scope`s binding expressions must be evaluated. Defaults to the
+   * inner-most scope.
    */
-  constructor(
-      callFrame: CallFrame, scope: ScopesCodec.OriginalScope, range: ScopesCodec.GeneratedRange|undefined,
-      isInnerMostFunction: boolean, returnValue: RemoteObject|undefined) {
+  constructor(callFrame: CallFrame, scope: ScopesCodec.OriginalScope, range: ScopesCodec.GeneratedRange|undefined,
+              isInnerMostFunction: boolean, returnValue: RemoteObject|undefined, scopeNumber?: number) {
     this.#callFrame = callFrame;
     this.#scope = scope;
     this.#range = range;
     this.#isInnerMostFunction = isInnerMostFunction;
     this.#returnValue = returnValue;
+    this.#scopeNumber = scopeNumber;
+  }
+
+  originalScope(): ScopesCodec.OriginalScope {
+    return this.#scope;
   }
 
   extraProperties(): RemoteObjectProperty[] {
-    if (this.#returnValue) {
-      return [new RemoteObjectProperty(
-          i18nString(UIStrings.returnValue), this.#returnValue, undefined, undefined, undefined, undefined, undefined,
-          /* synthetic */ true)];
+    const extraProperties = [];
+    if (this.#isInnerMostFunction && this.#callFrame.exception) {
+      extraProperties.push(new RemoteObjectProperty(i18nString(UIStrings.exception), this.#callFrame.exception,
+                                                    undefined, undefined, undefined, undefined, undefined,
+                                                    /* synthetic */ true));
     }
-    return [];
+    if (this.#returnValue) {
+      extraProperties.push(new RemoteObjectProperty(
+          i18nString(UIStrings.returnValue), this.#returnValue, undefined, undefined, undefined, undefined, undefined,
+          /* synthetic */ true, this.#callFrame.setReturnValue.bind(this.#callFrame)));
+    }
+    return extraProperties;
   }
 
   callFrame(): CallFrame {
@@ -70,11 +88,13 @@ export class SourceMapScopeChainEntry implements ScopeChainEntry {
   }
 
   type(): string {
-    switch (this.#scope.kind) {
+    if (this.#scope.isStackFrame) {
+      return this.#isInnerMostFunction ? Protocol.Debugger.ScopeType.Local : Protocol.Debugger.ScopeType.Closure;
+    }
+    // `kind` is a free-form label. The spec encourages 'Global'/'Block' but doesn't mandate the casing.
+    switch (this.#scope.kind?.toLowerCase()) {
       case 'global':
         return Protocol.Debugger.ScopeType.Global;
-      case 'function':
-        return this.#isInnerMostFunction ? Protocol.Debugger.ScopeType.Local : Protocol.Debugger.ScopeType.Closure;
       case 'block':
         return Protocol.Debugger.ScopeType.Block;
     }
@@ -82,11 +102,12 @@ export class SourceMapScopeChainEntry implements ScopeChainEntry {
   }
 
   typeName(): string {
-    switch (this.#scope.kind) {
+    if (this.#scope.isStackFrame) {
+      return this.#isInnerMostFunction ? i18nString(UIStrings.local) : i18nString(UIStrings.closure);
+    }
+    switch (this.#scope.kind?.toLowerCase()) {
       case 'global':
         return i18nString(UIStrings.global);
-      case 'function':
-        return this.#isInnerMostFunction ? i18nString(UIStrings.local) : i18nString(UIStrings.closure);
       case 'block':
         return i18nString(UIStrings.block);
     }
@@ -102,7 +123,10 @@ export class SourceMapScopeChainEntry implements ScopeChainEntry {
   }
 
   object(): RemoteObject {
-    return new SourceMapScopeRemoteObject(this.#callFrame, this.#scope, this.#range);
+    if (!this.#object) {
+      this.#object = new SourceMapScopeRemoteObject(this.#callFrame, this.#scope, this.#range, this.#scopeNumber);
+    }
+    return this.#object;
   }
 
   description(): string {
@@ -118,72 +142,134 @@ class SourceMapScopeRemoteObject extends RemoteObjectImpl {
   readonly #callFrame: CallFrame;
   readonly #scope: ScopesCodec.OriginalScope;
   readonly #range?: ScopesCodec.GeneratedRange;
+  readonly #scopeNumber?: number;
+  #propertiesPromise?: Promise<GetPropertiesResult>;
+  #cachedWithPreview = false;
 
-  constructor(callFrame: CallFrame, scope: ScopesCodec.OriginalScope, range: ScopesCodec.GeneratedRange|undefined) {
+  constructor(callFrame: CallFrame, scope: ScopesCodec.OriginalScope, range: ScopesCodec.GeneratedRange|undefined,
+              scopeNumber: number|undefined) {
     super(
         callFrame.debuggerModel.runtimeModel(), /* objectId */ undefined, 'object', /* sub type */ undefined,
         /* value */ null);
     this.#callFrame = callFrame;
     this.#scope = scope;
     this.#range = range;
+    this.#scopeNumber = scopeNumber;
   }
 
-  override async doGetProperties(_ownProperties: boolean, accessorPropertiesOnly: boolean, generatePreview: boolean):
-      Promise<GetPropertiesResult> {
+  override async doGetProperties(_ownProperties: boolean, accessorPropertiesOnly: boolean,
+                                 _nonIndexedPropertiesOnly: boolean,
+                                 generatePreview: boolean): Promise<GetPropertiesResult> {
     if (accessorPropertiesOnly) {
       return {properties: [], internalProperties: []};
     }
-
-    const properties: RemoteObjectProperty[] = [];
-    for (const [index, variable] of this.#scope.variables.entries()) {
-      const expression = this.#findExpression(index);
-      if (expression === null) {
-        properties.push(SourceMapScopeRemoteObject.#unavailableProperty(variable));
-        continue;
-      }
-
-      // TODO(crbug.com/40277685): Once we can evaluate expressions in scopes other than the innermost one,
-      //         we need to find the find the CDP scope that matches `this.#range` and evaluate in that.
-      const result = await this.#callFrame.evaluate({expression, generatePreview});
-      if ('error' in result || result.exceptionDetails) {
-        // TODO(crbug.com/40277685): Make these errors user-visible to aid tooling developers.
-        //         E.g. show the error on hover or expose it in the developer resources panel.
-        properties.push(SourceMapScopeRemoteObject.#unavailableProperty(variable));
-      } else {
-        properties.push(new RemoteObjectProperty(
-            variable, result.object, /* enumerable */ false, /* writable */ false, /* isOwn */ true,
-            /* wasThrown */ false));
-      }
+    if (!this.#propertiesPromise || (generatePreview && !this.#cachedWithPreview)) {
+      this.#cachedWithPreview = generatePreview;
+      this.#propertiesPromise = this.#evaluateProperties(generatePreview);
     }
+    return await this.#propertiesPromise;
+  }
+
+  async #evaluateProperties(generatePreview: boolean): Promise<GetPropertiesResult> {
+    if (this.#scope.variables.length === 0) {
+      return {properties: [], internalProperties: []};
+    }
+    const expressions = this.#scope.variables.map((_, index) => this.#findExpression(index));
+    const values = await this.#evaluateAsBatch(expressions, generatePreview) ??
+        await this.#evaluateSeparately(expressions, generatePreview);
+
+    const properties = this.#scope.variables.map((variable, index) => {
+      const value = values[index];
+      if (value === null) {
+        return SourceMapScopeRemoteObject.#unavailableProperty(variable);
+      }
+      return new RemoteObjectProperty(variable, value, /* enumerable */ true, /* writable */ false, /* isOwn */ true,
+                                      /* wasThrown */ false);
+    });
 
     return {properties, internalProperties: []};
   }
 
-  /** @returns null if the variable is unavailable at the current paused location */
-  #findExpression(index: number): string|null {
-    if (!this.#range) {
-      return null;
-    }
-
-    const expressionOrSubRanges = this.#range.values[index];
-    if (typeof expressionOrSubRanges === 'string') {
-      return expressionOrSubRanges;
-    }
-    if (expressionOrSubRanges === null) {
-      return null;
-    }
-
-    const pausedPosition = this.#callFrame.location();
-    for (const range of expressionOrSubRanges) {
-      if (contains({start: range.from, end: range.to}, pausedPosition.lineNumber, pausedPosition.columnNumber)) {
-        return range.value ?? null;
+  /**
+   * Evaluates all binding expressions of this scope with a single `evaluateOnCallFrame` call.
+   *
+   * We build an object literal that spreads in one `{index: value}` object per binding, each produced by
+   * its own arrow function wrapped in `try`/`catch`. A binding that throws contributes nothing, which is
+   * how we tell it apart from one that legitimately evaluates to `undefined`, and it doesn't take the
+   * rest of the scope down with it.
+   *
+   * The expressions are inlined rather than passed to `eval`. `eval` in the evaluated code is the page's
+   * `eval`, which a `script-src` CSP without `'unsafe-eval'` blocks. `Runtime.evaluate` can opt out of
+   * that via `allowUnsafeEvalBlockedByCSP`, but `Debugger.evaluateOnCallFrame` has no such option.
+   * Inlining also means we don't introduce bindings of our own that could shadow the names a binding
+   * expression refers to, and arrow functions keep `this` pointing at the paused frame's receiver.
+   *
+   * @returns The value for each expression, or null if the batch failed as a whole. The latter happens
+   *          when a binding expression doesn't parse, since that takes out the entire object literal.
+   */
+  async #evaluateAsBatch(expressions: Array<string|null>,
+                         generatePreview: boolean): Promise<Array<RemoteObject|null>|null> {
+    const spreads: string[] = [];
+    for (const [index, expression] of expressions.entries()) {
+      if (expression !== null) {
+        spreads.push(`...(() => { try { return {${index}: (${expression})}; } catch {} })()`);
       }
     }
-    return null;
+    if (spreads.length === 0) {
+      return expressions.map(() => null);
+    }
+
+    const result = await this.#callFrame.evaluate({
+      expression: `({__proto__: null, ${spreads.join(', ')}})`,
+      // The wrapper object is a throw-away. We only need previews for the values inside of it.
+      generatePreview: false,
+      scopeNumber: this.#scopeNumber,
+    });
+    if ('error' in result || result.exceptionDetails || !result.object) {
+      return null;
+    }
+
+    const {properties} = await result.object.getOwnProperties(generatePreview);
+    result.object.release();
+
+    const valueByIndex = new Map(properties?.map(({name, value}) => [name, value] as const));
+    return expressions.map((_, index) => valueByIndex.get(String(index)) ?? null);
+  }
+
+  /**
+   * Fallback for when {@link #evaluateAsBatch} fails as a whole, so that a single binding expression
+   * that doesn't parse only costs us that one variable.
+   */
+  async #evaluateSeparately(expressions: Array<string|null>,
+                            generatePreview: boolean): Promise<Array<RemoteObject|null>> {
+    const values: Array<RemoteObject|null> = [];
+    for (const expression of expressions) {
+      if (expression === null) {
+        values.push(null);
+        continue;
+      }
+
+      const result = await this.#callFrame.evaluate({expression, generatePreview, scopeNumber: this.#scopeNumber});
+      if ('error' in result || result.exceptionDetails) {
+        // TODO(crbug.com/40277685): Make these errors user-visible to aid tooling developers.
+        //         E.g. show the error on hover or expose it in the developer resources panel.
+        values.push(null);
+      } else {
+        values.push(result.object);
+      }
+    }
+    return values;
+  }
+
+  /** @returns null if the variable is unavailable at the current paused location */
+  #findExpression(index: number): string|null {
+    const pausedLocation = this.#callFrame.location();
+    const pausedPosition = pausedLocation ? scriptRelativePosition(pausedLocation) : undefined;
+    return findExpression(this.#range, index, pausedPosition?.line, pausedPosition?.column);
   }
 
   static #unavailableProperty(name: string): RemoteObjectProperty {
-    return new RemoteObjectProperty(
-        name, null, /* enumerable */ false, /* writeable */ false, /* isOwn */ true, /* wasThrown */ false);
+    return new RemoteObjectProperty(name, null, /* enumerable */ true, /* writeable */ false, /* isOwn */ true,
+                                    /* wasThrown */ false);
   }
 }

@@ -1,0 +1,55 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/ninja/devtools_entrypoint.gni")
+import("../../../scripts/build/ninja/devtools_module.gni")
+import("../../visibility.gni")
+
+devtools_ui_module("comments") {
+  sources = [
+    "CommentAnchorResolver.ts",
+    "CommentOverlayManager.ts",
+  ]
+
+  ts_deps = [
+    "../../core/common:bundle",
+    "../../models/comment_manager:bundle",
+    "../../third_party/codemirror.next:bundle",
+    "../../ui/visual_logging:bundle",
+  ]
+}
+
+devtools_entrypoint("bundle") {
+  entrypoint = "comments.ts"
+
+  ts_deps = [ ":comments" ]
+
+  visibility = [
+    ":*",
+    "../../entrypoints/main/*",
+    "../../panels/*",
+    "../../testing/*",
+    "../components/*",
+    "../legacy/*",
+  ]
+
+  visibility += devtools_visibility
+}
+
+devtools_ui_module("unittests") {
+  testonly = true
+
+  sources = [
+    "CommentAnchorResolver.test.ts",
+    "CommentOverlayManager.test.ts",
+  ]
+
+  ts_deps = [
+    ":bundle",
+    "../../models/comment_manager:bundle",
+    "../../testing",
+    "../../third_party/codemirror.next:bundle",
+    "../components/text_editor:bundle",
+  ]
+}

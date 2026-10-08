@@ -10,6 +10,7 @@ import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 import type * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import type {TemplateResult} from '../../ui/lit/lit.js';
 
 let colorGeneratorInstance: Common.Color.Generator|null = null;
 
@@ -82,7 +83,7 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
     throw new Error('Not implemented');
   }
 
-  preparePopoverElement(_entryIndex: number): Element|null {
+  preparePopoverElement(_entryIndex: number): Element|TemplateResult|null {
     throw new Error('Not implemented');
   }
 
@@ -130,9 +131,12 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
   }
 }
 
-export class ProfileFlameChart extends
-    Common.ObjectWrapper.eventMixin<PerfUI.FlameChart.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
-        implements UI.SearchableView.Searchable {
+const ProfileFlameChartBase: Common.ObjectWrapper.EventMixin<PerfUI.FlameChart.EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class ProfileFlameChart extends ProfileFlameChartBase implements UI.SearchableView.Searchable {
   readonly searchableView: UI.SearchableView.SearchableView;
   readonly overviewPane: OverviewPane;
   readonly mainPane: PerfUI.FlameChart.FlameChart;
@@ -141,8 +145,9 @@ export class ProfileFlameChart extends
   searchResults: number[];
   searchResultIndex = -1;
 
-  constructor(searchableView: UI.SearchableView.SearchableView, dataProvider: ProfileFlameChartDataProvider) {
-    super();
+  constructor(searchableView: UI.SearchableView.SearchableView, dataProvider: ProfileFlameChartDataProvider,
+              element?: HTMLElement) {
+    super(element);
     this.element.id = 'cpu-flame-chart';
 
     this.searchableView = searchableView;
@@ -172,8 +177,18 @@ export class ProfileFlameChart extends
     this.mainPane.setWindowTimes(windowLeft, windowRight, /* animate */ true);
   }
 
-  selectRange(timeLeft: number, timeRight: number): void {
-    this.overviewPane.selectRange(timeLeft, timeRight);
+  get range(): {left: number, right: number}|undefined {
+    return {
+      left: this.overviewPane.windowTimeLeft ?? 0,
+      right: this.overviewPane.windowTimeRight ?? 0,
+    };
+  }
+
+  set range(limits: {left: number, right: number}|undefined) {
+    if (!limits) {
+      return;
+    }
+    this.overviewPane.selectRange(limits.left, limits.right);
   }
 
   onEntrySelected(event: Common.EventTarget.EventTargetEvent<void|number>): void {
@@ -299,8 +314,12 @@ export class OverviewCalculator implements NetworkTimeCalculator.Calculator {
   }
 }
 
-export class OverviewPane extends Common.ObjectWrapper.eventMixin<OverviewPaneEventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements PerfUI.FlameChart.FlameChartDelegate {
+const OverviewPaneBase: Common.ObjectWrapper.EventMixin<OverviewPaneEventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class OverviewPane extends OverviewPaneBase implements PerfUI.FlameChart.FlameChartDelegate {
   overviewContainer: HTMLElement;
   readonly overviewCalculator: OverviewCalculator;
   readonly overviewGrid: PerfUI.OverviewGrid.OverviewGrid;

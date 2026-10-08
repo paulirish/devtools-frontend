@@ -22,28 +22,26 @@ devtools_ui_module("color_picker") {
     "Spectrum.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../../core/common:bundle",
     "../../../../core/host:bundle",
     "../../../../core/i18n:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/sdk:bundle",
-    "../../../../models/text_utils:bundle",
+    "../../../../core/text_utils:bundle",
     "../../../../ui/components/srgb_overlay:bundle",
     "../../../../ui/kit:bundle",
     "../../../../ui/legacy:bundle",
     "../../../../ui/visual_logging:bundle",
     "../../../helpers:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "color_picker.ts"
 
-  deps = [
-    ":color_picker",
-    ":css_files",
-  ]
+  ts_deps = [ ":color_picker" ]
 
   visibility = [
     # IMPORTANT: Be careful when extending visibility of front_end/ui/legacy/*,
@@ -67,11 +65,11 @@ devtools_ui_module("unittests") {
     "Spectrum.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../../core/common:bundle",
     "../../../../core/sdk:bundle",
-    "../../../../models/text_utils:bundle",
+    "../../../../core/text_utils:bundle",
     "../../../../testing",
     "../../../legacy:bundle",
   ]

@@ -10,8 +10,8 @@ import {
   record,
   stopRecording,
 } from '../helpers/recorder-helpers.js';
-import type {DevToolsPage} from '../shared/frontend-helper.js';
-import type {InspectedPage} from '../shared/target-helper.js';
+import type {DevToolsPage} from '../shared/DevToolsPage.js';
+import type {InspectedPage} from '../shared/InspectedPage.js';
 
 describe('Recorder', function() {
   if (this.timeout() !== 0) {
@@ -41,8 +41,8 @@ describe('Recorder', function() {
           })
         })();
       `);
-      await enableAndOpenRecorderPanel('recorder/recorder.html', devToolsPage, inspectedPage);
-      await createAndStartRecording('Test', undefined, devToolsPage);
+      await enableAndOpenRecorderPanel(devToolsPage, inspectedPage, 'recorder/recorder.html');
+      await createAndStartRecording(devToolsPage, 'Test', undefined);
       await record(devToolsPage, inspectedPage);
       await stopRecording(devToolsPage);
     }

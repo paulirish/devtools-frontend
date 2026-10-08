@@ -10,7 +10,8 @@ ts_e2e_library("quick_open") {
     "with_experiment.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
+    "../../shared",
     "../helpers",
     "../shared",
   ]

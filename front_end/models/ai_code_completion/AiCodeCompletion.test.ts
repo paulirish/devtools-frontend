@@ -3,37 +3,29 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Host from '../../core/host/host.js';
-import {
-  describeWithEnvironment,
-  updateHostConfig,
-} from '../../testing/EnvironmentHelpers.js';
-import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
 
 import * as AiCodeCompletion from './ai_code_completion.js';
 
 const DEFAULT_CURSOR_POSITION = 0;
 
-function createCallbacks(editor: TextEditor.TextEditor.TextEditor): AiCodeCompletion.AiCodeCompletion.Callbacks {
+function createCallbacks(): AiCodeCompletion.AiCodeCompletion.Callbacks {
   return {
-    getSelectionHead: () => editor.editor.state.selection.main.head,
-    getCompletionHint: () => editor.editor.plugin(TextEditor.Config.showCompletionHint)?.currentHint,
-    setAiAutoCompletion: (args: {
-      text: string,
-      from: number,
-      startTime: number,
-      onImpression: (rpcGlobalId: Host.AidaClient.RpcGlobalId, latency: number, sampleId?: number) => void,
-      clearCachedRequest: () => void,
-      rpcGlobalId?: Host.AidaClient.RpcGlobalId,
-      sampleId?: number,
-    }|null) => editor.dispatch({
-      effects: TextEditor.Config.setAiAutoCompleteSuggestion.of(args as unknown as TextEditor.Config.ActiveSuggestion)
-    }),
+    getSelectionHead: () => 0,
+    getCompletionHint: () => null,
+    setAiAutoCompletion: () => {},
   };
 }
 
-describeWithEnvironment('AiCodeCompletion', () => {
+describe('AiCodeCompletion', () => {
+  setupLocaleHooks();
+  setupRuntimeHooks();
+
   let clock: sinon.SinonFakeTimers;
 
   beforeEach(() => {
@@ -70,8 +62,7 @@ describeWithEnvironment('AiCodeCompletion', () => {
     });
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
         ['\n'],
     );
 
@@ -107,8 +98,7 @@ describeWithEnvironment('AiCodeCompletion', () => {
     });
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
     );
 
     await aiCodeCompletion.completeCode('prefix', 'suffix', DEFAULT_CURSOR_POSITION);
@@ -130,8 +120,7 @@ describeWithEnvironment('AiCodeCompletion', () => {
     });
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
     );
 
     await aiCodeCompletion.completeCode('prefix', 'suffix', DEFAULT_CURSOR_POSITION);
@@ -153,8 +142,7 @@ describeWithEnvironment('AiCodeCompletion', () => {
     });
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
     );
 
     await aiCodeCompletion.completeCode('prefix', 'suffix', DEFAULT_CURSOR_POSITION);
@@ -167,8 +155,7 @@ describeWithEnvironment('AiCodeCompletion', () => {
     const mockAidaClient = sinon.createStubInstance(Host.AidaClient.AidaClient);
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient, serverSideLoggingEnabled: false},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
     );
 
     const response = await aiCodeCompletion.completeCode('ab', 'cd', DEFAULT_CURSOR_POSITION);
@@ -186,14 +173,13 @@ describeWithEnvironment('AiCodeCompletion', () => {
         sampleId: 1,
         score: 1,
       }],
-      metadata: {}
+      metadata: {},
     };
     mockAidaClient.completeCode.onSecondCall().resolves(nonEmptyResponse);
 
     const aiCodeCompletion = new AiCodeCompletion.AiCodeCompletion.AiCodeCompletion(
         {aidaClient: mockAidaClient, serverSideLoggingEnabled: false},
-        AiCodeCompletion.AiCodeCompletion.ContextFlavor.CONSOLE,
-        createCallbacks(sinon.createStubInstance(TextEditor.TextEditor.TextEditor)),
+        createCallbacks(),
     );
 
     await aiCodeCompletion.completeCode('prefix', 'suffix', DEFAULT_CURSOR_POSITION);

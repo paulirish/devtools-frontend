@@ -3,17 +3,24 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../core/host/host.js';
-import type {UrlString} from '../../../core/platform/DevToolsPath.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
-import type * as SDK from '../../../core/sdk/sdk.js';
+import * as SDK from '../../../core/sdk/sdk.js';
+import type * as TextUtils from '../../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
-import type * as TextUtils from '../../text_utils/text_utils.js';
 import type * as Trace from '../../trace/trace.js';
 import type * as Workspace from '../../workspace/workspace.js';
-import {areOriginsEquivalent, extractContextOrigin, isOpaqueOrigin} from '../AiOrigins.js';
 import {debugLog, isStructuredLogEnabled} from '../debug.js';
+import {dispatchAiAssistanceDoneEvent} from '../DOMHelpers.js';
+import {
+  type ContextHandlerResult,
+  type DataHandlerResult,
+  PermissionDecision,
+  type PermissionPrompt,
+} from '../tools/Tool.js';
 
+type UrlString = Platform.DevToolsPath.UrlString;
 const MAX_SUGGESTION_LENGTH = 200;
 
 export const enum ResponseType {
@@ -27,7 +34,7 @@ export const enum ResponseType {
   ERROR = 'error',
   QUERYING = 'querying',
   USER_QUERY = 'user-query',
-  CONTEXT_CHANGE = 'context-change'
+  CONTEXT_CHANGE = 'context-change',
 }
 
 export const enum ErrorType {
@@ -35,7 +42,9 @@ export const enum ErrorType {
   ABORT = 'abort',
   MAX_STEPS = 'max-steps',
   BLOCK = 'block',
-  CROSS_ORIGIN = 'cross-origin'
+  CROSS_ORIGIN = 'cross-origin',
+  QUOTA = 'quota',
+  PAYLOAD_TOO_LARGE = 'payload-too-large',
 }
 
 export const enum MultimodalInputType {
@@ -96,7 +105,9 @@ export interface SideEffectResponse {
   type: ResponseType.SIDE_EFFECT;
   description: string|null;
   code?: string;
-  confirm: (confirm: boolean) => void;
+  confirm: (decision: PermissionDecision) => void;
+  permissionPrompt?: PermissionPrompt;
+  permissionTitle?: string;
 }
 export interface ContextChangeResponse {
   type: ResponseType.CONTEXT_CHANGE;
@@ -118,6 +129,10 @@ export interface ActionResponse {
   output?: string;
   canceled: boolean;
   widgets?: AiWidget[];
+  /**
+   * The name of the executed tool. Only populated for AI v2.
+   */
+  toolName?: string;
 }
 
 export interface QueryingResponse {
@@ -150,20 +165,21 @@ export interface RequestOptions {
 }
 
 export type AllowedOriginResult = {
-  origin: string|undefined,
+  origin: SDK.SecurityOrigin.SecurityOrigin|undefined,
 }|{
   blocked: true,
 };
 
 export interface AgentOptions {
   aidaClient: Host.AidaClient.AidaClient;
-  serverSideLoggingEnabled?: boolean;
+  serverSideLoggingAllowed?: boolean;
   sessionId?: string;
   confirmSideEffectForTest?: typeof Promise.withResolvers;
   onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
   history?: Host.AidaClient.Content[];
   allowedOrigin?: () => AllowedOriginResult;
   lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  targetManager?: SDK.TargetManager.TargetManager;
 }
 
 export interface ParsedAnswer {
@@ -173,7 +189,7 @@ export interface ParsedAnswer {
 
 export type ParsedResponse = ParsedAnswer;
 
-export const MAX_STEPS = 10;
+export const MAX_STEPS = 20;
 
 export interface ConversationSuggestion {
   title: string;
@@ -183,36 +199,59 @@ export interface ConversationSuggestion {
 /** At least one. */
 export type ConversationSuggestions = [ConversationSuggestion, ...ConversationSuggestion[]];
 
+export type ConversationContextJslog = 'ai-context-dom-node'|'ai-context-network-request'|'ai-context-file'|
+    'ai-context-performance-trace'|'ai-context-accessibility'|'ai-context-storage';
+
 export abstract class ConversationContext<T> {
-  abstract getURL(): string;
+  abstract readonly jslogContext: ConversationContextJslog;
   abstract getItem(): T;
   abstract getTitle(): string;
 
-  getOrigin(): string {
-    return extractContextOrigin(this.getURL());
+  /**
+   * Returns true if the server-side logging is enabled when this context is active.
+   * Currently only used for AI v2.
+   */
+  isLoggingEnabled(): boolean {
+    return true;
   }
 
   /**
-   * Returns true if this data context (e.g., a DOM node or Network Request) is
-   * allowed to be included in a conversation that is locked to the provided
-   * `establishedOrigin`.
+   * Returns the security origin that owns this context data.
    *
-   * A conversation is "locked" to an origin once the first query is made.
-   * This method ensures that we don't mix data from different origins in the
-   * same conversation.
+   * The AI Assistance panel locks each conversation to the origin of the initial
+   * context. If the user selects a context with a different origin, DevTools
+   * blocks access to prevent unauthorized cross-origin data exposure.
    *
-   * @param establishedOrigin The origin that the current conversation is locked to.
-   * If undefined, the conversation has not yet been locked to an origin.
+   * Subclasses must implement this method. If a context is detached, invalid,
+   * or anonymous, the method must return a unique opaque origin
+   * (`SDK.SecurityOrigin.SecurityOrigin.createUniqueOpaque()`).
+   *
+   * @returns The {@link SDK.SecurityOrigin.SecurityOrigin} that owns this context.
    */
-  isOriginAllowed(establishedOrigin: string|undefined): boolean {
+  abstract getOrigin(): SDK.SecurityOrigin.SecurityOrigin;
+
+  /**
+   * Checks whether this context can participate in a conversation locked to `establishedOrigin`.
+   *
+   * Evaluation rules:
+   * 1. Returns `false` if this context origin is opaque. Opaque contexts can never
+   *    participate in AI conversations.
+   * 2. Returns `true` if `establishedOrigin` is `undefined` (conversation is not yet locked).
+   * 3. Returns `true` if this context origin is same-origin with `establishedOrigin`.
+   *
+   * @param establishedOrigin The locked origin of the current conversation, or `undefined`
+   * if the conversation has not made its first query.
+   */
+  isOriginAllowed(establishedOrigin: SDK.SecurityOrigin.SecurityOrigin|undefined): boolean {
     const origin = this.getOrigin();
-    // If no origin is established yet, this context will be the one to lock the conversation.
-    // Opaque origins are never allowed to be used as context.
-    if (!establishedOrigin) {
-      return !isOpaqueOrigin(origin);
+
+    if (origin.isOpaque()) {
+      return false;
     }
-    // Only allow data that matches the origin the conversation is already locked to.
-    return areOriginsEquivalent(origin, establishedOrigin);
+    if (!establishedOrigin) {
+      return true;
+    }
+    return origin.isSameOriginWith(establishedOrigin);
   }
 
   /**
@@ -225,6 +264,31 @@ export abstract class ConversationContext<T> {
 
   async getSuggestions(): Promise<ConversationSuggestions|undefined> {
     return;
+  }
+
+  /**
+   * Returns a detailed description of the context item for inclusion in the AI model prompt.
+   * Currently only used by AiAgent2.
+   */
+  async getPromptDetails(): Promise<string|null> {
+    return null;
+  }
+
+  /**
+   * Returns a list of context details to display to the user in the UI.
+   * Currently only used by AiAgent2.
+   */
+  async getUserFacingDetails(): Promise<[ContextDetail, ...ContextDetail[]]|null> {
+    return null;
+  }
+
+  /**
+   * Returns initial UI widgets to display in the conversation context header
+   * when this context is active (e.g. Core Web Vitals summary for a performance trace).
+   * Used by PerformanceAgent and AiAgent2.
+   */
+  async getWidgets(): Promise<AiWidget[]> {
+    return [];
   }
 }
 
@@ -258,6 +322,8 @@ export interface DomTreeAiWidget {
   name: 'DOM_TREE';
   data: {
     root: SDK.DOMModel.DOMNodeSnapshot,
+    title: Platform.UIString.LocalizedString,
+    accessibleRevealLabel: Platform.UIString.LocalizedString,
     networkRequest?: {
       url: string,
       size: number,
@@ -316,6 +382,20 @@ export interface SourceFilesListAiWidget {
   };
 }
 
+export interface NetworkRequestsListAiWidget {
+  name: 'NETWORK_REQUESTS_LIST';
+  data: {
+    requests: SDK.NetworkRequest.NetworkRequest[],
+  };
+}
+export interface NetworkTrackAiWidget {
+  name: 'NETWORK_TRACK';
+  data: {
+    parsedTrace: Trace.TraceModel.ParsedTrace,
+    bounds: Trace.Types.Timing.TraceWindowMicro,
+  };
+}
+
 export interface LighthouseReportAiWidget {
   name: 'LIGHTHOUSE_REPORT';
   data: {
@@ -350,28 +430,28 @@ export interface SourceCodeAiWidget {
   };
 }
 
-export type AiWidget =
-    ComputedStyleAiWidget|CoreVitalsAiWidget|StylePropertiesAiWidget|DomTreeAiWidget|PerformanceTraceAiWidget|
-    PerfInsightAiWidget|TimelineRangeSummaryAiWidget|BottomUpTreeAiWidget|SourceFileAiWidget|LighthouseReportAiWidget|
-    TimelineEventSummaryAiWidget|NetworkRequestGeneralHeadersAiWidget|SourceCodeAiWidget|SourceFilesListAiWidget;
+export interface StorageBreakdownAiWidget {
+  name: 'STORAGE_BREAKDOWN';
+  data: {
+    totalUsageBytes: number,
+    totalQuotaBytes: number,
+    usageBreakdown: Array<{
+      storageType: string,
+      bytes: number,
+    }>,
+  };
+}
 
-export type FunctionCallHandlerResult<Result> = {
-  requiresApproval: true,
-  /**
-   * Provides extra description of what the required
-   * approval is requesting.
-   */
-  description: string|null,
-}|{
-  result: Result,
-  widgets?: AiWidget[],
-}|{
-  context: ConversationContext<unknown>,
-  description: string,
-  widgets?: AiWidget[],
-}|{
-  error: string,
-};
+export type AiWidget = ComputedStyleAiWidget|CoreVitalsAiWidget|StylePropertiesAiWidget|DomTreeAiWidget|
+    PerformanceTraceAiWidget|PerfInsightAiWidget|TimelineRangeSummaryAiWidget|BottomUpTreeAiWidget|SourceFileAiWidget|
+    LighthouseReportAiWidget|TimelineEventSummaryAiWidget|NetworkRequestGeneralHeadersAiWidget|SourceCodeAiWidget|
+    SourceFilesListAiWidget|NetworkRequestsListAiWidget|NetworkTrackAiWidget|StorageBreakdownAiWidget;
+
+/**
+ * @deprecated Used for v1 agents. Once v2 is shipped, this can be removed.
+ * Use `DataHandlerResult` or `ContextHandlerResult` from `Tool.js` instead.
+ */
+export type ToolResult<ResultType> = DataHandlerResult<ResultType>|ContextHandlerResult;
 
 export interface FunctionHandlerOptions {
   /**
@@ -387,7 +467,7 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
    * Description of function, this is send to the LLM
    * to explain what will the function do.
    */
-  description: string;
+  description: string|(() => string);
   /**
    * JSON schema like representation of the parameters
    * the function needs to be called with.
@@ -404,9 +484,18 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
     title?: string, thought?: string, action?: string, suggestions?: [string, ...string[]],
   };
   /**
+   * Choices the permission prompt offers when the handler returns
+   * `requiresApproval`. Behaves as `ALLOW_ONCE` when unset.
+   */
+  permissionPrompt?: PermissionPrompt;
+  /**
+   * Title of the permission prompt, e.g. "Allow reading cookie values?".
+   */
+  permissionTitle?: string;
+  /**
    * Function implementation that the LLM will try to execute,
    */
-  handler(args: Args, options?: FunctionHandlerOptions): Promise<FunctionCallHandlerResult<ReturnType>>;
+  handler(args: Args, options?: FunctionHandlerOptions): Promise<ToolResult<ReturnType>>;
 }
 
 interface AidaFetchResult {
@@ -430,8 +519,6 @@ class CrossOriginError extends Error {
  *
  * TODO: missing a test that action code is yielded before the
  * confirmation dialog.
- * TODO: missing a test for an error if it took
- * more than MAX_STEPS iterations.
  */
 export abstract class AiAgent<T> {
   /**
@@ -447,10 +534,15 @@ export abstract class AiAgent<T> {
 
   readonly #sessionId: string;
   readonly #aidaClient: Host.AidaClient.AidaClient;
-  readonly #serverSideLoggingEnabled: boolean;
+  /**
+   * Tracks the dynamic runtime state of logging. Even if logging is allowed
+   * by policy, tools or sensitive contexts can deactivate this to avoid logging sensitive data.
+   */
+  #serverSideLoggingActive: boolean;
   readonly confirmSideEffect: typeof Promise.withResolvers;
   readonly #functionDeclarations = new Map<string, FunctionDeclaration<Record<string, unknown>, unknown>>();
   readonly #allowedOrigin?: () => AllowedOriginResult;
+  readonly #targetManager: SDK.TargetManager.TargetManager;
 
   /**
    * Used in the debug mode and evals.
@@ -473,21 +565,24 @@ export abstract class AiAgent<T> {
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
-    this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
+    let serverSideLoggingAllowed = opts.serverSideLoggingAllowed ?? false;
     // Disable logging for now.
     // For context, see b/454563259#comment35.
     // We should be able to remove this ~end of April.
     if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      this.#serverSideLoggingEnabled = false;
+      serverSideLoggingAllowed = false;
     }
+    this.#serverSideLoggingActive = serverSideLoggingAllowed;
     this.#sessionId = opts.sessionId ?? crypto.randomUUID();
     this.confirmSideEffect = opts.confirmSideEffectForTest ?? (() => Promise.withResolvers());
     this.#history = opts.history ?? [];
     this.#allowedOrigin = opts.allowedOrigin;
+    // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+    this.#targetManager = opts.targetManager ?? SDK.TargetManager.TargetManager.instance();
   }
 
-  async enhanceQuery(query: string, selected: ConversationContext<T>|null, multimodalInputType?: MultimodalInputType):
-      Promise<string>;
+  async enhanceQuery(query: string, selected: ConversationContext<T>|null,
+                     multimodalInputType?: MultimodalInputType): Promise<string>;
   async enhanceQuery(query: string): Promise<string> {
     return query;
   }
@@ -498,6 +593,10 @@ export abstract class AiAgent<T> {
 
   get history(): Host.AidaClient.Content[] {
     return [...this.#history];
+  }
+
+  get targetManager(): SDK.TargetManager.TargetManager {
+    return this.#targetManager;
   }
 
   /**
@@ -518,17 +617,44 @@ export abstract class AiAgent<T> {
     this.#facts.clear();
   }
 
+  /**
+   * Clears any subclass-specific caches. This is called when a run encounters
+   * an error (e.g., cross-origin navigation, abort, or execution error) to
+   * prevent unvalidated cached data from being replayed in subsequent runs.
+   */
+  clearCache(): void {
+  }
+
+  /**
+   * Disables server-side logging for the remainder of this agent instance's lifetime.
+   *
+   * Logging deactivation is irreversible for the session. Conversation history
+   * accumulates across turns; re-enabling logging later would leak sensitive
+   * data from prior turns to AIDA.
+   */
+  protected disableServerSideLogging(): void {
+    this.#serverSideLoggingActive = false;
+  }
+
   popPendingMultimodalInput(): MultimodalInput|undefined {
     return undefined;
   }
 
+  /**
+   * Preamble features appended to the `client_version` in metadata.
+   * This is required ONLY for the Styling Agent for legacy reasons to serve
+   * different server-side preambles based on the Chrome version.
+   * Other agents should NOT set or override this.
+   * If you are curious about this, look for `do_conversation_handler.cc` in
+   * Google3 or chat to @jacktfranklin.
+   */
   preambleFeatures(): string[] {
     return [];
   }
 
-  buildRequest(
-      part: Host.AidaClient.Part|Host.AidaClient.Part[],
-      role: Host.AidaClient.Role.USER|Host.AidaClient.Role.ROLE_UNSPECIFIED): Host.AidaClient.DoConversationRequest {
+  buildRequest(part: Host.AidaClient.Part|Host.AidaClient.Part[],
+               role: Host.AidaClient.Role.USER|
+               Host.AidaClient.Role.ROLE_UNSPECIFIED): Host.AidaClient.DoConversationRequest {
     const parts = Array.isArray(part) ? part : [part];
     const currentMessage: Host.AidaClient.Content = {
       parts,
@@ -539,7 +665,7 @@ export abstract class AiAgent<T> {
     for (const [name, definition] of this.#functionDeclarations.entries()) {
       declarations.push({
         name,
-        description: definition.description,
+        description: typeof definition.description === 'function' ? definition.description() : definition.description,
         parameters: definition.parameters,
       });
     }
@@ -548,8 +674,6 @@ export abstract class AiAgent<T> {
     }
     const enableAidaFunctionCalling = declarations.length;
     const userTier = Host.AidaClient.convertToUserTierEnum(this.userTier);
-    const clientFeatureName = Host.AidaClient.getClientFeatureName(this.clientFeature);
-    debugLog(`Client ${clientFeatureName} running with userTier ${this.userTier}`);
     const preamble = userTier === Host.AidaClient.UserTier.TESTERS ? this.preamble : undefined;
     const facts = Array.from(this.#facts);
     const request: Host.AidaClient.DoConversationRequest = {
@@ -566,7 +690,7 @@ export abstract class AiAgent<T> {
         model_id: this.options.modelId || undefined,
       },
       metadata: {
-        disable_user_content_logging: !(this.#serverSideLoggingEnabled ?? false),
+        disable_user_content_logging: !(this.#serverSideLoggingActive ?? false),
         string_session_id: this.#sessionId,
         user_tier: userTier,
         client_version:
@@ -645,6 +769,21 @@ export abstract class AiAgent<T> {
     return this.parseTextResponseForSuggestions(response.trim());
   }
 
+  /**
+   * Parses the text of a response that is still streaming. Only the `answer`
+   * of the result is shown, as a partial answer. By default, partial answers
+   * use the same parsing as completed answers.
+   *
+   * This hook exists so that `AiAgent2` (AI V2) can parse follow-up
+   * suggestions differently without changing the V1 agents. Remove it once
+   * AI V2 ships and the V1 agents are removed. b/568697679 explores getting
+   * suggestions from a function call instead of parsing them from text,
+   * which would remove the need for this parsing.
+   */
+  protected parsePartialTextResponse(response: string): ParsedResponse {
+    return this.parseTextResponse(response);
+  }
+
   protected async finalizeAnswer(answer: AnswerResponse): Promise<AnswerResponse> {
     return answer;
   }
@@ -674,6 +813,10 @@ export abstract class AiAgent<T> {
     this.#functionDeclarations.clear();
   }
 
+  /**
+   * Executed immediately after the current context is populated with the selected
+   * context and before the request is built.
+   */
   protected async preRun(): Promise<void> {
   }
 
@@ -686,13 +829,16 @@ export abstract class AiAgent<T> {
           },
           multimodalInput?: MultimodalInput,
           ): AsyncGenerator<ResponseData, void, void> {
-    await this.preRun();
     await options.selected?.refresh();
-    if (options.selected) {
-      this.context = options.selected;
-    }
+    // Reset context on each run so cleared selections (`null`) do not leave
+    // stale context references on long-lived agent instances (e.g. `AiAgent2`).
+    this.context = options.selected ?? undefined;
+    await this.preRun();
 
     const enhancedQuery = await this.enhanceQuery(initialQuery, options.selected, multimodalInput?.type);
+    if (!enhancedQuery.trim() && !multimodalInput) {
+      return;
+    }
     Host.userMetrics.freestylerQueryLength(enhancedQuery.length);
 
     let query: Host.AidaClient.Part|Host.AidaClient.Part[];
@@ -700,12 +846,24 @@ export abstract class AiAgent<T> {
     // Request is built here to capture history up to this point.
     let request = this.buildRequest(query, Host.AidaClient.Role.USER);
 
+    const clientFeatureName = Host.AidaClient.getClientFeatureName(this.clientFeature);
+    debugLog(`[AiAgent] Starting conversation with client ${clientFeatureName}, userTier ${this.userTier}`);
+
     yield* this.handleContextDetails(options.selected);
 
     for (let i = 0; i < MAX_STEPS; i++) {
       yield {
         type: ResponseType.QUERYING,
       };
+
+      if (i === 0) {
+        debugLog('[AiAgent] Step 1: Sending user prompt to model:', enhancedQuery);
+      } else if (!Array.isArray(query) && 'functionResponse' in query) {
+        debugLog(`[AiAgent] Step ${i + 1}: Sending function response for '${query.functionResponse.name}' to model:`,
+                 query.functionResponse.response);
+      } else {
+        debugLog(`[AiAgent] Step ${i + 1}: Sending request to model:`, request.current_message);
+      }
 
       let rpcId: Host.AidaClient.RpcGlobalId|undefined;
       let textResponse = '';
@@ -717,7 +875,7 @@ export abstract class AiAgent<T> {
           functionCall = fetchResult.functionCall;
 
           if (!functionCall && !fetchResult.completed) {
-            const parsed = this.parseTextResponse(textResponse);
+            const parsed = this.parsePartialTextResponse(textResponse);
             const partialAnswer = 'answer' in parsed ? parsed.answer : '';
             if (!partialAnswer) {
               continue;
@@ -732,13 +890,7 @@ export abstract class AiAgent<T> {
         }
       } catch (err) {
         debugLog('Error calling the AIDA API', err);
-
-        let error = ErrorType.UNKNOWN;
-        if (err instanceof Host.AidaClient.AidaAbortError) {
-          error = ErrorType.ABORT;
-        } else if (err instanceof Host.AidaClient.AidaBlockError) {
-          error = ErrorType.BLOCK;
-        }
+        const error = aidaErrorToErrorType(err);
         yield this.#createErrorResponse(error);
 
         break;
@@ -752,6 +904,7 @@ export abstract class AiAgent<T> {
           throw new Error('Expected a completed response to have an answer');
         }
         if (!functionCall) {
+          debugLog(`[AiAgent] Step ${i + 1}: Model returned text response:`, parsedResponse.answer);
           this.#history.push({
             parts: [{
               text: parsedResponse.answer,
@@ -773,6 +926,7 @@ export abstract class AiAgent<T> {
       }
 
       if (functionCall) {
+        debugLog(`[AiAgent] Step ${i + 1}: Model requested function call: ${functionCall.name}`, functionCall.args);
         const allowedOriginResult = this.#allowedOrigin?.();
         if (allowedOriginResult && 'blocked' in allowedOriginResult) {
           // Abort immediately if the page navigated before we could lock the origin.
@@ -798,6 +952,18 @@ export abstract class AiAgent<T> {
           }
 
           if ('context' in result) {
+            // Pair the functionCall with a functionResponse so history stays valid
+            // if this agent instance is re-run after the context change (AiAgent2).
+            // The new context reaches the model through the next USER query.
+            this.#history.push({
+              parts: [{
+                functionResponse: {
+                  name: functionCall.name,
+                  response: {result: result.description},
+                },
+              }],
+              role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
+            });
             yield {
               type: ResponseType.CONTEXT_CHANGE,
               description: result.description,
@@ -815,6 +981,17 @@ export abstract class AiAgent<T> {
               response: {...result, widgets: undefined},
             },
           };
+          if (i === MAX_STEPS - 1) {
+            // Normally, the functionResponse is pushed at the start of the next
+            // iteration. Since no further iteration will run, push it here so the
+            // last functionCall is not left unpaired in history.
+            this.#history.push({
+              parts: [query],
+              role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
+            });
+            yield this.#createErrorResponse(ErrorType.MAX_STEPS);
+            break;
+          }
           request = this.buildRequest(query, Host.AidaClient.Role.ROLE_UNSPECIFIED);
         } catch (err) {
           if (err instanceof CrossOriginError) {
@@ -826,13 +1003,13 @@ export abstract class AiAgent<T> {
           break;
         }
       } else {
-        yield this.#createErrorResponse(i - 1 === MAX_STEPS ? ErrorType.MAX_STEPS : ErrorType.UNKNOWN);
+        yield this.#createErrorResponse(ErrorType.UNKNOWN);
         break;
       }
     }
 
     if (isStructuredLogEnabled()) {
-      window.dispatchEvent(new CustomEvent('aiassistancedone'));
+      dispatchAiAssistanceDoneEvent();
     }
     return;
   }
@@ -851,6 +1028,7 @@ export abstract class AiAgent<T> {
     if (!call) {
       throw new Error(`Function ${name} is not found.`);
     }
+    debugLog(`[AiAgent] Executing tool '${name}' with args:`, args);
     const parts: Host.AidaClient.Part[] = [];
     if (options?.explanation) {
       parts.push({
@@ -911,37 +1089,47 @@ export abstract class AiAgent<T> {
         };
       }
 
-      const sideEffectConfirmationPromiseWithResolvers = this.confirmSideEffect<boolean>();
+      const sideEffectConfirmationPromiseWithResolvers = this.confirmSideEffect<PermissionDecision>();
 
-      void sideEffectConfirmationPromiseWithResolvers.promise.then(result => {
+      void sideEffectConfirmationPromiseWithResolvers.promise.then(decision => {
         Host.userMetrics.actionTaken(
-            result ? Host.UserMetrics.Action.AiAssistanceSideEffectConfirmed :
-                     Host.UserMetrics.Action.AiAssistanceSideEffectRejected,
+            decision === PermissionDecision.REJECT ? Host.UserMetrics.Action.AiAssistanceSideEffectRejected :
+                                                     Host.UserMetrics.Action.AiAssistanceSideEffectConfirmed,
         );
       });
 
       if (options?.signal?.aborted) {
-        sideEffectConfirmationPromiseWithResolvers.resolve(false);
+        sideEffectConfirmationPromiseWithResolvers.resolve(PermissionDecision.REJECT);
       }
 
-      options?.signal?.addEventListener('abort', () => {
-        sideEffectConfirmationPromiseWithResolvers.resolve(false);
-      }, {once: true});
+      const onAbort = (): void => {
+        sideEffectConfirmationPromiseWithResolvers.resolve(PermissionDecision.REJECT);
+      };
+
+      options?.signal?.addEventListener('abort', onAbort, {once: true});
 
       yield {
         type: ResponseType.SIDE_EFFECT,
         confirm: sideEffectConfirmationPromiseWithResolvers.resolve,
         description: result.description,
+        permissionPrompt: call.permissionPrompt,
+        permissionTitle: call.permissionTitle,
       };
 
-      const approvedRun = await sideEffectConfirmationPromiseWithResolvers.promise;
-      if (!approvedRun) {
+      let decision = PermissionDecision.REJECT;
+      try {
+        decision = await sideEffectConfirmationPromiseWithResolvers.promise;
+      } finally {
+        options?.signal?.removeEventListener('abort', onAbort);
+      }
+      if (decision === PermissionDecision.REJECT) {
         yield {
           type: ResponseType.ACTION,
           code,
           output: 'Error: User denied code execution with side effects.',
           canceled: true,
         };
+        debugLog(`[AiAgent] Tool '${name}' denied by user.`);
         return {
           result: 'Error: User denied code execution with side effects.',
         };
@@ -974,6 +1162,7 @@ export abstract class AiAgent<T> {
         output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
         widgets: result.widgets,
         canceled: false,
+        toolName: name,
       };
     }
 
@@ -983,8 +1172,11 @@ export abstract class AiAgent<T> {
         code,
         output: result.error,
         canceled: false,
+        toolName: name,
       };
     }
+
+    debugLog(`[AiAgent] Tool '${name}' result:`, result);
 
     if ('context' in result) {
       return result;
@@ -1001,7 +1193,10 @@ export abstract class AiAgent<T> {
 
     for await (aidaResponse of this.#aidaClient.doConversation(request, options)) {
       if (aidaResponse.functionCalls?.length) {
-        debugLog('functionCalls.length', aidaResponse.functionCalls.length);
+        if (aidaResponse.functionCalls.length > 1) {
+          debugLog(`[AiAgent] Unexpected: received ${aidaResponse.functionCalls.length} function calls in response:`,
+                   aidaResponse.functionCalls);
+        }
         yield {
           rpcId,
           functionCall: aidaResponse.functionCalls[0],
@@ -1019,16 +1214,16 @@ export abstract class AiAgent<T> {
       };
     }
 
-    debugLog({
-      request,
-      response: aidaResponse,
-    });
     if (isStructuredLogEnabled() && aidaResponse) {
       this.#structuredLog.push({
         request: structuredClone(request),
         aidaResponse,
       });
-      localStorage.setItem('aiAssistanceStructuredLog', JSON.stringify(this.#structuredLog));
+      try {
+        localStorage.setItem('aiAssistanceStructuredLog', JSON.stringify(this.#structuredLog));
+      } catch (err) {
+        console.warn('Failed to write to local storage "aiAssistanceStructuredLog":', err);
+      }
     }
   }
 
@@ -1039,7 +1234,11 @@ export abstract class AiAgent<T> {
   }
 
   #createErrorResponse(error: ErrorType): ResponseData {
-    this.#removeLastRunParts();
+    // If we hit MAX_STEPS, we still want to keep the call history as this may be relevant for follow-up requests.
+    if (error !== ErrorType.MAX_STEPS) {
+      this.#removeLastRunParts();
+      this.clearCache();
+    }
     if (error !== ErrorType.ABORT) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceError);
     }
@@ -1051,7 +1250,13 @@ export abstract class AiAgent<T> {
   }
 }
 
-function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefined {
+/**
+ * Parses `suggestions` as a JSON array and returns its non-empty string items,
+ * with whitespace collapsed and each item truncated to `MAX_SUGGESTION_LENGTH`.
+ * Returns `undefined` if the value is not an array or no items remain.
+ * Throws if `suggestions` is not valid JSON.
+ */
+export function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefined {
   const parsed = JSON.parse(suggestions);
   if (!Array.isArray(parsed)) {
     return undefined;
@@ -1072,4 +1277,25 @@ function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefin
     return undefined;
   }
   return sanitized as [string, ...string[]];
+}
+
+/**
+ * Maps AIDA-specific client error instances to user-facing ErrorType enums.
+ * This handles AIDA API failure modes such as quota exhaustion or blockages.
+ * Other application-level errors (like CROSS_ORIGIN or MAX_STEPS) are handled separately.
+ */
+export function aidaErrorToErrorType(err: unknown): ErrorType {
+  if (err instanceof Host.AidaClient.AidaAbortError) {
+    return ErrorType.ABORT;
+  }
+  if (err instanceof Host.AidaClient.AidaBlockError) {
+    return ErrorType.BLOCK;
+  }
+  if (err instanceof Host.AidaClient.AidaQuotaError) {
+    return ErrorType.QUOTA;
+  }
+  if (err instanceof Host.AidaClient.AidaPayloadTooLargeError) {
+    return ErrorType.PAYLOAD_TOO_LARGE;
+  }
+  return ErrorType.UNKNOWN;
 }

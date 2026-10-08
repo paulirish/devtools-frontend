@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {globSync, readFileSync} from 'node:fs';
+import {existsSync, globSync, readFileSync} from 'node:fs';
 import * as ts from 'typescript';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
+
+import {parseExpectations} from '../test/conductor/test_expectations_parser.js';
 
 const argv = yargs(hideBin(process.argv))
                  .option('format', {
                    alias: 'f',
                    describe: 'Output format',
-                   choices: ['list', 'b'],
+                   choices: ['list', 'b', 'json'],
                    default: 'list',
                  })
                  .option('sources', {
@@ -49,25 +51,12 @@ function extract(sourceFile: ts.SourceFile) {
     return false;
   }
 
-  function isSkipOnPlatformsCall(node: ts.Node) {
-    if (node.getChildAt(0).kind === ts.SyntaxKind.PropertyAccessExpression) {
-      const propAccess = node.getChildAt(0);
-      const skipOnPlatformCalls = new Set(['it.skipOnPlatforms', 'describe.skipOnPlatforms']);
-      if (skipOnPlatformCalls.has(propAccess.getText())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   function extractBugs(node: ts.Node) {
     switch (node.kind) {
       case ts.SyntaxKind.CallExpression: {
         let description;
         if (isSkipCall(node)) {
           description = node.getChildAt(2).getChildAt(0).getText();
-        } else if (isSkipOnPlatformsCall(node)) {
-          description = node.getChildAt(2).getChildAt(2).getText();
         }
         if (!description) {
           break;
@@ -97,6 +86,21 @@ if (argv.sources.includes('devtools')) {
         file, readFileSync(file).toString(), ts.ScriptTarget.ESNext,
         /* setParentNodes */ true));
   }
+
+  const devtoolsExpectationsPath = 'test/TestExpectations';
+  if (existsSync(devtoolsExpectationsPath)) {
+    const content = readFileSync(devtoolsExpectationsPath, 'utf-8');
+    const expectations = parseExpectations(content);
+    for (const exp of expectations) {
+      if (!exp.isCommentOrEmpty && exp.results?.includes('Skip')) {
+        for (const bug of exp.bugs || []) {
+          const bugId = bug.replace('crbug.com/', '');
+          bugs.add(bugId);
+          bugToFile.set(bugId, exp.testName || '');
+        }
+      }
+    }
+  }
 }
 
 if (argv.sources.includes('chromium')) {
@@ -117,7 +121,13 @@ if (argv.sources.includes('chromium')) {
   }
 }
 
-if (argv.format === 'b') {
+if (argv.format === 'json') {
+  const result = Array.from(bugs).map(bug => ({
+                                        bug: `crbug.com/${bug}`,
+                                        file: bugToFile.get(bug) ?? '',
+                                      }));
+  console.log(JSON.stringify(result, null, 2));
+} else if (argv.format === 'b') {
   console.log(`id: (${Array.from(bugs).join('|')})`);
 } else {
   for (const bug of bugs) {

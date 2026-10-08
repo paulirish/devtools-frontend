@@ -165,6 +165,13 @@ function createLanternRequest(
     }
   }
 
+  // NetworkRequestsHandler defaults missing `renderBlocking` to 'non_blocking',
+  // so only populate `renderBlocking` when it was explicitly set on the raw
+  // ResourceSendRequest event or updated via PreloadRenderBlockingStatusChange.
+  const hasExplicitRenderBlocking = request.rawSourceEvent.args.data.renderBlocking !== undefined ||
+      request.args.data.renderBlocking !== 'non_blocking';
+  const renderBlocking = hasExplicitRenderBlocking ? request.args.data.renderBlocking : undefined;
+
   return {
     rawRequest: request,
     requestId: request.args.data.requestId,
@@ -191,6 +198,7 @@ function createLanternRequest(
     resourceType,
     mimeType: request.args.data.mimeType,
     priority: request.args.data.priority,
+    renderBlocking,
     frameId: request.args.data.frame,
     fromWorker,
     serverResponseTime: request.args.data.lrServerResponseTime,
@@ -269,9 +277,8 @@ function linkInitiators(lanternRequests: NetworkRequest[]): void {
   }
 }
 
-function createNetworkRequests(
-    trace: Lantern.Types.Trace, data: Handlers.Types.HandlerData, startTime = 0,
-    endTime = Number.POSITIVE_INFINITY): NetworkRequest[] {
+function createNetworkRequests(trace: Lantern.Types.Trace, data: Handlers.Types.HandlerData, startTime = 0,
+                               endTime: number = Number.POSITIVE_INFINITY): NetworkRequest[] {
   const workerThreads = findWorkerThreads(trace);
 
   const lanternRequestsNoRedirects: NetworkRequest[] = [];

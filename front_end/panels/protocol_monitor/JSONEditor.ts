@@ -23,37 +23,37 @@ const {live, classMap, repeat} = Directives;
 
 const UIStrings = {
   /**
-   * @description The title of a button that deletes a parameter.
+   * @description Tooltip text for the button inside the CDP command editor that removes a parameter or custom property row.
    */
   deleteParameter: 'Delete parameter',
   /**
-   * @description The title of a button that adds a parameter.
+   * @description Tooltip text for the button inside the CDP command editor that adds an optional parameter or appends a new item to an array parameter.
    */
-  addParameter: 'Add a parameter',
+  addParameter: 'Add parameter',
   /**
-   * @description The title of a button that reset the value of a parameters to its default value.
+   * @description Tooltip text for the button inside the CDP command editor that resets a modified parameter value back to its default state.
    */
   resetDefaultValue: 'Reset to default value',
   /**
-   * @description The title of a button to add custom key/value pairs to object parameters with no keys defined
+   * @description Tooltip text for the button inside the CDP command editor that allows adding custom key-value pairs to object parameters without predefined keys.
    */
   addCustomProperty: 'Add custom property',
   /**
-   * @description The title of a button that sends a CDP command.
+   * @description Tooltip text (including Windows/Linux keyboard shortcut Ctrl+Enter) for the send button at the bottom of the CDP command editor.
    */
   sendCommandCtrlEnter: 'Send command - Ctrl+Enter',
   /**
-   * @description The title of a button that sends a CDP command.
+   * @description Tooltip text (including macOS keyboard shortcut ⌘+Enter) for the send button at the bottom of the CDP command editor.
    */
   sendCommandCmdEnter: 'Send command - ⌘+Enter',
   /**
-   * @description The title of a button that copies a CDP command.
+   * @description Tooltip text for the copy button at the bottom of the CDP command editor that copies the current command and parameters as JSON to the clipboard.
    */
   copyCommand: 'Copy command',
   /**
-   * @description A label for a select input that allows selecting a CDP target to send the commands to.
+   * @description Tooltip text for the target selector dropdown in the Protocol monitor and CDP command editor allowing users to choose which CDP target receives commands.
    */
-  selectTarget: 'Select a target',
+  selectTarget: 'Select target',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/protocol_monitor/JSONEditor.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -177,7 +177,12 @@ export interface EventTypes {
   [Events.SUBMIT_EDITOR]: Command;
 }
 
-export class JSONEditor extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
+const JSONEditorBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class JSONEditor extends JSONEditorBase {
   #metadataByCommand = new Map<string, {parameters: Parameter[], description: string, replyArgs: string[]}>();
   #typesByName = new Map<string, Parameter[]>();
   #enumsByName = new Map<string, Record<string, string>>();
@@ -191,7 +196,7 @@ export class JSONEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
   displayCommandInput = true;
   displayToolbar = true;
 
-  constructor(element: HTMLElement, view = DEFAULT_VIEW) {
+  constructor(element: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.#view = view;
     this.registerRequiredCSS(editorWidgetStyles);

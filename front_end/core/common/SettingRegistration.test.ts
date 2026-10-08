@@ -4,10 +4,6 @@
 
 import {assert} from 'chai';
 
-import {
-  updateHostConfig,
-} from '../../testing/EnvironmentHelpers.js';
-
 import * as Common from './common.js';
 
 describe('SettingRegistration', () => {
@@ -51,32 +47,124 @@ describe('SettingRegistration', () => {
     });
   });
 
-  it('can handle settings with condition which depends on host config', () => {
-    updateHostConfig({
-      devToolsConsoleInsights: {
-        modelId: 'mockModel',
-        temperature: -1,
-        enabled: true,
-      },
-    });
-    const settingRegistrations: Common.SettingRegistration.SettingRegistration[] = [{
-      settingName,
+  it('throws an error when trying to register a duplicate order value for the same category', () => {
+    Common.Settings.registerSettingExtension({
+      settingName: 'mock-setting-1',
       settingType: Common.Settings.SettingType.BOOLEAN,
       defaultValue: false,
-      condition: config => {
-        return config?.devToolsConsoleInsights?.enabled === true;
-      },
-    }];
-
-    const dummyStorage = new Common.Settings.SettingsStorage({});
-    const settings = new Common.Settings.Settings({
-      syncedStorage: dummyStorage,
-      globalStorage: dummyStorage,
-      localStorage: dummyStorage,
-      settingRegistrations,
+      category: Common.Settings.SettingCategory.CONSOLE,
+      order: 1,
     });
-    const setting = settings.moduleSetting(settingName);
-    assert.isNotNull(setting);
-    assert.isFalse(setting.get());
+
+    assert.throws(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.CONSOLE,
+        order: 1,
+      });
+    }, 'Duplicate order value \'1\' for settings category \'CONSOLE\'');
+  });
+
+  it('allows registering settings with the same order value in different categories', () => {
+    Common.Settings.registerSettingExtension({
+      settingName: 'mock-setting-1',
+      settingType: Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+      category: Common.Settings.SettingCategory.CONSOLE,
+      order: 1,
+    });
+
+    assert.doesNotThrow(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.ELEMENTS,
+        order: 1,
+      });
+    });
+  });
+
+  it('allows registering settings without order or category', () => {
+    assert.doesNotThrow(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-1',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+      });
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.CONSOLE,
+      });
+    });
+  });
+
+  it('allows registering order 0 and throws on duplicate order 0 in the same category', () => {
+    Common.Settings.registerSettingExtension({
+      settingName: 'mock-setting-1',
+      settingType: Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+      category: Common.Settings.SettingCategory.DEBUGGER,
+      order: 0,
+    });
+
+    assert.throws(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.DEBUGGER,
+        order: 0,
+      });
+    }, 'Duplicate order value \'0\' for settings category \'DEBUGGER\'');
+  });
+
+  it('allows re-registering an order after removing the setting with maybeRemoveSettingExtension', () => {
+    Common.Settings.registerSettingExtension({
+      settingName: 'mock-setting-1',
+      settingType: Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+      category: Common.Settings.SettingCategory.CONSOLE,
+      order: 1,
+    });
+
+    const removalResult = Common.Settings.maybeRemoveSettingExtension('mock-setting-1');
+    assert.isTrue(removalResult);
+
+    assert.doesNotThrow(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.CONSOLE,
+        order: 1,
+      });
+    });
+  });
+
+  it('allows re-registering an order after resetSettings', () => {
+    Common.Settings.registerSettingExtension({
+      settingName: 'mock-setting-1',
+      settingType: Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+      category: Common.Settings.SettingCategory.CONSOLE,
+      order: 1,
+    });
+
+    Common.Settings.resetSettings();
+
+    assert.doesNotThrow(() => {
+      Common.Settings.registerSettingExtension({
+        settingName: 'mock-setting-2',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+        category: Common.Settings.SettingCategory.CONSOLE,
+        order: 1,
+      });
+    });
   });
 });

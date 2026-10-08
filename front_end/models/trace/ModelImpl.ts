@@ -51,6 +51,11 @@ export class Model extends EventTarget {
     this.#processor = new TraceProcessor(handlers, this.#config);
   }
 
+  updateConfiguration(config: Types.Configuration.Configuration): void {
+    this.#config = config;
+    this.#processor.updateConfiguration(config);
+  }
+
   /**
    * Parses an array of trace events into a structured object containing all the
    * information parsed by the trace handlers.
@@ -105,6 +110,8 @@ export class Model extends EventTarget {
       }
       const file = this.#storeAndCreateParsedTraceFile(
           syntheticEventsManager, traceEvents, metadata, this.#processor.data, this.#processor.insights);
+      // Reclaim memory used by the temporary event-to-index lookup map now that trace parsing is complete.
+      syntheticEventsManager.clearRegistrationIndex();
       // We only push the file onto this.#traces here once we know it's valid
       // and there's been no errors in the parsing.
       this.#traces.push(file);
@@ -222,12 +229,6 @@ export class ModelUpdateEvent extends Event {
   static readonly eventName = 'modelupdate';
   constructor(public data: ModelUpdateEventData) {
     super(ModelUpdateEvent.eventName);
-  }
-}
-
-declare global {
-  interface HTMLElementEventMap {
-    [ModelUpdateEvent.eventName]: ModelUpdateEvent;
   }
 }
 

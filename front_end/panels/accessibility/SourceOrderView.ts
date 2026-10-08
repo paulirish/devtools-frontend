@@ -14,21 +14,21 @@ import {AccessibilitySubPane} from './AccessibilitySubPane.js';
 
 const UIStrings = {
   /**
-   * @description Name of a tool which allows the developer to view the contents of the page in the
-   * 'source order' (the order in which the HTML elements show up in the source code). In the
-   * Accessibility panel.
+   * @description Name of a feature that allows the developer to view the contents of the page in the
+   * 'source order' (the order in which the HTML elements show up in the source code) under the
+   * Accessibility tab in the Elements panel.
    */
-  sourceOrderViewer: 'Source Order Viewer',
+  sourceOrderViewer: 'Source order viewer',
   /**
-   * @description Text in Source Order Viewer of the Accessibility panel shown when the selected node has no child elements
+   * @description Text in the source order viewer under the Accessibility tab of the Elements panel shown when the selected node has no child elements.
    */
   noSourceOrderInformation: 'No source order information available',
   /**
-   * @description Text in Source Order Viewer of the Accessibility panel shown when the selected node has many child elements
+   * @description Text in the source order viewer under the Accessibility tab of the Elements panel shown when the selected node has many child elements.
    */
   thereMayBeADelayInDisplaying: 'There may be a delay in displaying source order for elements with many children',
   /**
-   * @description Checkbox label in Source Order Viewer of the Accessibility panel. Source order
+   * @description Checkbox label in the source order viewer under the Accessibility tab of the Elements panel. Source order
    * means the order in which the HTML elements show up in the source code.
    */
   showSourceOrder: 'Show source order',
@@ -87,8 +87,8 @@ export class SourceOrderPane extends AccessibilitySubPane<ShadowRoot> {
   #showSourceOrder: boolean|undefined = undefined;
   readonly #view: View;
 
-  constructor(view: View = DEFAULT_VIEW) {
-    super({
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element, {
       title: i18nString(UIStrings.sourceOrderViewer),
       viewId: 'source-order-viewer',
       useShadowDom: 'pure',
@@ -96,11 +96,15 @@ export class SourceOrderPane extends AccessibilitySubPane<ShadowRoot> {
     this.#view = view;
   }
 
-  async setNodeAsync(node: SDK.DOMModel.DOMNode|null): Promise<void> {
+  protected override setNode(node: SDK.DOMModel.DOMNode|null): void {
     if (this.nodeInternal && this.#showSourceOrder) {
       this.nodeInternal.domModel().overlayModel().hideSourceOrderInOverlay();
     }
     super.setNode(node);
+    void this.#updateNodeAsync();
+  }
+
+  async #updateNodeAsync(): Promise<void> {
     this.#childCount = this.nodeInternal?.childNodeCount() ?? 0;
     if (!this.nodeInternal || !this.#childCount) {
       this.#showSourceOrder = undefined;

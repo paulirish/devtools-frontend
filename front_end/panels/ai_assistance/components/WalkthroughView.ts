@@ -6,7 +6,7 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
-import type {MarkdownLitRenderer} from '../../../ui/components/markdown_view/MarkdownView.js';
+import type * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -17,7 +17,7 @@ import {
   type ModelChatMessage,
   renderStep,
   type Step,
-  titleForStep
+  titleForStep,
 } from './ChatMessage.js';
 import {getButtonLabel} from './WalkthroughUtils.js';
 import walkthroughViewStyles from './walkthroughView.css.js';
@@ -64,7 +64,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export interface ViewInput {
   message: ModelChatMessage|null;
   isLoading: boolean;
-  markdownRenderer: MarkdownLitRenderer;
+  markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer;
   isInlined: boolean;
   isExpanded: boolean;
   prompt: string;
@@ -206,7 +206,7 @@ export const DEFAULT_VIEW = (
   // Ensure that we render steps but not ones that need approval; a
   // step that needs approval is always rendered into the main chat
   // view regardless of if the walkthrough is open or not.
-  const renderableSteps = allSteps.filter(s => !s.requestApproval);
+  const renderableSteps = allSteps.filter(s => s.state.type !== 'needs_approval');
 
   // clang-format off
   const stepsOutput = renderableSteps.length > 0 ? html`
@@ -222,9 +222,8 @@ export const DEFAULT_VIEW = (
             <div class="step-wrapper">
               ${renderStep({
                 step,
-                isLoading: input.isLoading,
                 markdownRenderer: input.markdownRenderer,
-                isLast: index === renderableSteps.length - 1
+                isLast: index === renderableSteps.length - 1,
               })}
             </div>
           </div>
@@ -252,7 +251,7 @@ export class WalkthroughView extends UI.Widget.Widget {
 
   #message: ModelChatMessage|null = null;
   #isLoading = false;
-  #markdownRenderer: MarkdownLitRenderer|null = null;
+  #markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer|null = null;
   #onToggle: (isOpen: boolean, message: ModelChatMessage) => void = () => {};
   #onOpen: (message: ModelChatMessage) => void = () => {};
   #isInlined = false;
@@ -362,11 +361,11 @@ export class WalkthroughView extends UI.Widget.Widget {
     return this.#isLoading;
   }
 
-  get markdownRenderer(): MarkdownLitRenderer|null {
+  get markdownRenderer(): MarkdownView.MarkdownView.MarkdownLitRenderer|null {
     return this.#markdownRenderer;
   }
 
-  set markdownRenderer(markdownRenderer: MarkdownLitRenderer|null) {
+  set markdownRenderer(markdownRenderer: MarkdownView.MarkdownView.MarkdownLitRenderer|null) {
     this.#markdownRenderer = markdownRenderer;
     this.requestUpdate();
   }

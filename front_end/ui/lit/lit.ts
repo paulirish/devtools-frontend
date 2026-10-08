@@ -4,7 +4,7 @@
 
 import type * as Lit from '../../third_party/lit/lit.js';
 
-export type {DirectiveResult} from '../../third_party/lit/lib/directive.js';
+export type {DirectiveResult} from '../../third_party/lit/lit.js';
 export {
   AsyncDirective,
   Decorators,
@@ -18,6 +18,7 @@ export {
   svg,
   type TemplateResult,
 } from '../../third_party/lit/lit.js';
+export * as CustomDirectives from './Directives.js';
 export {
   i18nTemplate,
 } from './i18n-template.js';
@@ -27,6 +28,7 @@ export {
 } from './render.js';
 export {
   html,
+  isLitDirective,
 } from './strip-whitespace.js';
 
 export type LitTemplate = Lit.TemplateResult|typeof Lit.nothing;

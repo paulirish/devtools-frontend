@@ -17,7 +17,7 @@ devtools_module("app") {
     "NodeMain.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
     "../../../core/i18n:bundle",
@@ -25,25 +25,22 @@ devtools_module("app") {
     "../../../core/protocol_client:bundle",
     "../../../core/sdk:bundle",
     "../../../generated",
-    "../../../generated:protocol",
     "../../../ui/components/buttons:bundle",
     "../../../ui/i18n:bundle",
     "../../../ui/kit:bundle",
     "../../../ui/legacy:bundle",
     "../../../ui/legacy/components/utils:bundle",
   ]
+  deps = [ ":css_files" ]
 }
 
 devtools_entrypoint("bundle") {
   entrypoint = "app.ts"
 
-  deps = [
-    ":app",
-    ":css_files",
-  ]
+  ts_deps = [ ":app" ]
 
   visibility = [
-    ":unittests",
+    ":*",
     "../:*",
   ]
 }
@@ -53,7 +50,7 @@ ts_library("unittests") {
 
   sources = [ "NodeMain.test.ts" ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../../core/sdk:bundle",
     "../../../generated",

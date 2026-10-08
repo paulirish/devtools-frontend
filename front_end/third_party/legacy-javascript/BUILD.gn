@@ -10,7 +10,6 @@ devtools_pre_built("legacy-javascript") {
   sources_are_release = false
 
   sources = [
-    "legacy-javascript-tsconfig.json",
     "lib/legacy-javascript.d.ts",
     "lib/legacy-javascript.js",
   ]
@@ -19,7 +18,7 @@ devtools_pre_built("legacy-javascript") {
 devtools_entrypoint("bundle") {
   entrypoint = "legacy-javascript.ts"
 
-  deps = [ ":legacy-javascript" ]
+  ts_deps = [ ":legacy-javascript" ]
 
   visibility = [ "../../models/trace/*" ]
 

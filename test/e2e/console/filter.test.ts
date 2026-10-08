@@ -10,18 +10,21 @@ import {
   filterConsoleMessages,
   navigateToConsoleTab,
   showVerboseMessages,
-  waitForConsoleMessagesToBeNonEmpty
+  waitForConsoleMessagesToBeNonEmpty,
 } from '../helpers/console-helpers.js';
 
 describe('The Console Tab', () => {
   it('shows messages from all levels', async ({devToolsPage, inspectedPage}) => {
-    await Promise.all([
-      inspectedPage.goToResource('console/console-filter.html'),
-      navigateToConsoleTab(devToolsPage),
-    ]);
+    await inspectedPage.goToResource('console/console-filter.html');
+    await navigateToConsoleTab(devToolsPage);
 
     await showVerboseMessages(devToolsPage);
-    await waitForConsoleMessagesToBeNonEmpty(19, devToolsPage);
+    await waitForConsoleMessagesToBeNonEmpty(devToolsPage, 19);
+
+    await devToolsPage.waitForFunction(async () => {
+      return await devToolsPage.evaluate(
+          () => document.querySelectorAll('.console-group-messages .devtools-link').length >= 19);
+    });
 
     const actualMessages = await devToolsPage.evaluate(
         selector => Array.from(document.querySelectorAll(selector)).map(e => e.textContent),
@@ -51,16 +54,14 @@ describe('The Console Tab', () => {
   });
 
   it('resets the filter', async ({devToolsPage, inspectedPage}) => {
-    await Promise.all([
-      inspectedPage.goToResource('console/console-filter.html'),
-      navigateToConsoleTab(devToolsPage),
-      waitForConsoleMessagesToBeNonEmpty(18, devToolsPage),
-    ]);
+    await inspectedPage.goToResource('console/console-filter.html');
+    await navigateToConsoleTab(devToolsPage);
+    await waitForConsoleMessagesToBeNonEmpty(devToolsPage, 18);
 
-    await filterConsoleMessages('outer', devToolsPage);
-    await waitForConsoleMessagesToBeNonEmpty(3, devToolsPage);
+    await filterConsoleMessages(devToolsPage, 'outer');
+    await waitForConsoleMessagesToBeNonEmpty(devToolsPage, 3);
 
     await deleteConsoleMessagesFilter(devToolsPage);
-    await waitForConsoleMessagesToBeNonEmpty(18, devToolsPage);
+    await waitForConsoleMessagesToBeNonEmpty(devToolsPage, 18);
   });
 });

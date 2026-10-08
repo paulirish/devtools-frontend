@@ -27,10 +27,10 @@ import path from 'node:path';
  * the scripts directory, at which point we've found this file and can use it
  * for all subsequent logic.
  *
- * e.g. the user executes a script: scripts/test/run_lint_check.mjs
+ * e.g. the user executes a script: scripts/lint/run_lint_check.mjs
  *
  * process.argv[1] =
- * /full/path/devtools-frontend/src/scripts/test/run_lint_check.mjs
+ * /full/path/devtools-frontend/src/scripts/lint/run_lint_check.mjs
  */
 const PATH_TO_EXECUTED_FILE = process.argv[1];
 
@@ -164,6 +164,10 @@ export function litAnalyzerExecutablePath() {
  */
 export function tsconfigJsonPath() {
   return path.join(devtoolsRootPath(), 'front_end', 'tsconfig.json');
+}
+
+export function typescriptPyPath() {
+  return path.join(devtoolsRootPath(), 'third_party', 'typescript', 'typescript.py');
 }
 
 export function downloadedChromeBinaryPath() {

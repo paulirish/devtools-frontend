@@ -4,12 +4,13 @@
 
 import {assert} from 'chai';
 
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError} from '../../testing/InsightHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as Trace from '../trace/trace.js';
 
-describeWithEnvironment('TraceModel', function() {
+describe('TraceModel', function() {
+  setupLocaleHooks();
   it('dispatches an end event when the trace is done', async function() {
     const model = Trace.TraceModel.Model.createWithAllHandlers();
     const events: string[] = [];
@@ -166,7 +167,7 @@ describeWithEnvironment('TraceModel', function() {
         milli() {
           return 'FAKE-MILLI-TIME-FORMATTER';
         },
-      }
+      },
     });
     const result = model.parsedTrace();
     assert.isOk(result);
@@ -174,5 +175,27 @@ describeWithEnvironment('TraceModel', function() {
     const insight = getInsightOrError(
         'DocumentLatency', result.insights, getFirstOrError(result.data.Meta.navigationsByNavigationId.values()));
     assert.include(insight.data?.checklist.noRedirects.label ?? '', 'FAKE-MILLI-TIME-FORMATTER');
+  });
+
+  it('supports updating configuration across model and handlers', async function() {
+    const config = Trace.Types.Configuration.defaults();
+    config.enableSoftNavigation = false;
+    const model = Trace.TraceModel.Model.createWithAllHandlers(config);
+
+    const file = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
+    await model.parse(file);
+    let result = model.parsedTrace(0);
+    assert.isOk(result);
+    assert.strictEqual(result.data.Meta.softNavigationsById.size, 0);
+
+    const newConfig = Trace.Types.Configuration.defaults();
+    newConfig.enableSoftNavigation = true;
+    model.updateConfiguration(newConfig);
+    model.resetProcessor();
+
+    await model.parse(file);
+    result = model.parsedTrace(1);
+    assert.isOk(result);
+    assert.isAbove(result.data.Meta.softNavigationsById.size, 0);
   });
 });

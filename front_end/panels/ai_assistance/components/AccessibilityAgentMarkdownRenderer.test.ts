@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
@@ -51,12 +52,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'https://example.com',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
 
       mockDomModel.pushNodesByBackendIdsToFrontend.resolves(new Map([
         [23 as Protocol.DOM.BackendNodeId, mockNode],
@@ -90,12 +87,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'https://cross-origin.com',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://cross-origin.com'));
 
       mockDomModel.pushNodesByBackendIdsToFrontend.resolves(new Map([
         [23 as Protocol.DOM.BackendNodeId, mockNode],
@@ -114,7 +107,7 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
       assert.notInclude(el.textContent, 'LINKIFIED');
     });
 
-    it('linkifies nodes using #node-ID if both are identical data URLs', async () => {
+    it('does not linkify nodes if the document is a data URL', async () => {
       const targetManager = SDK.TargetManager.TargetManager.instance();
       const mockDomModel = sinon.createStubInstance(SDK.DOMModel.DOMModel);
 
@@ -129,12 +122,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'data:text/html,foo',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('data:text/html,foo'));
 
       mockDomModel.pushNodesByBackendIdsToFrontend.resolves(new Map([
         [23 as Protocol.DOM.BackendNodeId, mockNode],
@@ -146,16 +135,14 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
       const component = new MarkdownView.MarkdownView.MarkdownView();
       renderElementIntoDOM(component, {allowMultipleChildren: true});
 
-      const linkifyCalledPromise = expectCalled(linkifyStub);
-
       component.data = {
         tokens: Marked.Marked.lexer('[text](#node-23)'),
         renderer: new AiAssistance.AccessibilityAgentMarkdownRenderer(urlString`data:text/html,foo`),
       };
 
-      await linkifyCalledPromise;
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      sinon.assert.calledOnce(linkifyStub);
+      sinon.assert.notCalled(linkifyStub);
     });
 
     it('does not linkify nodes if they are different data URLs', async () => {
@@ -173,12 +160,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'data:text/html,bar',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('data:text/html,bar'));
 
       mockDomModel.pushNodesByBackendIdsToFrontend.resolves(new Map([
         [23 as Protocol.DOM.BackendNodeId, mockNode],
@@ -237,12 +220,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'https://example.com',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
 
       mockDomModel.pushNodeByPathToFrontend.resolves(42 as Protocol.DOM.NodeId);
       mockDomModel.nodeForId.returns(mockNode);
@@ -274,12 +253,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'https://example.com',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'));
 
       mockDomModel.pushNodeByPathToFrontend.resolves(42 as Protocol.DOM.NodeId);
       mockDomModel.nodeForId.returns(mockNode);
@@ -312,12 +287,8 @@ describeWithEnvironment('AccessibilityAgentMarkdownRenderer', () => {
 
       sinon.stub(targetManager, 'primaryPageTarget').returns(mockTarget);
 
-      const mockDocument = {
-        documentURL: 'https://cross-origin.com',
-      } as SDK.DOMModel.DOMDocument;
-      const mockNode = {
-        ownerDocument: mockDocument,
-      } as SDK.DOMModel.DOMNode;
+      const mockNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      mockNode.securityOrigin.returns(SDK.SecurityOrigin.SecurityOrigin.create('https://cross-origin.com'));
 
       mockDomModel.pushNodeByPathToFrontend.resolves(42 as Protocol.DOM.NodeId);
       mockDomModel.nodeForId.returns(mockNode);

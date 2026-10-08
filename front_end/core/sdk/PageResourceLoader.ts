@@ -17,12 +17,13 @@ import {
   type ResourceTreeFrame,
   ResourceTreeModel,
 } from './ResourceTreeModel.js';
+import {cacheDisabledSettingDescriptor, enableRemoteFileLoadingSettingDescriptor} from './SDKSettings.js';
 import type {Target} from './Target.js';
 import {TargetManager} from './TargetManager.js';
 
 const UIStrings = {
   /**
-   * @description Error message for canceled source map loads
+   * @description Error message for canceled source map loads.
    */
   loadCanceledDueToReloadOf: 'Load canceled due to reload of inspected page',
 } as const;
@@ -135,11 +136,13 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
     loadOverride: null,
   }): PageResourceLoader {
     if (forceNew) {
+      /* eslint-disable @devtools/no-instance-of-migrated-singletons */
       Root.DevToolsContext.globalInstance().set(
           PageResourceLoader,
           new PageResourceLoader(
               targetManager ?? TargetManager.instance(), settings ?? Common.Settings.Settings.instance(),
               userAgentProvider ?? MultitargetNetworkManager.instance(), loadOverride, maxConcurrentLoads));
+      /* eslint-enable @devtools/no-instance-of-migrated-singletons */
     }
 
     return Root.DevToolsContext.globalInstance().get(PageResourceLoader);
@@ -314,6 +317,29 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
     }
   }
 
+  #resolveFrameTarget(initiator: PageResourceLoadInitiator): {
+    frameTarget: Target|null,
+    frameId: Protocol.Page.FrameId|null,
+  } {
+    let frameTarget: Target|null = initiator.target;
+    let parentFrameId: Protocol.Page.FrameId|null = null;
+    while (frameTarget && !frameTarget.model(ResourceTreeModel)) {
+      parentFrameId = parentFrameId ?? frameTarget.targetInfo()?.parentFrameId ?? null;
+      frameTarget = frameTarget.parentTarget();
+    }
+    const frameId = initiator.frameId ?? parentFrameId ?? frameTarget?.model(ResourceTreeModel)?.mainFrame?.id ?? null;
+    return {frameTarget, frameId};
+  }
+
+  #isSameOriginWithPrimaryPage(frameTarget: Target|null, frameId: Protocol.Page.FrameId|null): boolean {
+    const primaryFrame = this.#targetManager.primaryPageTarget()?.model(ResourceTreeModel)?.mainFrame;
+    const initiatorFrame = frameId ? frameTarget?.model(ResourceTreeModel)?.frameForId(frameId) : null;
+    if (!primaryFrame || !initiatorFrame) {
+      return false;
+    }
+    return initiatorFrame.securityOrigin().isSameOriginWith(primaryFrame.securityOrigin());
+  }
+
   private async dispatchLoad(
       url: Platform.DevToolsPath.UrlString, initiator: PageResourceLoadInitiator, isBinary: boolean): Promise<{
     success: boolean,
@@ -334,42 +360,40 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
         initiator.target;
     Host.userMetrics.developerResourceScheme(this.getDeveloperResourceScheme(parsedURL));
     if (eligibleForLoadFromTarget) {
-      let mustEnforceCSP = false;
       const isHttp = parsedURL.scheme === 'http' || parsedURL.scheme === 'https';
-      if (isHttp && initiator.target) {
-        const networkManager = initiator.target.model(NetworkManager);
+      // Default to enforcing CSP for http(s) resources (fail-closed). Only relax
+      // if the isolation-status query positively confirms no connect-src/default-src
+      // directive is present. A null/error response keeps the guard armed so that a
+      // detached-frame or protocol-error path cannot fall through to loadFromHostBindings.
+      let mustEnforceCSP = isHttp;
+      const {frameTarget, frameId} = this.#resolveFrameTarget(initiator);
+      if (isHttp && frameTarget) {
+        const networkManager = frameTarget.model(NetworkManager);
         if (networkManager) {
-          let status = await networkManager.getSecurityIsolationStatus(initiator.frameId);
-          if (!status && initiator.frameId) {
-            status = await networkManager.getSecurityIsolationStatus(null);
-          }
+          const status = await networkManager.getSecurityIsolationStatus(frameId);
           if (status?.csp) {
-            for (const csp of status.csp) {
-              const directives = csp.effectiveDirectives;
-              if (directives.includes('connect-src') || directives.includes('default-src')) {
-                mustEnforceCSP = true;
-                break;
-              }
-            }
+            mustEnforceCSP = status.csp.some(csp => csp.effectiveDirectives.includes('connect-src') ||
+                                                 csp.effectiveDirectives.includes('default-src'));
           }
         }
       }
 
       try {
         Host.userMetrics.developerResourceLoaded(Host.UserMetrics.DeveloperResourceLoaded.LOAD_THROUGH_PAGE_VIA_TARGET);
-        const result = await this.loadFromTarget(initiator.target, initiator.frameId, url, isBinary);
+        const result = await this.loadFromTarget(frameTarget ?? initiator.target, frameId, url, isBinary);
         return result;
       } catch (e) {
         if (e instanceof Error) {
           Host.userMetrics.developerResourceLoaded(Host.UserMetrics.DeveloperResourceLoaded.LOAD_THROUGH_PAGE_FAILURE);
-          if (mustEnforceCSP || e.message.includes('CSP violation')) {
+          if (mustEnforceCSP || !this.#isSameOriginWithPrimaryPage(frameTarget, frameId) ||
+              e.message.includes('CSP violation')) {
             return {
               success: false,
               content: '',
               errorDescription: {
                 statusCode: 0,
                 message: e.message,
-              }
+              },
             };
           }
         }
@@ -431,7 +455,7 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
   }> {
     const networkManager = (target.model(NetworkManager) as NetworkManager);
     const ioModel = (target.model(IOModel) as IOModel);
-    const disableCache = this.#settings.moduleSetting('cache-disabled').get();
+    const disableCache = this.#settings.resolve(cacheDisabledSettingDescriptor).get();
     const resource = await networkManager.loadNetworkResource(frameId, url, {disableCache, includeCredentials: true});
     try {
       const content = resource.stream ?
@@ -468,11 +492,11 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
       headers['User-Agent'] = currentUserAgent;
     }
 
-    if (this.#settings.moduleSetting('cache-disabled').get()) {
+    if (this.#settings.resolve(cacheDisabledSettingDescriptor).get()) {
       headers['Cache-Control'] = 'no-cache';
     }
 
-    const allowRemoteFilePaths = this.#settings.moduleSetting('network.enable-remote-file-loading').get();
+    const allowRemoteFilePaths = this.#settings.resolve(enableRemoteFileLoadingSettingDescriptor).get();
 
     return await new Promise(
         resolve => Host.ResourceLoader.load(url, headers, (success, _responseHeaders, content, errorDescription) => {

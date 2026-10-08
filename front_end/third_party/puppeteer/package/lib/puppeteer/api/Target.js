@@ -23,15 +23,18 @@ export var TargetType;
 /**
  * Target represents a
  * {@link https://chromedevtools.github.io/devtools-protocol/tot/Target/ | CDP target}.
- * In CDP a target is something that can be debugged such a frame, a page or a
+ * In CDP a target is something that can be debugged, such as a frame, a page or a
  * worker.
  * @public
  */
 export class Target {
+    logger;
     /**
      * @internal
      */
-    constructor() { }
+    constructor(logger) {
+        this.logger = logger;
+    }
     /**
      * If the target is not of type `"service_worker"` or `"shared_worker"`, returns `null`.
      */

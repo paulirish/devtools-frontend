@@ -16,23 +16,23 @@ import {ServiceWorkerCacheView} from './ServiceWorkerCacheViews.js';
 
 const UIStrings = {
   /**
-   * @description Text in Application Panel Sidebar of the Application panel
+   * @description Label for the cache storage tree element in the Application panel sidebar.
    */
   cacheStorage: 'Cache storage',
   /**
-   * @description Text in Application Panel if no cache storage was detected.
+   * @description Empty state title in the Application panel when no cache storage is detected.
    */
   noCacheStorage: 'No cache storage detected',
   /**
-   * @description Description text in Application Panel describing the cache storage tab
+   * @description Empty state description in the Application panel describing the cache storage view.
    */
-  cacheStorageDescription: 'On this page you can view and delete cache data.',
+  cacheStorageDescription: 'On this page you can view and delete cache data',
   /**
-   * @description A context menu item in the Application Panel Sidebar of the Application panel
+   * @description Context menu item in the Application panel sidebar to refresh caches.
    */
-  refreshCaches: 'Refresh Caches',
+  refreshCaches: 'Refresh caches',
   /**
-   * @description Text to delete something
+   * @description Context menu item in the Application panel sidebar to delete a cache.
    */
   delete: 'Delete',
 } as const;
@@ -41,6 +41,8 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTreeElement {
   private swCacheModels: Set<SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel>;
   private swCacheTreeElements: Set<SWCacheTreeElement>;
+  private swCacheModelObserver?:
+      SDK.TargetManager.SDKModelObserver<SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel>;
   private storageBucket?: Protocol.Storage.StorageBucket;
 
   constructor(resourcesPanel: ResourcesPanel, storageBucket?: Protocol.Storage.StorageBucket) {
@@ -53,17 +55,25 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
     this.swCacheModels = new Set();
     this.swCacheTreeElements = new Set();
     this.storageBucket = storageBucket;
+    this.initialize();
   }
 
   initialize(): void {
+    this.removeChildren();
     this.swCacheModels.clear();
     this.swCacheTreeElements.clear();
-    SDK.TargetManager.TargetManager.instance().observeModels(SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, {
+    if (this.swCacheModelObserver) {
+      SDK.TargetManager.TargetManager.instance().unobserveModels(SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel,
+                                                                 this.swCacheModelObserver);
+    }
+    this.swCacheModelObserver = {
       modelAdded: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel) =>
           this.serviceWorkerCacheModelAdded(model),
       modelRemoved: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel) =>
           this.serviceWorkerCacheModelRemoved(model),
-    });
+    };
+    SDK.TargetManager.TargetManager.instance().observeModels(SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel,
+                                                             this.swCacheModelObserver, {scoped: true});
   }
 
   override onattach(): void {

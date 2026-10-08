@@ -14,7 +14,7 @@ devtools_ui_module("linear_memory_inspector") {
     "LinearMemoryInspectorPane.ts",
   ]
 
-  deps = [
+  ts_deps = [
     "../../core/common:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
@@ -33,10 +33,7 @@ devtools_ui_module("linear_memory_inspector") {
 devtools_entrypoint("bundle") {
   entrypoint = "linear_memory_inspector.ts"
 
-  deps = [
-    ":linear_memory_inspector",
-    "../../ui/legacy:css_files",
-  ]
+  ts_deps = [ ":linear_memory_inspector" ]
 
   visibility = [
     ":*",
@@ -50,7 +47,7 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "linear_memory_inspector-meta.ts"
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/common:bundle",
     "../../core/i18n:bundle",
@@ -70,7 +67,7 @@ devtools_ui_module("unittests") {
     "LinearMemoryInspectorPane.test.ts",
   ]
 
-  deps = [
+  ts_deps = [
     ":bundle",
     "../../core/sdk:bundle",
     "../../testing",

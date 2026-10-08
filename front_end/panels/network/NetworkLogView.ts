@@ -40,25 +40,29 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as Annotations from '../../models/annotations/annotations.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as Persistence from '../../models/persistence/persistence.js';
-import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as Workspace from '../../models/workspace/workspace.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as Sources from '../../panels/sources/sources.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
+import dataGridAiButtonStyles from '../../ui/legacy/components/data_grid/dataGridAiButton.css.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Settings from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
+import {commentForbiddenHeaders, isForbiddenHeader} from './FetchHeaderCommenting.js';
+import {canPreloadRequest, generatePreloadLink} from './LinkPreloadGenerator.js';
 import {
   Events,
   type EventTypes,
@@ -144,7 +148,7 @@ const UIStrings = {
    * @example {Ctrl + R} PH2
    */
   performARequestOrHitSToRecordThe:
-      'Perform a request or reload the page by using the "{PH1}" button or by pressing {PH2}.',
+      'Perform a request or reload the page by using the "{PH1}" button or by pressing {PH2}',
   /**
    * @description Shown in the Network Log View of the Network panel when the user has not yet
    * recorded any network activity. This is an instruction to the user to start recording in order to
@@ -153,7 +157,7 @@ const UIStrings = {
    * @example {Ctrl + E} PH2
    */
   recordToDisplayNetworkActivity:
-      'Record network log to display network activity by using the "{PH1}" button or by pressing {PH2}.',
+      'Record network log to display network activity by using the "{PH1}" button or by pressing {PH2}',
   /**
    * @description Label of a button in the Network Log View of the Network panel.
    */
@@ -170,7 +174,7 @@ const UIStrings = {
   /**
    * @description Text to announce to screen readers that network data is available.
    */
-  networkDataAvailable: 'Network Data Available',
+  networkDataAvailable: 'Network data available',
   /**
    * @description Text in Network Log View of the Network panel
    * @example {3} PH1
@@ -282,6 +286,11 @@ const UIStrings = {
    * refers to the format the data will be copied as, which is compatible with the fetch web API.
    */
   copyAsFetch: 'Copy as `fetch`',
+  /**
+   * @description A context menu command in the Network panel, for copying a resource's link element
+   * to the clipboard. 'preload' refers to the HTML link relation format the data will be copied as.
+   */
+  copyAsPreload: 'Copy as preload element',
   /**
    * @description Text in Network Log View of the Network panel. An action that copies a command to
    * the developer's clipboard. The command allows the developer to replay this specific network
@@ -459,9 +468,36 @@ const UIStrings = {
    */
   blockRequestDomain: 'Block request domain',
   /**
-   * @description Text to replay an XHR request
+   * @description Text to resend a network request
    */
-  replayXhr: 'Replay XHR',
+  resend: 'Resend',
+  /**
+   * @description A context menu command in the Network panel that copies a request as an editable
+   * fetch command and pastes it into the Console for the user to modify before resending.
+   */
+  editAndResendAsFetch: 'Edit and resend as fetch',
+  /**
+   * @description Console message that appears when using "Edit and resend as fetch" feature.
+   * Indicates that a resendable copy of a request has been placed in the console.
+   * @example {GET} PH1
+   * @example {api/data} PH2
+   */
+  resendableCopyOfRequest: 'Resendable copy of {PH1} request to {PH2}',
+  /**
+   * @description Comment added before a generated fetch command, indicating which execution
+   * context the original request was sent from.
+   * @example {top} PH1
+   */
+  originallyCalledFromContext: '// Originally called from {PH1} context',
+  /**
+   * @description Comment added before a generated fetch command, advising the user to select
+   * the execution context in the Console toolbar to resend from the same context.
+   */
+  selectExecutionContextInConsole: '// To resend from the same execution context, select it in the Console’s toolbar',
+  /**
+   * @description Comment added after a generated fetch command, inviting the user to edit before resending.
+   */
+  editAndEnterToResend: '// Make any edits, then ENTER to resend',
   /**
    * @description Text in Network Log View of the Network panel
    */
@@ -503,6 +539,11 @@ const UIStrings = {
    * @description Context menu item in Network panel to assess security headers of a request via AI.
    */
   assessSecurityHeaders: 'Assess security headers',
+  /**
+   * @description A comment in a generated command indicating that the URL scheme is unsupported. The placeholder is the comment prefix (e.g. '//' or '#').
+   * @example {//} PH1
+   */
+  unsupportedUrlScheme: '{PH1} Unsupported URL scheme',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkLogView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -512,8 +553,13 @@ const enum FetchStyle {
   NODE_JS = 1,
 }
 
-export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
-    implements SDK.TargetManager.SDKModelObserver<SDK.NetworkManager.NetworkManager>, NetworkLogViewInterface {
+const NetworkLogViewBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widget.VBox> =
+    Common.ObjectWrapper.eventMixin(
+        UI.Widget.VBox,
+    );
+
+export class NetworkLogView extends NetworkLogViewBase implements
+    SDK.TargetManager.SDKModelObserver<SDK.NetworkManager.NetworkManager>, NetworkLogViewInterface {
   private readonly networkInvertFilterSetting: Common.Settings.Setting<boolean>;
   private readonly networkHideDataURLSetting: Common.Settings.Setting<boolean>;
   private readonly networkHideChromeExtensions: Common.Settings.Setting<boolean>;
@@ -555,11 +601,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly textFilterSetting: Common.Settings.Setting<string>;
   private networkRequestToNode: WeakMap<SDK.NetworkRequest.NetworkRequest, NetworkRequestNode>;
 
-  constructor(
-      filterBar: UI.FilterBar.FilterBar, progressBarContainer: Element,
-      networkLogLargeRowsSetting: Common.Settings.Setting<boolean>) {
+  constructor(filterBar: UI.FilterBar.FilterBar, progressBarContainer: Element,
+              networkLogLargeRowsSetting: Common.Settings.Setting<boolean>) {
     super();
     this.registerRequiredCSS(networkLogViewStyles);
+    this.registerRequiredCSS(dataGridAiButtonStyles);
     this.setMinimumSize(50, 64);
 
     this.element.id = 'network-container';
@@ -579,8 +625,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         Common.Settings.Settings.instance().createSetting('network-only-third-party-setting', false);
     this.networkResourceTypeFiltersSetting =
         Common.Settings.Settings.instance().createSetting('network-resource-type-filters', {});
-    this.networkShowOptionsToGenerateHarWithSensitiveData = Common.Settings.Settings.instance().createSetting(
-        'network.show-options-to-generate-har-with-sensitive-data', false);
+    this.networkShowOptionsToGenerateHarWithSensitiveData = Common.Settings.Settings.instance().resolve(
+        Settings.NetworkSettings.showOptionsToGenerateHarWithSensitiveDataSettingDescriptor);
 
     this.progressBarContainer = progressBarContainer;
     this.networkLogLargeRowsSetting = networkLogLargeRowsSetting;
@@ -671,7 +717,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         this.element, [UI.DropTarget.Type.File], i18nString(UIStrings.dropHarFilesHere), this.handleDrop.bind(this));
 
     Common.Settings.Settings.instance()
-        .moduleSetting('network-color-code-resource-types')
+        .resolve(Settings.NetworkSettings.colorCodeResourceTypesSettingDescriptor)
         .addChangeListener(this.invalidateAllItems.bind(this, false), this);
 
     SDK.TargetManager.TargetManager.instance().observeModels(SDK.NetworkManager.NetworkManager, this, {scoped: true});
@@ -685,7 +731,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
     this.updateGroupByFrame();
     Common.Settings.Settings.instance()
-        .moduleSetting('network.group-by-frame')
+        .resolve(Settings.NetworkSettings.groupByFrameSettingDescriptor)
         .addChangeListener(() => this.updateGroupByFrame());
 
     this.filterBar = filterBar;
@@ -697,7 +743,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   private updateGroupByFrame(): void {
-    const value = Common.Settings.Settings.instance().moduleSetting('network.group-by-frame').get();
+    const value =
+        Common.Settings.Settings.instance().resolve(Settings.NetworkSettings.groupByFrameSettingDescriptor).get();
     this.setGrouping(value ? 'Frame' : null);
   }
 
@@ -718,12 +765,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     return !filter(request);
   }
 
-  private static requestPathFilter(regex: RegExp|null, request: SDK.NetworkRequest.NetworkRequest): boolean {
+  private static requestHostAndPathFilter(regex: RegExp|null, request: SDK.NetworkRequest.NetworkRequest): boolean {
     if (!regex) {
       return false;
     }
-
-    return regex.test(request.path() + '/' + request.name());
+    return regex.test(request.parsedURL.urlWithoutScheme());
   }
 
   private static subdomains(domain: string): string[] {
@@ -759,6 +805,10 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
   private static initiatedByServiceWorkerFilter(request: SDK.NetworkRequest.NetworkRequest): boolean {
     return request.initiatedByServiceWorker();
+  }
+
+  private static linkPreloadRequestFilter(request: SDK.NetworkRequest.NetworkRequest): boolean {
+    return request.isLinkPreload();
   }
 
   private static requestResponseHeaderFilter(value: string, request: SDK.NetworkRequest.NetworkRequest): boolean {
@@ -982,14 +1032,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     return this.summaryToolbarInternal;
   }
 
-  getDataGrid(): DataGrid.SortableDataGrid.SortableDataGrid<NetworkNode>|null {
-    if (Annotations.AnnotationRepository.annotationsEnabled()) {
-      return this.dataGrid;
-    }
-
-    return null;
-  }
-
   modelAdded(networkManager: SDK.NetworkManager.NetworkManager): void {
     // TODO(allada) Remove dependency on networkManager and instead use NetworkLog and PageLoad for needed data.
     const target = networkManager.target();
@@ -1020,7 +1062,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       resourceTreeModel.removeEventListener(
           SDK.ResourceTreeModel.Events.DOMContentLoaded, this.domContentLoadedEventFired, this);
     }
-    const preserveLog = Common.Settings.Settings.instance().moduleSetting('network-log.preserve-log').get();
+    const preserveLog =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.preserveNetworkLogSettingDescriptor).get();
     if (!preserveLog) {
       this.reset();
     }
@@ -1054,6 +1097,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         NetworkForward.UIFilter.FilterType.Is, NetworkForward.UIFilter.IsFilterType.SERVICE_WORKER_INTERCEPTED);
     this.suggestionBuilder.addItem(
         NetworkForward.UIFilter.FilterType.Is, NetworkForward.UIFilter.IsFilterType.SERVICE_WORKER_INITIATED);
+    this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.Is, NetworkForward.UIFilter.IsFilterType.PRELOAD);
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.LargerThan, '100');
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.LargerThan, '10k');
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.LargerThan, '1M');
@@ -1105,7 +1149,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         jslogContext: actionName,
         variant: Buttons.Button.Variant.TONAL,
       });
-      this.recordingHint.contentElement.appendChild(button);
+      this.recordingHint.element.appendChild(button);
     }
 
     this.recordingHint.show(this.element);
@@ -1173,9 +1217,9 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
           return;
         }
 
-        if (SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
+        if (SDK.NetworkManager.NetworkManager.canResendRequest(request, true)) {
           SDK.NetworkManager.NetworkManager.replayRequest(request);
-          void VisualLogging.logKeyDown(this.dataGrid.selectedNode.element(), event, 'replay-xhr');
+          void VisualLogging.logKeyDown(this.dataGrid.selectedNode.element(), event, 'resend');
         }
       }
     });
@@ -1563,6 +1607,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
   private reset(): void {
     this.dispatchEventToListeners(Events.RequestActivated, {showPanel: RequestPanelBehavior.HidePanel});
+    this.dispatchEventToListeners(Events.RequestSelected, null);
 
     this.setHoveredNode(null);
     this.columnsInternal.reset();
@@ -1644,7 +1689,10 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.Scheme, String(request.scheme));
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.StatusCode, String(request.statusCode));
     this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.ResourceType, request.resourceType().name());
-    this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.Url, request.securityOrigin());
+    const requestURLSecurityOrigin = request.requestURLSecurityOrigin();
+    if (!requestURLSecurityOrigin.isOpaque()) {
+      this.suggestionBuilder.addItem(NetworkForward.UIFilter.FilterType.Url, requestURLSecurityOrigin.siteId());
+    }
 
     const priority = request.priority();
     if (priority) {
@@ -1802,6 +1850,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NODE_JS),
           {disabled: disableIfBlob, jslogContext: 'copy-as-nodejs-fetch'});
+      this.appendCopyAsPreloadItem(copyMenu, request);
 
       if (Host.Platform.isWin()) {
         copyMenu.footerSection().appendItem(
@@ -1961,10 +2010,16 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
             {jslogContext: 'throttle-request-domain'});
       }
 
-      if (SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request),
-            {jslogContext: 'replay-xhr'});
+      if (SDK.NetworkManager.NetworkManager.canResendRequest(request, true)) {
+        contextMenu.debugSection().appendItem(i18nString(UIStrings.resend),
+                                              SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request),
+                                              {jslogContext: 'resend'});
+      }
+
+      if (SDK.NetworkManager.NetworkManager.canResendRequest(request, false)) {
+        contextMenu.debugSection().appendItem(i18nString(UIStrings.editAndResendAsFetch),
+                                              this.resendFromConsole.bind(this, request),
+                                              {jslogContext: 'edit-and-resend-as-fetch'});
       }
     }
   }
@@ -2001,6 +2056,27 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(commands);
   }
 
+  private copyPreloadElement(request: SDK.NetworkRequest.NetworkRequest): void {
+    const preloadLink = generatePreloadLink(request);
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(preloadLink);
+  }
+
+  private appendCopyAsPreloadItem(copyMenu: UI.ContextMenu.SubMenu, request: SDK.NetworkRequest.NetworkRequest): void {
+    const isHttpOrHttps = request.parsedURL.scheme === 'http' || request.parsedURL.scheme === 'https';
+    const isGetRequest = request.requestMethod === 'GET';
+
+    const networkManager = SDK.NetworkManager.NetworkManager.forRequest(request);
+    const resourceTreeModel = networkManager?.target().model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const isMainDocument = Boolean(resourceTreeModel?.mainFrame && resourceTreeModel.mainFrame.id === request.frameId &&
+                                   request.resourceType() === Common.ResourceType.resourceTypes.Document);
+
+    const disablePreload =
+        !isHttpOrHttps || request.isBlobRequest() || !isGetRequest || isMainDocument || !canPreloadRequest(request);
+    copyMenu.defaultSection().appendItem(i18nString(UIStrings.copyAsPreload),
+                                         this.copyPreloadElement.bind(this, request),
+                                         {disabled: disablePreload, jslogContext: 'copy-as-preload'});
+  }
+
   private async copyFetchCall(request: SDK.NetworkRequest.NetworkRequest, style: FetchStyle): Promise<void> {
     const command = await this.generateFetchCall(request, style);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(command);
@@ -2010,6 +2086,85 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     const requests = Logs.NetworkLog.NetworkLog.instance().requests().filter(request => this.applyFilter(request));
     const commands = await this.generateAllFetchCall(requests, style);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(commands);
+  }
+
+  private async resendFromConsole(request: SDK.NetworkRequest.NetworkRequest): Promise<void> {
+    // Record telemetry
+    Host.userMetrics.editResendRequest(Host.UserMetrics.resendRequestType(request.resourceType()));
+
+    // Step 1: Generate an editable fetch command that retains forbidden headers as comments.
+    let fetchCommand = await this.generateFetchCall(request, FetchStyle.BROWSER, {commentForbiddenHeaders: true});
+
+    // Step 2: Prepend 'await' unless already present
+    if (!fetchCommand.startsWith('await ')) {
+      fetchCommand = 'await ' + fetchCommand;
+    }
+
+    // Prepend execution context guidance comments
+    const contextDescription = NetworkRequestNode.getExecutionContextDescription(request);
+    if (contextDescription) {
+      const contextComments = i18nString(UIStrings.originallyCalledFromContext, {PH1: contextDescription}) + '\n' +
+          i18nString(UIStrings.selectExecutionContextInConsole) + '\n';
+      fetchCommand = contextComments + fetchCommand;
+    }
+
+    // Append invitation to edit before resending
+    fetchCommand += '\n' + i18nString(UIStrings.editAndEnterToResend);
+
+    // Step 3: Show the console drawer (without switching away from network panel)
+    UI.InspectorView.InspectorView.instance().showDrawer({focus: false, hasTargetDrawer: true});
+    void UI.ViewManager.ViewManager.instance().showView('console-view', /* userGesture */ false, /* omitFocus */ true);
+
+    // Step 4: Log console message with link to original request
+    NetworkLogView.logResendConsoleMessage(request);
+
+    // Step 5: Inject fetch command into console prompt
+    const consoleViewWrapper = await UI.ViewManager.ViewManager.instance().view('console-view');
+    if (!consoleViewWrapper) {
+      return;
+    }
+    const widget = await consoleViewWrapper.widget();
+
+    // Use a minimal interface to avoid circular imports
+    interface ConsoleViewWithPrompt {
+      insertIntoPrompt(text: string): void;
+    }
+    const consoleView = widget as unknown as Partial<ConsoleViewWithPrompt>;
+    if (typeof consoleView.insertIntoPrompt !== 'function') {
+      return;
+    }
+    consoleView.insertIntoPrompt(fetchCommand);
+  }
+
+  private static logResendConsoleMessage(request: SDK.NetworkRequest.NetworkRequest): void {
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    if (!target) {
+      return;
+    }
+    const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    if (!runtimeModel || !consoleModel) {
+      return;
+    }
+    const method = request.requestMethod;
+    const name = request.name();
+    const logMessage = i18nString(UIStrings.resendableCopyOfRequest, {PH1: method, PH2: name});
+    const requestId = request.requestId();
+
+    const message = new SDK.ConsoleModel.ConsoleMessage(
+        runtimeModel, Protocol.Log.LogEntrySource.Network, Protocol.Log.LogEntryLevel.Info, logMessage, {
+          affectedResources: {requestId: requestId as Protocol.Network.RequestId},
+        });
+    consoleModel.addMessage(message);
+
+    // Associate message with request for bidirectional linking
+    Logs.NetworkLog.NetworkLog.instance().associateConsoleMessageWithRequest(message, requestId);
+
+    // Clear the initiator-derived fields to prevent confusing "VM123:1" display
+    message.url = undefined;
+    message.line = 0;
+    message.column = 0;
+    message.stackTrace = undefined;
   }
 
   private async copyPowerShellCommand(request: SDK.NetworkRequest.NetworkRequest): Promise<void> {
@@ -2031,7 +2186,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     const url = mainTarget.inspectedURL();
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
     const filename = (parsedURL ? parsedURL.host : 'network-log') as Platform.DevToolsPath.RawPathString;
-    const stream = new Bindings.FileUtils.FileOutputStream();
+    const stream = new Bindings.FileUtils.FileOutputStream(Workspace.FileManager.FileManager.instance());
 
     if (!await stream.open(Common.ParsedURL.ParsedURL.concatenate(filename, '.har'))) {
       return;
@@ -2048,12 +2203,14 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         NetworkForward.UIRequestLocation.UIRequestLocation.responseHeaderMatch(request, {name: '', value: ''});
     const networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
     if (networkPersistenceManager.project()) {
-      Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(true);
+      Common.Settings.Settings.instance()
+          .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
+          .set(true);
       await networkPersistenceManager.getOrCreateHeadersUISourceCodeFromUrl(request.url());
       await Common.Revealer.reveal(requestLocation);
     } else {  // If folder for local overrides has not been provided yet
       UI.InspectorView.InspectorView.instance().displaySelectOverrideFolderInfobar(async () => {
-        await Sources.SourcesNavigator.OverridesNavigatorView.instance().setupNewWorkspace();
+        await Sources.SourcesNavigator.OverridesNavigatorView.setupNewWorkspace();
         await networkPersistenceManager.getOrCreateHeadersUISourceCodeFromUrl(request.url());
         await Common.Revealer.reveal(requestLocation);
       });
@@ -2134,13 +2291,13 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       if (key) {
         const defaultText = Platform.StringUtilities.escapeForRegExp(key + ':' + text);
         filter = this.createSpecialFilter((key as NetworkForward.UIFilter.FilterType), text) ||
-            NetworkLogView.requestPathFilter.bind(null, new RegExp(defaultText, 'i'));
+            NetworkLogView.requestHostAndPathFilter.bind(null, new RegExp(defaultText, 'i'));
       } else if (descriptor.regex) {
-        filter = NetworkLogView.requestPathFilter.bind(null, (regex as RegExp));
+        filter = NetworkLogView.requestHostAndPathFilter.bind(null, (regex as RegExp));
       } else if (this.isValidUrl(text)) {
         filter = NetworkLogView.requestUrlFilter.bind(null, text);
       } else {
-        filter = NetworkLogView.requestPathFilter.bind(
+        filter = NetworkLogView.requestHostAndPathFilter.bind(
             null, new RegExp(Platform.StringUtilities.escapeForRegExp(text), 'i'));
       }
       if ((descriptor.negative && !invert) || (!descriptor.negative && invert)) {
@@ -2176,6 +2333,9 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         }
         if (value.toLowerCase() === NetworkForward.UIFilter.IsFilterType.SERVICE_WORKER_INITIATED) {
           return NetworkLogView.initiatedByServiceWorkerFilter;
+        }
+        if (value.toLowerCase() === NetworkForward.UIFilter.IsFilterType.PRELOAD) {
+          return NetworkLogView.linkPreloadRequestFilter;
         }
         break;
 
@@ -2316,49 +2476,46 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     return requests.filter(request => !request.isBlobRequest());
   }
 
-  private async generateFetchCall(request: SDK.NetworkRequest.NetworkRequest, style: FetchStyle): Promise<string> {
-    const ignoredHeaders = new Set<string>([
-      // Internal headers
-      'method',
-      'path',
-      'scheme',
-      'version',
+  static #getValidClipboardUrl(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.UrlString|null {
+    // `hasWebSafeScheme` unwraps `blob:` and `filesystem:` URLs to check their inner origin,
+    // but standalone CLI tools (cURL, PowerShell, fetch) cannot request browser-internal URLs.
+    if (Common.ParsedURL.schemeIs(url, 'blob:') || Common.ParsedURL.schemeIs(url, 'filesystem:') ||
+        !Common.ParsedURL.hasWebSafeScheme(url)) {
+      return null;
+    }
+    return url;
+  }
 
-      // Unsafe headers
-      // Keep this list synchronized with src/net/http/http_util.cc
-      'accept-charset',
-      'accept-encoding',
-      'access-control-request-headers',
-      'access-control-request-method',
-      'connection',
-      'content-length',
-      'cookie',
-      'cookie2',
-      'date',
-      'dnt',
-      'expect',
-      'host',
-      'keep-alive',
-      'origin',
-      'referer',
-      'te',
-      'trailer',
-      'transfer-encoding',
-      'upgrade',
-      'via',
+  private async generateFetchCall(request: SDK.NetworkRequest.NetworkRequest, style: FetchStyle,
+                                  generateOptions?: {commentForbiddenHeaders?: boolean}): Promise<string> {
+    // Editable fetch commands retain unsafe headers so the generated output can
+    // show them as comments, but still omit protocol-internal pseudo-headers.
+    const internalOnly = new Set<string>(['method', 'path', 'scheme', 'version']);
+    const shouldFilterHeader = (name: string, value: string): boolean => {
+      const lowerName = name.toLowerCase();
+      if (internalOnly.has(lowerName) || name.includes(':')) {
+        return true;
+      }
+      if (generateOptions?.commentForbiddenHeaders) {
+        return false;
+      }
       // TODO(phistuck) - remove this once crbug.com/571722 is fixed.
-      'user-agent',
-    ]);
+      return lowerName === 'user-agent' || isForbiddenHeader(name, value);
+    };
 
     const credentialHeaders = new Set<string>(['cookie', 'authorization']);
 
-    const url = JSON.stringify(request.url());
+    const validUrl = NetworkLogView.#getValidClipboardUrl(request.url());
+    if (!validUrl) {
+      return i18nString(UIStrings.unsupportedUrlScheme, {PH1: '//'});
+    }
+    const url = JSON.stringify(validUrl);
 
     const requestHeaders = request.requestHeaders();
     const headerData: Headers = requestHeaders.reduce((result, header) => {
       const name = header.name;
 
-      if (!ignoredHeaders.has(name.toLowerCase()) && !name.includes(':')) {
+      if (!shouldFilterHeader(name, header.value)) {
         result.append(name, header.value);
       }
 
@@ -2412,7 +2569,10 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       fetchOptions.credentials = credentials;
     }
 
-    const options = JSON.stringify(fetchOptions, null, 2);
+    let options = JSON.stringify(fetchOptions, null, 2);
+    if (generateOptions?.commentForbiddenHeaders) {
+      options = commentForbiddenHeaders(options);
+    }
     return `fetch(${url}, ${options});`;
   }
 
@@ -2466,7 +2626,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       return encapsChars +
           str.replace(/\\/g, '\\\\')
               .replace(/"/g, '\\"')
-              .replace(/[^a-zA-Z0-9\s_\-:=+~'\/.',?;()*`]/g, '^$&')
+              .replace(/[^a-zA-Z0-9\s_\-:=+~'\/.',?;*]/g, '^$&')
               .replace(/%(?=[a-zA-Z0-9_])/g, '%^')
               .replace(/[^ -~\r\n]/g, ' ')
               .replace(/\r?\n|\r/g, '^\n\n') +
@@ -2504,7 +2664,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     // (it may be different from the inspected page platform).
     const escapeString = platform === 'win' ? escapeStringWin : escapeStringPosix;
 
-    command.push(escapeString(request.url()).replace(/[[{}\]]/g, '\\$&'));
+    const validUrl = NetworkLogView.#getValidClipboardUrl(request.url());
+    if (!validUrl) {
+      return i18nString(UIStrings.unsupportedUrlScheme, {PH1: '#'});
+    }
+    command.push('--url ' + escapeString(validUrl).replace(/[[{}\]]/g, '\\$&'));
 
     let inferredMethod = 'GET';
     const data = [];
@@ -2610,7 +2774,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       return null;
     }
 
-    command.push('-Uri ' + escapeString(request.url()));
+    const validUrl = NetworkLogView.#getValidClipboardUrl(request.url());
+    if (!validUrl) {
+      return i18nString(UIStrings.unsupportedUrlScheme, {PH1: '#'});
+    }
+    command.push('-Uri ' + escapeString(validUrl));
 
     if (request.requestMethod !== 'GET') {
       command.push('-Method ' + escapeString(request.requestMethod));

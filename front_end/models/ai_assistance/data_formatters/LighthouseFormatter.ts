@@ -7,6 +7,12 @@ import type * as LHModel from '../../lighthouse/lighthouse.js';
 import {bytes, millis} from './UnitFormatters.js';
 
 /**
+ * Category argument for Lighthouse tools, accepting a specific category ID or `'all'`
+ * to target a full report across all standard categories.
+ */
+export type LighthouseCategoryArg = 'all'|LHModel.RunTypes.CategoryId;
+
+/**
  * A formatter that takes a raw Lighthouse report JSON and creates a markdown
  * summary for an AI Agent.
  */
@@ -30,13 +36,50 @@ export class LighthouseFormatter {
   }
 
   /**
+   * Returns the title and score of every failing audit (score < 90), grouped by category.
+   * Descriptions and details tables are left out to keep the prompt small. Each category
+   * heading includes its category ID so the agent can request the full audit details.
+   */
+  failingAuditsSummary(report: LHModel.ReporterTypes.ReportJSON): string {
+    const lines: string[] = [];
+    lines.push('## Failing audits');
+    for (const [categoryId, category] of Object.entries(report.categories)) {
+      lines.push('');
+      lines.push(`### ${category.title} (categoryId: "${categoryId}")`);
+      const failingAudits = this.#findFailingAudits(report, category);
+      if (failingAudits.length === 0) {
+        lines.push('- No failing audits.');
+        continue;
+      }
+      for (const audit of failingAudits) {
+        lines.push(`- ${audit.title}: ${this.#formatScore(audit.score)}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Formats a Lighthouse report for an AI Agent. If categoryId is 'all', returns
+   * each category's audits. Otherwise, returns audits for the specified category.
+   * The output does not include the report summary, because the conversation
+   * context already sends it.
+   */
+  formatReport(report: LHModel.ReporterTypes.ReportJSON, categoryId: LighthouseCategoryArg): string {
+    if (categoryId === 'all') {
+      return Object.values(report.categories).map(category => this.audits(report, category)).join('\n\n');
+    }
+    return this.audits(report, categoryId);
+  }
+
+  /**
    * Returns a markdown list of all audits in a given category.
    * Highlight failing audits (score < 90).
    */
-  audits(report: LHModel.ReporterTypes.ReportJSON, categoryId: LHModel.RunTypes.CategoryId): string {
-    const category = report.categories[categoryId];
+  audits(report: LHModel.ReporterTypes.ReportJSON,
+         categoryOrId: LHModel.RunTypes.CategoryId|LHModel.ReporterTypes.CategoryJSON): string {
+    const category = typeof categoryOrId === 'string' ? report.categories[categoryOrId] : categoryOrId;
     if (!category) {
-      return `Category "${categoryId}" not found.`;
+      return `Category "${categoryOrId}" not found.`;
     }
 
     const lines: string[] = [];
@@ -46,10 +89,7 @@ export class LighthouseFormatter {
     }
     lines.push('');
 
-    const failingAudits = category.auditRefs.filter(ref => {
-      const audit = report.audits[ref.id];
-      return audit && audit.score !== null && audit.score < 0.9;
-    });
+    const failingAudits = this.#findFailingAudits(report, category);
 
     if (failingAudits.length === 0) {
       lines.push('All audits in this category passed (score >= 90).');
@@ -57,13 +97,8 @@ export class LighthouseFormatter {
     }
 
     lines.push('The following audits in this category have a score below 90 and may need attention:');
-    for (const ref of failingAudits) {
-      const audit = report.audits[ref.id];
-      if (!audit) {
-        continue;
-      }
-      const score = audit.score !== null ? Math.round(audit.score * 100) : 'n/a';
-      let line = `- **${audit.title}**: ${score}`;
+    for (const audit of failingAudits) {
+      let line = `- **${audit.title}**: ${this.#formatScore(audit.score)}`;
       if (audit.displayValue) {
         line += ` (${audit.displayValue})`;
       }
@@ -79,6 +114,22 @@ export class LighthouseFormatter {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * Returns the audits in a category that scored below 90, in the category's order.
+   * Audits without a score (such as informative or manual audits) cannot fail, so they
+   * are excluded.
+   */
+  #findFailingAudits(report: LHModel.ReporterTypes.ReportJSON, category: LHModel.ReporterTypes.CategoryJSON):
+      Array<LHModel.ReporterTypes.AuditResultJSON&{score: number}> {
+    return category.auditRefs.map(ref => report.audits[ref.id])
+        .filter((audit): audit is LHModel.ReporterTypes.AuditResultJSON&{score: number} =>
+                    Boolean(audit) && audit.score !== null && audit.score < 0.9);
+  }
+
+  #formatScore(score: number): number {
+    return Math.round(score * 100);
   }
 
   #formatDetails(details: LHModel.ReporterTypes.DetailsJSON): string {

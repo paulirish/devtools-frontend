@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Greendev from '../../../models/greendev/greendev.js';
-
 /**
  * To use links in markdown, add key here with the link and
  * use the added key in markdown.
@@ -16,7 +14,7 @@ import * as Greendev from '../../../models/greendev/greendev.js';
  * imported in any component, instead add link in map and
  * use getMarkdownLink to get the appropriate link.
  **/
-export const markdownLinks = new Map<string, string>([
+export const markdownLinks: Map<string, string> = new Map<string, string>([
   ['issuesContrastWCAG21AA', 'https://www.w3.org/TR/WCAG21/#contrast-minimum'],
   ['issuesContrastWCAG21AAA', 'https://www.w3.org/TR/WCAG21/#contrast-enhanced'],
   ['issuesContrastSuggestColor', 'https://developers.google.com/web/updates/2020/08/devtools#accessible-color'],
@@ -70,14 +68,14 @@ export const markdownLinks = new Map<string, string>([
   ['componentParameterReq', 'https://www.rfc-editor.org/rfc/rfc9421.html#content-request-response'],
   [
     'unencodedDigestHeader',
-    'https://lpardue.github.io/draft-pardue-http-identity-digest/draft-pardue-httpbis-identity-digest.html'
+    'https://lpardue.github.io/draft-pardue-http-identity-digest/draft-pardue-httpbis-identity-digest.html',
   ],
   ['storagePartitioningExplainer', 'https://developers.google.com/privacy-sandbox/cookies/storage-partitioning'],
   ['storageAccessAPI', 'https://developer.mozilla.org/en-US/docs/Web/API/StorageAccessHandle/createObjectURL'],
   ['https://goo.gle/ps-status', 'https://goo.gle/ps-status'],
   [
     'https://privacysandbox.com/news/update-on-plans-for-privacy-sandbox-technologies/',
-    'https://privacysandbox.com/news/update-on-plans-for-privacy-sandbox-technologies/'
+    'https://privacysandbox.com/news/update-on-plans-for-privacy-sandbox-technologies/',
   ],
   ['urlPatternSpec', 'https://urlpattern.spec.whatwg.org/'],
   [
@@ -108,11 +106,6 @@ export const getMarkdownLink = (key: string): string => {
   }
   const link = markdownLinks.get(key);
   if (!link) {
-    if (Greendev.Prototypes.instance().isEnabled('beyondStylingAntigravity') ||
-        Greendev.Prototypes.instance().isEnabled('beyondStylingGemini')) {
-      return key;
-    }
-
     throw new Error(`Markdown link with key '${key}' is not available, please check MarkdownLinksMap.ts`);
   }
   return link;

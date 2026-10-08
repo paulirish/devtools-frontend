@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Protocol from '../../generated/protocol.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection, setMockConnectionResponseHandler} from '../../testing/MockConnection.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 
 import * as SDK from './sdk.js';
 
@@ -410,17 +414,26 @@ describe('RemoteObjectProperty', () => {
   });
 });
 
-describeWithMockConnection('ScopeRemoteObject', () => {
+describe('ScopeRemoteObject', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
   it('preserves writability of properties', async () => {
-    setMockConnectionResponseHandler(
-        'Runtime.getProperties', () => ({
+    const connection = new MockCDPConnection();
+    connection.setSuccessHandler('Runtime.getProperties',
+                                 () => ({
                                    result: [
                                      {name: 'a', configurable: true, enumerable: true, writable: true},
                                      {name: 'b', configurable: true, enumerable: true, writable: true},
-                                     {name: 'c', configurable: true, enumerable: true, writable: true}
-                                   ]
+                                     {name: 'c', configurable: true, enumerable: true, writable: true},
+                                   ],
                                  }));
-    const target = createTarget();
+    const target = universe.createTarget({connection});
     const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel) as SDK.RuntimeModel.RuntimeModel;
     const scopeRef = new SDK.RemoteObject.ScopeRef(0, '0' as Protocol.Debugger.CallFrameId);
 
@@ -432,12 +445,20 @@ describeWithMockConnection('ScopeRemoteObject', () => {
   });
 });
 
-describeWithMockConnection('RemoteError', () => {
+describe('RemoteError', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
   let target: SDK.Target.Target;
   let runtimeModel: SDK.RuntimeModel.RuntimeModel;
 
   beforeEach(() => {
-    target = createTarget();
+    target = universe.createTarget();
     runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel) as SDK.RuntimeModel.RuntimeModel;
   });
 
@@ -491,5 +512,75 @@ describeWithMockConnection('RemoteError', () => {
     const error = SDK.RemoteObject.RemoteError.objectAsError(object);
 
     assert.strictEqual(await error.cause(), causeValue);
+  });
+});
+
+describe('RemoteObject TypedArray', () => {
+  setupLocaleHooks();
+  setupSettingsHooks();
+  setupRuntimeHooks();
+
+  let universe: TestUniverse;
+  beforeEach(() => {
+    universe = new TestUniverse();
+  });
+  let target: SDK.Target.Target;
+  let runtimeModel: SDK.RuntimeModel.RuntimeModel;
+
+  beforeEach(() => {
+    target = universe.createTarget();
+    runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel) as SDK.RuntimeModel.RuntimeModel;
+  });
+
+  const typedArrayTypes = [
+    'Int8Array',
+    'Int16Array',
+    'Int32Array',
+    'Uint8Array',
+    'Uint16Array',
+    'Uint32Array',
+    'Float32Array',
+    'Float64Array',
+  ];
+
+  it('correctly detects typed arrays as arrays and extracts length and name', () => {
+    for (const typeName of typedArrayTypes) {
+      const description = `${typeName}(10)`;
+      const object = new SDK.RemoteObject.RemoteObjectImpl(
+          runtimeModel,
+          '1' as Protocol.Runtime.RemoteObjectId,
+          'object',
+          'typedarray',
+          null,
+          undefined,
+          description,
+      );
+
+      assert.strictEqual(object.type, 'object');
+      assert.strictEqual(object.subtype, 'typedarray');
+      assert.strictEqual(object.arrayLength(), 10);
+      assert.strictEqual(SDK.RemoteObject.RemoteObject.arrayLength(object), 10);
+      assert.strictEqual(SDK.RemoteObject.RemoteObject.arrayNameFromDescription(description), typeName);
+
+      const remoteArray = SDK.RemoteObject.RemoteArray.objectAsArray(object);
+      assert.strictEqual(remoteArray.length(), 10);
+      assert.isTrue(object.isLinearMemoryInspectable());
+    }
+  });
+
+  it('handles square bracket formatting for typed array descriptions', () => {
+    const object = new SDK.RemoteObject.RemoteObjectImpl(
+        runtimeModel,
+        '1' as Protocol.Runtime.RemoteObjectId,
+        'object',
+        'typedarray',
+        null,
+        undefined,
+        'Int32Array[20]',
+    );
+
+    assert.strictEqual(object.arrayLength(), 20);
+    assert.strictEqual(SDK.RemoteObject.RemoteObject.arrayLength(object), 20);
+    assert.strictEqual(SDK.RemoteObject.RemoteObject.arrayNameFromDescription('Int32Array[20]'), 'Int32Array');
   });
 });

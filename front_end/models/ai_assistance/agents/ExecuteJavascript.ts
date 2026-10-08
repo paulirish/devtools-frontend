@@ -7,14 +7,14 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
+import {isNaturalLanguageInterfaceEnabled} from '../AiUtils.js';
 import type {ChangeManager} from '../ChangeManager.js';
-import {debugLog} from '../debug.js';
 import {EvaluateAction, formatError, SideEffectError} from '../EvaluateAction.js';
-import {FREESTYLER_WORLD_NAME} from '../injected.js';
+import {FREESTYLER_WORLD_CSP, FREESTYLER_WORLD_NAME} from '../injected.js';
+import type {DataHandlerResult} from '../tools/Tool.js';
 
-import type {
-  AgentOptions as BaseAgentOptions, FunctionCallHandlerResult, FunctionDeclaration, FunctionHandlerOptions,} from
-  './AiAgent.js';
+import type {AgentOptions as BaseAgentOptions, FunctionHandlerOptions} from './AiAgent.js';
 
 const lockedString = i18n.i18n.lockedString;
 
@@ -28,104 +28,45 @@ export interface ExecuteJsAgentOptions extends BaseAgentOptions {
   execJs?: typeof executeJsCode;
 }
 
-export function executeJavaScriptFunction(executor: JavascriptExecutor): FunctionDeclaration<
-    {
-      title: string,
-      explanation: string,
-      code: string,
-    },
-    unknown> {
-  return {
-    description:
-        'This function allows you to run JavaScript code on the inspected page to access the element styles and page content.\nCall this function to gather additional information or modify the page state. Call this function enough times to investigate the user request.',
-    parameters: {
-      type: Host.AidaClient.ParametersTypes.OBJECT,
-      description: '',
-      nullable: false,
-      properties: {
-        code: {
-          type: Host.AidaClient.ParametersTypes.STRING,
-          description:
-              `JavaScript code snippet to run on the inspected page. Make sure the code is formatted for readability.
-
-# Instructions
-
-* To return data, define a top-level \`data\` variable and populate it with data you want to get. Only JSON-serializable objects can be assigned to \`data\`.
-* If you modify styles on an element, ALWAYS call the pre-defined global \`async setElementStyles(el: Element, styles: object)\` function. This function is an internal mechanism for you and should never be presented as a command/advice to the user.
-* **CRITICAL** Only get styles that might be relevant to the user request.
-* **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.
-* **CRITICAL** Consider that \`data\` variable from the previous function calls are not available in a new function call.
-
-For example, the code to change element styles:
-
-\`\`\`
-await setElementStyles($0, {
-  color: 'blue',
-});
-\`\`\`
-
-For example, the code to get overlapping elements:
-
-\`\`\`
-const data = {
-  overlappingElements: Array.from(document.querySelectorAll('*'))
-    .filter(el => {
-      const rect = el.getBoundingClientRect();
-      const popupRect = $0.getBoundingClientRect();
-      return (
-        el !== $0 &&
-        rect.left < popupRect.right &&
-        rect.right > popupRect.left &&
-        rect.top < popupRect.bottom &&
-        rect.bottom > popupRect.top
-      );
-    })
-    .map(el => ({
-      tagName: el.tagName,
-      id: el.id,
-      className: el.className,
-      zIndex: window.getComputedStyle(el)['z-index']
-    }))
-};
-\`\`\`
-`,
-        },
-        explanation: {
-          type: Host.AidaClient.ParametersTypes.STRING,
-          description: 'Explain why you want to run this code',
-        },
-        title: {
-          type: Host.AidaClient.ParametersTypes.STRING,
-          description: 'Provide a summary of what the code does. For example, "Checking related element styles".',
-        },
-      },
-      required: ['code', 'explanation', 'title']
-    },
-    displayInfoFromArgs: params => {
-      return {
-        title: params.title,
-        thought: params.explanation,
-        action: params.code,
-      };
-    },
-    handler: async (
-        params,
-        options,
-        ) => {
-      return await executor.executeAction(params.code, options);
-    },
-  };
+/**
+ * Creates or retrieves the DevTools AI Assistance isolated world for the given frame.
+ *
+ * Page.createIsolatedWorld is idempotent per frame when given a fixed worldName.
+ * If an isolated world with FREESTYLER_WORLD_NAME already exists on the frame,
+ * CDP returns its existing executionContextId rather than re-creating the world.
+ */
+export async function getOrCreateIsolatedWorld(
+    target: SDK.Target.Target,
+    frameId: Protocol.Page.FrameId,
+    ): Promise<SDK.RuntimeModel.ExecutionContext> {
+  const pageAgent = target.pageAgent();
+  const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+  const {executionContextId} = await pageAgent.invoke_createIsolatedWorld({
+    frameId,
+    worldName: FREESTYLER_WORLD_NAME,
+    contentSecurityPolicy: FREESTYLER_WORLD_CSP,
+  });
+  const executionContext = runtimeModel?.executionContext(executionContextId);
+  if (!executionContext) {
+    throw new Error('Execution context is not found for executing code');
+  }
+  return executionContext;
 }
 
 export async function executeJsCode(
     functionDeclaration: string,
-    {throwOnSideEffect, contextNode}: {throwOnSideEffect: boolean, contextNode: SDK.DOMModel.DOMNode|null}):
-    Promise<string> {
+    options: {
+      contextNode: SDK.DOMModel.DOMNode|null,
+      throwOnSideEffect?: boolean,
+    },
+    ): Promise<string> {
+  const {contextNode, throwOnSideEffect} = options;
+
   if (!contextNode) {
     throw new Error('Cannot execute JavaScript because of missing context node');
   }
-  const target = contextNode.domModel().target();
 
+  const target = contextNode.domModel().target();
   if (!target) {
     throw new Error('Target is not found for executing code');
   }
@@ -137,26 +78,19 @@ export async function executeJsCode(
     throw new Error('Main frame is not found for executing code');
   }
 
-  const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
-  const pageAgent = target.pageAgent();
-
-  // This returns previously created world if it exists for the frame.
-  const {executionContextId} = await pageAgent.invoke_createIsolatedWorld({frameId, worldName: FREESTYLER_WORLD_NAME});
-  const executionContext = runtimeModel?.executionContext(executionContextId);
-  if (!executionContext) {
-    throw new Error('Execution context is not found for executing code');
-  }
+  const executionContext = await getOrCreateIsolatedWorld(target, frameId);
 
   if (executionContext.debuggerModel.selectedCallFrame()) {
     return formatError('Cannot evaluate JavaScript because the execution is paused on a breakpoint.');
   }
 
-  const remoteObject = await contextNode.resolveToObject(undefined, executionContextId);
+  const remoteObject = await contextNode.resolveToObject(undefined, executionContext.id);
   if (!remoteObject) {
     throw new Error('Cannot execute JavaScript because remote object cannot be resolved');
   }
 
-  return await EvaluateAction.execute(functionDeclaration, [remoteObject], executionContext, {throwOnSideEffect});
+  return await EvaluateAction.execute(functionDeclaration, [remoteObject], executionContext,
+                                      {throwOnSideEffect: !!throwOnSideEffect});
 }
 
 const MAX_OBSERVATION_BYTE_LENGTH = 25_000;
@@ -180,9 +114,7 @@ export class JavascriptExecutor {
     this.#execJs = execJs;
   }
 
-  async executeAction(action: string, options?: FunctionHandlerOptions): Promise<FunctionCallHandlerResult<unknown>> {
-    debugLog(`Action to execute: ${action}`);
-
+  async executeAction(action: string, options?: FunctionHandlerOptions): Promise<DataHandlerResult<unknown>> {
     if (options?.approved === false) {
       return {
         error: 'Error: User denied code execution with side effects.',
@@ -215,7 +147,6 @@ export class JavascriptExecutor {
       }
 
       const result = await this.generateObservation(action, {throwOnSideEffect});
-      debugLog(`Action result: ${JSON.stringify(result)}`);
       if (result.sideEffect) {
         if (this.#options.executionMode ===
             Root.Runtime.HostConfigFreestylerExecutionMode.SIDE_EFFECT_FREE_SCRIPTS_ONLY) {
@@ -232,7 +163,9 @@ export class JavascriptExecutor {
 
         return {
           requiresApproval: true,
-          description: lockedString('This code may modify page content. Continue?'),
+          description: isNaturalLanguageInterfaceEnabled() ?
+              lockedString('AI assistance wants to execute JavaScript code. This code may modify page content.') :
+              lockedString('This code may modify page content. Continue?'),
         };
       }
       if (result.canceled) {
@@ -270,7 +203,11 @@ export class JavascriptExecutor {
     return error;
   }
 }`;
+    const timeoutSentinel = Symbol('timeout');
+    const {promise: timeoutPromise, resolve: resolveTimeout} = Promise.withResolvers<typeof timeoutSentinel>();
+    let timeoutId: ReturnType<typeof setTimeout>|undefined;
     try {
+      timeoutId = setTimeout(() => resolveTimeout(timeoutSentinel), OBSERVATION_TIMEOUT);
       const result = await Promise.race([
         this.#execJs(
             functionDeclaration,
@@ -279,11 +216,11 @@ export class JavascriptExecutor {
               contextNode: this.#options.getContextNode(),
             },
             ),
-        new Promise<never>((_, reject) => {
-          setTimeout(
-              () => reject(new Error('Script execution exceeded the maximum allowed time.')), OBSERVATION_TIMEOUT);
-        }),
+        timeoutPromise,
       ]);
+      if (result === timeoutSentinel) {
+        throw new Error('Script execution exceeded the maximum allowed time.');
+      }
       const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
       Host.userMetrics.freestylerEvalResponseSize(byteCount);
       if (byteCount > MAX_OBSERVATION_BYTE_LENGTH) {
@@ -308,6 +245,11 @@ export class JavascriptExecutor {
         sideEffect: false,
         canceled: false,
       };
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      resolveTimeout(timeoutSentinel);
     }
   }
 }

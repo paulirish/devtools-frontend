@@ -3,18 +3,22 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import sinon from 'sinon';
 
 import * as Protocol from '../../generated/protocol.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../testing/MockConnection.js';
-import * as Common from '../common/common.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
+import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 
 import * as SDK from './sdk.js';
 
-describeWithMockConnection('EmulationModel', () => {
+describe('EmulationModel', () => {
+  setupRuntimeHooks();
+  setupLocaleHooks();
   it('should track screen orientation lock state from CDP events', () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
     assert.isNotNull(emulationModel);
 
@@ -35,8 +39,9 @@ describeWithMockConnection('EmulationModel', () => {
   });
 
   it('should dispatch SCREEN_ORIENTATION_LOCK_CHANGED event', () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
     assert.isNotNull(emulationModel);
 
@@ -50,8 +55,9 @@ describeWithMockConnection('EmulationModel', () => {
   });
 
   it('should `emulateTouch` enable touch emulation', async () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
     const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
     const emulationAgent = target.emulationAgent();
     const spySetTouchEmulationEnabled = sinon.stub(emulationAgent, 'invoke_setTouchEmulationEnabled');
@@ -68,8 +74,9 @@ describeWithMockConnection('EmulationModel', () => {
 
   it('should `emulateTouch` not enable touch emulation when `setTouchEmulationAllowed` is called with false',
      async () => {
-       const parentTarget = createTarget();
-       const target = createTarget({parentTarget});
+       const universe = new TestUniverse();
+       const parentTarget = universe.createTarget();
+       const target = universe.createTarget({parentTarget});
        const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
        const emulationAgent = target.emulationAgent();
        const spySetTouchEmulationEnabled = sinon.stub(emulationAgent, 'invoke_setTouchEmulationEnabled');
@@ -85,15 +92,77 @@ describeWithMockConnection('EmulationModel', () => {
      });
 
   it('updates disabled image types when JPEG XL format disabling is toggled', () => {
-    const parentTarget = createTarget();
-    const target = createTarget({parentTarget});
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    target.model(SDK.EmulationModel.EmulationModel);
     const emulationAgent = target.emulationAgent();
     const spySetDisabledImageTypes = sinon.stub(emulationAgent, 'invoke_setDisabledImageTypes');
 
-    const jpegXlFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('jpeg-xl-format-disabled');
+    const jpegXlFormatDisabledSetting =
+        universe.settings.resolve(SDK.SDKSettings.jpegXlFormatDisabledSettingDescriptor);
     jpegXlFormatDisabledSetting.set(true);
 
     sinon.assert.calledOnce(spySetDisabledImageTypes);
     sinon.assert.calledWith(spySetDisabledImageTypes, {imageTypes: [Protocol.Emulation.DisabledImageType.Jxl]});
+  });
+
+  it('`setSafeAreaInsets` forwards insets to setSafeAreaInsetsOverride', async () => {
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
+    assert.isNotNull(emulationModel);
+    const spy = sinon.stub(target.emulationAgent(), 'invoke_setSafeAreaInsetsOverride');
+
+    await emulationModel.setSafeAreaInsets({top: 59, left: 0, bottom: 34, right: 0});
+
+    sinon.assert.calledOnceWithExactly(spy, {insets: {top: 59, left: 0, bottom: 34, right: 0}});
+  });
+
+  it('`setSafeAreaInsets` with empty insets clears the override', async () => {
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
+    assert.isNotNull(emulationModel);
+    const spy = sinon.stub(target.emulationAgent(), 'invoke_setSafeAreaInsetsOverride');
+
+    await emulationModel.setSafeAreaInsets({});
+
+    sinon.assert.calledOnceWithExactly(spy, {insets: {}});
+  });
+
+  it('applies data saver override setting changes to the target', () => {
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    target.model(SDK.EmulationModel.EmulationModel);
+    const emulationAgent = target.emulationAgent();
+    const spySetDataSaverOverride = sinon.stub(emulationAgent, 'invoke_setDataSaverOverride');
+
+    const dataSaverSetting = universe.settings.resolve(SDK.SDKSettings.dataSaverSettingDescriptor);
+    dataSaverSetting.set(SDK.EmulationModel.DataSaverOverride.ENABLED);
+
+    sinon.assert.calledOnce(spySetDataSaverOverride);
+    sinon.assert.calledWith(spySetDataSaverOverride, {dataSaverEnabled: true});
+  });
+
+  it('removes data saver setting change listener when disposed', () => {
+    const universe = new TestUniverse();
+    const parentTarget = universe.createTarget();
+    const target = universe.createTarget({parentTarget});
+    const emulationModel = target.model(SDK.EmulationModel.EmulationModel);
+    assert.isNotNull(emulationModel);
+    const emulationAgent = target.emulationAgent();
+    const spySetDataSaverOverride = sinon.stub(emulationAgent, 'invoke_setDataSaverOverride');
+
+    target.dispose('test');
+    spySetDataSaverOverride.resetHistory();
+
+    const dataSaverSetting = universe.settings.resolve(SDK.SDKSettings.dataSaverSettingDescriptor);
+    dataSaverSetting.set(SDK.EmulationModel.DataSaverOverride.DISABLED);
+
+    sinon.assert.notCalled(spySetDataSaverOverride);
   });
 });
