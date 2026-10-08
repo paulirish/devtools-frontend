@@ -38,9 +38,9 @@
 - [x] **`HostRuntime.ts` Top-Level `await`**:
   - Revert `front_end/core/platform/HostRuntime.ts` to match `origin/main`, and write the synchronous `HOST_RUNTIME` stub to `$dist/core/platform/HostRuntime.js` in `scripts/trace/prep-trace-engine-package.sh`.
 - [ ] **`export const enum` -> `export enum` (Upstream to `devtools-frontend` `main`)**:
-  - Land a CL on `devtools-frontend` `main` changing `export const enum` to `export enum` in `front_end/models/trace/` (`LayoutShiftsHandler.ts`, `PageLoadMetricsHandler.ts`, `Threads.ts`, `SamplesIntegrator.ts`, `CLSCulprits.ts`, `File.ts`, `TraceEvents.ts`), and keeping `MarkerEventName` / `MarkerName` / `MarkerEvent` below `enum Name` in `TraceEvents.ts`.
+  - Land [crrev.com/c/8539952](https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/8539952) on `devtools-frontend` `main` changing `export const enum` to `export enum` in `front_end/models/trace/` (`ModelImpl.ts`, `LayoutShiftsHandler.ts`, `PageLoadMetricsHandler.ts`, `Threads.ts`, `SamplesIntegrator.ts`, `CLSCulprits.ts`, `File.ts`, `TraceEvents.ts`), and keeping `MarkerEventName` / `MarkerName` / `MarkerEvent` below `enum Name` in `TraceEvents.ts`.
 - [ ] **`ImageDelivery.ts` Return Types (Upstream to `devtools-frontend` `main`)**:
-  - Land a CL on `devtools-frontend` `main` changing the return types of `getOptimizationMessage` and `getOptimizationMessageWithBytes` in `front_end/models/trace/insights/ImageDelivery.ts` from `string` to `Platform.UIString.LocalizedString`.
+  - Land [crrev.com/c/8539952](https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/8539952) on `devtools-frontend` `main` changing the return types of `getOptimizationMessage` and `getOptimizationMessageWithBytes` in `front_end/models/trace/insights/ImageDelivery.ts` from `string` to `Platform.UIString.LocalizedString`.
 
 ### B. Replace `.js` and `.d.ts` Regex Rewriting in `prep-trace-engine-package.sh`
 - [x] Replace the Python string-replacement passes for `i18n`, `Common`, `SDK`, and `CrUXManager` in `scripts/trace/prep-trace-engine-package.sh` with clean module shims in `scripts/trace/replacements/` (`i18n.{js,d.ts}`, `common.{js,d.ts}`, `UIString.d.ts`, `sdk.d.ts`, `crux-manager.d.ts`).
