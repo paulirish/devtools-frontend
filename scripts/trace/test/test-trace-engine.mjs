@@ -108,7 +108,7 @@ test('insights look ok', t => {
     jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 1.2049999833106995 },
     noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 2.2430000007152557 },
     'Google Tag Manager': { transferSize: 0, mainThreadTime: 0.2629999965429306 },
-    'Google Fonts': { transferSize: 74145, mainThreadTime: 0 },
+    'Google Fonts': { transferSize: 74145, mainThreadTime: 0.22999998927116394 },
     Disqus: { transferSize: 1550, mainThreadTime: 0.4229999780654907 },
     'Google Analytics': { transferSize: 0, mainThreadTime: 0.2199999839067459 },
     bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 0.601999968290329 },

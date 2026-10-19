@@ -39,6 +39,7 @@ cp ./front_end/models/trace/package-template.json "$dist/package.json"
 rm -rf "$dist/core/platform/browser" "$dist/core/platform/node"
 cp "$DIRNAME/replacements/HostRuntime.js" "$dist/core/platform/HostRuntime.js"
 cp "$DIRNAME/replacements/UIString.d.ts" "$dist/core/platform/UIString.d.ts"
+echo 'export {};' > "$dist/core/platform/UserVisibleError.d.ts"
 
 # Copy ParsedURL from core/common and provide common.{js,d.ts}.
 cp "$out_dir/gen/front_end/core/common/ParsedURL.js" "$dist/core/common/ParsedURL.js"
