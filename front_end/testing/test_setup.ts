@@ -9,6 +9,7 @@
 
 import '../third_party/chromium/ahem/ahem.js';
 
+import {afterEach, before, beforeEach} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../core/common/common.js';
@@ -26,17 +27,16 @@ import {
   stopTrackingAsyncActivity,
 } from './TrackAsyncOperations.js';
 
-declare global {
-  namespace Mocha {
-    interface Suite {
-      hasOnly?: () => boolean;
-    }
+/**
+ * `hasOnly` is not part of Mocha's public API.
+ */
+interface SuiteWithHasOnly extends Mocha.Suite {
+  hasOnly?: () => boolean;
+}
 
-    interface Test {
-      // Custom extension: attached in beforeEach to signal to Karma that exclusive tests (e.g. it.only) are being run.
-      hasExclusiveTests?: boolean;
-    }
-  }
+interface TestWithExclusiveTests extends Mocha.Test {
+  // Custom extension: attached in beforeEach to signal to Karma that exclusive tests (e.g. it.only) are being run.
+  hasExclusiveTests?: boolean;
 }
 
 async function setupTestFont() {
@@ -60,14 +60,16 @@ before(async function() {
 });
 
 beforeEach(async function(this: Mocha.Context) {
-  if (this.currentTest) {
-    this.currentTest.hasExclusiveTests = this.currentTest.parent?.hasOnly?.();
+  const currentTest: TestWithExclusiveTests|undefined = this.currentTest;
+  if (currentTest) {
+    const parent: SuiteWithHasOnly|undefined = currentTest.parent;
+    currentTest.hasExclusiveTests = parent?.hasOnly?.();
   }
 
-  stopTrackingAsyncActivity();
-  resetHostConfig();
   // Clear out any Sinon stubs or spies between individual tests.
   sinon.restore();
+  stopTrackingAsyncActivity();
+  resetHostConfig();
   await setupTestDOM();
 
   // Ensure that no trace data leaks between tests when testing the trace engine.
@@ -91,9 +93,12 @@ beforeEach(async function(this: Mocha.Context) {
 
 afterEach(async function() {
   cleanTestDOM(this.currentTest?.fullTitle());
+  // Flush and restore any Sinon fake timers before checking for pending activity,
+  // so fake timers do not intercept timeouts scheduled while flushing pending async work.
+  sinon.clock?.runToLast();
+  sinon.clock?.restore();
   await checkForPendingActivity(this.currentTest?.fullTitle());
   stopTrackingAsyncActivity();
   // Clear out any Sinon stubs or spies between individual tests.
-  sinon.clock?.runToLast();
   sinon.restore();
 });

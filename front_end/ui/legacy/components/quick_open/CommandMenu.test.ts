@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {after, before, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../../../core/common/common.js';
@@ -140,6 +141,5 @@ describe('CommandMenu Views', () => {
     viewCommand.execute();
 
     sinon.assert.calledOnceWithExactly(showViewStub, viewId, true);
-    showViewStub.restore();
   });
 });

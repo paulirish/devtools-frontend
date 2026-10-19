@@ -6,6 +6,7 @@ import {assert} from 'chai';
 
 import type * as Host from '../../../front_end/core/host/host.js';
 import type * as Root from '../../../front_end/core/root/root.js';
+import {describe, it} from '../conductor/mocha-interface.js';
 import type {DevToolsPage} from '../shared/DevToolsPage.js';
 import type {InspectedPage} from '../shared/InspectedPage.js';
 
@@ -41,9 +42,9 @@ describe('AI Assistance', function() {
         if (!request.streamId) {
           throw new Error('No streamId');
         }
-        const response = JSON.stringify([
-          messages[call],
-        ]);
+        // An array entry is one response with several parts, such as
+        // several function calls.
+        const response = JSON.stringify(Array.isArray(messages[call]) ? messages[call] : [messages[call]]);
         call++;
         let first = true;
         for (const chunk of response.split(',{')) {
@@ -108,12 +109,48 @@ describe('AI Assistance', function() {
     await devtoolsPage.typeText(query);
   }
 
+  /**
+   * Clicks Continue until the panel accepts the approval and removes the button.
+   * The panel ignores approvals that arrive within 500 ms of a prompt appearing,
+   * so a single immediate click can be dropped.
+   */
+  async function approvePendingSideEffect(devToolsPage: DevToolsPage, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    const handle = await devToolsPage.locator('aria/Continue').waitHandle({signal});
+    try {
+      await devToolsPage.waitForFunction(async () => {
+        signal?.throwIfAborted();
+        const isConnected = await handle.evaluate(el => el.isConnected).catch(() => false);
+        if (!isConnected) {
+          return true;
+        }
+        await handle.click().catch(() => {});
+        signal?.throwIfAborted();
+        return undefined;
+      });
+    } catch (err) {
+      if (!signal?.aborted) {
+        throw err;
+      }
+      // The caller aborts only after the run has finished. A run cannot finish
+      // while a prompt is pending, and only this helper answers prompts, so the
+      // prompt behind this handle was approved. The panel can render after the
+      // run finishes, so wait for the render to remove the button.
+      await devToolsPage.waitForFunction(async () => {
+        const isConnected = await handle.evaluate(el => el.isConnected).catch(() => false);
+        return isConnected ? undefined : true;
+      });
+    } finally {
+      await handle.dispose().catch(() => {});
+    }
+  }
+
   interface Log {
     request: Host.AidaClient.DoConversationRequest;
   }
 
-  async function submitAndWaitTillDone(
-      devtoolsPage: DevToolsPage, waitForSideEffect?: boolean, throwOnSideEffect?: boolean): Promise<Log[]> {
+  async function submitAndWaitTillDone(devtoolsPage: DevToolsPage, waitForSideEffect?: boolean,
+                                       throwOnSideEffect?: boolean, onSideEffect?: () => void): Promise<Log[]> {
     const done = devtoolsPage.evaluate(() => {
       return new Promise(resolve => {
         window.addEventListener('aiassistancedone', resolve, {
@@ -134,14 +171,16 @@ describe('AI Assistance', function() {
     let sideEffectCount = 0;
     async function autoAcceptEvals(signal: AbortSignal) {
       while (!signal.aborted) {
-        await devtoolsPage.locator('aria/Continue').click({signal});
+        await approvePendingSideEffect(devtoolsPage, signal);
         sideEffectCount++;
+        onSideEffect?.();
       }
     }
     // Click continue once without sending abort signal.
-    autoAcceptEvals(abort.signal).catch(() => {});
+    const acceptLoop = autoAcceptEvals(abort.signal).catch(() => {});
     await done;
     abort.abort();
+    await acceptLoop;
     if (sideEffectCount && throwOnSideEffect) {
       throw new Error('Unexpected side effect');
     }
@@ -162,6 +201,7 @@ describe('AI Assistance', function() {
     shadowRoot?: string,
     waitForSideEffect?: boolean,
     throwOnSideEffect?: boolean,
+    onSideEffect?: () => void,
     v2Architecture?: boolean,
   }) {
     const {
@@ -174,6 +214,7 @@ describe('AI Assistance', function() {
       shadowRoot,
       waitForSideEffect,
       throwOnSideEffect,
+      onSideEffect,
       v2Architecture,
     } = options;
 
@@ -211,6 +252,7 @@ describe('AI Assistance', function() {
         messages,
         waitForSideEffect,
         throwOnSideEffect,
+        onSideEffect,
       });
     } finally {
       if (preloadScriptId) {
@@ -228,13 +270,15 @@ describe('AI Assistance', function() {
     shadowRoot?: string,
     waitForSideEffect?: boolean,
     throwOnSideEffect?: boolean,
+    onSideEffect?: () => void,
   }) {
-    const {messages, query, node = 'div', iframeId, shadowRoot, waitForSideEffect, throwOnSideEffect} = options;
+    const {messages, query, node = 'div', iframeId, shadowRoot, waitForSideEffect, throwOnSideEffect, onSideEffect} =
+        options;
 
     await resetMockMessages(devToolsPage, messages);
     await inspectNode(devToolsPage, node, iframeId, shadowRoot);
     await typeQuery(devToolsPage, query);
-    return await submitAndWaitTillDone(devToolsPage, waitForSideEffect, throwOnSideEffect);
+    return await submitAndWaitTillDone(devToolsPage, waitForSideEffect, throwOnSideEffect, onSideEffect);
   }
 
   async function openConversationFromHistory(devToolsPage: DevToolsPage, historyEntrySelector: string) {
@@ -586,8 +630,7 @@ describe('AI Assistance', function() {
     // Verify that the prior conversation is aborted and its confirmation unmounts before continuing.
     await devToolsPage.waitForElementWithTextContent('You stopped this response');
     // Wait for the new conversation's side-effect confirmation to mount and approve it.
-    await devToolsPage.waitForAria('Continue');
-    await devToolsPage.click('aria/Continue');
+    await approvePendingSideEffect(devToolsPage);
     await devToolsPage.waitForElementWithTextContent('changed styles');
 
     await inspectedPage.waitForFunction(() => {
@@ -738,6 +781,108 @@ describe('AI Assistance', function() {
       role: 0,
       parts: [{functionResponse: {name: 'executeJavaScript', response: {result: 'undefined'}}}],
     });
+  });
+
+  it('runs every function call in one model response', async ({devToolsPage, inspectedPage}) => {
+    const result = await runAiAssistance(devToolsPage, inspectedPage, {
+      query: 'What are the color and display of this element?',
+      throwOnSideEffect: true,
+      messages: [
+        [
+          {
+            functionCallChunk: {
+              functionCall: {
+                name: 'executeJavaScript',
+                args: {
+                  thought: 'Read the color.',
+                  title: 'Reading the color',
+                  code: 'const data = {color: window.getComputedStyle($0).color}',
+                },
+              },
+            },
+          },
+          {
+            functionCallChunk: {
+              functionCall: {
+                name: 'executeJavaScript',
+                args: {
+                  thought: 'Read the display.',
+                  title: 'Reading the display',
+                  code: 'const data = {display: window.getComputedStyle($0).display}',
+                },
+              },
+            },
+          },
+        ],
+        {textChunk: {text: 'done'}},
+      ],
+    });
+
+    assert.deepEqual(result.at(-1)!.request.current_message, {
+      role: 0,
+      parts: [
+        {functionResponse: {name: 'executeJavaScript', response: {result: '{"color":"rgb(0, 0, 0)"}'}}},
+        {functionResponse: {name: 'executeJavaScript', response: {result: '{"display":"block"}'}}},
+      ],
+    });
+    await devToolsPage.click('pierce/details.walkthrough-inline summary');
+    await devToolsPage.waitForElementWithTextContent('Reading the color');
+    await devToolsPage.waitForElementWithTextContent('Reading the display');
+  });
+
+  it('asks for approval for each style change in one model response', async ({devToolsPage, inspectedPage}) => {
+    let approvalPrompts = 0;
+    const result = await runAiAssistance(devToolsPage, inspectedPage, {
+      query: 'Make this element red on blue',
+      onSideEffect: () => {
+        approvalPrompts++;
+      },
+      messages: [
+        [
+          {
+            functionCallChunk: {
+              functionCall: {
+                name: 'executeJavaScript',
+                args: {
+                  thought: 'Set the color.',
+                  title: 'Setting the color',
+                  code: 'await setElementStyles($0, { \'color\': \'red\' });',
+                },
+              },
+            },
+          },
+          {
+            functionCallChunk: {
+              functionCall: {
+                name: 'executeJavaScript',
+                args: {
+                  thought: 'Set the background color.',
+                  title: 'Setting the background color',
+                  code: 'await setElementStyles($0, { \'background-color\': \'blue\' });',
+                },
+              },
+            },
+          },
+        ],
+        {textChunk: {text: 'changed styles'}},
+      ],
+    });
+
+    await inspectedPage.waitForFunction(() => {
+      return inspectedPage.evaluate(() => {
+        // @ts-expect-error page context.
+        const styles = window.getComputedStyle(document.querySelector('div'));
+        return styles.color === 'rgb(255, 0, 0)' && styles.backgroundColor === 'rgb(0, 0, 255)';
+      });
+    });
+    assert.strictEqual(approvalPrompts, 2);
+    const parts = result.at(-1)!.request.current_message.parts;
+    assert.lengthOf(parts, 2);
+    const [colorPart, backgroundPart] = parts;
+    assertIsFunctionResponsePart(colorPart);
+    assert.strictEqual(colorPart.functionResponse.name, 'executeJavaScript');
+    assertIsFunctionResponsePart(backgroundPart);
+    assert.strictEqual(backgroundPart.functionResponse.name, 'executeJavaScript');
   });
 
   for (const code of ['const data = {}', 'throw new Error("test")', 'const data = {;']) {
@@ -1014,6 +1159,51 @@ describe('AI Assistance', function() {
       const [responsePart] = secondRequest.current_message.parts;
       assertIsFunctionResponsePart(responsePart);
       assert.strictEqual(responsePart.functionResponse.name, 'learnSkills');
+    });
+
+    it('runs every function call in one model response with AiAgent2', async ({devToolsPage, inspectedPage}) => {
+      const AI_RESPONSE = 'I have read the styles.';
+      // The element uid is not known when the mock responses are set up, so
+      // both getStyles calls return an error result. The test checks that
+      // both calls run and that both responses go back in one request.
+      const aidaRoundTrips = await runAiAssistance(devToolsPage, inspectedPage, {
+        resource: '../resources/ai_assistance/index.html',
+        node: 'div.test-node',
+        query: 'What are the color and display of this element?',
+        v2Architecture: true,
+        messages: [
+          {functionCallChunk: {functionCall: {name: 'learnSkills', args: {skills: ['styling']}}}},
+          [
+            {
+              functionCallChunk: {
+                functionCall: {
+                  name: 'getStyles',
+                  args: {explanation: 'Read the color.', elements: [1], styleProperties: ['color']},
+                },
+              },
+            },
+            {
+              functionCallChunk: {
+                functionCall: {
+                  name: 'getStyles',
+                  args: {explanation: 'Read the display.', elements: [1], styleProperties: ['display']},
+                },
+              },
+            },
+          ],
+          {textChunk: {text: AI_RESPONSE}},
+        ],
+      });
+
+      await devToolsPage.waitForElementWithTextContent(AI_RESPONSE);
+      assert.lengthOf(aidaRoundTrips, 3);
+      const parts = aidaRoundTrips[2].request.current_message.parts;
+      assert.lengthOf(parts, 2);
+      const [colorPart, displayPart] = parts;
+      assertIsFunctionResponsePart(colorPart);
+      assert.strictEqual(colorPart.functionResponse.name, 'getStyles');
+      assertIsFunctionResponsePart(displayPart);
+      assert.strictEqual(displayPart.functionResponse.name, 'getStyles');
     });
   });
 });

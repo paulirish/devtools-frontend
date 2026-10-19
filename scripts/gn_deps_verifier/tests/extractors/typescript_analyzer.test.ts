@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import * as path from 'node:path';
 import sinon from 'sinon';
 
@@ -18,7 +19,6 @@ const FIXTURES_BUILD_GN = path.join(FIXTURES_DIR, 'BUILD.gn');
 describe('typescript_analyzer', () => {
   afterEach(() => {
     TypeScriptAnalyzer.clearCacheForTesting();
-    sinon.restore();
   });
 
   describe('getMappedTarget', () => {
@@ -1017,6 +1017,23 @@ describe('typescript_analyzer', () => {
       const analyzer = TypeScriptAnalyzer.create(ROOT_DIR);
       const result = await analyzer.analyze();
       assert.strictEqual(result.size, 0);
+    });
+
+    it('does not recursively analyze transitive BUILD.gn files loaded during import resolution', async () => {
+      const explainBuildGn = path.join(ROOT_DIR, 'front_end/panels/explain/BUILD.gn');
+      const extractor = GnAstExtractor.create(ROOT_DIR);
+      const analyzer = TypeScriptAnalyzer.create(ROOT_DIR);
+
+      const result = await analyzer.analyze([explainBuildGn]);
+
+      // Resolving imports loads external BUILD.gn files into the extractor cache...
+      assert.isAbove(extractor.buildFiles.size, 1);
+      // ...but TypeScriptAnalyzer should only process the requested BUILD.gn file.
+      assert.strictEqual(analyzer.buildFiles.size, 1);
+      assert.isTrue(analyzer.buildFiles.has(explainBuildGn));
+      for (const targetLabel of result.keys()) {
+        assert.isTrue(targetLabel.startsWith('//front_end/panels/explain:'));
+      }
     });
   });
 

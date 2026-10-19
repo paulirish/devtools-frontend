@@ -62,6 +62,10 @@ const AI_ASSISTANCE_HELP =
     'https://developer.chrome.com/docs/devtools/ai-assistance' as Platform.DevToolsPath.UrlString;
 const WALKTHROUGH_SIDEBAR_BREAKPOINT = 700;
 const WALKTHROUGH_SIDEBAR_INITIAL_WIDTH = 400;
+// Ignores approvals that arrive within this window after a permission prompt appears, so input meant for something
+// else (such as the second click of a double-click on the previous prompt) cannot approve it. The value matches the
+// 500 ms double-click interval that Chromium's InputEventActivationProtector uses for dialog buttons.
+const PERMISSION_PROMPT_INPUT_PROTECTION_MS = 500;
 
 const UIStrings = {
   /**
@@ -482,7 +486,7 @@ function defaultView(input: ViewInput, output: PanelViewOutput, target: HTMLElem
         name="ai-assistance-split-view-state"
         direction="column"
         sidebar-position="second"
-        sidebar-visibility=${shouldShowWalkthrough && !input.props.walkthrough.isInlined ? 'visible' : 'hidden'}
+        show=${shouldShowWalkthrough && !input.props.walkthrough.isInlined ? 'both' : 'main'}
         sidebar-initial-size=${WALKTHROUGH_SIDEBAR_INITIAL_WIDTH}
       >
         <div slot="main" class="main-view">
@@ -913,8 +917,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
     return await TimelinePanel.TimelinePanel.TimelinePanel.executeRecordAndReload();
   }
 
-  async #handleLighthouseRun(overrides?: LHModel.RunTypes.RunOverrides):
-      Promise<LHModel.ReporterTypes.ReportJSON|null> {
+  async #handleLighthouseRun(overrides?: LHModel.RunTypes.RunOverrides): Promise<LHModel.RunTypes.RunResult> {
     return await LighthousePanel.LighthousePanel.LighthousePanel.executeLighthouseRecording({
       isAIControlled: true,
       ...overrides,
@@ -1753,6 +1756,10 @@ export class AiAssistancePanel extends UI.Panel.Panel {
     // Cancel any previous in-flight query.
     this.#cancel();
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceQuerySubmitted);
+    if (AiAssistanceModel.AiUtils.isAiV2Enabled()) {
+      void VisualLogging.logFunctionCall('ai-v2-query-submitted',
+                                         getContextTypeString(this.#conversation.selectedContext));
+    }
     const signal = this.#runAbortController.signal;
 
     // Initial conversation boundary (turn 1 only).
@@ -1797,6 +1804,10 @@ export class AiAssistancePanel extends UI.Panel.Panel {
         id: crypto.randomUUID(),
       };
       let step: Step = {state: {type: 'in_progress'}};
+      /**
+       * The step for each tool call in this stream, keyed by `callId`.
+       */
+      const stepsByCallId = new Map<string, Step>();
 
       /**
        * Commits the step to props only if necessary.
@@ -1810,6 +1821,27 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           type: 'step',
           step,
         });
+      }
+
+      /**
+       * Returns the step for `callId`.
+       *
+       * The first call after `QUERYING` takes over the step that `QUERYING`
+       * created. A further call before the next `QUERYING` gets a new step.
+       * Events in conversations saved before `callId` existed have no
+       * `callId`, and keep updating the current step.
+       */
+      function stepForCall(callId: string|undefined): Step {
+        if (callId === undefined) {
+          return step;
+        }
+        const callStep = stepsByCallId.get(callId);
+        if (callStep) {
+          return callStep;
+        }
+        const newStep: Step = [...stepsByCallId.values()].includes(step) ? {state: {type: 'in_progress'}} : step;
+        stepsByCallId.set(callId, newStep);
+        return newStep;
       }
 
       this.#isLoading = true;
@@ -1857,11 +1889,13 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             break;
           }
           case AiAssistanceModel.AiAgent.ResponseType.TITLE: {
+            step = stepForCall(data.callId);
             step.title = data.title;
             commitStep();
             break;
           }
           case AiAssistanceModel.AiAgent.ResponseType.THOUGHT: {
+            step = stepForCall(data.callId);
             step.state = {type: 'completed'};
             step.thought = data.thought;
             commitStep();
@@ -1881,16 +1915,23 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             break;
           }
           case AiAssistanceModel.AiAgent.ResponseType.SIDE_EFFECT: {
-            step.code ??= data.code;
-            step.state = {
+            step = stepForCall(data.callId);
+            const approvalStep = step;
+            approvalStep.code ??= data.code;
+            const promptShownAt = performance.now();
+            approvalStep.state = {
               type: 'needs_approval',
               sideEffectDialog: {
                 description: data.description,
                 permissionPrompt: data.permissionPrompt,
                 permissionTitle: data.permissionTitle,
                 onAnswer: (decision: AiAssistanceModel.Tool.PermissionDecision) => {
+                  if (decision !== AiAssistanceModel.Tool.PermissionDecision.REJECT &&
+                      performance.now() - promptShownAt < PERMISSION_PROMPT_INPUT_PROTECTION_MS) {
+                    return;
+                  }
                   data.confirm(decision);
-                  step.state = {type: 'completed'};
+                  approvalStep.state = {type: 'completed'};
                   this.requestUpdate();
                 },
               },
@@ -1899,11 +1940,22 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             break;
           }
           case AiAssistanceModel.AiAgent.ResponseType.ACTION: {
+            step = stepForCall(data.callId);
             step.state = data.canceled ? {type: 'canceled'} : {type: 'completed'};
             step.code ??= data.code;
             step.output ??= data.output;
             step.widgets ??= data.widgets;
             commitStep();
+            if (AiAssistanceModel.AiUtils.isAiV2Enabled() && !this.#conversation?.isReadOnly) {
+              if (data.toolName === 'learnSkills') {
+                for (const skill of data.loadedSkills ?? []) {
+                  void VisualLogging.logFunctionCall('ai-v2-learn-skill', skill);
+                }
+              } else if (data.toolName) {
+                void VisualLogging.logFunctionCall('ai-v2-tool-call',
+                                                   Platform.StringUtilities.toKebabCase(data.toolName));
+              }
+            }
             break;
           }
 
@@ -1947,6 +1999,10 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           }
           case AiAssistanceModel.AiAgent.ResponseType.ERROR: {
             systemMessage.error = data.error;
+            if (AiAssistanceModel.AiUtils.isAiV2Enabled() && !this.#conversation?.isReadOnly &&
+                data.error !== AiAssistanceModel.AiAgent.ErrorType.ABORT) {
+              void VisualLogging.logFunctionCall('ai-v2-error', data.error);
+            }
             const lastPart = systemMessage.parts.at(-1);
             if (lastPart?.type === 'step') {
               const lastStep = lastPart.step;
@@ -1969,6 +2025,10 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           }
 
           case AiAssistanceModel.AiAgent.ResponseType.CONTEXT_CHANGE: {
+            if (AiAssistanceModel.AiUtils.isAiV2Enabled() && !this.#conversation?.isReadOnly && data.toolName) {
+              void VisualLogging.logFunctionCall('ai-v2-tool-call',
+                                                 Platform.StringUtilities.toKebabCase(data.toolName));
+            }
             this.#handleConversationContextChange(data.context);
             step.state = {type: 'completed'};
             step.widgets = data.widgets;

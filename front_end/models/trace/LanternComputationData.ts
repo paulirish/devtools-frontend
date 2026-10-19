@@ -38,11 +38,14 @@ function createProcessedNavigation(
     }
     return metricScore.event.ts;
   };
+  const lcpScore = scores.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
   return {
     timestamps: {
       firstContentfulPaint: getTimestamp(Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP),
       largestContentfulPaint: getTimestampOrUndefined(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP),
     },
+    largestContentfulPaintEvt:
+        lcpScore && Handlers.ModelHandlers.PageLoadMetrics.metricIsLCP(lcpScore) ? lcpScore.event : undefined,
   };
 }
 
@@ -154,17 +157,6 @@ function createLanternRequest(
     resourceType = 'Fetch';
   }
 
-  // TODO: set decodedBodyLength for data urls in Trace Engine.
-  let resourceSize = request.args.data.decodedBodyLength ?? 0;
-  if (url.protocol === 'data:' && resourceSize === 0) {
-    const commaIndex = url.pathname.indexOf(',');
-    if (url.pathname.substring(0, commaIndex).includes(';base64')) {
-      resourceSize = atob(url.pathname.substring(commaIndex + 1)).length;
-    } else {
-      resourceSize = url.pathname.length - commaIndex - 1;
-    }
-  }
-
   // NetworkRequestsHandler defaults missing `renderBlocking` to 'non_blocking',
   // so only populate `renderBlocking` when it was explicitly set on the raw
   // ResourceSendRequest event or updated via PreloadRenderBlockingStatusChange.
@@ -186,7 +178,7 @@ function createLanternRequest(
     responseHeadersEndTime: request.args.data.syntheticData.downloadStart / 1000,
     networkEndTime: request.args.data.syntheticData.finishTime / 1000,
     transferSize: request.args.data.encodedDataLength,
-    resourceSize,
+    resourceSize: request.args.data.decodedBodyLength ?? 0,
     fromDiskCache: request.args.data.syntheticData.isDiskCached,
     fromMemoryCache: request.args.data.syntheticData.isMemoryCached,
     isLinkPreload: request.args.data.isLinkPreload,
@@ -318,8 +310,8 @@ function createNetworkRequests(trace: Lantern.Types.Trace, data: Handlers.Types.
 
       redirectedRequest.timing = {
         requestTime: redirectedRequest.networkRequestTime / 1000,
-        receiveHeadersStart: redirectedRequest.responseHeadersEndTime,
-        receiveHeadersEnd: redirectedRequest.responseHeadersEndTime,
+        receiveHeadersStart: redirectedRequest.responseHeadersEndTime - redirectedRequest.networkRequestTime,
+        receiveHeadersEnd: redirectedRequest.responseHeadersEndTime - redirectedRequest.networkRequestTime,
         proxyStart: -1,
         proxyEnd: -1,
         dnsStart: -1,
@@ -347,6 +339,9 @@ function createNetworkRequests(trace: Lantern.Types.Trace, data: Handlers.Types.
       redirectedRequest.transferSize = 400;
       requestChain.push(redirectedRequest);
       lanternRequests.push(redirectedRequest);
+    }
+    if (requestChain.length) {
+      request.rendererStartTime = requestChain[requestChain.length - 1].networkEndTime;
     }
     requestChain.push(request);
     lanternRequests.push(request);

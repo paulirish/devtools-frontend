@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {after, before, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -36,10 +37,6 @@ describe('GlobalAiButton', () => {
   let clock: sinon.SinonFakeTimers;
   beforeEach(() => {
     Common.Settings.Settings.instance().settingForTest('global-ai-button-click-count').set(0);
-  });
-
-  afterEach(() => {
-    clock?.restore();
   });
 
   async function createWidget() {

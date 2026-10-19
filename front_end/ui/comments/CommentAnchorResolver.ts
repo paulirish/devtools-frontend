@@ -20,20 +20,30 @@ const DISALLOWED_COMMENT_TARGETS = new Set<number>([
   VisualLogging.VisualElements.PanelTabHeader,
   VisualLogging.VisualElements.Resizer,
   VisualLogging.VisualElements.Menu,
+  VisualLogging.VisualElements.Popover,
+  VisualLogging.VisualElements.Dialog,
   // Minor controls and toolbars
+  VisualLogging.VisualElements.Link,
+  VisualLogging.VisualElements.Section,
+  VisualLogging.VisualElements.Counter,
   VisualLogging.VisualElements.Action,
   VisualLogging.VisualElements.Toggle,
   VisualLogging.VisualElements.Close,
   VisualLogging.VisualElements.Expand,
   VisualLogging.VisualElements.ToggleSubpane,
   VisualLogging.VisualElements.Toolbar,
+  VisualLogging.VisualElements.DropDown,
+  VisualLogging.VisualElements.FilterDropdown,
+  VisualLogging.VisualElements.TextField,
 ]);
 
-/**
- * The comment thread UI itself is never a valid comment target: anything inside it (including the
- * DOM node link in its header) must stay inert while comment mode is on.
- */
-export const COMMENT_THREAD_UI_SELECTOR = '.comment-thread-widget';
+const DISALLOWED_COMMENT_ANCESTORS = new Set<number>([
+  VisualLogging.VisualElements.Toolbar,
+  VisualLogging.VisualElements.Menu,
+  VisualLogging.VisualElements.Popover,
+  VisualLogging.VisualElements.Dialog,
+  VisualLogging.VisualElements.PanelTabHeader,
+]);
 
 /**
  * Finds the closest ancestor (or the element itself) matching a CSS selector,
@@ -105,6 +115,20 @@ export interface CustomAnchorResult {
 /**
  * Extension point allowing views that render custom content (such as canvas-based
  * flame charts) to provide custom anchor resolution for comments without direct DOM nodes.
+ *
+ * The shared comments overlay draws the pin, popup and highlight for these
+ * anchors in its own layer, as it does for DOM anchors. The view supplies the
+ * parts that depend on how it renders:
+ * - `resolve()` maps a pointer position to an anchor when a comment is created.
+ * - `getAnchorElement()` returns a DOM element that the view keeps over the
+ *   anchor on screen. The element can be invisible. CommentOverlayManager
+ *   positions the pin from the element's visible rect.
+ * - The view calls `notifyCustomAnchorsMoved()` whenever it moves or hides
+ *   these elements, because CommentOverlayManager does not observe them.
+ *
+ * For example, the Performance panel returns an invisible timeline overlay box
+ * that it keeps over each commented entry, and notifies after every overlays
+ * update, such as when the flame chart is panned.
  */
 export interface CustomAnchorResolver {
   /**
@@ -123,9 +147,17 @@ export interface CustomAnchorResolver {
    * @returns The resolved anchor result, or null if no anchor is present at the specified location.
    */
   resolve(element: Element, options?: {clientX: number, clientY: number, forHover?: boolean}): CustomAnchorResult|null;
+
+  /**
+   * Returns a positioned DOM element that tracks the on-screen bounds of a
+   * non-DOM anchor, or null if the anchor is not handled by this resolver or
+   * is not currently visible.
+   */
+  getAnchorElement(anchor: CommentAnchorSignature): Element|null;
 }
 
 const customAnchorResolvers = new Set<CustomAnchorResolver>();
+const customAnchorsMovedListeners = new Set<() => void>();
 
 /**
  * Registers a custom anchor resolver. Usually called when a view becomes visible
@@ -170,6 +202,50 @@ export function getCustomAnchorResolverForElement(element: Element): CustomAncho
 }
 
 /**
+ * Returns the positioned element for a non-DOM anchor from the first
+ * registered resolver that provides one, or null if no resolver handles the
+ * anchor or the anchor is not visible.
+ */
+export function getCustomAnchorElement(anchor: CommentAnchorSignature): Element|null {
+  for (const resolver of customAnchorResolvers) {
+    const element = resolver.getAnchorElement(anchor);
+    if (element) {
+      return element;
+    }
+  }
+  return null;
+}
+
+/**
+ * Requests that comment pins on non-DOM anchors are repositioned. The
+ * elements returned by `getAnchorElement()` are not observed for DOM scroll,
+ * resize or intersection changes, so this must be called whenever they move
+ * or change visibility (for example, when a canvas is panned). Resolvers do
+ * not hold a reference to a CommentOverlayManager, so every registered
+ * listener is notified.
+ */
+export function notifyCustomAnchorsMoved(): void {
+  for (const listener of customAnchorsMovedListeners) {
+    listener();
+  }
+}
+
+/**
+ * Registers a listener for `notifyCustomAnchorsMoved()`. CommentOverlayManager
+ * uses it to reposition pins on non-DOM anchors.
+ */
+export function addCustomAnchorsMovedListener(listener: () => void): void {
+  customAnchorsMovedListeners.add(listener);
+}
+
+/**
+ * Unregisters a listener added with `addCustomAnchorsMovedListener()`.
+ */
+export function removeCustomAnchorsMovedListener(listener: () => void): void {
+  customAnchorsMovedListeners.delete(listener);
+}
+
+/**
  * Checks whether an element contains non-empty text content (after trimming whitespace),
  * including text from any nested shadow roots.
  *
@@ -180,32 +256,29 @@ export function isNonEmptyItem(element: Element): boolean {
   return element.deepTextContent().trim().length > 0;
 }
 
+function getElementLoggingConfig(element: Element): VisualLogging.LoggingConfig|null {
+  if (!VisualLogging.needsLogging(element)) {
+    return null;
+  }
+  try {
+    return VisualLogging.getLoggingConfig(element);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Determines whether an element represents a tab header or tab title
- * (e.g. PanelTabHeader, role="tab", or .tab-header class) across shadow DOM boundaries,
- * which should be excluded from commenting.
+ * Determines whether an element or any of its ancestors across shadow boundaries
+ * is a container where commenting is disallowed
  *
  * @param element The element to check.
- * @returns True if the element or any of its ancestors is a tab title; otherwise false.
+ * @returns True if the element or an ancestor is a disallowed comment ancestor; otherwise false.
  */
-export function isTabTitle(element: Element): boolean {
+export function hasDisallowedCommentAncestor(element: Element): boolean {
   let current: Element|null = element;
   while (current) {
-    if (VisualLogging.needsLogging(current)) {
-      try {
-        const config = VisualLogging.getLoggingConfig(current);
-        if (config.ve === VisualLogging.VisualElements.PanelTabHeader) {
-          return true;
-        }
-      } catch {
-        // Ignore
-      }
-    }
-    const role = current.getAttribute('role');
-    if (role === 'tab') {
-      return true;
-    }
-    if (current.classList.contains('tab-element') || current.classList.contains('tab-header')) {
+    const config = getElementLoggingConfig(current);
+    if (config && (DISALLOWED_COMMENT_ANCESTORS.has(config.ve) || config.context === 'comments')) {
       return true;
     }
     current = current.parentElementOrShadowHost();
@@ -274,7 +347,7 @@ function resolveCodeMirrorLineInfo(element: Element): CodeMirrorLineInfo|null {
  * Resolves an arbitrary clicked or targeted DOM element to its appropriate semantic comment anchor element.
  *
  * Traversal hierarchy:
- * 1. Checks if the element is part of a tab title or of the comment thread UI (returns null if so).
+ * 1. Checks if any ancestor is in DISALLOWED_COMMENT_ANCESTORS (returns null if so).
  * 2. Escalates CodeMirror line/gutter elements to .cm-editor (only if the clicked line is non-empty).
  * 3. Checks for domain IDs (`data-network-request-id` or `data-backend-node-id`) across shadow boundaries,
  *    returning the owning domain element.
@@ -287,7 +360,7 @@ function resolveCodeMirrorLineInfo(element: Element): CodeMirrorLineInfo|null {
  */
 export function resolveCommentAnchorElement(
     element: Element, options?: {clientX: number, clientY: number, forHover?: boolean}): Element|null {
-  if (isTabTitle(element) || closestAcrossShadow(element, COMMENT_THREAD_UI_SELECTOR)) {
+  if (hasDisallowedCommentAncestor(element)) {
     return null;
   }
   const customResolver = getCustomAnchorResolverForElement(element);
@@ -317,18 +390,13 @@ export function resolveCommentAnchorElement(
   let fallbackCandidate: Element|null = null;
 
   while (target) {
-    if (VisualLogging.needsLogging(target)) {
-      try {
-        const config = VisualLogging.getLoggingConfig(target);
-        if (config.ve === VisualLogging.VisualElements.TableRow ||
-            config.ve === VisualLogging.VisualElements.TreeItem) {
-          return isNonEmptyItem(target) ? target : null;
-        }
-        if (!fallbackCandidate && !DISALLOWED_COMMENT_TARGETS.has(config.ve)) {
-          fallbackCandidate = target;
-        }
-      } catch {
-        // Ignore
+    const config = getElementLoggingConfig(target);
+    if (config) {
+      if (config.ve === VisualLogging.VisualElements.TableRow || config.ve === VisualLogging.VisualElements.TreeItem) {
+        return isNonEmptyItem(target) ? target : null;
+      }
+      if (!fallbackCandidate && !DISALLOWED_COMMENT_TARGETS.has(config.ve)) {
+        fallbackCandidate = target;
       }
     }
     target = target.parentElementOrShadowHost();
@@ -607,7 +675,7 @@ export function rematchCommentAnchor(comment: CommentThread, root: Document|Elem
       return VisualLogging.getVePath(cmEditor) === anchor.vePath;
     });
     for (const cmEditor of matchingEditors) {
-      if (checkCodeMirrorLineMatch(cmEditor, lineNumber, anchor.textSignature)) {
+      if (anchor.textSignature !== undefined && checkCodeMirrorLineMatch(cmEditor, lineNumber, anchor.textSignature)) {
         return cmEditor;
       }
     }

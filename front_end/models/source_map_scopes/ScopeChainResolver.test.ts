@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
@@ -25,7 +26,6 @@ describe('ScopeChainResolver', () => {
 
   afterEach(() => {
     universe.dispose();
-    sinon.restore();
   });
 
   function createFakeCallFrame(debuggerModel: SDK.DebuggerModel.DebuggerModel,

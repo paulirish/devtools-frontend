@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as CommentManager from '../../models/comment_manager/comment_manager.js';
@@ -97,46 +98,6 @@ describeWithEnvironment('CommentAnchorResolver', () => {
       shadow.appendChild(span);
 
       assert.isTrue(Comments.CommentAnchorResolver.isNonEmptyItem(host));
-    });
-  });
-
-  describe('isTabTitle', () => {
-    it('identifies PanelTabHeader VE elements', () => {
-      const tabHeader = document.createElement('div');
-      tabHeader.setAttribute('jslog', 'PanelTabHeader; context: console');
-      assert.isTrue(Comments.CommentAnchorResolver.isTabTitle(tabHeader));
-    });
-
-    it('identifies elements with role="tab"', () => {
-      const tab = document.createElement('div');
-      tab.setAttribute('role', 'tab');
-      assert.isTrue(Comments.CommentAnchorResolver.isTabTitle(tab));
-    });
-
-    it('identifies elements with tab CSS classes', () => {
-      const tab1 = document.createElement('div');
-      tab1.classList.add('tab-element');
-      assert.isTrue(Comments.CommentAnchorResolver.isTabTitle(tab1));
-
-      const tab2 = document.createElement('div');
-      tab2.classList.add('tab-header');
-      assert.isTrue(Comments.CommentAnchorResolver.isTabTitle(tab2));
-    });
-
-    it('identifies child elements within tab headers across shadow boundaries', () => {
-      const host = document.createElement('div');
-      host.setAttribute('role', 'tab');
-      const shadow = host.attachShadow({mode: 'open'});
-      const child = document.createElement('span');
-      shadow.appendChild(child);
-
-      assert.isTrue(Comments.CommentAnchorResolver.isTabTitle(child));
-    });
-
-    it('returns false for non-tab elements', () => {
-      const el = document.createElement('div');
-      el.setAttribute('jslog', 'TreeItem; context: item');
-      assert.isFalse(Comments.CommentAnchorResolver.isTabTitle(el));
     });
   });
 
@@ -338,34 +299,6 @@ describeWithEnvironment('CommentAnchorResolver', () => {
       assert.strictEqual(anchorEl, nodeEl);
     });
 
-    it('does not resolve elements inside the comment thread UI', () => {
-      const threadWidget = document.createElement('div');
-      threadWidget.className = 'comment-thread-widget';
-      const textarea = document.createElement('textarea');
-      textarea.setAttribute('jslog', 'TextField; context: comment');
-      threadWidget.appendChild(textarea);
-      container.appendChild(threadWidget);
-
-      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(textarea));
-    });
-
-    it('does not resolve nodes rendered in a shadow root inside the comment thread UI', () => {
-      const threadWidget = document.createElement('div');
-      threadWidget.className = 'comment-thread-widget';
-      const host = document.createElement('div');
-      threadWidget.appendChild(host);
-      container.appendChild(threadWidget);
-
-      const shadow = host.attachShadow({mode: 'open'});
-      const link = document.createElement('button');
-      link.setAttribute('jslog', 'Link; context: node');
-      link.setAttribute('data-backend-node-id', '42');
-      link.textContent = 'div#container';
-      shadow.appendChild(link);
-
-      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(link));
-    });
-
     it('escalates table cell to entire TableRow in grids/tables', () => {
       const row = document.createElement('div');
       row.setAttribute('jslog', 'TableRow; context: grid-row');
@@ -418,24 +351,8 @@ describeWithEnvironment('CommentAnchorResolver', () => {
       tabHeader.textContent = 'Console';
       container.appendChild(tabHeader);
 
-      const anchorEl1 = Comments.CommentAnchorResolver.resolveCommentAnchorElement(tabHeader);
-      assert.isNull(anchorEl1);
-
-      const ariaTab = document.createElement('div');
-      ariaTab.setAttribute('role', 'tab');
-      ariaTab.textContent = 'Network';
-      container.appendChild(ariaTab);
-
-      const anchorEl2 = Comments.CommentAnchorResolver.resolveCommentAnchorElement(ariaTab);
-      assert.isNull(anchorEl2);
-
-      const classTab = document.createElement('div');
-      classTab.classList.add('tab-header');
-      classTab.textContent = 'Sources';
-      container.appendChild(classTab);
-
-      const anchorEl3 = Comments.CommentAnchorResolver.resolveCommentAnchorElement(classTab);
-      assert.isNull(anchorEl3);
+      const anchorEl = Comments.CommentAnchorResolver.resolveCommentAnchorElement(tabHeader);
+      assert.isNull(anchorEl);
     });
 
     it('excludes top-level Panel from commenting', () => {
@@ -464,6 +381,46 @@ describeWithEnvironment('CommentAnchorResolver', () => {
 
       const anchorEl = Comments.CommentAnchorResolver.resolveCommentAnchorElement(unanchoredElement);
       assert.isNull(anchorEl);
+    });
+
+    it('excludes elements inside a disallowed ancestor container (e.g. Popover) from commenting', () => {
+      const popover = document.createElement('div');
+      popover.setAttribute('jslog', 'Popover; context: comment-thread');
+
+      const link = document.createElement('span');
+      link.setAttribute('data-backend-node-id', '101');
+      link.textContent = 'div#my-element';
+      popover.appendChild(link);
+      container.appendChild(popover);
+
+      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(link));
+    });
+
+    it('excludes standalone disallowed minor controls from commenting', () => {
+      const link = document.createElement('a');
+      link.setAttribute('jslog', 'Link; context: docs');
+      link.textContent = 'Learn more';
+      container.appendChild(link);
+
+      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(link));
+    });
+
+    it('excludes elements inside a Dialog (e.g. Settings or Command Menu across shadow DOM) from commenting', () => {
+      const dialog = document.createElement('div');
+      dialog.setAttribute('jslog', 'Dialog; context: settings; track: resize, keydown: Escape');
+
+      const host = document.createElement('div');
+      const shadow = host.attachShadow({mode: 'open'});
+      const treeItem = document.createElement('div');
+      treeItem.setAttribute('jslog', 'TreeItem; context: setting-item');
+      treeItem.textContent = 'Enable setting';
+      shadow.appendChild(treeItem);
+      dialog.appendChild(host);
+      container.appendChild(dialog);
+
+      assert.isTrue(Comments.CommentAnchorResolver.hasDisallowedCommentAncestor(treeItem));
+      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(treeItem));
+      assert.isNull(Comments.CommentAnchorResolver.resolveCommentAnchorElement(dialog));
     });
   });
 
@@ -1722,6 +1679,10 @@ describeWithEnvironment('CommentAnchorResolver', () => {
       container.appendChild(customElement);
 
       customResolver = {
+        getAnchorElement(): Element |
+            null {
+              return null;
+            },
         matches(element: Element): boolean {
           return element.classList.contains('custom-canvas-target') ||
               Boolean(element.closest('.custom-canvas-target'));
@@ -1790,6 +1751,37 @@ describeWithEnvironment('CommentAnchorResolver', () => {
       Comments.CommentAnchorResolver.unregisterCustomAnchorResolver(customResolver);
       const resolver = Comments.CommentAnchorResolver.getCustomAnchorResolverForElement(customElement);
       assert.isNull(resolver);
+    });
+
+    it('returns the anchor element from the resolver that handles the anchor', () => {
+      const anchorBox = document.createElement('div');
+      const handledAnchor: CommentManager.CommentManager.CommentAnchorSignature = {
+        vePath: 'Panel: custom > Canvas: main',
+        textSignature: 'Handled Event',
+      };
+      const unhandledAnchor: CommentManager.CommentManager.CommentAnchorSignature = {
+        vePath: 'Panel: custom > Canvas: main',
+        textSignature: 'Unhandled Event',
+      };
+      Comments.CommentAnchorResolver.registerCustomAnchorResolver({
+        matches: () => false,
+        resolve: () => null,
+        getAnchorElement: anchor => anchor === handledAnchor ? anchorBox : null,
+      });
+
+      assert.strictEqual(Comments.CommentAnchorResolver.getCustomAnchorElement(handledAnchor), anchorBox);
+      assert.isNull(Comments.CommentAnchorResolver.getCustomAnchorElement(unhandledAnchor));
+    });
+
+    it('calls custom anchors moved listeners until they are removed', () => {
+      const listener = sinon.spy();
+      Comments.CommentAnchorResolver.addCustomAnchorsMovedListener(listener);
+      Comments.CommentAnchorResolver.notifyCustomAnchorsMoved();
+      sinon.assert.calledOnce(listener);
+
+      Comments.CommentAnchorResolver.removeCustomAnchorsMovedListener(listener);
+      Comments.CommentAnchorResolver.notifyCustomAnchorsMoved();
+      sinon.assert.calledOnce(listener);
     });
   });
 

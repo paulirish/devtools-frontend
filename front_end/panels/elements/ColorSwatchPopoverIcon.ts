@@ -5,12 +5,14 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import type * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type {Icon} from '../../ui/kit/kit.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import {type RenderingContext, ValueEditEvent} from './PropertyRenderer.js';
 import type {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
 
 const UIStrings = {
@@ -32,14 +34,16 @@ interface BezierPopoverIconParams {
   treeElement: StylePropertyTreeElement;
   swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   swatch: Icon;
-  bezierText: HTMLElement;
+  match: SDK.CSSPropertyParser.Match;
+  context: RenderingContext;
 }
 
 export class BezierPopoverIcon {
   private treeElement: StylePropertyTreeElement;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   private readonly swatch: Icon;
-  private readonly bezierText: HTMLElement;
+  private readonly match: SDK.CSSPropertyParser.Match;
+  private readonly context: RenderingContext;
   private readonly boundBezierChanged: (event: Common.EventTarget.EventTargetEvent<string>) => void;
   private readonly boundOnScroll: (event: Event) => void;
   private bezierEditor?: InlineEditor.BezierEditor.BezierEditor;
@@ -50,12 +54,14 @@ export class BezierPopoverIcon {
     treeElement,
     swatchPopoverHelper,
     swatch,
-    bezierText,
+    match,
+    context,
   }: BezierPopoverIconParams) {
     this.treeElement = treeElement;
     this.swatchPopoverHelper = swatchPopoverHelper;
     this.swatch = swatch;
-    this.bezierText = bezierText;
+    this.match = match;
+    this.context = context;
 
     UI.Tooltip.Tooltip.install(this.swatch, i18nString(UIStrings.openCubicBezierEditor));
     this.swatch.addEventListener('click', this.iconClick.bind(this), false);
@@ -76,7 +82,8 @@ export class BezierPopoverIcon {
       return;
     }
 
-    const model = InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(this.bezierText.innerText) ||
+    const text = this.context.edits?.getEdit(this.match) ?? this.context.matchedResult.getComputedText(this.match.node);
+    const model = InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(text) ||
         InlineEditor.AnimationTimingModel.LINEAR_BEZIER;
     this.bezierEditor = new InlineEditor.BezierEditor.BezierEditor(model);
     this.bezierEditor.addEventListener(InlineEditor.BezierEditor.Events.BEZIER_CHANGED, this.boundBezierChanged);
@@ -96,7 +103,8 @@ export class BezierPopoverIcon {
   }
 
   private bezierChanged(event: Common.EventTarget.EventTargetEvent<string>): void {
-    this.bezierText.textContent = event.data;
+    this.swatch.dispatchEvent(new ValueEditEvent(event.data));
+    this.context.recordEdit(this.match, event.data);
     void this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
   }
 

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -404,7 +405,6 @@ describeWithEnvironment('ConsoleView', () => {
       dispatchPasteEvent(messagesElement, {clipboardData: dt, bubbles: true});
 
       assert.lengthOf(Common.Console.Console.instance().messages(), 0);
-      stub.restore();
     });
   });
 
@@ -479,6 +479,7 @@ describeWithEnvironment('ConsoleView', () => {
     });
 
     it('cleans up toolbar when the feature is disabled', async () => {
+      const detachSpy = sinon.spy(AiCodeCompletionSummaryToolbar.AiCodeCompletionSummaryToolbar.prototype, 'detach');
       const providerConfig = consoleView.aiCodeCompletionConfig;
       assert.exists(providerConfig);
       providerConfig.onFeatureEnabled();
@@ -486,6 +487,7 @@ describeWithEnvironment('ConsoleView', () => {
 
       providerConfig.onFeatureDisabled();
 
+      sinon.assert.calledOnce(detachSpy);
       assert.notExists(consoleView.element.querySelector('div.ai-code-completion-summary-toolbar-container'));
     });
 

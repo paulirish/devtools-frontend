@@ -4,6 +4,8 @@
 
 import {assert} from 'chai';
 
+import {describe, it} from '../../../test/api/mocha-interface.js';
+
 import * as SDK from './sdk.js';
 
 describe('TargetManager API Test', () => {

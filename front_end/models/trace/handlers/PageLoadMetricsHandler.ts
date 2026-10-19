@@ -41,7 +41,7 @@ let metricScoresByFrameId = new Map<FrameId, Map<AnyNavigationStart, Map<MetricN
 let allMarkerEvents: Types.Events.PageLoadEvent[] = [];
 
 // Grouped by navigation to make it easier for insights to scope checks.
-let metaCharsetCheckEventsByNavigation = new Map<AnyNavigationStart, Types.Events.MetaCharsetCheck[]>();
+let metaCharsetCheckEventsByNavigation = new WeakMap<AnyNavigationStart, Types.Events.MetaCharsetCheck[]>();
 let metaCharsetCheckEventsArray: Types.Events.MetaCharsetCheck[] = [];
 
 export function reset(): void {
@@ -49,7 +49,7 @@ export function reset(): void {
   pageLoadEventsArray = [];
   allMarkerEvents = [];
   selectedLCPCandidateEvents = new Set();
-  metaCharsetCheckEventsByNavigation = new Map();
+  metaCharsetCheckEventsByNavigation = new WeakMap();
   metaCharsetCheckEventsArray = [];
 }
 
@@ -281,15 +281,16 @@ function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): AnyNa
     const {navigationsByNavigationId, softNavigationsById} = metaHandlerData();
 
     let navigation;
-    if (event.name === Types.Events.Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION &&
-        event.args.data?.performanceTimelineNavigationId) {
-      navigation = softNavigationsById.get(event.args.data.performanceTimelineNavigationId);
+    if (Types.Events.isSoftLargestContentfulPaintCandidate(event)) {
+      const navigationId = event.args.data?.performanceTimelineNavigationId;
+      navigation = navigationId ? softNavigationsById.get(navigationId) : undefined;
       if (!navigation) {
         // The most recent soft navigation must have been before the trace started.
         return null;
       }
-    } else if (Types.Events.isSoftFirstContentfulPaint(event) && event.args.context?.performanceTimelineNavigationId) {
-      navigation = softNavigationsById.get(event.args.context.performanceTimelineNavigationId);
+    } else if (Types.Events.isSoftFirstContentfulPaint(event)) {
+      const navigationId = event.args.context?.performanceTimelineNavigationId;
+      navigation = navigationId ? softNavigationsById.get(navigationId) : undefined;
       if (!navigation) {
         // The most recent soft navigation must have been before the trace started.
         return null;
@@ -299,7 +300,6 @@ function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): AnyNa
       if (!navigationId) {
         throw new Error(`Trace event unexpectedly had no navigation ID: ${JSON.stringify(event, null, 2)}`);
       }
-
       navigation = navigationsByNavigationId.get(navigationId);
     }
 
@@ -491,7 +491,7 @@ export interface PageLoadMetricsData {
   /**
    * MetaCharsetCheck events grouped by navigation.
    */
-  metaCharsetCheckEventsByNavigation: Map<AnyNavigationStart, Types.Events.MetaCharsetCheck[]>;
+  metaCharsetCheckEventsByNavigation: WeakMap<AnyNavigationStart, Types.Events.MetaCharsetCheck[]>;
 }
 
 export function data(): PageLoadMetricsData {

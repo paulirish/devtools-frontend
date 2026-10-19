@@ -500,7 +500,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
           <devtools-split-view name="webmcp-call-split-view"
                                direction="column"
                                sidebar-position="second"
-                               sidebar-visibility=${input.selectedCall ? 'show' : 'hidden'}>
+                               show=${input.selectedCall ? 'both' : 'main'}>
             <div slot="main" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
               <devtools-data-grid striped .template=${html`
                 <table>
@@ -600,19 +600,19 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                 <devtools-widget
                   id=${TabId.DETAILS}
                   ?selected=${Directives.live(input.selectedTab === TabId.DETAILS)}
-                  title=${i18nString(UIStrings.toolDetails)}
+                  label=${i18nString(UIStrings.toolDetails)}
                   ${widget(ToolDetailsWidget, {tool: input.selectedCall?.tool, isUnregistered: input.selectedCall ? !input.tools.includes(input.selectedCall.tool) : false})}>
                 </devtools-widget>
                 <devtools-widget
                   id=${TabId.INPUT}
                   ?selected=${Directives.live(input.selectedTab === TabId.INPUT)}
-                  title=${i18nString(UIStrings.input)}
+                  label=${i18nString(UIStrings.input)}
                   ${widget(PayloadWidget, parsePayload(input.selectedCall?.input))}>
                 </devtools-widget>
                 <devtools-widget
                   id=${TabId.OUTPUT}
                   ?selected=${Directives.live(input.selectedTab === TabId.OUTPUT)}
-                  title=${i18nString(UIStrings.output)}
+                  label=${i18nString(UIStrings.output)}
                   ${widget(PayloadWidget, {
                           valueObject: input.selectedCall?.result?.output,
                           errorText: input.selectedCall?.result?.errorText,
@@ -647,7 +647,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                            direction="column"
                            sidebar-position="second"
                            name="webmcp-details-split-view"
-                           sidebar-visibility=${input.selectedTool ? 'show' : 'hidden'}>
+                           show=${input.selectedTool ? 'both' : 'main'}>
         <div slot="main" class="tool-list" jslog=${VisualLogging.section('tool-list')}>
           <div class="section-title">${i18nString(UIStrings.toolRegistry)}</div>
           ${tools.length === 0 ? html`

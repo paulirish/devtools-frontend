@@ -7,6 +7,7 @@ import '../../ui/kit/kit.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as FormatterActions from '../../entrypoints/formatter_actions/formatter_actions.js';
 import * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
@@ -312,8 +313,9 @@ export class UISourceCodeFrame extends UISourceCodeFrameBase {
       return;
     }
     const content = TextUtils.ContentData.ContentData.textOr(contentDataOrError, '');
-    const {formattedContent, formattedMapping} = await Formatter.ScriptFormatter.format(
-        Common.Settings.Settings.instance(), this.#uiSourceCode.contentType(), this.contentType, content);
+    const indent = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get();
+    const {formattedContent, formattedMapping} =
+        await Formatter.ScriptFormatter.format(this.#uiSourceCode.contentType(), this.contentType, content, indent);
     if (this.#uiSourceCode.workingCopy() === formattedContent) {
       return;
     }
@@ -359,7 +361,7 @@ export class UISourceCodeFrame extends UISourceCodeFrameBase {
   static sourceFramePlugins(): Array<typeof Plugin> {
     // The order of these plugins matters for toolbar items and editor
     // extension precedence
-    const sourceFramePluginsList = [
+    const sourceFramePluginsList: Array<typeof Plugin> = [
       CSSPlugin,
       DebuggerPlugin,
       SnippetsPlugin,
@@ -484,7 +486,7 @@ export class UISourceCodeFrame extends UISourceCodeFrameBase {
   }
 
   override async toolbarItems(): Promise<TemplateResult> {
-    const leftToolbarItems: Array<UI.Toolbar.ToolbarItem|LitTemplate> = [await super.toolbarItems()];
+    const leftToolbarItems: LitTemplate[] = [await super.toolbarItems()];
 
     const isEditable = Persistence.Persistence.PersistenceImpl.instance().hasEditableContent(this.#uiSourceCode);
     const isJavaScript = Common.ResourceType.ResourceType.isJavaScriptMimeType(this.contentType);
@@ -501,18 +503,18 @@ export class UISourceCodeFrame extends UISourceCodeFrameBase {
       ></devtools-button>`);
     }
 
-    const rightToolbarItems: Array<UI.Toolbar.ToolbarItem|LitTemplate> = [];
+    const rightToolbarItems: LitTemplate[] = [];
     for (const plugin of this.plugins) {
       leftToolbarItems.push(...plugin.leftToolbarItems());
       rightToolbarItems.push(...plugin.rightToolbarItems());
     }
 
     return html`
-      ${leftToolbarItems.map(item => item instanceof UI.Toolbar.ToolbarItem ? item.element : item)}
+      ${leftToolbarItems}
       ${
         rightToolbarItems.length ? html`
         <div class="toolbar-spacer"></div>
-        ${rightToolbarItems.map(item => item instanceof UI.Toolbar.ToolbarItem ? item.element : item)}
+        ${rightToolbarItems}
       ` :
                                    nothing}
     `;

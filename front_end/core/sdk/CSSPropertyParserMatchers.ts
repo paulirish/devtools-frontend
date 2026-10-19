@@ -85,7 +85,10 @@ export class BaseVariableMatcher extends BaseVariableMatcherBase {
       return null;
     }
     const nameNode = args[0][0];
-    const fallback = args.length === 2 ? args[1] : undefined;
+    // Skip the first comma and closing parenthesis, preserving commas in the fallback.
+    const fallback = args.length > 1 ?
+        Array.from(ASTUtils.stripComments(ASTUtils.siblings(nameNode.nextSibling))).slice(1, -1) :
+        undefined;
 
     if (!isVariableNameNode(nameNode, matching.ast)) {
       return null;
@@ -1164,14 +1167,15 @@ export class FlexGridGridLanesMatcher extends FlexGridGridLanesMatcherBase {
                        .map(node => matching.getComputedText(node).trim())
                        .filter(value => value);
     const text = values.join(' ');
+    const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
     if (FlexGridGridLanesMatcher.FLEX.includes(text)) {
-      return new FlexGridGridLanesMatch(matching.ast.text(node), node, LayoutType.FLEX);
+      return new FlexGridGridLanesMatch(valueText, node, LayoutType.FLEX);
     }
     if (FlexGridGridLanesMatcher.GRID.includes(text)) {
-      return new FlexGridGridLanesMatch(matching.ast.text(node), node, LayoutType.GRID);
+      return new FlexGridGridLanesMatch(valueText, node, LayoutType.GRID);
     }
     if (FlexGridGridLanesMatcher.GRID_LANES.includes(text)) {
-      return new FlexGridGridLanesMatch(matching.ast.text(node), node, LayoutType.GRID_LANES);
+      return new FlexGridGridLanesMatch(valueText, node, LayoutType.GRID_LANES);
     }
     return null;
   }
@@ -1490,10 +1494,11 @@ export class PositionAreaMatcher extends PositionAreaMatcherBase {
     if (valueNodes.length === 0) {
       return null;
     }
-    const valueText = matching.getComputedTextRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
-    if (CSSMetadata.isCSSWideKeyword(valueText)) {
+    const computedText = matching.getComputedTextRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
+    if (CSSMetadata.isCSSWideKeyword(computedText)) {
       return null;
     }
+    const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
     return new PositionAreaMatch(valueText, node);
   }
 }

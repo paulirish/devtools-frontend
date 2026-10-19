@@ -57,7 +57,7 @@ import {appendStyle, deepActiveElement, rangeOfWord} from './DOMUtilities.js';
 import {GlassPane, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
 import inspectorCommonStyles from './inspectorCommon.css.js';
 import {InspectorView} from './InspectorView.js';
-import {KeyboardShortcut, Keys} from './KeyboardShortcut.js';
+import {KeyboardShortcut} from './KeyboardShortcut.js';
 import smallBubbleStyles from './smallBubble.css.js';
 import {Tooltip} from './Tooltip.js';
 import * as WidgetUtils from './Widget.js';
@@ -1027,51 +1027,6 @@ export function createInput(className?: string, type?: string, jslogContext?: st
   return element;
 }
 
-export function createHistoryInput(type = 'search', className?: string): HTMLInputElement {
-  const history = [''];
-  let historyPosition = 0;
-
-  const historyInput = document.createElement('input');
-  historyInput.type = type;
-  if (className) {
-    historyInput.className = className;
-  }
-  historyInput.addEventListener('input', onInput, false);
-  historyInput.addEventListener('keydown', onKeydown, false);
-  return historyInput;
-
-  function onInput(_event: Event): void {
-    if (history.length === historyPosition + 1) {
-      history[historyPosition] = historyInput.value;
-    }
-  }
-
-  function onKeydown(event: KeyboardEvent): void {
-    if (event.keyCode === Keys.Up.code) {
-      if (historyPosition > 0) {
-        historyPosition--;
-        historyInput.value = history[historyPosition];
-        historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
-      }
-      event.consume(true);
-    } else if (event.keyCode === Keys.Down.code) {
-      if (historyPosition < history.length - 1) {
-        historyPosition++;
-        historyInput.value = history[historyPosition];
-        historyInput.dispatchEvent(new Event('input', {bubbles: true, cancelable: true}));
-      }
-      event.consume(true);
-    } else if (event.keyCode === Keys.Enter.code) {
-      if (history.length > 1 && history[history.length - 2] === historyInput.value) {
-        return;
-      }
-      history[history.length - 1] = historyInput.value;
-      historyPosition = history.length - 1;
-      history.push('');
-    }
-  }
-}
-
 export function createSelect(
     name: string, options: string[]|Array<Map<string, string[]>>|Set<string>): HTMLSelectElement {
   const select = document.createElement('select');
@@ -1619,8 +1574,8 @@ export class MessageDialog {
 }
 
 export class ConfirmDialog {
-  static async show(message: string, header?: string, where?: Element|Document, options?: ConfirmDialogOptions):
-      Promise<boolean> {
+  static async show(message: string, header?: string, where?: Element|Document|Widget,
+                    options?: ConfirmDialogOptions): Promise<boolean> {
     const dialog = new Dialog(options?.jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MEASURE_CONTENT);
     dialog.setDimmed(true);
@@ -1637,13 +1592,13 @@ export class ConfirmDialog {
           /* text= */ options?.okButtonLabel || i18nString(UIStrings.ok), /* clickHandler= */ () => resolve(true),
           {jslogContext: 'confirm', variant: Buttons.Button.Variant.PRIMARY});
       buttonsBar.appendChild(okButton);
-      buttonsBar.appendChild(createTextButton(
-          options?.cancelButtonLabel || i18nString(UIStrings.cancel), () => resolve(false), {jslogContext: 'cancel'}));
+      buttonsBar.appendChild(createTextButton(options?.cancelButtonLabel || i18nString(UIStrings.cancel),
+                                              () => resolve(false), {jslogContext: 'cancel'}));
       dialog.setOutsideClickCallback(event => {
         event.consume();
         resolve(false);
       });
-      dialog.show(where);
+      dialog.show(where instanceof Widget ? where.element : where);
       okButton.focus();
     });
     dialog.hide();
@@ -1924,6 +1879,7 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
 
   let setEnabled: (enabled: boolean) => void;
   let toggled: () => void;
+  let longClickController: LongClickController|null = null;
   function actionEnabledChanged(event: Common.EventTarget.EventTargetEvent<boolean>): void {
     setEnabled(event.data);
   }
@@ -1932,6 +1888,8 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
     if (!e || !(e instanceof Buttons.Button.Button)) {
       action.removeEventListener(ActionRegistration.Events.ENABLED, actionEnabledChanged);
       action.removeEventListener(ActionRegistration.Events.TOGGLED, toggled);
+      longClickController?.dispose();
+      longClickController = null;
       return;
     }
 
@@ -1947,13 +1905,115 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
     const jslogContext = action.id();
     const toggledIconName = action.toggledIcon() ?? iconName;
     const toggleType = action.toggleWithRedColor() ? Buttons.Button.ToggleType.RED : Buttons.Button.ToggleType.PRIMARY;
-    if (e.childNodes.length) {
+    const hasContentChildren = Array.from(e.childNodes)
+                                   .some(node => !(node instanceof Buttons.Button.Button) &&
+                                             (node.nodeType !== Node.TEXT_NODE || Boolean(node.textContent?.trim())));
+
+    const updateLongClickOptions = (): void => {
+      const optionButtons = Array.from(e.querySelectorAll('devtools-button'));
+      if (optionButtons.length > 0 && (!toggleable || action.toggled())) {
+        if (!longClickController) {
+          longClickController = new LongClickController(e, showOptions);
+          e.longClickable = true;
+        }
+      } else if (longClickController) {
+        longClickController.dispose();
+        longClickController = null;
+        e.longClickable = false;
+      }
+    };
+
+    function showOptions(): void {
+      if (!(e instanceof Buttons.Button.Button)) {
+        return;
+      }
+      let buttons = [...e.querySelectorAll('devtools-button'), e];
+
+      const document = e.ownerDocument;
+      document.documentElement.addEventListener('mouseup', mouseUp, false);
+
+      const optionsGlassPane = new GlassPane();
+      optionsGlassPane.setPointerEventsBehavior(PointerEventsBehavior.BLOCKED_BY_GLASS_PANE);
+      optionsGlassPane.show(document);
+      const optionsBar = optionsGlassPane.contentElement.createChild('devtools-toolbar');
+      optionsBar.floating = true;
+      const buttonHeight = 26;
+
+      const hostButtonPosition = e.boxInWindow().relativeToElement(GlassPane.container(document));
+      const topNotBottom = hostButtonPosition.y + buttonHeight * buttons.length < document.documentElement.offsetHeight;
+
+      if (topNotBottom) {
+        buttons = buttons.reverse();
+      }
+
+      optionsBar.style.height = (buttonHeight * buttons.length) + 'px';
+      if (topNotBottom) {
+        optionsBar.style.top = (hostButtonPosition.y - 5) + 'px';
+      } else {
+        optionsBar.style.top = (hostButtonPosition.y - (buttonHeight * (buttons.length - 1)) - 6) + 'px';
+      }
+      optionsBar.style.left = (hostButtonPosition.x - 5) + 'px';
+
+      const buttonClones: Buttons.Button.Button[] = [];
+      for (const button of buttons) {
+        const clone = button.cloneNode(false) as Buttons.Button.Button;
+        clone.longClickable = false;
+        clone.classList.add('toolbar-button');
+        clone.addEventListener('mousemove', mouseOver, false);
+        clone.addEventListener('mouseout', mouseOut, false);
+        optionsBar.appendChild(clone);
+        buttonClones.push(clone);
+      }
+      const hostButtonIndex = topNotBottom ? 0 : buttons.length - 1;
+      buttonClones[hostButtonIndex].classList.add('emulate-active');
+
+      function mouseOver(ev: Event): void {
+        if ((ev as MouseEvent).which !== 1) {
+          return;
+        }
+        if (ev.target instanceof HTMLElement) {
+          const buttonElement = ev.target.enclosingNodeOrSelfWithClass('toolbar-button');
+          buttonElement?.classList.add('emulate-active');
+        }
+      }
+
+      function mouseOut(ev: Event): void {
+        if ((ev as MouseEvent).which !== 1) {
+          return;
+        }
+        if (ev.target instanceof HTMLElement) {
+          const buttonElement = ev.target.enclosingNodeOrSelfWithClass('toolbar-button');
+          buttonElement?.classList.remove('emulate-active');
+        }
+      }
+
+      function mouseUp(ev: Event): void {
+        if ((ev as MouseEvent).which !== 1) {
+          return;
+        }
+        optionsGlassPane.hide();
+        document.documentElement.removeEventListener('mouseup', mouseUp, false);
+
+        for (let i = 0; i < buttonClones.length; ++i) {
+          if (buttonClones[i].classList.contains('emulate-active')) {
+            buttonClones[i].classList.remove('emulate-active');
+            buttons[i].click();
+            break;
+          }
+        }
+      }
+    }
+
+    if (hasContentChildren) {
       e.jslogContext = jslogContext;
+      updateLongClickOptions();
     } else if (toggleable) {
       toggled = () => {
         e.toggled = action.toggled();
+        updateLongClickOptions();
         if (action.title()) {
-          e.title = action.title();
+          ARIAUtils.setLabel(e, action.title());
+          e.accessibleLabel = action.title();
           Tooltip.installWithActionBinding(e, action.title(), action.id());
         }
       };
@@ -1961,17 +2021,28 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
       e.data = {
         jslogContext,
         title,
+        accessibleLabel: title,
         variant: Buttons.Button.Variant.ICON_TOGGLE,
         iconName,
         toggledIconName,
         toggleType,
         toggled: action.toggled(),
+        toggleOnClick: false,
       };
       toggled();
     } else if (iconName) {
-      e.data = {iconName, jslogContext, title, variant: Buttons.Button.Variant.ICON};
+      e.data = {iconName, jslogContext, title, accessibleLabel: title, variant: Buttons.Button.Variant.ICON};
+      if (title) {
+        ARIAUtils.setLabel(e, title);
+        Tooltip.installWithActionBinding(e, title, action.id());
+      }
+      updateLongClickOptions();
     } else {
-      e.data = {jslogContext, title, variant: Buttons.Button.Variant.TEXT};
+      e.data = {jslogContext, title, accessibleLabel: title, variant: Buttons.Button.Variant.TEXT};
+      if (title) {
+        ARIAUtils.setLabel(e, title);
+      }
+      updateLongClickOptions();
     }
     setEnabled(action.enabled());
     e.onclick = () => action.execute();
@@ -2243,20 +2314,26 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
   protected removeNodes(_nodes: NodeList|Node[]): void {
   }
 
-  static findCorrespondingElement(
-      sourceElement: HTMLElement, sourceRootElement: HTMLElement, targetRootElement: Element): Element|null {
+  static findCorrespondingElement(sourceElement: Element, sourceRootElement: Element,
+                                  targetRootElement: Element): Element|null {
     let currentElement = sourceElement;
     const childIndexesOnPathToRoot: number[] = [];
-    while (currentElement?.parentElement && currentElement !== sourceRootElement) {
-      childIndexesOnPathToRoot.push([...currentElement.parentElement.children].indexOf(currentElement));
+    while (currentElement.parentElement && currentElement !== sourceRootElement) {
+      let childIndex = 0;
+      let sibling = currentElement.previousElementSibling;
+      while (sibling) {
+        childIndex++;
+        sibling = sibling.previousElementSibling;
+      }
+      childIndexesOnPathToRoot.push(childIndex);
       currentElement = currentElement.parentElement;
     }
-    if (!currentElement) {
+    if (currentElement !== sourceRootElement) {
       return null;
     }
-    let targetElement = targetRootElement;
+    let targetElement: Element|null = targetRootElement;
     for (const index of childIndexesOnPathToRoot.reverse()) {
-      targetElement = targetElement.children[index];
+      targetElement = targetElement?.children[index] ?? null;
     }
     return targetElement;
   }

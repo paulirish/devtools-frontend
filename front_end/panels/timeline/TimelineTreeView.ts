@@ -207,8 +207,8 @@ export class TimelineTreeView extends TimelineTreeViewBase implements UI.Searcha
    */
   protected autoSelectFirstChildOnRefresh = true;
 
-  constructor(element?: HTMLElement) {
-    super(element);
+  constructor(element?: HTMLElement, options?: UI.Widget.WidgetOptions) {
+    super(element, options);
     this.#selectedEvents = null;
     this.element.classList.add('timeline-tree-view');
     this.registerRequiredCSS(timelineTreeViewStyles);
@@ -746,9 +746,10 @@ export class TimelineTreeView extends TimelineTreeViewBase implements UI.Searcha
     this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_CLICKED, {node});
   }
 
-  override childWasDetached(_widget: UI.Widget.Widget): void {
-    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange);
-    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.DESELECTED_NODE, this.#onDataGridDeselection);
+  override willHide(): void {
+    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange, this);
+    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.DESELECTED_NODE, this.#onDataGridDeselection, this);
+    super.willHide();
   }
 
   /**
@@ -1085,15 +1086,36 @@ const treeNodeToGridNode = new WeakMap<Trace.Extras.TraceTree.Node, TreeGridNode
 export class AggregatedTimelineTreeView extends TimelineTreeView {
   protected readonly groupBySetting: Common.Settings.Setting<AggregatedTimelineTreeView.GroupBy>;
   readonly stackView: TimelineStackView;
+  #builtGroupBy?: AggregatedTimelineTreeView.GroupBy;
+  readonly #onGroupByChanged = (): void => this.refreshTree();
 
   constructor(element?: HTMLElement) {
     super(element);
     this.groupBySetting = Common.Settings.Settings.instance().createSetting(
         'timeline-tree-group-by', AggregatedTimelineTreeView.GroupBy.None);
-    this.groupBySetting.addChangeListener(() => this.refreshTree());
     this.init();
     this.stackView = new TimelineStackView(this);
     this.stackView.addEventListener(TimelineStackView.Events.SELECTION_CHANGED, this.onStackViewSelectionChanged, this);
+  }
+
+  override refreshTree(forceRefresh = false): void {
+    if (this.element.parentElement || forceRefresh) {
+      this.#builtGroupBy = this.groupBySetting.get();
+    }
+    super.refreshTree(forceRefresh);
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    this.groupBySetting.addChangeListener(this.#onGroupByChanged);
+    if (this.#builtGroupBy !== undefined && this.#builtGroupBy !== this.groupBySetting.get()) {
+      this.refreshTree();
+    }
+  }
+
+  override willHide(): void {
+    this.groupBySetting.removeChangeListener(this.#onGroupByChanged);
+    super.willHide();
   }
 
   setGroupBySetting(groupBy: AggregatedTimelineTreeView.GroupBy): void {

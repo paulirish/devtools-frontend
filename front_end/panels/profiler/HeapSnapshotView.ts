@@ -353,6 +353,9 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
   currentSearchResultIndex = -1;
   currentSearch?: HeapSnapshotModel.HeapSnapshotModel.SearchConfig;
   #registry: ProfileTypeRegistry;
+  // Profiles on which `updateControls` listens for title changes. Other
+  // profiles can outlive this view, so `dispose()` removes the listeners.
+  readonly #profilesWithTitleListener = new Set<ProfileHeader>();
 
   get currentQuery(): string|undefined {
     return this.currentSearch?.query;
@@ -530,13 +533,14 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
 
     for (const existingProfile of this.profiles()) {
       existingProfile.addEventListener(ProfileHeaderEvents.PROFILE_TITLE_CHANGED, this.updateControls, this);
+      this.#profilesWithTitleListener.add(existingProfile);
     }
   }
 
   createOverview(): void {
     const profileType = this.profile.profileType();
     this.trackingOverviewGrid = new HeapTimelineOverview();
-    this.trackingOverviewGrid.addEventListener(Events.IDS_RANGE_CHANGED, this.onIdsRangeChanged.bind(this));
+    this.trackingOverviewGrid.addEventListener(Events.IDS_RANGE_CHANGED, this.onIdsRangeChanged, this);
     if (!this.profile.fromFile() && profileType.profileBeingRecorded() === this.profile) {
       (profileType as TrackingHeapSnapshotProfileType)
           .addEventListener(TrackingHeapSnapshotProfileTypeEvents.HEAP_STATS_UPDATE, this.onHeapStatsUpdate, this);
@@ -1189,11 +1193,13 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.updateControls();
     const profile = event.data;
     profile.addEventListener(ProfileHeaderEvents.PROFILE_TITLE_CHANGED, this.updateControls, this);
+    this.#profilesWithTitleListener.add(profile);
   }
 
   onProfileHeaderRemoved(event: Common.EventTarget.EventTargetEvent<ProfileHeader>): void {
     const profile = event.data;
     profile.removeEventListener(ProfileHeaderEvents.PROFILE_TITLE_CHANGED, this.updateControls, this);
+    this.#profilesWithTitleListener.delete(profile);
 
     if (this.profile === profile) {
       this.detach();
@@ -1218,8 +1224,12 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     }
     this.onStopTracking();
     if (this.trackingOverviewGrid) {
-      this.trackingOverviewGrid.removeEventListener(Events.IDS_RANGE_CHANGED, this.onIdsRangeChanged.bind(this));
+      this.trackingOverviewGrid.removeEventListener(Events.IDS_RANGE_CHANGED, this.onIdsRangeChanged, this);
     }
+    for (const profile of this.#profilesWithTitleListener) {
+      profile.removeEventListener(ProfileHeaderEvents.PROFILE_TITLE_CHANGED, this.updateControls, this);
+    }
+    this.#profilesWithTitleListener.clear();
   }
 }
 

@@ -13,35 +13,35 @@ The tests therefore have a dual purpose:
 
 ## Running E2E tests
 
-The end-to-end tests are implicitly run as part of `npm run test`,
+The end-to-end tests are implicitly run as part of `./dt test`,
 but that also runs all the other test suites. To run only
 **all end-to-end tests**, use:
 
 ```bash
-npm run test test/e2e
+./dt test test/e2e
 ```
 
 To use `out/Debug` instead of the default `out/Default` target
 directory, use:
 
 ```bash
-npm run test -- -t Debug test/e2e
+./dt test -t Debug test/e2e
 ```
 
 To run the end-to-end tests in **debug mode**, use:
 
 ```bash
-npm run test -- --debug test/e2e
+./dt test --debug test/e2e
 ```
 
 To run only **specific end-to-end tests** from a single `.test.ts`
 file, say `console-log.test.ts` for example, use:
 
 ```bash
-npm run test test/e2e/console/console-log.test.ts
+./dt test test/e2e/console/console-log.test.ts
 ```
 
-Check the output of `npm run test -- --help` for an overview of
+Check the output of `./dt test --help` for an overview of
 all options.
 
 ## Debugging E2E tests
@@ -75,6 +75,27 @@ Current limitations when using VSCode for e2e tests:
 - VSCode only attaches to the node portion of the code (mostly the test files
   and the test helpers), not to Chrome.
 - VSCode debugging only works with headless mode.
+
+## Defining tests
+
+E2E tests use Mocha, but `describe`, `it` and `setup` are not available as
+globals. Import them from the e2e test interface instead:
+
+```ts
+import {describe, it, setup} from '../conductor/mocha-interface.js';
+
+describe('The Console Tab', () => {
+  setup({enabledFeatures: ['MyFeature']});
+
+  it('shows logged messages', async ({devToolsPage, inspectedPage}) => {
+    // ...
+  });
+});
+```
+
+The test body receives the `devToolsPage`, `inspectedPage` and `browser` to use
+in the test. The `node_ts_library` that contains the test needs
+`"../conductor:implementation"` in its `ts_deps`.
 
 ## General implementation details
 

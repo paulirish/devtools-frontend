@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -143,6 +144,43 @@ describeWithEnvironment('SourcesView', () => {
     await sourcesView.updateComplete;
     const urls = [...view.input.uiSourceCodes].map(c => c.url());
     assert.deepEqual(urls, ['snippet:///foo.js']);
+    sourcesView.detach();
+  });
+
+  it('does not re-create uiSourceCodes Set on unrelated view updates', async () => {
+    createFileSystemUISourceCode({
+      url: urlString`snippet:///foo.js`,
+      mimeType: 'application/javascript',
+      type: Persistence.PlatformFileSystem.PlatformFileSystemType.SNIPPETS,
+    });
+
+    const view = createViewFunctionStub(Sources.SourcesView.SourcesView);
+    const sourcesView = new Sources.SourcesView.SourcesView(undefined, view);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    const initialSet = view.input.uiSourceCodes;
+
+    sourcesView.isNavigatorSidebarOpen = !sourcesView.isNavigatorSidebarOpen;
+    await sourcesView.updateComplete;
+
+    assert.strictEqual(view.input.uiSourceCodes, initialSet);
+    sourcesView.detach();
+  });
+
+  it('does not schedule TabbedEditorContainer update on unrelated SourcesView updates', async () => {
+    const sourcesView = new Sources.SourcesView.SourcesView();
+    sourcesView.setLayoutMode(true, false);
+    renderElementIntoDOM(sourcesView);
+    await sourcesView.updateComplete;
+
+    const requestUpdateSpy = sinon.spy(Sources.TabbedEditorContainer.TabbedEditorContainer.prototype, 'requestUpdate');
+
+    sourcesView.toggleBreakpointsActiveState(false);
+    await sourcesView.updateComplete;
+
+    sinon.assert.notCalled(requestUpdateSpy);
+    requestUpdateSpy.restore();
     sourcesView.detach();
   });
 

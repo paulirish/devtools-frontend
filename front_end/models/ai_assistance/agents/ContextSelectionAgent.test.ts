@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {after, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
@@ -22,6 +23,7 @@ import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
 import {SnapshotTester} from '../../../testing/SnapshotTester.js';
 import {TestUniverse} from '../../../testing/TestUniverse.js';
 import * as Bindings from '../../bindings/bindings.js';
+import type * as LHModel from '../../lighthouse/lighthouse.js';
 import * as Logs from '../../logs/logs.js';
 import type * as Trace from '../../trace/trace.js';
 import * as Workspace from '../../workspace/workspace.js';
@@ -30,6 +32,7 @@ import {
   ContextSelectionAgent,
   DOMNodeContext,
   FileContext,
+  LighthouseContext,
   PerformanceTraceContext,
   RequestContext,
   StorageContext,
@@ -163,6 +166,45 @@ describe('ContextSelectionAgent', function() {
       assert.exists(contextChange);
       assert.instanceOf(contextChange.context, PerformanceTraceContext.PerformanceTraceContext);
       assert.strictEqual(contextChange.context.getItem().parsedTrace, trace);
+    });
+
+    it('selects the report recorded by the runLighthouseAudits tool', async () => {
+      const report = {finalDisplayedUrl: 'https://example.com'} as LHModel.ReporterTypes.ReportJSON;
+      const lighthouseRecording = sinon.stub().resolves({status: 'completed', report});
+      const agent = new ContextSelectionAgent.ContextSelectionAgent({
+        aidaClient: mockAidaClient([
+          [{functionCalls: [{name: 'runLighthouseAudits', args: {mode: 'snapshot'}}], explanation: ''}],
+          [{explanation: 'Lighthouse audit completed'}],
+        ]),
+        lighthouseRecording,
+      });
+
+      const responses = await Array.fromAsync(agent.run('test', {selected: null}));
+
+      sinon.assert.calledOnceWithExactly(lighthouseRecording, {mode: 'snapshot'});
+      const contextChange = responses.find(r => r.type === AiAgent.ResponseType.CONTEXT_CHANGE);
+      assert.exists(contextChange);
+      assert.instanceOf(contextChange.context, LighthouseContext.LighthouseContext);
+      assert.strictEqual(contextChange.context.getItem(), report);
+    });
+
+    it('tells the model not to retry when the user cancels runLighthouseAudits', async () => {
+      const lighthouseRecording = sinon.stub().resolves({status: 'cancelled'});
+      const agent = new ContextSelectionAgent.ContextSelectionAgent({
+        aidaClient: mockAidaClient([
+          [{functionCalls: [{name: 'runLighthouseAudits', args: {mode: 'snapshot'}}], explanation: ''}],
+          [{explanation: 'The audit was cancelled'}],
+        ]),
+        lighthouseRecording,
+      });
+
+      const responses = await Array.fromAsync(agent.run('test', {selected: null}));
+
+      const actionResponse = responses.find(r => r.type === AiAgent.ResponseType.ACTION);
+      assert.exists(actionResponse);
+      assert.strictEqual(actionResponse.output,
+                         'The user cancelled the Lighthouse audit. Do not run it again unless the user asks you to.');
+      assert.isUndefined(responses.find(r => r.type === AiAgent.ResponseType.CONTEXT_CHANGE));
     });
   });
 
@@ -1073,7 +1115,9 @@ describe('ContextSelectionAgent', function() {
 
       const actionResponse = responses.find(response => response.type === AiAgent.ResponseType.ACTION);
       assert.exists(actionResponse);
-      assert.deepEqual(actionResponse, {
+      const {callId, ...actionWithoutCallId} = actionResponse;
+      assert.isString(callId);
+      assert.deepEqual(actionWithoutCallId, {
         type: AiAgent.ResponseType.ACTION,
         code: 'listSourceFiles()',
         output: '[{"file":"script.js","id":1}]',
@@ -1181,7 +1225,9 @@ describe('ContextSelectionAgent', function() {
 
       const actionResponse = responses.find(response => response.type === AiAgent.ResponseType.ACTION);
       assert.exists(actionResponse);
-      assert.deepEqual(actionResponse, {
+      const {callId, ...actionWithoutCallId} = actionResponse;
+      assert.isString(callId);
+      assert.deepEqual(actionWithoutCallId, {
         type: AiAgent.ResponseType.ACTION,
         code: 'listSourceFiles()',
         output: '[{"file":"script.js","id":1}]',

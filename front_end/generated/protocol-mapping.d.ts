@@ -4,7 +4,7 @@
 
 /**
  * This file is auto-generated, do not edit manually. *
- * Re-generate with: npm run generate-protocol-resources.
+ * Re-generate with: scripts/tools/dt.py generate-protocol-resources.
  */
 
 
@@ -4229,6 +4229,16 @@ export namespace ProtocolMapping {
       returnType: Protocol.Page.GetAdScriptAncestryResponse;
     };
     /**
+     * Returns the words that the frame's document added to its spell check custom
+     * dictionary with `document.spellCheckCustomDictionary.addWords()`, sorted.
+     * Page script cannot read the dictionary back; this lets developers inspect
+     * it.
+     */
+    'Page.getSpellCheckCustomDictionary': {
+      paramsType: [Protocol.Page.GetSpellCheckCustomDictionaryRequest];
+      returnType: Protocol.Page.GetSpellCheckCustomDictionaryResponse;
+    };
+    /**
      * Returns present frame tree structure.
      */
     'Page.getFrameTree': {
@@ -4571,6 +4581,13 @@ export namespace ProtocolMapping {
     'Page.getAnnotatedPageContent': {
       paramsType: [Protocol.Page.GetAnnotatedPageContentRequest?];
       returnType: Protocol.Page.GetAnnotatedPageContentResponse;
+    };
+    /**
+     * Configures input visualization on the page.
+     */
+    'Page.setInputVisualization': {
+      paramsType: [Protocol.Page.SetInputVisualizationRequest?];
+      returnType: void;
     };
     /**
      * Disable collecting and reporting metrics.

@@ -2766,7 +2766,13 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   },
   {
     name: "getFileHandle",
-    signatures: [["name","?options"]]
+    signatures: [["name","?options"]],
+    receivers: ["FileSystemDirectoryHandle"]
+  },
+  {
+    name: "getFileHandle",
+    signatures: [["hash","?options"]],
+    receivers: ["CrossOriginStorageManager"]
   },
   {
     name: "removeEntry",
@@ -6730,10 +6736,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["rangeOffset","data","?dataOffset","?size"]]
   },
   {
-    name: "copyElementImageToTexture",
-    signatures: [["source","destination"]]
-  },
-  {
     name: "drawElementImageToTexture",
     signatures: [["source","destination"]]
   },
@@ -6824,10 +6826,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   {
     name: "drawingBufferToneMapping",
     signatures: [["?toneMapping"]]
-  },
-  {
-    name: "texElementImage2D",
-    signatures: [["target","internalformat","element","?config"]]
   },
   {
     name: "texElementSubImage2D",
@@ -7032,10 +7030,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["type"]]
   },
   {
-    name: "requestStorageAccessFor",
-    signatures: [["requestedOrigin"]]
-  },
-  {
     name: "createObjectURL",
     signatures: [["blob"]],
     receivers: ["StorageAccessHandle"]
@@ -7124,38 +7118,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   {
     name: "SmartCardError",
     signatures: [["message","options"]]
-  },
-  {
-    name: "contributeToHistogram",
-    signatures: [["contribution"]]
-  },
-  {
-    name: "enableDebugMode",
-    signatures: [["?options"]]
-  },
-  {
-    name: "SharedStorageAppendMethod",
-    signatures: [["key","value","?options"]]
-  },
-  {
-    name: "SharedStorageClearMethod",
-    signatures: [["?options"]]
-  },
-  {
-    name: "SharedStorageDeleteMethod",
-    signatures: [["key","?options"]]
-  },
-  {
-    name: "SharedStorageSetMethod",
-    signatures: [["key","value","?options"]]
-  },
-  {
-    name: "selectURL",
-    signatures: [["name","urls","?options"]]
-  },
-  {
-    name: "run",
-    signatures: [["name","?options"]]
   },
   {
     name: "BarcodeDetector",
@@ -8090,10 +8052,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["decapsulationAlgorithm","decapsulationKey","ciphertext"]]
   },
   {
-    name: "requestFileHandle",
-    signatures: [["hash","?options"]]
-  },
-  {
     name: "userAgentAllowsProtocol",
     signatures: [["protocol"]]
   },
@@ -8466,6 +8424,10 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["pathData"]]
   },
   {
+    name: "getPathSegmentAtLength",
+    signatures: [["distance"]]
+  },
+  {
     name: "ByteLengthQueuingStrategy",
     signatures: [["init"]]
   },
@@ -8590,14 +8552,8 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["width","height"]]
   },
   {
-    name: "getElementTransform",
-    signatures: [["element","draw_transform"]],
-    receivers: ["OffscreenCanvas"]
-  },
-  {
-    name: "getElementTransform",
-    signatures: [["element","?draw_transform"]],
-    receivers: ["HTMLCanvasElement"]
+    name: "getElementImageDefaultSize",
+    signatures: [["element"]]
   },
   {
     name: "updateElementGeometry",
@@ -8740,10 +8696,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["event"]]
   },
   {
-    name: "setSharedStorageContext",
-    signatures: [["contextString"]]
-  },
-  {
     name: "CloseWatcher",
     signatures: [["?options"]]
   },
@@ -8754,6 +8706,10 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   {
     name: "ElementGeometryUpdateEvent",
     signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "getElementTransform",
+    signatures: [["element"]]
   },
   {
     name: "captureElementImage",
@@ -9133,7 +9089,7 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   },
   {
     name: "Focusable",
-    signatures: [["target"]]
+    signatures: [["target","?options"],["focusable","?options"]]
   },
   {
     name: "getBoxQuads",

@@ -9,6 +9,7 @@ import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as LighthouseModel from '../../models/lighthouse/lighthouse.js';
+import * as LiveMetrics from '../../models/live-metrics/live-metrics.js';
 
 /**
  * @file
@@ -97,6 +98,7 @@ export class ProtocolService implements ProtocolClient.CDPConnection.CDPConnecti
   async attach(inspectedURL: Platform.DevToolsPath.UrlString): Promise<void> {
     const parsedInitialOrigin = Common.ParsedURL.ParsedURL.extractOrigin(inspectedURL);
 
+    await LiveMetrics.LiveMetrics.instance().disable();
     await SDK.TargetManager.TargetManager.instance().suspendAllTargets();
     const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (!mainTarget) {
@@ -236,6 +238,7 @@ export class ProtocolService implements ProtocolClient.CDPConnection.CDPConnecti
       await oldRootTarget.targetAgent().invoke_detachFromTarget({sessionId: this.mainSessionId});
     }
     await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
+    await LiveMetrics.LiveMetrics.instance().enable();
     this.removeDialogHandler?.();
   }
 
@@ -364,26 +367,34 @@ export class ProtocolService implements ProtocolClient.CDPConnection.CDPConnecti
   /** sendWithResponse currently only handles the original startLighthouse request and LHR-filled response. */
   private async sendWithResponse(action: string, args: Record<string, string|string[]|object|undefined> = {}):
       Promise<LighthouseModel.ReporterTypes.RunnerResult> {
-    const worker = await this.ensureWorkerExists();
     const messageId = lastId++;
-    const messageResult = new Promise<LighthouseModel.ReporterTypes.RunnerResult>((resolve, reject) => {
-      const workerListener = (event: MessageEvent): void => {
-        const lighthouseMessage = event.data;
+    const {promise, resolve, reject} = Promise.withResolvers<LighthouseModel.ReporterTypes.RunnerResult>();
+    // Register the request before waiting for the worker, so that detach()
+    // can reject it even if the user cancels while the worker is still loading.
+    this.#pendingRequests.set(messageId, reject);
+    const worker = await this.ensureWorkerExists();
+    if (!this.#pendingRequests.has(messageId)) {
+      // detach() ran while the worker was loading: it has already rejected
+      // this request and terminated the worker.
+      return await promise;
+    }
 
-        if (lighthouseMessage.id === messageId) {
-          worker.removeEventListener('message', workerListener);
-          this.#pendingRequests.delete(messageId);
-          resolve(lighthouseMessage.result);
-        }
-      };
-      worker.addEventListener('message', workerListener);
-      this.#pendingRequests.set(messageId, (err: Error) => {
+    const workerListener = (event: MessageEvent): void => {
+      const lighthouseMessage = event.data;
+
+      if (lighthouseMessage.id === messageId) {
         worker.removeEventListener('message', workerListener);
-        reject(err);
-      });
+        this.#pendingRequests.delete(messageId);
+        resolve(lighthouseMessage.result);
+      }
+    };
+    worker.addEventListener('message', workerListener);
+    this.#pendingRequests.set(messageId, (err: Error) => {
+      worker.removeEventListener('message', workerListener);
+      reject(err);
     });
     worker.postMessage({id: messageId, action, args: {...args, id: messageId}});
 
-    return await messageResult;
+    return await promise;
   }
 }

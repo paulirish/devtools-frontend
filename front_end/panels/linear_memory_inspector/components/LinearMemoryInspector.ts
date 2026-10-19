@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import './LinearMemoryViewer.js';
-
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as UI from '../../../ui/legacy/legacy.js';
@@ -18,7 +16,7 @@ import {
   Navigation,
 } from './LinearMemoryNavigator.js';
 import {LinearMemoryValueInterpreter} from './LinearMemoryValueInterpreter.js';
-import type {ByteSelectedEvent, ResizeEvent} from './LinearMemoryViewer.js';
+import {LinearMemoryViewer} from './LinearMemoryViewer.js';
 import type {HighlightInfo} from './LinearMemoryViewerUtils.js';
 import {
   Endianness,
@@ -120,8 +118,8 @@ export interface ViewInput {
   onNavigateHistory: (navigation: Navigation) => boolean;
   onJumpToAddress: (address: number) => void;
   onDeleteMemoryHighlight: (info: HighlightInfo) => void;
-  onByteSelected: (e: ByteSelectedEvent) => void;
-  onResize: (e: ResizeEvent) => void;
+  onByteSelected: (address: number) => void;
+  onResize: (numBytesPerPage: number) => void;
   onValueTypeToggled: (type: ValueType, checked: boolean) => void;
   onValueTypeModeChanged: (type: ValueType, mode: ValueTypeMode) => void;
   onEndiannessChanged: (endianness: Endianness) => void;
@@ -165,19 +163,17 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: Record<string, unknown>,
         jumpToAddress: (address: number) => input.onJumpToAddress(address),
         deleteHighlight: input.onDeleteMemoryHighlight,
       })}
-      <devtools-linear-memory-inspector-viewer
-        .data=${
-      {
+      <devtools-widget class="viewer-widget"
+        ${widget(LinearMemoryViewer, {
         memory: input.memorySlice,
         address: input.address,
         memoryOffset: input.viewerStart,
-        focus: input.currentNavigatorMode === Mode.SUBMITTED,
+        focusOnByte: input.currentNavigatorMode === Mode.SUBMITTED,
         highlightInfo: input.highlightInfo,
         focusedMemoryHighlight,
-      }}
-        @byteselected=${input.onByteSelected}
-        @resize=${input.onResize}>
-      </devtools-linear-memory-inspector-viewer>
+        onByteSelected: input.onByteSelected,
+        onNumBytesPerPageChanged: input.onResize,
+      })}></devtools-widget>
     </div>
     ${
       input.hideValueInspector ? nothing : html`
@@ -388,9 +384,9 @@ export class LinearMemoryInspector extends LinearMemoryInspectorBase {
     this.dispatchEventToListeners(Events.MEMORY_REQUEST, {start, end, address: this.#address});
   }
 
-  #onByteSelected(e: ByteSelectedEvent): void {
+  #onByteSelected(address: number): void {
     this.#currentNavigatorMode = Mode.SUBMITTED;
-    const addressInRange = Math.max(0, Math.min(e.data, this.#outerMemoryLength - 1));
+    const addressInRange = Math.max(0, Math.min(address, this.#outerMemoryLength - 1));
     this.#jumpToAddress(addressInRange);
   }
 
@@ -464,8 +460,8 @@ export class LinearMemoryInspector extends LinearMemoryInspectorBase {
     void this.requestUpdate();
   }
 
-  #resize(event: ResizeEvent): void {
-    this.#numBytesPerPage = event.data;
+  #resize(numBytesPerPage: number): void {
+    this.#numBytesPerPage = numBytesPerPage;
     void this.requestUpdate();
   }
 

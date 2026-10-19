@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
@@ -108,6 +109,23 @@ describe('TargetManager', () => {
 
     targetManager.removeModelListener(SDK.ResourceTreeModel.ResourceTreeModel, WillReloadPage, listener, thisObject);
     resourceTreeModel(target1).dispatchEventToListeners(WillReloadPage);
+    sinon.assert.calledTwice(listener);
+  });
+
+  it('removes all registrations of the same model listener at once', () => {
+    const WillReloadPage = SDK.ResourceTreeModel.Events.WillReloadPage;
+    const thisObject = {};
+    const listener = sinon.spy();
+    const target = createTarget({targetManager});
+
+    targetManager.addModelListener(SDK.ResourceTreeModel.ResourceTreeModel, WillReloadPage, listener, thisObject);
+    targetManager.addModelListener(SDK.ResourceTreeModel.ResourceTreeModel, WillReloadPage, listener, thisObject);
+    resourceTreeModel(target).dispatchEventToListeners(WillReloadPage);
+    sinon.assert.calledTwice(listener);
+
+    targetManager.removeModelListener(SDK.ResourceTreeModel.ResourceTreeModel, WillReloadPage, listener, thisObject);
+    assert.isFalse(resourceTreeModel(target).hasEventListeners(WillReloadPage));
+    resourceTreeModel(target).dispatchEventToListeners(WillReloadPage);
     sinon.assert.calledTwice(listener);
   });
 

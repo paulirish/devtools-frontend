@@ -22,14 +22,13 @@ ts_library("mocha-adapter-browser") {
   testonly = true
   sources = [ "mocha-adapter-browser.ts" ]
   ts_deps = [
+    ":browser-globals",
     ":mocha-interface",
     "../../front_end/testing:mocha_helpers",
   ]
 }
 
 node_ts_library("karma") {
-  inputs = typescript_puppeteer_types_inputs
-
   sources = [ "karma.conf.ts" ]
   ts_deps = [
     "../../front_end/testing:test_id_generation",

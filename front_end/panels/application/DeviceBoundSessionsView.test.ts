@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -19,15 +20,13 @@ describeWithEnvironment('DeviceBoundSessionsView', () => {
   const mockSessionId = 'session-id-123';
   const mockSite = 'https://example.com';
 
-  let toLocaleStringStub: sinon.SinonStub;
   beforeEach(async () => {
     const original = Date.prototype.toLocaleString;
-    toLocaleStringStub = sinon.stub(Date.prototype, 'toLocaleString').callsFake(function(this: Date) {
+    sinon.stub(Date.prototype, 'toLocaleString').callsFake(function(this: Date) {
       return original.call(this, 'en-US', {timeZone: 'UTC'});
     });
   });
   afterEach(async () => {
-    toLocaleStringStub.restore();
     cleanTestDOM();
     await raf();
   });
@@ -414,8 +413,6 @@ describeWithEnvironment('DeviceBoundSessionsView', () => {
     sinon.assert.notCalled(deselectSpy);
     Application.DeviceBoundSessionsView.DEFAULT_VIEW(viewInput, {}, targetWidget.contentElement);
     sinon.assert.calledOnce(deselectSpy);
-
-    deselectSpy.restore();
   });
 
   it('renders session correctly', async () => {

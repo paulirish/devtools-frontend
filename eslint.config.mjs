@@ -61,6 +61,7 @@ export default defineConfig([
     'scripts/deps/tests/fixtures',
     'scripts/gn_deps_verifier/tests/fixtures',
     'test/**/fixtures/',
+    'test/ai_evals/eval_data/',
     'test/e2e/**/*.js',
     'test/shared/**/*.js',
     'extensions/cxx_debugging/tests/inputs/',
@@ -266,8 +267,7 @@ export default defineConfig([
         'error',
         {
           selector: 'ExportDefaultDeclaration',
-          message:
-            'Default exports are not allowed. Use named exports instead.',
+          message: 'Default exports are not allowed. Use named exports instead.',
         },
       ],
       /**
@@ -308,8 +308,8 @@ export default defineConfig([
         'error',
         {
           definedTags: [
-            'attribute', // @attribute is used by lit-analyzer (through web-component-analyzer)
-            'meaning', // @meaning is used by localization
+            'attribute',  // @attribute is used by lit-analyzer (through web-component-analyzer)
+            'meaning',    // @meaning is used by localization
           ],
         },
       ],
@@ -340,11 +340,11 @@ export default defineConfig([
       parserOptions: {
         allowAutomaticSingleRunInference: true,
         project: join(
-          import.meta.dirname,
-          'config',
-          'typescript',
-          'tsconfig.eslint.json',
-        ),
+            import.meta.dirname,
+            'config',
+            'typescript',
+            'tsconfig.eslint.json',
+            ),
       },
     },
 
@@ -587,12 +587,12 @@ export default defineConfig([
         {
           // Enforce that any import of models/trace/trace.js names the import Trace.
           modulePath: join(
-            import.meta.dirname,
-            'front_end',
-            'models',
-            'trace',
-            'trace.js',
-          ),
+              import.meta.dirname,
+              'front_end',
+              'models',
+              'trace',
+              'trace.js',
+              ),
           importName: 'Trace',
         },
       ],
@@ -667,6 +667,8 @@ export default defineConfig([
       ],
       '@devtools/static-custom-event-names': 'error',
       '@devtools/lit-no-attribute-quotes': 'error',
+      '@devtools/lit-no-non-latin1': 'error',
+      '@devtools/no-boolean-input-checked-attr': 'error',
       '@devtools/lit-template-result-or-nothing': 'error',
       '@devtools/inject-checkbox-styles': 'error',
       '@devtools/jslog-context-list': 'error',
@@ -791,6 +793,7 @@ export default defineConfig([
       '@devtools/prefer-url-string': 'error',
       '@devtools/trace-engine-test-timeouts': 'error',
       '@devtools/no-document-body-mutation': 'error',
+      '@devtools/no-manual-sinon-restore': 'error',
       // Don't update the KnownContext with test data.
       '@devtools/jslog-context-list': 'off',
       '@devtools/enforce-custom-element-definitions-location': 'off',
@@ -820,9 +823,15 @@ export default defineConfig([
   {
     name: 'Use private class members rule',
     files: [
+      'front_end/core/**/*.ts',
+      'front_end/models/**/*.ts',
       'front_end/panels/**/components/*.ts',
       'front_end/ui/components/**/*.ts',
       'front_end/entrypoints/**/*.ts',
+    ],
+    ignores: [
+      'front_end/core/**/*.test.ts',
+      'front_end/models/**/*.test.ts',
     ],
 
     rules: {
@@ -832,6 +841,29 @@ export default defineConfig([
   {
     name: 'Ignore private class members rule',
     files: [
+      'front_end/core/common/**/*.ts',
+      'front_end/core/host/**/*.ts',
+      'front_end/core/platform/**/*.ts',
+      'front_end/core/protocol_client/**/*.ts',
+      'front_end/core/sdk/**/*.ts',
+      'front_end/core/text_utils/**/*.ts',
+      'front_end/models/bindings/**/*.ts',
+      'front_end/models/breakpoints/**/*.ts',
+      'front_end/models/computed_style/**/*.ts',
+      'front_end/models/cpu_profile/**/*.ts',
+      'front_end/models/elements/**/*.ts',
+      'front_end/models/emulation/**/*.ts',
+      'front_end/models/extensions/**/*.ts',
+      'front_end/models/formatter/**/*.ts',
+      'front_end/models/har/**/*.ts',
+      'front_end/models/javascript_metadata/**/*.ts',
+      'front_end/models/logs/**/*.ts',
+      'front_end/models/persistence/**/*.ts',
+      'front_end/models/source_map_scopes/**/*.ts',
+      'front_end/models/trace/**/*.ts',
+      'front_end/models/trace_source_maps_resolver/**/*.ts',
+      'front_end/models/workspace/**/*.ts',
+      'front_end/models/workspace_diff/**/*.ts',
       'front_end/panels/recorder/**/*.ts',
       'front_end/ui/components/suggestion_input/*.ts',
     ],
@@ -898,12 +930,12 @@ export default defineConfig([
           bannedImportPaths: [
             {
               bannedPath: join(
-                import.meta.dirname,
-                'front_end',
-                'core',
-                'sdk',
-                'sdk.js',
-              ),
+                  import.meta.dirname,
+                  'front_end',
+                  'core',
+                  'sdk',
+                  'sdk.js',
+                  ),
               allowTypeImports: true,
             },
           ],
@@ -960,6 +992,17 @@ export default defineConfig([
       // The config operate on the default export
       // So allow it for them
       'no-restricted-syntax': 'off',
+    },
+  },
+  {
+    name: 'Mocha test harness setup files',
+    files: [
+      'front_end/testing/test_setup.ts',
+      'test/unit/mocha-hooks.ts',
+    ],
+    rules: {
+      // Global Mocha test harness restores Sinon stubs and timers after each test.
+      '@devtools/no-manual-sinon-restore': 'off',
     },
   },
 ]);

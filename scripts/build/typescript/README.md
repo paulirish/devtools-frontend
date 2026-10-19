@@ -53,13 +53,19 @@ ts_library("my_feature") {
   Non-TypeScript build dependencies such as asset generators, copy actions, or CSS compilation targets that must complete before compiling this library.
 
 - **`testonly`** (`boolean`, optional):
-  Set to `true` for unit tests and test helpers (`testonly = true`). Compiling with `testonly = true` automatically includes type definitions for Mocha, Chai, Sinon, and Node.
+  Set to `true` for unit tests and test helpers (`testonly = true`). Compiling with `testonly = true` adds the type definitions of Mocha, Chai and Sinon to the inputs of the target. They are not declared globally: tests import `describe`, `it`, etc. from `mocha` (or from the Mocha interface of their test suite).
 
 - **`runs_in`** (`string`, optional):
   Specifies the execution environment for scripts/tools running in Node.js. Allowed value is `"node"`. Omitting the flag implies running in the browser.
 
 - **`additional_type_definitions`** (`list(string)`, optional):
-  List of additional `.d.ts` definition files required for type-checking this target (e.g. `test/e2e/types.d.ts`).
+  List of additional `.d.ts` definition files required for type-checking this target (e.g. `node_modules/@types/estree/index.d.ts`).
+
+- **`inputs`** (`list(string)`, optional):
+  Files other than the sources that type-checking reads, such as type definitions from `node_modules` (e.g. `typescript_yargs_types_inputs`). Declaring them makes incremental and remote builds correct.
+
+- **`public_inputs`** (`list(string)`, optional):
+  Like `inputs`, but dependents inherit them as inputs as well, directly and transitively through `ts_deps`. Use this for type definitions that the library exposes in its public API, e.g. `//test/conductor:implementation` exposes the Mocha and Puppeteer types to all test targets.
 
 - **`rootdir`** (`string`, optional):
   Custom root directory for resolving source paths if sources reside in a subfolder. Defaults to `"."`.

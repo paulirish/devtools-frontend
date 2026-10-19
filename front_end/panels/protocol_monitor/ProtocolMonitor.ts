@@ -201,7 +201,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
         <devtools-split-view name="protocol-monitor-split-container"
                              direction="column"
                              sidebar-initial-size="400"
-                             sidebar-visibility=${input.sidebarVisible ? 'visible' : 'hidden'}
+                             show=${input.sidebarVisible ? 'both' : 'main'}
                              @change=${(e: CustomEvent<string>) => input.onSplitChange(e.detail === 'OnlyMain')}>
           <div slot="main" class="vbox protocol-monitor-main">
             <devtools-toolbar class="protocol-monitor-toolbar"
@@ -344,7 +344,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                       @change=${(e: Event) => input.onTargetChange((e.target as HTMLSelectElement).value)}>
                 ${input.targets.map(target => html`
                   <option jslog=${VisualLogging.item('target').track({click: true})}
-                          value=${target.id()} ?selected=${target.id() === input.selectedTargetId}>
+                          value=${target.id()} .selected=${target.id() === input.selectedTargetId}>
                     ${target.name()} (${target.inspectedURL()})
                   </option>`)}
               </select>
@@ -684,26 +684,26 @@ const INFO_WIDGET_VIEW: InfoWidgetView = (input, _output, target) => {
   render(html`
     <devtools-tabbed-pane>${input.type === undefined ? html`
       <devtools-widget
-          id="request" title=${i18nString(UIStrings.request)}
+          id="request" label=${i18nString(UIStrings.request)}
           ?selected=${input.selectedTab === 'request'} disabled
           ${widget(UI.EmptyWidget.EmptyWidget, {
               header: i18nString(UIStrings.noMessageSelected),
               text: i18nString(UIStrings.selectAMessageToView)})}>
       </devtools-widget>
       <devtools-widget
-          id="response" title=${i18nString(UIStrings.response)}
+          id="response" label=${i18nString(UIStrings.response)}
           ?selected=${input.selectedTab === 'response'}
           ${widget(UI.EmptyWidget.EmptyWidget, {
               header: i18nString(UIStrings.noMessageSelected),
               text: i18nString(UIStrings.selectAMessageToView)})}>
       </devtools-widget>`: html`
       <devtools-widget
-          id="request" title=${i18nString(UIStrings.request)}
+          id="request" label=${i18nString(UIStrings.request)}
           ?selected=${input.selectedTab === 'request'} ?disabled=${input.type !== 'sent'}
           ${widget(SourceFrame.JSONView.SearchableJsonView, {jsonObject: input.request})}>
       </devtools-widget>
       <devtools-widget
-          id="response" title=${i18nString(UIStrings.response)}
+          id="response" label=${i18nString(UIStrings.response)}
           ?selected=${input.selectedTab === 'response'}
           ${widget(SourceFrame.JSONView.SearchableJsonView, {jsonObject: input.response})}>
       </devtools-widget>`}

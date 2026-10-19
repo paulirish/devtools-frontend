@@ -259,7 +259,8 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
       ${repeat(input.openTabs, tab => tab.tabId, tab => html`
         <div id=${tab.tabId}
              class="vbox flex-auto"
-             title=${tab.title}
+             label=${tab.title}
+             tab-tooltip=${tab.tooltip}
              ?closeable=${tab.isCloseable}
              ?selected=${input.activeTabId === tab.tabId}>
              ${tab.widget ? html`${widget(UI.Widget.WrapperWidget, {widget: tab.widget})}` : nothing}
@@ -405,20 +406,20 @@ export class TabbedEditorContainer extends TabbedEditorContainerBase {
 
   #leftToolbarItems: LitTemplate[] = [];
   set leftToolbarItems(items: LitTemplate[]) {
-    if (this.#leftToolbarItems === items) {
+    if (this.#leftToolbarItems === items || (this.#leftToolbarItems.length === 0 && items.length === 0)) {
       return;
     }
     this.#leftToolbarItems = items;
-    this.#scheduleUpdate();
+    this.requestUpdate();
   }
 
   #rightToolbarItems: LitTemplate[] = [];
   set rightToolbarItems(items: LitTemplate[]) {
-    if (this.#rightToolbarItems === items) {
+    if (this.#rightToolbarItems === items || (this.#rightToolbarItems.length === 0 && items.length === 0)) {
       return;
     }
     this.#rightToolbarItems = items;
-    this.#scheduleUpdate();
+    this.requestUpdate();
   }
 
   readonly #syncedUISourceCodes = new Set<Workspace.UISourceCode.UISourceCode>();

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 
 import type * as SDK from '../../core/sdk/sdk.js';
 import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
@@ -162,7 +163,7 @@ describe('DOMChanges', () => {
   });
 
   it('trims page controlled data that is too long', () => {
-    const {MAX_VALUE_LENGTH} = Elements.DOMChanges;
+    const {MAX_VALUE_LENGTH} = Elements.ChangeTrackingUtils;
     const longValue = 'a'.repeat(MAX_VALUE_LENGTH * 2);
 
     Elements.DOMChanges.trackHTMLEdit(tracker, createNode(), 'div.main', '<div></div>', `<div>${longValue}</div>`);

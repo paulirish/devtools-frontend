@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import type * as Platform from '../../core/platform/platform.js';
@@ -325,5 +326,19 @@ describeWithEnvironment('BackgroundServiceView', () => {
     dataRows = view.contentElement.querySelectorAll('devtools-data-grid table tr:not(:first-child)');
     assert.lengthOf(dataRows, 0);
     assertEmptyState('No recording yet');
+  });
+
+  it('stops listening to the managers of the previous target when the model changes', () => {
+    assert.exists(manager);
+    assert.exists(securityOriginManager);
+    assert.isTrue(manager.hasEventListeners(SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED));
+    assert.isTrue(securityOriginManager.hasEventListeners(SDK.SecurityOriginManager.Events.MainSecurityOriginChanged));
+
+    const otherModel = createTarget().model(Resources.BackgroundServiceModel.BackgroundServiceModel);
+    assert.exists(otherModel);
+    view.model = otherModel;
+
+    assert.isFalse(manager.hasEventListeners(SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED));
+    assert.isFalse(securityOriginManager.hasEventListeners(SDK.SecurityOriginManager.Events.MainSecurityOriginChanged));
   });
 });

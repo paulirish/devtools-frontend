@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
@@ -24,10 +25,6 @@ describe('DOMBreakpointsSidebarPane', () => {
 
   beforeEach(() => {
     linkifierStub = sinon.stub(PanelsCommon.DOMLinkifier.Linkifier.instance(), 'linkify');
-  });
-
-  afterEach(() => {
-    linkifierStub.restore();
   });
 
   it('renders correctly with no breakpoints (Sources)', async () => {
@@ -184,7 +181,7 @@ describe('DOMBreakpointsSidebarPane', () => {
         domDebuggerModel, node, Protocol.DOMDebugger.DOMBreakpointType.SubtreeModified, true);
 
     const removeStub = sinon.stub(domDebuggerModel, 'removeDOMBreakpoint');
-    const contextMenuStub = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
+    sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
     const appendItemStub = sinon.stub(UI.ContextMenu.Section.prototype, 'appendItem');
 
     pane.performUpdate();
@@ -197,9 +194,6 @@ describe('DOMBreakpointsSidebarPane', () => {
     removeCallback();
 
     sinon.assert.calledWith(removeStub, node, Protocol.DOMDebugger.DOMBreakpointType.SubtreeModified);
-
-    contextMenuStub.restore();
-    appendItemStub.restore();
   });
 
   it('calls removeAllDOMBreakpoints when remove all option is selected from context menu', async () => {
@@ -211,7 +205,7 @@ describe('DOMBreakpointsSidebarPane', () => {
         domDebuggerModel, node, Protocol.DOMDebugger.DOMBreakpointType.SubtreeModified, true);
 
     const removeAllStub = sinon.stub(domDebuggerModel, 'removeAllDOMBreakpoints');
-    const contextMenuStub = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
+    sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
     const appendItemStub = sinon.stub(UI.ContextMenu.Section.prototype, 'appendItem');
 
     pane.performUpdate();
@@ -224,8 +218,5 @@ describe('DOMBreakpointsSidebarPane', () => {
     removeAllCallback();
 
     sinon.assert.calledOnce(removeAllStub);
-
-    contextMenuStub.restore();
-    appendItemStub.restore();
   });
 });

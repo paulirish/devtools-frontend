@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {describe, it} from 'mocha';
 
 import {createContextForNavigation, getFirstOrError, processTrace} from '../../../testing/InsightHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
@@ -27,7 +28,7 @@ function addMetaCharsetCheckEvent(
     disposition: Trace.Types.Events.MetaCharsetDisposition,
     ): void {
   const eventsByNavigation = data.PageLoadMetrics.metaCharsetCheckEventsByNavigation as
-      Map<Trace.Types.Events.NavigationStart, Trace.Types.Events.MetaCharsetCheck[]>;
+      WeakMap<Trace.Types.Events.NavigationStart, Trace.Types.Events.MetaCharsetCheck[]>;
   const events = eventsByNavigation.get(context.navigation) ?? [];
   events.push({
     name: Trace.Types.Events.Name.META_CHARSET_CHECK,

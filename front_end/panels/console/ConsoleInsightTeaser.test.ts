@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -188,7 +189,6 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
     await input.onTellMeMoreClick(new Event('click'));
     sinon.assert.calledOnce(show);
     Common.Settings.Settings.instance().settingForTest('console-insights-enabled').set(true);
-    show.restore();
   });
 
   it('disables teasers on "Dont show" change', async () => {
@@ -235,7 +235,6 @@ describeWithEnvironment('ConsoleInsightTeaser', () => {
     assert.isEmpty(input.mainText);
     assert.strictEqual(input.headerText, 'message text string');
     assert.isTrue(input.isSlowGeneration);
-    clock.restore();
   });
 
   it('can show error state', async () => {

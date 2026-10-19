@@ -9,14 +9,16 @@ group("ai_evals") {
   testonly = true
   deps = [
     ":eval_tests",
+    ":harness_library",
     ":test_inputs",
     "network",
   ]
 }
 
-ts_e2e_library("eval_tests") {
+node_ts_library("eval_tests") {
   sources = [ "ai_smoke.test.ts" ]
   ts_deps = [
+    ":harness_library",
     "../../front_end/core/sdk:bundle",
     "../../front_end/panels/ai_assistance:bundle",
     "../e2e/helpers",
@@ -24,7 +26,7 @@ ts_e2e_library("eval_tests") {
   ]
 }
 
-ts_e2e_library("harness_library") {
+node_ts_library("harness_library") {
   sources = [
     "ai-eval-state-provider.ts",
     "mocha-interface.ts",
@@ -32,10 +34,13 @@ ts_e2e_library("harness_library") {
     "run-mocha.ts",
   ]
   ts_deps = [
+    "../../front_end/panels/ai_assistance:bundle",
     "../conductor:implementation",
     "../e2e/conductor:implementation",
     "../e2e/shared",
     "../shared",
+    "helpers",
+    "report",
   ]
 }
 
@@ -45,8 +50,5 @@ generated_file("test_inputs") {
   data_keys = [ "tests" ]
   rebase = target_gen_dir
 
-  deps = [
-    ":eval_tests",
-    "network",
-  ]
+  deps = [ ":eval_tests" ]
 }

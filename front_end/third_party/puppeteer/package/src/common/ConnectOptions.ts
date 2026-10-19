@@ -76,6 +76,15 @@ export interface WsOptions {
    * @defaultValue `30_000`
    */
   keepAliveIntervalMs?: number;
+
+  /**
+   * Maximum size in bytes of a single message received from the browser.
+   * Messages exceeding it close the connection. Raise it when a protocol
+   * response, such as a large PDF, does not fit.
+   *
+   * @defaultValue `256 * 1024 * 1024`
+   */
+  maxPayload?: number;
 }
 
 /**
@@ -236,6 +245,11 @@ export interface ConnectOptions {
    * For complete network sandboxing, we recommend using
    * container/OS-level sandbox mechanism.
    *
+   * To enforce the patterns for requests made by service workers (including
+   * requests they forward on behalf of controlled pages), Puppeteer stays
+   * attached to every service worker while this option is set. As a
+   * consequence, the browser never idle-terminates service workers.
+   *
    * Cannot be used along with {@link ConnectOptions.allowlist}.
    *
    * @experimental
@@ -274,6 +288,11 @@ export interface ConnectOptions {
    * usage under Puppeteer control and not a complete network sandbox.
    * For complete network sandboxing, we recommend using
    * container/OS-level sandbox mechanism.
+   *
+   * To enforce the patterns for requests made by service workers (including
+   * requests they forward on behalf of controlled pages), Puppeteer stays
+   * attached to every service worker while this option is set. As a
+   * consequence, the browser never idle-terminates service workers.
    *
    * Cannot be used along with {@link ConnectOptions.blocklist}.
    *

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -20,6 +21,25 @@ import * as NetworkForward from '../network/forward/forward.js';
 import * as Security from './security.js';
 
 const {urlString} = Platform.DevToolsPath;
+
+function createSecurityDetails(overrides: Partial<Protocol.Network.SecurityDetails> = {}):
+    Protocol.Network.SecurityDetails {
+  return {
+    protocol: 'TLS 1.3',
+    keyExchange: '',
+    cipher: 'AES_128_GCM',
+    certificateId: 0 as Protocol.Security.CertificateId,
+    subjectName: 'example.com',
+    sanList: [],
+    issuer: 'Test CA',
+    validFrom: 0,
+    validTo: 1,
+    signedCertificateTimestampList: [],
+    certificateTransparencyCompliance: Protocol.Network.CertificateTransparencyCompliance.Unknown,
+    encryptedClientHello: false,
+    ...overrides,
+  };
+}
 
 describe('createHighlightedUrl', () => {
   it('renders a URL without a scheme separator as plain text', () => {
@@ -52,21 +72,7 @@ describeWithEnvironment('SecurityOriginView', () => {
       Security.SecurityPanel.OriginState {
     return {
       securityState: Protocol.Security.SecurityState.Secure,
-      securityDetails: {
-        protocol: 'TLS 1.3',
-        keyExchange: '',
-        cipher: 'AES_128_GCM',
-        certificateId: 0 as Protocol.Security.CertificateId,
-        subjectName: 'example.com',
-        sanList: [],
-        issuer: 'Test CA',
-        validFrom: 0,
-        validTo: 1,
-        signedCertificateTimestampList: [],
-        certificateTransparencyCompliance: Protocol.Network.CertificateTransparencyCompliance.Unknown,
-        encryptedClientHello: false,
-        ...securityDetails,
-      },
+      securityDetails: createSecurityDetails(securityDetails),
       loadedFromCache: false,
     };
   }
@@ -76,22 +82,44 @@ describeWithEnvironment('SecurityOriginView', () => {
         row => [...row.cells].map(cell => cell.textContent ?? ''));
   }
 
+  it('updates security details when the security state changes', () => {
+    const view = new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, {
+      securityState: Protocol.Security.SecurityState.Unknown,
+      securityDetails: null,
+      loadedFromCache: false,
+    });
+    const securityStateSection = querySelectorErrorOnMissing(view.element, '.security-state-section');
+    assert.include(securityStateSection.textContent, 'No security information');
+
+    const securityDetails = createSecurityDetails({
+      protocol: 'TLS 1.3',
+      subjectName: 'foo.bar',
+    });
+    view.setSecurityState(Protocol.Security.SecurityState.Secure, securityDetails);
+
+    assert.notExists(view.element.querySelector('.security-state-section'));
+    const connectionSection = querySelectorErrorOnMissing(view.element, '.connection-section');
+    assert.deepInclude(getDetailsTableRows(connectionSection), ['Protocol', 'TLS 1.3']);
+    const certificateSection = querySelectorErrorOnMissing(view.element, '.certificate-section');
+    assert.deepInclude(getDetailsTableRows(certificateSection), ['Subject', 'foo.bar']);
+  });
+
   describe('security state section', () => {
     const cases = [
       {
         securityState: Protocol.Security.SecurityState.Secure,
         title: 'Secure',
-        description: 'This origin is a non-HTTPS secure origin.',
+        description: 'This origin is a non-HTTPS secure origin',
       },
       {
         securityState: Protocol.Security.SecurityState.Insecure,
         title: 'Not secure',
-        description: 'Your connection to this origin isn’t secure.',
+        description: 'Your connection to this origin isn’t secure',
       },
       {
         securityState: Protocol.Security.SecurityState.Unknown,
         title: 'No security information',
-        description: 'No security details are available for this origin.',
+        description: 'No security details are available for this origin',
       },
     ];
     for (const {securityState, title, description} of cases) {
@@ -256,7 +284,8 @@ describeWithEnvironment('SecurityOriginView', () => {
     });
 
     it('updates the origin display when the security state changes', () => {
-      const view = new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, createOriginState());
+      const originState = createOriginState();
+      const view = new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, originState);
 
       const initialOriginDisplay = view.element.querySelector('.origin-display');
       assert.instanceOf(initialOriginDisplay, HTMLElement);
@@ -268,7 +297,7 @@ describeWithEnvironment('SecurityOriginView', () => {
 
       assert.exists(initialOriginDisplay.querySelector('.url-scheme-secure'));
 
-      view.setSecurityState(Protocol.Security.SecurityState.Insecure);
+      view.setSecurityState(Protocol.Security.SecurityState.Insecure, originState.securityDetails);
 
       const updatedOriginDisplay = view.element.querySelector('.origin-display');
       assert.instanceOf(updatedOriginDisplay, HTMLElement);
@@ -448,11 +477,11 @@ describeWithEnvironment('SecurityOriginView', () => {
     const cases = [
       {
         compliance: Protocol.Network.CertificateTransparencyCompliance.Compliant,
-        expectedNote: 'This request complies with Chrome’s Certificate Transparency policy.',
+        expectedNote: 'This request complies with Chrome’s Certificate Transparency policy',
       },
       {
         compliance: Protocol.Network.CertificateTransparencyCompliance.NotCompliant,
-        expectedNote: 'This request doesn’t comply with Chrome’s Certificate Transparency policy.',
+        expectedNote: 'This request doesn’t comply with Chrome’s Certificate Transparency policy',
       },
     ];
     for (const {compliance, expectedNote} of cases) {
@@ -515,23 +544,9 @@ describeWithEnvironment('SecurityOriginView', () => {
 
     it('renders when security details are available', () => {
       const originState = createOriginState();
-      originState.securityDetails = {
-        protocol: 'TLS 1.3',
-        keyExchange: '',
-        cipher: 'AES_128_GCM',
-        certificateId: 0 as Protocol.Security.CertificateId,
-        subjectName: 'example.com',
-        sanList: [],
-        issuer: 'Test CA',
-        validFrom: 0,
-        validTo: 1,
-        signedCertificateTimestampList: [],
-        certificateTransparencyCompliance: Protocol.Network.CertificateTransparencyCompliance.Unknown,
-        encryptedClientHello: false,
-      };
       const view = new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, originState);
 
-      assert.deepEqual(getNoteTexts(view), ['The security details above are from the first inspected response.']);
+      assert.deepEqual(getNoteTexts(view), ['The security details above are from the first inspected response']);
     });
 
     it('does not render when security details are null', () => {
@@ -549,7 +564,7 @@ describeWithEnvironment('SecurityOriginView', () => {
 
       assert.deepEqual(getNoteTexts(view), [
         'This response was loaded from cache. Some security details might be missing.',
-        'The security details above are from the first inspected response.',
+        'The security details above are from the first inspected response',
       ]);
     });
 
@@ -587,7 +602,8 @@ describeWithEnvironment('SecurityOriginView', () => {
   });
 
   it('renders an empty SAN', () => {
-    const view = new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, createOriginState());
+    const view =
+        new Security.SecurityPanel.SecurityOriginView(urlString`https://foo.bar`, createOriginState({sanList: []}));
 
     const sanElement = view.element.querySelector('.san');
     assert.instanceOf(sanElement, HTMLElement);
@@ -610,6 +626,10 @@ describeWithEnvironment('SecurityOriginView', () => {
     assert.notExists(truncationToggle);
   });
 
+  const visibleSanEntries = (sanElement: Element) => [...sanElement.querySelectorAll<HTMLElement>('.san-entry')]
+                                                         .filter(entry => entry.checkVisibility())
+                                                         .map(entry => entry.textContent);
+
   it('renders a SAN with truncation button and updates on truncation toggle', () => {
     const view = new Security.SecurityPanel.SecurityOriginView(
         urlString`https://foo.bar`, createOriginState({sanList: ['a.test', 'b.test', 'c.test', 'd.test']}));
@@ -618,11 +638,7 @@ describeWithEnvironment('SecurityOriginView', () => {
     const sanElement = view.element.querySelector('.san');
     assert.instanceOf(sanElement, HTMLElement);
 
-    const visibleSanEntries = () => [...sanElement.querySelectorAll<HTMLElement>('.san-entry')]
-                                        .filter(entry => entry.checkVisibility())
-                                        .map(entry => entry.textContent);
-
-    assert.deepEqual(visibleSanEntries(), ['a.test', 'b.test']);
+    assert.deepEqual(visibleSanEntries(sanElement), ['a.test', 'b.test']);
 
     const toggleButton = sanElement.querySelector('devtools-button');
     assert.instanceOf(toggleButton, HTMLElement);
@@ -631,15 +647,38 @@ describeWithEnvironment('SecurityOriginView', () => {
 
     toggleButton.click();
 
-    assert.deepEqual(visibleSanEntries(), ['a.test', 'b.test', 'c.test', 'd.test']);
+    assert.deepEqual(visibleSanEntries(sanElement), ['a.test', 'b.test', 'c.test', 'd.test']);
     assert.strictEqual(toggleButton.textContent, 'Show less');
     assert.isTrue(toggleButton.accessibleExpanded);
 
     toggleButton.click();
 
-    assert.deepEqual(visibleSanEntries(), ['a.test', 'b.test']);
+    assert.deepEqual(visibleSanEntries(sanElement), ['a.test', 'b.test']);
     assert.strictEqual(toggleButton.textContent, 'Show more (4 total)');
     assert.isFalse(toggleButton.accessibleExpanded);
+  });
+
+  it('updates SAN truncation when security details change', () => {
+    const view = new Security.SecurityPanel.SecurityOriginView(
+        urlString`https://foo.bar`, createOriginState({sanList: ['a.test', 'b.test', 'c.test', 'd.test']}));
+    renderElementIntoDOM(view);
+
+    const sanElement = view.element.querySelector('.san');
+    assert.instanceOf(sanElement, HTMLElement);
+
+    assert.deepEqual(visibleSanEntries(sanElement), ['a.test', 'b.test']);
+
+    const toggleButton = sanElement.querySelector('devtools-button');
+    assert.instanceOf(toggleButton, HTMLElement);
+    toggleButton.click();
+
+    assert.deepEqual(visibleSanEntries(sanElement), ['a.test', 'b.test', 'c.test', 'd.test']);
+
+    const updatedSecurityDetails =
+        createOriginState({sanList: ['e.test', 'f.test', 'g.test', 'h.test']}).securityDetails;
+    view.setSecurityState(Protocol.Security.SecurityState.Neutral, updatedSecurityDetails);
+
+    assert.deepEqual(visibleSanEntries(sanElement), ['e.test', 'f.test']);
   });
 });
 
@@ -675,6 +714,28 @@ describeWithEnvironment('SecurityPanel', () => {
     const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
+  });
+
+  it('shows security information for a non-cryptographic secure origin', () => {
+    const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+    renderElementIntoDOM(securityPanel);
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assert.exists(networkManager);
+
+    const origin = urlString`chrome-test://test`;
+    const request = createNetworkRequest({url: origin});
+    request.setSecurityState(Protocol.Security.SecurityState.Secure);
+    networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
+    securityPanel.sidebar.selectedOrigin = origin;
+
+    const originView = securityPanel.visibleView;
+    assert.instanceOf(originView, Security.SecurityPanel.SecurityOriginView);
+
+    const originDisplay = querySelectorErrorOnMissing(originView.element, '.origin-display');
+    assert.strictEqual(originDisplay.textContent, origin);
+
+    const section = querySelectorErrorOnMissing(originView.element, '.security-state-section');
+    assert.include(section.textContent, 'This origin is a non-HTTPS secure origin');
   });
 
   it('updates when security state changes', async () => {
@@ -744,17 +805,35 @@ describeWithEnvironment('SecurityPanel', () => {
     sinon.assert.calledOnce(sidebarTreeClearSpy);
   });
 
+  it('shows Certificate Transparency compliance when an origin is selected', () => {
+    const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+    renderElementIntoDOM(securityPanel);
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assert.exists(networkManager);
+
+    const request = createNetworkRequest({url: 'https://foo.test/'});
+    request.setSecurityState(Protocol.Security.SecurityState.Secure);
+    request.setSecurityDetails(createSecurityDetails({
+      signedCertificateTimestampList: [],
+      certificateTransparencyCompliance: Protocol.Network.CertificateTransparencyCompliance.Compliant,
+    }));
+    networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
+
+    securityPanel.sidebar.selectedOrigin = urlString`https://foo.test`;
+
+    const originView = securityPanel.visibleView;
+    assert.instanceOf(originView, Security.SecurityPanel.SecurityOriginView);
+    const section = querySelectorErrorOnMissing(originView.contentElement, '.certificate-transparency-section');
+    const note = querySelectorErrorOnMissing(section, '.origin-view-section-notes');
+    assert.strictEqual(note.textContent, 'This request complies with Chrome’s Certificate Transparency policy');
+  });
+
   it('preserves the selected origin when the panel is hidden and shown again', async () => {
     const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
     const securityModel = target.model(Security.SecurityModel.SecurityModel);
     assert.exists(securityModel);
     const networkManager = securityModel.networkManager();
-    const request = createNetworkRequest({
-      url: 'https://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request = createNetworkRequest({url: 'https://foo.test'});
     request.setSecurityState(Protocol.Security.SecurityState.Secure);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
 
@@ -815,20 +894,12 @@ describeWithEnvironment('SecurityPanel', () => {
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
 
-    const request1 = createNetworkRequest({
-      url: 'https://foo.test/foo.jpg',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request1 = createNetworkRequest({url: 'https://foo.test/foo.jpg'});
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request1);
 
     const request2 = createNetworkRequest({
       url:
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAKCAYAAABmBXS+AAAAPElEQVR42mNgQAMZGRn/GfABkIIdO3b8x6kQpgAEsCpEVgADKAqxKcBQCCLwARRFIBodYygiyiSCighhAO4e2jskhrm3AAAAAElFTkSuQmCC',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
     });
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request2);
     await doubleRaf();
@@ -856,21 +927,11 @@ describeWithEnvironment('SecurityPanel', () => {
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
 
-    const request1 = createNetworkRequest({
-      url: 'https://foo.test/foo.jpg',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request1 = createNetworkRequest({url: 'https://foo.test/foo.jpg'});
     request1.setSecurityState(Protocol.Security.SecurityState.Secure);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request1);
 
-    const request2 = createNetworkRequest({
-      url: 'https://does-not-resolve.test',
-      documentURL: 'https://does-not-resolve.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request2 = createNetworkRequest({url: 'https://does-not-resolve.test'});
     // Leave the security state unknown.
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request2);
     await doubleRaf();
@@ -899,7 +960,7 @@ describeWithEnvironment('SecurityPanel', () => {
     assert.strictEqual(unknownOriginElement.textContent, 'https://does-not-resolve.test');
   });
 
-  it('shows an explanation for blocked mixed content', () => {
+  it('shows an explanation for blocked mixed content and clears it on navigation', () => {
     const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
     renderElementIntoDOM(securityPanel);
     const securityModel = target.model(Security.SecurityModel.SecurityModel);
@@ -909,12 +970,7 @@ describeWithEnvironment('SecurityPanel', () => {
     securityModel.dispatchEventToListeners(Security.SecurityModel.Events.VisibleSecurityStateChanged,
                                            pageVisibleSecurityState);
 
-    const request = createNetworkRequest({
-      url: 'http://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request = createNetworkRequest({url: 'http://foo.test'});
     request.setBlockedReason(Protocol.Network.BlockedReason.MixedContent);
     request.mixedContentType = Protocol.Security.MixedContentType.Blockable;
     const networkManager = securityModel.networkManager();
@@ -929,11 +985,16 @@ describeWithEnvironment('SecurityPanel', () => {
     assert.strictEqual(title.textContent, 'Blocked mixed content');
 
     const explanationText = querySelectorErrorOnMissing(explanation, '.security-explanation-text');
-    assert.include(explanationText.textContent, 'Your page requested non-secure resources that were blocked.');
+    assert.include(explanationText.textContent, 'Your page requested non-secure resources that were blocked');
 
     const requestsLink = querySelectorErrorOnMissing(explanation, 'button.security-mixed-content');
     assert.strictEqual(requestsLink.textContent, 'View 1 request in Network panel');
     assert.strictEqual(requestsLink.getAttribute('role'), 'link');
+
+    // Test that the explanations are cleared on navigation. Regression test for https://crbug.com/601944.
+    navigate(getMainFrame(target));
+
+    assert.isEmpty(securityPanel.mainView.contentElement.querySelectorAll('.security-explanation'));
   });
 
   it('replaces the mixed content reload prompt with a request link when a request is recorded', () => {
@@ -956,23 +1017,18 @@ describeWithEnvironment('SecurityPanel', () => {
       assert.strictEqual(title.textContent, 'Resources - mixed content');
 
       const explanationText = querySelectorErrorOnMissing(explanation, '.security-explanation-text');
-      assert.include(explanationText.textContent, 'This page includes HTTP resources.');
+      assert.include(explanationText.textContent, 'This page includes HTTP resources');
       return explanation;
     }
 
     const explanationBeforeReload = assertMixedContentExplanation();
     const reloadPrompt = querySelectorErrorOnMissing(explanationBeforeReload, '.security-mixed-content');
-    assert.strictEqual(reloadPrompt.textContent, 'Reload the page to record requests for HTTP resources.');
+    assert.strictEqual(reloadPrompt.textContent, 'Reload the page to record requests for HTTP resources');
 
     // Now simulate a refresh.
     securityModel.dispatchEventToListeners(Security.SecurityModel.Events.VisibleSecurityStateChanged,
                                            pageVisibleSecurityState);
-    const request = createNetworkRequest({
-      url: 'http://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request = createNetworkRequest({url: 'http://foo.test'});
     request.mixedContentType = Protocol.Security.MixedContentType.OptionallyBlockable;
     const networkManager = securityModel.networkManager();
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
@@ -1006,7 +1062,7 @@ describeWithEnvironment('SecurityPanel', () => {
 
       const activeExplanationText = querySelectorErrorOnMissing(activeExplanation, '.security-explanation-text');
       assert.include(activeExplanationText.textContent,
-                     'You have recently allowed non-secure content (such as scripts or iframes) to run on this site.');
+                     'You have recently allowed non-secure content (such as scripts or iframes) to run on this site');
 
       assert.isTrue(passiveExplanation.classList.contains('security-explanation-neutral'));
 
@@ -1014,7 +1070,7 @@ describeWithEnvironment('SecurityPanel', () => {
       assert.strictEqual(passiveExplanationTitle.textContent, 'Resources - mixed content');
 
       const passiveExplanationText = querySelectorErrorOnMissing(passiveExplanation, '.security-explanation-text');
-      assert.include(passiveExplanationText.textContent, 'This page includes HTTP resources.');
+      assert.include(passiveExplanationText.textContent, 'This page includes HTTP resources');
       return [activeExplanation, passiveExplanation];
     }
 
@@ -1023,28 +1079,18 @@ describeWithEnvironment('SecurityPanel', () => {
     const explanationsBeforeReload = assertMixedContentExplanations();
     for (const explanation of explanationsBeforeReload) {
       const reloadPrompt = querySelectorErrorOnMissing(explanation, '.security-mixed-content');
-      assert.strictEqual(reloadPrompt.textContent, 'Reload the page to record requests for HTTP resources.');
+      assert.strictEqual(reloadPrompt.textContent, 'Reload the page to record requests for HTTP resources');
     }
 
     // Now simulate a refresh.
     securityModel.dispatchEventToListeners(Security.SecurityModel.Events.VisibleSecurityStateChanged,
                                            pageVisibleSecurityState);
     const networkManager = securityModel.networkManager();
-    const passiveRequest = createNetworkRequest({
-      url: 'http://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const passiveRequest = createNetworkRequest({url: 'http://foo.test'});
     passiveRequest.mixedContentType = Protocol.Security.MixedContentType.OptionallyBlockable;
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, passiveRequest);
 
-    const activeRequest = createNetworkRequest({
-      url: 'http://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const activeRequest = createNetworkRequest({url: 'http://foo.test'});
     activeRequest.mixedContentType = Protocol.Security.MixedContentType.Blockable;
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, activeRequest);
 
@@ -1067,12 +1113,7 @@ describeWithEnvironment('SecurityPanel', () => {
     securityModel.dispatchEventToListeners(
         Security.SecurityModel.Events.VisibleSecurityStateChanged, pageVisibleSecurityState);
 
-    const passive = createNetworkRequest({
-      url: 'http://foo.test',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const passive = createNetworkRequest({url: 'http://foo.test'});
     passive.mixedContentType = Protocol.Security.MixedContentType.OptionallyBlockable;
     const networkManager = securityModel.networkManager();
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, passive);
@@ -1081,17 +1122,36 @@ describeWithEnvironment('SecurityPanel', () => {
         sidebarTreeClearSpy.calledOnceWith(urlString`http://foo.test`, Protocol.Security.SecurityState.Insecure));
     sidebarTreeClearSpy.resetHistory();
 
-    const active = createNetworkRequest({
-      url: 'http://bar.test',
-      documentURL: 'https://bar.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const active = createNetworkRequest({url: 'http://bar.test'});
     active.mixedContentType = Protocol.Security.MixedContentType.Blockable;
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, active);
 
     assert.isTrue(
         sidebarTreeClearSpy.calledOnceWith(urlString`http://bar.test`, Protocol.Security.SecurityState.Insecure));
+  });
+
+  it('shows the overview when an interstitial is shown', () => {
+    const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+    renderElementIntoDOM(securityPanel);
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assert.exists(networkManager);
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+
+    const request = createNetworkRequest({url: 'http://foo.test/'});
+    request.setSecurityState(Protocol.Security.SecurityState.Insecure);
+    networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
+    assert.isTrue(securityPanel.mainView.isShowing());
+
+    securityPanel.sidebar.selectedOrigin = urlString`http://foo.test`;
+    const originView = securityPanel.visibleView;
+    assert.instanceOf(originView, Security.SecurityPanel.SecurityOriginView);
+    assert.isFalse(securityPanel.mainView.isShowing());
+    assert.isTrue(originView.isShowing());
+
+    resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.InterstitialShown);
+    assert.isTrue(securityPanel.mainView.isShowing());
+    assert.isFalse(originView.isShowing());
   });
 
   it('hides and shows the sidebar origin list when an interstitial is shown or hidden', async () => {
@@ -1102,32 +1162,17 @@ describeWithEnvironment('SecurityPanel', () => {
     assert.exists(resourceTreeModel);
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
-    const request1 = createNetworkRequest({
-      url: 'https://foo.test/',
-      documentURL: 'https://foo.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request1 = createNetworkRequest({url: 'https://foo.test/'});
     request1.setSecurityState(Protocol.Security.SecurityState.Secure);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request1);
 
-    const request2 = createNetworkRequest({
-      url: 'https://bar.test/foo.jpg',
-      documentURL: 'https://bar.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request2 = createNetworkRequest({url: 'https://bar.test/foo.jpg'});
     request2.setSecurityState(Protocol.Security.SecurityState.Secure);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request2);
 
     resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.InterstitialShown);
     // Simulate a request finishing after the interstitial is shown, to make sure that doesn't show up in the sidebar.
-    const request3 = createNetworkRequest({
-      url: 'https://bar.test/foo.jpg',
-      documentURL: 'https://bar.test',
-      frameId: '0',
-      loaderId: '0',
-    });
+    const request3 = createNetworkRequest({url: 'https://bar.test/foo.jpg'});
     request3.setSecurityState(Protocol.Security.SecurityState.Unknown);
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request3);
     assert.isTrue(toggleSidebarSpy.calledOnceWith(true));

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
@@ -74,7 +75,6 @@ describeWithEnvironment('AiCodeGenerationTeaser', () => {
     clock.tick(1100);
 
     assert.strictEqual(timerCallCount, setTimerText.callCount);
-    clock.restore();
   });
 
   it('disclaimerTextVariant is updated', async () => {

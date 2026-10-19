@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {after, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
@@ -98,6 +99,7 @@ describe('NetworkAgent', function() {
         requestHeaders: [{name: 'content-type', value: 'bar1'}],
         responseHeaders: [{name: 'content-type', value: 'bar2'}, {name: 'x-forwarded-for', value: 'bar3'}],
         timing: timingInfo,
+        finished: true,
         contentData: () =>
             Promise.resolve(new TextUtils.ContentData.ContentData(exampleResponse, false, 'application/json', 'utf-8')),
       });
@@ -221,6 +223,7 @@ describe('NetworkAgent', function() {
           {name: 'www-authenticate', value: 'Bearer secret'},
         ],
         timing: timingInfo,
+        finished: true,
         contentData: () => Promise.resolve(new TextUtils.ContentData.ContentData('{"secret":"victim-confidential"}',
                                                                                  false, 'application/json', 'utf-8')),
       });

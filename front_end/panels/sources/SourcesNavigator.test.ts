@@ -6,6 +6,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -66,7 +67,6 @@ describe('NetworkNavigatorView', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 
@@ -745,7 +745,6 @@ describe('FilesNavigatorView', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 
@@ -881,7 +880,6 @@ describe('OverridesNavigatorView', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 
@@ -919,6 +917,54 @@ describe('OverridesNavigatorView', () => {
 
     const disabledOverridesNode = rootElement.children()[0];
     assert.isFalse(disabledOverridesNode.listItemElement.classList.contains('has-mapped-files'));
+
+    project.removeProject();
+  });
+
+  it('creates the checkbox for enabling local overrides only once', async () => {
+    const networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
+    const enabledSetting = Common.Settings.Settings.instance().resolve(
+        Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor);
+    enabledSetting.set(true);
+    const projectChanged = networkPersistenceManager.once(Persistence.NetworkPersistenceManager.Events.PROJECT_CHANGED);
+    const {project} = createFileSystemUISourceCode({
+      url: urlString`file:///home/workspace/overrides/.headers`,
+      mimeType: 'text/plain',
+      fileSystemPath: 'file:///home/workspace/overrides',
+      type: Persistence.PlatformFileSystem.PlatformFileSystemType.OVERRIDES,
+      universe: backend.universe,
+    });
+    await projectChanged;
+
+    const countSettingListeners = (): number =>
+        Common.Settings.Settings.instance().eventTargetForTest.listeners?.get(enabledSetting.name)?.size ?? 0;
+    const navigatorView =
+        Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true, networkProjectManager});
+    const toolbar = navigatorView.contentElement.querySelector('.navigator-toolbar');
+    assert.exists(toolbar);
+    const checkbox = toolbar.querySelector('devtools-checkbox');
+    assert.exists(checkbox);
+    assert.isTrue(checkbox.checked);
+    const listenerCount = countSettingListeners();
+
+    // Adding or removing any project other than a file system updates the toolbar.
+    const {project: networkProject} = createContentProviderUISourceCodes({
+      items: [],
+      projectType: Workspace.Workspace.projectTypes.Network,
+      universe: backend.universe,
+    });
+    networkProject.removeProject();
+    // So does disabling local overrides.
+    const overridesUpdated =
+        networkPersistenceManager.once(Persistence.NetworkPersistenceManager.Events.LOCAL_OVERRIDES_PROJECT_UPDATED);
+    enabledSetting.set(false);
+    await overridesUpdated;
+
+    assert.strictEqual(countSettingListeners(), listenerCount);
+    const checkboxes = toolbar.querySelectorAll('devtools-checkbox');
+    assert.lengthOf(checkboxes, 1);
+    assert.strictEqual(checkboxes[0], checkbox);
+    assert.isFalse(checkbox.checked);
 
     project.removeProject();
   });

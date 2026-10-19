@@ -35,6 +35,8 @@ export const TaskOutputFile = {
   CHAT_LOG: 'agent_logs/chat_log.txt',
   AGENT_STDERR: 'agent_logs/agent_stderr.log',
   GRADER_LOG: 'grader_output/grader.log',
+  VERIFICATION_STDOUT: 'verification/verification_stdout.log',
+  VERIFICATION_STDERR: 'verification/verification_stderr.log',
 } as const;
 export type TaskOutputFile = (typeof TaskOutputFile)[keyof typeof TaskOutputFile];
 
@@ -52,10 +54,11 @@ export interface TaskCompletedPayload {
   runId: string;
   /** Execution status: 'PASSED' on success, 'FAILED' on error or timeout. */
   status: string;
-  /** Task evaluation score from 0.0 (failure) to 1.0 (success). Defaults to 1.0 for completed tasks without inline assertions. */
-  score: number;
+  /** Task evaluation score from 0.0 to 1.0 when graded, or null if ungraded or execution failed. */
+  score: number|null;
   durationSeconds: number;
   tokens?: Record<string, unknown>;
+  metrics?: {toolCallCount?: number};
 }
 
 export interface RunCompletedPayload {
@@ -67,13 +70,14 @@ export interface RunCompletedPayload {
   totalTasks: number;
   passedTasks: number;
   failedTasks: number;
+  metrics: {totalToolCalls: number};
 }
 
 /** Record of a completed task's execution outcome and score. Each task corresponds to an evaluation trajectory. */
 export interface TaskStatus {
   taskId: string;
   status: string;
-  score: number;
+  score: number|null;
 }
 
 /**
@@ -117,26 +121,78 @@ export function getContentType(filePath: string): string {
   return 'text/plain; charset=utf-8';
 }
 
+const MAX_UPLOAD_ATTEMPTS = 3;
+const TOKEN_CACHE_TTL_MS = 45 * 60 * 1000;
+
+let cachedAccessToken: {token: string, expiresAt: number}|undefined;
+
+/**
+ * Retrieves an OAuth access token for Google Cloud Storage via `luci-auth`.
+ * On gLinux/Cloudtop workstations this uses `/usr/bin/sso-cred-helper` (`gcert`)
+ * and on LUCI bots it uses the ambient `LUCI_CONTEXT` service account, avoiding
+ * the need for manual `gcloud auth login`.
+ */
+function getGcsAccessToken(forceRefresh = false): string|undefined {
+  const now = Date.now();
+  if (!forceRefresh && cachedAccessToken && now < cachedAccessToken.expiresAt) {
+    return cachedAccessToken.token;
+  }
+  try {
+    const token = execSync('luci-auth token -scopes https://www.googleapis.com/auth/devstorage.read_write', {
+                    encoding: 'utf-8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                    timeout: 5_000,
+                  }).trim();
+    if (token) {
+      cachedAccessToken = {token, expiresAt: now + TOKEN_CACHE_TTL_MS};
+      return token;
+    }
+  } catch {
+    // Fall back to default gcloud credentials if luci-auth is unavailable.
+  }
+  return undefined;
+}
+
 /**
  * Uploads a local file to GCS using system gcloud CLI.
  */
 function uploadFileToGCS(localFilePath: string, destination: string, contentType?: string): boolean {
   console.log(`[GCS] Preparing upload of ${localFilePath} to ${destination}`);
+  const type = contentType ?? getContentType(destination);
+  const command = [
+    'gcloud storage cp',
+    '--quiet',
+    `--content-type="${type}"`,
+    `"${localFilePath}"`,
+    `"${destination}"`,
+  ].join(' ');
 
-  try {
-    const type = contentType ?? getContentType(destination);
-    const command = `gcloud storage cp --content-type="${type}" "${localFilePath}" "${destination}"`;
-    execSync(command, {
-      stdio: 'inherit',
-    });
-
-    console.log('[GCS] ✅ Upload successful!');
-    return true;
-  } catch (error) {
-    console.error(`[GCS] ❌ Failed to upload to ${destination}. Ensure you are logged in via 'gcloud auth login'.`);
-    console.error(error);
-    return false;
+  for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
+    const accessToken = getGcsAccessToken(attempt > 1);
+    try {
+      execSync(command, {
+        env: {
+          ...process.env,
+          CLOUDSDK_STORAGE_PROCESS_COUNT: '1',
+          CLOUDSDK_STORAGE_THREAD_COUNT: '1',
+          ...(accessToken ? {CLOUDSDK_AUTH_ACCESS_TOKEN: accessToken} : {}),
+        },
+        stdio: ['ignore', 'inherit', 'inherit'],
+        timeout: 30_000,
+      });
+      console.log('[GCS] ✅ Upload successful!');
+      return true;
+    } catch (error) {
+      if (attempt < MAX_UPLOAD_ATTEMPTS) {
+        console.warn(`[GCS] ⚠️ Upload attempt ${attempt}/${MAX_UPLOAD_ATTEMPTS} failed for ${destination}; retrying...`);
+        continue;
+      }
+      console.error(`[GCS] ❌ Failed to upload to ${
+          destination}. Ensure you have a valid 'gcert' session or 'gcloud auth login'.`);
+      console.error(error);
+    }
   }
+  return false;
 }
 
 /**
@@ -186,6 +242,7 @@ export function uploadRunStarted(payload: RunStartedPayload): boolean {
   const jsonContent = {
     project: payload.project,
     run_id: payload.runId,
+    user: os.userInfo().username,
     model: payload.model,
     agent: payload.agent,
     start_time: payload.startTime,
@@ -235,6 +292,9 @@ export function uploadTaskCompleted(payload: TaskCompletedPayload): boolean {
     score: payload.score,
     duration_seconds: payload.durationSeconds,
     tokens: payload.tokens ?? {},
+    metrics: {
+      tool_calls: payload.metrics?.toolCallCount ?? 0,
+    },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),
@@ -272,6 +332,9 @@ export function uploadRunCompleted(payload: RunCompletedPayload): boolean {
     total_tasks: payload.totalTasks,
     passed_tasks: payload.passedTasks,
     failed_tasks: payload.failedTasks,
+    metrics: {
+      total_tool_calls: payload.metrics.totalToolCalls,
+    },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),

@@ -5,6 +5,8 @@
 /**
  * Asserts two strings are equal, and logs the first differing line if not equal.
  */
+
+import type * as Mocha from 'mocha';
 function assertSnapshotContent(actual: string, expected: string): void {
   if (actual !== expected) {
     const actualLines = actual.split('\n');
@@ -15,7 +17,7 @@ function assertSnapshotContent(actual: string, expected: string): void {
       if (actualLine !== expectedLine) {
         const firstDifference = `First differing line:\nexpected: ${expectedLine}\nactual:   ${actualLine}`;
         throw new Error(
-            `snapshot assertion failed! to update snapshot, run \`npm run test -- --on-diff=update ...\`\n\n${
+            `snapshot assertion failed! to update snapshot, run \`scripts/tools/dt.py test --on-diff=update ...\`\n\n${
                 firstDifference}`);
       }
     }
@@ -94,7 +96,7 @@ class BaseSnapshotTester {
       }
 
       throw new Error(`snapshot assertion failed! new snapshot found (${
-          title}), must run \`npm run test -- --on-diff=update ...\` to accept it.`);
+          title}), must run \`scripts/tools/dt.py test --on-diff=update ...\` to accept it.`);
     }
 
     const isDifferent = actual !== expected;

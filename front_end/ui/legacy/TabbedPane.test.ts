@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 
 import {doubleRaf, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
@@ -185,6 +186,31 @@ describeWithEnvironment('TabbedPane', () => {
 
     assert.isUndefined((tabbedPane as unknown as {lastSelectedOverflowTab?: unknown}).lastSelectedOverflowTab);
   });
+
+  it('only listens to zoom changes while shown', () => {
+    const zoomManager = UI.ZoomManager.ZoomManager.instance();
+    assert.isTrue(zoomManager.hasEventListeners(UI.ZoomManager.Events.ZOOM_CHANGED));
+
+    tabbedPane.detach();
+    const hiddenTabbedPane = new UI.TabbedPane.TabbedPane();
+    assert.isFalse(hiddenTabbedPane.isShowing());
+    assert.isFalse(zoomManager.hasEventListeners(UI.ZoomManager.Events.ZOOM_CHANGED));
+
+    renderElementIntoDOM(tabbedPane);
+    assert.isTrue(zoomManager.hasEventListeners(UI.ZoomManager.Events.ZOOM_CHANGED));
+  });
+
+  it('re-measures the tabs when shown again', async () => {
+    tabbedPane.detach();
+    // The zoom factor might have changed while the pane was hidden.
+    (tabbedPane as unknown as {measuredDropDownButtonWidth: number}).measuredDropDownButtonWidth = 999;
+
+    renderElementIntoDOM(tabbedPane);
+    await tabbedPane.updateComplete;
+
+    assert.notStrictEqual((tabbedPane as unknown as {measuredDropDownButtonWidth?: number}).measuredDropDownButtonWidth,
+                          999);
+  });
 });
 
 describeWithEnvironment('TabbedPaneElement', () => {
@@ -212,6 +238,38 @@ describeWithEnvironment('TabbedPaneElement', () => {
     assert.strictEqual(widget.tabs[0].title, 'Tab 1');
     assert.strictEqual(widget.tabs[1].id, 'tab2');
     assert.strictEqual(widget.tabs[1].title, 'Tab 2');
+  });
+
+  it('creates tabs with label, tab-tooltip, and falls back to title', async () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    render(html`
+      <devtools-tabbed-pane>
+        <div id="tab1" label="Tab 1" tab-tooltip="Tooltip 1">Content 1</div>
+        <div id="tab2" title="Fallback Tab 2">Content 2</div>
+      </devtools-tabbed-pane>
+    `,
+           container);
+
+    const tabbedPaneElement = container.querySelector('devtools-tabbed-pane') as UI.TabbedPane.TabbedPaneElement;
+    assert.isNotNull(tabbedPaneElement);
+    const widget = UI.Widget.Widget.get(tabbedPaneElement) as UI.TabbedPane.TabbedPane;
+    assert.isNotNull(widget);
+
+    await raf();  // Wait for slotchange and updateTabs
+
+    assert.lengthOf(widget.tabs, 2);
+    assert.strictEqual(widget.tabs[0].id, 'tab1');
+    assert.strictEqual(widget.tabs[0].title, 'Tab 1');
+    assert.strictEqual(widget.tabs[0].tabTooltip, 'Tooltip 1');
+    assert.strictEqual(widget.tabsById.get('tab1')?.tooltip, 'Tooltip 1');
+    assert.strictEqual(
+        widget.tabsById.get('tab1')?.tabElement.querySelector('.tabbed-pane-header-tab-title')?.getAttribute('title'),
+        'Tooltip 1');
+    assert.strictEqual(widget.tabs[1].id, 'tab2');
+    assert.strictEqual(widget.tabs[1].title, 'Fallback Tab 2');
+    assert.isUndefined(widget.tabs[1].tabTooltip);
+    assert.isUndefined(widget.tabsById.get('tab2')?.tooltip);
   });
 
   it('creates tabs with selected and disabled attributes', async () => {
@@ -282,6 +340,35 @@ describeWithEnvironment('TabbedPaneElement', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     assert.strictEqual(widget.tabs[0].title, 'Updated Tab 1');
+  });
+
+  it('updates tabs when label and tab-tooltip attributes change', async () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    render(html`
+      <devtools-tabbed-pane>
+        <div id="tab1" label="Tab 1" tab-tooltip="Initial Tooltip">Content 1</div>
+      </devtools-tabbed-pane>
+    `,
+           container);
+
+    const tabbedPaneElement = container.querySelector('devtools-tabbed-pane') as UI.TabbedPane.TabbedPaneElement;
+    const widget = UI.Widget.Widget.get(tabbedPaneElement) as UI.TabbedPane.TabbedPane;
+    await raf();
+
+    const tabElement = container.querySelector('#tab1') as HTMLElement;
+    tabElement.setAttribute('label', 'Updated Tab 1');
+    tabElement.setAttribute('tab-tooltip', 'Updated Tooltip');
+
+    // MutationObserver needs a tick
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.strictEqual(widget.tabs[0].title, 'Updated Tab 1');
+    assert.strictEqual(widget.tabs[0].tabTooltip, 'Updated Tooltip');
+    assert.strictEqual(widget.tabsById.get('tab1')?.tooltip, 'Updated Tooltip');
+    assert.strictEqual(
+        widget.tabsById.get('tab1')?.tabElement.querySelector('.tabbed-pane-header-tab-title')?.getAttribute('title'),
+        'Updated Tooltip');
   });
 
   it('updates tabs when jslogcontext attribute changes', async () => {

@@ -19,9 +19,11 @@ import * as ModificationsManager from './ModificationsManager.js';
 import * as NetworkTrackAppender from './NetworkTrackAppender.js';
 import * as RecordingMetadata from './RecordingMetadata.js';
 import * as SaveFileFormatter from './SaveFileFormatter.js';
+import * as StatusDialog from './StatusDialog.js';
 import * as TargetForEvent from './TargetForEvent.js';
 import * as ThirdPartyTreeView from './ThirdPartyTreeView.js';
 import * as ThreadAppender from './ThreadAppender.js';
+import * as TimelineCommentController from './TimelineCommentController.js';
 import * as TimelineController from './TimelineController.js';
 import * as TimelineDetailsView from './TimelineDetailsView.js';
 import * as TimelineEventOverview from './TimelineEventOverview.js';
@@ -63,9 +65,11 @@ export {
   NetworkTrackAppender,
   RecordingMetadata,
   SaveFileFormatter,
+  StatusDialog,
   TargetForEvent,
   ThirdPartyTreeView,
   ThreadAppender,
+  TimelineCommentController,
   TimelineController,
   TimelineDetailsView,
   TimelineEventOverview,

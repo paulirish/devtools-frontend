@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {after, afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -729,7 +730,6 @@ describe('BreakpointsSidebarController', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 
@@ -931,7 +931,6 @@ describe('BreakpointsView', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 

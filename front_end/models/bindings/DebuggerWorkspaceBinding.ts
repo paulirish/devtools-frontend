@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Common from '../../core/common/common.js';
+import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -27,6 +27,13 @@ import {
   SymbolizedErrorObject,
   UnparsableError,
 } from './SymbolizedError.js';
+
+export const wasmAutoSteppingSettingDescriptor: Common.Settings.SettingDescriptor<boolean> = {
+  name: 'wasm-auto-stepping',
+  type: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  storageType: Common.Settings.SettingStorageType.LOCAL,
+};
 
 export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObserver<SDK.DebuggerModel.DebuggerModel>,
                                                  DebuggerLocationUpdater {
@@ -474,6 +481,10 @@ export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObser
     const scripts = new Set<SDK.Script.Script>();
     this.pluginManager.scriptsForUISourceCode(uiSourceCode).forEach(script => scripts.add(script));
     for (const modelData of this.#debuggerModelToData.values()) {
+      const defaultScript = modelData.defaultMapping.scriptForUISourceCode(uiSourceCode);
+      if (defaultScript) {
+        scripts.add(defaultScript);
+      }
       const resourceScriptFile = modelData.getResourceScriptMapping().scriptFile(uiSourceCode);
       if (resourceScriptFile?.script) {
         scripts.add(resourceScriptFile.script);
@@ -536,7 +547,7 @@ export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObser
     const {callFrames: [frame]} = debuggerPausedDetails;
     const functionLocation = frame.functionLocation();
     if (!autoSteppingContext || debuggerPausedDetails.reason !== Protocol.Debugger.PausedEventReason.Step ||
-        !functionLocation || !this.#settings.moduleSetting('wasm-auto-stepping').get() ||
+        !functionLocation || !this.#settings.resolve(wasmAutoSteppingSettingDescriptor).get() ||
         !this.pluginManager.hasPluginForScript(frame.script)) {
       return true;
     }
@@ -581,7 +592,7 @@ export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObser
 class ModelData {
   readonly #debuggerModel: SDK.DebuggerModel.DebuggerModel;
   readonly #debuggerWorkspaceBinding: DebuggerWorkspaceBinding;
-  #defaultMapping: DefaultScriptMapping;
+  readonly defaultMapping: DefaultScriptMapping;
   readonly #resourceMapping: ResourceMapping;
   #resourceScriptMapping: ResourceScriptMapping;
   readonly compilerMapping: CompilerScriptMapping;
@@ -592,7 +603,7 @@ class ModelData {
     this.#debuggerWorkspaceBinding = debuggerWorkspaceBinding;
 
     const {workspace} = debuggerWorkspaceBinding.resourceMapping;
-    this.#defaultMapping = new DefaultScriptMapping(debuggerModel, workspace, debuggerWorkspaceBinding);
+    this.defaultMapping = new DefaultScriptMapping(debuggerModel, workspace, debuggerWorkspaceBinding);
     this.#resourceMapping = debuggerWorkspaceBinding.resourceMapping;
     this.#resourceScriptMapping = new ResourceScriptMapping(debuggerModel, workspace, debuggerWorkspaceBinding);
     this.compilerMapping = new CompilerScriptMapping(debuggerModel, workspace, debuggerWorkspaceBinding);
@@ -631,7 +642,7 @@ class ModelData {
   #nonCompilerRawLocationToUILocation(rawLocation: SDK.DebuggerModel.Location): Workspace.UISourceCode.UILocation|null {
     let uiLocation = this.#resourceScriptMapping.rawLocationToUILocation(rawLocation);
     uiLocation = uiLocation || this.#resourceMapping.jsLocationToUILocation(rawLocation);
-    uiLocation = uiLocation || this.#defaultMapping.rawLocationToUILocation(rawLocation);
+    uiLocation = uiLocation || this.defaultMapping.rawLocationToUILocation(rawLocation);
     return uiLocation;
   }
 
@@ -639,7 +650,7 @@ class ModelData {
     let uiSourceCode: Workspace.UISourceCode.UISourceCode|null = null;
     uiSourceCode = uiSourceCode || this.#resourceScriptMapping.uiSourceCodeForScript(script);
     uiSourceCode = uiSourceCode || this.#resourceMapping.uiSourceCodeForScript(script);
-    uiSourceCode = uiSourceCode || this.#defaultMapping.uiSourceCodeForScript(script);
+    uiSourceCode = uiSourceCode || this.defaultMapping.uiSourceCodeForScript(script);
     return uiSourceCode;
   }
 
@@ -654,9 +665,8 @@ class ModelData {
     locations = locations.length ?
         locations :
         this.#resourceMapping.uiLocationToJSLocations(uiSourceCode, lineNumber, columnNumber);
-    locations = locations.length ?
-        locations :
-        this.#defaultMapping.uiLocationToRawLocations(uiSourceCode, lineNumber, columnNumber);
+    locations = locations.length ? locations :
+                                   this.defaultMapping.uiLocationToRawLocations(uiSourceCode, lineNumber, columnNumber);
     return locations;
   }
 
@@ -666,7 +676,7 @@ class ModelData {
     let ranges = this.compilerMapping.uiLocationRangeToRawLocationRanges(uiSourceCode, textRange);
     ranges ??= this.#resourceScriptMapping.uiLocationRangeToRawLocationRanges(uiSourceCode, textRange);
     ranges ??= this.#resourceMapping.uiLocationRangeToJSLocationRanges(uiSourceCode, textRange);
-    ranges ??= this.#defaultMapping.uiLocationRangeToRawLocationRanges(uiSourceCode, textRange);
+    ranges ??= this.defaultMapping.uiLocationRangeToRawLocationRanges(uiSourceCode, textRange);
     return ranges;
   }
 
@@ -720,7 +730,7 @@ class ModelData {
     this.#debuggerModel.setBeforePausedCallback(null);
     this.compilerMapping.dispose();
     this.#resourceScriptMapping.dispose();
-    this.#defaultMapping.dispose();
+    this.defaultMapping.dispose();
   }
 
   getResourceScriptMapping(): ResourceScriptMapping {

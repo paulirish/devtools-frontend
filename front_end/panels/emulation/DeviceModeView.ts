@@ -9,6 +9,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as EmulationModel from '../../models/emulation/emulation.js';
+import * as Snackbars from '../../ui/components/snackbars/snackbars.js';
 import * as Geometry from '../../ui/geometry/geometry.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, nothing, render} from '../../ui/lit/lit.js';
@@ -58,6 +59,20 @@ const UIStrings = {
    * Translation of this phrase should be limited to 10 characters.
    */
   laptopL: 'Laptop L',
+  /**
+   * @description Label for a responsive preset button showing the device category and width in pixels.
+   * @example {Mobile S} PH1
+   * @example {320} PH2
+   */
+  presetSize: '{PH1} – {PH2}px',
+  /**
+   * @description Message shown after a screenshot is copied to the clipboard.
+   */
+  screenshotCopied: 'Screenshot copied to clipboard',
+  /**
+   * @description Message shown when a screenshot cannot be copied to the clipboard.
+   */
+  screenshotCopyFailed: 'Couldn’t copy screenshot to clipboard',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/emulation/DeviceModeView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -147,7 +162,7 @@ export const DEFAULT_DEVICE_MODE_VIEW: DeviceModeViewView = (
                    style="width: ${size * input.scale}px;"
                    jslog=${VisualLogging.action().track({click: true}).context(`device-mode-preset-${size}px`)}
                    @click=${(e: Event) => input.onApplyPresetSize(size, e)}>
-                <span>${titles[idx]} – ${size}px</span>
+                <span>${i18nString(UIStrings.presetSize, {PH1: titles[idx], PH2: size})}</span>
               </div>
             </div>
           `).reverse()}
@@ -278,6 +293,9 @@ export class DeviceModeView extends UI.Widget.VBox {
 
     this.model = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
     this.model.addEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.updateUI, this);
+    this.model.addEventListener(EmulationModel.DeviceModeModel.Events.SCREENSHOT_COPIED, this.screenshotCopied, this);
+    this.model.addEventListener(EmulationModel.DeviceModeModel.Events.SCREENSHOT_COPY_FAILED, this.screenshotCopyFailed,
+                                this);
     this.showMediaInspectorSetting = Common.Settings.Settings.instance().resolve(
         SettingsUI.EmulationSettings.showMediaQueryInspectorSettingDescriptor);
     this.showMediaInspectorSetting.addChangeListener(this.updateUI, this);
@@ -297,6 +315,14 @@ export class DeviceModeView extends UI.Widget.VBox {
 
     this.performUpdate();
     UI.ZoomManager.ZoomManager.instance().addEventListener(UI.ZoomManager.Events.ZOOM_CHANGED, this.zoomChanged, this);
+  }
+
+  private screenshotCopied(): void {
+    Snackbars.Snackbar.Snackbar.show({message: i18nString(UIStrings.screenshotCopied)});
+  }
+
+  private screenshotCopyFailed(): void {
+    Snackbars.Snackbar.Snackbar.show({message: i18nString(UIStrings.screenshotCopyFailed)});
   }
 
   #showDeviceModeChanged(): void {

@@ -4,7 +4,7 @@
 
 /**
  * This file is auto-generated, do not edit manually. *
- * Re-generate with: npm run generate-protocol-resources.
+ * Re-generate with: scripts/tools/dt.py generate-protocol-resources.
  */
 
 
@@ -2258,6 +2258,7 @@ declare namespace ProtocolProxyApi {
 
     /**
      * Return UUID of Blob object specified by a remote object id.
+     * @deprecated
      */
     invoke_resolveBlob(params: Protocol.IO.ResolveBlobRequest): Promise<Protocol.IO.ResolveBlobResponse>;
 
@@ -3423,6 +3424,14 @@ declare namespace ProtocolProxyApi {
     invoke_getAdScriptAncestry(params: Protocol.Page.GetAdScriptAncestryRequest): Promise<Protocol.Page.GetAdScriptAncestryResponse>;
 
     /**
+     * Returns the words that the frame's document added to its spell check custom
+     * dictionary with `document.spellCheckCustomDictionary.addWords()`, sorted.
+     * Page script cannot read the dictionary back; this lets developers inspect
+     * it.
+     */
+    invoke_getSpellCheckCustomDictionary(params: Protocol.Page.GetSpellCheckCustomDictionaryRequest): Promise<Protocol.Page.GetSpellCheckCustomDictionaryResponse>;
+
+    /**
      * Returns present frame tree structure.
      */
     invoke_getFrameTree(): Promise<Protocol.Page.GetFrameTreeResponse>;
@@ -3679,6 +3688,11 @@ declare namespace ProtocolProxyApi {
      * This is an experimental command that is subject to change.
      */
     invoke_getAnnotatedPageContent(params: Protocol.Page.GetAnnotatedPageContentRequest): Promise<Protocol.Page.GetAnnotatedPageContentResponse>;
+
+    /**
+     * Configures input visualization on the page.
+     */
+    invoke_setInputVisualization(params: Protocol.Page.SetInputVisualizationRequest): Promise<Protocol.ProtocolResponseWithError>;
 
   }
   export interface PageDispatcher {

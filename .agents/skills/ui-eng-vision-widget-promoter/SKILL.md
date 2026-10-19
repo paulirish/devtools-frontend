@@ -28,11 +28,11 @@ clean `UI.Widget` classes that use native update rendering delegates.
 2.  **Upgrade View Delegates & Inject View**:
 
     *   Migrate the local Lit template strings into a formally exported default
-        view layout:
+        view layout (using named imports `import {html, render} from '../../ui/lit/lit.js';`):
 
         ```typescript
         export const DEFAULT_VIEW: View = (input, output, target) => {
-          Lit.render(html`...`, target);
+          render(html`...`, target);
         };
         ```
 
@@ -67,10 +67,10 @@ clean `UI.Widget` classes that use native update rendering delegates.
 
     *   Remove any `LegacyWrapper` bindings or custom wrappable custom elements.
     *   Replace old panel instantiations with standard `<devtools-widget>`
-        declarative entries:
+        declarative entries (using `const {widget} = UI.Widget;`):
 
         ```typescript
-        html`<devtools-widget .widgetConfig=${widgetConfig(MyWidgetClass, [params])}></devtools-widget>`
+        html`<devtools-widget ${widget(MyWidgetClass, {params})}></devtools-widget>`
         ```
 
     *   Inspect instantiator files (e.g., `ApplicationPanelSidebar.ts`) and
@@ -81,7 +81,7 @@ clean `UI.Widget` classes that use native update rendering delegates.
 ## 2. Safety & Verification Rules
 
 *   **CRITICAL**: Never update screenshot goldens without explicit consent of the user. Most likely the failure points to an issue in the implementation or (less likely) the test itself. Look at the screenshot diffs to debug.
-*   **Minimal Code Movement**: When migrating, try to move code around as little as possible, in particular around the lit rendering helpers. This minimizes the git diff and improves reviewability.
+*   **Minimal Code Movement & Helper Topology**: When migrating, try to move code around as little as possible, in particular around the lit rendering helpers. Preserve existing standalone/module-level DOM helper functions (e.g., `linkifyIcon`, `maybeCreateLinkToElementsPanel`) and async class update helpers in their original locations, having DOM helpers return `LitTemplate` (or `Promise<LitTemplate|null>`) rather than deleting and inlining them into `performUpdate()` or `DEFAULT_VIEW`. This minimizes the git diff and improves reviewability.
 
 --------------------------------------------------------------------------------
 

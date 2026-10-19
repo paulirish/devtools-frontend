@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
@@ -129,7 +130,6 @@ describe('SourceMapsResolver', () => {
   });
 
   afterEach(() => {
-    sinon.restore();
     Formatter.FormatterWorkerPool.FormatterWorkerPool.removeInstance();
   });
 

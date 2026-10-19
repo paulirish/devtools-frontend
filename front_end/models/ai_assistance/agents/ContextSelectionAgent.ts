@@ -6,6 +6,7 @@ import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
+import * as AiUtils from '../../ai-utils/ai-utils.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
 import * as Logs from '../../logs/logs.js';
 import * as NetworkTimeCalculator from '../../network_time_calculator/network_time_calculator.js';
@@ -18,7 +19,6 @@ import {PerformanceTraceContext} from '../contexts/PerformanceTraceContext.js';
 import {RequestContext} from '../contexts/RequestContext.js';
 import {StorageContext} from '../contexts/StorageContext.js';
 import {formatBytesToKb, seconds} from '../data_formatters/UnitFormatters.js';
-import {debugLog} from '../debug.js';
 import {StorageItem} from '../StorageItem.js';
 import {isOriginAllowedByLock} from '../tools/Tool.js';
 
@@ -29,6 +29,8 @@ import {
   type ContextResponse,
   type RequestOptions,
 } from './AiAgent.js';
+
+const {debugLog} = AiUtils.Debug;
 
 type NetworkRequest = SDK.NetworkRequest.NetworkRequest;
 
@@ -106,8 +108,7 @@ export class ContextSelectionAgent extends AiAgent<never> {
   readonly #performanceRecordAndReload?: () => Promise<Trace.TraceModel.ParsedTrace>;
   readonly #onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
   readonly #networkTimeCalculator?: NetworkTimeCalculator.NetworkTransferTimeCalculator;
-  readonly #lighthouseRecording?:
-      (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  readonly #lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   #allowedOrigin: () => AllowedOriginResult;
   readonly #networkLog: Logs.NetworkLog.NetworkLog;
   readonly #workspace: Workspace.Workspace.WorkspaceImpl;
@@ -439,14 +440,19 @@ export class ContextSelectionAgent extends AiAgent<never> {
         const mode = parseLighthouseMode(params.mode);
         debugLog(`Recording with Lighthouse; runMode=${mode}`);
         const result = await this.#lighthouseRecording({mode});
-        if (!result) {
+        if (result.status === 'cancelled') {
+          return {
+            error: 'The user cancelled the Lighthouse audit. Do not run it again unless the user asks you to.',
+          };
+        }
+        if (result.status === 'failed') {
           return {error: 'Failed to generate Lighthouse report.'};
         }
 
         return {
-          context: new LighthouseContext(result),
+          context: new LighthouseContext(result.report),
           description: 'User has selected a Lighthouse report',
-          widgets: [{name: 'LIGHTHOUSE_REPORT', data: {report: result}}],
+          widgets: [{name: 'LIGHTHOUSE_REPORT', data: {report: result.report}}],
         };
       },
     });

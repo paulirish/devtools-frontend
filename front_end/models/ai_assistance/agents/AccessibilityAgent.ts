@@ -6,10 +6,10 @@ import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as AiUtils from '../../ai-utils/ai-utils.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
 import {ChangeManager} from '../ChangeManager.js';
 import {LighthouseFormatter} from '../data_formatters/LighthouseFormatter.js';
-import {debugLog} from '../debug.js';
 import {ExtensionScope} from '../ExtensionScope.js';
 import {
   type OriginLockState,
@@ -30,6 +30,8 @@ import {
   type ExecuteJsAgentOptions,
   executeJsCode,
 } from './ExecuteJavascript.js';
+
+const {debugLog} = AiUtils.Debug;
 
 /**
  * WARNING: preamble defined in code is only used when userTier is
@@ -88,8 +90,7 @@ If the user asks a question that requires an investigation of a problem, use thi
 export class AccessibilityAgent extends AiAgent<LHModel.ReporterTypes.ReportJSON> {
   readonly preamble: string = preamble;
   readonly clientFeature: Host.AidaClient.ClientFeature = Host.AidaClient.ClientFeature.CHROME_ACCESSIBILITY_AGENT;
-  readonly #lighthouseRecording?:
-      (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  readonly #lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
 
   #execJs: typeof executeJsCode;
   #changes: ChangeManager;
@@ -300,14 +301,20 @@ export class AccessibilityAgent extends AiAgent<LHModel.ReporterTypes.ReportJSON
         if (!this.#lighthouseRecording) {
           return {error: 'Lighthouse recording is not available.'};
         }
-        const report = await this.#lighthouseRecording({
+        const result = await this.#lighthouseRecording({
           mode: 'snapshot',
           categoryIds: ['accessibility'],
           isAIControlled: true,
         });
-        if (!report) {
+        if (result.status === 'cancelled') {
+          return {
+            error: 'The user cancelled the accessibility audits. Do not run them again unless the user asks you to.',
+          };
+        }
+        if (result.status === 'failed') {
           return {error: 'Failed to run accessibility audits.'};
         }
+        const {report} = result;
         const audits = new LighthouseFormatter().audits(report, 'accessibility');
         return {
           result: {audits},

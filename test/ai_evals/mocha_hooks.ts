@@ -5,12 +5,19 @@
 import {stopServer} from '../conductor/test_server.js';
 
 import {AiEvalStateProvider} from './ai-eval-state-provider.js';
+import {validateEvalEnvironment} from './helpers/eval-environment.js';
 
 export async function mochaGlobalSetup(): Promise<void> {
+  validateEvalEnvironment();
+  AiEvalStateProvider.instance.startEvalRun();
   await AiEvalStateProvider.instance.resolveBrowser();
 }
 
 export async function mochaGlobalTeardown(): Promise<void> {
-  await AiEvalStateProvider.instance.closeBrowsers();
-  stopServer();
+  try {
+    await AiEvalStateProvider.instance.closeBrowsers();
+    stopServer();
+  } finally {
+    AiEvalStateProvider.instance.finishEvalRun();
+  }
 }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -131,8 +132,6 @@ describe('CrUXManager', () => {
     });
 
     afterEach(() => {
-      mockFetch?.restore();
-      mockConsoleError?.restore();
       cruxManager?.getConfigSetting().set({enabled: false});
     });
 
@@ -379,7 +378,6 @@ describe('CrUXManager', () => {
     });
 
     afterEach(() => {
-      getFieldDataMock.restore();
       cruxManager?.getConfigSetting().set({enabled: false});
     });
 
@@ -568,7 +566,6 @@ describe('CrUXManager', () => {
     });
 
     afterEach(() => {
-      getFieldDataMock.restore();
       cruxManager?.getConfigSetting().set({enabled: false});
     });
 

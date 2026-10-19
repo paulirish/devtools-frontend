@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Elements from './elements.js';
@@ -26,7 +27,6 @@ describe('WebCustomData', () => {
 
   afterEach(() => {
     fetchResolve({});  // Resolve for our pending promise detection.
-    fetchStub.restore();
   });
 
   describe('findCssProperty', () => {

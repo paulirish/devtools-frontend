@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import {
@@ -609,7 +610,7 @@ describe('Trace helpers', function() {
           data: {
             functionName: 'test',
             url: 'https://google.com/test.js',
-            scriptId: Number(123),
+            scriptId: '123',
             lineNumber: 1,
             columnNumber: 1,
           },

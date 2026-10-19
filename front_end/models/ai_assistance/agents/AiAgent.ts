@@ -8,10 +8,10 @@ import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as TextUtils from '../../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import * as AiUtils from '../../ai-utils/ai-utils.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
 import type * as Trace from '../../trace/trace.js';
 import type * as Workspace from '../../workspace/workspace.js';
-import {debugLog, isStructuredLogEnabled} from '../debug.js';
 import {dispatchAiAssistanceDoneEvent} from '../DOMHelpers.js';
 import {
   type ContextHandlerResult,
@@ -20,9 +20,90 @@ import {
   type PermissionPrompt,
 } from '../tools/Tool.js';
 
+const {debugLog, isStructuredLogEnabled} = AiUtils.Debug;
+
 type UrlString = Platform.DevToolsPath.UrlString;
 const MAX_SUGGESTION_LENGTH = 200;
 
+/**
+ * The types of event in the response stream that `AiConversation#run()`
+ * yields to the AI assistance panel. The same events, minus a few, are saved
+ * as the conversation history and replayed when a saved conversation opens.
+ *
+ * ## Order of events in one run
+ *
+ * ```
+ * USER_QUERY                    (AiConversation, first run of a query only)
+ * CONTEXT*                      (agent's handleContextDetails())
+ * repeated for each model request, up to MAX_STEPS:
+ *   QUERYING
+ *   one of:
+ *     ANSWER (complete: false)*, ANSWER (complete: true)   text-only reply; the run ends
+ *     ANSWER (complete: false)*, [ANSWER (complete: true)],
+ *       <tool call events>+                                one or more function calls, optionally with text
+ *     ERROR                                                the run ends
+ * ```
+ *
+ * When a model response contains several function calls,
+ * `AiAgent#runFunctionCalls()` runs them one after another, so each call's
+ * events finish before the next call's events start. A denied call does not
+ * stop the calls after it, and neither does a failed call: an unknown tool
+ * name or an error thrown by the handler becomes an error result for that
+ * call.
+ *
+ * An `ERROR` can also follow the tool call events, for example when the user
+ * aborts, the page navigates cross-origin, or the run reaches `MAX_STEPS`.
+ * The remaining calls in that model response do not run after an abort or a
+ * cross-origin navigation.
+ *
+ * ## Events for one tool call
+ *
+ * `AiAgent#callFunction()` yields these. All events for one call carry the
+ * same `callId`.
+ *
+ * ```
+ * TITLE?, THOUGHT?              from the tool's displayInfoFromArgs()
+ * if the tool needs approval:
+ *   ACTION {code}               code only, shown above the approval prompt;
+ *                               skipped if displayInfoFromArgs() has no action
+ *   SIDE_EFFECT                 the panel shows the prompt and calls confirm()
+ *   if denied: ACTION {code, output, canceled: true}, and the call ends
+ * ACTION {code, output, widgets, toolName}   result or error
+ * ```
+ *
+ * If the tool switches context instead of returning a result, there is no
+ * result `ACTION`. `AiAgent#runFunctionCalls()` yields `CONTEXT_CHANGE` and
+ * the run ends, and `AiConversation` starts a new run with the agent for the
+ * new context. The remaining calls in that model response do not run.
+ *
+ * ## Model history for function calls
+ *
+ * This is the history sent to the model, separate from the saved history
+ * below. `AiAgent#runFunctionCalls()` stores the model's explanation text and
+ * every function call in a response as one `MODEL` turn. The next request
+ * carries one `functionResponse` per call, in the same order. A denied call
+ * gets a response that says it did not run. After a context change, each call
+ * that did not run gets a "Not executed" response.
+ *
+ * ## Saved history
+ *
+ * `AiConversation` saves every event except `CONTEXT_CHANGE` and partial
+ * `ANSWER`s. `AiConversation#serialize()` removes `confirm`, images and
+ * widgets, and redacts the `ACTION` output of tools annotated with
+ * `REDACT_FROM_HISTORY`. Saved data has no version field, so new fields must
+ * be optional.
+ *
+ * ## How the panel renders events
+ *
+ * `AiAssistancePanel#consumeResponseStream()` builds one chat message per
+ * `USER_QUERY` and one step per tool call:
+ * - `QUERYING` starts a new step with a spinner. The panel shows the step only
+ *   if it is the first part of the message. Otherwise, the step stays hidden
+ *   until a tool call fills it in.
+ * - `TITLE`, `THOUGHT`, `ACTION` and `SIDE_EFFECT` update the step for their
+ *   `callId`. Events saved before `callId` existed update the current step.
+ * - `ANSWER` adds the answer text. `ERROR` sets the message error.
+ */
 export const enum ResponseType {
   CONTEXT = 'context',
   TITLE = 'title',
@@ -68,6 +149,10 @@ export interface AnswerResponse {
   widgets?: AiWidget[];
 }
 
+/**
+ * No agent yields this event. The panel still handles it by attaching the
+ * suggestions to the last answer.
+ */
 export interface SuggestionsResponse {
   type: ResponseType.SUGGESTIONS;
   suggestions: [string, ...string[]];
@@ -83,32 +168,79 @@ export interface ContextDetail {
   text: string;
   codeLang?: string;
 }
+
+/**
+ * Describes the context sent with the user's query, such as the selected
+ * element. The agent's `handleContextDetails()` yields it before the first
+ * model request. The panel shows it as a completed "Analyzing data" step.
+ */
 export interface ContextResponse {
   type: ResponseType.CONTEXT;
   details: [ContextDetail, ...ContextDetail[]];
   widgets?: AiWidget[];
 }
 
-export interface TitleResponse {
+/**
+ * Identifies the tool call that an event belongs to. `AiAgent#callFunction()`
+ * generates one per call and sets it on every event for that call. Only the
+ * UI reads it; the agent never sends it to the model.
+ *
+ * Conversations saved before this field existed do not have it. The panel
+ * applies events without a `callId` to the current step.
+ */
+interface ToolCallEvent {
+  callId?: string;
+}
+
+/**
+ * The heading of a tool call's step, from `displayInfoFromArgs().title`.
+ */
+export interface TitleResponse extends ToolCallEvent {
   type: ResponseType.TITLE;
   title: string;
+  /**
+   * No agent sets this field.
+   */
   rpcId?: Host.AidaClient.RpcGlobalId;
 }
 
-export interface ThoughtResponse {
+/**
+ * Explanation text for a tool call's step, from
+ * `displayInfoFromArgs().thought`. The panel marks the step as completed when
+ * it receives a thought, even though the tool has not run yet.
+ */
+export interface ThoughtResponse extends ToolCallEvent {
   type: ResponseType.THOUGHT;
   thought: string;
+  /**
+   * No agent sets this field.
+   */
   rpcId?: Host.AidaClient.RpcGlobalId;
 }
 
-export interface SideEffectResponse {
+/**
+ * Asks the user to approve a tool call that has side effects. The agent waits
+ * until `confirm()` is called. If `displayInfoFromArgs()` returns an
+ * `action`, the agent yields it in a code-only `ACTION` just before this
+ * event.
+ */
+export interface SideEffectResponse extends ToolCallEvent {
   type: ResponseType.SIDE_EFFECT;
   description: string|null;
+  /**
+   * No agent sets this field. The code comes from the preceding `ACTION`.
+   */
   code?: string;
   confirm: (decision: PermissionDecision) => void;
   permissionPrompt?: PermissionPrompt;
   permissionTitle?: string;
 }
+
+/**
+ * Yielded when a tool selects a new context, for example a network request.
+ * `AiConversation` switches to the agent for that context and starts a new
+ * run. `AiConversation` does not save this event in the history.
+ */
 export interface ContextChangeResponse {
   type: ResponseType.CONTEXT_CHANGE;
   /**
@@ -119,26 +251,65 @@ export interface ContextChangeResponse {
   description: string;
   context: ConversationContext<unknown>;
   widgets?: AiWidget[];
-}
-
-interface SerializedSideEffectResponse extends Omit<SideEffectResponse, 'confirm'> {}
-
-export interface ActionResponse {
-  type: ResponseType.ACTION;
-  code?: string;
-  output?: string;
-  canceled: boolean;
-  widgets?: AiWidget[];
   /**
-   * The name of the executed tool. Only populated for AI v2.
+   * The name of the tool that triggered this context change. Used by the panel
+   * to emit UI telemetry.
    */
   toolName?: string;
 }
 
+interface SerializedSideEffectResponse extends Omit<SideEffectResponse, 'confirm'> {}
+
+/**
+ * The code and result of a tool call. A call yields one or two:
+ * - Calls that need approval and have code first yield a code-only `ACTION`
+ *   (no `output`), so the panel can show the code above the approval prompt.
+ * - Every call that runs, fails or is denied ends with an `ACTION` that has
+ *   an `output`.
+ */
+export interface ActionResponse extends ToolCallEvent {
+  type: ResponseType.ACTION;
+  /**
+   * The text shown in the step's code box, from
+   * `displayInfoFromArgs().action`. It is real code only for tools that run
+   * code, such as `executeJavaScript`. For other tools it is a readable form of
+   * the call.
+   */
+  code?: string;
+  /**
+   * The tool's result, error message, or the denial message. Missing on the
+   * code-only `ACTION` that precedes an approval prompt.
+   */
+  output?: string;
+  /**
+   * True if the user denied the call, so the tool did not run.
+   */
+  canceled: boolean;
+  widgets?: AiWidget[];
+  /**
+   * The name of the tool. Set on the result `ACTION` but not on the code-only
+   * or denied `ACTION`. `AiConversation#serialize()` uses it to redact the
+   * output of tools annotated with `REDACT_FROM_HISTORY`.
+   */
+  toolName?: string;
+  /**
+   * Skills newly loaded by a `learnSkills` call. Used by the panel to emit
+   * `ai-v2-learn-skill` visual logging events.
+   */
+  loadedSkills?: string[];
+}
+
+/**
+ * Yielded before each model request. The panel starts a new step for it.
+ */
 export interface QueryingResponse {
   type: ResponseType.QUERYING;
 }
 
+/**
+ * The user's query. Yielded by `AiConversation`, not by the agent, before
+ * the first run for the query. The panel starts a new chat message for it.
+ */
 export interface UserQuery {
   type: ResponseType.USER_QUERY;
   query: string;
@@ -178,7 +349,7 @@ export interface AgentOptions {
   onInspectElement?: () => Promise<SDK.DOMModel.DOMNode|null>;
   history?: Host.AidaClient.Content[];
   allowedOrigin?: () => AllowedOriginResult;
-  lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   targetManager?: SDK.TargetManager.TargetManager;
 }
 
@@ -190,6 +361,22 @@ export interface ParsedAnswer {
 export type ParsedResponse = ParsedAnswer;
 
 export const MAX_STEPS = 20;
+
+/**
+ * The response sent for each function call that did not run because an
+ * earlier call in the same model response switched the context. Every
+ * `functionCall` in the history needs a matching `functionResponse`.
+ */
+const NOT_EXECUTED_AFTER_CONTEXT_CHANGE =
+    'Not executed: the conversation switched to a new context before this call ran.';
+
+/**
+ * The response sent to the model for a call that the user denied. The other
+ * calls in the same model response still run after a denial, so the message
+ * points the model to their responses to see what did run.
+ */
+const USER_DENIED_CALL =
+    'Error: The user denied this call, so it did not run. Other calls in the same response were handled separately; check their responses.';
 
 export interface ConversationSuggestion {
   title: string;
@@ -476,7 +663,17 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
    */
   parameters: Host.AidaClient.FunctionObjectParam<keyof Args>;
   /**
-   * Provided a way to give information back to the UI.
+   * Returns the text the UI shows for a call to this function. The agent
+   * calls it before the handler runs.
+   *
+   * - `title`: the step heading, sent as `TITLE`.
+   * - `thought`: optional explanation shown in the step, sent as `THOUGHT`.
+   * - `action`: the text shown in the step's code box, sent as
+   *   `ACTION.code`. It is real code only for tools that run code, such as
+   *   `executeJavaScript`. For other tools it is a readable form of the call,
+   *   for example `getInsightDetails('NAVIGATION_0', 'LCPBreakdown')`, and is
+   *   never executed.
+   * - `suggestions`: `AiAgent` does not use this field.
    */
   displayInfoFromArgs?: (
       args: Args,
@@ -498,9 +695,34 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
   handler(args: Args, options?: FunctionHandlerOptions): Promise<ToolResult<ReturnType>>;
 }
 
+/**
+ * The function calls in one model response. A response that has function
+ * calls has at least one.
+ */
+type FunctionCalls = [Host.AidaClient.AidaFunctionCall, ...Host.AidaClient.AidaFunctionCall[]];
+
+/**
+ * What happened after `AiAgent#runFunctionCalls()` ran the calls in one model
+ * response:
+ * - `responses`: every call ran. `functionResponses` go to the model in the
+ *   next request.
+ * - `contextChanged`: a call switched the context. The run ends, and
+ *   `AiConversation` starts a new run in the new context.
+ * - `stopped`: an abort, a cross-origin navigation or an unexpected error
+ *   stopped the run. The ERROR response has already been yielded.
+ */
+type FunctionCallsOutcome = {
+  type: 'responses',
+  functionResponses: Host.AidaClient.Part[],
+}|{
+  type: 'contextChanged',
+}|{
+  type: 'stopped',
+};
+
 interface AidaFetchResult {
   text?: string;
-  functionCall?: Host.AidaClient.AidaFunctionCall;
+  functionCalls?: FunctionCalls;
   completed: boolean;
   rpcId?: Host.AidaClient.RpcGlobalId;
 }
@@ -634,10 +856,6 @@ export abstract class AiAgent<T> {
    */
   protected disableServerSideLogging(): void {
     this.#serverSideLoggingActive = false;
-  }
-
-  popPendingMultimodalInput(): MultimodalInput|undefined {
-    return undefined;
   }
 
   /**
@@ -841,8 +1059,8 @@ export abstract class AiAgent<T> {
     }
     Host.userMetrics.freestylerQueryLength(enhancedQuery.length);
 
-    let query: Host.AidaClient.Part|Host.AidaClient.Part[];
-    query = multimodalInput ? [{text: enhancedQuery}, multimodalInput.input] : [{text: enhancedQuery}];
+    const query: Host.AidaClient.Part[] =
+        multimodalInput ? [{text: enhancedQuery}, multimodalInput.input] : [{text: enhancedQuery}];
     // Request is built here to capture history up to this point.
     let request = this.buildRequest(query, Host.AidaClient.Role.USER);
 
@@ -858,23 +1076,20 @@ export abstract class AiAgent<T> {
 
       if (i === 0) {
         debugLog('[AiAgent] Step 1: Sending user prompt to model:', enhancedQuery);
-      } else if (!Array.isArray(query) && 'functionResponse' in query) {
-        debugLog(`[AiAgent] Step ${i + 1}: Sending function response for '${query.functionResponse.name}' to model:`,
-                 query.functionResponse.response);
       } else {
         debugLog(`[AiAgent] Step ${i + 1}: Sending request to model:`, request.current_message);
       }
 
       let rpcId: Host.AidaClient.RpcGlobalId|undefined;
       let textResponse = '';
-      let functionCall: Host.AidaClient.AidaFunctionCall|undefined = undefined;
+      let functionCalls: FunctionCalls|undefined;
       try {
         for await (const fetchResult of this.#aidaFetch(request, {signal: options.signal})) {
           rpcId = fetchResult.rpcId;
           textResponse = fetchResult.text ?? '';
-          functionCall = fetchResult.functionCall;
+          functionCalls = fetchResult.functionCalls;
 
-          if (!functionCall && !fetchResult.completed) {
+          if (!functionCalls && !fetchResult.completed) {
             const parsed = this.parsePartialTextResponse(textResponse);
             const partialAnswer = 'answer' in parsed ? parsed.answer : '';
             if (!partialAnswer) {
@@ -903,7 +1118,7 @@ export abstract class AiAgent<T> {
         if (!('answer' in parsedResponse)) {
           throw new Error('Expected a completed response to have an answer');
         }
-        if (!functionCall) {
+        if (!functionCalls) {
           debugLog(`[AiAgent] Step ${i + 1}: Model returned text response:`, parsedResponse.answer);
           this.#history.push({
             parts: [{
@@ -920,92 +1135,38 @@ export abstract class AiAgent<T> {
           complete: true,
           rpcId,
         });
-        if (!functionCall) {
+        if (!functionCalls) {
           break;
         }
       }
 
-      if (functionCall) {
-        debugLog(`[AiAgent] Step ${i + 1}: Model requested function call: ${functionCall.name}`, functionCall.args);
-        const allowedOriginResult = this.#allowedOrigin?.();
-        if (allowedOriginResult && 'blocked' in allowedOriginResult) {
-          // Abort immediately if the page navigated before we could lock the origin.
-          // This prevents the AI from accessing data from the new page.
-          yield this.#createErrorResponse(ErrorType.CROSS_ORIGIN);
-          break;
-        }
-        try {
-          const result = yield*
-              this.#callFunction(
-                  functionCall.name,
-                  functionCall.args,
-                  functionCall.thoughtSignature,
-                  {
-                    ...options,
-                    explanation: textResponse,
-                  },
-              );
-
-          if (options.signal?.aborted) {
-            yield this.#createErrorResponse(ErrorType.ABORT);
-            break;
-          }
-
-          if ('context' in result) {
-            // Pair the functionCall with a functionResponse so history stays valid
-            // if this agent instance is re-run after the context change (AiAgent2).
-            // The new context reaches the model through the next USER query.
-            this.#history.push({
-              parts: [{
-                functionResponse: {
-                  name: functionCall.name,
-                  response: {result: result.description},
-                },
-              }],
-              role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
-            });
-            yield {
-              type: ResponseType.CONTEXT_CHANGE,
-              description: result.description,
-              context: result.context,
-              widgets: result.widgets,
-            };
-
-            return;
-          }
-
-          query = {
-            functionResponse: {
-              name: functionCall.name,
-              // Widgets are not sent back to the LLM
-              response: {...result, widgets: undefined},
-            },
-          };
-          if (i === MAX_STEPS - 1) {
-            // Normally, the functionResponse is pushed at the start of the next
-            // iteration. Since no further iteration will run, push it here so the
-            // last functionCall is not left unpaired in history.
-            this.#history.push({
-              parts: [query],
-              role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
-            });
-            yield this.#createErrorResponse(ErrorType.MAX_STEPS);
-            break;
-          }
-          request = this.buildRequest(query, Host.AidaClient.Role.ROLE_UNSPECIFIED);
-        } catch (err) {
-          if (err instanceof CrossOriginError) {
-            yield this.#createErrorResponse(ErrorType.CROSS_ORIGIN);
-            break;
-          }
-          debugLog('Error handling function call', err);
-          yield this.#createErrorResponse(ErrorType.UNKNOWN);
-          break;
-        }
-      } else {
+      if (!functionCalls) {
         yield this.#createErrorResponse(ErrorType.UNKNOWN);
         break;
       }
+
+      debugLog(`[AiAgent] Step ${i + 1}: Model requested function calls:`, functionCalls);
+      const outcome = yield* this.#runFunctionCalls(functionCalls, textResponse, options);
+      if (outcome.type === 'contextChanged') {
+        return;
+      }
+      if (outcome.type === 'stopped') {
+        break;
+      }
+
+      if (i === MAX_STEPS - 1) {
+        // Normally, the functionResponses are pushed at the start of the next
+        // iteration. Since no further iteration will run, push them here so the
+        // last functionCalls are not left unpaired in history.
+        this.#history.push({
+          parts: outcome.functionResponses,
+          role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
+        });
+        yield this.#createErrorResponse(ErrorType.MAX_STEPS);
+        break;
+      }
+
+      request = this.buildRequest(outcome.functionResponses, Host.AidaClient.Role.ROLE_UNSPECIFIED);
     }
 
     if (isStructuredLogEnabled()) {
@@ -1014,39 +1175,143 @@ export abstract class AiAgent<T> {
     return;
   }
 
+  /**
+   * Runs every function call in one model response, one after another, in the
+   * order the model returned them.
+   *
+   * The model's text and all calls are stored in history as one MODEL turn.
+   * Every `functionCall` in history gets a matching `functionResponse`: in the
+   * returned `functionResponses`, or, after a context change, in history
+   * directly. When the run stops, the ERROR response removes the run from
+   * history instead.
+   */
+  async *
+      #runFunctionCalls(functionCalls: FunctionCalls, textResponse: string, options: {signal?: AbortSignal}):
+          AsyncGenerator<ResponseData, FunctionCallsOutcome, void> {
+    // Each call keeps its own `thoughtSignature`, if it has one.
+    const modelParts: Host.AidaClient.Part[] = textResponse ? [{text: textResponse}] : [];
+    modelParts.push(...functionCalls.map(functionCall => ({functionCall})));
+    this.#history.push({
+      parts: modelParts,
+      role: Host.AidaClient.Role.MODEL,
+    });
+
+    const functionResponses: Host.AidaClient.Part[] = [];
+    try {
+      for (const [index, functionCall] of functionCalls.entries()) {
+        const allowedOriginResult = this.#allowedOrigin?.();
+        if (allowedOriginResult && 'blocked' in allowedOriginResult) {
+          // Stop if the page navigated before the origin was locked.
+          // This prevents the AI from accessing data from the new page.
+          throw new CrossOriginError();
+        }
+
+        const result = yield* this.#callFunction(functionCall.name, functionCall.args, options);
+
+        if (options.signal?.aborted) {
+          // The remaining calls do not run. The ABORT response removes the run
+          // from history.
+          yield this.#createErrorResponse(ErrorType.ABORT);
+          return {type: 'stopped'};
+        }
+
+        if ('context' in result) {
+          functionResponses.push(
+              ...this.#contextChangeResponses(functionCall, functionCalls.slice(index + 1), result.description));
+          this.#history.push({
+            parts: functionResponses,
+            role: Host.AidaClient.Role.ROLE_UNSPECIFIED,
+          });
+          yield {
+            type: ResponseType.CONTEXT_CHANGE,
+            description: result.description,
+            context: result.context,
+            widgets: result.widgets,
+            toolName: functionCall.name,
+          };
+          return {type: 'contextChanged'};
+        }
+
+        functionResponses.push({
+          functionResponse: {
+            name: functionCall.name,
+            // Widgets and UI telemetry metadata are not sent back to the LLM.
+            response: {
+              ...result,
+              widgets: undefined,
+              ...('loadedSkills' in result ? {loadedSkills: undefined} : {}),
+            },
+          },
+        });
+      }
+    } catch (err) {
+      if (err instanceof CrossOriginError) {
+        yield this.#createErrorResponse(ErrorType.CROSS_ORIGIN);
+        return {type: 'stopped'};
+      }
+      debugLog('Error handling function call', err);
+      yield this.#createErrorResponse(ErrorType.UNKNOWN);
+      return {type: 'stopped'};
+    }
+
+    return {type: 'responses', functionResponses};
+  }
+
+  /**
+   * Returns the function responses for `switchingCall`, which switched the
+   * context, and for `skippedCalls`, which come after it and do not run.
+   *
+   * Pairing every `functionCall` with a `functionResponse` keeps the history
+   * valid if this agent instance runs again after the context change
+   * (`AiAgent2`). The new context reaches the model through the next USER
+   * query.
+   */
+  #contextChangeResponses(switchingCall: Host.AidaClient.AidaFunctionCall,
+                          skippedCalls: Host.AidaClient.AidaFunctionCall[],
+                          description: string): Host.AidaClient.Part[] {
+    return [
+      {
+        functionResponse: {
+          name: switchingCall.name,
+          response: {result: description},
+        },
+      },
+      ...skippedCalls.map(skippedCall => ({
+                            functionResponse: {
+                              name: skippedCall.name,
+                              response: {result: NOT_EXECUTED_AFTER_CONTEXT_CHANGE},
+                            },
+                          })),
+    ];
+  }
+
   async *
       #callFunction(
           name: string,
           args: Record<string, unknown>,
-          thoughtSignature?: string,
-          options?: FunctionHandlerOptions&{explanation?: string},
+          options?: FunctionHandlerOptions,
           ): AsyncGenerator<FunctionCallResponseData, {
         result: unknown,
         widgets?: AiWidget[],
-      }|{context: ConversationContext<unknown>, description: string, widgets?: AiWidget[]}> {
+        loadedSkills?: string[],
+      }|{error: string}|{context: ConversationContext<unknown>, description: string, widgets?: AiWidget[]}> {
+    const callId = crypto.randomUUID();
     const call = this.#functionDeclarations.get(name);
     if (!call) {
-      throw new Error(`Function ${name} is not found.`);
+      // Answer with an error instead of throwing, so the other calls in the
+      // same model response still run and the history keeps their results.
+      const error = `Error: Function ${name} is not found.`;
+      debugLog(`[AiAgent] Tool '${name}' is not declared.`);
+      yield {
+        type: ResponseType.ACTION,
+        callId,
+        output: error,
+        canceled: false,
+        toolName: name,
+      };
+      return {error};
     }
     debugLog(`[AiAgent] Executing tool '${name}' with args:`, args);
-    const parts: Host.AidaClient.Part[] = [];
-    if (options?.explanation) {
-      parts.push({
-        text: options.explanation,
-      });
-    }
-    const functionCall: Host.AidaClient.AidaFunctionCall = {
-      name,
-      args,
-    };
-    if (thoughtSignature) {
-      functionCall.thoughtSignature = thoughtSignature;
-    }
-    parts.push({functionCall});
-    this.#history.push({
-      parts,
-      role: Host.AidaClient.Role.MODEL,
-    });
 
     let code;
     if (call.displayInfoFromArgs) {
@@ -1055,6 +1320,7 @@ export abstract class AiAgent<T> {
       if (title) {
         yield {
           type: ResponseType.TITLE,
+          callId,
           title,
         };
       }
@@ -1062,6 +1328,7 @@ export abstract class AiAgent<T> {
       if (thought) {
         yield {
           type: ResponseType.THOUGHT,
+          callId,
           thought,
         };
       }
@@ -1072,7 +1339,19 @@ export abstract class AiAgent<T> {
       return Boolean(allowedOriginResult && 'blocked' in allowedOriginResult);
     };
 
-    let result = await call.handler(args, options);
+    // Turns an error thrown by the handler into an error result, so the other
+    // calls in the same model response still run and the history keeps their
+    // results.
+    const runHandler = async(handlerOptions?: FunctionHandlerOptions): Promise<ToolResult<unknown>> => {
+      try {
+        return await call.handler(args, handlerOptions);
+      } catch (err) {
+        debugLog(`[AiAgent] Tool '${name}' threw:`, err);
+        return {error: `Error: ${err instanceof Error ? err.message : String(err)}`};
+      }
+    };
+
+    let result = await runHandler(options);
 
     // Check 1: After first handler execution.
     // Navigation could have occurred during the async handler execution.
@@ -1084,6 +1363,7 @@ export abstract class AiAgent<T> {
       if (code) {
         yield {
           type: ResponseType.ACTION,
+          callId,
           code,
           canceled: false,
         };
@@ -1110,6 +1390,7 @@ export abstract class AiAgent<T> {
 
       yield {
         type: ResponseType.SIDE_EFFECT,
+        callId,
         confirm: sideEffectConfirmationPromiseWithResolvers.resolve,
         description: result.description,
         permissionPrompt: call.permissionPrompt,
@@ -1125,13 +1406,14 @@ export abstract class AiAgent<T> {
       if (decision === PermissionDecision.REJECT) {
         yield {
           type: ResponseType.ACTION,
+          callId,
           code,
           output: 'Error: User denied code execution with side effects.',
           canceled: true,
         };
         debugLog(`[AiAgent] Tool '${name}' denied by user.`);
         return {
-          result: 'Error: User denied code execution with side effects.',
+          result: USER_DENIED_CALL,
         };
       }
 
@@ -1143,7 +1425,7 @@ export abstract class AiAgent<T> {
         throw new CrossOriginError();
       }
 
-      result = await call.handler(args, {
+      result = await runHandler({
         ...options,
         approved: true,
       });
@@ -1158,17 +1440,20 @@ export abstract class AiAgent<T> {
     if ('result' in result) {
       yield {
         type: ResponseType.ACTION,
+        callId,
         code,
         output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
         widgets: result.widgets,
         canceled: false,
         toolName: name,
+        ...(result.loadedSkills ? {loadedSkills: result.loadedSkills} : {}),
       };
     }
 
     if ('error' in result) {
       yield {
         type: ResponseType.ACTION,
+        callId,
         code,
         output: result.error,
         canceled: false,
@@ -1193,13 +1478,9 @@ export abstract class AiAgent<T> {
 
     for await (aidaResponse of this.#aidaClient.doConversation(request, options)) {
       if (aidaResponse.functionCalls?.length) {
-        if (aidaResponse.functionCalls.length > 1) {
-          debugLog(`[AiAgent] Unexpected: received ${aidaResponse.functionCalls.length} function calls in response:`,
-                   aidaResponse.functionCalls);
-        }
         yield {
           rpcId,
-          functionCall: aidaResponse.functionCalls[0],
+          functionCalls: aidaResponse.functionCalls,
           completed: true,
           text: aidaResponse.explanation,
         };

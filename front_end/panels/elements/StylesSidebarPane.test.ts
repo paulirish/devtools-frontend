@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -2682,7 +2683,6 @@ describe('StylesSidebarPane', () => {
         sinon.assert.calledOnce(triggerAiCodeCompletionStub);
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[0], 'backgrou');
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[1], 8);
-        clock.restore();
       });
 
       it('cancels pending requests and clears suggestions on deletion', async () => {
@@ -2705,7 +2705,6 @@ describe('StylesSidebarPane', () => {
         sinon.assert.notCalled(triggerAiCodeCompletionStub);
         // Verify active suggestion was cleared
         assert.isUndefined(mockTreeItem.section().activeAiSuggestion);
-        clock.restore();
       });
 
       it('triggerAiCodeCompletion calls the provider with correct arguments', () => {
@@ -2720,7 +2719,6 @@ describe('StylesSidebarPane', () => {
         sinon.assert.calledOnce(triggerAiCodeCompletionStub);
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[0], 'backgrou');
         assert.strictEqual(triggerAiCodeCompletionStub.firstCall.args[1], 8);
-        clock.restore();
       });
 
       it('setAiAutoCompletion sets activeAiSuggestion on the section', async () => {
@@ -4953,5 +4951,30 @@ describeWithEnvironment('StylesSidebarPane updates, completions, and media/keyfr
       stylesSidebarPane.setEditingStyle(false);
       sinon.assert.calledOnce(hideHighlightSpy);
     });
+  });
+
+  it('re-runs filter on LIVE_LOCATION_UPDATED after a styles rebuild', async () => {
+    computedStyleModel.node = node;
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      cssModel,
+      node,
+      matchedPayload: [ruleMatch('div', {color: 'red'})],
+    });
+    sinon.stub(cssModel, 'cachedMatchedCascadeForNode').resolves(matchedStyles);
+    sinon.stub(cssModel, 'getComputedStyle').resolves(new Map());
+    sinon.stub(cssModel, 'getComputedStyleExtraFields').resolves({isAppearanceBase: false});
+
+    await stylesSidebarPane.performUpdate();
+    assert.isTrue(stylesSidebarPane.linkifier.hasEventListeners(Components.Linkifier.Events.LIVE_LOCATION_UPDATED));
+
+    stylesSidebarPane.setFilter(/long-stylesheet-name/);
+    const updateFilterSpy = sinon.spy(stylesSidebarPane.sectionBlocks[0], 'updateFilter');
+    stylesSidebarPane.linkifier.dispatchEventToListeners(
+        Components.Linkifier.Events.LIVE_LOCATION_UPDATED,
+        {} as unknown as Bindings.LiveLocation.LiveLocation,
+    );
+    await new Promise<void>(resolve => queueMicrotask(resolve));
+    sinon.assert.calledOnce(updateFilterSpy);
   });
 });

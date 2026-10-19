@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
@@ -77,7 +78,9 @@ describe('ImagePaintingHandler', () => {
 
     assert(data.didCorrectForHostDpr);
 
-    const [paintEvent, corrected] = [...data.paintEventToCorrectedDisplaySize.entries()][0];
+    const paintEvent = events.find(Trace.Types.Events.isPaintImage);
+    assert.isOk(paintEvent);
+    const corrected = data.paintEventToCorrectedDisplaySize.get(paintEvent);
     assert.deepEqual({width: paintEvent.args.data.width, height: paintEvent.args.data.height}, {
       width: 792,
       height: 750,

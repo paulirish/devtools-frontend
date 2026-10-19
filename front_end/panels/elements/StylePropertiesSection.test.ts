@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -61,6 +62,7 @@ describeWithEnvironment('StylesPropertySection', () => {
     assert.strictEqual(selectorElement?.textContent, '.child');
     const tooltip = section.element?.querySelector('devtools-tooltip');
     assert.exists(tooltip);
+    assert.isTrue(tooltip.classList.contains('styles-specificity-tooltip'));
     const details = tooltip.querySelector('details');
     assert.exists(details);
     const summary = details.querySelector('summary');
@@ -206,7 +208,7 @@ describeWithEnvironment('StylesPropertySection', () => {
   });
 
   it('properly renders ancestor rules', async () => {
-    Common.Settings.Settings.instance().moduleSetting('text-editor-indent').set('  ');
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).set('  ');
     const cssModel = createTarget({connection}).model(SDK.CSSModel.CSSModel);
     assert.exists(cssModel);
     const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
@@ -321,7 +323,7 @@ describeWithEnvironment('StylesPropertySection', () => {
   });
 
   it('renders braces correctly with a non-style-rule section', async () => {
-    Common.Settings.Settings.instance().moduleSetting('text-editor-indent').set('  ');
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).set('  ');
     const cssModel = createTarget({connection}).model(SDK.CSSModel.CSSModel);
     assert.exists(cssModel);
     const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
@@ -663,7 +665,7 @@ describeWithEnvironment('StylesPropertySection', () => {
   });
 
   it('renders ancestor rules with rich sub-selectors and specificity tooltips when parent rule is found', async () => {
-    Common.Settings.Settings.instance().moduleSetting('text-editor-indent').set('  ');
+    Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).set('  ');
     const cssModel = createTarget({connection}).model(SDK.CSSModel.CSSModel);
     assert.exists(cssModel);
     const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
@@ -859,7 +861,6 @@ describeWithEnvironment('StylesPropertySection', () => {
 
     selectorHeader.dispatchEvent(new MouseEvent('mouseleave'));
     sinon.assert.called(hideStub);
-    clock.restore();
   });
 
   it('triggers node overlay highlight with resolved :is(...) selector when hovering nested section selector',
@@ -929,8 +930,6 @@ describeWithEnvironment('StylesPropertySection', () => {
        selectorElement.dispatchEvent(new MouseEvent('mouseenter'));
        clock.tick(300);
        sinon.assert.calledWith(highlightSpy, {node, selectorList: ':is(.card) .title'}, 'all');
-
-       clock.restore();
      });
 
   it('highlights rule selectors in overlay when hovering selector container', async () => {
@@ -2221,5 +2220,55 @@ describeWithEnvironment('StylesPropertySection', () => {
       assert.isTrue(stylesSidebarPane.isEditingStyle);
       cancelEditing(newProperty);
     });
+  });
+
+  it('only renders the insert style rule below button for style rule sections', async () => {
+    const cssModel = createTarget({connection}).model(SDK.CSSModel.CSSModel);
+    assert.exists(cssModel);
+    const stylesSidebarPane = new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel);
+    const origin = Protocol.CSS.StyleSheetOrigin.Regular;
+    const styleSheetId = '0' as Protocol.DOM.StyleSheetId;
+    const range = {startLine: 0, startColumn: 0, endLine: 0, endColumn: 10};
+    const matchedStyles = await getMatchedStylesWithStylesheet({
+      cssModel,
+      origin,
+      styleSheetId,
+      matchedPayload: [{
+        rule: {
+          selectorList: {selectors: [{text: 'div'}], text: 'div'},
+          origin,
+          styleSheetId,
+          style: {cssProperties: [{name: 'color', value: 'red'}], shorthandEntries: [], range},
+        },
+        matchingSelectors: [0],
+      }],
+      functionRules: [{
+        name: {text: '--my-fn', range},
+        origin,
+        styleSheetId,
+        parameters: [],
+        children: [{
+          style: {
+            styleSheetId,
+            range,
+            cssProperties: [{name: 'result', value: '1px', range}],
+            shorthandEntries: [],
+            cssText: 'result: 1px;',
+          },
+        }],
+      }],
+      connection,
+    });
+
+    const styleSection = new Elements.StylePropertiesSection.StylePropertiesSection(
+        stylesSidebarPane, matchedStyles, matchedStyles.nodeStyles()[0], 0, null, null, null);
+    assert.exists(styleSection.element.querySelector('.new-rule-toolbar'));
+
+    const functionRule = matchedStyles.functionRules()[0];
+    assert.exists(functionRule);
+    const functionSection = new Elements.StylePropertiesSection.FunctionRuleSection(
+        stylesSidebarPane, matchedStyles, functionRule.style, functionRule.children(), 0,
+        functionRule.nameWithParameters(), true);
+    assert.isNull(functionSection.element.querySelector('.new-rule-toolbar'));
   });
 });

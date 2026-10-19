@@ -130,6 +130,7 @@ export interface TaskCompletedPayload {
   score: number|null;
   durationSeconds: number;
   tokens?: Record<string, unknown>;
+  metrics?: {toolCallCount?: number};
 }
 
 export interface RunCompletedPayload {
@@ -141,6 +142,7 @@ export interface RunCompletedPayload {
   totalTasks: number;
   passedTasks: number;
   failedTasks: number;
+  metrics: {totalToolCalls: number};
 }
 
 /** Record of a completed task's execution outcome and score. Each task corresponds to an evaluation trajectory. */
@@ -259,6 +261,7 @@ export function uploadRunStarted(payload: RunStartedPayload): boolean {
   const jsonContent = {
     project: payload.project,
     run_id: payload.runId,
+    user: os.userInfo().username,
     model: payload.model,
     agent: payload.agent,
     start_time: payload.startTime,
@@ -308,6 +311,9 @@ export function uploadTaskCompleted(payload: TaskCompletedPayload): boolean {
     score: payload.score,
     duration_seconds: payload.durationSeconds,
     tokens: payload.tokens ?? {},
+    metrics: {
+      tool_calls: payload.metrics?.toolCallCount ?? 0,
+    },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),
@@ -345,6 +351,9 @@ export function uploadRunCompleted(payload: RunCompletedPayload): boolean {
     total_tasks: payload.totalTasks,
     passed_tasks: payload.passedTasks,
     failed_tasks: payload.failedTasks,
+    metrics: {
+      total_tool_calls: payload.metrics.totalToolCalls,
+    },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),

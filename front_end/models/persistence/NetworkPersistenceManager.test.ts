@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -284,6 +285,8 @@ describe('NetworkPersistenceManager', () => {
         urlString`https://www.example.com/script.js`));
     assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
         urlString`http://www.example.com/script.js`));
+    assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
+        urlString`http://[2001:db8::1]/`));
     assert.isFalse(Persistence.NetworkPersistenceManager.NetworkPersistenceManager.isForbiddenNetworkUrl(
         urlString`file:///path/to/script.js`));
   });

@@ -61,7 +61,7 @@ interface NetworkRequestData {
    * This is because backend trace events have some bugs which means the initiators are not always accurate.
    * See crrev.com/c/7032169 for context.
    */
-  incompleteInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
+  incompleteInitiator: WeakMap<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
   webSocket: WebSocketTraceData[];
   entityMappings: HandlerHelpers.EntityMappings;
   linkPreconnectEvents: Types.Events.LinkPreconnect[];
@@ -77,7 +77,7 @@ let requestsByTime: Types.Events.SyntheticNetworkRequest[] = [];
 let requestIdsByURL = new Map<string, string[]>();
 
 let networkRequestEventByInitiatorUrl = new Map<string, Types.Events.SyntheticNetworkRequest[]>();
-let eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>();
+let eventToInitiatorMap = new WeakMap<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>();
 
 /**
  * These are to store ThirdParty data relationships between entities and events. To reduce iterating through data
@@ -129,7 +129,7 @@ export function reset(): void {
   requestMap = new Map();
   requestsByTime = [];
   networkRequestEventByInitiatorUrl = new Map();
-  eventToInitiatorMap = new Map();
+  eventToInitiatorMap = new WeakMap();
   webSocketData = new Map();
   requestIdsByURL = new Map();
   entityMappings = {
@@ -349,7 +349,7 @@ export async function finalize(): Promise<void> {
       const TCPMsHeader = request.receiveResponse.args.data.headers.find(h => h.name === 'X-TCPMs');
       const TCPMs = TCPMsHeader ? Math.max(0, parseInt(TCPMsHeader.value, 10)) : 0;
 
-      if (request.receiveResponse.args.data.protocol.startsWith('h3')) {
+      if (request.receiveResponse.args.data.protocol?.startsWith('h3')) {
         timing.connectStart = 0 as Types.Timing.Milli;
         timing.connectEnd = TCPMs as Types.Timing.Milli;
       } else {
@@ -701,7 +701,7 @@ function createSyntheticWebSocketConnection(
       data: {
         identifier: mainEvent.args.data.identifier,
         priority: Protocol.Network.ResourcePriority.Low,
-        url: mainEvent.args.data.url || '',
+        url: startEvent ? startEvent.args.data.url : '',
       },
     },
   };

@@ -19,7 +19,8 @@ Before you run this automated test suite, the prerequisites are:
    ```bash
    gcloud auth login
    ```
-3. A Google OTA (test) account. Make sure to create a production test account, with a password set (see 'updated password flow' during account creation).
+3. Add `"checkout_devtools_ai_evals": True` to `custom_vars` in your `.gclient` file and run `gclient sync`.
+4. A Google OTA (test) account. By default, the test runner uses the shared team OTA account stored in `test/ai_evals/eval_data/ota_account.txt`. If you create your own account instead, make sure to create a production test account, with a password set (see 'updated password flow' during account creation).
 
 ---
 
@@ -35,11 +36,24 @@ autoninja -C out/Default test/ai_evals:ai_evals
 
 ## Run the Tests
 
-AI Evals tests:
+AI Evals tests (uses the default team OTA account from `eval_data/ota_account.txt`):
 
 ```bash
-npm run test -- test/ai_evals/ --ota-username your_ota_account@gmail.com
+./dt test test/ai_evals
 ```
+
+To override with a custom OTA account:
+
+```bash
+./dt test test/ai_evals --ota-username your_ota_account@gmail.com
+```
+
+> [!NOTE]
+> Passing `--ota-password` is generally only needed for OTA accounts where the user or environment cannot change the password dynamically (for example, on CI bots that cannot use `stubby` and instead rely on a pre-configured password):
+>
+> ```bash
+> ./dt test test/ai_evals --ota-username your_ota_account@gmail.com --ota-password your_password
+> ```
 
 Harness tests:
 
@@ -55,7 +69,7 @@ Protip: You can add `--debug` to the harness test command line, to see the outpu
 
 When you run the test, the test runner performs these steps:
 
-1. Uses `stubby` to get a temporary password for the OTA account.
+1. Uses `stubby` to get a temporary password for the OTA account (unless `--ota-password` is provided).
 2. Starts Chrome and signs in to the Google account automatically.
 3. Configures DevTools AI Assistance preferences.
 4. Opens the inspected target page and sends prompts to AI Assistance.

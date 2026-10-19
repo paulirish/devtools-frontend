@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
@@ -32,7 +33,7 @@ describe('LayerTreeHandler', function() {
     const data = Trace.Handlers.ModelHandlers.LayerTree.data();
 
     assert.lengthOf(data.paints, 49);
-    assert.strictEqual(data.paintsToSnapshots.size, 35);
+    assert.lengthOf(data.paints.filter(paint => data.paintsToSnapshots.has(paint)), 35);
     // Check that one expected pair got created
     const paintEvent = data.paints.find(paint => {
       return paint.ts === 42482841188;

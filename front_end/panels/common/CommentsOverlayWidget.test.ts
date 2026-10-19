@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import type * as Protocol from '../../generated/protocol.js';
@@ -626,5 +627,185 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
 
     el.remove();
     widget.detach();
+  });
+
+  it('saves comment to thread as ACTIVE when queued via onQueueComment', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: queue-test');
+    testEl.textContent = 'queue test content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+
+    try {
+      await view.nextInput;
+      renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+      commentManager.setCommentMode(true);
+      overlayManager.handleElementClick(testEl);
+
+      const draftInput = await view.nextInput;
+      assert.isNotNull(draftInput.activeThread);
+      assert.strictEqual(draftInput.activeThread.status, 'DRAFT');
+
+      draftInput.onQueueComment('Queued comment text');
+      const queuedInput = await view.nextInput;
+      assert.isNotNull(queuedInput.activeThread);
+      assert.strictEqual(queuedInput.activeThread.status, 'ACTIVE');
+      assert.lengthOf(queuedInput.activeThread.comments, 1);
+      assert.strictEqual(queuedInput.activeThread.comments[0].text, 'Queued comment text');
+
+      // Closes after 2 seconds
+      clock.tick(2000);
+      const closedInput = await view.nextInput;
+      assert.isNull(closedInput.activeThread);
+      // Pin remains saved and visible on the overlay
+      assert.lengthOf(closedInput.pins, 1);
+    } finally {
+      testEl.remove();
+      widget.detach();
+      clock.restore();
+    }
+  });
+
+  it('keeps the popup open when editing starts before the auto-close timer fires', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: start-edit-test');
+    testEl.textContent = 'start edit test content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+
+    try {
+      await view.nextInput;
+      renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+      commentManager.setCommentMode(true);
+      overlayManager.handleElementClick(testEl);
+
+      const draftInput = await view.nextInput;
+      draftInput.onQueueComment('Queued comment text');
+      const queuedInput = await view.nextInput;
+      assert.isNotNull(queuedInput.activeThread);
+      assert.strictEqual(queuedInput.activeThread.status, 'ACTIVE');
+
+      queuedInput.onStartEdit();
+      clock.tick(2000);
+
+      // The auto-close timer must not fire, so force a render to inspect the current state.
+      widget.requestUpdate();
+      const afterTickInput = await view.nextInput;
+      assert.isNotNull(afterTickInput.activeThread);
+      assert.strictEqual(afterTickInput.activeThread.id, queuedInput.activeThread.id);
+    } finally {
+      testEl.remove();
+      widget.detach();
+      clock.restore();
+    }
+  });
+
+  it('replaces the queued comment text when an edit is saved via onSaveEdit', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: edit-test');
+    testEl.textContent = 'edit test content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+
+    try {
+      await view.nextInput;
+      renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+      commentManager.setCommentMode(true);
+      overlayManager.handleElementClick(testEl);
+
+      const draftInput = await view.nextInput;
+      draftInput.onQueueComment('Original text');
+      const queuedInput = await view.nextInput;
+      assert.isNotNull(queuedInput.activeThread);
+      assert.strictEqual(queuedInput.activeThread.status, 'ACTIVE');
+
+      queuedInput.onSaveEdit('Edited text');
+      const editedInput = await view.nextInput;
+
+      assert.isNotNull(editedInput.activeThread);
+      assert.strictEqual(editedInput.activeThread.status, 'ACTIVE');
+      assert.lengthOf(editedInput.activeThread.comments, 1);
+      assert.strictEqual(editedInput.activeThread.comments[0].text, 'Edited text');
+    } finally {
+      testEl.remove();
+      widget.detach();
+      clock.restore();
+    }
+  });
+
+  it('removes a queued thread, its pin and the popover when the queued comment is deleted', async () => {
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+    await view.nextInput;
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: delete-queued-test');
+    testEl.textContent = 'delete queued content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    try {
+      commentManager.setCommentMode(true);
+      overlayManager.handleElementClick(testEl);
+      const draftInput = await view.nextInput;
+      const thread = draftInput.activeThread;
+      assert.isNotNull(thread);
+
+      draftInput.onQueueComment('To be deleted');
+      const queuedInput = await view.nextInput;
+      assert.strictEqual(thread.status, 'ACTIVE');
+      assert.lengthOf(queuedInput.pins, 1);
+
+      queuedInput.onDeleteQueuedComment();
+      const deletedInput = await view.nextInput;
+
+      assert.isUndefined(commentManager.getCommentThread(thread.id));
+      assert.isNull(deletedInput.activeThread);
+      assert.lengthOf(deletedInput.pins, 0);
+      assert.isEmpty(commentManager.takeComments());
+    } finally {
+      testEl.remove();
+      widget.detach();
+    }
   });
 });

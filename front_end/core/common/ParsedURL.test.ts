@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {describe, it} from 'mocha';
 
 import * as Platform from '../platform/platform.js';
 
@@ -91,6 +92,15 @@ describe('Parsed URL', () => {
     assert.strictEqual(parsedUrl.fragment, 'fragmentWith/Many//Slashes', 'URL fragment is incorrect');
     assert.strictEqual(parsedUrl.folderPathComponents, '', 'URL folder path components are incorrect');
     assert.strictEqual(parsedUrl.lastPathComponent, '', 'URL last path component is incorrect');
+  });
+
+  it('recognizes a valid IPv6 URL', () => {
+    const parsedUrl = new ParsedURL('http://[2001:db8::1]:8080/path/to/file.js');
+    assert.isTrue(parsedUrl.isValid, 'the URL should be valid');
+    assert.strictEqual(parsedUrl.scheme, 'http');
+    assert.strictEqual(parsedUrl.host, '[2001:db8::1]');
+    assert.strictEqual(parsedUrl.port, '8080');
+    assert.strictEqual(parsedUrl.path, '/path/to/file.js');
   });
 
   it('recognizes a valid blob URL', () => {

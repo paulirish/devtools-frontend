@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -18,6 +19,7 @@ import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {MockDebuggerBackend, parseScopeChain} from '../../testing/MockScopeChain.js';
 import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
 import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
+import {stubFrame} from '../../testing/StackTraceHelpers.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -44,7 +46,6 @@ describe('ScopeChainSidebarPane', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     await deinitializeGlobalVars();
   });
 
@@ -60,11 +61,11 @@ describe('ScopeChainSidebarPane', () => {
     const pane = new Sources.ScopeChainSidebarPane.ScopeChainSidebarPane();
     renderElementIntoDOM(pane, {includeCommonStyles: true});
 
-    const debuggableFrame: StackTrace.StackTrace.DebuggableFrame = {
+    const debuggableFrame = stubFrame<StackTrace.StackTrace.DebuggableFrame>({
       sdkFrame: callFrame,
       line: 0,
       column: 0,
-    };
+    });
 
     const flavor = StackTrace.StackTrace.DebuggableFrameFlavor.for(debuggableFrame);
 
@@ -91,11 +92,11 @@ describe('ScopeChainSidebarPane', () => {
     const pane = new Sources.ScopeChainSidebarPane.ScopeChainSidebarPane(undefined, view);
     renderElementIntoDOM(pane.contentElement);
 
-    const debuggableFrame: StackTrace.StackTrace.DebuggableFrame = {
+    const debuggableFrame = stubFrame<StackTrace.StackTrace.DebuggableFrame>({
       sdkFrame: callFrame,
       line: 0,
       column: 0,
-    };
+    });
 
     const flavor = StackTrace.StackTrace.DebuggableFrameFlavor.for(debuggableFrame);
 

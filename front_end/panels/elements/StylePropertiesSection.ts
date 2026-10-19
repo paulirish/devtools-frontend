@@ -256,7 +256,7 @@ export class StylePropertiesSection {
     });
     this.#styleRuleElement.appendChild(this.showAllButton);
 
-    const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
+    const indent = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get();
     const selectorContainer = document.createElement('div');
     selectorContainer.createChild('span', 'styles-clipboard-only').textContent = indent.repeat(this.nestingLevel);
     selectorContainer.classList.add('selector-container');
@@ -308,7 +308,7 @@ export class StylePropertiesSection {
       this.updateAncestorRuleList();
     }
 
-    if (rule) {
+    if (rule instanceof SDK.CSSRule.CSSStyleRule) {
       const newRuleButton = new UI.Toolbar.ToolbarButton(
           i18nString(UIStrings.insertStyleRuleBelow), 'plus', undefined, 'elements.new-style-rule');
       newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.onNewRuleClick, this);
@@ -1030,7 +1030,7 @@ export class StylePropertiesSection {
   }
 
   protected indentElement(element: HTMLElement, nestingLevel: number, clipboardOnly?: boolean): HTMLElement {
-    const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
+    const indent = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get();
     const indentElement = document.createElement('span');
     indentElement.classList.add('styles-clipboard-only');
     indentElement.setAttribute('slot', 'indent');
@@ -1570,6 +1570,7 @@ export class StylePropertiesSection {
           variant: 'rich',
           jslogContext: 'elements.css-selector-specificity',
         }));
+        tooltip.classList.add('styles-specificity-tooltip');
         tooltip.hoverDelay = 500;
 
         const specificitySummary = formatSpecificitySummary(selector.specificity);
@@ -1832,7 +1833,7 @@ export class StylePropertiesSection {
     ruleText: string,
   } {
     const selectorText = this.headerText();
-    const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
+    const indent = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get();
 
     const style = this.style();
     const lines: string[] = [];

@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
-import type * as Platform from '../../../core/platform/platform.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as TextUtils from '../../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../../generated/protocol.js';
@@ -35,6 +36,8 @@ import {
 import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
 import * as Lighthouse from '../../lighthouse/lighthouse.js';
 import * as AiAssistance from '../ai_assistance.js';
+
+const {urlString} = Platform.DevToolsPath;
 
 describeWithEnvironment('ChatMessage', () => {
   function createComponent(
@@ -559,6 +562,17 @@ describeWithEnvironment('ChatMessage', () => {
 
     sinon.assert.callCount(view, 1);
     assert.isFalse(view.input.showRateButtons);
+  });
+
+  it('opens the legal issue form when the report button is clicked', async () => {
+    const openInNewTabStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'openInNewTab');
+    const [view] = createComponent();
+
+    view.input.onReportClick();
+
+    sinon.assert.calledOnceWithExactly(
+        openInNewTabStub,
+        urlString`https://support.google.com/legal/troubleshooter/1114905?hl=en#ts=1115658%2C13380504`);
   });
 
   it('should show actions when it is not the last message and it is loading', async () => {
@@ -1135,6 +1149,49 @@ describeWithEnvironment('ChatMessage', () => {
       );
     });
 
+    it('renders new buttons when one prompt replaces another in a single render', () => {
+      const stepA: AiAssistance.ChatMessage.Step = {
+        state: {type: 'needs_approval', sideEffectDialog: {description: null, onAnswer: () => {}}},
+        title: 'Setting the color',
+        code: 'a()',
+      };
+      const stepB: AiAssistance.ChatMessage.Step = {
+        state: {type: 'needs_approval', sideEffectDialog: {description: null, onAnswer: () => {}}},
+        title: 'Setting the background color',
+        code: 'b()',
+      };
+      const walkthrough = {...DEFAULT_WALKTHROUGH, isInlined: true, isExpanded: false};
+      const target = renderView({
+        message: {
+          entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+          parts: [{type: 'step', step: stepA}],
+          rpcId: 99,
+          id: '1',
+        },
+        walkthrough,
+      });
+      const buttonA =
+          querySelectorErrorOnMissing(target, '.side-effect-container .side-effect-confirmation devtools-button');
+
+      // Prompt A is answered and prompt B appears before the next render.
+      stepA.state = {type: 'completed'};
+      renderView({
+        message: {
+          entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
+          parts: [{type: 'step', step: stepA}, {type: 'step', step: stepB}],
+          rpcId: 99,
+          id: '1',
+        },
+        walkthrough,
+      },
+                 target);
+      const buttonB =
+          querySelectorErrorOnMissing(target, '.side-effect-container .side-effect-confirmation devtools-button');
+
+      assert.isFalse(buttonA.isConnected);
+      assert.notStrictEqual(buttonA, buttonB);
+    });
+
     it('does not force walkthrough expansion when there are side-effect steps', () => {
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
@@ -1173,7 +1230,7 @@ describeWithEnvironment('ChatMessage', () => {
       }
     });
 
-    it('renders side effect step with aborted indicator when canceled', () => {
+    it('does not render side effect step in the main chat area when canceled', () => {
       const sideEffectMessage: AiAssistance.ChatMessage.ModelChatMessage = {
         entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
         parts: [
@@ -1199,9 +1256,7 @@ describeWithEnvironment('ChatMessage', () => {
         },
       });
 
-      const indicator = target.querySelector('.side-effect-container devtools-icon.indicator');
-      assert.isNotNull(indicator);
-      assert.strictEqual(indicator?.getAttribute('aria-label'), 'Aborted');
+      assert.isNull(target.querySelector('.side-effect-container'));
       assert.isNull(target.querySelector('.side-effect-confirmation'));
     });
 
@@ -1955,7 +2010,7 @@ describeWithEnvironment('ChatMessage', () => {
       const revealError = new Error(
           'Node can’t be found in the current page',
       );
-      const revealStub = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').rejects(revealError);
+      sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal').rejects(revealError);
       const snackbarShowStub = sinon.stub(Snackbars.Snackbar.Snackbar, 'show');
 
       revealBtn.click();
@@ -1966,9 +2021,6 @@ describeWithEnvironment('ChatMessage', () => {
       sinon.assert.calledOnceWithExactly(snackbarShowStub, {
         message: 'Node can’t be found in the current page',
       });
-
-      revealStub.restore();
-      snackbarShowStub.restore();
     });
     it('renders NETWORK_TRACK widget with correct header and widget element', async () => {
       const parsedTrace = getBaseTraceHandlerData();
@@ -2089,7 +2141,6 @@ describeWithEnvironment('ChatMessage', () => {
       const [revealedObject] = revealStub.getCall(0).args;
       assert.instanceOf(revealedObject, Lighthouse.LighthousePanel.ActiveLighthouseReport);
       assert.strictEqual((revealedObject as Lighthouse.LighthousePanel.ActiveLighthouseReport).report, mockReport);
-      revealStub.restore();
     });
 
     it('does not render empty step-widgets-wrapper when step widgets return nothing', async () => {

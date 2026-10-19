@@ -88,7 +88,7 @@ export const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElem
                          .variant=${Buttons.Button.Variant.TOOLBAR}></devtools-button>
         ${input.mainToolbarItems.map(item => item.element)}
       </devtools-toolbar>
-      ${input.metadataView}`,
+      ${UI.Widget.widget(UI.Widget.WrapperWidget, {widget: input.metadataView})}`,
       // clang-format on
       target);
 };
@@ -168,7 +168,7 @@ export class StorageItemsToolbar extends StorageItemsToolbarBase {
   }
 
   setStorageKey(storageKey: string): void {
-    this.metadataView.setStorageKey(storageKey);
+    this.metadataView.storageKey = storageKey;
   }
 
   filterChanged({detail: text}: CustomEvent<string|null>): void {

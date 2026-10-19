@@ -4,7 +4,7 @@
 
 /**
  * This file is auto-generated, do not edit manually. *
- * Re-generate with: npm run generate-protocol-resources.
+ * Re-generate with: scripts/tools/dt.py generate-protocol-resources.
  */
 
 
@@ -1291,6 +1291,7 @@ export namespace Audits {
     FormModelContextMissingToolDescription = 'FormModelContextMissingToolDescription',
     FormModelContextRequiredParameterMissingName = 'FormModelContextRequiredParameterMissingName',
     FormModelContextParameterMissingName = 'FormModelContextParameterMissingName',
+    GeolocationPromptWithoutUserGesture = 'GeolocationPromptWithoutUserGesture',
   }
 
   /**
@@ -13002,6 +13003,11 @@ export namespace Network {
      * Total number of bytes received for this request.
      */
     encodedDataLength: number;
+    /**
+     * Size of the response body before removing content encodings.
+     * Includes cached bodies, but excludes headers and transfer framing.
+     */
+    encodedBodyLength?: number;
   }
 
   /**
@@ -14834,8 +14840,6 @@ export namespace Page {
     Rewriter = 'rewriter',
     ScreenWakeLock = 'screen-wake-lock',
     Serial = 'serial',
-    SharedStorage = 'shared-storage',
-    SharedStorageSelectUrl = 'shared-storage-select-url',
     SmartCard = 'smart-card',
     SpeakerSelection = 'speaker-selection',
     StorageAccess = 'storage-access',
@@ -14844,6 +14848,7 @@ export namespace Page {
     SyncXhr = 'sync-xhr',
     Tools = 'tools',
     Translator = 'translator',
+    UnboundedElement = 'unbounded-element',
     Unload = 'unload',
     Usb = 'usb',
     UsbUnrestricted = 'usb-unrestricted',
@@ -16027,6 +16032,14 @@ export namespace Page {
     adScriptAncestry?: Network.AdAncestry;
   }
 
+  export interface GetSpellCheckCustomDictionaryRequest {
+    frameId: FrameId;
+  }
+
+  export interface GetSpellCheckCustomDictionaryResponse extends ProtocolResponseWithError {
+    words: string[];
+  }
+
   export interface GetFrameTreeResponse extends ProtocolResponseWithError {
     /**
      * Present frame tree structure.
@@ -16669,6 +16682,13 @@ export namespace Page {
      * components/optimization_guide/proto/features/common_quality_data.proto
      */
     content: binary;
+  }
+
+  export interface SetInputVisualizationRequest {
+    /**
+     * Whether to enable click visualization.
+     */
+    clicks?: boolean;
   }
 
   export interface DomContentEventFiredEvent {

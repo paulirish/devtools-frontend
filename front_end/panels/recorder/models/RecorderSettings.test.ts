@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../../core/common/common.js';
@@ -32,13 +33,12 @@ describeWithEnvironment('RecorderSettings', () => {
 
   it('should get default Title', async () => {
     const now = new Date('2022-12-01 15:30');
-    const clock = sinon.useFakeTimers(now.getTime());
+    sinon.useFakeTimers(now.getTime());
 
     assert.strictEqual(
         recorderSettings.defaultTitle,
         `Recording ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`,
     );
-    clock.restore();
   });
 
   it('should save selector attribute change', () => {

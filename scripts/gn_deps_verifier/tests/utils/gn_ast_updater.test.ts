@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import {GnAstExtractor} from '../../extractors/gn_ast_extractor.ts';
@@ -12,14 +13,7 @@ import type {AstTargetInfo} from '../../gn_ast/gn_ast_types.ts';
 import {updateBuildGnFiles} from '../../utils/gn_ast_updater.ts';
 
 describe('gn_ast_updater', () => {
-  let sandbox: sinon.SinonSandbox;
-
-  beforeEach(() => {
-    sandbox = sinon.createSandbox();
-  });
-
   afterEach(() => {
-    sandbox.restore();
     GnAstExtractor.clearCacheForTesting();
   });
 
@@ -46,8 +40,8 @@ describe('gn_ast_updater', () => {
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    const computeDepsSpy = sandbox.spy(
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    const computeDepsSpy = sinon.spy(
         TypeScriptAnalyzer,
         'computeTargetDepsDiff',
     );
@@ -92,8 +86,8 @@ describe('gn_ast_updater', () => {
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    const computeDepsSpy = sandbox.spy(
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    const computeDepsSpy = sinon.spy(
         TypeScriptAnalyzer,
         'computeTargetDepsDiff',
     );
@@ -125,8 +119,8 @@ describe('gn_ast_updater', () => {
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff')
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff')
         .resolves({missingTsDeps: [], unusedTsDeps: [], missingDeps: [], unusedDeps: []});
 
     const requiredDeps = new Map([['//test:target', new Set(['dep1'])]]);
@@ -145,16 +139,16 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
+      updateTargetDeps: sinon.stub().returns(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
 
     // Provide unused and missing deps that match IGNORED_TARGET_SUBSTRINGS
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//other:Images'],
       unusedTsDeps: ['//other:Images', '//foo/legacy_test_runner/bar:target'],
       missingDeps: [],
@@ -179,16 +173,16 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(true),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
 
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//new:dep', '//other:Images'],
       unusedTsDeps: ['//old:dep', '//foo/legacy_test_runner/bar:target'],
       missingDeps: [],
@@ -223,16 +217,16 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(true),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
 
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//new:dep'],
       unusedTsDeps: ['//old:dep'],
       missingDeps: [],
@@ -267,16 +261,16 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(true),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
 
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: [],
       unusedTsDeps: [],
       missingDeps: [],
@@ -311,16 +305,16 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(true),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
 
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: [],
       unusedTsDeps: [],
       missingDeps: [],
@@ -353,15 +347,15 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(false),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(false),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//new:dep'],
       unusedTsDeps: [],
       missingDeps: [],
@@ -387,15 +381,15 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().rejects(new Error('I/O error')),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().rejects(new Error('I/O error')),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//new:dep'],
       unusedTsDeps: [],
       missingDeps: [],
@@ -421,15 +415,15 @@ describe('gn_ast_updater', () => {
           } as AstTargetInfo,
         ],
       ]),
-      updateTargetDeps: sandbox.stub().returns(true),
-      writeGnFile: sandbox.stub().resolves(true),
+      updateTargetDeps: sinon.stub().returns(true),
+      writeGnFile: sinon.stub().resolves(true),
     } as unknown as GnBuildFile;
 
     const extractorStub = {
       buildFiles: new Map([['test_file', Promise.resolve(gnBuildMock)]]),
     };
-    sandbox.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
-    sandbox.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
+    sinon.stub(GnAstExtractor, 'create').returns(extractorStub as unknown as GnAstExtractor);
+    sinon.stub(TypeScriptAnalyzer, 'computeTargetDepsDiff').resolves({
       missingTsDeps: ['//new:dep'],
       unusedTsDeps: ['//old:dep'],
       missingDeps: [],
@@ -449,7 +443,7 @@ describe('gn_ast_updater', () => {
     assert.include(thrownError.message, 'Mismatch in //test:target (BUILD.gn)');
     assert.include(thrownError.message, 'Missing (ts_deps): //new:dep');
     assert.include(thrownError.message, 'Unused (ts_deps): //old:dep');
-    assert.include(thrownError.message, 'npm run check-gn -- --all');
+    assert.include(thrownError.message, 'scripts/tools/dt.py check-gn --all');
     sinon.assert.notCalled(gnBuildMock.updateTargetDeps as sinon.SinonStub);
     sinon.assert.notCalled(gnBuildMock.writeGnFile as sinon.SinonStub);
   });

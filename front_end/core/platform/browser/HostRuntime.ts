@@ -95,17 +95,17 @@ async function saveScreenshot(options: Api.HostRuntime.ScreenshotOptions): Promi
     const contentTop = options.clip.visiblePageRectTop * scale;
 
     canvas = new OffscreenCanvas(
-        Math.floor(screenRectWidth),
+        Math.round(screenRectWidth),
         // Cap the height to not hit the GPU limit.
         // https://crbug.com/1260828
-        Math.min(1 << 14, Math.floor(screenRectHeight)),
+        Math.min(1 << 14, Math.round(screenRectHeight)),
     );
     const ctx = canvas.getContext('2d', {willReadFrequently: true});
     if (!ctx) {
       throw new Error('Could not get 2d context from canvas.');
     }
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pageImage, Math.floor(contentLeft), Math.floor(contentTop));
+    ctx.drawImage(pageImage, Math.round(contentLeft), Math.round(contentTop));
   } else {
     canvas = new OffscreenCanvas(
         pageImage.naturalWidth,
@@ -128,6 +128,15 @@ async function saveScreenshot(options: Api.HostRuntime.ScreenshotOptions): Promi
   lastScreenshotBlobUrl = blobUrl;
   link.href = blobUrl;
   link.click();
+}
+
+async function copyScreenshot(options: Api.HostRuntime.ScreenshotOptions): Promise<void> {
+  const response = await fetch('data:image/png;base64,' + options.base64Png);
+  const blob = await response.blob();
+
+  await navigator.clipboard.write([
+    new ClipboardItem({'image/png': blob}),
+  ]);
 }
 
 let cssEvaluationElement: HTMLElement|null = null;
@@ -155,6 +164,7 @@ export const HOST_RUNTIME: Api.HostRuntime.HostRuntime = {
     return window.devicePixelRatio;
   },
   saveScreenshot,
+  copyScreenshot,
   revokeLastScreenshotUrl,
   async loadTextFile(url: URL): Promise<string> {
     const response = await fetch(url);

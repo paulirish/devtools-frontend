@@ -695,7 +695,7 @@ export class TimelineUIUtils {
     const unsafeEventArgs = event.args as Record<string, any>;
     // TODO(40287735): update this code with type-safe data checks.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsafeEventData = event.args?.data as Record<string, any>;
+    const unsafeEventData = unsafeEventArgs?.data as Record<string, any>;
 
     switch (event.name) {
       case Trace.Types.Events.Name.PAINT_IMAGE:
@@ -973,8 +973,7 @@ export class TimelineUIUtils {
     let entityAppended = false;
 
     if (maybeTarget) {
-      // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-      if (typeof event[previewElementSymbol] === 'undefined') {
+      if (!previewElementCache.has(event)) {
         let previewElement: (Element|null)|null = null;
         const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace.data);
         if (url) {
@@ -985,8 +984,7 @@ export class TimelineUIUtils {
         } else if (Trace.Types.Events.isPaint(event)) {
           previewElement = await TimelineUIUtils.buildPicturePreviewContent(parsedTrace, event, maybeTarget);
         }
-        // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-        event[previewElementSymbol] = previewElement;
+        previewElementCache.set(event, previewElement);
       }
     }
 
@@ -1006,7 +1004,7 @@ export class TimelineUIUtils {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unsafeEventArgs = event.args as Record<string, any>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsafeEventData = event.args?.data as Record<string, any>;
+    const unsafeEventData = unsafeEventArgs?.data as Record<string, any>;
     const initiator = parsedTrace.data.Initiators.eventToInitiator.get(event) ?? null;
     const initiatorFor = parsedTrace.data.Initiators.initiatorToEvents.get(event) ?? null;
 
@@ -1551,11 +1549,10 @@ export class TimelineUIUtils {
       }
     }
 
-    // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-    if (event[previewElementSymbol]) {
+    const previewElement = previewElementCache.get(event);
+    if (previewElement) {
       contentHelper.addSection(i18nString(UIStrings.preview));
-      // @ts-expect-error TODO(crbug.com/1011811): Remove symbol usage.
-      contentHelper.appendElementRow('', event[previewElementSymbol]);
+      contentHelper.appendElementRow('', previewElement);
     }
 
     if (!entityAppended) {
@@ -1601,7 +1598,8 @@ export class TimelineUIUtils {
   }
 
   private static renderObjectJson(obj: Object|Trace.Types.Extensions.JsonValue): HTMLDivElement {
-    const indentLength = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get().length;
+    const indentLength =
+        Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get().length;
     // Elide if the data is huge. Then remove the initial new-line for a denser UI
     const eventStr = JSON.stringify(obj, null, indentLength).slice(0, 10_000).replace(/{\n  /, '{ ');
 
@@ -2212,9 +2210,7 @@ export class TimelineUIUtils {
   }
 }
 
-export const aggregatedStatsKey: unique symbol = Symbol('aggregatedStats');
-
-export const previewElementSymbol: unique symbol = Symbol('previewElement');
+const previewElementCache = new WeakMap<Trace.Types.Events.Event, Element|null>();
 
 export class EventDispatchTypeDescriptor {
   priority: number;
@@ -2442,7 +2438,6 @@ export class TimelineDetailsContentHelper {
   }
 }
 
-export const categoryBreakdownCacheSymbol: unique symbol = Symbol('categoryBreakdownCache');
 export interface TimelineMarkerStyle {
   title: string;
   color: string;

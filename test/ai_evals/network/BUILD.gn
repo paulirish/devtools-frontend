@@ -4,13 +4,12 @@
 
 import("../../../scripts/build/typescript/typescript.gni")
 
-ts_e2e_library("network") {
+node_ts_library("network") {
   sources = [ "server-error-5xx.test.ts" ]
 
   ts_deps = [
-    "../../conductor:implementation",
+    "..:harness_library",
     "../../e2e/helpers",
     "../helpers",
-    "../report",
   ]
 }

@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {describe, it} from 'mocha';
 
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {allThreadEntriesInTrace} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
 describe('getNonResolvedURL', () => {
+  setupLocaleHooks();
   it('returns the URL in event.args.data if it has one', async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
     const commitLoadEvent = allThreadEntriesInTrace(parsedTrace).find(Trace.Types.Events.isCommitLoad);
@@ -32,7 +35,8 @@ describe('getNonResolvedURL', () => {
     const parseStyle = allThreadEntriesInTrace(parsedTrace).find(Trace.Types.Events.isParseAuthorStyleSheetEvent);
     assert.isOk(parseStyle);
     const url = Trace.Handlers.Helpers.getNonResolvedURL(parseStyle, parsedTrace.data);
-    assert.strictEqual(url, parseStyle.args?.data.url);
+    assert.isNotNull(url);
+    assert.strictEqual(url, parseStyle.args?.data.styleSheetUrl);
   });
 
   it('uses the request URL for a network request', async function() {
@@ -46,13 +50,13 @@ describe('getNonResolvedURL', () => {
 
   it('for a generic event with a stackTrace property, it uses the URL of the top frame', async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
-    const eventDispatch = allThreadEntriesInTrace(parsedTrace).find(entry => {
-      return Trace.Types.Events.isDispatch(entry) && entry.args.data.stackTrace;
+    const eventDispatch = allThreadEntriesInTrace(parsedTrace).find((entry): entry is Trace.Types.Events.Dispatch => {
+      return Trace.Types.Events.isDispatch(entry) && Boolean(entry.args.data.stackTrace);
     });
     assert.isOk(eventDispatch);
     const url = Trace.Handlers.Helpers.getNonResolvedURL(eventDispatch, parsedTrace.data);
     assert.isNotNull(url);
-    assert.strictEqual(url, eventDispatch.args?.data?.stackTrace?.[0].url);
+    assert.strictEqual(url, eventDispatch.args.data.stackTrace?.[0].url);
   });
 
   it('finds the URL for a ParseHTML event', async function() {

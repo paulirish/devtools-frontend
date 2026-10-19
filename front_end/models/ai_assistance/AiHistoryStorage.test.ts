@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -665,7 +666,7 @@ describe('AiHistoryStorage', () => {
 
     it('should generate markdown from a conversation', function() {
       const fakeTime = new Date('2024-01-01T00:00:00.000Z');
-      const clock = sinon.useFakeTimers(fakeTime);
+      sinon.useFakeTimers(fakeTime);
 
       const history: AiAssistance.AiAgent.ResponseData[] = [
         {
@@ -727,7 +728,6 @@ describe('AiHistoryStorage', () => {
       const markdown = conversation.getConversationMarkdown();
 
       snapshotTester.assert(this, markdown);
-      clock.restore();
     });
   });
 });

@@ -1,8 +1,6 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
-/* eslint-disable @devtools/no-lit-render-outside-of-view */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -50,30 +48,22 @@ import * as Lit from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {
-  AdoptedStyleSheetContentsWidget,
-  AdoptedStyleSheetSetTreeElement,
-  AdoptedStyleSheetTreeElement,
-} from './AdoptedStyleSheetTreeElement.js';
+import {AdoptedStyleSheetContentsWidget} from './AdoptedStyleSheetTreeElement.js';
 import * as ElementsComponents from './components/components.js';
 import {cssPath, jsPath, xPath} from './DOMPath.js';
 import {showContextMenu} from './DOMTreeContextMenu.js';
-import {getElementIssueDetails} from './ElementIssueUtils.js';
 import {
   adornerRef,
   buildChangeSelector,
-  ElementsTreeElement,
-  ElementsTreeWidget,
+  DOMTreeElementWidget,
   ForbiddenClosingTagElements,
   handleAdornerKeydown,
   InitialChildrenLimit,
   type InitialEditState,
-  isOpeningTag,
-} from './ElementsTreeElement.js';
-import elementsTreeOutlineStyles from './elementsTreeOutline.css.js';
+} from './DOMTreeElementWidget.js';
+import domTreeWidgetStyles from './domTreeWidget.css.js';
+import {getElementIssueDetails} from './ElementIssueUtils.js';
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
-import {ShortcutTreeElement} from './ShortcutTreeElement.js';
-import {TopLayerContainer} from './TopLayerContainer.js';
 
 const {html, nothing, render, Directives: {classMap, ifDefined, repeat, styleMap}} = Lit;
 
@@ -103,90 +93,88 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/DOMTreeWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const elementsTreeOutlineByDOMModel = new WeakMap<SDK.DOMModel.DOMModel, ElementsTreeOutline>();
-
-const populatedTreeElements = new WeakSet<ElementsTreeElement>();
 
 export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
-export {elementsTreeOutlineStyles};
+export {domTreeWidgetStyles};
 
 interface ViewInput {
-  domTreeWidget?: DOMTreeWidget;
   rootDOMNode: SDK.DOMModel.DOMNode|null;
   omitRootDOMNode: boolean;
   selectEnabled: boolean;
   hideGutter: boolean;
   maxTreeDepth?: number;
-  showComments?: boolean;
-  showAIButton?: boolean;
-  disableEdits?: boolean;
-  expandRoot?: boolean;
+  showComments: boolean;
+  showAIButton: boolean;
+  disableEdits: boolean;
   maxRowsShown?: number;
   wrap: boolean;
   showSelectionOnKeyboardFocus: boolean;
   deindentSingleNode: boolean;
   currentHighlightedNode: SDK.DOMModel.DOMNode|null;
-  hoveredNode?: SDK.DOMModel.DOMNode|null;
-  hoveredClosingTag?: boolean;
-  searchMatchNode?: SDK.DOMModel.DOMNode|null;
-  searchMatchQuery?: string|null;
+  hoveredNode: SDK.DOMModel.DOMNode|null;
+  hoveredClosingTag: boolean;
+  searchMatchNode: SDK.DOMModel.DOMNode|null;
+  searchMatchQuery: string|null;
 
   selectedNode: SDK.DOMModel.DOMNode|null;
-  selectedClosingTag?: boolean;
+  selectedClosingTag: boolean;
 
-  onSelect?: (node: SDK.DOMModel.DOMNode, isClosingTag?: boolean, selectedByUser?: boolean) => void;
-  onExpand?: (node: SDK.DOMModel.DOMNode, expanded: boolean) => void;
-  onContextMenu?: (node: SDK.DOMModel.DOMNode, event: MouseEvent) => void;
-  onClearMaxRows?: () => void;
-  onHoverNode?: (node: SDK.DOMModel.DOMNode|null, showInfo?: boolean, isClosingTag?: boolean) => void;
-  onLeave?: () => void;
-  onToggleHideElement?: (node: SDK.DOMModel.DOMNode) => Promise<void>;
-  onKeyDown?: (event: KeyboardEvent) => void;
-  isToggledToHidden?: (node: SDK.DOMModel.DOMNode) => boolean;
-  isNodeExpanded?: (node: SDK.DOMModel.DOMNode) => boolean;
-  isNodeInClipboard?: (node: SDK.DOMModel.DOMNode) => boolean;
-  onCopyOrCut?: (isCut: boolean, event: Event) => void;
-  onPaste?: (event: Event) => void;
-  onSelectNodeAfterEdit?: (wasExpanded: boolean, error: string|null, newNode: SDK.DOMModel.DOMNode|null,
-                           moveDirection?: string) => void;
-  nodeToEdit?: ({node: SDK.DOMModel.DOMNode}&InitialEditState)|null;
-  onInitialEditCompleted?: () => void;
-  attributeToHighlight?: {node: SDK.DOMModel.DOMNode, attribute: string}|null;
-  onAttributeHighlighted?: () => void;
-  nodesWithDirtyAdorners?: Set<SDK.DOMModel.DOMNode>;
-  nodeAdornerVersions?: WeakMap<SDK.DOMModel.DOMNode, number>;
-  onDirtyAdornersUpdated?: () => void;
-  forceOpenPopovers?: WeakSet<SDK.DOMModel.DOMNode>;
-  onPopoverAdornerToggled?: (node: SDK.DOMModel.DOMNode, active: boolean) => void;
-  forceOpenInterests?: WeakSet<SDK.DOMModel.DOMNode>;
-  onInterestAdornerToggled?: (node: SDK.DOMModel.DOMNode, active: boolean) => void;
-  multilineEditingNode?: SDK.DOMModel.DOMNode|null;
-  dragOverNode?: {node: SDK.DOMModel.DOMNode, isClosingTag: boolean}|null;
-  isValidDragSource?: (node: SDK.DOMModel.DOMNode) => boolean;
-  onDragStart?: (node: SDK.DOMModel.DOMNode, event: DragEvent, textContent?: string) => boolean;
-  onDragOver?: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, event: DragEvent) => boolean;
-  onDragLeave?: (event: DragEvent) => void;
-  onDrop?: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, event: DragEvent) => void;
-  onDragEnd?: (event: DragEvent) => void;
-  getTopLayerShortcuts?: (doc: SDK.DOMModel.DOMDocument) => SDK.DOMModel.DOMNodeShortcut[];
-  isTopLayerExpanded?: (doc: SDK.DOMModel.DOMDocument) => boolean;
-  onToggleTopLayerExpanded?: (doc: SDK.DOMModel.DOMDocument, expanded: boolean) => void;
-  onSelectTopLayerContainer?: (doc: SDK.DOMModel.DOMDocument) => void;
-  isTopLayerShortcutExpanded?: (shortcut: SDK.DOMModel.DOMNodeShortcut) => boolean;
-  onToggleTopLayerShortcutExpanded?: (shortcut: SDK.DOMModel.DOMNodeShortcut, expanded: boolean) => void;
-  selectedTopLayerShortcut?: SDK.DOMModel.DOMNodeShortcut|null;
-  onSelectTopLayerShortcut?: (shortcut: SDK.DOMModel.DOMNodeShortcut) => void;
-  onRevealTopLayerShortcut?: (shortcut: SDK.DOMModel.DOMNodeShortcut) => void;
-  isAdoptedStyleSheetsExpanded?: (node: SDK.DOMModel.DOMNode) => boolean;
-  onToggleAdoptedStyleSheetsExpanded?: (node: SDK.DOMModel.DOMNode, expanded: boolean) => void;
-  onSelectAdoptedStyleSheets?: (node: SDK.DOMModel.DOMNode) => void;
-  isAdoptedStyleSheetExpanded?: (sheet: SDK.DOMModel.AdoptedStyleSheet) => boolean;
-  onToggleAdoptedStyleSheetExpanded?: (sheet: SDK.DOMModel.AdoptedStyleSheet, expanded: boolean) => void;
-  selectedAdoptedStyleSheet?: SDK.DOMModel.AdoptedStyleSheet|null;
-  onSelectAdoptedStyleSheet?: (sheet: SDK.DOMModel.AdoptedStyleSheet) => void;
-  expandedChildrenLimit?: (node: SDK.DOMModel.DOMNode) => number;
-  onExpandAllChildren?: (node: SDK.DOMModel.DOMNode) => void;
-  updateRecordForNode?: (node: SDK.DOMModel.DOMNode) => Elements.ElementUpdateRecord.ElementUpdateRecord | null;
+  onSelect: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, selectedByUser: boolean) => void;
+  onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean) => void;
+  onContextMenu: (node: SDK.DOMModel.DOMNode, event: MouseEvent) => void;
+  onClearMaxRows: () => void;
+  onHoverNode: (node: SDK.DOMModel.DOMNode|null, showInfo: boolean, isClosingTag: boolean) => void;
+  onLeave: () => void;
+  onToggleHideElement: (node: SDK.DOMModel.DOMNode) => Promise<void>;
+  onKeyDown: (event: KeyboardEvent) => void;
+  isToggledToHidden: (node: SDK.DOMModel.DOMNode) => boolean;
+  isNodeExpanded: (node: SDK.DOMModel.DOMNode) => boolean;
+  isNodeInClipboard: (node: SDK.DOMModel.DOMNode) => boolean;
+  onCopyOrCut: (isCut: boolean, event: Event) => void;
+  onPaste: (event: Event) => void;
+  onSelectNodeAfterEdit: (wasExpanded: boolean, error: string|null, newNode: SDK.DOMModel.DOMNode|null,
+                          moveDirection?: string) => void;
+  nodeToEdit: ({node: SDK.DOMModel.DOMNode}&InitialEditState)|null;
+  onInitialEditCompleted: () => void;
+  attributeToHighlight: {node: SDK.DOMModel.DOMNode, attribute: string}|null;
+  onAttributeHighlighted: () => void;
+  nodesWithDirtyAdorners: Set<SDK.DOMModel.DOMNode>;
+  nodeAdornerVersions: WeakMap<SDK.DOMModel.DOMNode, number>;
+  onDirtyAdornersUpdated: () => void;
+  forceOpenPopovers: WeakSet<SDK.DOMModel.DOMNode>;
+  onPopoverAdornerToggled: (node: SDK.DOMModel.DOMNode, active: boolean) => void;
+  forceOpenInterests: WeakSet<SDK.DOMModel.DOMNode>;
+  onInterestAdornerToggled: (node: SDK.DOMModel.DOMNode, active: boolean) => void;
+  multilineEditingNode: SDK.DOMModel.DOMNode|null;
+  onSetMultilineEditing: (editing: MultilineEditorController|null, node: SDK.DOMModel.DOMNode) => void;
+  onRevealInTopLayer: (node: SDK.DOMModel.DOMNode) => void;
+  visibleWidth: () => number;
+  dragOverNode: {node: SDK.DOMModel.DOMNode, isClosingTag: boolean}|null;
+  isValidDragSource: (node: SDK.DOMModel.DOMNode) => boolean;
+  onDragStart: (node: SDK.DOMModel.DOMNode, event: DragEvent, textContent?: string) => boolean;
+  onDragOver: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, event: DragEvent) => boolean;
+  onDragLeave: (event: DragEvent) => void;
+  onDrop: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, event: DragEvent) => void;
+  onDragEnd: (event: DragEvent) => void;
+  getTopLayerShortcuts: (doc: SDK.DOMModel.DOMDocument) => SDK.DOMModel.DOMNodeShortcut[];
+  isTopLayerExpanded: (doc: SDK.DOMModel.DOMDocument) => boolean;
+  onToggleTopLayerExpanded: (doc: SDK.DOMModel.DOMDocument, expanded: boolean) => void;
+  onSelectTopLayerContainer: (doc: SDK.DOMModel.DOMDocument) => void;
+  isTopLayerShortcutExpanded: (shortcut: SDK.DOMModel.DOMNodeShortcut) => boolean;
+  onToggleTopLayerShortcutExpanded: (shortcut: SDK.DOMModel.DOMNodeShortcut, expanded: boolean) => void;
+  selectedTopLayerShortcut: SDK.DOMModel.DOMNodeShortcut|null;
+  onSelectTopLayerShortcut: (shortcut: SDK.DOMModel.DOMNodeShortcut) => void;
+  onRevealTopLayerShortcut: (shortcut: SDK.DOMModel.DOMNodeShortcut) => void;
+  isAdoptedStyleSheetsExpanded: (node: SDK.DOMModel.DOMNode) => boolean;
+  onToggleAdoptedStyleSheetsExpanded: (node: SDK.DOMModel.DOMNode, expanded: boolean) => void;
+  onSelectAdoptedStyleSheets: (node: SDK.DOMModel.DOMNode) => void;
+  isAdoptedStyleSheetExpanded: (sheet: SDK.DOMModel.AdoptedStyleSheet) => boolean;
+  onToggleAdoptedStyleSheetExpanded: (sheet: SDK.DOMModel.AdoptedStyleSheet, expanded: boolean) => void;
+  selectedAdoptedStyleSheet: SDK.DOMModel.AdoptedStyleSheet|null;
+  onSelectAdoptedStyleSheet: (sheet: SDK.DOMModel.AdoptedStyleSheet) => void;
+  expandedChildrenLimit: (node: SDK.DOMModel.DOMNode) => number;
+  onExpandAllChildren: (node: SDK.DOMModel.DOMNode) => void;
+  updateRecordForNode: (node: SDK.DOMModel.DOMNode) => Elements.ElementUpdateRecord.ElementUpdateRecord | null;
 }
 
 function isMaxDepthReached(node: SDK.DOMModel.DOMNode, rootDOMNode: SDK.DOMModel.DOMNode|null, maxTreeDepth?: number,
@@ -209,17 +197,19 @@ function isMaxDepthReached(node: SDK.DOMModel.DOMNode, rootDOMNode: SDK.DOMModel
   return depth >= maxTreeDepth;
 }
 
-function nodeHasVisibleChildren(node: SDK.DOMModel.DOMNode, rootDOMNode: SDK.DOMModel.DOMNode|null = null,
-                                maxTreeDepth?: number, omitRootDOMNode?: boolean): boolean {
-  if (isMaxDepthReached(node, rootDOMNode, maxTreeDepth, omitRootDOMNode)) {
+/** The settings that determine which nodes the tree shows. Both the view input and the presenter satisfy it. */
+type TreeOptions = Pick<ViewInput, 'rootDOMNode'|'maxTreeDepth'|'omitRootDOMNode'|'showComments'>;
+
+function nodeHasVisibleChildren(node: SDK.DOMModel.DOMNode, options: TreeOptions): boolean {
+  if (isMaxDepthReached(node, options.rootDOMNode, options.maxTreeDepth, options.omitRootDOMNode)) {
     return false;
   }
   if (node.isIframe() || node.contentDocument() || node.templateContent() ||
-      ElementsTreeWidget.visibleShadowRoots(node).length || node.hasPseudoElements() || node.isInsertionPoint() ||
+      DOMTreeElementWidget.visibleShadowRoots(node).length || node.hasPseudoElements() || node.isInsertionPoint() ||
       node.adoptedStyleSheetsForNode.length) {
     return true;
   }
-  return Boolean(node.childNodeCount()) && !ElementsTreeWidget.canShowInlineText(node);
+  return Boolean(node.childNodeCount()) && !DOMTreeElementWidget.canShowInlineText(node);
 }
 
 function nodeNeedsClosingTag(node: SDK.DOMModel.DOMNode, hasChildren: boolean): boolean {
@@ -227,9 +217,21 @@ function nodeNeedsClosingTag(node: SDK.DOMModel.DOMNode, hasChildren: boolean): 
       !ForbiddenClosingTagElements.has(node.nodeName().toLowerCase()) && !node.pseudoType();
 }
 
-function getVisibleChildren(node: SDK.DOMModel.DOMNode, showComments = true): SDK.DOMModel.DOMNode[] {
+/** Children of the document element (e.g. `<html>`) are always shown expanded. */
+function isNotCollapsible(node: SDK.DOMModel.DOMNode): boolean {
+  return node.nodeType() === Node.ELEMENT_NODE && node.parentNode?.nodeType() === Node.DOCUMENT_NODE &&
+      !node.parentNode.parentNode;
+}
+
+function isBeingEditedAsHTML(state: Pick<ViewInput, 'multilineEditingNode'|'nodeToEdit'>,
+                             node: SDK.DOMModel.DOMNode): boolean {
+  return state.multilineEditingNode === node ||
+      (state.nodeToEdit?.node === node && Boolean(state.nodeToEdit.isEditAsHTML));
+}
+
+function getVisibleChildren(node: SDK.DOMModel.DOMNode, {showComments}: TreeOptions): SDK.DOMModel.DOMNode[] {
   const children: SDK.DOMModel.DOMNode[] = [];
-  children.push(...ElementsTreeWidget.visibleShadowRoots(node));
+  children.push(...DOMTreeElementWidget.visibleShadowRoots(node));
 
   const contentDocument = node.contentDocument();
   if (contentDocument) {
@@ -305,6 +307,37 @@ function isAncestorOf(ancestor: SDK.DOMModel.DOMNode, descendant: SDK.DOMModel.D
   return false;
 }
 
+/**
+ * Returns the closest sibling of `node` that is part of `visibleChildren`,
+ * preferring following siblings over preceding ones.
+ */
+function findVisibleSibling(node: SDK.DOMModel.DOMNode, visibleChildren: SDK.DOMModel.DOMNode[]): SDK.DOMModel.DOMNode|
+    null {
+  for (let candidate = node.nextSibling; candidate; candidate = candidate.nextSibling) {
+    if (visibleChildren.includes(candidate)) {
+      return candidate;
+    }
+  }
+  for (let candidate = node.previousSibling; candidate; candidate = candidate.previousSibling) {
+    if (visibleChildren.includes(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/** How a node is laid out in the tree: whether it has children, is expanded, and which children are shown. */
+interface NodeShape {
+  isEditingAsHTML: boolean;
+  hasChildren: boolean;
+  isCollapsible: boolean;
+  isExpanded: boolean;
+  /** The children that are rendered, i.e. the visible ones up to the node's children limit. */
+  children: SDK.DOMModel.DOMNode[];
+  remainingChildrenCount: number;
+  needsClosingTag: boolean;
+}
+
 function computeLeftIndent(depth: number, isExpandable: boolean): number {
   return 12 * (depth - 1) + (isExpandable ? 1 : 12);
 }
@@ -315,8 +348,8 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
   const rootDOMNode = input.rootDOMNode;
   if (rootDOMNode) {
     if (input.omitRootDOMNode) {
-      allRootNodes = getVisibleChildren(rootDOMNode, input.showComments ?? true);
-      const rootLimit = input.expandedChildrenLimit ? input.expandedChildrenLimit(rootDOMNode) : InitialChildrenLimit;
+      allRootNodes = getVisibleChildren(rootDOMNode, input);
+      const rootLimit = input.expandedChildrenLimit(rootDOMNode);
       rootNodes = allRootNodes.slice(0, rootLimit);
     } else {
       rootNodes = [rootDOMNode];
@@ -334,21 +367,21 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
 
   const renderShortcut = (shortcut: SDK.DOMModel.DOMNodeShortcut, shortcutDepth: number): Lit.LitTemplate => {
     const hasShortcutChildren = shortcut.childShortcuts.length > 0;
-    const isShortcutExpanded = Boolean(input.isTopLayerShortcutExpanded?.(shortcut));
+    const isShortcutExpanded = input.isTopLayerShortcutExpanded(shortcut);
     const isShortcutSelected = input.selectedTopLayerShortcut === shortcut;
     let title = shortcut.nodeName.toLowerCase();
     if (shortcut.nodeType === Node.ELEMENT_NODE) {
       title = '<' + title + '>';
     }
     const onShortcutExpand = (event: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      input.onToggleTopLayerShortcutExpanded?.(shortcut, event.detail.expanded);
+      input.onToggleTopLayerShortcutExpanded(shortcut, event.detail.expanded);
     };
     const onShortcutSelect = (): void => {
-      input.onSelectTopLayerShortcut?.(shortcut);
+      input.onSelectTopLayerShortcut(shortcut);
     };
     const onReveal = (event: Event): void => {
       event.stopPropagation();
-      input.onRevealTopLayerShortcut?.(shortcut);
+      input.onRevealTopLayerShortcut(shortcut);
     };
     const onShortcutMouseMove = (event: MouseEvent): void => {
       event.stopPropagation();
@@ -400,16 +433,16 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
 
   const renderTopLayerContainer =
       (doc: SDK.DOMModel.DOMDocument, containerDepth: number): Lit.LitTemplate|typeof nothing => {
-        const shortcuts = input.getTopLayerShortcuts?.(doc) ?? [];
+        const shortcuts = input.getTopLayerShortcuts(doc);
         if (shortcuts.length === 0) {
           return nothing;
         }
-        const isTopLayerExpanded = Boolean(input.isTopLayerExpanded?.(doc));
+        const isTopLayerExpanded = input.isTopLayerExpanded(doc);
         const onTopLayerExpand = (event: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-          input.onToggleTopLayerExpanded?.(doc, event.detail.expanded);
+          input.onToggleTopLayerExpanded(doc, event.detail.expanded);
         };
         const onTopLayerSelect = (): void => {
-          input.onSelectTopLayerContainer?.(doc);
+          input.onSelectTopLayerContainer(doc);
         };
 
         // clang-format off
@@ -433,13 +466,13 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
   const renderAdoptedStyleSheet = (sheet: SDK.DOMModel.AdoptedStyleSheet, depth: number): Lit.LitTemplate => {
     const header = sheet.cssModel.styleSheetHeaderForId(sheet.id);
     const linkText = header?.sourceURL;
-    const isExpanded = Boolean(input.isAdoptedStyleSheetExpanded?.(sheet));
+    const isExpanded = input.isAdoptedStyleSheetExpanded(sheet);
     const isSelected = input.selectedAdoptedStyleSheet === sheet;
     const onExpand = (event: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      input.onToggleAdoptedStyleSheetExpanded?.(sheet, event.detail.expanded);
+      input.onToggleAdoptedStyleSheetExpanded(sheet, event.detail.expanded);
     };
     const onSelect = (): void => {
-      input.onSelectAdoptedStyleSheet?.(sheet);
+      input.onSelectAdoptedStyleSheet(sheet);
     };
 
     // clang-format off
@@ -479,12 +512,12 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
     if (!sheets || sheets.length === 0) {
       return nothing;
     }
-    const isExpanded = Boolean(input.isAdoptedStyleSheetsExpanded?.(node));
+    const isExpanded = input.isAdoptedStyleSheetsExpanded(node);
     const onExpand = (event: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      input.onToggleAdoptedStyleSheetsExpanded?.(node, event.detail.expanded);
+      input.onToggleAdoptedStyleSheetsExpanded(node, event.detail.expanded);
     };
     const onSelect = (): void => {
-      input.onSelectAdoptedStyleSheets?.(node);
+      input.onSelectAdoptedStyleSheets(node);
     };
 
     // clang-format off
@@ -507,26 +540,34 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
     // clang-format on
   };
 
-  const isNodeExpanded = (node: SDK.DOMModel.DOMNode, isEditingAsHTML: boolean): boolean => {
-    const isNotCollapsible = node.nodeType() === Node.ELEMENT_NODE &&
-        node.parentNode?.nodeType() === Node.DOCUMENT_NODE && !node.parentNode.parentNode;
-    const isCollapsible = !isEditingAsHTML && !isNotCollapsible;
-    return !isCollapsible ||
-        Boolean((input.currentHighlightedNode && isAncestorOf(node, input.currentHighlightedNode)) ||
-                (input.isNodeExpanded ? input.isNodeExpanded(node) :
-                                        (input.expandRoot &&
-                                         (node === input.rootDOMNode ||
-                                          (input.omitRootDOMNode && node.parentNode === input.rootDOMNode)))));
+  const resolveNodeShape = (node: SDK.DOMModel.DOMNode): NodeShape => {
+    const editingAsHTML = isBeingEditedAsHTML(input, node);
+    const hasChildren = !editingAsHTML && nodeHasVisibleChildren(node, input);
+    const isCollapsible = !editingAsHTML && !isNotCollapsible(node);
+    const isExpanded = !isCollapsible ||
+        Boolean(input.currentHighlightedNode && isAncestorOf(node, input.currentHighlightedNode)) ||
+        input.isNodeExpanded(node);
+    const allChildren = hasChildren && isExpanded ? getVisibleChildren(node, input) : [];
+    const children = allChildren.slice(0, input.expandedChildrenLimit(node));
+    return {
+      isEditingAsHTML: editingAsHTML,
+      hasChildren,
+      isCollapsible,
+      isExpanded,
+      children,
+      remainingChildrenCount: allChildren.length - children.length,
+      needsClosingTag: nodeNeedsClosingTag(node, hasChildren),
+    };
   };
 
   const countTopLayerRows = (doc: SDK.DOMModel.DOMDocument): number => {
-    const shortcuts = input.getTopLayerShortcuts?.(doc) ?? [];
+    const shortcuts = input.getTopLayerShortcuts(doc);
     if (shortcuts.length === 0) {
       return 0;
     }
     const countShortcutRows = (shortcut: SDK.DOMModel.DOMNodeShortcut): number => {
       let shortcutRows = 1;
-      if (shortcut.childShortcuts.length > 0 && input.isTopLayerShortcutExpanded?.(shortcut)) {
+      if (shortcut.childShortcuts.length > 0 && input.isTopLayerShortcutExpanded(shortcut)) {
         for (const child of shortcut.childShortcuts) {
           shortcutRows += countShortcutRows(child);
         }
@@ -534,7 +575,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
       return shortcutRows;
     };
     let rows = 1;
-    if (input.isTopLayerExpanded?.(doc)) {
+    if (input.isTopLayerExpanded(doc)) {
       for (const shortcut of shortcuts) {
         rows += countShortcutRows(shortcut);
       }
@@ -548,10 +589,10 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
       return 0;
     }
     let rows = 1;  // The "#adopted-style-sheets" container
-    if (input.isAdoptedStyleSheetsExpanded?.(node)) {
+    if (input.isAdoptedStyleSheetsExpanded(node)) {
       for (const sheet of sheets) {
         rows += 1;  // The sheet row
-        if (input.isAdoptedStyleSheetExpanded?.(sheet) && sheet.cssModel.styleSheetHeaderForId(sheet.id)) {
+        if (input.isAdoptedStyleSheetExpanded(sheet) && sheet.cssModel.styleSheetHeaderForId(sheet.id)) {
           rows += 1;  // The AdoptedStyleSheetContentsWidget row
         }
       }
@@ -561,25 +602,19 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
 
   const countVisibleRowsForNode = (node: SDK.DOMModel.DOMNode): number => {
     let rows = 1;
-    const isEditingAsHTML = input.multilineEditingNode === node ||
-        (input.nodeToEdit?.node === node && Boolean(input.nodeToEdit.isEditAsHTML));
-    const hasChildren =
-        !isEditingAsHTML && nodeHasVisibleChildren(node, input.rootDOMNode, input.maxTreeDepth, input.omitRootDOMNode);
-    if (hasChildren && isNodeExpanded(node, isEditingAsHTML)) {
+    const shape = resolveNodeShape(node);
+    if (shape.hasChildren && shape.isExpanded) {
       rows += countAdoptedStyleSheetsRows(node);
-      const allVisibleChildren = getVisibleChildren(node, input.showComments ?? true);
-      const limit = input.expandedChildrenLimit ? input.expandedChildrenLimit(node) : InitialChildrenLimit;
-      const children = allVisibleChildren.slice(0, limit);
-      for (const child of children) {
+      for (const child of shape.children) {
         rows += countVisibleRowsForNode(child);
       }
-      if (allVisibleChildren.length > children.length) {
+      if (shape.remainingChildrenCount > 0) {
         rows += 1;
       }
       if (node instanceof SDK.DOMModel.DOMDocument) {
         rows += countTopLayerRows(node);
       }
-      if (nodeNeedsClosingTag(node, hasChildren)) {
+      if (shape.needsClosingTag) {
         rows += 1;
       }
     }
@@ -611,105 +646,77 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
     const isSelected = Boolean(input.selectEnabled) && isDOMNodeSelected;
     const isOpeningHovered =
         (input.currentHighlightedNode === node) || (input.hoveredNode === node && !input.hoveredClosingTag);
-    const isClosingHovered = input.hoveredNode === node && Boolean(input.hoveredClosingTag);
-    const isEditingAsHTML = input.multilineEditingNode === node ||
-        (input.nodeToEdit?.node === node && Boolean(input.nodeToEdit.isEditAsHTML));
-    const hasChildren =
-        !isEditingAsHTML && nodeHasVisibleChildren(node, input.rootDOMNode, input.maxTreeDepth, input.omitRootDOMNode);
-    const isNotCollapsible = node.nodeType() === Node.ELEMENT_NODE &&
-        node.parentNode?.nodeType() === Node.DOCUMENT_NODE && !node.parentNode.parentNode;
-    const isCollapsible = !isEditingAsHTML && !isNotCollapsible;
-    const isExpanded = isNodeExpanded(node, isEditingAsHTML);
+    const isClosingHovered = input.hoveredNode === node && input.hoveredClosingTag;
+    const {isEditingAsHTML, hasChildren, isCollapsible, isExpanded, children, remainingChildrenCount, needsClosingTag} =
+        resolveNodeShape(node);
     const isExpandable = hasChildren && isCollapsible;
-    const allVisibleChildren = hasChildren ? getVisibleChildren(node, input.showComments ?? true) : [];
-    const limit = input.expandedChildrenLimit ? input.expandedChildrenLimit(node) : InitialChildrenLimit;
-    const children = allVisibleChildren.slice(0, limit);
-    const remainingChildrenCount = allVisibleChildren.length - children.length;
-    const needsClosingTag = nodeNeedsClosingTag(node, hasChildren);
-
-    const on = Lit.Directive.directive(Lit.CustomDirectives.InterceptBindingDirective);
 
     const onSelect = (isClosingTag = false, selectedByUser = false): void => {
-      input.onSelect?.(node, isClosingTag, selectedByUser);
+      input.onSelect(node, isClosingTag, selectedByUser);
     };
 
     const onExpand = (event: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      if (isEditingAsHTML || !isCollapsible) {
+      if (!isCollapsible) {
         return;
       }
-      input.onExpand?.(node, event.detail.expanded);
+      input.onExpand(node, event.detail.expanded);
     };
 
     const isDragOver = input.dragOverNode?.node === node && !input.dragOverNode.isClosingTag;
     const isClosingTagDragOver = input.dragOverNode?.node === node && Boolean(input.dragOverNode.isClosingTag);
-    const isDraggable = !input.disableEdits && Boolean(input.isValidDragSource?.(node));
+    const isDraggable = !input.disableEdits && input.isValidDragSource(node);
 
     const classes = classMap({
       selected: isSelected && !input.selectedClosingTag,
       hovered: isOpeningHovered,
-      'in-clipboard': Boolean(input.isNodeInClipboard?.(node)),
+      'in-clipboard': input.isNodeInClipboard(node),
       'elements-drag-over': isDragOver,
       'always-parent': !isCollapsible && !isEditingAsHTML,
     });
 
-    const onOpeningMouseMove = (event: MouseEvent): void => {
+    // The opening and the closing tag are separate rows that report the
+    // same node with a different `isClosingTag`.
+    const onMouseMove = (isClosingTag: boolean) => (event: MouseEvent): void => {
       const currentTarget = event.currentTarget as Element | null;
       if (currentTarget && (event.target as Element).closest('li[role="treeitem"]') !== currentTarget) {
         return;
       }
       const showInfo = !UI.KeyboardShortcut.KeyboardShortcut.eventHasEitherCtrlOrMeta(event);
-      input.onHoverNode?.(node, showInfo, /* isClosingTag= */ false);
-    };
-
-    const onClosingMouseMove = (event: MouseEvent): void => {
-      const currentTarget = event.currentTarget as Element | null;
-      if (currentTarget && (event.target as Element).closest('li[role="treeitem"]') !== currentTarget) {
-        return;
-      }
-      const showInfo = !UI.KeyboardShortcut.KeyboardShortcut.eventHasEitherCtrlOrMeta(event);
-      input.onHoverNode?.(node, showInfo, /* isClosingTag= */ true);
+      input.onHoverNode(node, showInfo, isClosingTag);
     };
 
     const onContextMenu = (event: MouseEvent): void => {
       event.stopPropagation();
-      input.onContextMenu?.(node, event);
+      input.onContextMenu(node, event);
     };
 
     const onDragStart = (event: DragEvent): void => {
       event.stopPropagation();
       const currentTarget = event.currentTarget as HTMLElement | null;
-      const textContent = currentTarget?.firstElementChild?.textContent ?? currentTarget?.textContent ?? undefined;
-      input.onDragStart?.(node, event, textContent);
+      // Only use the row's own content, not the nested child rows.
+      const textContent = currentTarget?.querySelector(':scope > devtools-widget')?.textContent ||
+          currentTarget?.textContent || undefined;
+      input.onDragStart(node, event, textContent);
     };
 
-    const onDragOver = (event: DragEvent): void => {
+    const onDragOver = (isClosingTag: boolean) => (event: DragEvent): void => {
       event.stopPropagation();
-      input.onDragOver?.(node, /* isClosingTag= */ false, event);
-    };
-
-    const onClosingTagDragOver = (event: DragEvent): void => {
-      event.stopPropagation();
-      input.onDragOver?.(node, /* isClosingTag= */ true, event);
+      input.onDragOver(node, isClosingTag, event);
     };
 
     const onDragLeave = (event: DragEvent): void => {
       event.stopPropagation();
-      input.onDragLeave?.(event);
+      input.onDragLeave(event);
     };
 
-    const onDrop = (event: DragEvent): void => {
+    const onDrop = (isClosingTag: boolean) => (event: DragEvent): void => {
       event.stopPropagation();
-      input.onDrop?.(node, /* isClosingTag= */ false, event);
-    };
-
-    const onClosingTagDrop = (event: DragEvent): void => {
-      event.stopPropagation();
-      input.onDrop?.(node, /* isClosingTag= */ true, event);
+      input.onDrop(node, isClosingTag, event);
     };
 
     const onDragEnd = (event: DragEvent): void => {
       event.stopPropagation();
-      input.onDragEnd?.(event);
+      input.onDragEnd(event);
     };
 
     // clang-format off
@@ -725,14 +732,14 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
           draggable=${isDraggable ? 'true' : 'false'}
           @select=${on((event: UI.TreeOutline.TreeViewElement.SelectEvent) => onSelect(false, Boolean(event.detail?.selectedByUser)))}
           @expand=${on(onExpand)}
-          @mousemove=${on(onOpeningMouseMove)}
+          @mousemove=${on(onMouseMove(/* isClosingTag= */ false))}
           @contextmenu=${on(onContextMenu)}
           @dragstart=${on(onDragStart)}
-          @dragover=${on(onDragOver)}
+          @dragover=${on(onDragOver(/* isClosingTag= */ false))}
           @dragleave=${on(onDragLeave)}
-          @drop=${on(onDrop)}
+          @drop=${on(onDrop(/* isClosingTag= */ false))}
           @dragend=${on(onDragEnd)}
-          jslog=${treeItemJslog(undefined, true)}>${UI.Widget.widget(ElementsTreeWidget, {
+          jslog=${treeItemJslog(undefined, true)}>${UI.Widget.widget(DOMTreeElementWidget, {
           node,
           isClosingTag: false,
           renderSelection: false,
@@ -741,39 +748,38 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
           selected: isSelected && !input.selectedClosingTag,
           isDOMNodeSelected,
           hovered: isOpeningHovered,
-          searchQuery: input.searchMatchNode === node ? (input.searchMatchQuery ?? null) : null,
-          inClipboard: input.isNodeInClipboard?.(node) ?? false,
+          searchQuery: input.searchMatchNode === node ? input.searchMatchQuery : null,
           computeLeftIndent: computeLeftIndent(depth, isExpandable),
-          disableEdits: input.disableEdits ?? false,
-          showAIButton: input.showAIButton ?? true,
+          disableEdits: input.disableEdits,
+          showAIButton: input.showAIButton,
           initialEdit: input.nodeToEdit?.node === node ? input.nodeToEdit : null,
           onInitialEditCompleted: input.onInitialEditCompleted,
           attributeToHighlight:
               input.attributeToHighlight?.node === node ? input.attributeToHighlight.attribute : null,
           onAttributeHighlighted: input.onAttributeHighlighted,
-          adornersDirty: input.nodesWithDirtyAdorners?.has(node) ?? false,
-          adornersUpdateVersion: input.nodeAdornerVersions?.get(node) ?? 0,
-          popoverAdornerActive: Boolean(input.forceOpenPopovers?.has(node)),
+          adornersUpdateVersion: input.nodeAdornerVersions.get(node) ?? 0,
+          popoverAdornerActive: input.forceOpenPopovers.has(node),
           onPopoverAdornerToggled: input.onPopoverAdornerToggled,
-          interestAdornerActive: Boolean(input.forceOpenInterests?.has(node)),
+          interestAdornerActive: input.forceOpenInterests.has(node),
           onInterestAdornerToggled: input.onInterestAdornerToggled,
-          revealInTopLayer: (n: SDK.DOMModel.DOMNode) => input.domTreeWidget?.revealInTopLayer(n),
-          setMultilineEditing: (multilineEditing, n) => input.domTreeWidget?.setMultilineEditing(multilineEditing, n ?? node),
-          visibleWidth: () => input.domTreeWidget?.visibleWidth ?? 0,
-          selectDOMNode: (n: SDK.DOMModel.DOMNode, selectedByUser?: boolean) => input.onSelect?.(n, false, selectedByUser),
+          expandNode: isCollapsible ? () => input.onExpand(node, true) : undefined,
+          revealInTopLayer: input.onRevealInTopLayer,
+          setMultilineEditing: (multilineEditing, n) => input.onSetMultilineEditing(multilineEditing, n ?? node),
+          visibleWidth: input.visibleWidth,
+          selectDOMNode: (n: SDK.DOMModel.DOMNode, selectedByUser?: boolean) => input.onSelect(n, false, Boolean(selectedByUser)),
           selectNodeAfterEdit: (wasExpanded: boolean, error: string|null, newNode: SDK.DOMModel.DOMNode|null, moveDirection?: string) => {
-            input.onSelectNodeAfterEdit?.(wasExpanded, error, newNode, moveDirection);
+            input.onSelectNodeAfterEdit(wasExpanded, error, newNode, moveDirection);
           },
           toggleHideElement: (n: SDK.DOMModel.DOMNode) => {
-            return input.onToggleHideElement?.(n) ?? Promise.resolve();
+            return input.onToggleHideElement(n) ?? Promise.resolve();
           },
-          isToggledToHidden: (n: SDK.DOMModel.DOMNode) => input.isToggledToHidden?.(n) ?? false,
+          isToggledToHidden: (n: SDK.DOMModel.DOMNode) => input.isToggledToHidden(n) ?? false,
           showContextMenu: (event: Event) => {
             if (event instanceof MouseEvent) {
-              input.onContextMenu?.(node, event);
+              input.onContextMenu(node, event);
             }
           },
-          updateRecord: input.updateRecordForNode?.(node) ?? null,
+          updateRecord: input.updateRecordForNode(node) ?? null,
         })}${hasChildren ? html`<ul role="group">
             ${isExpanded && !isEditingAsHTML ? html`
               ${node.adoptedStyleSheetsForNode.length > 0 ? renderAdoptedStyleSheets(node, depth + 1) : nothing}
@@ -788,7 +794,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
                       title=${i18nString(UIStrings.showAllNodesDMore, {PH1: remainingChildrenCount})}
                       @click=${on((event: Event) => {
                         event.stopPropagation();
-                        input.onExpandAllChildren?.(node);
+                        input.onExpandAllChildren(node);
                       })}>${i18nString(UIStrings.showAllNodesDMore, {PH1: remainingChildrenCount})}</devtools-button></li>
               ` : nothing}
               ${node.isInsertionPoint() ? node.distributedNodes().map(distributedNode => renderShortcut(distributedNode, depth + 1)) : nothing}
@@ -798,9 +804,9 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
                     data-backend-node-id=${ifDefined(node.backendNodeId())}
                     data-target-id=${ifDefined(node.domModel().target().id())}
                     selectable=${input.selectEnabled ? 'true' : 'false'}
-                    ?selected=${isSelected && Boolean(input.selectedClosingTag)}
+                    ?selected=${isSelected && input.selectedClosingTag}
                     class=${classMap({
-                      selected: isSelected && Boolean(input.selectedClosingTag),
+                      selected: isSelected && input.selectedClosingTag,
                       hovered: isClosingHovered,
                       'elements-drag-over': isClosingTagDragOver,
                     })}
@@ -809,29 +815,29 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
                     jslog=${treeItemJslog(undefined, true)}
                     @select=${on((event: UI.TreeOutline.TreeViewElement.SelectEvent) => onSelect(true, Boolean(event.detail?.selectedByUser)))}
                     @contextmenu=${on(onContextMenu)}
-                    @mousemove=${on(onClosingMouseMove)}
+                    @mousemove=${on(onMouseMove(/* isClosingTag= */ true))}
                     @dragstart=${on(onDragStart)}
-                    @dragover=${on(onClosingTagDragOver)}
+                    @dragover=${on(onDragOver(/* isClosingTag= */ true))}
                     @dragleave=${on(onDragLeave)}
-                    @drop=${on(onClosingTagDrop)}
-                    @dragend=${on(onDragEnd)}>${UI.Widget.widget(ElementsTreeWidget, {
+                    @drop=${on(onDrop(/* isClosingTag= */ true))}
+                    @dragend=${on(onDragEnd)}>${UI.Widget.widget(DOMTreeElementWidget, {
                     node,
                     isClosingTag: true,
                     renderSelection: false,
                     expanded: false,
                     isExpandable: false,
-                    selected: isSelected && Boolean(input.selectedClosingTag),
+                    selected: isSelected && input.selectedClosingTag,
                     isDOMNodeSelected,
                     hovered: isClosingHovered,
                     computeLeftIndent: computeLeftIndent(depth + 1, false),
-                    disableEdits: input.disableEdits ?? false,
+                    disableEdits: input.disableEdits,
                     showAIButton: false,
                     showContextMenu: (event: Event) => {
                       if (event instanceof MouseEvent) {
-                        input.onContextMenu?.(node, event);
+                        input.onContextMenu(node, event);
                       }
                     },
-                    updateRecord: input.updateRecordForNode?.(node) ?? null,
+                    updateRecord: input.updateRecordForNode(node) ?? null,
                   })}</li>
               ` : nothing}
             ` : nothing}
@@ -841,8 +847,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
   };
 
   const isSingleNode =
-      Boolean(input.deindentSingleNode && rootNodes.length === 1 &&
-              !nodeHasVisibleChildren(rootNodes[0], input.rootDOMNode, input.maxTreeDepth, input.omitRootDOMNode));
+      Boolean(input.deindentSingleNode && rootNodes.length === 1 && !nodeHasVisibleChildren(rootNodes[0], input));
   const disclosureClasses = classMap({
     'elements-disclosure': true,
     'single-node': isSingleNode,
@@ -855,11 +860,15 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
   const totalVisibleRows = input.maxRowsShown ? countAllVisibleRows() : 0;
   const truncatedLines = input.maxRowsShown ? Math.max(0, totalVisibleRows - input.maxRowsShown) : 0;
 
+  // This widget renders without a shadow root, so you must scope its
+  // stylesheets. Otherwise, broad rules such as `* {min-width: 0}` in
+  // `inspectorCommon.css` apply to the host's whole tree scope and break the
+  // layout of hosts such as the AI assistance chat.
   // clang-format off
   render(html`
-    <style>${UI.inspectorCommonStyles}</style>
-    <style>${elementsTreeOutlineStyles}</style>
-    <style>${CodeHighlighter.codeHighlighterStyles}</style>
+    <style>@scope to (devtools-widget > *) { ${UI.inspectorCommonStyles} }</style>
+    <style>@scope to (devtools-widget > *) { ${domTreeWidgetStyles} }</style>
+    <style>@scope to (devtools-widget > *) { ${CodeHighlighter.codeHighlighterStyles} }</style>
     <div class=${disclosureClasses} style=${disclosureStyles}>
       <devtools-tree
         class="elements-tree-outline ${input.wrap ? '' : 'elements-tree-nowrap'} ${input.hideGutter ? 'elements-hide-gutter' : ''} ${isSingleNode ? 'single-node' : ''}"
@@ -868,13 +877,13 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
         ?show-selection-on-keyboard-focus=${input.showSelectionOnKeyboardFocus}
         @enter=${(event: Event) => event.preventDefault()}
         @keydown=${input.onKeyDown}
-        @clipboard-copy=${(event: Event) => input.onCopyOrCut?.(false, event)}
-        @clipboard-cut=${(event: Event) => input.onCopyOrCut?.(true, event)}
-        @clipboard-paste=${(event: Event) => input.onPaste?.(event)}
+        @clipboard-copy=${(event: Event) => input.onCopyOrCut(false, event)}
+        @clipboard-cut=${(event: Event) => input.onCopyOrCut(true, event)}
+        @clipboard-paste=${(event: Event) => input.onPaste(event)}
         @mouseleave=${input.onLeave}
         .template=${html`
           <style>${UI.inspectorCommonStyles}</style>
-          <style>${elementsTreeOutlineStyles}</style>
+          <style>${domTreeWidgetStyles}</style>
           <style>${CodeHighlighter.codeHighlighterStyles}</style>
           <ul role="tree" class="elements-tree-outline source-code ${input.wrap ? '' : 'elements-tree-nowrap'} ${input.hideGutter ? 'elements-hide-gutter' : ''} ${isSingleNode ? 'single-node' : ''}" aria-label=${i18nString(UIStrings.pageDom)}>
             ${input.omitRootDOMNode && input.rootDOMNode && input.rootDOMNode.adoptedStyleSheetsForNode.length > 0 ?
@@ -896,7 +905,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
                     title=${i18nString(UIStrings.showAllNodesDMore, {PH1: remaining})}
                     @click=${on((event: Event) => {
                       event.stopPropagation();
-                      input.onExpandAllChildren?.(root);
+                      input.onExpandAllChildren(root);
                     })}>${i18nString(UIStrings.showAllNodesDMore, {PH1: remaining})}</devtools-button></li>
               `;
             })() : nothing}
@@ -917,12 +926,12 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
   `, target);
   // clang-format on
 
-  if (input.nodesWithDirtyAdorners && input.nodesWithDirtyAdorners.size > 0) {
-    input.onDirtyAdornersUpdated?.();
+  if (input.nodesWithDirtyAdorners.size > 0) {
+    input.onDirtyAdornersUpdated();
   }
 };
 
-function getElementsTreeWidgetAndNode(element: Element): {node?: SDK.DOMModel.DOMNode, widget?: ElementsTreeWidget} {
+function getElementsTreeWidgetAndNode(element: Element): {node?: SDK.DOMModel.DOMNode, widget?: DOMTreeElementWidget} {
   let current: Element|null = element;
   while (current) {
     if (current.tagName === 'LI') {
@@ -930,7 +939,7 @@ function getElementsTreeWidgetAndNode(element: Element): {node?: SDK.DOMModel.DO
           current.querySelector(':scope > devtools-widget, :scope > .tree-element-title > devtools-widget');
       if (devtoolsWidget) {
         const widget = UI.Widget.Widget.get(devtoolsWidget);
-        if (widget instanceof ElementsTreeWidget) {
+        if (widget instanceof DOMTreeElementWidget) {
           return {node: widget.node, widget};
         }
       }
@@ -964,7 +973,8 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   #enableContextMenu = true;
   #showHTMLCommentsSetting =
       Common.Settings.Settings.instance().resolve(SettingsUI.ElementsSettings.showHTMLCommentsSettingDescriptor);
-  #showComments = this.#showHTMLCommentsSetting.get();
+  #lastObservedShowHTMLCommentsSetting = this.#showHTMLCommentsSetting.get();
+  #showComments = this.#lastObservedShowHTMLCommentsSetting;
   #showAIButton = true;
   #disableEdits = false;
   #expandRoot = false;
@@ -1004,9 +1014,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#expandedNodes.add(node);
     const expandChildren = (): void => {
       for (const child of node.children() ?? []) {
-        const isNotCollapsible = child.nodeType() === Node.ELEMENT_NODE &&
-            child.parentNode?.nodeType() === Node.DOCUMENT_NODE && !child.parentNode.parentNode;
-        if (isNotCollapsible || (this.#expandRoot && this.omitRootDOMNode)) {
+        if (isNotCollapsible(child) || (this.#expandRoot && this.omitRootDOMNode)) {
           this.setNodeExpanded(child, true);
         }
       }
@@ -1091,7 +1099,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   #currentHighlightedNode: SDK.DOMModel.DOMNode|null = null;
-  #wiredDOMModels = new Set<SDK.DOMModel.DOMModel>();
+  #domModelListeners = new Map<SDK.DOMModel.DOMModel, Common.EventTarget.EventDescriptor[]>();
   #topLayerShortcutsByDocument = new WeakMap<SDK.DOMModel.DOMDocument, SDK.DOMModel.DOMNodeShortcut[]>();
   #topLayerContainerExpandedByDocument = new WeakMap<SDK.DOMModel.DOMDocument, boolean>();
   #topLayerShortcutExpanded = new WeakMap<SDK.DOMModel.DOMNodeShortcut, boolean>();
@@ -1149,9 +1157,9 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       SDK.TargetManager.TargetManager.instance().addModelListener(SDK.OverlayModel.OverlayModel,
                                                                   SDK.OverlayModel.Events.HIGHLIGHT_NODE_REQUESTED,
                                                                   this.#highlightNode, this, {scoped: true});
-      SDK.TargetManager.TargetManager.instance().addModelListener(SDK.OverlayModel.OverlayModel,
-                                                                  SDK.OverlayModel.Events.INSPECT_MODE_WILL_BE_TOGGLED,
-                                                                  this.#clearHighlightedNode, this, {scoped: true});
+      SDK.TargetManager.TargetManager.instance().addModelListener(
+          SDK.OverlayModel.OverlayModel, SDK.OverlayModel.Events.INSPECT_MODE_WILL_BE_TOGGLED,
+          this.#onInspectModeWillBeToggled, this, {scoped: true});
     }
   }
 
@@ -1165,7 +1173,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         SDK.OverlayModel.OverlayModel, SDK.OverlayModel.Events.HIGHLIGHT_NODE_REQUESTED, this.#highlightNode, this);
     SDK.TargetManager.TargetManager.instance().removeModelListener(SDK.OverlayModel.OverlayModel,
                                                                    SDK.OverlayModel.Events.INSPECT_MODE_WILL_BE_TOGGLED,
-                                                                   this.#clearHighlightedNode, this);
+                                                                   this.#onInspectModeWillBeToggled, this);
   }
 
   // TODO: Move imagePreviewPopover and issuePopoverHelper to the view once declarative versions exist.
@@ -1212,23 +1220,27 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         box: hoveredNode.boxInWindow(),
         show: async (popover: UI.GlassPane.GlassPane) => {
           popover.setIgnoreLeftMargin(true);
+          // The popover content is rendered imperatively into the GlassPane
+          // provided by PopoverHelper; this is a one-off render outside of
+          // the view until the popover is made declarative.
           // clang-format off
+          // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
           render(html`
             <div class="squiggles-content">
               ${issues.map(issue => {
-            const elementIssueDetails = getElementIssueDetails(issue);
-            if (!elementIssueDetails) {
-              return nothing;
-            }
-            const issueKindIconName = IssueCounter.IssueCounter.getIssueKindIconName(issue.getKind());
-            const openIssueEvent = (): Promise<void> => Common.Revealer.reveal(issue);
-            return html`
+                const elementIssueDetails = getElementIssueDetails(issue);
+                if (!elementIssueDetails) {
+                  return nothing;
+                }
+                const issueKindIconName = IssueCounter.IssueCounter.getIssueKindIconName(issue.getKind());
+                const openIssueEvent = (): Promise<void> => Common.Revealer.reveal(issue);
+                return html`
                   <div class="squiggles-content-item">
-                  <devtools-icon .name=${issueKindIconName} @click=${openIssueEvent}></devtools-icon>
-                  <devtools-link class="link" @click=${openIssueEvent}>${i18nString(UIStrings.viewIssue)}</devtools-link>
-                  <span>${elementIssueDetails.tooltip}</span>
+                    <devtools-icon .name=${issueKindIconName} @click=${openIssueEvent}></devtools-icon>
+                    <devtools-link class="link" @click=${openIssueEvent}>${i18nString(UIStrings.viewIssue)}</devtools-link>
+                    <span>${elementIssueDetails.tooltip}</span>
                   </div>`;
-          })}
+              })}
             </div>`, popover.contentElement);
           // clang-format on
           return true;
@@ -1255,14 +1267,19 @@ export class DOMTreeWidget extends UI.Widget.Widget {
 
   #onDocumentUpdated(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMModel>): void {
     const domModel = event.data;
+    this.#resetTreeState();
+    if (domModel.existingDocument()) {
+      this.rootDOMNode = domModel.existingDocument();
+    }
+  }
+
+  /** Forgets selection, expansion and pending changes, e.g. when the document is replaced. */
+  #resetTreeState(): void {
     this.#selectedDOMNode = null;
     this.#selectedClosingTag = false;
     this.#expandedNodes.clear();
     this.#currentHighlightedNode = null;
     this.#updateRecords.clear();
-    if (domModel.existingDocument()) {
-      this.rootDOMNode = domModel.existingDocument();
-    }
   }
 
   #updateModifiedNodesTimeout?: number;
@@ -1277,6 +1294,19 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#updateModifiedNodesTimeout = window.setTimeout(this.updateModifiedNodes.bind(this), 50);
   }
 
+  #cancelPendingModifiedNodesUpdate(): void {
+    if (this.#updateModifiedNodesTimeout) {
+      clearTimeout(this.#updateModifiedNodesTimeout);
+      this.#updateModifiedNodesTimeout = undefined;
+    }
+  }
+
+  /** Drops changes that have been recorded but not rendered yet, e.g. when the tree is hidden. */
+  #discardPendingUpdates(): void {
+    this.#cancelPendingModifiedNodesUpdate();
+    this.#updateRecords.clear();
+  }
+
   #onNodeInserted(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
     const node = event.data;
     if (node.parentNode) {
@@ -1286,22 +1316,10 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   #findNextNodeOnRemoval(node: SDK.DOMModel.DOMNode, parent: SDK.DOMModel.DOMNode|null): SDK.DOMModel.DOMNode|null {
-    const visibleChildren = parent ? getVisibleChildren(parent, this.#showComments) : [];
-    if (visibleChildren.length > 0) {
-      let candidate: SDK.DOMModel.DOMNode|null = node.nextSibling;
-      while (candidate) {
-        if (visibleChildren.includes(candidate)) {
-          return candidate;
-        }
-        candidate = candidate.nextSibling;
-      }
-      candidate = node.previousSibling;
-      while (candidate) {
-        if (visibleChildren.includes(candidate)) {
-          return candidate;
-        }
-        candidate = candidate.previousSibling;
-      }
+    const visibleChildren = parent ? getVisibleChildren(parent, this) : [];
+    const sibling = findVisibleSibling(node, visibleChildren);
+    if (sibling) {
+      return sibling;
     }
     if (parent) {
       if (parent.nodeType() === Node.DOCUMENT_NODE) {
@@ -1325,47 +1343,12 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#updateModifiedNodesSoon();
   }
 
-  #onAttrModified(event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}>): void {
-    const {node, name} = event.data;
-    this.#addUpdateRecord(node).attributeModified(name);
-    this.#updateModifiedNodesSoon();
-  }
-
-  #onAttrRemoved(event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}>): void {
-    const {node, name} = event.data;
-    this.#addUpdateRecord(node).attributeRemoved(name);
-    this.#updateModifiedNodesSoon();
-  }
-
   #onCharacterDataModified(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
     const node = event.data;
     this.#addUpdateRecord(node).charDataModified();
     if (node.parentNode && node.parentNode.firstChild === node.parentNode.lastChild) {
       this.#addUpdateRecord(node.parentNode).childrenModified();
     }
-    this.#updateModifiedNodesSoon();
-  }
-
-  #onChildNodeCountUpdated(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.#addUpdateRecord(node).childrenModified();
-    this.#updateModifiedNodesSoon();
-  }
-
-  #onAdoptedStyleSheetsModified(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.#addUpdateRecord(node).childrenModified();
-    this.#updateModifiedNodesSoon();
-  }
-
-  #onDistributedNodesChanged(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.#addUpdateRecord(node).childrenModified();
-    this.#updateModifiedNodesSoon();
-  }
-
-  #onDocumentURLChanged(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMDocument>): void {
-    this.#addUpdateRecord(event.data).charDataModified();
     this.#updateModifiedNodesSoon();
   }
 
@@ -1378,63 +1361,69 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   updateModifiedNodes(): void {
-    if (this.#updateModifiedNodesTimeout) {
-      clearTimeout(this.#updateModifiedNodesTimeout);
-      this.#updateModifiedNodesTimeout = undefined;
-    }
+    this.#cancelPendingModifiedNodesUpdate();
     this.#validateSelectedNode();
     this.performUpdate();
   }
 
   #wireDOMModel(domModel: SDK.DOMModel.DOMModel): void {
-    domModel.addEventListener(SDK.DOMModel.Events.DocumentUpdated, this.#onDocumentUpdated, this);
-    domModel.addEventListener(SDK.DOMModel.Events.NodeInserted, this.#onNodeInserted, this);
-    domModel.addEventListener(SDK.DOMModel.Events.NodeRemoved, this.#onNodeRemoved, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AttrModified, this.#onAttrModified, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AttrRemoved, this.#onAttrRemoved, this);
-    domModel.addEventListener(SDK.DOMModel.Events.CharacterDataModified, this.#onCharacterDataModified, this);
-    domModel.addEventListener(SDK.DOMModel.Events.ChildNodeCountUpdated, this.#onChildNodeCountUpdated, this);
-    domModel.addEventListener(SDK.DOMModel.Events.MarkersChanged, this.#onMarkersChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AdoptedStyleSheetsModified, this.#onAdoptedStyleSheetsModified, this);
-    domModel.addEventListener(SDK.DOMModel.Events.TopLayerElementsChanged, this.#onTopLayerElementsChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.DistributedNodesChanged, this.#onDistributedNodesChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.DocumentURLChanged, this.#onDocumentURLChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AffectedByStartingStylesFlagUpdated, this.requestUpdate, this);
+    const {Events} = SDK.DOMModel;
+    // Records a change for the event's node and schedules a re-render.
+    const recordAndUpdate = (record: (node: SDK.DOMModel.DOMNode) => void) =>
+        (event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void => {
+          record(event.data);
+          this.#updateModifiedNodesSoon();
+        };
+    const recordAttributeAndUpdate = (record: (node: SDK.DOMModel.DOMNode, name: string) => void) =>
+        (event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}>): void => {
+          record(event.data.node, event.data.name);
+          this.#updateModifiedNodesSoon();
+        };
+    const listeners: Common.EventTarget.EventDescriptor[] = [
+      domModel.addEventListener(Events.DocumentUpdated, this.#onDocumentUpdated, this),
+      domModel.addEventListener(Events.NodeInserted, this.#onNodeInserted, this),
+      domModel.addEventListener(Events.NodeRemoved, this.#onNodeRemoved, this),
+      domModel.addEventListener(
+          Events.AttrModified,
+          recordAttributeAndUpdate((node, name) => this.#addUpdateRecord(node).attributeModified(name))),
+      domModel.addEventListener(
+          Events.AttrRemoved,
+          recordAttributeAndUpdate((node, name) => this.#addUpdateRecord(node).attributeRemoved(name))),
+      domModel.addEventListener(Events.CharacterDataModified, this.#onCharacterDataModified, this),
+      domModel.addEventListener(Events.ChildNodeCountUpdated,
+                                recordAndUpdate(node => this.#addUpdateRecord(node).childrenModified())),
+      domModel.addEventListener(Events.MarkersChanged, this.#onMarkersChanged, this),
+      domModel.addEventListener(Events.AdoptedStyleSheetsModified,
+                                recordAndUpdate(node => this.#addUpdateRecord(node).childrenModified())),
+      domModel.addEventListener(Events.TopLayerElementsChanged, this.#onTopLayerElementsChanged, this),
+      domModel.addEventListener(Events.DistributedNodesChanged,
+                                recordAndUpdate(node => this.#addUpdateRecord(node).childrenModified())),
+      domModel.addEventListener(Events.DocumentURLChanged,
+                                recordAndUpdate(node => this.#addUpdateRecord(node).charDataModified())),
+      domModel.addEventListener(Events.AffectedByStartingStylesFlagUpdated, this.requestUpdate, this),
+    ];
     const cssModel = domModel.target().model(SDK.CSSModel.CSSModel);
     if (cssModel) {
-      cssModel.addEventListener(SDK.CSSModel.Events.StyleSheetAdded, this.requestUpdate, this);
+      listeners.push(cssModel.addEventListener(SDK.CSSModel.Events.StyleSheetAdded, this.requestUpdate, this));
     }
+    this.#domModelListeners.set(domModel, listeners);
   }
 
   #unwireDOMModel(domModel: SDK.DOMModel.DOMModel): void {
-    const cssModel = domModel.target().model(SDK.CSSModel.CSSModel);
-    if (cssModel) {
-      cssModel.removeEventListener(SDK.CSSModel.Events.StyleSheetAdded, this.requestUpdate, this);
-    }
-    domModel.removeEventListener(SDK.DOMModel.Events.DocumentUpdated, this.#onDocumentUpdated, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.NodeInserted, this.#onNodeInserted, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.NodeRemoved, this.#onNodeRemoved, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AttrModified, this.#onAttrModified, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AttrRemoved, this.#onAttrRemoved, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.CharacterDataModified, this.#onCharacterDataModified, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.ChildNodeCountUpdated, this.#onChildNodeCountUpdated, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.MarkersChanged, this.#onMarkersChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AdoptedStyleSheetsModified, this.#onAdoptedStyleSheetsModified,
-                                 this);
-    domModel.removeEventListener(SDK.DOMModel.Events.TopLayerElementsChanged, this.#onTopLayerElementsChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.DistributedNodesChanged, this.#onDistributedNodesChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.DocumentURLChanged, this.#onDocumentURLChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AffectedByStartingStylesFlagUpdated, this.requestUpdate, this);
+    Common.EventTarget.removeEventListeners(this.#domModelListeners.get(domModel) ?? []);
+    this.#domModelListeners.delete(domModel);
   }
 
   #onShowHTMLCommentsChange(): void {
-    this.#showComments = this.#showHTMLCommentsSetting.get();
+    this.#lastObservedShowHTMLCommentsSetting = this.#showHTMLCommentsSetting.get();
+    this.#showComments = this.#lastObservedShowHTMLCommentsSetting;
     this.#validateSelectedNode();
     const selectedNode = this.selectedDOMNode();
     if (selectedNode && selectedNode.nodeType() === Node.COMMENT_NODE && !this.#showComments) {
       this.selectDOMNode(selectedNode.parentNode);
+    } else {
+      this.performUpdate();
     }
-    this.performUpdate();
   }
 
   #highlightNode(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
@@ -1444,9 +1433,14 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     });
   }
 
+  #onInspectModeWillBeToggled(): void {
+    this.#clearHighlightedNode();
+    this.performUpdate();
+  }
+
+  // Callers render themselves, so that an entry point renders only once.
   #clearHighlightedNode(): void {
     this.#currentHighlightedNode = null;
-    this.performUpdate();
   }
 
   selectDOMNode(node: SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet|null, focus?: boolean,
@@ -1459,8 +1453,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
     this.#selectedAdoptedStyleSheet = null;
     if (node?.nodeType() === Node.TEXT_NODE && node.parentNode &&
-        (!nodeHasVisibleChildren(node.parentNode, this.rootDOMNode, this.maxTreeDepth, this.omitRootDOMNode) ||
-         !getVisibleChildren(node.parentNode, this.#showComments).includes(node))) {
+        (!nodeHasVisibleChildren(node.parentNode, this) || !getVisibleChildren(node.parentNode, this).includes(node))) {
       node = node.parentNode;
     }
     if (node) {
@@ -1472,23 +1465,15 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         const ancestor = ancestors[i];
         const child = ancestors[i + 1] || node;
         this.#expandedNodes.add(ancestor);
-        const visibleChildren = getVisibleChildren(ancestor, this.#showComments);
-        const childIndex = visibleChildren.indexOf(child);
-        if (childIndex !== -1 && childIndex >= this.expandedChildrenLimit(ancestor)) {
-          this.setExpandedChildrenLimit(ancestor, childIndex + 1);
-        }
+        this.#ensureChildVisible(ancestor, child);
         if (!ancestor.children() && ancestor.childNodeCount()) {
           void ancestor.getChildNodes(() => {
-            const visibleChildren = getVisibleChildren(ancestor, this.#showComments);
-            const childIndex = visibleChildren.indexOf(child);
-            if (childIndex !== -1 && childIndex >= this.expandedChildrenLimit(ancestor)) {
-              this.setExpandedChildrenLimit(ancestor, childIndex + 1);
-            }
+            this.#ensureChildVisible(ancestor, child);
             this.performUpdate();
           });
         }
       }
-      if (isClosingTag && nodeHasVisibleChildren(node, this.rootDOMNode, this.maxTreeDepth, this.omitRootDOMNode)) {
+      if (isClosingTag && nodeHasVisibleChildren(node, this)) {
         this.#expandedNodes.add(node);
       }
     }
@@ -1498,9 +1483,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#selectedClosingTag = selectClosingTag;
     this.#clearHighlightedNode();
     if (!isSameNode) {
-      this.onSelectedNodeChanged(
-          {data: {node, focus: Boolean(focus)}} as
-          Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode | null, focus: boolean}>);
+      this.#notifySelectedNodeChanged(node, Boolean(focus));
     }
     this.performUpdate();
     if (focus) {
@@ -1508,10 +1491,23 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
   }
 
+  /** Raises the children limit of `ancestor` if `child` is paginated away. */
+  #ensureChildVisible(ancestor: SDK.DOMModel.DOMNode, child: SDK.DOMModel.DOMNode): void {
+    const childIndex = getVisibleChildren(ancestor, this).indexOf(child);
+    if (childIndex !== -1 && childIndex >= this.expandedChildrenLimit(ancestor)) {
+      this.#expandedChildrenLimitByNode.set(ancestor, childIndex + 1);
+    }
+  }
+
+  #notifySelectedNodeChanged(node: SDK.DOMModel.DOMNode|null, focus: boolean): void {
+    this.onSelectedNodeChanged(
+        {data: {node, focus}} as
+        Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode | null, focus: boolean}>);
+  }
+
   highlightNodeAttribute(node: SDK.DOMModel.DOMNode, attribute: string): void {
-    this.selectDOMNode(node);
     this.#attributeToHighlight = {node, attribute};
-    this.performUpdate();
+    this.selectDOMNode(node);
   }
 
   get wrap(): boolean {
@@ -1554,12 +1550,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   isNodeExpanded(node: SDK.DOMModel.DOMNode): boolean {
-    const isNotCollapsible = node.nodeType() === Node.ELEMENT_NODE &&
-        node.parentNode?.nodeType() === Node.DOCUMENT_NODE && !node.parentNode.parentNode;
-    if (isNotCollapsible) {
-      return true;
-    }
-    return this.#expandedNodes.has(node);
+    return isNotCollapsible(node) || this.#expandedNodes.has(node);
   }
 
   expandedChildrenLimit(node: SDK.DOMModel.DOMNode): number {
@@ -1576,7 +1567,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
 
   expandAllChildren(node: SDK.DOMModel.DOMNode): void {
     const currentLimit = this.expandedChildrenLimit(node);
-    const visibleChildren = getVisibleChildren(node, this.#showComments);
+    const visibleChildren = getVisibleChildren(node, this);
     this.setExpandedChildrenLimit(node, Math.max(visibleChildren.length, currentLimit + InitialChildrenLimit));
   }
 
@@ -1592,13 +1583,13 @@ export class DOMTreeWidget extends UI.Widget.Widget {
           (n === node || n.childNodeCount() || n.isIframe() || n.nodeType() === Node.DOCUMENT_NODE)) {
         await n.getSubtree(100, true);
       }
-      if (nodeHasVisibleChildren(n, this.rootDOMNode, this.maxTreeDepth, this.omitRootDOMNode)) {
+      if (nodeHasVisibleChildren(n, this)) {
         this.#expandedNodes.add(n);
       }
-      const visibleChildren = getVisibleChildren(n, this.#showComments);
+      const visibleChildren = getVisibleChildren(n, this);
       if (visibleChildren.length) {
         if (visibleChildren.length > this.expandedChildrenLimit(n)) {
-          this.setExpandedChildrenLimit(n, visibleChildren.length);
+          this.#expandedChildrenLimitByNode.set(n, visibleChildren.length);
         }
         await Promise.all(visibleChildren.map(child => expand(child, depth + 1)));
       }
@@ -1609,7 +1600,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
 
   collapseChildren(node: SDK.DOMModel.DOMNode): void {
     const collapse = (n: SDK.DOMModel.DOMNode): void => {
-      for (const child of getVisibleChildren(n, this.#showComments)) {
+      for (const child of getVisibleChildren(n, this)) {
         if (this.#expandedNodes.delete(child)) {
           collapse(child);
         }
@@ -1703,31 +1694,10 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         return fallback ?? this.#rootDOMNode;
       }
       if (parent.children() !== null || parent.childNodeCount() === 0 || parent.isIframe()) {
-        const visibleChildren = getVisibleChildren(parent, this.#showComments);
+        const visibleChildren = getVisibleChildren(parent, this);
         if (!visibleChildren.includes(current)) {
-          let sibling: SDK.DOMModel.DOMNode|null = null;
-          let candidate: SDK.DOMModel.DOMNode|null = current.nextSibling;
-          while (candidate) {
-            if (visibleChildren.includes(candidate)) {
-              sibling = candidate;
-              break;
-            }
-            candidate = candidate.nextSibling;
-          }
-          if (!sibling) {
-            candidate = current.previousSibling;
-            while (candidate) {
-              if (visibleChildren.includes(candidate)) {
-                sibling = candidate;
-                break;
-              }
-              candidate = candidate.previousSibling;
-            }
-          }
-          if (sibling) {
-            return this.#findValidSelectedNode(sibling);
-          }
-          return this.#findValidSelectedNode(parent);
+          const sibling = findVisibleSibling(current, visibleChildren);
+          return this.#findValidSelectedNode(sibling ?? parent);
         }
       }
       fallback = parent;
@@ -1737,12 +1707,12 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   #hasClosingTag(node: SDK.DOMModel.DOMNode): boolean {
-    const isEditingAsHTML = this.#multilineEditingNode === node ||
-        (this.#nodeToEdit?.node === node && Boolean(this.#nodeToEdit.isEditAsHTML));
-    if (isEditingAsHTML || !this.isNodeExpanded(node)) {
+    const editingAsHTML =
+        isBeingEditedAsHTML({multilineEditingNode: this.#multilineEditingNode, nodeToEdit: this.#nodeToEdit}, node);
+    if (editingAsHTML || !this.isNodeExpanded(node)) {
       return false;
     }
-    const hasChildren = nodeHasVisibleChildren(node, this.#rootDOMNode, this.#maxTreeDepth, this.omitRootDOMNode);
+    const hasChildren = nodeHasVisibleChildren(node, this);
     return nodeNeedsClosingTag(node, hasChildren);
   }
 
@@ -1756,23 +1726,17 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       this.#selectedDOMNode = validNode;
       this.#selectedClosingTag = false;
       this.#clearHighlightedNode();
-      this.onSelectedNodeChanged(
-          {data: {node: validNode, focus: false}} as
-          Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode | null, focus: boolean}>);
+      this.#notifySelectedNodeChanged(validNode, false);
     } else if (this.#selectedClosingTag && !this.#hasClosingTag(this.#selectedDOMNode)) {
       this.#selectedClosingTag = false;
     }
   }
 
   override performUpdate(): void {
-    if (this.#updateModifiedNodesTimeout) {
-      clearTimeout(this.#updateModifiedNodesTimeout);
-      this.#updateModifiedNodesTimeout = undefined;
-    }
+    this.#cancelPendingModifiedNodesUpdate();
     this.#validateSelectedNode();
     const updatedNodes = [...this.#updateRecords.keys()];
     this.#view({
-      domTreeWidget: this,
       rootDOMNode: this.#rootDOMNode,
       omitRootDOMNode: this.omitRootDOMNode,
       selectEnabled: this.selectEnabled,
@@ -1781,7 +1745,6 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       showComments: this.#showComments,
       showAIButton: this.#showAIButton,
       disableEdits: this.#disableEdits,
-      expandRoot: this.#expandRoot,
       wrap: this.#wrap,
       maxRowsShown: this.#maxRows,
       onClearMaxRows: () => {
@@ -1808,6 +1771,11 @@ export class DOMTreeWidget extends UI.Widget.Widget {
           return;
         }
         this.selectDOMNode(node, selectedByUser, isClosingTag);
+        // Mirror the legacy ElementsTreeElement.onselect behavior: a user
+        // selection (mouse click or keyboard navigation) highlights the node
+        // in the page overlay.
+        node.highlight();
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.ChangeInspectedNodeInElementsPanel);
       },
       onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean) => {
         this.setNodeExpanded(node, expanded);
@@ -1872,6 +1840,10 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         this.performUpdate();
       },
       multilineEditingNode: this.#multilineEditingNode,
+      onSetMultilineEditing: (editing: MultilineEditorController|null, node: SDK.DOMModel.DOMNode) =>
+          this.setMultilineEditing(editing, node),
+      onRevealInTopLayer: (node: SDK.DOMModel.DOMNode) => this.revealInTopLayer(node),
+      visibleWidth: () => this.visibleWidth,
       dragOverNode: this.#dragOverNode,
       isValidDragSource: (node: SDK.DOMModel.DOMNode) => this.isValidDragSource(node),
       onDragStart: (node: SDK.DOMModel.DOMNode, event: DragEvent, textContent?: string) =>
@@ -1889,7 +1861,6 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       onSelectTopLayerContainer: (_doc: SDK.DOMModel.DOMDocument) => {
         this.#selectedTopLayerShortcut = null;
         this.selectDOMNode(null);
-        this.performUpdate();
       },
       isTopLayerShortcutExpanded: (shortcut: SDK.DOMModel.DOMNodeShortcut) => this.isTopLayerShortcutExpanded(shortcut),
       onToggleTopLayerShortcutExpanded: (shortcut: SDK.DOMModel.DOMNodeShortcut, expanded: boolean) =>
@@ -1904,7 +1875,6 @@ export class DOMTreeWidget extends UI.Widget.Widget {
             this.selectDOMNode(node, true);
           }
         });
-        this.performUpdate();
       },
       onRevealTopLayerShortcut: (shortcut: SDK.DOMModel.DOMNodeShortcut) => {
         shortcut.deferredNode.resolve(node => {
@@ -1920,17 +1890,12 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       onSelectAdoptedStyleSheets: (_node: SDK.DOMModel.DOMNode) => {
         this.#selectedAdoptedStyleSheet = null;
         this.selectDOMNode(null);
-        this.performUpdate();
       },
       isAdoptedStyleSheetExpanded: (sheet: SDK.DOMModel.AdoptedStyleSheet) => this.isAdoptedStyleSheetExpanded(sheet),
       onToggleAdoptedStyleSheetExpanded: (sheet: SDK.DOMModel.AdoptedStyleSheet, expanded: boolean) =>
           this.setAdoptedStyleSheetExpanded(sheet, expanded),
       selectedAdoptedStyleSheet: this.#selectedAdoptedStyleSheet,
-      onSelectAdoptedStyleSheet: (sheet: SDK.DOMModel.AdoptedStyleSheet) => {
-        this.#selectedAdoptedStyleSheet = sheet;
-        this.selectDOMNode(null);
-        this.performUpdate();
-      },
+      onSelectAdoptedStyleSheet: (sheet: SDK.DOMModel.AdoptedStyleSheet) => this.#selectAdoptedStyleSheet(sheet),
       expandedChildrenLimit: (node: SDK.DOMModel.DOMNode) => this.expandedChildrenLimit(node),
       onExpandAllChildren: (node: SDK.DOMModel.DOMNode) => this.expandAllChildren(node),
       updateRecordForNode: (node: SDK.DOMModel.DOMNode) => this.#updateRecords.get(node) ?? null,
@@ -1943,40 +1908,44 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   modelAdded(domModel: SDK.DOMModel.DOMModel): void {
-    if (!this.#wiredDOMModels.has(domModel)) {
-      this.#wiredDOMModels.add(domModel);
+    if (!this.#domModelListeners.has(domModel)) {
       this.#wireDOMModel(domModel);
     }
-    if (this.isShowing() && !domModel.parentModel() &&
-        (!this.rootDOMNode || this.rootDOMNode.domModel() !== domModel)) {
-      if (domModel.existingDocument()) {
-        this.rootDOMNode = domModel.existingDocument();
-        this.onDocumentUpdated(domModel);
-      } else {
-        void domModel.requestDocument().then(document => {
-          if (document && this.isShowing() && this.#wiredDOMModels.has(domModel)) {
-            this.rootDOMNode = document;
-            this.onDocumentUpdated(domModel);
-          }
-        });
-      }
+    if (this.isShowing() && !domModel.parentModel()) {
+      this.#adoptDocument(domModel);
     }
     this.performUpdate();
   }
 
   modelRemoved(domModel: SDK.DOMModel.DOMModel): void {
-    if (this.#wiredDOMModels.has(domModel)) {
-      this.#wiredDOMModels.delete(domModel);
-      this.#unwireDOMModel(domModel);
-    }
+    this.#unwireDOMModel(domModel);
     if (this.#rootDOMNode?.domModel() === domModel) {
       this.#rootDOMNode = null;
-      this.#selectedDOMNode = null;
-      this.#selectedClosingTag = false;
-      this.#expandedNodes.clear();
-      this.#updateRecords.clear();
+      this.#resetTreeState();
     }
     this.performUpdate();
+  }
+
+  /**
+   * Makes the document of `domModel` the root of the tree, requesting it
+   * first if it has not been fetched yet.
+   */
+  #adoptDocument(domModel: SDK.DOMModel.DOMModel): void {
+    if (this.rootDOMNode?.domModel() === domModel) {
+      return;
+    }
+    const existingDocument = domModel.existingDocument();
+    if (existingDocument) {
+      this.rootDOMNode = existingDocument;
+      this.onDocumentUpdated(domModel);
+      return;
+    }
+    void domModel.requestDocument().then(document => {
+      if (document && this.isShowing() && this.#domModelListeners.has(domModel)) {
+        this.rootDOMNode = document;
+        this.onDocumentUpdated(domModel);
+      }
+    });
   }
 
   expand(): void {
@@ -1997,9 +1966,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#selectedDOMNode = node;
     this.#selectedClosingTag = false;
     this.#clearHighlightedNode();
-    this.onSelectedNodeChanged(
-        {data: {node, focus: false}} as
-        Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode | null, focus: boolean}>);
+    this.#notifySelectedNodeChanged(node, false);
     this.performUpdate();
   }
 
@@ -2018,8 +1985,9 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#searchMatchQuery = query ?? null;
     if (this.selectedDOMNode() !== node) {
       this.selectDOMNode(node, /* focus= */ false);
+    } else {
+      this.performUpdate();
     }
-    this.performUpdate();
   }
 
   hideMatchHighlights(node: SDK.DOMModel.DOMNode): void {
@@ -2099,11 +2067,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     this.#unregisterGlobalListeners();
     this.#imagePreviewPopover?.hide();
     this.#issuePopoverHelper?.hidePopover();
-    if (this.#updateModifiedNodesTimeout) {
-      clearTimeout(this.#updateModifiedNodesTimeout);
-      this.#updateModifiedNodesTimeout = undefined;
-    }
-    this.#updateRecords.clear();
+    this.#discardPendingUpdates();
     if (this.#multilineEditing) {
       this.#multilineEditing.cancel();
     }
@@ -2326,6 +2290,9 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
     if (moveDirection) {
       if (newNode.nodeType() === Node.PROCESSING_INSTRUCTION_NODE) {
+        if (!DOMTreeElementWidget.canEditTextNode(newNode)) {
+          return;
+        }
         this.#nodeToEdit = {node: newNode, isProcessingInstruction: true};
       } else if (moveDirection !== 'forward') {
         this.#nodeToEdit = {node: newNode, isNewAttribute: true};
@@ -2421,9 +2388,15 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     for (let current: (SDK.DOMModel.DOMNode|null) = parent; current; current = current.parentNode) {
       this.#expandedNodes.add(current);
     }
-    this.setAdoptedStyleSheetsExpanded(parent, true);
-    this.#selectedAdoptedStyleSheet = adoptedStyleSheet;
+    this.#adoptedStyleSheetsExpandedByNode.set(parent, true);
+    this.#selectAdoptedStyleSheet(adoptedStyleSheet);
+  }
+
+  #selectAdoptedStyleSheet(sheet: SDK.DOMModel.AdoptedStyleSheet): void {
+    // Clear the DOM node selection first: selectDOMNode() also resets the
+    // selected adopted style sheet.
     this.selectDOMNode(null);
+    this.#selectedAdoptedStyleSheet = sheet;
     this.performUpdate();
   }
 
@@ -2439,7 +2412,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   }
 
   startEditingTextNode(node: SDK.DOMModel.DOMNode): void {
-    if (UI.UIUtils.isEditing()) {
+    if (UI.UIUtils.isEditing() || !DOMTreeElementWidget.canEditTextNode(node)) {
       return;
     }
     this.#nodeToEdit = {node, isTextNode: true};
@@ -2467,9 +2440,15 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       }
       this.performUpdate();
     } else if (nodeType === Node.TEXT_NODE) {
+      if (!DOMTreeElementWidget.canEditTextNode(node)) {
+        return;
+      }
       this.#nodeToEdit = {node, isTextNode: true};
       this.performUpdate();
     } else if (nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+      if (!DOMTreeElementWidget.canEditTextNode(node)) {
+        return;
+      }
       this.#nodeToEdit = {node, isProcessingInstruction: true};
       this.performUpdate();
     }
@@ -2485,28 +2464,13 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
 
     if (UI.KeyboardShortcut.KeyboardShortcut.eventHasCtrlEquivalentKey(event) && node.parentNode) {
-      const wasExpanded = this.isNodeExpanded(node);
       if (event.key === 'ArrowUp' && node.previousSibling) {
-        node.moveTo(node.parentNode, node.previousSibling, (error, newNode) => {
-          if (!error && newNode) {
-            const changeTracker = this.changeTracker;
-            Elements.DOMChanges.trackNodeMove(changeTracker, newNode, buildChangeSelector(changeTracker, newNode),
-                                              /* directionUp= */ true);
-          }
-          this.selectNodeAfterEdit(wasExpanded, error, newNode);
-        });
+        this.#moveNodeAmongSiblings(node, node.previousSibling, /* directionUp= */ true);
         event.consume(true);
         return true;
       }
       if (event.key === 'ArrowDown' && node.nextSibling) {
-        node.moveTo(node.parentNode, node.nextSibling.nextSibling, (error, newNode) => {
-          if (!error && newNode) {
-            const changeTracker = this.changeTracker;
-            Elements.DOMChanges.trackNodeMove(changeTracker, newNode, buildChangeSelector(changeTracker, newNode),
-                                              /* directionUp= */ false);
-          }
-          this.selectNodeAfterEdit(wasExpanded, error, newNode);
-        });
+        this.#moveNodeAmongSiblings(node, node.nextSibling.nextSibling, /* directionUp= */ false);
         event.consume(true);
         return true;
       }
@@ -2537,6 +2501,23 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
 
     return false;
+  }
+
+  /** Moves `node` within its parent so that it ends up right before `anchor` (or last, if `anchor` is null). */
+  #moveNodeAmongSiblings(node: SDK.DOMModel.DOMNode, anchor: SDK.DOMModel.DOMNode|null, directionUp: boolean): void {
+    const parentNode = node.parentNode;
+    if (!parentNode) {
+      return;
+    }
+    const wasExpanded = this.isNodeExpanded(node);
+    node.moveTo(parentNode, anchor, (error, newNode) => {
+      if (!error && newNode) {
+        const changeTracker = this.changeTracker;
+        Elements.DOMChanges.trackNodeMove(changeTracker, newNode, buildChangeSelector(changeTracker, newNode),
+                                          directionUp);
+      }
+      this.selectNodeAfterEdit(wasExpanded, error, newNode);
+    });
   }
 
   #clipboardData: ClipboardData|null = null;
@@ -2575,12 +2556,12 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(jsPath(node, true));
   }
 
-  copyXPath(node: SDK.DOMModel.DOMNode, optimized = true): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(xPath(node, optimized));
+  async copyXPath(node: SDK.DOMModel.DOMNode, optimized = true): Promise<void> {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(await xPath(node, optimized));
   }
 
-  copyFullXPath(node: SDK.DOMModel.DOMNode): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(xPath(node, false));
+  async copyFullXPath(node: SDK.DOMModel.DOMNode): Promise<void> {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(await xPath(node, false));
   }
 
   async copyStyles(node: SDK.DOMModel.DOMNode): Promise<void> {
@@ -2590,7 +2571,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
       return;
     }
 
-    const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
+    const indent = Common.Settings.Settings.instance().resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor).get();
     const lines: string[] = [];
     for (const style of cascade.nodeStyles().reverse()) {
       for (const property of style.leadingProperties()) {
@@ -2743,7 +2724,7 @@ export class DOMTreeWidget extends UI.Widget.Widget {
   override wasShown(): void {
     super.wasShown();
     this.#registerGlobalListeners();
-    if (this.#showComments !== this.#showHTMLCommentsSetting.get()) {
+    if (this.#lastObservedShowHTMLCommentsSetting !== this.#showHTMLCommentsSetting.get()) {
       // The setting changed while the tree was hidden.
       this.#onShowHTMLCommentsChange();
       return;
@@ -2753,20 +2734,12 @@ export class DOMTreeWidget extends UI.Widget.Widget {
 
   override wasHidden(): void {
     super.wasHidden();
-    if (this.#updateModifiedNodesTimeout) {
-      clearTimeout(this.#updateModifiedNodesTimeout);
-      this.#updateModifiedNodesTimeout = undefined;
-    }
-    this.#updateRecords.clear();
+    this.#discardPendingUpdates();
   }
 
   override detach(overrideHideOnDetach?: boolean): void {
     super.detach(overrideHideOnDetach);
-    if (this.#updateModifiedNodesTimeout) {
-      clearTimeout(this.#updateModifiedNodesTimeout);
-      this.#updateModifiedNodesTimeout = undefined;
-    }
-    this.#updateRecords.clear();
+    this.#discardPendingUpdates();
   }
 
   hideImagePreview(): void {
@@ -2789,1245 +2762,13 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     // different (e.g. OOPIF) DOM model than the scoped main one.
     const domModels = SDK.TargetManager.TargetManager.instance().models(SDK.DOMModel.DOMModel, {scoped: true});
     for (const domModel of domModels) {
-      if (domModel.parentModel() || !this.#wiredDOMModels.has(domModel)) {
-        continue;
-      }
-      if (!this.rootDOMNode || this.rootDOMNode.domModel() !== domModel) {
-        if (domModel.existingDocument()) {
-          this.rootDOMNode = domModel.existingDocument();
-          this.onDocumentUpdated(domModel);
-        } else {
-          void domModel.requestDocument().then(document => {
-            if (document && this.isShowing() && this.#wiredDOMModels.has(domModel)) {
-              this.rootDOMNode = document;
-              this.onDocumentUpdated(domModel);
-            }
-          });
-        }
+      if (!domModel.parentModel() && this.#domModelListeners.has(domModel)) {
+        this.#adoptDocument(domModel);
       }
     }
     super.show(parentElement, insertBefore, suppressOrphanWidgetError);
   }
 }
-
-const ElementsTreeOutlineBase:
-    Common.ObjectWrapper.EventMixin<ElementsTreeOutline.EventTypes, typeof UI.TreeOutline.TreeOutline> =
-    Common.ObjectWrapper.eventMixin(
-        UI.TreeOutline.TreeOutline,
-    );
-
-export class ElementsTreeOutline extends ElementsTreeOutlineBase {
-  treeElementByNode: WeakMap<SDK.DOMModel.DOMNode, ElementsTreeElement>;
-  private readonly shadowRoot: ShadowRoot;
-  readonly elementInternal: HTMLElement;
-  private includeRootDOMNode: boolean;
-  private selectEnabled: boolean|undefined;
-  private rootDOMNodeInternal: SDK.DOMModel.DOMNode|null;
-  selectedDOMNodeInternal: SDK.DOMModel.DOMNode|null;
-  private visible: boolean;
-  private updateRecords: Map<SDK.DOMModel.DOMNode, Elements.ElementUpdateRecord.ElementUpdateRecord>;
-  private treeElementsBeingUpdated: Set<ElementsTreeElement>;
-  private visibleWidthInternal?: number;
-  private isXMLMimeTypeInternal?: boolean|null;
-  suppressRevealAndSelect = false;
-  private previousHoveredElement?: UI.TreeOutline.TreeElement;
-  private dragOverTreeElement?: ElementsTreeElement;
-  private updateModifiedNodesTimeout?: number;
-  #topLayerContainerByDocument = new WeakMap<SDK.DOMModel.DOMDocument, TopLayerContainer>();
-  maxTreeDepth?: number;
-  enableContextMenu: boolean;
-  showComments: boolean;
-  showAIButton: boolean;
-  disableEdits: boolean;
-  expandRoot: boolean;
-  #maxRowsShown?: number;
-  #showAllButton?: HTMLElement;
-  domTreeWidget: DOMTreeWidget|null = null;
-
-  get hoveredTreeElement(): UI.TreeOutline.TreeElement|null {
-    return this.previousHoveredElement ?? null;
-  }
-
-  constructor(omitRootDOMNode?: boolean, selectEnabled?: boolean, hideGutter?: boolean, maxTreeDepth?: number,
-              enableContextMenu?: boolean, showComments?: boolean, showAIButton?: boolean, disableEdits?: boolean,
-              expandRoot?: boolean, domTreeWidget?: DOMTreeWidget|null) {
-    super();
-
-    this.domTreeWidget = domTreeWidget ?? null;
-    this.renderSelection = true;
-    this.treeElementByNode = new WeakMap();
-    const shadowContainer = document.createElement('div');
-    this.shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        shadowContainer, {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.codeHighlighterStyles]});
-    const outlineDisclosureElement = this.shadowRoot.createChild('div', 'elements-disclosure');
-
-    this.elementInternal = this.element;
-    this.elementInternal.classList.add('elements-tree-outline', 'source-code');
-    this.maxTreeDepth = maxTreeDepth;
-    this.enableContextMenu = enableContextMenu ?? true;
-    this.showComments = showComments ?? true;
-    this.showAIButton = showAIButton ?? true;
-    this.disableEdits = disableEdits ?? false;
-    this.expandRoot = expandRoot ?? false;
-    this.elementInternal.classList.toggle('elements-hide-gutter', hideGutter);
-    UI.ARIAUtils.setLabel(this.elementInternal, i18nString(UIStrings.pageDom));
-    this.elementInternal.addEventListener('focusout', this.onfocusout.bind(this), false);
-    this.elementInternal.addEventListener('mousedown', this.onmousedown.bind(this), false);
-    this.elementInternal.addEventListener('mousemove', this.onmousemove.bind(this), false);
-    this.elementInternal.addEventListener('mouseleave', this.onmouseleave.bind(this), false);
-
-    if (!this.disableEdits) {
-      this.elementInternal.addEventListener('dragstart', this.ondragstart.bind(this), false);
-      this.elementInternal.addEventListener('dragover', this.ondragover.bind(this), false);
-      this.elementInternal.addEventListener('dragleave', this.ondragleave.bind(this), false);
-      this.elementInternal.addEventListener('drop', this.ondrop.bind(this), false);
-      this.elementInternal.addEventListener('dragend', this.ondragend.bind(this), false);
-    }
-
-    outlineDisclosureElement.appendChild(this.elementInternal);
-    this.element = shadowContainer;
-    this.contentElement.setAttribute('jslog', `${VisualLogging.tree('elements')}`);
-
-    this.includeRootDOMNode = !omitRootDOMNode;
-    this.selectEnabled = selectEnabled;
-    this.rootDOMNodeInternal = null;
-    this.selectedDOMNodeInternal = null;
-
-    this.visible = false;
-
-    this.updateRecords = new Map();
-    this.treeElementsBeingUpdated = new Set();
-
-    this.setUseLightSelectionColor(true);
-  }
-
-  static forDOMModel(domModel: SDK.DOMModel.DOMModel): ElementsTreeOutline|null {
-    return elementsTreeOutlineByDOMModel.get(domModel) || null;
-  }
-
-  deindentSingleNode(): void {
-    const firstChild = this.firstChild();
-    if (!firstChild || (firstChild && !firstChild.isExpandable())) {
-      this.shadowRoot.querySelector('.elements-disclosure')?.classList.add('single-node');
-    }
-  }
-
-  setWordWrap(wrap: boolean): void {
-    this.elementInternal.classList.toggle('elements-tree-nowrap', !wrap);
-  }
-
-  setMultilineEditing(multilineEditing: MultilineEditorController|null, node?: SDK.DOMModel.DOMNode): void {
-    this.domTreeWidget?.setMultilineEditing(multilineEditing, node);
-  }
-
-  visibleWidth(): number {
-    return this.domTreeWidget?.visibleWidth ?? this.visibleWidthInternal ?? 0;
-  }
-
-  setVisibleWidth(width: number): void {
-    this.visibleWidthInternal = width;
-  }
-
-  setClipboardData(data: ClipboardData|null): void {
-    this.domTreeWidget?.setClipboardData(data);
-  }
-
-  resetClipboardIfNeeded(removedNode: SDK.DOMModel.DOMNode): void {
-    this.domTreeWidget?.resetClipboardIfNeeded(removedNode);
-  }
-
-  performCopyOrCut(isCut: boolean, node: SDK.DOMModel.DOMNode|null, includeShadowRoots = false): void {
-    this.domTreeWidget?.performCopyOrCut(isCut, node, includeShadowRoots);
-  }
-
-  canPaste(targetNode: SDK.DOMModel.DOMNode): boolean {
-    return this.domTreeWidget?.canPaste(targetNode) ?? false;
-  }
-
-  pasteNode(targetNode: SDK.DOMModel.DOMNode): void {
-    this.domTreeWidget?.pasteNode(targetNode);
-  }
-
-  duplicateNode(targetNode: SDK.DOMModel.DOMNode): void {
-    this.domTreeWidget?.duplicateNode(targetNode);
-  }
-
-  setVisible(visible: boolean): void {
-    if (visible === this.visible) {
-      return;
-    }
-    this.visible = visible;
-    if (!this.visible) {
-      this.domTreeWidget?.multilineEditing()?.cancel();
-      return;
-    }
-
-    this.runPendingUpdates();
-    if (this.selectedDOMNodeInternal) {
-      this.revealAndSelectNode(this.selectedDOMNodeInternal, false);
-    }
-  }
-
-  get rootDOMNode(): SDK.DOMModel.DOMNode|null {
-    return this.rootDOMNodeInternal;
-  }
-
-  set rootDOMNode(x: SDK.DOMModel.DOMNode|null) {
-    if (this.rootDOMNodeInternal === x) {
-      return;
-    }
-
-    this.rootDOMNodeInternal = x;
-
-    this.isXMLMimeTypeInternal = x?.isXMLNode();
-
-    this.update();
-  }
-
-  get isXMLMimeType(): boolean {
-    return Boolean(this.isXMLMimeTypeInternal);
-  }
-
-  selectedDOMNode(): SDK.DOMModel.DOMNode|null {
-    return this.selectedDOMNodeInternal;
-  }
-
-  selectDOMNode(node: SDK.DOMModel.DOMNode|null, focus?: boolean): void {
-    if (this.selectedDOMNodeInternal === node) {
-      this.revealAndSelectNode(node, !focus);
-      return;
-    }
-
-    this.selectedDOMNodeInternal = node;
-    this.revealAndSelectNode(node, !focus);
-
-    // The revealAndSelectNode() method might find a different element if there is inlined text,
-    // and the select() call would change the selectedDOMNode and reenter this setter. So to
-    // avoid calling selectedNodeChanged() twice, first check if selectedDOMNodeInternal is the same
-    // node as the one passed in.
-    if (this.selectedDOMNodeInternal === node) {
-      this.selectedNodeChanged(Boolean(focus));
-    }
-  }
-
-  set maxRowsShown(maxRows: number|undefined) {
-    this.#maxRowsShown = maxRows;
-    this.#updateShowAllButton();
-  }
-
-  #updateShowAllButton(): void {
-    const container = this.shadowRoot.querySelector('.elements-disclosure') as HTMLElement;
-    if (!container) {
-      return;
-    }
-    if (!this.#maxRowsShown) {
-      this.#showAllButton?.classList.add('hidden');
-      container.style.removeProperty('--max-rows');
-      container.classList.remove('elements-tree-truncated');
-      return;
-    }
-
-    container.style.setProperty('--max-rows', String(this.#maxRowsShown));
-    container.classList.add('elements-tree-truncated');
-
-    // We use a microtask to wait for rendering so all node lines are rendered.
-    window.requestAnimationFrame(() => {
-      // The container has a max-height (based on --max-rows). If the total content height
-      // (scrollHeight) is greater than the visible height (clientHeight), it means
-      // some rows are hidden due to truncation, and we should show the "Show all" button.
-      const isOverflowing = container.scrollHeight > container.clientHeight;
-      if (!isOverflowing) {
-        return;
-      }
-      if (!this.#showAllButton) {
-        this.#showAllButton = UI.UIUtils.createTextButton('', () => {
-          this.dispatchEventToListeners(ElementsTreeOutline.Events.ShowAllRows);
-          this.dispatchEventToListeners(UI.TreeOutline.Events.ElementExpanded, this.rootElement());
-        }, {
-          jslogContext: 'show-all-nodes',
-        });
-        this.#showAllButton.classList.add('elements-tree-show-all');
-        this.shadowRoot.appendChild(this.#showAllButton);
-      }
-      this.#showAllButton.classList.remove('hidden');
-      const computedStyle = window.getComputedStyle(container);
-      const lineHeight = parseFloat(computedStyle.lineHeight) || 16;
-      const truncatedLines = Math.round((container.scrollHeight - container.clientHeight) / lineHeight);
-
-      if (truncatedLines > 0) {
-        this.#showAllButton.textContent = i18nString(UIStrings.showAllLines, {PH1: truncatedLines});
-      } else {
-        this.#showAllButton?.classList.add('hidden');
-      }
-    });
-  }
-
-  highlightAdoptedStyleSheet(adoptedStyleSheet: SDK.DOMModel.AdoptedStyleSheet): void {
-    const parentDOMNode =
-        !this.includeRootDOMNode && adoptedStyleSheet.parent === this.rootDOMNode && this.rootDOMNode ?
-        this.rootElement() :
-        this.createTreeElementFor(adoptedStyleSheet.parent);
-    if (!parentDOMNode) {
-      return;
-    }
-    const parentNode = parentDOMNode.firstChild();
-    if (!(parentNode && parentNode instanceof AdoptedStyleSheetSetTreeElement)) {
-      return;
-    }
-
-    for (const child of parentNode.children()) {
-      if (child instanceof AdoptedStyleSheetTreeElement && child.adoptedStyleSheet === adoptedStyleSheet) {
-        parentNode.expand();
-        child.highlight();
-        return;
-      }
-    }
-  }
-
-  editing(): boolean {
-    const node = this.selectedDOMNode();
-    if (!node) {
-      return false;
-    }
-    const treeElement = this.findTreeElement(node);
-    if (!treeElement) {
-      return false;
-    }
-    return treeElement.isEditing || false;
-  }
-
-  update(): void {
-    const selectedNode = this.selectedDOMNode();
-    this.removeChildren();
-    if (!this.rootDOMNode) {
-      return;
-    }
-
-    if (this.includeRootDOMNode) {
-      const treeElement = this.createElementTreeElement(this.rootDOMNode);
-      this.appendChild(treeElement);
-      if (this.expandRoot) {
-        treeElement.expand();
-      }
-    } else {
-      // FIXME: this could use findTreeElement to reuse a tree element if it already exists
-      const children = this.visibleChildren(this.rootDOMNode);
-      for (const child of children) {
-        const treeElement = this.createElementTreeElement(child);
-        this.appendChild(treeElement);
-      }
-    }
-    if (this.rootDOMNode instanceof SDK.DOMModel.DOMDocument) {
-      void this.createTopLayerContainer(this.rootElement(), this.rootDOMNode);
-    }
-
-    if (selectedNode) {
-      this.revealAndSelectNode(selectedNode, true);
-    }
-  }
-
-  selectedNodeChanged(focus: boolean): void {
-    this.dispatchEventToListeners(ElementsTreeOutline.Events.SelectedNodeChanged,
-                                  {node: this.selectedDOMNodeInternal, focus});
-  }
-
-  private fireElementsTreeUpdated(nodes: SDK.DOMModel.DOMNode[]): void {
-    this.dispatchEventToListeners(ElementsTreeOutline.Events.ElementsTreeUpdated, nodes);
-  }
-
-  findTreeElement(node: SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[]): ElementsTreeElement|null {
-    if (node instanceof Array) {
-      return null;
-    }
-    let treeElement = this.lookUpTreeElement(node);
-    if (!treeElement && node.nodeType() === Node.TEXT_NODE) {
-      // The text node might have been inlined if it was short, so try to find the parent element.
-      treeElement = this.lookUpTreeElement(node.parentNode);
-    }
-
-    return treeElement as ElementsTreeElement | null;
-  }
-
-  private lookUpTreeElement(node: SDK.DOMModel.DOMNode|null): UI.TreeOutline.TreeElement|null {
-    if (!node) {
-      return null;
-    }
-
-    const cachedElement = this.treeElementByNode.get(node);
-    if (cachedElement) {
-      return cachedElement;
-    }
-
-    // Walk up the parent pointers from the desired node
-    const ancestors = [];
-    let currentNode;
-    for (currentNode = node.parentNode; currentNode; currentNode = currentNode.parentNode) {
-      ancestors.push(currentNode);
-      if (this.treeElementByNode.has(currentNode)) {  // stop climbing as soon as we hit
-        break;
-      }
-    }
-
-    if (!currentNode) {
-      return null;
-    }
-
-    // Walk down to populate each ancestor's children, to fill in the tree and the cache.
-    for (let i = ancestors.length - 1; i >= 0; --i) {
-      const child = ancestors[i - 1] || node;
-      const treeElement = this.treeElementByNode.get(ancestors[i]);
-      if (treeElement) {
-        void treeElement.onpopulate();  // fill the cache with the children of treeElement
-        if (child.index && child.index >= treeElement.expandedChildrenLimit()) {
-          this.setExpandedChildrenLimit(treeElement, child.index + 1);
-        }
-      }
-    }
-
-    return this.treeElementByNode.get(node) || null;
-  }
-
-  createTreeElementFor(node: SDK.DOMModel.DOMNode): ElementsTreeElement|null {
-    let treeElement = this.findTreeElement(node);
-    if (treeElement) {
-      return treeElement;
-    }
-    if (!node.parentNode) {
-      return null;
-    }
-
-    treeElement = this.createTreeElementFor(node.parentNode);
-    return treeElement ? this.showChild(treeElement, node) : null;
-  }
-
-  private revealAndSelectNode(node: SDK.DOMModel.DOMNode|null, omitFocus: boolean): void {
-    if (this.suppressRevealAndSelect) {
-      return;
-    }
-
-    if (!this.includeRootDOMNode && node === this.rootDOMNode && this.rootDOMNode) {
-      node = this.rootDOMNode.firstChild;
-    }
-    if (!node) {
-      return;
-    }
-    const treeElement = this.createTreeElementFor(node);
-    if (!treeElement) {
-      return;
-    }
-
-    treeElement.revealAndSelect(omitFocus);
-  }
-
-  highlightNodeAttribute(node: SDK.DOMModel.DOMNode, attribute: string): void {
-    const treeElement = this.findTreeElement(node);
-    if (!treeElement) {
-      return;
-    }
-    treeElement.reveal();
-    treeElement.highlightAttribute(attribute);
-  }
-
-  treeElementFromEventInternal(event: MouseEvent): UI.TreeOutline.TreeElement|null {
-    for (const target of event.composedPath()) {
-      if (target instanceof HTMLLIElement) {
-        const element = UI.TreeOutline.TreeElement.getTreeElementBylistItemNode(target);
-        if (element) {
-          return element;
-        }
-      }
-    }
-
-    const scrollContainer = this.element.parentElement;
-    if (!scrollContainer) {
-      return null;
-    }
-
-    const x = event.clientX;
-    const y = event.clientY;
-
-    // Our list items have 1-pixel cracks between them vertically. We avoid
-    // the cracks by checking slightly above and slightly below the mouse
-    // and seeing if we hit the same element each time.
-    const elementUnderMouse = this.treeElementFromPoint(x, y);
-    const elementAboveMouse = this.treeElementFromPoint(x, y - 2);
-    let element;
-    if (elementUnderMouse === elementAboveMouse) {
-      element = elementUnderMouse;
-    } else {
-      element = this.treeElementFromPoint(x, y + 2);
-    }
-
-    return element;
-  }
-
-  private onfocusout(_event: Event): void {
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
-  }
-
-  private onmousedown(event: MouseEvent): void {
-    const element = this.treeElementFromEventInternal(event);
-    if (element) {
-      element.select();
-    }
-  }
-
-  setHoverEffect(treeElement: UI.TreeOutline.TreeElement|null): void {
-    if (this.previousHoveredElement === treeElement) {
-      return;
-    }
-
-    if (this.previousHoveredElement instanceof ElementsTreeElement) {
-      this.previousHoveredElement.hovered = false;
-      delete this.previousHoveredElement;
-    }
-
-    if (treeElement instanceof ElementsTreeElement) {
-      treeElement.hovered = true;
-      this.previousHoveredElement = treeElement;
-    }
-  }
-
-  private onmousemove(event: MouseEvent): void {
-    const element = this.treeElementFromEventInternal(event);
-    if (element && this.previousHoveredElement === element) {
-      return;
-    }
-
-    this.setHoverEffect(element);
-    const showInfo = !UI.KeyboardShortcut.KeyboardShortcut.eventHasEitherCtrlOrMeta(event);
-    this.highlightTreeElement((element as UI.TreeOutline.TreeElement | null), showInfo);
-  }
-
-  private highlightTreeElement(element: UI.TreeOutline.TreeElement|null, showInfo: boolean): void {
-    if (element instanceof ElementsTreeElement) {
-      const selectorList = element.isDisplayContents() ? '*' : undefined;
-      element.node().domModel().overlayModel().highlightInOverlay({node: element.node(), selectorList}, 'all',
-                                                                  showInfo);
-      return;
-    }
-
-    if (element instanceof ShortcutTreeElement) {
-      element.domModel().overlayModel().highlightInOverlay(
-          {deferredNode: element.deferredNode(), selectorList: undefined}, 'all', showInfo);
-      return;
-    }
-
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
-  }
-
-  private onmouseleave(_event: MouseEvent): void {
-    this.setHoverEffect(null);
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
-  }
-
-  private ondragstart(event: DragEvent): boolean|undefined {
-    const treeElement = this.treeElementFromEventInternal(event);
-    if (!(treeElement instanceof ElementsTreeElement)) {
-      return false;
-    }
-    const textContent = treeElement.widget.contentElement.textContent || treeElement.listItemElement.textContent ||
-        treeElement.node().nodeName().toLowerCase();
-    const success = this.domTreeWidget?.onDragStart(treeElement.node(), event, textContent);
-    return success;
-  }
-
-  private ondragover(event: DragEvent): boolean {
-    const treeElement = this.treeElementFromEventInternal(event);
-    if (!(treeElement instanceof ElementsTreeElement)) {
-      this.clearDragOverTreeElementMarker();
-      return false;
-    }
-    const success = this.domTreeWidget?.onDragOver(treeElement.node(), treeElement.isClosingTag(), event);
-    if (success) {
-      if (this.dragOverTreeElement !== treeElement) {
-        this.clearDragOverTreeElementMarker();
-        treeElement.listItemElement.classList.add('elements-drag-over');
-        this.dragOverTreeElement = treeElement;
-      }
-    } else {
-      this.clearDragOverTreeElementMarker();
-    }
-    return !success;
-  }
-
-  private ondragleave(event: DragEvent): boolean {
-    this.clearDragOverTreeElementMarker();
-    this.domTreeWidget?.onDragLeave(event);
-    event.preventDefault();
-    return false;
-  }
-
-  private ondrop(event: DragEvent): void {
-    event.preventDefault();
-    const treeElement = this.treeElementFromEventInternal(event);
-    if (treeElement instanceof ElementsTreeElement) {
-      this.domTreeWidget?.onDrop(treeElement.node(), treeElement.isClosingTag(), event);
-    }
-    this.clearDragOverTreeElementMarker();
-  }
-
-  private ondragend(event: DragEvent): void {
-    event.preventDefault();
-    this.clearDragOverTreeElementMarker();
-    this.domTreeWidget?.onDragEnd(event);
-  }
-
-  private clearDragOverTreeElementMarker(): void {
-    if (this.dragOverTreeElement) {
-      this.dragOverTreeElement.listItemElement.classList.remove('elements-drag-over');
-      delete this.dragOverTreeElement;
-    }
-  }
-
-  showContextMenu: (treeElement: ElementsTreeElement, event: Event) => void = () => {};
-
-  runPendingUpdates(): void {
-    this.updateModifiedNodes();
-  }
-
-  toggleEditAsHTML(node: SDK.DOMModel.DOMNode, startEditing?: boolean, callback?: (() => void)): void {
-    this.domTreeWidget?.toggleEditAsHTML(node, startEditing, callback);
-  }
-
-  selectNodeAfterEdit(wasExpanded: boolean, error: string|null, newNode: SDK.DOMModel.DOMNode|null): ElementsTreeElement
-      |null {
-    if (error) {
-      return null;
-    }
-
-    // Select it and expand if necessary. We force tree update so that it processes dom events and is up to date.
-    this.runPendingUpdates();
-
-    if (!newNode) {
-      return null;
-    }
-
-    this.selectDOMNode(newNode, true);
-
-    const newTreeItem = this.findTreeElement(newNode);
-    if (wasExpanded) {
-      if (newTreeItem) {
-        newTreeItem.expand();
-      }
-    }
-    return newTreeItem;
-  }
-
-  async toggleHideElement(node: SDK.DOMModel.DOMNode): Promise<void> {
-    await node.toggleHideElement();
-  }
-
-  isToggledToHidden(node: SDK.DOMModel.DOMNode): boolean {
-    return node.isToggledToHidden();
-  }
-
-  private reset(): void {
-    this.rootDOMNode = null;
-    this.selectDOMNode(null, false);
-    this.setClipboardData(null);
-    SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
-    this.updateRecords.clear();
-  }
-
-  wireToDOMModel(domModel: SDK.DOMModel.DOMModel): void {
-    elementsTreeOutlineByDOMModel.set(domModel, this);
-    domModel.addEventListener(SDK.DOMModel.Events.MarkersChanged, this.markersChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.NodeInserted, this.nodeInserted, this);
-    domModel.addEventListener(SDK.DOMModel.Events.NodeRemoved, this.nodeRemoved, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AttrModified, this.attributeModified, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AttrRemoved, this.attributeRemoved, this);
-    domModel.addEventListener(SDK.DOMModel.Events.CharacterDataModified, this.characterDataModified, this);
-    domModel.addEventListener(SDK.DOMModel.Events.DocumentUpdated, this.documentUpdated, this);
-    domModel.addEventListener(SDK.DOMModel.Events.DocumentURLChanged, this.documentURLChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.ChildNodeCountUpdated, this.childNodeCountUpdated, this);
-    domModel.addEventListener(SDK.DOMModel.Events.DistributedNodesChanged, this.distributedNodesChanged, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AffectedByStartingStylesFlagUpdated,
-                              this.affectedByStartingStylesFlagUpdated, this);
-    domModel.addEventListener(SDK.DOMModel.Events.AdoptedStyleSheetsModified, this.adoptedStyleSheetsModified, this);
-  }
-
-  unwireFromDOMModel(domModel: SDK.DOMModel.DOMModel): void {
-    domModel.removeEventListener(SDK.DOMModel.Events.MarkersChanged, this.markersChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.NodeInserted, this.nodeInserted, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.NodeRemoved, this.nodeRemoved, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AttrModified, this.attributeModified, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AttrRemoved, this.attributeRemoved, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.CharacterDataModified, this.characterDataModified, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.DocumentUpdated, this.documentUpdated, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.DocumentURLChanged, this.documentURLChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.ChildNodeCountUpdated, this.childNodeCountUpdated, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.DistributedNodesChanged, this.distributedNodesChanged, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AffectedByStartingStylesFlagUpdated,
-                                 this.affectedByStartingStylesFlagUpdated, this);
-    domModel.removeEventListener(SDK.DOMModel.Events.AdoptedStyleSheetsModified, this.adoptedStyleSheetsModified, this);
-    elementsTreeOutlineByDOMModel.delete(domModel);
-  }
-
-  private addUpdateRecord(node: SDK.DOMModel.DOMNode): Elements.ElementUpdateRecord.ElementUpdateRecord {
-    let record = this.updateRecords.get(node);
-    if (!record) {
-      record = new Elements.ElementUpdateRecord.ElementUpdateRecord();
-      this.updateRecords.set(node, record);
-    }
-    return record;
-  }
-
-  private updateRecordForHighlight(node: SDK.DOMModel.DOMNode): Elements.ElementUpdateRecord.ElementUpdateRecord|null {
-    if (!this.visible) {
-      return null;
-    }
-    return this.updateRecords.get(node) || null;
-  }
-
-  private documentUpdated(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMModel>): void {
-    const domModel = event.data;
-    this.reset();
-    if (domModel.existingDocument()) {
-      this.rootDOMNode = domModel.existingDocument();
-    }
-  }
-
-  private attributeModified(event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}>):
-      void {
-    const {node} = event.data;
-    this.addUpdateRecord(node).attributeModified(event.data.name);
-    this.updateModifiedNodesSoon();
-  }
-
-  private attributeRemoved(event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, name: string}>):
-      void {
-    const {node} = event.data;
-    this.addUpdateRecord(node).attributeRemoved(event.data.name);
-    this.updateModifiedNodesSoon();
-  }
-
-  private characterDataModified(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.addUpdateRecord(node).charDataModified();
-    // Text could be large and force us to render itself as the child in the tree outline.
-    if (node.parentNode && node.parentNode.firstChild === node.parentNode.lastChild) {
-      this.addUpdateRecord(node.parentNode).childrenModified();
-    }
-    this.updateModifiedNodesSoon();
-  }
-
-  private documentURLChanged(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMDocument>): void {
-    this.addUpdateRecord(event.data).charDataModified();
-    this.updateModifiedNodesSoon();
-  }
-
-  private nodeInserted(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.addUpdateRecord((node.parentNode as SDK.DOMModel.DOMNode)).nodeInserted(node);
-    this.updateModifiedNodesSoon();
-  }
-
-  private nodeRemoved(
-      event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode, parent: SDK.DOMModel.DOMNode}>): void {
-    const {node, parent} = event.data;
-    this.resetClipboardIfNeeded(node);
-    this.addUpdateRecord(parent).nodeRemoved(node);
-    this.updateModifiedNodesSoon();
-  }
-
-  private childNodeCountUpdated(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.addUpdateRecord(node).childrenModified();
-    this.updateModifiedNodesSoon();
-  }
-
-  private distributedNodesChanged(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.addUpdateRecord(node).childrenModified();
-    this.updateModifiedNodesSoon();
-  }
-
-  private adoptedStyleSheetsModified(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    this.addUpdateRecord(node).childrenModified();
-    this.updateModifiedNodesSoon();
-  }
-
-  private updateModifiedNodesSoon(): void {
-    if (!this.updateRecords.size) {
-      return;
-    }
-    if (this.updateModifiedNodesTimeout) {
-      return;
-    }
-    this.updateModifiedNodesTimeout = window.setTimeout(this.updateModifiedNodes.bind(this), 50);
-  }
-
-  /**
-   * TODO: this is made public for unit tests until the ElementsTreeOutline is
-   * migrated into DOMTreeWidget and highlights are declarative.
-   */
-  updateModifiedNodes(): void {
-    if (this.updateModifiedNodesTimeout) {
-      clearTimeout(this.updateModifiedNodesTimeout);
-      delete this.updateModifiedNodesTimeout;
-    }
-
-    const updatedNodes = [...this.updateRecords.keys()];
-    const hidePanelWhileUpdating = updatedNodes.length > 10;
-
-    let treeOutlineContainerElement;
-    let originalScrollTop;
-    if (hidePanelWhileUpdating) {
-      treeOutlineContainerElement = (this.element.parentNode as Element | null);
-      originalScrollTop = treeOutlineContainerElement ? treeOutlineContainerElement.scrollTop : 0;
-      this.elementInternal.classList.add('hidden');
-    }
-    try {
-      const rootNodeUpdateRecords = this.rootDOMNodeInternal && this.updateRecords.get(this.rootDOMNodeInternal);
-      if (rootNodeUpdateRecords?.hasChangedChildren()) {
-        // Document's children have changed, perform total update.
-        this.update();
-      } else {
-        for (const [node, record] of this.updateRecords) {
-          if (record.hasChangedChildren()) {
-            this.updateModifiedParentNode((node));
-          } else {
-            this.updateModifiedNode((node));
-          }
-        }
-      }
-    } finally {
-      if (hidePanelWhileUpdating) {
-        this.elementInternal.classList.remove('hidden');
-        if (treeOutlineContainerElement && originalScrollTop) {
-          treeOutlineContainerElement.scrollTop = originalScrollTop;
-        }
-      }
-
-      this.updateRecords.clear();
-    }
-    this.fireElementsTreeUpdated(updatedNodes);
-  }
-
-  private updateModifiedNode(node: SDK.DOMModel.DOMNode): void {
-    const treeElement = this.findTreeElement(node);
-    if (treeElement) {
-      treeElement.updateTitle(this.updateRecordForHighlight(node));
-    }
-  }
-
-  private updateModifiedParentNode(node: SDK.DOMModel.DOMNode): void {
-    const parentTreeElement = this.findTreeElement(node);
-    if (parentTreeElement) {
-      parentTreeElement.setExpandable(this.hasVisibleChildren(node));
-      parentTreeElement.updateTitle(this.updateRecordForHighlight(node));
-      if (populatedTreeElements.has(parentTreeElement)) {
-        this.updateChildren(parentTreeElement);
-      }
-    }
-  }
-
-  populateTreeElement(treeElement: ElementsTreeElement): Promise<void> {
-    if (treeElement.childCount() || !treeElement.isExpandable()) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>(resolve => {
-      treeElement.node().getChildNodes(() => {
-        populatedTreeElements.add(treeElement);
-        this.updateModifiedParentNode(treeElement.node());
-        resolve();
-      });
-    });
-  }
-
-  createTopLayerContainer(parent: UI.TreeOutline.TreeElement, document: SDK.DOMModel.DOMDocument): void {
-    if (!parent.treeOutline || !(parent.treeOutline instanceof ElementsTreeOutline)) {
-      return;
-    }
-    const container = new TopLayerContainer(parent.treeOutline, document);
-    this.#topLayerContainerByDocument.set(document, container);
-    parent.appendChild(container);
-  }
-
-  revealInTopLayer(node: SDK.DOMModel.DOMNode): void {
-    const document = node.ownerDocument;
-    if (!document) {
-      return;
-    }
-    const container = this.#topLayerContainerByDocument.get(document);
-    if (container) {
-      container.revealInTopLayer(node);
-    }
-  }
-
-  private isMaxDepthReached(node: SDK.DOMModel.DOMNode): boolean {
-    if (this.maxTreeDepth === undefined || this.maxTreeDepth === Infinity) {
-      return false;
-    }
-    // Allow ShadowRoots and Documents to expand one more level.
-    if (node.nodeType() === Node.DOCUMENT_NODE || node.isShadowRoot()) {
-      return false;
-    }
-    const maxDepth = this.maxTreeDepth;
-    let depth = 0;
-    let current: SDK.DOMModel.DOMNode|null = node;
-    const rootNode = this.rootDOMNode;
-    while (current && current !== rootNode) {
-      depth++;
-      current = current.parentNode;
-    }
-    if (this.includeRootDOMNode) {
-      depth++;
-    }
-    if (depth >= maxDepth) {
-      return true;
-    }
-    return false;
-  }
-
-  private createElementTreeElement(node: SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[],
-                                   isClosingTag?: boolean): UI.TreeOutline.TreeElement {
-    if (node instanceof Array) {
-      return new AdoptedStyleSheetSetTreeElement(node);
-    }
-    const treeElement = new ElementsTreeElement(node, isClosingTag);
-    if (this.domTreeWidget) {
-      treeElement.setExpandedChildrenLimit(this.domTreeWidget.expandedChildrenLimit(node));
-    }
-    treeElement.setExpandable(!isClosingTag && this.hasVisibleChildren(node));
-    if (node.nodeType() === Node.ELEMENT_NODE && node.parentNode && node.parentNode.nodeType() === Node.DOCUMENT_NODE &&
-        !node.parentNode.parentNode) {
-      treeElement.setCollapsible(false);
-    }
-
-    treeElement.selectable = Boolean(this.selectEnabled);
-    return treeElement;
-  }
-
-  private showChild(treeElement: ElementsTreeElement, child: SDK.DOMModel.DOMNode): ElementsTreeElement|null {
-    if (treeElement.isClosingTag()) {
-      return null;
-    }
-
-    const index = this.visibleChildren(treeElement.node()).indexOf(child);
-    if (index === -1) {
-      return null;
-    }
-
-    if (index >= treeElement.expandedChildrenLimit()) {
-      this.setExpandedChildrenLimit(treeElement, index + 1);
-    }
-    return treeElement.childAt(index) as ElementsTreeElement;
-  }
-
-  private visibleChildren(node: SDK.DOMModel.DOMNode): Array<SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[]> {
-    const visibleChildren: Array<SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[]> = [];
-    if (node.adoptedStyleSheetsForNode.length) {
-      visibleChildren.push(node.adoptedStyleSheetsForNode);
-    }
-    visibleChildren.push(...ElementsTreeElement.visibleShadowRoots(node));
-
-    const contentDocument = node.contentDocument();
-    if (contentDocument) {
-      visibleChildren.push(contentDocument);
-    }
-
-    const templateContent = node.templateContent();
-    if (templateContent) {
-      visibleChildren.push(templateContent);
-    }
-
-    visibleChildren.push(...node.viewTransitionPseudoElements());
-
-    const markerPseudoElement = node.markerPseudoElement();
-    if (markerPseudoElement) {
-      visibleChildren.push(markerPseudoElement);
-    }
-
-    const checkmarkPseudoElement = node.checkmarkPseudoElement();
-    if (checkmarkPseudoElement) {
-      visibleChildren.push(checkmarkPseudoElement);
-    }
-
-    const beforePseudoElement = node.beforePseudoElement();
-    if (beforePseudoElement) {
-      visibleChildren.push(beforePseudoElement);
-    }
-
-    visibleChildren.push(...node.carouselPseudoElements());
-
-    if (node.childNodeCount()) {
-      // Children may be stale when the outline is not wired to receive DOMModel updates.
-      let children: SDK.DOMModel.DOMNode[] = node.children() || [];
-      if (!this.showComments) {
-        children = children.filter(n => n.nodeType() !== Node.COMMENT_NODE);
-      }
-      visibleChildren.push(...children);
-    }
-
-    const afterPseudoElement = node.afterPseudoElement();
-    if (afterPseudoElement) {
-      visibleChildren.push(afterPseudoElement);
-    }
-
-    const pickerIconPseudoElement = node.pickerIconPseudoElement();
-    if (pickerIconPseudoElement) {
-      visibleChildren.push(pickerIconPseudoElement);
-    }
-
-    const interestButtonPseudoElement = node.interestButtonPseudoElement();
-    if (interestButtonPseudoElement) {
-      visibleChildren.push(interestButtonPseudoElement);
-    }
-
-    const backdropPseudoElement = node.backdropPseudoElement();
-    if (backdropPseudoElement) {
-      visibleChildren.push(backdropPseudoElement);
-    }
-
-    return visibleChildren;
-  }
-
-  private hasVisibleChildren(node: SDK.DOMModel.DOMNode): boolean {
-    if (this.isMaxDepthReached(node)) {
-      return false;
-    }
-    if (node.isIframe()) {
-      return true;
-    }
-    if (node.contentDocument()) {
-      return true;
-    }
-    if (node.templateContent()) {
-      return true;
-    }
-    if (ElementsTreeElement.visibleShadowRoots(node).length) {
-      return true;
-    }
-    if (node.hasPseudoElements()) {
-      return true;
-    }
-    if (node.isInsertionPoint()) {
-      return true;
-    }
-    return Boolean(node.childNodeCount()) && !ElementsTreeElement.canShowInlineText(node);
-  }
-
-  private createExpandAllButtonTreeElement(treeElement: ElementsTreeElement): UI.TreeOutline.TreeElement {
-    const button = UI.UIUtils.createTextButton('', handleLoadAllChildren.bind(this));
-    button.value = '';
-    const expandAllButtonElement = new UI.TreeOutline.TreeElement(button);
-    expandAllButtonElement.selectable = false;
-    expandAllButtonElement.button = button;
-    return expandAllButtonElement;
-
-    function handleLoadAllChildren(this: ElementsTreeOutline, event: Event): void {
-      const visibleChildCount = this.visibleChildren(treeElement.node()).length;
-      this.setExpandedChildrenLimit(
-          treeElement, Math.max(visibleChildCount, treeElement.expandedChildrenLimit() + InitialChildrenLimit));
-      event.consume();
-    }
-  }
-
-  setExpandedChildrenLimit(treeElement: ElementsTreeElement, expandedChildrenLimit: number): void {
-    if (treeElement.expandedChildrenLimit() === expandedChildrenLimit) {
-      return;
-    }
-
-    treeElement.setExpandedChildrenLimit(expandedChildrenLimit);
-    if (this.domTreeWidget && this.domTreeWidget.expandedChildrenLimit(treeElement.node()) !== expandedChildrenLimit) {
-      this.domTreeWidget.setExpandedChildrenLimit(treeElement.node(), expandedChildrenLimit);
-    }
-    if (treeElement.treeOutline && !this.treeElementsBeingUpdated.has(treeElement)) {
-      this.updateModifiedParentNode(treeElement.node());
-    }
-  }
-
-  private updateChildren(treeElement: ElementsTreeElement): void {
-    if (!treeElement.isExpandable()) {
-      if (!treeElement.treeOutline) {
-        return;
-      }
-      const selectedTreeElement = treeElement.treeOutline.selectedTreeElement;
-      if (selectedTreeElement?.hasAncestor(treeElement)) {
-        treeElement.select(true);
-      }
-      treeElement.removeChildren();
-      return;
-    }
-
-    console.assert(!treeElement.isClosingTag());
-
-    this.#updateChildren(treeElement);
-  }
-
-  insertChildElement(treeElement: ElementsTreeElement|TopLayerContainer,
-                     child: SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[], index: number,
-                     isClosingTag?: boolean): UI.TreeOutline.TreeElement {
-    const newElement = this.createElementTreeElement(child, isClosingTag);
-    treeElement.insertChild(newElement, index);
-    return newElement;
-  }
-
-  private moveChild(treeElement: ElementsTreeElement, child: ElementsTreeElement, targetIndex: number): void {
-    if (treeElement.indexOfChild(child) === targetIndex) {
-      return;
-    }
-    const wasSelected = child.selected;
-    if (child.parent) {
-      child.parent.removeChild(child);
-    }
-    treeElement.insertChild(child, targetIndex);
-    if (wasSelected) {
-      child.select();
-    }
-  }
-
-  #updateChildren(treeElement: ElementsTreeElement): void {
-    if (this.treeElementsBeingUpdated.has(treeElement)) {
-      return;
-    }
-
-    this.treeElementsBeingUpdated.add(treeElement);
-
-    const node = treeElement.node();
-    const visibleChildren = this.visibleChildren(node);
-    const visibleChildrenSet = new Set<SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[]>(visibleChildren);
-
-    // Remove any tree elements that no longer have this node as their parent and save
-    // all existing elements that could be reused. This also removes closing tag element.
-    const existingTreeElements = new Map<SDK.DOMModel.DOMNode|SDK.DOMModel.AdoptedStyleSheet[],
-                                         UI.TreeOutline.TreeElement&ElementsTreeElement>();
-    for (let i = treeElement.childCount() - 1; i >= 0; --i) {
-      const existingTreeElement = treeElement.childAt(i);
-      if (!(existingTreeElement instanceof ElementsTreeElement)) {
-        // Remove expand all button and shadow host toolbar.
-        treeElement.removeChildAtIndex(i);
-        continue;
-      }
-      const elementsTreeElement = (existingTreeElement);
-      const existingNode = elementsTreeElement.node();
-
-      if (visibleChildrenSet.has(existingNode)) {
-        existingTreeElements.set(existingNode, existingTreeElement);
-        continue;
-      }
-
-      treeElement.removeChildAtIndex(i);
-    }
-
-    // Insert child nodes.
-    for (let i = 0; i < visibleChildren.length && i < treeElement.expandedChildrenLimit(); ++i) {
-      const child = visibleChildren[i];
-      const existingTreeElement = existingTreeElements.get(child) || this.findTreeElement(child);
-      if (existingTreeElement && existingTreeElement !== treeElement) {
-        // If an existing element was found, just move it.
-        this.moveChild(treeElement, existingTreeElement, i);
-      } else {
-        // No existing element found, insert a new element.
-        const newElement = this.insertChildElement(treeElement, child, i);
-        if (this.updateRecordForHighlight(node) && treeElement.expanded && newElement instanceof ElementsTreeElement) {
-          ElementsTreeElement.animateOnDOMUpdate(newElement);
-        }
-        // If a node was inserted in the middle of existing list dynamically we might need to increase the limit.
-        if (treeElement.childCount() > treeElement.expandedChildrenLimit()) {
-          this.setExpandedChildrenLimit(treeElement, treeElement.expandedChildrenLimit() + 1);
-        }
-      }
-    }
-
-    // Update expand all button.
-    const expandedChildCount = treeElement.childCount();
-    if (visibleChildren.length > expandedChildCount) {
-      const targetButtonIndex = expandedChildCount;
-      if (!treeElement.expandAllButtonElement) {
-        treeElement.expandAllButtonElement = this.createExpandAllButtonTreeElement(treeElement);
-      }
-      treeElement.insertChild(treeElement.expandAllButtonElement, targetButtonIndex);
-      treeElement.expandAllButtonElement.title =
-          i18nString(UIStrings.showAllNodesDMore, {PH1: visibleChildren.length - expandedChildCount});
-    } else if (treeElement.expandAllButtonElement) {
-      treeElement.expandAllButtonElement = null;
-    }
-
-    // Insert shortcuts to distributed children.
-    if (node.isInsertionPoint()) {
-      for (const distributedNode of node.distributedNodes()) {
-        treeElement.appendChild(new ShortcutTreeElement(distributedNode));
-      }
-    }
-
-    // Insert close tag.
-    if (node.nodeType() === Node.ELEMENT_NODE && !node.pseudoType() && treeElement.isExpandable()) {
-      this.insertChildElement(treeElement, node, treeElement.childCount(), true);
-    }
-
-    if (node instanceof SDK.DOMModel.DOMDocument && !this.isXMLMimeType) {
-      let topLayerContainer = this.#topLayerContainerByDocument.get(node);
-      if (!topLayerContainer) {
-        topLayerContainer = new TopLayerContainer(this, node);
-        this.#topLayerContainerByDocument.set(node, topLayerContainer);
-      }
-      treeElement.appendChild(topLayerContainer);
-    }
-
-    this.treeElementsBeingUpdated.delete(treeElement);
-  }
-
-  private markersChanged(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void {
-    const node = event.data;
-    const treeElement = this.treeElementByNode.get(node);
-    if (treeElement) {
-      treeElement.updateDecorations();
-    }
-  }
-
-  private affectedByStartingStylesFlagUpdated(event: Common.EventTarget.EventTargetEvent<{node: SDK.DOMModel.DOMNode}>):
-      void {
-    const {node} = event.data;
-    const treeElement = this.treeElementByNode.get(node);
-    if (treeElement && isOpeningTag(treeElement.tagTypeContext)) {
-      void treeElement.updateAdorners();
-    }
-  }
-}
-
-export namespace ElementsTreeOutline {
-  export enum Events {
-    /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
-    SelectedNodeChanged = 'SelectedNodeChanged',
-    ElementsTreeUpdated = 'ElementsTreeUpdated',
-    ShowAllRows = 'ShowAllRows',
-    /* eslint-enable @typescript-eslint/naming-convention */
-  }
-
-  export interface EventTypes {
-    [Events.SelectedNodeChanged]: {node: SDK.DOMModel.DOMNode|null, focus: boolean};
-    [Events.ElementsTreeUpdated]: SDK.DOMModel.DOMNode[];
-    [Events.ShowAllRows]: void;
-  }
-}
-
-// clang-format off
-export const MappedCharToEntity: Map<string, string> = new Map<string, string>([
-  ['\xA0', 'nbsp'],
-  ['\xAD', 'shy'],
-  ['\u2002', 'ensp'],
-  ['\u2003', 'emsp'],
-  ['\u2009', 'thinsp'],
-  ['\u200A', 'hairsp'],
-  ['\u200B', 'ZeroWidthSpace'],
-  ['\u200C', 'zwnj'],
-  ['\u200D', 'zwj'],
-  ['\u200E', 'lrm'],
-  ['\u200F', 'rlm'],
-  ['\u202A', '#x202A'],
-  ['\u202B', '#x202B'],
-  ['\u202C', '#x202C'],
-  ['\u202D', '#x202D'],
-  ['\u202E', '#x202E'],
-  ['\u2060', 'NoBreak'],
-  ['\uFEFF', '#xFEFF'],
-]);
-// clang-format on
 
 export interface MultilineEditorController {
   cancel: () => void;

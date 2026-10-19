@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Protocol from '../../generated/protocol.js';
 import {expectCookie} from '../../testing/Cookies.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
 import {mockResourceTree} from '../../testing/ResourceTreeHelpers.js';
 import {setupRuntimeHooks} from '../../testing/RuntimeHelpers.js';
 import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
@@ -261,7 +263,6 @@ describe('NetworkRequest (MockConnection)', () => {
   setupLocaleHooks();
   setupSettingsHooks();
   setupRuntimeHooks();
-  let networkManagerForRequestStub: sinon.SinonStub;
   let cookie: SDK.Cookie.Cookie;
   let addBlockedCookieSpy: sinon.SinonSpy;
   let target: SDK.Target.Target;
@@ -275,13 +276,9 @@ describe('NetworkRequest (MockConnection)', () => {
     target = universe.createTarget({connection});
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
-    networkManagerForRequestStub = sinon.stub(SDK.NetworkManager.NetworkManager, 'forRequest').returns(networkManager);
+    sinon.stub(SDK.NetworkManager.NetworkManager, 'forRequest').returns(networkManager);
     cookie = new SDK.Cookie.Cookie('name', 'value');
     addBlockedCookieSpy = sinon.spy(SDK.CookieModel.CookieModel.prototype, 'addBlockedCookie');
-  });
-
-  afterEach(() => {
-    networkManagerForRequestStub.restore();
   });
 
   it('adds blocked response cookies to - and removes exempted cookies from cookieModel', async () => {
@@ -477,6 +474,53 @@ describe('NetworkRequest (MockConnection)', () => {
     const matches = await request.searchInContent('test', false, false);
     sinon.assert.calledOnce(searchStub);
     assert.isEmpty(matches);
+  });
+
+  describe('requestContentDataIfAvailable', () => {
+    it('returns the body of a finished request', async () => {
+      const request = createNetworkRequest({mimeType: 'text/plain', finished: true});
+      connection.setSuccessHandler('Network.getResponseBody', () => ({body: 'response', base64Encoded: false}));
+
+      const contentData = await request.requestContentDataIfAvailable();
+
+      if (TextUtils.ContentData.ContentData.isError(contentData)) {
+        assert.fail(contentData.error);
+      }
+      assert.strictEqual(contentData.text, 'response');
+    });
+
+    it('returns the body of an unfinished request that has a content data provider', async () => {
+      const request = createNetworkRequest({
+        contentData: new TextUtils.ContentData.ContentData('provided', false, 'text/plain'),
+      });
+
+      const contentData = await request.requestContentDataIfAvailable();
+
+      if (TextUtils.ContentData.ContentData.isError(contentData)) {
+        assert.fail(contentData.error);
+      }
+      assert.strictEqual(contentData.text, 'provided');
+    });
+
+    it('returns an error for an unfinished request without a content data provider', async () => {
+      const request = createNetworkRequest();
+      const getResponseBodySpy = sinon.spy(target.networkAgent(), 'invoke_getResponseBody');
+
+      const contentData = await request.requestContentDataIfAvailable();
+
+      assert.deepEqual(contentData, {error: 'Request has not finished loading'});
+      sinon.assert.notCalled(getResponseBodySpy);
+    });
+
+    it('returns an error when an earlier requestContentData() call is still waiting for the request to finish',
+       async () => {
+         const request = createNetworkRequest();
+         void request.requestContentData();
+
+         const contentData = await request.requestContentDataIfAvailable();
+
+         assert.deepEqual(contentData, {error: 'Request has not finished loading'});
+       });
   });
 });
 

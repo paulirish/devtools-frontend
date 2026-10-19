@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {describe, it} from 'mocha';
 
 import {
   findModuleConfiguration,
@@ -128,6 +129,15 @@ describe('resolveSourcePathToURL', () => {
     assert.strictEqual(
         resolveSourcePathToURL([], '\\\\network\\Server\\Source', BASE_URL).href,
         'file://network/Server/Source',
+    );
+    assert.strictEqual(
+        resolveSourcePathToURL(
+            [],
+            '//v24.0/build/sysroot/wasi-libc/libc-bottom-half/crt/crt1-command.c',
+            BASE_URL,
+            )
+            .href,
+        'file:///v24.0/build/sysroot/wasi-libc/libc-bottom-half/crt/crt1-command.c',
     );
   });
 

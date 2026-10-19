@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Platform from '../../core/platform/platform.js';
@@ -40,7 +41,6 @@ describe('NameResolver', () => {
 
   afterEach(() => {
     Formatter.FormatterWorkerPool.FormatterWorkerPool.removeInstance();
-    sinon.restore();
   });
 
   /** Resolves the function name at the start of `callFrame`'s local scope, i.e. where V8 reports a function's location. */

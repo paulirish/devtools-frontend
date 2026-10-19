@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Platform from '../../../../core/platform/platform.js';
@@ -10,7 +11,6 @@ import * as SDK from '../../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Breakpoints from '../../../../models/breakpoints/breakpoints.js';
-import type * as StackTrace from '../../../../models/stack_trace/stack_trace.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
 import {findMenuItemWithLabel} from '../../../../testing/ContextMenuHelpers.js';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../../../testing/EnvironmentHelpers.js';
 import {dispatchEvent} from '../../../../testing/MockConnection.js';
 import {MockDebuggerBackend} from '../../../../testing/MockScopeChain.js';
+import {stubFrame} from '../../../../testing/StackTraceHelpers.js';
 import {TestUniverse} from '../../../../testing/TestUniverse.js';
 import * as UI from '../../legacy.js';
 
@@ -369,12 +370,11 @@ describeWithEnvironment('Linkifier', () => {
       const url = Platform.DevToolsPath.urlString`http://example.com/script.js`;
       ignoreListManager.ignoreListURL(url);
 
-      const frame = {
+      const frame = stubFrame({
         url,
         line: 1,
         column: 1,
-        uiSourceCode: null,
-      } as unknown as StackTrace.StackTrace.Frame;
+      });
 
       const anchor = Components.Linkifier.Linkifier.linkifyStackTraceFrame(frame, {ignoreListManager});
 

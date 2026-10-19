@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
@@ -28,9 +29,7 @@ describe('ScopeChainModel', () => {
   });
 
   afterEach(async () => {
-    clock.restore();
     await deinitializeGlobalVars();
-    sinon.restore();
   });
 
   it('emits an event after it was constructed with the scope chain', async () => {

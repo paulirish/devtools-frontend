@@ -22,6 +22,7 @@ Use unit tests for isolated testing of individual functions, classes, models, he
   - Use `TestUniverse` (and foundation test helpers) for easy, isolated setup of required dependencies and models.
   - For testing UI widgets, use stubbed view functions and screenshot assertions rather than spinning up heavy DOM/browser infrastructure.
 - **Location:** Co-located next to their implementation files (e.g. `TimelinePanel.ts` and `TimelinePanel.test.ts`).
+- **Test functions:** import `describe`, `it`, `beforeEach`, etc. from `mocha` (e.g. `import {describe, it} from 'mocha';`). They are not available as globals.
 - **BUILD.gn**: test file should be added to `devtools_ui_module("unittests")` or `devtools_foundation_module("foundation_unittests")` target in the corresponding `BUILD.gn` file.
 
 ---
@@ -37,7 +38,8 @@ Use API tests for integration tests that verify business logic requiring more co
   - Tests that require extensive CDP mock setup.
   - Verifying the "foundational layer" of DevTools models against a real browser/web page.
 - **Location:** Defined in `front_end/` with `.test.api.ts` extension (e.g. `Universe.test.api.ts`).
-- **BUILD.gn**: test file should be added to `devtools_api_test_module("api_tests")` target in the corresponding `BUILD.gn` file.
+- **Test functions:** import `describe`, `it` and `setup` from `test/api/mocha-interface.ts`. They are not available as globals.
+- **BUILD.gn**: test file should be added to `devtools_api_test_module("api_tests")` target in the corresponding `BUILD.gn` file, which needs `test/api` in its `ts_deps`.
 
 ---
 
@@ -49,4 +51,5 @@ Use E2E tests to verify real end-to-end user stories and user journeys.
   - Verifying full user journeys across DevTools panels and drawers.
   - Complex UI behaviors that require extensive user interaction setup and benefit from a complete DevTools frontend page connected to an inspected target page over CDP.
 - **Location:** Defined in `test/e2e/` (e.g. `test/e2e/console/console-log.test.ts`).
-- **BUILD.gn**: test file should be added to `ts_e2e_library(ts_e2e_library)` target in the corresponding `BUILD.gn` file. And `node_ts_library` in `test/e2e/BUILD.gn` for its dependencies.
+- **Test functions:** import `describe`, `it` and `setup` from `test/e2e/conductor/mocha-interface.ts` (e.g. `import {describe, it} from '../conductor/mocha-interface.js';`). They are not available as globals.
+- **BUILD.gn**: test file should be added to the `node_ts_library` target in the corresponding `BUILD.gn` file, which needs `"../conductor:implementation"` in its `ts_deps`. And `node_ts_library` in `test/e2e/BUILD.gn` for its dependencies.

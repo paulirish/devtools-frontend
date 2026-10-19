@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, before, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -82,8 +83,6 @@ describe('CookieItemsView', () => {
     viewFunction.input.onAiButtonClick?.(cookie, dummyEvent);
 
     sinon.assert.calledOnce(executeStub);
-
-    executeStub.restore();
   });
 
   it('populates context menu with Debug with AI submenu and expected items', () => {
@@ -103,8 +102,6 @@ describe('CookieItemsView', () => {
     assert.exists(debugWithAiItem, 'Expected Debug with AI context menu item');
 
     assert.deepEqual(debugWithAiItem?.subItems?.map(item => item.label), ['Start a chat', 'Explain this cookie']);
-
-    contextFlavorStub.restore();
   });
 
   it('sets StorageItem flavor on select', () => {

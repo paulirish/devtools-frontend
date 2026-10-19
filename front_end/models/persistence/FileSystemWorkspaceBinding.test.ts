@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -29,10 +30,6 @@ describe('FileSystemWorkspaceBinding', () => {
 
   beforeEach(() => {
     universe = new TestUniverse();
-  });
-
-  afterEach(() => {
-    sinon.restore();
   });
 
   it('does not conflict when file system paths share a prefix', async () => {

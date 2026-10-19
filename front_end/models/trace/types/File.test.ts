@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {describe, it} from 'mocha';
 
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Trace from '../trace.js';
@@ -22,6 +23,16 @@ describe('Trace file types', () => {
     it('converts the values for a synthetic event', async () => {
       const result = Trace.Types.File.traceEventKeyToValues('s-101');
       assert.deepEqual(result, {type: Trace.Types.File.EventKeyType.SYNTHETIC_EVENT, rawIndex: 101});
+    });
+
+    it('converts the values for a layout shift cluster', async () => {
+      const result = Trace.Types.File.traceEventKeyToValues('c-101');
+      assert.deepEqual(result, {type: Trace.Types.File.EventKeyType.LAYOUT_SHIFT_CLUSTER, rawIndex: 101});
+    });
+
+    it('throws for a layout shift cluster key with extra parts', async () => {
+      const key = 'c-101-1' as Trace.Types.File.SerializableKey;
+      assert.throws(() => Trace.Types.File.traceEventKeyToValues(key), 'Invalid LayoutShiftCluster Key: c-101-1');
     });
 
     it('converts the values for a profile call event', async () => {

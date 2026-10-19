@@ -4,11 +4,9 @@ buganizer_public: {
 }
 agentic_review: {
   capability_groups: {
-    name: "core-review"
     review_capability_skills: [".agents/skills/code-review/SKILL.md"]
   }
   capability_groups: {
-    name: "typescript-and-models"
     path_expression: ["front_end/.*\\.ts", ".*BUILD\\.gn", ".*\\.gni"]
     path_expression_exclusion: [".*\\.test\\.ts"]
     review_capability_skills: [
@@ -20,21 +18,32 @@ agentic_review: {
     ]
   }
   capability_groups: {
-    name: "ui-and-widgets"
+    path_expression: [
+      "front_end/(core|models|entrypoints|generated)/.*\\.ts",
+      ".*BUILD\\.gn",
+      ".*\\.gni"
+    ]
+    path_expression_exclusion: [".*\\.test\\.ts"]
+    review_capability_skills: [
+      ".agents/skills/review-models-core/SKILL.md"
+    ]
+  }
+  capability_groups: {
     path_expression: ["front_end/(panels|ui)/.*\\.(ts|css)"]
     path_expression_exclusion: [".*\\.test\\.ts"]
     review_capability_skills: [
       ".agents/skills/ui-widgets/SKILL.md",
-      ".agents/skills/ui-eng-vision-orchestrator/SKILL.md"
+      ".agents/skills/ui-eng-vision-orchestrator/SKILL.md",
+      ".agents/skills/review-ui-widgets/SKILL.md"
     ]
   }
   capability_groups: {
-    name: "tests"
-    path_expression: [".*\\.test\\.ts", "test/.*\\.ts"]
+    path_expression: [".*\\.test\\.ts", "test/.*\\.ts", "front_end/testing/.*\\.ts"]
     review_capability_skills: [
       ".agents/skills/devtools-testing-guidance/SKILL.md",
       ".agents/skills/foundation-test-migration/SKILL.md",
-      ".agents/skills/fix-tests/SKILL.md"
+      ".agents/skills/fix-tests/SKILL.md",
+      ".agents/skills/review-tests/SKILL.md"
     ]
   }
 }

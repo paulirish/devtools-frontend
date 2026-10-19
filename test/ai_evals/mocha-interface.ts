@@ -2,15 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {createMochaInterface} from '../conductor/mocha-interface.js';
-import type {E2EState} from '../e2e/conductor/state-provider.js';
+import {
+  createMochaInterface,
+  type MochaInterface,
+  type SetupFunction,
+  type SuiteFunction,
+  type TestFunction,
+} from '../conductor/mocha-interface.js';
 
-import {AiEvalStateProvider} from './ai-eval-state-provider.js';
+import {type AiEvalState, AiEvalStateProvider, type AiEvalSuiteSettings} from './ai-eval-state-provider.js';
 
-export const devtoolsAiEvalTestInterface: {
-  (rootSuite: Mocha.Suite): void,
-  description: string,
-} = createMochaInterface<E2EState, E2E.SuiteSettings>({
+export const devtoolsAiEvalTestInterface: MochaInterface<AiEvalState, AiEvalSuiteSettings> = createMochaInterface({
   description: 'DevTools AI Eval test interface',
   stateProvider: AiEvalStateProvider.instance,
 });
+
+/**
+ * Defines a suite of AI evals.
+ */
+export const describe: SuiteFunction = devtoolsAiEvalTestInterface.describe;
+
+/**
+ * Defines an AI eval. The test body receives the e2e state and the eval task.
+ */
+export const it: TestFunction<AiEvalState> = devtoolsAiEvalTestInterface.it;
+
+/**
+ * Configures the browser, DevTools and the eval task for the tests of the
+ * enclosing suite.
+ */
+export const setup: SetupFunction<AiEvalSuiteSettings> = devtoolsAiEvalTestInterface.setup;

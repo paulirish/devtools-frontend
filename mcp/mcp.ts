@@ -29,6 +29,7 @@ export * as SDKSettings from '../front_end/core/sdk/SDKSettings.js';
 export * as SourceMapManager from '../front_end/core/sdk/SourceMapManager.js';
 export {Target} from '../front_end/core/sdk/Target.js';
 export {TargetManager} from '../front_end/core/sdk/TargetManager.js';
+export * as WebAuthnModel from '../front_end/core/sdk/WebAuthnModel.js';
 export {VALID_PLACEHOLDER_MATCH_PATTERN} from '../front_end/core/text_utils/Markdown.js';
 export * as Foundation from '../front_end/foundation/foundation.js';
 export * as Protocol from '../front_end/generated/protocol.js';
@@ -41,6 +42,7 @@ export {
 } from '../front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.js';
 export {AgentFocus} from '../front_end/models/ai_assistance/performance/AIContext.js';
 export {DebuggerWorkspaceBinding} from '../front_end/models/bindings/DebuggerWorkspaceBinding.js';
+export * as BreakpointManager from '../front_end/models/breakpoints/BreakpointManager.js';
 export type * as CD4ABridge from '../front_end/models/comment_manager/CD4ABridge.js';
 export * as CrUXManager from '../front_end/models/crux-manager/CrUXManager.js';
 export * as Formatter from '../front_end/models/formatter/formatter.js';
@@ -66,4 +68,5 @@ export {
   OptionalCategories as TracingOptionalCategories,
 } from '../front_end/models/trace/types/TraceEvents.js';
 export {IgnoreListManager} from '../front_end/models/workspace/IgnoreListManager.js';
+export * as Workspace from '../front_end/models/workspace/workspace.js';
 export * as Marked from '../front_end/third_party/marked/marked.js';

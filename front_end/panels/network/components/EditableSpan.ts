@@ -3,41 +3,23 @@
 // found in the LICENSE file.
 /* eslint-disable @devtools/no-lit-render-outside-of-view */
 
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import {html, render} from '../../../ui/lit/lit.js';
+import {Directives, html, render} from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import editableSpanStyles from './EditableSpan.css.js';
 
-export interface EditableSpanData {
-  value: string;
-}
-
 export class EditableSpan extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
+  readonly #editableRef = Directives.createRef<HTMLElement>();
   #value = '';
 
-  connectedCallback(): void {
-    this.#shadow.addEventListener('focusin', this.#selectAllText.bind(this));
-    this.#shadow.addEventListener('keydown', this.#onKeyDown.bind(this));
-    this.#shadow.addEventListener('input', this.#onInput.bind(this));
-  }
-
-  set data(data: EditableSpanData) {
-    this.#value = data.value;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
   get value(): string {
-    return this.#shadow.querySelector<HTMLSpanElement>('span')?.innerText || '';
+    return this.#value;
   }
 
   set value(value: string) {
     this.#value = value;
-    const span = this.#shadow.querySelector<HTMLSpanElement>('span');
-    if (span) {
-      span.innerText = value;
-    }
+    this.performUpdate();
   }
 
   #onKeyDown(event: Event): void {
@@ -60,29 +42,28 @@ export class EditableSpan extends HTMLElement {
     selection?.addRange(range);
   }
 
-  #render(): void {
-    if (!ComponentHelpers.ScheduledRender.isScheduledRender(this)) {
-      throw new Error('HeaderSectionRow render was not scheduled');
-    }
-
+  performUpdate(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
       <style>${editableSpanStyles}</style>
       <span
+        ${Directives.ref(this.#editableRef)}
         contenteditable="plaintext-only"
         class="editable"
         tabindex="0"
-        .innerText=${this.#value}
+        .innerText=${Directives.live(this.#value)}
         jslog=${VisualLogging.value('header-editor').track({change: true, keydown: 'Enter|Escape'})}
+        @focusin=${this.#selectAllText.bind(this)}
+        @keydown=${this.#onKeyDown.bind(this)}
+        @input=${this.#onInput.bind(this)}
         ></span>`, this.#shadow, {host: this});
     // clang-format on
   }
 
   override focus(): void {
     requestAnimationFrame(() => {
-      const span = this.#shadow.querySelector<HTMLElement>('.editable');
-      span?.focus();
+      this.#editableRef.value?.focus();
     });
   }
 }

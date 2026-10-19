@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -46,10 +47,6 @@ describeWithEnvironment('AISettingsTab', () => {
     });
     aidaAccessStub = sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions');
     aidaAccessStub.returns(Promise.resolve(Host.AidaClient.AidaAccessPreconditions.AVAILABLE));
-  });
-
-  afterEach(async () => {
-    aidaAccessStub.restore();
   });
 
   function mockHostConfigWithExplainThisResourceEnabled() {
@@ -261,11 +258,10 @@ describeWithEnvironment('AISettingsTab', () => {
   });
 
   it('updates disabled reason', async () => {
-    const isAvailableStub =
-        sinon.stub(AiAssistanceModel.AiUtils.aiAssistanceEnabledSettingDescriptor, 'isAvailable').returns({
-          status: Common.Settings.SettingAvailability.DISABLED,
-          reason: [AiAssistanceModel.AiUtils.DisabledReason.WRONG_LOCALE],
-        });
+    sinon.stub(AiAssistanceModel.AiUtils.aiAssistanceEnabledSettingDescriptor, 'isAvailable').returns({
+      status: Common.Settings.SettingAvailability.DISABLED,
+      reason: [AiAssistanceModel.AiUtils.DisabledReason.WRONG_LOCALE],
+    });
 
     const {view} = await setupWidget();
 
@@ -273,7 +269,6 @@ describeWithEnvironment('AISettingsTab', () => {
       'To use this feature, set your language preference to English in DevTools settings' as
           Platform.UIString.LocalizedString,
     ]);
-    isAvailableStub.restore();
   });
 
   it('can turn feature off and clear history', async () => {

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {afterEach, beforeEach} from 'mocha';
 import sinon from 'sinon';
 
 import type {Chrome} from '../../extension-api/ExtensionAPI.js';
@@ -64,7 +65,6 @@ export function setupDevtoolsExtensionHooks(extension: Partial<Host.InspectorFro
     const chrome: Partial<Chrome.DevTools.Chrome> = {};
     (window as {chrome?: Partial<Chrome.DevTools.Chrome>}).chrome = chrome;
     context.chrome = chrome;
-    sinon.restore();
   }
 
   beforeEach(async () => {

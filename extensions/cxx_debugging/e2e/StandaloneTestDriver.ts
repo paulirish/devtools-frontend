@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {createRequire} from 'node:module';
+import {describe} from 'test/e2e/conductor/mocha-interface.js';
 
 import {loadTests} from './cxx-debugging-extension-helpers.js';
 

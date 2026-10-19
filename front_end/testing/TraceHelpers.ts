@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Mocha from 'mocha';
+
 import * as SDK from '../core/sdk/sdk.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as Trace from '../models/trace/trace.js';
@@ -95,9 +97,9 @@ export async function renderFlameChartIntoDOM(context: Mocha.Context|null, optio
     parsedTrace = options.fileNameOrParsedTrace;
   }
 
-  if (options.preloadScreenshots) {
-    const screenshots =
-        parsedTrace?.data.Screenshots.screenshots ?? parsedTrace?.data.Screenshots.legacySyntheticScreenshots ?? [];
+  if (options.preloadScreenshots && parsedTrace) {
+    const filmStrip = Trace.Extras.FilmStrip.fromHandlerData(parsedTrace.data);
+    const screenshots = filmStrip.frames.map(f => f.screenshotEvent);
     await Timeline.Utils.ImageCache.preload(screenshots);
   }
   const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);

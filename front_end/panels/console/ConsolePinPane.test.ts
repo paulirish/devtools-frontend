@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
@@ -124,7 +125,6 @@ describeWithEnvironment('ConsolePinPane', () => {
       await pasteIntoLiveExpression(consolePinPane);
       const dialogContainer = document.body.querySelector<HTMLDivElement>('[data-devtools-glass-pane]');
       assert.isNull(dialogContainer);
-      stub.restore();
     });
   });
 });

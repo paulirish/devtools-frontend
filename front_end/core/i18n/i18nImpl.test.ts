@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as i18n from './i18n.js';
@@ -20,7 +21,6 @@ describe('fetchAndRegisterLocaleData', () => {
   });
 
   afterEach(() => {
-    fetchStub.restore();
     i18n.i18n.resetLocaleDataForTest();
   });
 

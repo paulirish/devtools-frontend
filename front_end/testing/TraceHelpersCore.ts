@@ -214,6 +214,32 @@ export function makeInstantEvent(
 }
 
 /**
+ * Builds a mock ConsoleTimeStamp.
+ */
+export function makeConsoleTimeStamp(
+    message: string,
+    tsMicroseconds: number,
+    data: Partial<Trace.Types.Events.ConsoleTimeStamp['args']['data']> = {},
+    pid = 0,
+    tid = 0,
+    ): Trace.Types.Events.ConsoleTimeStamp {
+  return {
+    args: {
+      data: {
+        message,
+        ...data,
+      },
+    },
+    cat: 'devtools.timeline',
+    name: Trace.Types.Events.Name.TIME_STAMP,
+    ph: Trace.Types.Events.Phase.INSTANT,
+    pid: Trace.Types.Events.ProcessID(pid),
+    tid: Trace.Types.Events.ThreadID(tid),
+    ts: Trace.Types.Timing.Micro(tsMicroseconds),
+  };
+}
+
+/**
  * Builds a mock Begin.
  */
 export function makeBeginEvent(name: string, ts: number, cat = '*', pid = 0, tid = 0): Trace.Types.Events.Begin {
@@ -368,7 +394,7 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
     Animations: {animations: []},
     AnimationFrames: {
       animationFrames: [],
-      presentationForFrame: new Map(),
+      presentationForFrame: new WeakMap(),
     },
     DOMStats: {
       domStatsByFrameId: new Map(),
@@ -432,7 +458,11 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
       entryToNode: new Map(),
       profilesInProcess: new Map(),
     },
-    PageLoadMetrics: {metricScoresByFrameId: new Map(), allMarkerEvents: []},
+    PageLoadMetrics: {
+      metricScoresByFrameId: new Map(),
+      allMarkerEvents: [],
+      metaCharsetCheckEventsByNavigation: new WeakMap(),
+    },
     UserInteractions: {
       allEvents: [],
       interactionEvents: [],
@@ -444,7 +474,7 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
     },
     NetworkRequests: {
       byId: new Map(),
-      incompleteInitiator: new Map(),
+      incompleteInitiator: new WeakMap(),
       byTime: [],
       webSocket: [],
       entityMappings: {
@@ -484,14 +514,14 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
     },
     ImagePainting: {
       paintImageByDrawLazyPixelRef: new Map(),
-      paintImageForEvent: new Map(),
+      paintImageForEvent: new WeakMap(),
       paintImageEventForUrl: new Map(),
-      paintEventToCorrectedDisplaySize: new Map(),
+      paintEventToCorrectedDisplaySize: new WeakMap(),
       didCorrectForHostDpr: false,
     },
     Initiators: {
-      eventToInitiator: new Map(),
-      initiatorToEvents: new Map(),
+      eventToInitiator: new WeakMap(),
+      initiatorToEvents: new WeakMap(),
     },
     Invalidations: {
       invalidationCountForEvent: new Map(),
@@ -499,7 +529,7 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
     },
     LayerTree: {
       paints: [],
-      paintsToSnapshots: new Map(),
+      paintsToSnapshots: new WeakMap(),
       snapshots: [],
     },
     Memory: {
@@ -513,7 +543,7 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
       invalidatedNodeList: [],
     },
     Warnings: {
-      perEvent: new Map(),
+      perEvent: new WeakMap(),
       perWarning: new Map(),
     },
     Workers: {
@@ -526,8 +556,8 @@ export function getBaseTraceHandlerData(overrides: Partial<Trace.Handlers.Types.
     },
     AsyncJSCalls: {
       schedulerToRunEntryPoints: new Map(),
-      asyncCallToScheduler: new Map(),
-      runEntryPointToScheduler: new Map(),
+      asyncCallToScheduler: new WeakMap(),
+      runEntryPointToScheduler: new WeakMap(),
     },
     Scripts: {
       scripts: [],

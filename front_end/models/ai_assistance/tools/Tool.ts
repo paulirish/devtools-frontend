@@ -34,6 +34,10 @@ export interface ToolApprovalResult {
 export interface ToolDataResult<DataType> {
   result: DataType;
   widgets?: AiWidget[];
+  /**
+   * Skills newly activated by this tool execution. Used to emit UI telemetry.
+   */
+  loadedSkills?: string[];
 }
 
 /**
@@ -201,7 +205,7 @@ export interface LighthouseReportCapability {
  * Capability for tools that trigger new Lighthouse audit runs.
  */
 export interface LighthouseRecordingCapability {
-  runLighthouse(overrides?: LHModel.RunTypes.RunOverrides): Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  runLighthouse(overrides?: LHModel.RunTypes.RunOverrides): Promise<LHModel.RunTypes.RunResult>;
 }
 
 /**
@@ -331,8 +335,17 @@ export interface BaseTool<ArgsType extends ToolArgs = ToolArgs> {
    */
   readonly parameters: Host.AidaClient.FunctionObjectParam<keyof ArgsType>;
   /**
-   * Converts the tool arguments into user-friendly display information.
-   * This is used by the UI to show what the agent is doing (e.g., in the history/steps log).
+   * Converts the tool arguments into the text the UI shows for a call to
+   * this tool. The agent calls it before the tool runs.
+   *
+   * - `title`: the step heading, sent as `TITLE`.
+   * - `thought`: optional explanation shown in the step, sent as `THOUGHT`.
+   * - `action`: the text shown in the step's code box, sent as
+   *   `ACTION.code`. It is real code only for tools that run code, such as
+   *   `executeJavaScript`. For other tools it is a readable form of the call,
+   *   for example `getInsightDetails('NAVIGATION_0', 'LCPBreakdown')`, and is
+   *   never executed.
+   * - `suggestions`: `AiAgent` does not use this field.
    */
   readonly displayInfoFromArgs?: (
       args: ArgsType,

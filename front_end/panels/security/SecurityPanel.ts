@@ -31,7 +31,6 @@ import {SecurityPanelSidebar} from './SecurityPanelSidebar.js';
 
 const {widget, widgetRef} = UI.Widget;
 
-/* eslint-disable @devtools/l10n-uistrings-sentence-punctuation -- Kept with periods to avoid breaking Blink layout tests in chromium/src: http/tests/devtools/security/ */
 const UIStrings = {
   /**
    * @description Title of the overview section in the Security panel.
@@ -60,7 +59,7 @@ const UIStrings = {
   /**
    * @description Main summary in the Security panel when the page has been flagged as unsafe by Google Safe Browsing.
    */
-  thisPageIsDangerousFlaggedBy: 'This page is dangerous (flagged by Google Safe Browsing).',
+  thisPageIsDangerousFlaggedBy: 'This page is dangerous (flagged by Google Safe Browsing)',
   /**
    * @description Title of the security explanation when the page is flagged by Google Safe Browsing.
    */
@@ -68,19 +67,19 @@ const UIStrings = {
   /**
    * @description Description of the security explanation directing the user to check the page's status on Safe Browsing.
    */
-  toCheckThisPagesStatusVisit: 'To check this page’s status, visit g.co/safebrowsingstatus.',
+  toCheckThisPagesStatusVisit: 'To check this page’s status, visit g.co/safebrowsingstatus',
   /**
    * @description Main summary in the Security panel when the inspected page is an error page.
    */
-  thisIsAnErrorPage: 'This is an error page.',
+  thisIsAnErrorPage: 'This is an error page',
   /**
    * @description Main summary in the Security panel when the site is accessed over unencrypted HTTP.
    */
-  thisPageIsInsecureUnencrypted: 'This page is insecure (unencrypted HTTP).',
+  thisPageIsInsecureUnencrypted: 'This page is insecure (unencrypted HTTP)',
   /**
    * @description Main summary in the Security panel when the page has a secure origin that does not use HTTPS.
    */
-  thisPageHasANonhttpsSecureOrigin: 'This page has a non-HTTPS secure origin.',
+  thisPageHasANonhttpsSecureOrigin: 'This page has a non-HTTPS secure origin',
   /**
    * @description Summary of the security explanation when the page triggered a Chrome Safety Tip.
    */
@@ -88,11 +87,11 @@ const UIStrings = {
   /**
    * @description First part of the description in the Security panel when a page triggered a bad reputation Safety Tip.
    */
-  chromeHasDeterminedThatThisSiteS: 'Chrome has determined that this site could be fake or fraudulent.',
+  chromeHasDeterminedThatThisSiteS: 'Chrome has determined that this site could be fake or fraudulent',
   /**
    * @description Second part of the description in the Security panel when a page triggered a bad reputation Safety Tip.
    */
-  ifYouBelieveThisIsShownIn: 'If you believe this is shown in error, visit https://g.co/chrome/lookalike-warnings.',
+  ifYouBelieveThisIsShownIn: 'If you believe this is shown in error, visit https://g.co/chrome/lookalike-warnings',
   /**
    * @description Summary of the security explanation when the visited domain looks similar to another known domain.
    */
@@ -107,11 +106,11 @@ const UIStrings = {
    * @description Second part of the description in the Security panel when a page triggered a lookalike domain Safety Tip.
    */
   ifYouBelieveThisIsShownInErrorSafety:
-      'If you believe this is shown in error, visit https://g.co/chrome/lookalike-warnings.',
+      'If you believe this is shown in error, visit https://g.co/chrome/lookalike-warnings',
   /**
    * @description Main summary in the Security panel when the page triggered a Chrome Safety Tip.
    */
-  thisPageIsSuspiciousFlaggedBy: 'This page is suspicious (flagged by Chrome).',
+  thisPageIsSuspiciousFlaggedBy: 'This page is suspicious (flagged by Chrome)',
   /**
    * @description Title of the certificate section in the Security panel explanations and origin view.
    */
@@ -123,7 +122,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when the site's certificate chain contains a certificate signed using SHA-1.
    */
-  theCertificateChainForThisSite: 'The certificate chain for this site contains a certificate signed using SHA-1.',
+  theCertificateChainForThisSite: 'The certificate chain for this site contains a certificate signed using SHA-1',
   /**
    * @description Summary phrase for a security problem where the site's certificate is missing a subjectAltName extension.
    */
@@ -132,7 +131,7 @@ const UIStrings = {
    * @description Description of the security explanation when the site's certificate is missing a Subject Alternative Name extension.
    */
   theCertificateForThisSiteDoesNot:
-      'The certificate for this site doesn’t contain a `Subject Alternative Name` extension containing a domain name or IP address.',
+      'The certificate for this site doesn’t contain a `Subject Alternative Name` extension containing a domain name or IP address',
   /**
    * @description Summary phrase in the Security panel when the site's certificate is missing or invalid.
    */
@@ -141,7 +140,7 @@ const UIStrings = {
    * @description Description of a security problem with the site's certificate.
    * @example {net::ERR_CERT_AUTHORITY_INVALID} PH1
    */
-  thisSiteIsMissingAValidTrusted: 'This site is missing a valid, trusted certificate ({PH1}).',
+  thisSiteIsMissingAValidTrusted: 'This site is missing a valid, trusted certificate ({PH1})',
   /**
    * @description Summary phrase in the Security panel when the site has a valid server certificate.
    */
@@ -151,7 +150,7 @@ const UIStrings = {
    * @example {Let's Encrypt Authority X3} PH1
    */
   theConnectionToThisSiteIsUsingA:
-      'The connection to this site is using a valid, trusted server certificate issued by {PH1}.',
+      'The connection to this site is using a valid, trusted server certificate issued by {PH1}',
   /**
    * @description Summary phrase in the Security panel when Public-Key-Pinning is bypassed due to a local root certificate.
    */
@@ -159,7 +158,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when Public-Key-Pinning is bypassed by a local root certificate.
    */
-  publickeypinningWasBypassedByA: 'Public-Key-Pinning was bypassed by a local root certificate.',
+  publickeypinningWasBypassedByA: 'Public-Key-Pinning was bypassed by a local root certificate',
   /**
    * @description Summary of the security explanation when the site's certificate is expiring soon.
    */
@@ -168,7 +167,7 @@ const UIStrings = {
    * @description Description of the security explanation when the site's certificate expires in less than 48 hours.
    */
   theCertificateForThisSiteExpires:
-      'The certificate for this site expires in less than 48 hours and needs to be renewed.',
+      'The certificate for this site expires in less than 48 hours and needs to be renewed',
   /**
    * @description Title of the connection section in the Security panel explanations and origin view.
    */
@@ -183,8 +182,7 @@ const UIStrings = {
    * @example {ECDHE_RSA} PH2
    * @example {AES_128_GCM} PH3
    */
-  theConnectionToThisSiteIs:
-      'The connection to this site is encrypted and authenticated using {PH1}, {PH2}, and {PH3}.',
+  theConnectionToThisSiteIs: 'The connection to this site is encrypted and authenticated using {PH1}, {PH2}, and {PH3}',
   /**
    * @description A recommendation to the site owner to use a modern TLS protocol.
    * @example {TLS 1.0} PH1
@@ -220,7 +218,7 @@ const UIStrings = {
    * @description Description of the security explanation when active mixed content (such as scripts or iframes) was allowed to run on the site.
    */
   youHaveRecentlyAllowedNonsecure:
-      'You have recently allowed non-secure content (such as scripts or iframes) to run on this site.',
+      'You have recently allowed non-secure content (such as scripts or iframes) to run on this site',
   /**
    * @description Summary phrase in the Security panel when the page displayed passive mixed content.
    */
@@ -228,7 +226,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when the page includes resources loaded over HTTP.
    */
-  thisPageIncludesHttpResources: 'This page includes HTTP resources.',
+  thisPageIncludesHttpResources: 'This page includes HTTP resources',
   /**
    * @description Summary phrase in the Security panel when the page contains a form with a non-secure action attribute.
    */
@@ -236,7 +234,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when the page includes a form with a non-secure action attribute.
    */
-  thisPageIncludesAFormWithA: 'This page includes a form with a non-secure `action` attribute.',
+  thisPageIncludesAFormWithA: 'This page includes a form with a non-secure `action` attribute',
   /**
    * @description Summary phrase in the Security panel when active content with certificate errors was run on the site.
    */
@@ -245,7 +243,7 @@ const UIStrings = {
    * @description Description of the security explanation when active content loaded with certificate errors was allowed to run on the site.
    */
   youHaveRecentlyAllowedContent:
-      'You have recently allowed content loaded with certificate errors (such as scripts or iframes) to run on this site.',
+      'You have recently allowed content loaded with certificate errors (such as scripts or iframes) to run on this site',
   /**
    * @description Summary phrase in the Security panel when the page displayed content loaded with certificate errors.
    */
@@ -253,7 +251,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when the page includes resources loaded with certificate errors.
    */
-  thisPageIncludesResourcesThat: 'This page includes resources that were loaded with certificate errors.',
+  thisPageIncludesResourcesThat: 'This page includes resources that were loaded with certificate errors',
   /**
    * @description Summary phrase in the Security panel when all resources on the page are served securely.
    */
@@ -261,7 +259,7 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when all resources on the page are served securely.
    */
-  allResourcesOnThisPageAreServed: 'All resources on this page are served securely.',
+  allResourcesOnThisPageAreServed: 'All resources on this page are served securely',
   /**
    * @description Title of the security explanation when mixed content requests were blocked on the page.
    */
@@ -269,11 +267,11 @@ const UIStrings = {
   /**
    * @description Description of the security explanation when non-secure resources requested by the page were blocked.
    */
-  yourPageRequestedNonsecure: 'Your page requested non-secure resources that were blocked.',
+  yourPageRequestedNonsecure: 'Your page requested non-secure resources that were blocked',
   /**
    * @description Prompt in the Security panel instructing the user to reload the page to record HTTP requests.
    */
-  reloadThePageToRecordRequestsFor: 'Reload the page to record requests for HTTP resources.',
+  reloadThePageToRecordRequestsFor: 'Reload the page to record requests for HTTP resources',
   /**
    * @description Link text in the Security panel. Clicking the link navigates the user to the Network panel. Requests refers to network requests. Each request is a piece of data transmitted from the current user's browser to a remote server.
    */
@@ -378,11 +376,11 @@ const UIStrings = {
   /**
    * @description Note in the Certificate Transparency section indicating that the request complies with Chrome's policy.
    */
-  thisRequestCompliesWithChromes: 'This request complies with Chrome’s Certificate Transparency policy.',
+  thisRequestCompliesWithChromes: 'This request complies with Chrome’s Certificate Transparency policy',
   /**
    * @description Note in the Certificate Transparency section indicating that the request does not comply with Chrome's policy.
    */
-  thisRequestDoesNotComplyWith: 'This request doesn’t comply with Chrome’s Certificate Transparency policy.',
+  thisRequestDoesNotComplyWith: 'This request doesn’t comply with Chrome’s Certificate Transparency policy',
   /**
    * @description Note in the origin view warning that the response was loaded from cache and some details may be missing.
    */
@@ -390,15 +388,15 @@ const UIStrings = {
   /**
    * @description Note in the origin view stating that the displayed details are from the first inspected response.
    */
-  theSecurityDetailsAboveAreFrom: 'The security details above are from the first inspected response.',
+  theSecurityDetailsAboveAreFrom: 'The security details above are from the first inspected response',
   /**
    * @description Note in the origin view when the origin is secure without using HTTPS (for example, chrome:// or about:).
    */
-  thisOriginIsANonhttpsSecure: 'This origin is a non-HTTPS secure origin.',
+  thisOriginIsANonhttpsSecure: 'This origin is a non-HTTPS secure origin',
   /**
    * @description Note in the origin view when the connection to the origin isn't secure.
    */
-  yourConnectionToThisOriginIsNot: 'Your connection to this origin isn’t secure.',
+  yourConnectionToThisOriginIsNot: 'Your connection to this origin isn’t secure',
   /**
    * @description Title of the section in the origin view when no security information is available.
    */
@@ -406,7 +404,7 @@ const UIStrings = {
   /**
    * @description Note in the origin view indicating that no security details are available for the origin.
    */
-  noSecurityDetailsAreAvailableFor: 'No security details are available for this origin.',
+  noSecurityDetailsAreAvailableFor: 'No security details are available for this origin',
   /**
    * @description Text displayed in the Subject Alternative Name (SAN) field when no SANs are present.
    */
@@ -429,7 +427,6 @@ const UIStrings = {
    */
   enabled: 'enabled',
 } as const;
-/* eslint-enable @devtools/l10n-uistrings-sentence-punctuation */
 const str_ = i18n.i18n.registerUIStrings('panels/security/SecurityPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -715,7 +712,7 @@ export class SecurityPanel extends UI.Panel.Panel implements SDK.TargetManager.S
         }
         this.sidebar.updateOrigin(origin, securityState);
         if (originState.originView) {
-          originState.originView.setSecurityState(securityState);
+          originState.originView.setSecurityState(securityState, originState.securityDetails);
         }
       }
     } else {
@@ -1594,77 +1591,126 @@ function renderSecurityStateSection(securityState: Protocol.Security.SecuritySta
   // clang-format on
 }
 
-export class SecurityOriginView extends UI.Widget.VBox {
-  readonly #origin: Platform.DevToolsPath.UrlString;
-  readonly #titleSection: HTMLElement;
+export interface SecurityOriginViewInput {
+  origin: Platform.DevToolsPath.UrlString;
+  securityState: Protocol.Security.SecurityState;
+  securityDetails: Protocol.Network.SecurityDetails|null;
+  loadedFromCache: boolean;
+  isSanListTruncated: boolean;
+  isCertificateTransparencyDetailsShown: boolean;
+  onRevealInNetwork: (event: Event) => void;
+  onToggleSanTruncation: () => void;
+  onToggleCertificateTransparencyDetails: () => void;
+  onViewCertificate: (event: Event) => void;
+}
 
-  constructor(origin: Platform.DevToolsPath.UrlString, originState: OriginState) {
-    super({jslog: `${VisualLogging.pane('security.origin-view')}`});
-    this.registerRequiredCSS(originViewStyles, lockIconStyles);
+export type SecurityOriginViewFunction = (input: SecurityOriginViewInput, output: undefined, target: HTMLElement) =>
+    void;
+
+interface SecurityDetailsInput {
+  securityState: Protocol.Security.SecurityState;
+  securityDetails: Protocol.Network.SecurityDetails|null;
+  loadedFromCache: boolean;
+  isSanListTruncated: boolean;
+  isCertificateTransparencyDetailsShown: boolean;
+  onToggleSanTruncation: () => void;
+  onToggleCertificateTransparencyDetails: () => void;
+  onViewCertificate: (event: Event) => void;
+}
+
+function renderSecurityDetails(input: SecurityDetailsInput): TemplateResult {
+  if (!input.securityDetails) {
+    // clang-format off
+    return html`
+      <div class="origin-view-section security-state-section">
+        ${renderSecurityStateSection(input.securityState)}
+      </div>`;
+    // clang-format on
+  }
+
+  function shouldShowCertificateTransparencySection(securityDetails: Protocol.Network.SecurityDetails): boolean {
+    const hasScts = securityDetails.signedCertificateTimestampList.length > 0;
+    const hasComplianceInfo = securityDetails.certificateTransparencyCompliance !==
+        Protocol.Network.CertificateTransparencyCompliance.Unknown;
+    return hasScts || hasComplianceInfo;
+  }
+
+  // clang-format off
+  return html`
+    <div class="origin-view-section connection-section">
+      ${renderConnectionSection(input.securityDetails)}
+    </div>
+    <div class="origin-view-section certificate-section">
+      ${renderCertificateSection({
+        securityDetails: input.securityDetails,
+        isSanListTruncated: input.isSanListTruncated,
+        onToggleSanTruncation: input.onToggleSanTruncation,
+        onViewCertificate: input.onViewCertificate,
+      })}
+    </div>
+    ${shouldShowCertificateTransparencySection(input.securityDetails) ? html`
+      <div class="origin-view-section certificate-transparency-section">
+        ${renderCertificateTransparencySection({
+          securityDetails: input.securityDetails,
+          isDetailsShown: input.isCertificateTransparencyDetailsShown,
+          onToggleDetails: input.onToggleCertificateTransparencyDetails,
+        })}
+      </div>` : nothing}
+    <div class="origin-view-section origin-view-notes">
+      ${renderNoteSection(input.loadedFromCache)}
+    </div>`;
+  // clang-format on
+}
+
+export const DEFAULT_SECURITY_ORIGIN_VIEW: SecurityOriginViewFunction = (input, _output, target): void => {
+  // clang-format off
+  render(html`
+    <style>${originViewStyles}</style>
+    <style>${lockIconStyles}</style>
+    <div class="title-section">
+      ${renderTitleSection(input.origin, input.securityState, input.onRevealInNetwork)}
+    </div>
+    ${renderSecurityDetails(input)}`,  // clang-format on
+         target, {
+           container: {
+             classes: ['security-origin-view'],
+             attributes: {jslog: `${VisualLogging.pane('security.origin-view')}`},
+           },
+         });
+};
+
+export class SecurityOriginView extends UI.Widget.VBox {
+  readonly #view: SecurityOriginViewFunction;
+  readonly #origin: Platform.DevToolsPath.UrlString;
+  readonly #loadedFromCache: boolean;
+  #securityState: Protocol.Security.SecurityState;
+  #securityDetails: Protocol.Network.SecurityDetails|null;
+  #isSanListTruncated: boolean;
+  #isCertificateTransparencyDetailsShown = false;
+
+  constructor(origin: Platform.DevToolsPath.UrlString, originState: OriginState,
+              view: SecurityOriginViewFunction = DEFAULT_SECURITY_ORIGIN_VIEW) {
+    super();
+    this.#view = view;
     this.setMinimumSize(200, 100);
     this.#origin = origin;
+    this.#securityState = originState.securityState;
+    this.#securityDetails = originState.securityDetails;
+    this.#loadedFromCache = originState.loadedFromCache;
+    this.#isSanListTruncated = isSanListTruncatable(this.#securityDetails?.sanList ?? []);
 
-    this.element.classList.add('security-origin-view');
-
-    this.#titleSection = this.element.createChild('div', 'title-section');
-    this.#renderTitleSection(originState.securityState);
-
-    if (originState.securityDetails) {
-      const connectionSection = this.element.createChild('div', 'origin-view-section connection-section');
-      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-      render(renderConnectionSection(originState.securityDetails), connectionSection);
-
-      this.#createCertificateSection(originState.securityDetails);
-
-      const sctListLength = originState.securityDetails.signedCertificateTimestampList.length;
-      const ctCompliance = originState.securityDetails.certificateTransparencyCompliance;
-      if (sctListLength || ctCompliance !== Protocol.Network.CertificateTransparencyCompliance.Unknown) {
-        this.#createCertificateTransparencySection(originState.securityDetails);
-      }
-
-      const noteSection = this.element.createChild('div', 'origin-view-section origin-view-notes');
-      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-      render(renderNoteSection(originState.loadedFromCache), noteSection);
-    } else {
-      const securityStateSection = this.element.createChild('div', 'origin-view-section security-state-section');
-      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-      render(renderSecurityStateSection(originState.securityState), securityStateSection);
-    }
+    this.#renderView();
   }
 
-  #createCertificateSection(securityDetails: Protocol.Network.SecurityDetails): void {
-    const certificateSection = this.element.createChild('div', 'origin-view-section certificate-section');
-    let isSanListTruncated = isSanListTruncatable(securityDetails.sanList);
-    const onToggleSanTruncation = (): void => {
-      isSanListTruncated = !isSanListTruncated;
-      updateCertificateSection();
-    };
-    const updateCertificateSection = (): void => {
-      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-      render(renderCertificateSection({
-               securityDetails,
-               isSanListTruncated,
-               onToggleSanTruncation,
-               onViewCertificate: this.#showCertificateViewer,
-             }),
-             certificateSection);
-    };
-    updateCertificateSection();
-  }
+  #toggleSanTruncation = (): void => {
+    this.#isSanListTruncated = !this.#isSanListTruncated;
+    this.#renderView();
+  };
 
-  #createCertificateTransparencySection(securityDetails: Protocol.Network.SecurityDetails): void {
-    const section = this.element.createChild('div', 'origin-view-section certificate-transparency-section');
-    let isDetailsShown = false;
-    const onToggleDetails = (): void => {
-      isDetailsShown = !isDetailsShown;
-      updateSection();
-    };
-    const updateSection = (): void => {
-      // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-      render(renderCertificateTransparencySection({securityDetails, isDetailsShown, onToggleDetails}), section);
-    };
-    updateSection();
-  }
+  #toggleCertificateTransparencyDetails = (): void => {
+    this.#isCertificateTransparencyDetailsShown = !this.#isCertificateTransparencyDetailsShown;
+    this.#renderView();
+  };
 
   #showCertificateViewer = async(event: Event): Promise<void> => {
     event.consume();
@@ -1674,13 +1720,30 @@ export class SecurityOriginView extends UI.Widget.VBox {
     }
   };
 
-  setSecurityState(newSecurityState: Protocol.Security.SecurityState): void {
-    this.#renderTitleSection(newSecurityState);
+  setSecurityState(newSecurityState: Protocol.Security.SecurityState,
+                   securityDetails: Protocol.Network.SecurityDetails|null): void {
+    if (this.#securityDetails !== securityDetails) {
+      this.#isSanListTruncated = isSanListTruncatable(securityDetails?.sanList ?? []);
+    }
+    this.#securityState = newSecurityState;
+    this.#securityDetails = securityDetails;
+    this.#renderView();
   }
 
-  #renderTitleSection(securityState: Protocol.Security.SecurityState): void {
-    // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
-    render(renderTitleSection(this.#origin, securityState, this.#revealInNetwork), this.#titleSection);
+  #renderView(): void {
+    this.#view({
+      origin: this.#origin,
+      securityState: this.#securityState,
+      securityDetails: this.#securityDetails,
+      loadedFromCache: this.#loadedFromCache,
+      isSanListTruncated: this.#isSanListTruncated,
+      isCertificateTransparencyDetailsShown: this.#isCertificateTransparencyDetailsShown,
+      onRevealInNetwork: this.#revealInNetwork,
+      onToggleSanTruncation: this.#toggleSanTruncation,
+      onToggleCertificateTransparencyDetails: this.#toggleCertificateTransparencyDetails,
+      onViewCertificate: this.#showCertificateViewer,
+    },
+               undefined, this.contentElement);
   }
 
   #revealInNetwork = (event: Event): void => {

@@ -5,6 +5,7 @@
 import * as Host from '../../core/host/host.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as AiUtils from '../ai-utils/ai-utils.js';
 import type * as LHModel from '../lighthouse/lighthouse.js';
 import type * as Trace from '../trace/trace.js';
 
@@ -23,7 +24,6 @@ import {ChangeManager} from './ChangeManager.js';
 import {DOMNodeContext} from './contexts/DOMNodeContext.js';
 import {LighthouseContext} from './contexts/LighthouseContext.js';
 import {PerformanceTraceContext} from './contexts/PerformanceTraceContext.js';
-import {debugLog} from './debug.js';
 import {ExtensionScope} from './ExtensionScope.js';
 import type {Skill, SkillName} from './skills/Skill.js';
 import {SKILLS} from './skills/SkillRegistry.js';
@@ -36,10 +36,11 @@ import {
 } from './tools/Tool.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
 
+const {debugLog} = AiUtils.Debug;
+
 const SKILL_DISPLAY_NAMES: Record<SkillName, string> = {
   styling: 'CSS and styling',
   network: 'Network requests',
-  accessibility: 'Accessibility',
   performance: 'Performance',
   storage: 'Storage',
   sources: 'Sources',
@@ -83,7 +84,7 @@ export interface AiAgent2Options extends ExecuteJsAgentOptions {
    * Supplies the origin lock state for the conversation.
    */
   originLock: () => OriginLockState;
-  lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   performanceRecordAndReload?: () => Promise<Trace.TraceModel.ParsedTrace>;
 }
 
@@ -202,8 +203,7 @@ export class AiAgent2 extends AiAgent<unknown> {
   #changes: ChangeManager;
   #execJs: typeof executeJsCode;
   readonly #originLock: () => OriginLockState;
-  readonly #lighthouseRecording?:
-      (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.ReporterTypes.ReportJSON|null>;
+  readonly #lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   readonly #performanceRecordAndReload?: () => Promise<Trace.TraceModel.ParsedTrace>;
 
   get options(): RequestOptions {
@@ -298,8 +298,15 @@ export class AiAgent2 extends AiAgent<unknown> {
         };
       },
       handler: async args => {
+        const previouslyLoaded = new Set(this.#activeSkills);
         const result = await this.learnSkill(args.skills);
-        return {result};
+        // The LLM may hallucinate skill names. Filter out any skills that were not newly activated.
+        const loadedSkills =
+            [...new Set(args.skills)].filter(skill => !previouslyLoaded.has(skill) && this.#activeSkills.has(skill));
+        return {
+          result,
+          loadedSkills: loadedSkills.length > 0 ? loadedSkills : undefined,
+        };
       },
     });
   }
@@ -444,7 +451,7 @@ User query: ${enhancedQuery}`;
           getTarget: () => this.#getTarget(),
           getOriginLock: () => this.#originLock(),
           getLighthouseReport: () => (this.context instanceof LighthouseContext ? this.context.getItem() : null),
-          runLighthouse: async overrides => await (this.#lighthouseRecording?.(overrides) ?? null),
+          runLighthouse: async overrides => await (this.#lighthouseRecording?.(overrides) ?? {status: 'failed'}),
           getPerformanceTraceContext: () => (this.context instanceof PerformanceTraceContext ? this.context : null),
           performanceRecordAndReload: this.#performanceRecordAndReload,
           disableLogging: () => {

@@ -108,7 +108,7 @@ As of July 2024, they are used to power:
 2. Annotations; the user has the ability to create labels and attach them to entries. These are drawn with overlays.
 3. Selected entry; the box drawn around the entry a user selects is drawn as an overlay.
 4. Vertical ruler: when holding shift and moving their mouse, the vertical cursor drawn is drawn as an overlay.
-5. Comment pins: comment threads anchored to flame chart entries.
+5. Comment pins: an invisible box over each commented entry. The shared comments overlay positions its pin, popup and highlight from this box.
 
 Overlays are drawn in **DOM**, not Canvas, and are drawn on a layer that sits above the entire timeline. This is important because it means they are drawn over both the canvases we have in the panel (network + main/rest).
 
@@ -119,6 +119,8 @@ Overlays are managed by the `Overlays` class instance. An instance of this exist
 To render an overlay, call the `add()` method and pass in the overlay you would like to create. Once you have done this, you must then call the `update()` method to trigger a redraw, otherwise the overlay will not be added.
 
 > When the user pans/scrolls/zooms the timeline, the `update()` method is called automatically.
+
+`update()` dispatches `OverlaysUpdated` when it finishes.
 
 To remove one or some overlays, check out the `remove()` or `removeOverlaysOfType()`.
 
@@ -170,6 +172,18 @@ If you ever need to know how high the network canvas is, use `networkChartOffset
 |                                           |
 +-------------------------------------------+
 ```
+
+## Comments
+
+Comments on flame chart entries use the shared comments UI from `ui/comments` and `panels/common`, so the pin, popup and highlight match other panels. Those widgets are not drawn in the canvas or by `Overlays`; they are drawn in the shared comments layer above the panel.
+
+`TimelineCommentController` connects the flame charts to the shared comments UI:
+
+1. It keeps one invisible `COMMENT_PIN` overlay over each commented entry. `Overlays` positions it like any other entry overlay, including when the user pans or zooms, when the entry runs under the network track, and when the entry is off-screen.
+2. It returns that overlay's element from `getAnchorElement()`, and calls `notifyCustomAnchorsMoved()` after each `OverlaysUpdated` event while `COMMENT_PIN` overlays exist, and once more after the last one is removed.
+3. `CommentOverlayManager` reads the element's on-screen rect and draws the pin, popup and highlight there.
+
+The pin and the `COMMENT_PIN` element are separate elements in separate layers, and moving the element fires no DOM scroll or resize event, so step 2 is what keeps the pin on its entry. See the `CustomAnchorResolver` documentation in `ui/comments/CommentAnchorResolver.ts` for the contract.
 
 ## Timeline tree views
 

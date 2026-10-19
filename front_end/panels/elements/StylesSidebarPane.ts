@@ -46,6 +46,7 @@ import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as AiCodeCompletion from '../../models/ai_code_completion/ai_code_completion.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import * as ChangeTracker from '../../models/change_tracker/change_tracker.js';
 import type * as ComputedStyle from '../../models/computed_style/computed_style.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
@@ -275,12 +276,17 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   #lazyRenderCallbacks = new WeakMap<Element, () => void>();
   #elementsForSyncViewportCheck: Element[] = [];
   #updateId = 0;
+  #changeTracker?: ChangeTracker.ChangeTracker.ChangeTracker;
 
-  constructor(computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel) {
+  constructor(computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel,
+              changeTracker?: ChangeTracker.ChangeTracker.ChangeTracker) {
     super(computedStyleModel, {delegatesFocus: true, useShadowDom: true, classes: ['flex-none']});
+    this.#changeTracker = changeTracker;
     this.setMinimumSize(96, 26);
     this.registerRequiredCSS(stylesSidebarPaneStyles);
-    Common.Settings.Settings.instance().moduleSetting('text-editor-indent').addChangeListener(this.requestUpdate, this);
+    Common.Settings.Settings.instance()
+        .resolve(SDK.SDKSettings.textEditorIndentSettingDescriptor)
+        .addChangeListener(this.requestUpdate, this);
     Common.Settings.Settings.instance()
         .resolve(SettingsUI.ElementsSettings.collapseNonContributingCSSRulesSettingDescriptor)
         .addChangeListener(this.updateCollapsedSectionsSetting, this);
@@ -301,21 +307,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
 
     this.#swatchPopoverHelper.addEventListener(InlineEditor.SwatchPopoverHelper.Events.WILL_SHOW_POPOVER,
                                                this.hideAllPopovers, this);
-    this.linkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, () => {
-      if (!this.filterRegex() || this.#filterUpdateScheduled) {
-        return;
-      }
-      this.#filterUpdateScheduled = true;
-      queueMicrotask(() => {
-        if (!this.#filterUpdateScheduled) {
-          return;
-        }
-        this.#filterUpdateScheduled = false;
-        if (this.filterRegex()) {
-          this.updateFilter();
-        }
-      });
-    });
+    this.linkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, this.#onLiveLocationUpdated,
+                                    this);
     this.decorator = new StylePropertyHighlighter(this);
     this.contentElement.classList.add('styles-pane');
 
@@ -366,6 +359,22 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }
   }
 
+  #onLiveLocationUpdated(): void {
+    if (!this.filterRegex() || this.#filterUpdateScheduled) {
+      return;
+    }
+    this.#filterUpdateScheduled = true;
+    queueMicrotask(() => {
+      if (!this.#filterUpdateScheduled) {
+        return;
+      }
+      this.#filterUpdateScheduled = false;
+      if (this.filterRegex()) {
+        this.updateFilter();
+      }
+    });
+  }
+
   get webCustomData(): WebCustomData|undefined {
     if (!this.#webCustomData &&
         Common.Settings.Settings.instance()
@@ -375,6 +384,15 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       this.#webCustomData = WebCustomData.create();
     }
     return this.#webCustomData;
+  }
+
+  get changeTracker(): ChangeTracker.ChangeTracker.ChangeTracker|undefined {
+    // The widget is currently created for non-widget StylesSidebarPane so
+    // the changeTracker can be empty, relying on the manual resolution.
+    // Note that this only works once the widget is attached to the DOM.
+    this.#changeTracker ??=
+        UI.Widget.lookupUniverseForElement(this.contentElement)?.get(ChangeTracker.ChangeTracker.ChangeTracker);
+    return this.#changeTracker;
   }
 
   private onScroll(_event: Event): void {
@@ -1073,6 +1091,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
 
     this.#elementsForSyncViewportCheck = [];
     this.linkifier.reset();
+    this.linkifier.addEventListener(Components.Linkifier.Events.LIVE_LOCATION_UPDATED, this.#onLiveLocationUpdated,
+                                    this);
     const node = this.node();
     if (this.#lastNode !== node) {
       // Clear inactive styles when a different node is selected.

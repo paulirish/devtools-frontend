@@ -89,21 +89,14 @@ export function objectIsEvent(obj: object): obj is Event {
   return 'cat' in obj && 'name' in obj && 'ts' in obj;
 }
 
-export interface Args {
-  data?: ArgsData;
-  sampleTraceId?: number;
-  stackTrace?: CallFrame[];
-}
-
-export interface ArgsData {
-  stackTrace?: CallFrame[];
-  sampleTraceId?: number;
-  url?: string;
-  navigationId?: string;
-  /** For soft navs. */
-  performanceTimelineNavigationId?: number;
-  frame?: string;
-}
+/**
+ * Base `args` payload for trace events.
+ *
+ * Do not add event-specific properties or catch-all `data` bags here; define
+ * them on individual event interfaces instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Args {}
 
 export interface CallFrame {
   codeType?: string;
@@ -154,7 +147,7 @@ export interface SyntheticCpuProfile extends Complete {
   name: Name.CPU_PROFILE;
   id: ProfileID;
   args: Args&{
-    data: ArgsData & {
+    data: {
       cpuProfile: Protocol.Profiler.Profile,
     },
   };
@@ -164,7 +157,7 @@ export interface Profile extends Sample {
   name: Name.PROFILE;
   id: ProfileID;
   args: Args&{
-    data: ArgsData & {
+    data: {
       startTime: Micro,
       source?: ProfileSource,
     },
@@ -176,7 +169,7 @@ export interface ProfileChunk extends Sample {
   id: ProfileID;
   args: Args&{
     // `data` is only missing in "fake" traces
-    data?: ArgsData & {
+    data: {
       cpuProfile?: PartialProfile,
       timeDeltas?: Micro[],
       lines?: number[],
@@ -236,11 +229,13 @@ export function isRunTask(event: Event): event is RunTask {
 export interface FireIdleCallback extends Complete {
   name: Name.FIRE_IDLE_CALLBACK;
   args: Args&{
-    data: ArgsData & {
+    data: {
       allottedMilliseconds: Milli,
-      frame: string,
       id: number,
       timedOut: boolean,
+      frame?: string,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
     },
   };
 }
@@ -248,8 +243,10 @@ export interface FireIdleCallback extends Complete {
 export interface SchedulePostMessage extends Instant {
   name: Name.SCHEDULE_POST_MESSAGE;
   args: Args&{
-    data: ArgsData & {
+    data: {
       traceId: string,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -257,7 +254,7 @@ export interface SchedulePostMessage extends Instant {
 export interface HandlePostMessage extends Complete {
   name: Name.HANDLE_POST_MESSAGE;
   args: Args&{
-    data: ArgsData & {
+    data: {
       traceId: string,
     },
   };
@@ -266,8 +263,10 @@ export interface HandlePostMessage extends Complete {
 export interface Dispatch extends Complete {
   name: 'EventDispatch';
   args: Args&{
-    data: ArgsData & {
+    data: {
       type: string,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -279,7 +278,9 @@ export interface ParseHTML extends Complete {
       frame: string,
       startLine: number,
       url: string,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
       sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
     endData?: {
       endLine: number,
@@ -316,7 +317,7 @@ export interface EventTimingBegin extends Event {
   id: string;
   args: Args&{
     // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_event_timing.cc;l=297;drc=4f00803ca25c0d0480ed14844d6406933c21e80e
-    data: ArgsData & {
+    data: {
       cancelable: boolean,
       duration: Milli,
       type: string,
@@ -343,7 +344,7 @@ export interface EventTimingEnd extends Event {
 export interface GPUTask extends Complete {
   name: 'GPUTask';
   args: Args&{
-    data?: ArgsData & {
+    data: {
       /* eslint-disable @typescript-eslint/naming-convention */
       renderer_pid: ProcessID,
       used_bytes: number,
@@ -394,7 +395,7 @@ interface SyntheticArgsData {
 export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.COMPLETE> {
   rawSourceEvent: ResourceSendRequest;
   args: Args&{
-    data: ArgsData & {
+    data: {
       syntheticData: SyntheticArgsData,
       // All fields below are from TraceEventsForNetworkRequest,
       // Required fields
@@ -443,6 +444,7 @@ export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.
       initiator?: Initiator,
       requestMethod?: string,
       timing?: ResourceReceiveResponseTimingData,
+      stackTrace?: CallFrame[],
       /** Server response time according to Lightrider. */
       lrServerResponseTime?: Milli,
     },
@@ -461,7 +463,7 @@ export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.
 export interface SyntheticWebSocketConnection extends Complete, SyntheticBased<Phase.COMPLETE> {
   rawSourceEvent: Event;
   args: Args&{
-    data: ArgsData & {
+    data: {
       identifier: number,
       priority: Protocol.Network.ResourcePriority,
       url: string,
@@ -496,7 +498,7 @@ export interface SyntheticAuctionWorklet extends Instant, SyntheticBased<Phase.I
   target: string;
   type: AuctionWorkletType;
   args: Args&{
-    data: ArgsData & {
+    data: {
       // There are two threads for a worklet that we care about, so we gather
       // the thread_name events so we can know the PID and TID for them (and
       // hence display the right events in the track for each thread)
@@ -534,7 +536,7 @@ export interface AuctionWorkletRunningInProcess extends Event {
   name: 'AuctionWorkletRunningInProcess';
   ph: Phase.INSTANT;
   args: Args&{
-    data: ArgsData & {
+    data: {
       host: string,
       pid: ProcessID,
       target: string,
@@ -546,7 +548,7 @@ export interface AuctionWorkletDoneWithProcess extends Event {
   name: 'AuctionWorkletDoneWithProcess';
   ph: Phase.INSTANT;
   args: Args&{
-    data: ArgsData & {
+    data: {
       host: string,
       pid: ProcessID,
       target: string,
@@ -632,7 +634,7 @@ export interface Screenshot extends Instant {
 
 export interface Animation extends Event {
   args: Args&{
-    data: ArgsData & {
+    data: {
       nodeName?: string,
       nodeId?: Protocol.DOM.BackendNodeId,
       displayName?: string,
@@ -681,7 +683,7 @@ export interface NavigationStart extends Mark {
   name: Name.NAVIGATION_START;
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       /** Must be non-empty to be valid. An empty documentLoaderURL means the event can be ignored. */
       documentLoaderURL: string,
       isLoadingMainFrame: boolean,
@@ -731,7 +733,7 @@ export interface FirstContentfulPaint extends Mark {
   name: Name.MARK_FCP;
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       navigationId: string,
     },
   };
@@ -751,7 +753,7 @@ export interface FirstPaint extends Mark {
   name: Name.MARK_FIRST_PAINT;
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       navigationId: string,
     },
   };
@@ -793,13 +795,14 @@ export interface LargestContentfulPaintCandidate extends Mark {
   name: Name.MARK_LCP_CANDIDATE;
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       candidateIndex: number,
       isOutermostMainFrame: boolean,
       isMainFrame: boolean,
       navigationId: string,
       nodeId: Protocol.DOM.BackendNodeId,
-      loadingAttr: string,
+      loadingAttr?: string,
+      size?: number,
       type?: string,
       // Landed in Chrome M140: crrev.com/c/6702010
       nodeName?: string,
@@ -811,13 +814,14 @@ export interface LargestContentfulPaintCandidateForSoftNavigation extends Mark {
   name: Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       candidateIndex: number,
       isOutermostMainFrame: boolean,
       isMainFrame: boolean,
       nodeId: Protocol.DOM.BackendNodeId,
-      loadingAttr: string,
       performanceTimelineNavigationId: number,
+      loadingAttr?: string,
+      size?: number,
       type?: string,
       // Landed in Chrome M140: crrev.com/c/6702010
       nodeName?: string,
@@ -832,7 +836,7 @@ export interface LargestImagePaintCandidate extends Mark {
   name: 'LargestImagePaint::Candidate';
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       candidateIndex: number,
       imageUrl: string,
       // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -844,7 +848,7 @@ export interface LargestTextPaintCandidate extends Mark {
   name: 'LargestTextPaint::Candidate';
   args: Args&{
     frame: string,
-    data?: ArgsData&{
+    data: {
       candidateIndex: number,
       // eslint-disable-next-line @typescript-eslint/naming-convention
       DOMNodeId: Protocol.DOM.BackendNodeId,
@@ -875,7 +879,7 @@ export interface Instant extends Event {
 export interface DOMStats extends Instant {
   name: 'DOMStats';
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       totalElements: number,
       maxChildren?: {
@@ -895,11 +899,11 @@ export interface DOMStats extends Instant {
 export interface UpdateCounters extends Instant {
   name: 'UpdateCounters';
   args: Args&{
-    data: ArgsData & {
-      documents: number,
-      jsEventListeners: number,
+    data: {
       jsHeapSizeUsed: number,
-      nodes: number,
+      documents?: number,
+      jsEventListeners?: number,
+      nodes?: number,
       gpuMemoryLimitKB?: number,
     },
   };
@@ -910,7 +914,7 @@ export type RendererEvent = Instant|Complete;
 export interface TracingStartedInBrowser extends Instant {
   name: Name.TRACING_STARTED_IN_BROWSER;
   args: Args&{
-    data?: ArgsData & {
+    data: {
       frameTreeNodeId: number,
       // Frames can only missing in "fake" traces
       persistentIds: boolean,
@@ -922,7 +926,7 @@ export interface TracingStartedInBrowser extends Instant {
 export interface TracingSessionIdForWorker extends Instant {
   name: 'TracingSessionIdForWorker';
   args: Args&{
-    data?: ArgsData & {
+    data?: {
       url: string,
       workerId: WorkerId,
       workerThreadId: ThreadID,
@@ -937,18 +941,18 @@ export function isTracingSessionIdForWorker(event: Event): event is TracingSessi
 export interface FrameCommittedInBrowser extends Instant {
   name: 'FrameCommittedInBrowser';
   args: Args&{
-    data?: ArgsData & TraceFrame,
+    data: TraceFrame,
   };
 }
 
 export interface MainFrameViewport extends Instant {
   name: 'PaintTimingVisualizer::Viewport';
-  args: {
-    data: ArgsData&{
+  args: Args&{
+    data: {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       viewport_rect: number[],
-      /** Device Pixel Ratio. Added in m128 */
-      dpr: number,
+      // Always present in traces since M128 (Jul 2024, crrev.com/c/5669987); marked optional so the engine supports earlier traces.
+      dpr?: number,
     },
   };
 }
@@ -956,14 +960,15 @@ export interface MainFrameViewport extends Instant {
 export interface CommitLoad extends Instant {
   name: 'CommitLoad';
   args: Args&{
-    data?: ArgsData & {
+    data: {
       frame: string,
       isMainFrame: boolean,
       name: string,
-      nodeId: number,
       page: string,
-      parent: string,
       url: string,
+      nodeId?: number,
+      parent?: string,
+      isOutermostMainFrame?: boolean,
     },
   };
 }
@@ -971,7 +976,7 @@ export interface CommitLoad extends Instant {
 export interface MarkDOMContent extends Instant {
   name: Name.MARK_DOM_CONTENT;
   args: Args&{
-    data?: ArgsData & {
+    data: {
       frame: string,
       isMainFrame: boolean,
       page: string,
@@ -983,7 +988,7 @@ export interface MarkDOMContent extends Instant {
 export interface MarkLoad extends Instant {
   name: Name.MARK_LOAD;
   args: Args&{
-    data?: ArgsData & {
+    data: {
       frame: string,
       isMainFrame: boolean,
       page: string,
@@ -1008,23 +1013,23 @@ export interface TraceImpactedNode {
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type LayoutShiftData = ArgsData&{
+export interface LayoutShiftData {
   // These keys come from the trace data, so we have to use underscores.
   /* eslint-disable @typescript-eslint/naming-convention */
-  cumulative_score: number,
-  frame_max_distance: number,
-  had_recent_input: boolean,
-  impacted_nodes: TraceImpactedNode[] | undefined,
-  is_main_frame: boolean,
-  overall_max_distance: number,
-  region_rects: TraceRect[],
+  cumulative_score: number;
+  frame_max_distance: number;
+  had_recent_input: boolean;
+  impacted_nodes: TraceImpactedNode[]|undefined;
+  is_main_frame: boolean;
+  overall_max_distance: number;
+  region_rects: TraceRect[];
   /** @deprecated This value will incorrectly overreport for shifts within an iframe. */
-  score: number,
+  score: number;
   /** This is the preferred "score", used for CLS. If `is_main_frame` is true, `score` and `weighted_score_delta` will be equal. But if the shift is from an iframe, `weighted_score_delta` will be appropriately reduced to account for the viewport size of that iframe. https://wicg.github.io/layout-instability/#subframe-weighting-factor and b/275509162 */
-  weighted_score_delta: number,
-  navigationId?: string,
+  weighted_score_delta: number;
+  navigationId?: string;
   /* eslint-enable @typescript-eslint/naming-convention */
-};
+}
 export interface LayoutShift extends Instant {
   name: Name.LAYOUT_SHIFT;
   normalized?: boolean;
@@ -1075,10 +1080,15 @@ export const NO_NAVIGATION = 'NO_NAVIGATION';
 export type NavigationId = string;
 
 /**
- * This is a synthetic Layout shift cluster. The rawSourceEvent is the worst layout shift event
- * in the cluster.
+ * This is a synthetic Layout shift cluster: a session window of layout shifts.
+ *
+ * Do not extend the SyntheticBased interface because a cluster is built from
+ * many layout shifts and doesn't have a raw trace event of its own. For the
+ * same reason, clusters are not registered with SyntheticEventsManager. Use
+ * `worstShiftEvent` to find the layout shift with the highest score in the
+ * cluster.
  */
-export interface SyntheticLayoutShiftCluster extends SyntheticBased<Phase.COMPLETE> {
+export interface SyntheticLayoutShiftCluster extends Event {
   name: 'SyntheticLayoutShiftCluster';
   clusterWindow: TraceWindowMicro;
   clusterCumulativeScore: number;
@@ -1120,7 +1130,7 @@ export interface Initiator {
 export interface ResourceSendRequest extends Instant {
   name: 'ResourceSendRequest';
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       requestId: string,
       url: string,
@@ -1133,6 +1143,8 @@ export interface ResourceSendRequest extends Instant {
       renderBlocking?: RenderBlocking,
       initiator?: Initiator,
       isLinkPreload?: boolean,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -1140,7 +1152,7 @@ export interface ResourceSendRequest extends Instant {
 export interface ResourceChangePriority extends Instant {
   name: 'ResourceChangePriority';
   args: Args&{
-    data: ArgsData & {
+    data: {
       requestId: string,
       priority: Protocol.Network.ResourcePriority,
     },
@@ -1151,7 +1163,7 @@ export interface ResourceChangePriority extends Instant {
 export interface ResourceWillSendRequest extends Instant {
   name: Name.RESOURCE_WILL_SEND_REQUEST;
   args: Args&{
-    data: ArgsData & {
+    data: {
       requestId: string,
     },
   };
@@ -1160,12 +1172,12 @@ export interface ResourceWillSendRequest extends Instant {
 export interface ResourceFinish extends Instant {
   name: 'ResourceFinish';
   args: Args&{
-    data: ArgsData & {
+    data: {
       decodedBodyLength: number,
       didFail: boolean,
       encodedDataLength: number,
-      finishTime: Seconds,
       requestId: string,
+      finishTime?: Seconds,
     },
   };
 }
@@ -1173,7 +1185,7 @@ export interface ResourceFinish extends Instant {
 export interface ResourceReceivedData extends Instant {
   name: 'ResourceReceivedData';
   args: Args&{
-    data: ArgsData & {
+    data: {
       encodedDataLength: number,
       frame: string,
       requestId: string,
@@ -1207,7 +1219,7 @@ interface ResourceReceiveResponseTimingData {
 export interface ResourceReceiveResponse extends Instant {
   name: 'ResourceReceiveResponse';
   args: Args&{
-    data: ArgsData & {
+    data: {
       /**
        * This is the protocol used to resolve the request.
        *
@@ -1215,18 +1227,18 @@ export interface ResourceReceiveResponse extends Instant {
        *
        * Example values (not exhaustive): http/0.9, http/1.0, http/1.1, http, h2, h3-Q050, data, blob
        */
-      protocol: string,
       encodedDataLength: number,
-      frame: string,
       fromCache: boolean,
       fromServiceWorker: boolean,
       mimeType: string,
       requestId: string,
-      responseTime: Milli,
       statusCode: number,
+      protocol?: string,
+      frame?: string,
+      responseTime?: Milli,
       // Some cached events don't have this field
-      connectionId: number,
-      connectionReused: boolean,
+      connectionId?: number,
+      connectionReused?: boolean,
       timing?: ResourceReceiveResponseTimingData,
       headers?: Array<{name: string, value: string}>,
     },
@@ -1236,7 +1248,7 @@ export interface ResourceReceiveResponse extends Instant {
 export interface ResourceMarkAsCached extends Instant {
   name: 'ResourceMarkAsCached';
   args: Args&{
-    data: ArgsData & {
+    data: {
       requestId: string,
     },
   };
@@ -1256,11 +1268,12 @@ export enum LayoutInvalidationReason {
 export interface LayoutInvalidationTracking extends Instant {
   name: Name.LAYOUT_INVALIDATION_TRACKING;
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       nodeId: Protocol.DOM.BackendNodeId,
       reason: LayoutInvalidationReason,
       nodeName?: string,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -1268,7 +1281,7 @@ export interface LayoutInvalidationTracking extends Instant {
 export interface ScheduleStyleInvalidationTracking extends Instant {
   name: Name.SCHEDULE_STYLE_INVALIDATION_TRACKING;
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       nodeId: Protocol.DOM.BackendNodeId,
       invalidationSet?: string,
@@ -1294,13 +1307,14 @@ export enum StyleRecalcInvalidationReason {
 export interface StyleRecalcInvalidationTracking extends Instant {
   name: Name.STYLE_RECALC_INVALIDATION_TRACKING;
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       nodeId: Protocol.DOM.BackendNodeId,
       reason: StyleRecalcInvalidationReason,
       subtree: boolean,
       nodeName?: string,
       extraData?: string,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -1311,14 +1325,14 @@ export function isStyleRecalcInvalidationTracking(event: Event): event is StyleR
 export interface StyleInvalidatorInvalidationTracking extends Instant {
   name: Name.STYLE_INVALIDATOR_INVALIDATION_TRACKING;
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       nodeId: Protocol.DOM.BackendNodeId,
       reason: string,
       invalidationList: Array<{id: string, classes?: string[]}>,
-      subtree: boolean,
       nodeName?: string,
       extraData?: string,
+      stackTrace?: CallFrame[],
       // eslint-disable-next-line @typescript-eslint/naming-convention
       selectors?: Array<{selector: string, style_sheet_id: string}>,
     },
@@ -1394,6 +1408,8 @@ export interface ScheduleStyleRecalculation extends Instant {
       reason?: StyleRecalcInvalidationReason,
       subtree?: boolean,
       nodeId?: Protocol.DOM.BackendNodeId,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -1430,6 +1446,11 @@ export function isLayoutImageUnsized(event: Event): event is LayoutImageUnsized 
 
 export interface PrePaint extends Complete {
   name: 'PrePaint';
+  args?: Args&{
+    data?: {
+      frame?: string,
+    },
+  };
 }
 
 export interface PairableAsync extends Event {
@@ -1520,6 +1541,8 @@ export interface DomLoading extends UserTiming {
 export interface BeginRemoteFontLoad extends UserTiming {
   name: Name.BEGIN_REMOTE_FONT_LOAD;
   args: Args&{
+    // Blink C++ serializes the CSS font-display keyword string ("auto", "swap", "block")
+    // from face_->GetFontFace()->display(), while internal Blink types use the FontDisplay enum (0..4).
     display: string,
     id: number,
     url?: string,
@@ -1541,6 +1564,7 @@ export interface PerformanceMeasureBegin extends PairableUserTiming {
     detail?: string,
     callTime?: Micro,
     traceId?: number,
+    stackTrace?: CallFrame[],
   };
   ph: Phase.ASYNC_NESTABLE_START;
 }
@@ -1550,10 +1574,14 @@ export type PerformanceMeasure = PerformanceMeasureBegin|PerformanceMeasureEnd;
 
 export interface PerformanceMark extends UserTiming {
   args: Args&{
-    data?: ArgsData & {
+    data: {
       detail?: string,
       callTime?: Micro,
+      // Always present in traces since M134 (Feb 2025, crrev.com/c/6187334); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
+    stackTrace?: CallFrame[],
   };
   ph: Phase.INSTANT|Phase.MARK|Phase.ASYNC_NESTABLE_INSTANT;
 }
@@ -1573,7 +1601,7 @@ export interface ConsoleTimeStamp extends Event {
   name: Name.TIME_STAMP;
   ph: Phase.INSTANT;
   args: Args&{
-    data?: ArgsData & {
+    data: {
       // The console.timeStamp allows to pass integers as values as well
       // as strings
       message: string,
@@ -1584,6 +1612,8 @@ export interface ConsoleTimeStamp extends Event {
       trackGroup?: string|number,
       color?: string|number,
       devtools?: string,
+      frame?: string,
+      // Always present in traces since M136 (Mar 2025, crrev.com/c/6311629); marked optional so the engine supports earlier traces.
       sampleTraceId?: number,
     },
   };
@@ -1785,6 +1815,12 @@ export type SyntheticConsoleTimingPair = SyntheticEventPair<ConsoleTime>;
 export type SyntheticAnimationPair = SyntheticEventPair<Animation>;
 
 export interface SyntheticInteractionPair extends SyntheticEventPair<EventTimingBeginOrEnd> {
+  args: SyntheticEventPair<EventTimingBeginOrEnd>['args']&{
+    data: {
+      frame: string,
+      navigationId?: string,
+    },
+  };
   // InteractionID and type are available within the beginEvent's data, but we
   // put them on the top level for ease of access.
   interactionId: number;
@@ -1834,7 +1870,7 @@ export interface SyntheticProfileCall extends Event {
 export interface SyntheticJSSample extends Event {
   name: Name.JS_SAMPLE;
   args: Args&{
-    data: ArgsData & {
+    data: {
       // Used to associate a stack sample with a trace event.
       stackTrace: Protocol.Runtime.CallFrame[],
       traceId?: number,
@@ -1847,9 +1883,15 @@ export function isJSSample(event: Event): event is SyntheticJSSample {
   return event.name === Name.JS_SAMPLE;
 }
 
+function hasSyntheticPairEvents(event: Event): boolean {
+  if (!event.args || !('data' in event.args) || typeof event.args.data !== 'object' || !event.args.data) {
+    return false;
+  }
+  return 'beginEvent' in event.args.data && 'endEvent' in event.args.data;
+}
+
 export function isSyntheticInteraction(event: Event): event is SyntheticInteractionPair {
-  return Boolean(
-      'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
+  return 'interactionId' in event && hasSyntheticPairEvents(event);
 }
 
 // Events relating to frames.
@@ -1906,7 +1948,7 @@ export interface BeginMainThreadFrame extends Instant {
   name: Name.BEGIN_MAIN_THREAD_FRAME;
   args: Args&{
     layerTreeId: number,
-    data: ArgsData&{
+    data: {
       frameId?: number,
     },
   };
@@ -1919,7 +1961,7 @@ export interface NeedsBeginFrameChanged extends Instant {
   name: Name.NEEDS_BEGIN_FRAME_CHANGED;
   args: Args&{
     layerTreeId: number,
-    data: ArgsData&{
+    data: {
       needsBeginFrame: number,
     },
   };
@@ -2046,15 +2088,14 @@ export enum SelectorTimingsKey {
   InvalidationCount = 'invalidation_count',
 }
 
-export interface SelectorStats {
+export interface SelectorStatsData {
   selector_timings: SelectorTiming[];
 }
 
 export interface SelectorStats extends Complete {
   name: Name.SELECTOR_STATS;
   args: Args&{
-
-    selector_stats?: SelectorStats,
+    selector_stats?: SelectorStatsData,
   };
 }
 
@@ -2110,6 +2151,8 @@ export interface InvalidateLayout extends Instant {
     data: {
       frame: string,
       nodeId: Protocol.DOM.BackendNodeId,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -2121,6 +2164,10 @@ export interface DebuggerAsyncTaskScheduled extends Event {
   name: Name.DEBUGGER_ASYNC_TASK_SCHEDULED;
   args: Args&{
     taskName: string,
+    // Always present in traces since M136 (Mar 2025, crrev.com/c/6383360); marked optional so the engine supports earlier traces.
+    data?: {
+      sampleTraceId?: number,
+    },
   };
 }
 
@@ -2130,6 +2177,12 @@ export function isDebuggerAsyncTaskScheduled(event: Event): event is DebuggerAsy
 
 export interface DebuggerAsyncTaskRun extends Event {
   name: Name.DEBUGGER_ASYNC_TASK_RUN;
+  args?: Args&{
+    // Always present on start ('b') events in traces since M136 (Mar 2025, crrev.com/c/6383360); marked optional for 'e' events and earlier traces.
+    data?: {
+      sampleTraceId?: number,
+    },
+  };
 }
 
 export function isDebuggerAsyncTaskRun(event: Event): event is DebuggerAsyncTaskRun {
@@ -2257,11 +2310,7 @@ export function isSyntheticAnimation(event: Event): event is SyntheticAnimationP
   if (event.name !== 'Animation' || !event.cat.includes('devtools.timeline')) {
     return false;
   }
-  const data = event.args?.data;
-  if (!data) {
-    return false;
-  }
-  return 'beginEvent' in data && 'endEvent' in data;
+  return hasSyntheticPairEvents(event);
 }
 
 export function isLayoutShift(
@@ -2288,10 +2337,14 @@ export function isAnyFirstContentfulPaint(event: Event): event is AnyFirstConten
   return event.name === Name.MARK_FCP || event.name === Name.MARK_SOFT_FCP;
 }
 
+export function isLargestContentfulPaintCandidate(event: Event): event is LargestContentfulPaintCandidate {
+  return event.name === Name.MARK_LCP_CANDIDATE;
+}
 export function isAnyLargestContentfulPaintCandidate(event: Event): event is AnyLargestContentfulPaintCandidate {
   return event.name === Name.MARK_LCP_CANDIDATE || event.name === Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
 }
-export function isSoftLargestContentfulPaintCandidate(event: Event): event is AnyLargestContentfulPaintCandidate {
+export function isSoftLargestContentfulPaintCandidate(event: Event):
+    event is LargestContentfulPaintCandidateForSoftNavigation {
   return event.name === Name.MARK_LCP_CANDIDATE_FOR_SOFT_NAVIGATION;
 }
 export function isLargestImagePaintCandidate(event: Event): event is LargestImagePaintCandidate {
@@ -2445,22 +2498,14 @@ export function isSyntheticUserTiming(event: Event): event is SyntheticUserTimin
   if (event.cat !== 'blink.user_timing') {
     return false;
   }
-  const data = event.args?.data;
-  if (!data) {
-    return false;
-  }
-  return 'beginEvent' in data && 'endEvent' in data;
+  return hasSyntheticPairEvents(event);
 }
 
 export function isSyntheticConsoleTiming(event: Event): event is SyntheticConsoleTimingPair {
   if (event.cat !== 'blink.console') {
     return false;
   }
-  const data = event.args?.data;
-  if (!data) {
-    return false;
-  }
-  return 'beginEvent' in data && 'endEvent' in data;
+  return hasSyntheticPairEvents(event);
 }
 
 export function isUserTiming(event: Event): event is UserTiming {
@@ -2527,9 +2572,9 @@ export function isProfileCall(event: Event): event is SyntheticProfileCall {
 export interface Paint extends Event {
   name: Name.PAINT;
   args: Args&{
-    data: ArgsData & {
-      frame: string,
+    data: {
       layerId: number,
+      frame: string,
       // With CompositeAfterPaint enabled, paint events are no longer
       // associated with a Node, and nodeId will not be present.
       nodeId?: Protocol.DOM.BackendNodeId,
@@ -2537,6 +2582,8 @@ export interface Paint extends Event {
       nodeName?: string,
       /** This rect is unreliable and often wrong. We'll remove it. crbug.com/41402938#comment10 */
       clip?: number[],
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2548,14 +2595,15 @@ export function isPaint(event: Event): event is Paint {
 export interface PaintImage extends Complete {
   name: Name.PAINT_IMAGE;
   args: Args&{
-    data: Event & {
+    data: {
       height: number,
       width: number,
       x: number,
       y: number,
-      isCSS: boolean,
       srcHeight: number,
       srcWidth: number,
+      // Always present in traces since M136 (Mar 2025, crrev.com/c/6319773); marked optional so the engine supports earlier traces.
+      isCSS?: boolean,
       isPicture?: boolean,
       loadingAttribute?: string,
       srcsetAttribute?: string,
@@ -2574,7 +2622,7 @@ export function isPaintImage(event: Event): event is PaintImage {
 export interface ScrollLayer extends Complete {
   name: Name.SCROLL_LAYER;
   args: Args&{
-    data: Event & {
+    data: {
       frame: string,
       nodeId?: Protocol.DOM.BackendNodeId,
     },
@@ -2587,7 +2635,7 @@ export function isScrollLayer(event: Event): event is ScrollLayer {
 export interface SetLayerTreeId extends Instant {
   name: Name.SET_LAYER_TREE_ID;
   args: Args&{
-    data: ArgsData & {
+    data: {
       frame: string,
       layerTreeId: number,
     },
@@ -2703,8 +2751,10 @@ export interface FireAnimationFrame extends Complete {
   name: Name.FIRE_ANIMATION_FRAME;
   args: Args&{
     data: {
-      frame: string,
       id: number,
+      frame?: string,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
     },
   };
 }
@@ -2717,9 +2767,10 @@ export interface RequestAnimationFrame extends Instant {
   name: Name.REQUEST_ANIMATION_FRAME;
   args: Args&{
     data: {
-      frame: string,
       id: number,
-      stackTrace?: CallFrame,
+      frame?: string,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -2728,11 +2779,12 @@ export interface TimerInstall extends Instant {
   name: Name.TIMER_INSTALL;
   args: Args&{
     data: {
-      frame: string,
       singleShot: boolean,
       timeout: number,
       timerId: number,
-      stackTrace?: CallFrame,
+      frame?: string,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -2744,8 +2796,8 @@ export interface TimerFire extends Complete {
   name: Name.TIMER_FIRE;
   args: Args&{
     data: {
-      frame: string,
       timerId: number,
+      frame?: string,
     },
   };
 }
@@ -2760,7 +2812,9 @@ export interface RequestIdleCallback extends Instant {
       frame: string,
       id: number,
       timeout: Milli,
-      stackTrace?: CallFrame,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
 
   };
@@ -2778,8 +2832,9 @@ export interface WebSocketCreate extends Instant {
       url: string,
       frame?: string,
       workerId?: string,
-      websocketProtocol?: string,
-      stackTrace?: CallFrame,
+      webSocketProtocol?: string,
+      stackTrace?: CallFrame[],
+      sampleTraceId?: number,
     },
   };
 }
@@ -2788,25 +2843,28 @@ export function isWebSocketCreate(event: Event): event is WebSocketCreate {
 }
 
 export interface WebSocketInfo extends Instant {
-  name: Name.WEB_SOCKET_DESTROY|Name.WEB_SOCKET_RECEIVE_HANDSHAKE|Name.WEB_SOCKET_RECEIVE_HANDSHAKE_REQUEST;
+  name: Name.WEB_SOCKET_DESTROY|Name.WEB_SOCKET_SEND_HANDSHAKE_REQUEST|Name.WEB_SOCKET_RECEIVE_HANDSHAKE|
+      Name.WEB_SOCKET_RECEIVE_HANDSHAKE_REQUEST;
   args: Args&{
-    data: ArgsData & {
+    data: {
       identifier: number,
-      url: string,
       frame?: string,
       workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
 export interface WebSocketTransfer extends Instant {
   name: Name.WEB_SOCKET_SEND|Name.WEB_SOCKET_RECEIVE;
   args: Args&{
-    data: ArgsData & {
+    data: {
       identifier: number,
-      url: string,
       dataLength: number,
       frame?: string,
       workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2822,12 +2880,13 @@ export function isWebSocketTransfer(event: Event): event is WebSocketTransfer {
 export interface WebSocketSend extends Instant {
   name: Name.WEB_SOCKET_SEND;
   args: Args&{
-    data: ArgsData & {
+    data: {
       identifier: number,
-      url: string,
       dataLength: number,
       frame?: string,
       workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2835,12 +2894,13 @@ export interface WebSocketSend extends Instant {
 export interface WebSocketReceive extends Instant {
   name: Name.WEB_SOCKET_RECEIVE;
   args: Args&{
-    data: ArgsData & {
+    data: {
       identifier: number,
-      url: string,
       dataLength: number,
       frame?: string,
       workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2849,8 +2909,11 @@ export interface WebSocketSendHandshakeRequest extends Instant {
   name: Name.WEB_SOCKET_SEND_HANDSHAKE_REQUEST;
   args: Args&{
     data: {
-      frame: string,
       identifier: number,
+      frame?: string,
+      workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2862,8 +2925,11 @@ export interface WebSocketReceiveHandshakeResponse extends Instant {
   name: Name.WEB_SOCKET_RECEIVE_HANDSHAKE_REQUEST;
   args: Args&{
     data: {
-      frame: string,
       identifier: number,
+      frame?: string,
+      workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2875,8 +2941,11 @@ export interface WebSocketDestroy extends Instant {
   name: Name.WEB_SOCKET_DESTROY;
   args: Args&{
     data: {
-      frame: string,
       identifier: number,
+      frame?: string,
+      workerId?: string,
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2920,7 +2989,12 @@ export interface FunctionCall extends Complete {
   args: Args&{
     data?: Partial<CallFrame>& {
       frame?: string,
-      isolate?: string,
+      isolate?: string|number,
+      // Blink C++ emits integer script IDs in internal locations, but the trace buffer serializer
+      // stringifies them with String::Number(location->ScriptId()), so trace events in the wild have string scriptId.
+      scriptId?: string,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6300647); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
     },
   };
 }
@@ -2934,9 +3008,11 @@ export interface SchedulePostTaskCallback extends Instant {
     data: {
       taskId: number,
       priority: 'user-blocking'|'user-visible'|'background',
-      delay: Milli,
+      delay?: Milli,
       frame?: string,
-      stackTrace?: CallFrame,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
@@ -2950,7 +3026,7 @@ export interface RunPostTaskCallback extends Complete {
     data: {
       taskId: number,
       priority: 'user-blocking'|'user-visible'|'background',
-      delay: Milli,
+      delay?: Milli,
       frame?: string,
     },
   };
@@ -2965,11 +3041,13 @@ export interface AbortPostTaskCallback extends Complete {
     data: {
       taskId: number,
       frame?: string,
-      stackTrace?: CallFrame,
+      // Always present in traces since M135 (Feb 2025, crrev.com/c/6288548); marked optional so the engine supports earlier traces.
+      sampleTraceId?: number,
+      stackTrace?: CallFrame[],
     },
   };
 }
-export function isAbortPostTaskCallback(event: Event): event is RunPostTaskCallback {
+export function isAbortPostTaskCallback(event: Event): event is AbortPostTaskCallback {
   return event.name === Name.ABORT_POST_TASK_CALLBACK && event.ph === Phase.COMPLETE;
 }
 
@@ -3002,7 +3080,8 @@ export function isJSInvocationEvent(event: Event): boolean {
 }
 export interface ConsoleRunTask extends Event {
   args: Args&{
-    data: ArgsData & {
+    // Always present in traces since M134 (Jan 2025, crrev.com/c/6185431); marked optional so the engine supports earlier traces.
+    data?: {
       sampleTraceId?: number,
     },
   };
@@ -3028,7 +3107,7 @@ export interface ParseAuthorStyleSheet extends Complete {
   name: Name.PARSE_AUTHOR_STYLE_SHEET;
   args?: Args&{
     data: {
-      stylesheetUrl: string,
+      styleSheetUrl: string,
     },
   };
 }
@@ -3427,7 +3506,7 @@ export interface RundownScriptSourceLarge extends Event {
   name: 'LargeScriptCatchup';
   args: Args&{
     data: {
-      isolate: number,
+      isolate: string | number,
       scriptId: number,
       splitIndex: number,
       splitCount: number,
@@ -3445,7 +3524,7 @@ export interface RundownScriptStub extends Event {
   name: 'StubScriptCatchup';
   args: Args&{
     data: {
-      isolate: number,
+      isolate: string | number,
       scriptId: number,
     },
   };

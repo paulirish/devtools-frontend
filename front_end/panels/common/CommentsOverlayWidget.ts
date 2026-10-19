@@ -29,6 +29,10 @@ export interface ViewInput {
   activePin: Comments.CommentOverlayManager.PinPositionData|null;
   title: Title;
   onAddComment: (text: string) => void;
+  onDeleteQueuedComment: () => void;
+  onQueueComment: (text: string) => void;
+  onSaveEdit: (text: string) => void;
+  onStartEdit: () => void;
 }
 
 export type View = (
@@ -107,7 +111,12 @@ const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target: HTMLEl
               ${UI.Widget.widget(CommentThreadWidget, {
                 title: input.title,
                 comments: [...item.thread.comments],
+                status: item.thread.status,
                 onAddComment: input.onAddComment,
+                onDeleteQueuedComment: input.onDeleteQueuedComment,
+                onQueueComment: input.onQueueComment,
+                onSaveEdit: input.onSaveEdit,
+                onStartEdit: input.onStartEdit,
               })}
             </div>
           `;
@@ -367,6 +376,10 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
           activePin: null,
           title: {text: ''},
           onAddComment: () => {},
+          onDeleteQueuedComment: () => {},
+          onQueueComment: () => {},
+          onSaveEdit: () => {},
+          onStartEdit: () => {},
         },
         undefined,
         this.contentElement,
@@ -395,18 +408,42 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
           return;
         }
         activeThread.sendToAgent(text);
-        const threadId = activeThread.id;
-        this.#clearCloseTimeout();
-        this.#closeTimeoutId = window.setTimeout(() => {
-          this.#closeTimeoutId = null;
-          if (this.#activeThreadId === threadId) {
-            this.#setActiveThreadId(null);
-            this.requestUpdate();
-          }
-        }, AUTO_CLOSE_DELAY_MS);
+        this.#scheduleAutoClose(activeThread.id);
       },
+      onDeleteQueuedComment: () => {
+        if (!activeThread) {
+          return;
+        }
+
+        this.#commentOverlayManager.removeCommentThread(activeThread.id);
+      },
+      onQueueComment: (text: string) => {
+        if (!activeThread) {
+          return;
+        }
+        activeThread.save(text);
+        this.#scheduleAutoClose(activeThread.id);
+      },
+      onSaveEdit: (text: string) => {
+        if (!activeThread) {
+          return;
+        }
+        activeThread.editComment(text);
+      },
+      onStartEdit: () => this.#clearCloseTimeout(),
     };
     this.#view(viewInput, undefined, this.contentElement);
+  }
+
+  #scheduleAutoClose(threadId: string): void {
+    this.#clearCloseTimeout();
+    this.#closeTimeoutId = window.setTimeout(() => {
+      this.#closeTimeoutId = null;
+      if (this.#activeThreadId === threadId) {
+        this.#setActiveThreadId(null);
+        this.requestUpdate();
+      }
+    }, AUTO_CLOSE_DELAY_MS);
   }
 
   override async performUpdate(signal?: AbortSignal): Promise<void> {

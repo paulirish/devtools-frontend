@@ -5,17 +5,30 @@
 import {execSync} from 'node:child_process';
 import type * as puppeteer from 'puppeteer-core';
 
-export async function chromeLogin(page: puppeteer.Page, username: string): Promise<void> {
-  await page.goto('https://accounts.google.com', {waitUntil: 'networkidle2'});
-  if (page.url().includes('myaccount.google.com')) {
-    return;
+const MAX_LOGIN_ATTEMPTS = 2;
+
+export async function chromeLogin(page: puppeteer.Page, username: string, password?: string): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
+    try {
+      await page.goto('https://accounts.google.com', {waitUntil: 'networkidle2'});
+      if (page.url().includes('myaccount.google.com')) {
+        return;
+      }
+      await fillGoogleLoginPage(page, username, password);
+      await page.waitForFunction(() => window.location.href.includes('myaccount.google.com'));
+      return;
+    } catch (error) {
+      if (attempt < MAX_LOGIN_ATTEMPTS) {
+        console.warn(`Google login attempt ${attempt}/${MAX_LOGIN_ATTEMPTS} failed; retrying...`, error);
+        continue;
+      }
+      throw error;
+    }
   }
-  await fillGoogleLoginPage(page, username);
-  await page.waitForFunction(() => window.location.href.includes('myaccount.google.com'));
 }
 
-export async function fillGoogleLoginPage(page: puppeteer.Page, username: string): Promise<void> {
-  const password = getOtaPassword(username);
+export async function fillGoogleLoginPage(page: puppeteer.Page, username: string, password?: string): Promise<void> {
+  const resolvedPassword = password ?? getOtaPassword(username);
   const nextBtn = await page.waitForSelector('#identifierNext, #passwordNext', {visible: true});
   if (!nextBtn) {
     throw new Error('Could not find Next button during login');
@@ -31,11 +44,12 @@ export async function fillGoogleLoginPage(page: puppeteer.Page, username: string
   if (isContactChallenge) {
     throw new Error('Account verification from trusted contact required!');
   }
-  await typeTextIn(page, 'input[type="password"]', password);
+  await typeTextIn(page, 'input[type="password"]', resolvedPassword);
   await page.click('#passwordNext');
 }
 
 export async function typeTextIn(page: puppeteer.Page, selector: string, value: string): Promise<void> {
+  await page.waitForSelector(selector, {visible: true});
   await page.focus(selector);
   await page.keyboard.type(value);
 }

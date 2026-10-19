@@ -56,6 +56,10 @@ not found in other traces:
 1. A sourcemap in the metadata array with a 'chrome-extension' protocol.
 2. 'V8SourceRundownSourcesScriptCatchupEvent' traces that have a 'chrome-extension' protocol with associated source text.
 
+### cross-origin-redirect.json.gz
+
+A trace of a navigation to `http://127.0.0.1:54321/docs/start?foo=bar` that responds with a 301 redirect to `http://localhost:54322/final`. Because the redirect crosses origins, Chromium scrubs the pre-redirect URL in the renderer's `ResourceSendRequest` trace event to its origin (`http://127.0.0.1:54321/`).
+
 ### display-item-list-instant-snapshot.json.gz
 
 A `cc::DisplayItemList:snapshot` instant event extracted from a trace recorded on a minimal page with advanced
@@ -166,6 +170,10 @@ Contains a page load that has two frames (main frame + iframe). There are two im
 - the main frame loads placeholder.co/100.jpg and placeholder.co/1000.jpg
 
 This trace is used to verify the fix for a bug [crbug.com/384000716] where we incorrectly associated image requests to the wrong navigation when calculating the LCP image.
+
+### lcp-text-fcp-same-frame.json.gz
+
+A trace of https://sparknight.io/dev-latch/test-post-again where FCP and LCP are both painted at the same timestamp (`type: "text"`), while several non-render-blocking resources (async Google Fonts stylesheet and font, images, and deferred scripts) finish downloading before that first paint.
 
 ### lcp-web-font.json.gz
 

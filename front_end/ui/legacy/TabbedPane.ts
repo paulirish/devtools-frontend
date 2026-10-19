@@ -112,6 +112,7 @@ export class TabbedPane extends TabbedPaneBase {
   #rightToolbar?: Toolbar;
   #trailingSlot!: HTMLSlotElement;
   #lastDispatchedHiddenTabIds = '';
+  readonly #zoomManager = ZoomManager.instance();
   allowTabReorder?: boolean;
   private automaticReorder?: boolean;
 
@@ -180,7 +181,6 @@ export class TabbedPane extends TabbedPaneBase {
     this.triggerDropDownTimeout = null;
     this.dropDownButton = this.createDropDownButton();
     this.currentDevicePixelRatio = window.devicePixelRatio;
-    ZoomManager.instance().addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.zoomChanged, this);
     this.makeTabSlider();
   }
 
@@ -584,12 +584,20 @@ export class TabbedPane extends TabbedPaneBase {
 
   override wasShown(): void {
     super.wasShown();
+    this.#zoomManager.addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.zoomChanged, this);
+    // The zoom factor might have changed while the pane was hidden.
+    this.clearMeasuredWidths();
     const effectiveTab = this.currentTab || this.tabsHistory[0];
     if (effectiveTab && this.autoSelectFirstItemOnShow) {
       this.selectTab(effectiveTab.id);
     }
     this.requestUpdate();
     this.dispatchEventToListeners(Events.PaneVisibilityChanged, {isVisible: true});
+  }
+
+  override willHide(): void {
+    super.willHide();
+    this.#zoomManager.removeEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.zoomChanged, this);
   }
 
   override wasHidden(): void {
@@ -1712,11 +1720,16 @@ export interface TabbedPaneTabDelegate {
  *
  * ```html
  * <devtools-tabbed-pane>
- *   <div id="tab1" title="Tab 1">Content 1</div>
+ *   <div id="tab1" label="Tab 1" tab-tooltip="Full Tab 1 description">Content 1</div>
  *   <devtools-icon slot="icon-tab1" name="warning"></devtools-icon>
  *   <span slot="suffix-tab1">*</span>
  * </devtools-tabbed-pane>
  * ```
+ *
+ * The tab label is read from `label` (falling back to `title`, which is
+ * deprecated for this purpose because it leaks a native tooltip onto the tab
+ * content). An optional `tab-tooltip` attribute sets the tooltip (`title`)
+ * shown on the tab header.
  *
  * Children with `slot="icon-<tab id>"` and `slot="suffix-<tab id>"` are shown
  * before and after the title in the header of that tab.
@@ -1836,7 +1849,16 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
     for (const child of nodes) {
       this.#tabObserver.observe(child, {
         attributes: true,
-        attributeFilter: ['title', 'jslogcontext', 'selected', 'disabled', 'closeable', 'uncloseable'],
+        attributeFilter: [
+          'label',
+          'title',
+          'tab-tooltip',
+          'jslogcontext',
+          'selected',
+          'disabled',
+          'closeable',
+          'uncloseable',
+        ],
       });
     }
   }
@@ -1855,7 +1877,8 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
     const nodes = this.#getTabNodes(widget);
     for (const child of nodes) {
       const id = child.id;
-      const title = child.getAttribute('title') || '';
+      const title = child.getAttribute('label') || child.getAttribute('title') || '';
+      const tabTooltip = child.getAttribute('tab-tooltip') ?? undefined;
       const jslogContext = child.getAttribute('jslogcontext') || undefined;
       const selected = child.hasAttribute('selected');
       const enabled = !child.hasAttribute('disabled');
@@ -1870,6 +1893,7 @@ export class TabbedPaneElement extends WidgetElement<TabbedPane> {
         id,
         title,
         view,
+        tabTooltip,
         jslogContext,
         selected,
         enabled,
