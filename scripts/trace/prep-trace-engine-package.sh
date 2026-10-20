@@ -14,8 +14,7 @@ dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources lay
 rm -rf "$out_dir/gen"
 
 # export all const enums so they can be used by clients. (perl instead of sed because bsd/gnu sed differ on -i flag)
-shopt -s globstar
-perl -pi -e 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/**/*.ts
+find "$dtfe"/front_end/models/trace -name "*.ts" -exec perl -pi -e 's/export const enum/export enum/g' {} +
 
 # build devtools first!
 gn --args="is_debug=true devtools_bundle=false" gen -C $out_dir
