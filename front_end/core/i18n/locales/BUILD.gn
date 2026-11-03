@@ -10,6 +10,15 @@ import("//$devtools_root_location/config/gni/i18n.gni")
 node_action("collect_strings") {
   script = "front_end/core/i18n/collect-ui-strings.js"
 
+  # The script imports these files. A change to them can change the output.
+  inputs = [
+    devtools_location_prepend + "front_end/core/i18n/collect-ui-strings.js",
+    devtools_location_prepend + "node_modules/typescript/package.json",
+    devtools_location_prepend + "scripts/build/ninja/write-if-changed.js",
+    devtools_location_prepend + "third_party/i18n/bake-ctc-to-lhl.js",
+    devtools_location_prepend + "third_party/i18n/collect-strings.js",
+  ]
+
   args = [ "--input-directories" ]
   foreach(dir, devtools_collection_directories) {
     args += [ rebase_path(dir, root_build_dir) ]
@@ -40,14 +49,21 @@ minify_json("i18n_locales") {
       remote_devtools_locales + bundled_devtools_locales - generated_locales) {
     sources += [ "$devtools_locale_directory/$locale.json" ]
   }
+}
 
-  sources += get_target_outputs(":collect_strings")
+# Minify the generated locales in a separate action, so that a change to a UI
+# string does not minify all translated locales again.
+minify_json("i18n_generated_locales") {
+  sources = get_target_outputs(":collect_strings")
 
   deps = [ ":collect_strings" ]
 }
 
 group("locales") {
-  public_deps = [ ":i18n_locales" ]
+  public_deps = [
+    ":i18n_generated_locales",
+    ":i18n_locales",
+  ]
 
   data = []
 
@@ -55,7 +71,16 @@ group("locales") {
     data += [ "$target_gen_dir/$locale.json" ]
   }
 
+  _remote_files = []
+  foreach(locale, remote_devtools_locales) {
+    _remote_files += [ "$target_gen_dir/$locale.json" ]
+  }
+
   metadata = {
     grd_files = data
+
+    # Locales that are not bundled with Chrome, but fetched on demand from the
+    # remote DevTools server (see `remote_fetch_pattern`).
+    remote_files = _remote_files
   }
 }

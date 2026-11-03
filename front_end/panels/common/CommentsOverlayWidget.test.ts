@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {afterEach, beforeEach, it} from 'mocha';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import type * as Protocol from '../../generated/protocol.js';
 import * as CommentManager from '../../models/comment_manager/comment_manager.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {findMenuItemWithLabel} from '../../testing/ContextMenuHelpers.js';
+import {renderElementIntoDOM, setTestUniverseForWidgets} from '../../testing/DOMHelpers.js';
+import {describeWithEnvironment, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
+import {TestUniverse} from '../../testing/TestUniverse.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as Comments from '../../ui/comments/comments.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -47,7 +49,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
 
     assert.isFalse(view.input.commentMode);
     assert.deepEqual(view.input.pins, []);
-    assert.deepEqual(view.input.highlights, []);
+    assert.isNull(view.input.activeHighlight);
 
     // Create a comment
     const testEl = document.createElement('div');
@@ -61,7 +63,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     const updatedInput = await view.nextInput;
     assert.isTrue(updatedInput.commentMode);
     assert.lengthOf(updatedInput.pins, 1);
-    assert.lengthOf(updatedInput.highlights, 1);
+    assert.isNotNull(updatedInput.activeHighlight);
 
     testEl.remove();
     widget.detach();
@@ -91,7 +93,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     const updatedInput = await view.nextInput;
     assert.isTrue(updatedInput.commentMode);
     assert.lengthOf(updatedInput.pins, 1);
-    assert.lengthOf(updatedInput.highlights, 1);
+    assert.isNotNull(updatedInput.activeHighlight);
     assert.isNotNull(updatedInput.activePin);
     assert.isNotNull(updatedInput.activeThread);
     assert.strictEqual(updatedInput.activeThread.status, 'DRAFT');
@@ -127,10 +129,10 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
 
     const pin = widget.contentElement.querySelector('.comment-pin') as HTMLElement;
     assert.isNotNull(pin);
-    assert.include(pin.textContent || '', '1');
+    assert.strictEqual(pin.getAttribute('aria-hidden'), 'true');
     const cursor = pin.querySelector('.comment-cursor');
     assert.isNotNull(cursor);
-    assert.strictEqual(cursor.textContent?.trim(), '1');
+    assert.strictEqual(cursor.textContent?.trim(), '');
 
     const highlight = widget.contentElement.querySelector('.comment-anchor-highlight') as HTMLElement;
     assert.isNotNull(highlight);
@@ -139,7 +141,149 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     widget.detach();
   });
 
-  it('renders sequential numbers for multiple comment pins in order of creation', async () => {
+  describe('anchor highlight', () => {
+    function createAnchor(context: string, top: number): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('jslog', `TreeItem; context: ${context}`);
+      el.textContent = context;
+      el.getBoundingClientRect = () => new DOMRect(10, top, 100, 30);
+      renderElementIntoDOM(el, {allowMultipleChildren: true});
+      return el;
+    }
+
+    async function setupWidget(): Promise<PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget> {
+      const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+      widget.setOverlayManagerForTest(overlayManager);
+      widget.markAsRoot();
+      renderElementIntoDOM(widget, {allowMultipleChildren: true});
+      commentManager.setCommentMode(true);
+      return widget;
+    }
+
+    async function getHighlights(widget: PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget):
+        Promise<HTMLElement[]> {
+      widget.requestUpdate();
+      await widget.updateComplete;
+      return Array.from(widget.contentElement.querySelectorAll<HTMLElement>('.comment-anchor-highlight'));
+    }
+
+    it('renders only pins when no thread is open', async () => {
+      const widget = await setupWidget();
+      const el1 = createAnchor('hl-closed-1', 10);
+      const el2 = createAnchor('hl-closed-2', 50);
+      overlayManager.createComment(el1, 'First')?.save();
+      overlayManager.createComment(el2, 'Second')?.sendToAgent();
+      // The last created thread is still open; close it.
+      document.documentElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+
+      assert.isEmpty(await getHighlights(widget));
+      assert.lengthOf(widget.contentElement.querySelectorAll('.comment-pin'), 2);
+
+      el1.remove();
+      el2.remove();
+      widget.detach();
+    });
+
+    it('renders a single highlight for the open thread and removes it on close', async () => {
+      const widget = await setupWidget();
+      const el1 = createAnchor('hl-single-1', 10);
+      const el2 = createAnchor('hl-single-2', 50);
+      const thread1 = overlayManager.createComment(el1, 'First');
+      assert.exists(thread1);
+      thread1.save();
+      const thread2 = overlayManager.createComment(el2, 'Second');
+      assert.exists(thread2);
+      thread2.save();
+
+      widget.openThread(thread2.id);
+      let highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.include(highlights[0].style.transform, 'translate3d(10px, 50px, 0');
+
+      widget.openThread(thread1.id);
+      highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.include(highlights[0].style.transform, 'translate3d(10px, 10px, 0');
+
+      // Clicking the pin of the open thread closes it.
+      const pins = widget.contentElement.querySelectorAll<HTMLElement>('.comment-pin');
+      pins[0].click();
+      assert.isEmpty(await getHighlights(widget));
+
+      el1.remove();
+      el2.remove();
+      widget.detach();
+    });
+
+    it('uses a solid border for DRAFT threads', async () => {
+      const widget = await setupWidget();
+      const el = createAnchor('hl-status-draft', 10);
+      const thread = overlayManager.createComment(el, 'Comment');
+      assert.exists(thread);
+      assert.strictEqual(thread.status, 'DRAFT');
+      // DRAFT threads open automatically; openThread() would discard them.
+
+      const highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.isFalse(highlights[0].classList.contains('resolved'));
+
+      el.remove();
+      widget.detach();
+    });
+
+    it('uses a solid border for ACTIVE threads', async () => {
+      const widget = await setupWidget();
+      const el = createAnchor('hl-status-active', 10);
+      const thread = overlayManager.createComment(el, 'Comment');
+      assert.exists(thread);
+      thread.save();
+      assert.strictEqual(thread.status, 'ACTIVE');
+      widget.openThread(thread.id);
+
+      const highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.isFalse(highlights[0].classList.contains('resolved'));
+
+      el.remove();
+      widget.detach();
+    });
+
+    it('uses a solid border for SENT_TO_AGENT threads', async () => {
+      const widget = await setupWidget();
+      const el = createAnchor('hl-status-sent-to-agent', 10);
+      const thread = overlayManager.createComment(el, 'Comment');
+      assert.exists(thread);
+      thread.sendToAgent();
+      assert.strictEqual(thread.status, 'SENT_TO_AGENT');
+      widget.openThread(thread.id);
+
+      const highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.isFalse(highlights[0].classList.contains('resolved'));
+
+      el.remove();
+      widget.detach();
+    });
+
+    it('uses a dashed border for RESOLVED threads', async () => {
+      const widget = await setupWidget();
+      const el = createAnchor('hl-status-resolved', 10);
+      const thread = overlayManager.createComment(el, 'Comment');
+      assert.exists(thread);
+      thread.resolve();
+      assert.strictEqual(thread.status, 'RESOLVED');
+      widget.openThread(thread.id);
+
+      const highlights = await getHighlights(widget);
+      assert.lengthOf(highlights, 1);
+      assert.isTrue(highlights[0].classList.contains('resolved'));
+
+      el.remove();
+      widget.detach();
+    });
+  });
+
+  it('renders a pin for each saved comment', async () => {
     const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
     widget.setOverlayManagerForTest(overlayManager);
     widget.markAsRoot();
@@ -174,50 +318,9 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     const pins = Array.from(widget.contentElement.querySelectorAll('.comment-pin'));
     assert.lengthOf(pins, 3);
 
-    const texts = pins.map(p => p.querySelector('.comment-cursor')?.textContent?.trim());
-    assert.deepEqual(texts, ['1', '2', '3']);
-
     el1.remove();
     el2.remove();
     el3.remove();
-    widget.detach();
-  });
-
-  it('does not increment pin index when clicking another element without saving draft', async () => {
-    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
-    widget.setOverlayManagerForTest(overlayManager);
-    widget.markAsRoot();
-    renderElementIntoDOM(widget, {allowMultipleChildren: true});
-
-    const el1 = document.createElement('div');
-    el1.setAttribute('jslog', 'TreeItem; context: draft-idx-1');
-    el1.textContent = 'item 1';
-    el1.getBoundingClientRect = () => new DOMRect(10, 10, 100, 30);
-    renderElementIntoDOM(el1, {allowMultipleChildren: true});
-
-    const el2 = document.createElement('div');
-    el2.setAttribute('jslog', 'TreeItem; context: draft-idx-2');
-    el2.textContent = 'item 2';
-    el2.getBoundingClientRect = () => new DOMRect(10, 50, 100, 30);
-    renderElementIntoDOM(el2, {allowMultipleChildren: true});
-
-    commentManager.setCommentMode(true);
-    overlayManager.handleElementClick(el1);
-    widget.requestUpdate();
-    await widget.updateComplete;
-
-    let pin = widget.contentElement.querySelector('.comment-pin .comment-cursor');
-    assert.strictEqual(pin?.textContent?.trim(), '1');
-
-    overlayManager.handleElementClick(el2);
-    widget.requestUpdate();
-    await widget.updateComplete;
-
-    pin = widget.contentElement.querySelector('.comment-pin .comment-cursor');
-    assert.strictEqual(pin?.textContent?.trim(), '1');
-
-    el1.remove();
-    el2.remove();
     widget.detach();
   });
 
@@ -257,6 +360,189 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     const handled = delegate.handleAction(context, 'comments.toggle-comment-mode');
     assert.isFalse(handled);
     assert.isFalse(commentManager.isCommentMode(), 'Comment mode should not be toggled when agent is not attached');
+  });
+
+  describe('Comments drawer reveal on toggle', () => {
+    type ViewLocation = Awaited<ReturnType<UI.ViewManager.ViewManager['resolveLocation']>>;
+    const fakeCommentsView = {} as UI.View.View;
+    let showViewStub: sinon.SinonStub;
+    let resolveLocationStub: sinon.SinonStub;
+    let locationShowViewStub: sinon.SinonStub;
+    let drawerVisible: boolean;
+
+    beforeEach(() => {
+      const viewManager = UI.ViewManager.ViewManager.instance();
+      sinon.stub(viewManager, 'hasView').withArgs('comments').returns(true);
+      sinon.stub(viewManager, 'view').withArgs('comments').returns(fakeCommentsView);
+      sinon.stub(viewManager, 'locationNameForViewId').withArgs('comments').returns('drawer-view');
+      showViewStub = sinon.stub(viewManager, 'showView').resolves();
+      locationShowViewStub = sinon.stub().resolves();
+      resolveLocationStub = sinon.stub(viewManager, 'resolveLocation').resolves({
+        showView: locationShowViewStub,
+      } as unknown as ViewLocation);
+      drawerVisible = false;
+      sinon.stub(UI.InspectorView.InspectorView, 'maybeGetInspectorViewInstance').returns({
+        drawerVisible: () => drawerVisible,
+      } as UI.InspectorView.InspectorView);
+    });
+
+    it('adds the Comments tab without selecting or focusing it when entering comment mode with the drawer visible',
+       async () => {
+         drawerVisible = true;
+         const delegate = new PanelCommon.CommentsOverlayWidget.ActionDelegate(commentManager);
+         delegate.handleAction({} as UI.Context.Context, 'comments.toggle-comment-mode');
+         assert.isTrue(commentManager.isCommentMode());
+         sinon.assert.calledOnceWithExactly(resolveLocationStub, 'drawer-view');
+         await resolveLocationStub.firstCall.returnValue;
+         sinon.assert.calledOnceWithExactly(locationShowViewStub, fakeCommentsView, undefined, false, true, false);
+         sinon.assert.notCalled(showViewStub);
+       });
+
+    it('does nothing when entering comment mode with the drawer closed', () => {
+      const delegate = new PanelCommon.CommentsOverlayWidget.ActionDelegate(commentManager);
+      delegate.handleAction({} as UI.Context.Context, 'comments.toggle-comment-mode');
+      assert.isTrue(commentManager.isCommentMode());
+      sinon.assert.notCalled(showViewStub);
+      sinon.assert.notCalled(resolveLocationStub);
+    });
+
+    it('opens the drawer on the Comments tab when leaving comment mode, even if the drawer was closed', () => {
+      commentManager.setCommentMode(true);
+      const delegate = new PanelCommon.CommentsOverlayWidget.ActionDelegate(commentManager);
+      delegate.handleAction({} as UI.Context.Context, 'comments.toggle-comment-mode');
+      assert.isFalse(commentManager.isCommentMode());
+      sinon.assert.calledOnceWithExactly(showViewStub, 'comments', true);
+    });
+
+    it('opens the drawer on the Comments tab when Escape exits comment mode', () => {
+      const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+      widget.setOverlayManagerForTest(overlayManager);
+      widget.markAsRoot();
+      renderElementIntoDOM(widget, {allowMultipleChildren: true});
+      commentManager.setCommentMode(true);
+
+      const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true});
+      document.body.dispatchEvent(event);
+
+      assert.isTrue(event.defaultPrevented);
+      assert.isFalse(commentManager.isCommentMode());
+      sinon.assert.calledOnceWithExactly(showViewStub, 'comments', true);
+
+      widget.detach();
+    });
+
+    it('does not reveal the Comments tab when comment mode is turned off by agent detach', () => {
+      commentManager.setCommentMode(true);
+      commentManager.setAgentAttached(false);
+      assert.isFalse(commentManager.isCommentMode());
+      sinon.assert.notCalled(showViewStub);
+    });
+  });
+
+  describe('ContextMenuProvider', () => {
+    let testEl: HTMLElement;
+
+    beforeEach(() => {
+      updateHostConfig({devToolsComments: {enabled: true}});
+      const universe = new TestUniverse();
+      setTestUniverseForWidgets(universe);
+      commentManager = universe.commentManager;
+      commentManager.setAgentAttached(true);
+      testEl = document.createElement('div');
+      testEl.setAttribute('jslog', 'TreeItem; context: context-menu-test');
+      testEl.textContent = 'context menu target';
+      testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+      renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+    });
+
+    afterEach(() => {
+      testEl.remove();
+    });
+
+    function openContextMenu(target: Node):
+        {contextMenu: UI.ContextMenu.ContextMenu, addCommentOption?: UI.ContextMenu.Item} {
+      const event = new MouseEvent('contextmenu', {clientX: 20, clientY: 25});
+      const contextMenu = new UI.ContextMenu.ContextMenu(event);
+      const provider = new PanelCommon.CommentsOverlayWidget.ContextMenuProvider();
+      provider.appendApplicableItems(event, contextMenu, target);
+      return {contextMenu, addCommentOption: findMenuItemWithLabel(contextMenu.annotationSection(), 'Add comment')};
+    }
+
+    it('offers "Add comment" on a commentable element', () => {
+      const {addCommentOption} = openContextMenu(testEl);
+      assert.exists(addCommentOption);
+    });
+
+    it('does not offer "Add comment" when the comments feature is disabled', () => {
+      updateHostConfig({devToolsComments: {enabled: false}});
+      const {addCommentOption} = openContextMenu(testEl);
+      assert.isUndefined(addCommentOption);
+    });
+
+    it('does not offer "Add comment" when no agent is attached', () => {
+      commentManager.setAgentAttached(false);
+      const {addCommentOption} = openContextMenu(testEl);
+      assert.isUndefined(addCommentOption);
+    });
+
+    it('does not offer "Add comment" on an element that cannot be commented on', () => {
+      const plainEl = document.createElement('div');
+      renderElementIntoDOM(plainEl, {allowMultipleChildren: true});
+      const {addCommentOption} = openContextMenu(plainEl);
+      assert.isUndefined(addCommentOption);
+      plainEl.remove();
+    });
+
+    it('offers "Add comment" only once when the menu has several targets in the same row', () => {
+      const row = document.createElement('div');
+      row.setAttribute('jslog', 'TableRow; context: context-menu-row');
+      row.getBoundingClientRect = () => new DOMRect(10, 60, 100, 20);
+      const cell = row.createChild('span');
+      cell.textContent = 'cell';
+      const link = row.createChild('span');
+      link.textContent = 'link';
+      renderElementIntoDOM(row, {allowMultipleChildren: true});
+
+      const event = new MouseEvent('contextmenu', {clientX: 20, clientY: 65});
+      const contextMenu = new UI.ContextMenu.ContextMenu(event);
+      const provider = new PanelCommon.CommentsOverlayWidget.ContextMenuProvider();
+      provider.appendApplicableItems(event, contextMenu, cell);
+      provider.appendApplicableItems(event, contextMenu, link);
+
+      const labels = contextMenu.annotationSection().items.map(item => item.buildDescriptor().label);
+      assert.deepEqual(labels, ['Add comment']);
+      row.remove();
+    });
+
+    it('turns comment mode on and opens a draft on the element when "Add comment" is chosen', () => {
+      assert.isFalse(commentManager.isCommentMode());
+      const {contextMenu, addCommentOption} = openContextMenu(testEl);
+      assert.exists(addCommentOption);
+
+      contextMenu.invokeHandler(addCommentOption.id());
+
+      assert.isTrue(commentManager.isCommentMode());
+      const threads = commentManager.getCommentThreads();
+      assert.lengthOf(threads, 1);
+      assert.strictEqual(threads[0].status, 'DRAFT');
+    });
+
+    it('keeps comment mode on and replaces an existing draft when "Add comment" is chosen in comment mode', () => {
+      const {contextMenu: firstMenu, addCommentOption: firstAddCommentOption} = openContextMenu(testEl);
+      assert.exists(firstAddCommentOption);
+      firstMenu.invokeHandler(firstAddCommentOption.id());
+      const firstDraft = commentManager.getCommentThreads()[0];
+
+      const {contextMenu: secondMenu, addCommentOption: secondAddCommentOption} = openContextMenu(testEl);
+      assert.exists(secondAddCommentOption);
+      secondMenu.invokeHandler(secondAddCommentOption.id());
+
+      assert.isTrue(commentManager.isCommentMode());
+      const threads = commentManager.getCommentThreads();
+      assert.lengthOf(threads, 1);
+      assert.notStrictEqual(threads[0], firstDraft);
+      assert.strictEqual(threads[0].status, 'DRAFT');
+    });
   });
 
   it('updates ButtonProvider item visibility and action enabled state when agentAttached changes', () => {
@@ -312,8 +598,41 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     assert.isNull(inputAfterDetach.activeThread);
     assert.isNull(inputAfterDetach.activePin);
     assert.isEmpty(inputAfterDetach.pins);
-    assert.isEmpty(inputAfterDetach.highlights);
+    assert.isNull(inputAfterDetach.activeHighlight);
     assert.isFalse(inputAfterDetach.commentMode);
+  });
+
+  it('shows "Sent" in the popover until the agent takes the comment, then "Working"', async () => {
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: sent-status');
+    testEl.textContent = 'sent status';
+    testEl.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    commentManager.setCommentMode(true);
+    overlayManager.handleElementClick(testEl);
+    const [thread] = commentManager.getCommentThreads();
+    assert.exists(thread);
+    thread.sendToAgent('Sent comment');
+    widget.requestUpdate();
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget .sent-status'));
+    assert.isNull(widget.contentElement.querySelector('.comment-popup-widget .working-status'));
+
+    commentManager.takeComments();
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNull(widget.contentElement.querySelector('.comment-popup-widget .sent-status'));
+    assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget .working-status devtools-spinner'));
+
+    testEl.remove();
+    widget.detach();
   });
 
   it('resets draft text when clicking a different element while a draft is open', async () => {
@@ -583,6 +902,525 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     widget.detach();
   });
 
+  describe('Escape in comment mode', () => {
+    function pressEscape(target: EventTarget = document.body, init: KeyboardEventInit = {}): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true, ...init});
+      target.dispatchEvent(event);
+      return event;
+    }
+
+    function renderWidget(): PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget {
+      const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+      widget.setOverlayManagerForTest(overlayManager);
+      widget.markAsRoot();
+      renderElementIntoDOM(widget, {allowMultipleChildren: true});
+      return widget;
+    }
+
+    it('closes the open thread first and exits comment mode on the next Escape', async () => {
+      const widget = renderWidget();
+      const el = document.createElement('div');
+      el.setAttribute('jslog', 'TreeItem; context: escape-exit-mode-test');
+      el.textContent = 'escape exit mode content';
+      el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+      renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+      commentManager.setCommentMode(true);
+      overlayManager.createComment(el, 'Saved comment')?.save();
+      widget.requestUpdate();
+      await UI.Widget.Widget.allUpdatesComplete;
+      assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+
+      assert.isTrue(pressEscape().defaultPrevented);
+      widget.requestUpdate();
+      await UI.Widget.Widget.allUpdatesComplete;
+      assert.isNull(widget.contentElement.querySelector('.comment-popup-widget'));
+      assert.isTrue(commentManager.isCommentMode());
+
+      assert.isTrue(pressEscape().defaultPrevented);
+      assert.isFalse(commentManager.isCommentMode());
+
+      el.remove();
+      widget.detach();
+    });
+
+    it('exits comment mode before panel-level Escape handlers run', () => {
+      const widget = renderWidget();
+      commentManager.setCommentMode(true);
+
+      const input = document.createElement('input');
+      renderElementIntoDOM(input, {allowMultipleChildren: true});
+      const panelHandler = sinon.spy();
+      input.addEventListener('keydown', panelHandler);
+
+      const event = pressEscape(input);
+
+      assert.isTrue(event.defaultPrevented);
+      assert.isFalse(commentManager.isCommentMode());
+      sinon.assert.notCalled(panelHandler);
+
+      input.remove();
+      widget.detach();
+    });
+
+    it('ignores other keys, modified Escape and Escape during IME composition', () => {
+      const widget = renderWidget();
+      commentManager.setCommentMode(true);
+
+      const keyEvent = new KeyboardEvent('keydown', {key: 'a', bubbles: true, cancelable: true});
+      document.body.dispatchEvent(keyEvent);
+      assert.isFalse(keyEvent.defaultPrevented);
+      assert.isFalse(pressEscape(document.body, {shiftKey: true}).defaultPrevented);
+      assert.isFalse(pressEscape(document.body, {isComposing: true}).defaultPrevented);
+      assert.isTrue(commentManager.isCommentMode());
+
+      widget.detach();
+    });
+
+    it('does not exit comment mode while a dialog is open', () => {
+      const widget = renderWidget();
+      commentManager.setCommentMode(true);
+      const hasInstanceStub = sinon.stub(UI.Dialog.Dialog, 'hasInstance').returns(true);
+
+      const event = pressEscape();
+      // Restore before teardown, which may close leftover dialogs while hasInstance() is true.
+      hasInstanceStub.restore();
+
+      assert.isFalse(event.defaultPrevented);
+      assert.isTrue(commentManager.isCommentMode());
+
+      widget.detach();
+    });
+
+    it('leaves Escape untouched when comment mode is off', () => {
+      const widget = renderWidget();
+      commentManager.setCommentMode(true);
+      commentManager.setCommentMode(false);
+
+      assert.isFalse(pressEscape().defaultPrevented);
+
+      widget.detach();
+    });
+
+    it('stops handling Escape once the widget is hidden', () => {
+      const widget = renderWidget();
+      commentManager.setCommentMode(true);
+      widget.detach();
+
+      assert.isFalse(pressEscape().defaultPrevented);
+      assert.isTrue(commentManager.isCommentMode());
+    });
+  });
+
+  it('closes draft comment thread UI, removes draft, and propagates click when clicking outside the popup',
+     async () => {
+       const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+       widget.setOverlayManagerForTest(overlayManager);
+       widget.markAsRoot();
+       renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+       const el = document.createElement('div');
+       el.setAttribute('jslog', 'TreeItem; context: click-outside-draft-test');
+       el.textContent = 'draft target content';
+       el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+       renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+       const toolbar = document.createElement('div');
+       toolbar.setAttribute('jslog', 'Toolbar; context: main-toolbar');
+       const toolbarButton = document.createElement('button');
+       toolbarButton.textContent = 'Toolbar Action';
+       const onToolbarClick = sinon.spy();
+       toolbarButton.addEventListener('click', onToolbarClick);
+       toolbar.appendChild(toolbarButton);
+       renderElementIntoDOM(toolbar, {allowMultipleChildren: true});
+
+       commentManager.setCommentMode(true);
+       overlayManager.handleElementClick(el);
+       await UI.Widget.Widget.allUpdatesComplete;
+
+       assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+       assert.lengthOf(commentManager.getCommentThreads(), 1);
+
+       const clickEvent = new MouseEvent('click', {bubbles: true, cancelable: true});
+       toolbarButton.dispatchEvent(clickEvent);
+       assert.isFalse(clickEvent.defaultPrevented);
+       sinon.assert.calledOnce(onToolbarClick);
+
+       await UI.Widget.Widget.allUpdatesComplete;
+
+       assert.isNull(widget.contentElement.querySelector('.comment-popup-widget'));
+       assert.lengthOf(commentManager.getCommentThreads(), 0);
+
+       el.remove();
+       toolbar.remove();
+       widget.detach();
+     });
+
+  it('closes active saved comment thread UI, keeps pin, and propagates click when clicking outside the popup',
+     async () => {
+       const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+       widget.setOverlayManagerForTest(overlayManager);
+       widget.markAsRoot();
+       renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+       const el = document.createElement('div');
+       el.setAttribute('jslog', 'TreeItem; context: click-outside-saved-test');
+       el.textContent = 'saved target content';
+       el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+       renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+       const outsideButton = document.createElement('button');
+       outsideButton.textContent = 'Outside Button';
+       const onOutsideClick = sinon.spy();
+       outsideButton.addEventListener('click', onOutsideClick);
+       renderElementIntoDOM(outsideButton, {allowMultipleChildren: true});
+
+       const thread = overlayManager.createComment(el, 'Saved comment');
+       assert.isNotNull(thread);
+       thread.save();
+       widget.openThread(thread.id);
+       await UI.Widget.Widget.allUpdatesComplete;
+
+       assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+
+       const clickEvent = new MouseEvent('click', {bubbles: true, cancelable: true});
+       outsideButton.dispatchEvent(clickEvent);
+       assert.isFalse(clickEvent.defaultPrevented);
+       sinon.assert.calledOnce(onOutsideClick);
+
+       await UI.Widget.Widget.allUpdatesComplete;
+
+       assert.isNull(widget.contentElement.querySelector('.comment-popup-widget'));
+       assert.lengthOf(commentManager.getCommentThreads(), 1);
+       assert.isNotNull(widget.contentElement.querySelector('.comment-pin'));
+
+       el.remove();
+       outsideButton.remove();
+       widget.detach();
+     });
+
+  it('does not close the comment thread UI when clicking inside the popup', async () => {
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: click-inside-popup-test');
+    el.textContent = 'inside popup test content';
+    el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+    renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+    commentManager.setCommentMode(true);
+    overlayManager.handleElementClick(el);
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    const textarea = widget.contentElement.querySelector('textarea') as HTMLTextAreaElement;
+    assert.isNotNull(textarea);
+    textarea.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+    assert.lengthOf(commentManager.getCommentThreads(), 1);
+
+    el.remove();
+    widget.detach();
+  });
+
+  it('toggles the comment thread UI closed when clicking the active thread pin', async () => {
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: click-pin-toggle-test');
+    el.textContent = 'pin toggle test content';
+    el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+    renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+    commentManager.setCommentMode(true);
+    const thread = overlayManager.createComment(el, 'Saved comment');
+    assert.isNotNull(thread);
+    thread.save();
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+
+    const pin = widget.contentElement.querySelector('.comment-pin') as HTMLElement;
+    assert.isNotNull(pin);
+    pin.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNull(widget.contentElement.querySelector('.comment-popup-widget'));
+    assert.lengthOf(commentManager.getCommentThreads(), 1);
+    assert.isNotNull(widget.contentElement.querySelector('.comment-pin'));
+
+    el.remove();
+    widget.detach();
+  });
+
+  describe('pin hover preview', () => {
+    type ViewStub =
+        ReturnType<typeof createViewFunctionStub<typeof PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget>>;
+
+    let view: ViewStub;
+    let widget: PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget;
+    let elements: HTMLElement[];
+    let threads: CommentManager.CommentManager.CommentThread[];
+
+    async function rerender(): Promise<PanelCommon.CommentsOverlayWidget.ViewInput> {
+      widget.requestUpdate();
+      return await view.nextInput;
+    }
+
+    async function setupWithSavedThreads(contexts: string[]): Promise<PanelCommon.CommentsOverlayWidget.ViewInput> {
+      view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+      widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager], view);
+      widget.setOverlayManagerForTest(overlayManager);
+      widget.markAsRoot();
+      renderElementIntoDOM(widget, {allowMultipleChildren: true});
+      await view.nextInput;
+      commentManager.setCommentMode(true);
+
+      elements = [];
+      threads = [];
+      contexts.forEach((context, i) => {
+        const el = document.createElement('div');
+        el.setAttribute('jslog', `TreeItem; context: ${context}`);
+        el.textContent = context;
+        el.getBoundingClientRect = () => new DOMRect(10, 10 + i * 50, 100, 30);
+        renderElementIntoDOM(el, {allowMultipleChildren: true});
+        elements.push(el);
+        const thread = overlayManager.createComment(el, `Comment ${i}`);
+        assert.exists(thread);
+        thread.save();
+        threads.push(thread);
+      });
+      // The last created thread is open; close it so only pins remain.
+      document.documentElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      const input = await rerender();
+      assert.isNull(input.activeThread);
+      assert.lengthOf(input.pins, contexts.length);
+      return input;
+    }
+
+    afterEach(() => {
+      elements?.forEach(el => el.remove());
+      widget?.detach();
+    });
+
+    it('shows the highlight and thread popup when hovering a pin and hides them on mouse leave', async () => {
+      const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+      try {
+        let input = await setupWithSavedThreads(['hover-show-1', 'hover-show-2']);
+
+        input.onPinMouseEnter(threads[1].id);
+        input = await view.nextInput;
+        assert.isNull(input.activeThread);
+        assert.strictEqual(input.hoveredThread?.id, threads[1].id);
+        assert.strictEqual(input.hoveredPin?.id, threads[1].id);
+        assert.strictEqual(input.hoveredHighlight?.top, 60);
+
+        input.onPinMouseLeave();
+        input = await rerender();
+        // Still visible during the grace period.
+        assert.strictEqual(input.hoveredThread?.id, threads[1].id);
+
+        clock.tick(200);
+        input = await view.nextInput;
+        assert.isNull(input.hoveredThread);
+        assert.isNull(input.hoveredPin);
+        assert.isNull(input.hoveredHighlight);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('keeps the popup visible while the cursor moves from the pin into the popup', async () => {
+      const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+      try {
+        let input = await setupWithSavedThreads(['hover-into-popup']);
+
+        input.onPinMouseEnter(threads[0].id);
+        input = await view.nextInput;
+        input.onPinMouseLeave();
+        input.onPopupMouseEnter();
+        clock.tick(200);
+        input = await rerender();
+        assert.strictEqual(input.hoveredThread?.id, threads[0].id);
+
+        input.onPopupMouseLeave();
+        clock.tick(200);
+        input = await view.nextInput;
+        assert.isNull(input.hoveredThread);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('opens the previewed thread once the user interacts with the popup', async () => {
+      const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+      try {
+        let input = await setupWithSavedThreads(['hover-interact']);
+
+        input.onPinMouseEnter(threads[0].id);
+        input = await view.nextInput;
+        input.onPopupMouseEnter();
+        input.onPopupInteract();
+        input = await view.nextInput;
+        assert.strictEqual(input.activeThread?.id, threads[0].id);
+        assert.isNull(input.hoveredThread);
+
+        input.onPopupMouseLeave();
+        clock.tick(200);
+        input = await rerender();
+        assert.strictEqual(input.activeThread?.id, threads[0].id);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('opens the hovered thread on pin click and closes it on a second click', async () => {
+      const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+      try {
+        let input = await setupWithSavedThreads(['hover-click']);
+
+        input.onPinMouseEnter(threads[0].id);
+        input = await view.nextInput;
+        input.onPinClick(threads[0].id);
+        input = await view.nextInput;
+        assert.strictEqual(input.activeThread?.id, threads[0].id);
+        assert.isNull(input.hoveredThread);
+        input.onPinMouseLeave();
+        clock.tick(200);
+        input = await rerender();
+        assert.strictEqual(input.activeThread?.id, threads[0].id);
+
+        input.onPinClick(threads[0].id);
+        input = await view.nextInput;
+        assert.isNull(input.activeThread);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('shows the hovered thread next to the open thread', async () => {
+      let input = await setupWithSavedThreads(['hover-both-1', 'hover-both-2']);
+
+      widget.openThread(threads[0].id);
+      input = await view.nextInput;
+      input.onPinMouseEnter(threads[1].id);
+      input = await view.nextInput;
+
+      assert.strictEqual(input.activeThread?.id, threads[0].id);
+      assert.strictEqual(input.activeHighlight?.top, 10);
+      assert.strictEqual(input.hoveredThread?.id, threads[1].id);
+      assert.strictEqual(input.hoveredHighlight?.top, 60);
+    });
+
+    it('does not preview the open thread when hovering its own pin', async () => {
+      let input = await setupWithSavedThreads(['hover-own-1', 'hover-own-2']);
+
+      widget.openThread(threads[0].id);
+      input = await view.nextInput;
+      input.onPinMouseEnter(threads[1].id);
+      input = await view.nextInput;
+      assert.strictEqual(input.hoveredThread?.id, threads[1].id);
+
+      input.onPinMouseEnter(threads[0].id);
+      input = await view.nextInput;
+      assert.strictEqual(input.activeThread?.id, threads[0].id);
+      assert.isNull(input.hoveredThread);
+    });
+
+    it('replaces the open thread when interacting with the preview of another thread', async () => {
+      let input = await setupWithSavedThreads(['hover-replace-1', 'hover-replace-2']);
+
+      widget.openThread(threads[0].id);
+      input = await view.nextInput;
+      input.onPinMouseEnter(threads[1].id);
+      input = await view.nextInput;
+      input.onPopupInteract();
+      input = await view.nextInput;
+
+      assert.strictEqual(input.activeThread?.id, threads[1].id);
+      assert.isNull(input.hoveredThread);
+    });
+
+    it('keeps an open draft when interacting with the preview of another thread', async () => {
+      // Attach the draft target before setup so that no DOM size change happens
+      // while the overlay manager observes anchor ancestors.
+      const draftEl = document.createElement('div');
+      draftEl.setAttribute('jslog', 'TreeItem; context: hover-draft-new');
+      draftEl.textContent = 'hover-draft-new';
+      draftEl.getBoundingClientRect = () => new DOMRect(10, 200, 100, 30);
+      renderElementIntoDOM(draftEl, {allowMultipleChildren: true});
+      let input = await setupWithSavedThreads(['hover-draft-saved']);
+      elements.push(draftEl);
+
+      assert.isTrue(overlayManager.handleElementClick(draftEl));
+      input = await rerender();
+      const draft = input.activeThread;
+      assert.strictEqual(draft?.status, 'DRAFT');
+
+      input.onPinMouseEnter(threads[0].id);
+      input = await view.nextInput;
+      assert.strictEqual(input.hoveredThread?.id, threads[0].id);
+
+      input.onPopupInteract();
+      input = await rerender();
+      assert.strictEqual(input.activeThread, draft);
+      assert.strictEqual(input.hoveredThread?.id, threads[0].id);
+      assert.lengthOf(commentManager.getCommentThreads().filter(t => t.status === 'DRAFT'), 1);
+    });
+
+    it('passes actions that act on the hovered thread', async () => {
+      let input = await setupWithSavedThreads(['hover-actions-1', 'hover-actions-2']);
+
+      widget.openThread(threads[0].id);
+      input = await view.nextInput;
+      input.onPinMouseEnter(threads[1].id);
+      input = await view.nextInput;
+
+      input.hoveredActions.onSaveEdit('Edited hovered');
+      assert.strictEqual(threads[1].comments.at(-1)?.text, 'Edited hovered');
+      assert.notStrictEqual(threads[0].comments.at(-1)?.text, 'Edited hovered');
+    });
+  });
+
+  it('closes and removes the draft thread when clicking its own pin in comment mode', async () => {
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const el = document.createElement('div');
+    el.setAttribute('jslog', 'TreeItem; context: click-draft-pin-toggle-test');
+    el.textContent = 'draft pin toggle test content';
+    el.getBoundingClientRect = () => new DOMRect(100, 100, 150, 40);
+    renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+    commentManager.setCommentMode(true);
+    overlayManager.handleElementClick(el);
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNotNull(widget.contentElement.querySelector('.comment-popup-widget'));
+    assert.lengthOf(commentManager.getCommentThreads(), 1);
+
+    const pin = widget.contentElement.querySelector('.comment-pin') as HTMLElement;
+    assert.isNotNull(pin);
+    pin.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNull(widget.contentElement.querySelector('.comment-popup-widget'));
+    assert.lengthOf(commentManager.getCommentThreads(), 0);
+    assert.isNull(widget.contentElement.querySelector('.comment-pin'));
+
+    el.remove();
+    widget.detach();
+  });
+
   it('positions pins and highlights with translate3d and preserves DOM nodes across realtime updates', async () => {
     const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
     widget.setOverlayManagerForTest(overlayManager);
@@ -600,6 +1438,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     const thread = overlayManager.createComment(el, 'Pinned comment');
     assert.isNotNull(thread);
     thread.save();
+    widget.openThread(thread.id);
 
     widget.requestUpdate();
     await widget.updateComplete;
@@ -615,7 +1454,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     // while preserving the exact same DOM elements via keyed repeat().
     currentTop = 160;
     overlayManager.dispatchEventToListeners(Comments.CommentOverlayManager.Events.POSITIONS_UPDATED, {
-      pins: [{id: thread.id, top: 148, left: 158, visible: true, index: 1}],
+      pins: [{id: thread.id, top: 148, left: 158, visible: true}],
       highlights: [{id: thread.id, top: 160, left: 50, width: 120, height: 30, visible: true}],
       isRealtimeSync: true,
     });
@@ -803,6 +1642,190 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       assert.isNull(deletedInput.activeThread);
       assert.lengthOf(deletedInput.pins, 0);
       assert.isEmpty(commentManager.takeComments());
+    } finally {
+      testEl.remove();
+      widget.detach();
+    }
+  });
+
+  it('shows the comment thread popup at the fallback position when not anchored to any element', async () => {
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(undefined, [commentManager]);
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+
+    const thread = commentManager.createCommentThread(
+        {
+          vePath: 'Panel: elements > TreeItem: removed-node',
+          textSignature: 'div.removed',
+        },
+        'Comment on removed element',
+    );
+    thread.save();
+
+    widget.openThread(thread.id, {left: 28, top: 450});
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    assert.isNull(widget.contentElement.querySelector('.comment-pin'));
+    const popup = widget.contentElement.querySelector('.comment-popup-widget') as HTMLElement;
+    assert.isNotNull(popup);
+    assert.include(popup.style.transform, 'translateY(-100%)');
+
+    widget.detach();
+  });
+
+  it('passes activePin and fallbackPosition to view input when opening an anchored thread', async () => {
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+    await view.nextInput;
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: rematched-target');
+    testEl.textContent = 'rematched element';
+    testEl.getBoundingClientRect = () => new DOMRect(100, 120, 150, 30);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    const thread = overlayManager.createComment(testEl, 'Anchored comment');
+    assert.isNotNull(thread);
+    thread.save();
+    await view.nextInput;
+
+    widget.openThread(thread.id, {left: 16, top: 450});
+    const updatedInput = await view.nextInput;
+
+    assert.lengthOf(updatedInput.pins, 1);
+    assert.strictEqual(updatedInput.activePin, updatedInput.pins[0]);
+    assert.deepEqual(updatedInput.fallbackPosition, {left: 16, top: 450});
+
+    testEl.remove();
+    widget.detach();
+  });
+
+  it('marks the agent response as seen when a resolved thread is opened', async () => {
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+    await view.nextInput;
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: response-seen-test');
+    testEl.textContent = 'response seen content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    try {
+      const thread = overlayManager.createComment(testEl, 'Fix this');
+      assert.isNotNull(thread);
+      thread.sendToAgent();
+      // New threads open as drafts, so close the thread before the agent responds.
+      const sentInput = await view.nextInput;
+      assert.strictEqual(sentInput.activeThread?.id, thread.id);
+      sentInput.onPinClick(thread.id);
+      assert.isNull((await view.nextInput).activeThread);
+
+      commentManager.resolveCommentThread(thread.id, 'Fixed');
+      const resolvedInput = await view.nextInput;
+      assert.isNull(resolvedInput.activeThread);
+      assert.isFalse(thread.responseSeen);
+
+      resolvedInput.onPinClick(thread.id);
+      const openedInput = await view.nextInput;
+      assert.strictEqual(openedInput.activeThread?.id, thread.id);
+      assert.isTrue(thread.responseSeen);
+    } finally {
+      testEl.remove();
+      widget.detach();
+    }
+  });
+
+  it('marks the agent response as seen when a thread is revealed', async () => {
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+    await view.nextInput;
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: response-revealed-test');
+    testEl.textContent = 'response revealed content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    try {
+      const thread = overlayManager.createComment(testEl, 'Fix this');
+      assert.isNotNull(thread);
+      thread.sendToAgent();
+      // New threads open as drafts, so close the thread before the agent responds.
+      const sentInput = await view.nextInput;
+      assert.strictEqual(sentInput.activeThread?.id, thread.id);
+      sentInput.onPinClick(thread.id);
+      assert.isNull((await view.nextInput).activeThread);
+
+      commentManager.resolveCommentThread(thread.id, 'Fixed');
+      await view.nextInput;
+      assert.isFalse(thread.responseSeen);
+
+      widget.openThread(thread.id);
+      const openedInput = await view.nextInput;
+      assert.strictEqual(openedInput.activeThread?.id, thread.id);
+      assert.isTrue(thread.responseSeen);
+    } finally {
+      testEl.remove();
+      widget.detach();
+    }
+  });
+
+  it('marks the agent response as seen when the agent responds while the thread is open', async () => {
+    const view = createViewFunctionStub(PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget);
+    const widget = new PanelCommon.CommentsOverlayWidget.CommentsOverlayWidget(
+        undefined,
+        [commentManager],
+        view,
+    );
+    widget.setOverlayManagerForTest(overlayManager);
+    widget.markAsRoot();
+    renderElementIntoDOM(widget, {allowMultipleChildren: true});
+    await view.nextInput;
+
+    const testEl = document.createElement('div');
+    testEl.setAttribute('jslog', 'TreeItem; context: response-while-open-test');
+    testEl.textContent = 'response while open content';
+    testEl.getBoundingClientRect = () => new DOMRect(10, 20, 100, 20);
+    renderElementIntoDOM(testEl, {allowMultipleChildren: true});
+
+    try {
+      commentManager.setCommentMode(true);
+      overlayManager.handleElementClick(testEl);
+      const draftInput = await view.nextInput;
+      const thread = draftInput.activeThread;
+      assert.isNotNull(thread);
+
+      draftInput.onAddComment('Fix this');
+      await view.nextInput;
+      assert.isFalse(thread.responseSeen);
+
+      commentManager.resolveCommentThread(thread.id, 'Fixed');
+      const resolvedInput = await view.nextInput;
+      assert.strictEqual(resolvedInput.activeThread?.id, thread.id);
+      assert.isTrue(thread.responseSeen);
     } finally {
       testEl.remove();
       widget.detach();

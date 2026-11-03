@@ -375,6 +375,25 @@ describe('TimelinePanel', function() {
       await Timeline.TimelinePanel.TimelinePanel.executeRecordAndReload();
       sinon.assert.calledWith(showViewStub, 'timeline');
     });
+
+    it('brings the primary page target to the front before starting a recording', async function() {
+      const primaryTarget = createTarget({targetManager});
+      try {
+        const uiView = UI.ViewManager.ViewManager.instance({forceNew: true});
+        sinon.stub(uiView, 'showView');
+        const bringToFrontSpy = sinon.spy(primaryTarget.pageAgent(), 'invoke_bringToFront');
+        const recordReloadStub = sinon.stub(timeline, 'recordReload').callsFake(() => {
+          timeline.dispatchEventToListeners(Timeline.TimelinePanel.Events.RECORDING_COMPLETED, {traceIndex: 0});
+        });
+        sinon.stub(traceModel, 'parsedTrace').returns({} as Trace.TraceModel.ParsedTrace);
+
+        await Timeline.TimelinePanel.TimelinePanel.executeRecordAndReload();
+        sinon.assert.calledOnce(bringToFrontSpy);
+        sinon.assert.callOrder(bringToFrontSpy, recordReloadStub);
+      } finally {
+        primaryTarget.dispose('test');
+      }
+    });
   });
 
   describe('saveToFile', function() {
@@ -843,4 +862,17 @@ describe('TimelinePanel', function() {
     assert.isNull(dialog.parentWidget());
     assert.isFalse(dialog.isShowing());
   });
+
+  it('hides the flame chart while the status pane overlay is shown and restores it when loading completes',
+     async function() {
+       const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz') as Trace.Types.Events.Event[];
+       await timeline.loadingComplete(events, null, null);
+       assert.isTrue(timeline.getFlameChart().isShowing());
+
+       await timeline.loadingStarted();
+       assert.isFalse(timeline.getFlameChart().isShowing());
+
+       await timeline.loadingComplete(events, null, null);
+       assert.isTrue(timeline.getFlameChart().isShowing());
+     });
 });

@@ -348,6 +348,39 @@ describe('TraceProcessor', function() {
       assert.lengthOf(insightSets[3].model.RenderBlocking.renderBlockingRequests, 1);
     });
 
+    it('computes lantern context across client-side redirects and unload beacons', async function() {
+      const consoleErrorSpy = sinon.spy(console, 'error');
+      const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
+      const file = await TraceLoader.rawEvents(this, 'multiple-navigations-client-side-redirect.json.gz');
+
+      await processor.parse(file, {isFreshRecording: true, isCPUProfile: false, yieldToMain: false});
+      if (!processor.insights) {
+        throw new Error('No insights');
+      }
+
+      sinon.assert.notCalled(consoleErrorSpy);
+      assert.deepEqual([...processor.insights.keys()], [
+        'NAVIGATION_0',
+        'NAVIGATION_1',
+        'NAVIGATION_2',
+      ]);
+
+      const insightSets = Array.from(processor.insights.values());
+      // NAVIGATION_0 was aborted before FCP, so it has no Lantern metric savings.
+      assert.isUndefined(insightSets[0].model.RenderBlocking?.metricSavings);
+      // NAVIGATION_1 (https://m.zol.com.cn/) and NAVIGATION_2 (https://m.so.com/s?...) both
+      // completed FCP/LCP and should have Lantern metric savings computed, even though an
+      // unload beacon image from NAVIGATION_1 fires right after NAVIGATION_2's navigationStart.
+      assert.deepEqual(insightSets[1].model.RenderBlocking?.metricSavings, {
+        FCP: Trace.Types.Timing.Milli(3),
+        LCP: Trace.Types.Timing.Milli(0),
+      });
+      assert.deepEqual(insightSets[2].model.RenderBlocking?.metricSavings, {
+        FCP: Trace.Types.Timing.Milli(0),
+        LCP: Trace.Types.Timing.Milli(0),
+      });
+    });
+
     it('returns insights for soft navigations', async function() {
       const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
       const file = await TraceLoader.rawEvents(this, 'soft-navs.json.gz');
@@ -417,19 +450,19 @@ describe('TraceProcessor', function() {
 
       const orderWithoutMetadata = await getInsightOrder(false);
       assert.deepEqual(orderWithoutMetadata, [
-        'CLSCulprits',  'Viewport',     'Cache',          'ImageDelivery',         'INPBreakdown',
-        'LCPBreakdown', 'LCPDiscovery', 'RenderBlocking', 'NetworkDependencyTree', 'DocumentLatency',
-        'FontDisplay',  'DOMSize',      'ThirdParties',   'DuplicatedJavaScript',  'SlowCSSSelector',
-        'ForcedReflow', 'CharacterSet', 'ModernHTTP',     'LegacyJavaScript',
+        'CLSCulprits',           'Viewport',        'INPBreakdown',    'LCPBreakdown', 'LCPDiscovery', 'RenderBlocking',
+        'NetworkDependencyTree', 'ImageDelivery',   'DocumentLatency', 'FontDisplay',  'DOMSize',      'ThirdParties',
+        'DuplicatedJavaScript',  'SlowCSSSelector', 'ForcedReflow',    'Cache',        'CharacterSet', 'ModernHTTP',
+        'LegacyJavaScript',
       ]);
 
       const orderWithMetadata = await getInsightOrder(true);
       // Viewport is first, before CLSCulprits, since the field data produces a higher weight for INP than for CLS.
       assert.deepEqual(orderWithMetadata, [
-        'Viewport',     'CLSCulprits',  'Cache',          'ImageDelivery',         'INPBreakdown',
-        'LCPBreakdown', 'LCPDiscovery', 'RenderBlocking', 'NetworkDependencyTree', 'DocumentLatency',
-        'FontDisplay',  'DOMSize',      'ThirdParties',   'DuplicatedJavaScript',  'SlowCSSSelector',
-        'ForcedReflow', 'CharacterSet', 'ModernHTTP',     'LegacyJavaScript',
+        'Viewport',       'CLSCulprits',           'INPBreakdown',         'LCPBreakdown',     'LCPDiscovery',
+        'RenderBlocking', 'NetworkDependencyTree', 'ImageDelivery',        'DocumentLatency',  'FontDisplay',
+        'DOMSize',        'ThirdParties',          'DuplicatedJavaScript', 'SlowCSSSelector',  'ForcedReflow',
+        'Cache',          'CharacterSet',          'ModernHTTP',           'LegacyJavaScript',
       ]);
     });
   });

@@ -23,9 +23,9 @@ type OmitOptions = 'reporter'|'allowUncaught'|'retries';
 
 function optionsWithDefalts(options: Options): Options {
   const withDefaults = {
-    // This should make mocha crash on uncaught errors.
-    // See https://github.com/mochajs/mocha/blob/master/docs/index.md#--allow-uncaught.
-    allowUncaught: true,
+    // Setting allowUncaught to true causes Mocha to silently abort test runs
+    // when a synchronous test fails after an async hook (crbug.com/505974404).
+    allowUncaught: false,
     retries: TestConfig.retries,
     reporter: ResultsDbReporter,
     slow: 1000,
@@ -88,7 +88,21 @@ export async function run(options: Omit<Options, OmitOptions>): Promise<void> {
     mocha.globalTeardown(globalTeardowns);
   }
 
-  await mocha.loadFilesAsync();
+  // Errors thrown while importing a test file (or any of its transitive
+  // dependencies) don't mention the test file, which makes them hard to
+  // track down. Remember which file Mocha is loading and report it.
+  let currentFile: string|undefined;
+  const onPreRequire = (_context: unknown, file: string) => {
+    currentFile = file;
+  };
+  mocha.suite.on(Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE, onPreRequire);
+  try {
+    await mocha.loadFilesAsync();
+  } catch (error) {
+    throw new Error(`Failed to load test file ${currentFile ?? '<unknown>'}`, {cause: error});
+  } finally {
+    mocha.suite.off(Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE, onPreRequire);
+  }
 
   const testIds = new Set(
       TestConfig.tests.filter(testId => TEST_ID_REGEX.test(testId)),

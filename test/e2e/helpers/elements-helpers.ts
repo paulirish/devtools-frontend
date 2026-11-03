@@ -31,7 +31,7 @@ const CSS_DECLARATION_SELECTOR =
     `[role="treeitem"]:has(${CSS_PROPERTY_NAME_SELECTOR}):has(${CSS_PROPERTY_VALUE_SELECTOR})`;
 const COLOR_SWATCH_SELECTOR = '.color-swatch-inner';
 const CSS_STYLE_RULE_SELECTOR = '[aria-label*="css selector"]';
-const COMPUTED_PROPERTY_SELECTOR = 'devtools-computed-style-property';
+const COMPUTED_PROPERTY_SELECTOR = 'devtools-widget.computed-style-property';
 const COMPUTED_STYLES_PANEL_SELECTOR = '[aria-label="Computed panel"]';
 const COMPUTED_STYLES_SHOW_ALL_SELECTOR = '[title="Show all"]';
 export const ELEMENTS_PANEL_SELECTOR = '.panel[aria-label="elements"]';
@@ -413,19 +413,21 @@ export const getAllPropertiesFromComputedPane = async(devToolsPage: DevToolsPage
   name: string,
   value: string,
 }>> => {
-  const properties = await devToolsPage.$$(COMPUTED_PROPERTY_SELECTOR);
-  return (await Promise.all(properties.map(elem => elem.evaluate(async node => {
-           const nameSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-name slot');
-           const valueSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-value slot');
-           const name = nameSlot?.assignedElements().at(0);
-           const value = valueSlot?.assignedElements().at(0);
+  return await devToolsPage.waitForFunction(async () => {
+    const properties = await devToolsPage.$$(COMPUTED_PROPERTY_SELECTOR);
+    const rendered = await Promise.all(properties.map(elem => elem.evaluate(node => {
+      const nameSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-name slot');
+      const valueSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-value slot');
+      const name = nameSlot?.assignedElements().at(0);
+      const value = valueSlot?.assignedElements().at(0);
 
-           return (!name || !value) ? null : {
-             name: name.textContent ? name.textContent.trim().replace(/:$/, '') : '',
-             value: value.textContent ? value.textContent.trim().replace(/;$/, '') : '',
-           };
-         }))))
-      .filter(prop => !!prop);
+      return (!name || !value) ? null : {
+        name: name.textContent ? name.textContent.trim().replace(/:$/, '') : '',
+        value: value.textContent ? value.textContent.trim().replace(/;$/, '') : '',
+      };
+    })));
+    return rendered.every(prop => prop !== null) ? rendered : undefined;
+  });
 };
 
 export const getPropertyFromComputedPane =
@@ -1107,6 +1109,7 @@ export const assertSelectedNodeClasses =
 
 export const toggleAccessibilityPane = async(devToolsPage: DevToolsPage): Promise<void> => {
   let a11yPane = await devToolsPage.$('Accessibility', undefined, 'aria');
+  const wasOverflowed = !a11yPane;
   if (!a11yPane) {
     const elementsPanel = await devToolsPage.waitForAria('Elements panel');
     await devToolsPage.clickMoreTabsButton(elementsPanel);
@@ -1124,15 +1127,24 @@ export const toggleAccessibilityPane = async(devToolsPage: DevToolsPage): Promis
   await devToolsPage.waitFor('.source-order-checkbox');
   await devToolsPage.waitFor('[aria-label="ARIA attributes"]');
   await devToolsPage.waitFor('[aria-label="Computed properties"]');
-  await expectVeEvents(
-      devToolsPage,
-      [
-        veClick('Panel: elements > Toolbar: sidebar > DropDown: more-tabs > Menu > Action: accessibility.view'),
-        veImpressionsUnder('Panel: elements > Toolbar: sidebar',
-                           [veImpression('PanelTabHeader', 'accessibility.view')]),
-        veImpressionForAccessibilityPane(),
-      ],
-      undefined);
+  if (wasOverflowed) {
+    await expectVeEvents(
+        devToolsPage,
+        [
+          veClick('Panel: elements > Toolbar: sidebar > DropDown: more-tabs > Menu > Action: accessibility.view'),
+          veImpressionsUnder('Panel: elements > Toolbar: sidebar',
+                             [veImpression('PanelTabHeader', 'accessibility.view')]),
+          veImpressionForAccessibilityPane(),
+        ],
+        undefined);
+  } else {
+    await expectVeEvents(devToolsPage,
+                         [
+                           veClick('Panel: elements > Toolbar: sidebar > PanelTabHeader: accessibility.view'),
+                           veImpressionForAccessibilityPane(),
+                         ],
+                         undefined);
+  }
 };
 
 function veImpressionForAccessibilityPane() {

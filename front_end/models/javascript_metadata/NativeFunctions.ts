@@ -6409,7 +6409,13 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   },
   {
     name: "openWindow",
-    signatures: [["url"]]
+    signatures: [["url"]],
+    receivers: ["Clients"]
+  },
+  {
+    name: "openWindow",
+    signatures: [["url","?options"]],
+    receivers: ["PaymentRequestEvent"]
   },
   {
     name: "waitUntil",
@@ -8016,6 +8022,10 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["type","eventInitDict"]]
   },
   {
+    name: "DeviceBoundSessionRegistrationObserver",
+    signatures: [["callback","?options"]]
+  },
+  {
     name: "DeviceMotionEvent",
     signatures: [["type","?eventInitDict"]]
   },
@@ -8292,10 +8302,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
     signatures: [["input","?options"]]
   },
   {
-    name: "queryFeatureSupport",
-    signatures: [["feature"]]
-  },
-  {
     name: "setPrivateToken",
     signatures: [["privateToken"]]
   },
@@ -8470,6 +8476,10 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   {
     name: "executeTool",
     signatures: [["tool","?inputObject","?options"]]
+  },
+  {
+    name: "resumeTool",
+    signatures: [["token","callback"]]
   },
   {
     name: "TaskController",
@@ -9645,6 +9655,6 @@ export const NativeFunctions: readonly NativeFunctionValue[] = [
   },
   {
     name: "ViewTimeline",
-    signatures: [["?options"]]
+    signatures: [["options"]]
   }
 ];

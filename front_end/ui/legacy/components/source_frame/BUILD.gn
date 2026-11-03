@@ -49,6 +49,7 @@ devtools_ui_module("source_frame") {
     "../../../../ui/components/text_editor:bundle",
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/components/object_ui:bundle",
+    "../../../../ui/legacy/components/utils:bundle",
     "../../../components/buttons:bundle",
     "../../../components/code_highlighter:bundle",
     "../../../components/dialogs:bundle",
@@ -108,6 +109,7 @@ devtools_ui_module("unittests") {
     "ResourceSourceFrame.test.ts",
     "SourceFrame.test.ts",
     "StreamingContentHexView.test.ts",
+    "XMLView.test.ts",
   ]
 
   ts_deps = [
@@ -115,7 +117,9 @@ devtools_ui_module("unittests") {
     "../../../../core/common:bundle",
     "../../../../core/platform:bundle",
     "../../../../core/root:bundle",
+    "../../../../core/sdk:bundle",
     "../../../../core/text_utils:bundle",
+    "../../../../models/workspace:bundle",
     "../../../../testing",
     "../../../../third_party/codemirror.next:bundle",
     "../../../../ui/legacy:bundle",

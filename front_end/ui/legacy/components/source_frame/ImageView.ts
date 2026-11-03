@@ -36,11 +36,13 @@ import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
+import * as SDK from '../../../../core/sdk/sdk.js';
 import * as TextUtils from '../../../../core/text_utils/text_utils.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
-import {html, render, type TemplateResult} from '../../../lit/lit.js';
+import {html, nothing, render, type TemplateResult} from '../../../lit/lit.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
+import * as Components from '../utils/utils.js';
 
 import imageViewStyles from './imageView.css.js';
 
@@ -96,6 +98,11 @@ export interface ViewInput {
   url: Platform.DevToolsPath.UrlString;
   imageSrc: string|null;
   isUnavailable: boolean;
+  showToolbar: boolean;
+  size: string;
+  dimensions: string;
+  aspectRatio: string;
+  mimeType: string;
   onImageLoad: (event: Event) => void;
   onImageError: (event: Event) => void;
   onContextMenu: (event: Event) => void;
@@ -132,11 +139,22 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
         ${i18nString(UIStrings.thisImageIsTooBig)}
       </devtools-link>
     </div>
+    ${input.showToolbar ? html`
+      <devtools-toolbar>
+        <div class="toolbar-text">${input.size}</div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-text">${input.dimensions}</div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-text">${input.aspectRatio}</div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-text">${input.mimeType}</div>
+      </devtools-toolbar>
+    ` : nothing}
   `, target, {
     container: {
       classes: ['image-view'],
       attributes: {
-        tabindex: '-1',
+        tabindex: '-1', jslog: `${VisualLogging.pane('image-view')}`,
       },
     },
   });
@@ -170,14 +188,15 @@ export class ImageView extends ImageViewBase {
   readonly #view: View;
   #imageSrc: string|null = null;
   #isUnavailable = false;
+  #showToolbar = false;
   #loadPromise?: Promise<void>;
   #loadResolve?: () => void;
 
-  constructor(mimeType: string, contentProvider: TextUtils.ContentProvider.ContentProvider, view: View = DEFAULT_VIEW) {
-    super({
+  constructor(mimeType: string, contentProvider: TextUtils.ContentProvider.ContentProvider, element?: HTMLElement,
+              view: View = DEFAULT_VIEW) {
+    super(element, {
       title: i18nString(UIStrings.image),
       viewId: 'image',
-      jslog: `${VisualLogging.pane('image-view')}`,
     });
     this.#view = view;
     this.#url = contentProvider.contentURL();
@@ -185,13 +204,23 @@ export class ImageView extends ImageViewBase {
     this.#contentProvider = contentProvider;
     this.#uiSourceCode = contentProvider instanceof Workspace.UISourceCode.UISourceCode ? contentProvider : null;
     if (this.#uiSourceCode) {
-      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted,
-                                          this.#workingCopyCommitted, this);
       new UI.DropTarget.DropTarget(this.element, [UI.DropTarget.Type.ImageFile, UI.DropTarget.Type.URI],
                                    i18nString(UIStrings.dropImageFileHere), this.#handleDrop.bind(this));
     }
     this.#mimeType = mimeType;
     this.performUpdate();
+  }
+
+  get showToolbar(): boolean {
+    return this.#showToolbar;
+  }
+
+  set showToolbar(showToolbar: boolean) {
+    if (this.#showToolbar === showToolbar) {
+      return;
+    }
+    this.#showToolbar = showToolbar;
+    this.requestUpdate();
   }
 
   override performUpdate(): void {
@@ -200,6 +229,11 @@ export class ImageView extends ImageViewBase {
           url: this.#url,
           imageSrc: this.#imageSrc,
           isUnavailable: this.#isUnavailable,
+          showToolbar: this.#showToolbar,
+          size: this.#size,
+          dimensions: this.#dimensions,
+          aspectRatio: this.#aspectRatio,
+          mimeType: this.#mimeType,
           onImageLoad: this.#onImageLoad,
           onImageError: this.#onImageError,
           onContextMenu: this.#contextMenu.bind(this),
@@ -213,6 +247,9 @@ export class ImageView extends ImageViewBase {
     const img = event.target as HTMLImageElement;
     this.#dimensions = i18nString(UIStrings.dD, {PH1: img.naturalWidth, PH2: img.naturalHeight});
     this.#aspectRatio = Platform.NumberUtilities.aspectRatio(img.naturalWidth, img.naturalHeight);
+    if (this.#showToolbar) {
+      this.requestUpdate();
+    }
     this.#loadResolve?.();
     this.#loadResolve = undefined;
     this.#loadPromise = undefined;
@@ -221,6 +258,9 @@ export class ImageView extends ImageViewBase {
   #onImageError = (): void => {
     this.#dimensions = '';
     this.#aspectRatio = '';
+    if (this.#showToolbar) {
+      this.requestUpdate();
+    }
     this.#loadResolve?.();
     this.#loadResolve = undefined;
     this.#loadPromise = undefined;
@@ -241,8 +281,16 @@ export class ImageView extends ImageViewBase {
 
   override wasShown(): void {
     super.wasShown();
+    this.#uiSourceCode?.addEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted, this.#workingCopyCommitted,
+                                         this);
     this.requestUpdate();
     void this.#updateContentIfNeeded();
+  }
+
+  override willHide(): void {
+    super.willHide();
+    this.#uiSourceCode?.removeEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted,
+                                            this.#workingCopyCommitted, this);
   }
 
   override disposeView(): void {
@@ -253,18 +301,17 @@ export class ImageView extends ImageViewBase {
   }
 
   #workingCopyCommitted(): void {
-    void this.#updateContentIfNeeded().then(() => {
-      this.dispatchEventToListeners(Events.TOOLBAR_ITEMS_CHANGED);
-    });
+    void this.#updateContentIfNeeded(true);
   }
 
-  async #updateContentIfNeeded(): Promise<void> {
+  async #updateContentIfNeeded(notifyToolbarItemsChanged = false): Promise<void> {
     const content = await this.#contentProvider.requestContentData();
     if (TextUtils.ContentData.ContentData.isError(content) || this.#cachedContent?.contentEqualTo(content)) {
       await this.#loadPromise;
       return;
     }
 
+    const shouldNotify = notifyToolbarItemsChanged || Boolean(this.#cachedContent);
     this.#cachedContent = content;
     this.#loadResolve?.();
     this.#loadResolve = undefined;
@@ -277,6 +324,9 @@ export class ImageView extends ImageViewBase {
       this.#dimensions = '';
       this.#aspectRatio = '';
       this.performUpdate();
+      if (shouldNotify) {
+        this.dispatchEventToListeners(Events.TOOLBAR_ITEMS_CHANGED);
+      }
       return;
     }
     this.#isUnavailable = false;
@@ -288,6 +338,9 @@ export class ImageView extends ImageViewBase {
     this.#size = i18n.ByteUtilities.bytesToString(size);
     this.performUpdate();
     await this.#loadPromise;
+    if (shouldNotify && this.#cachedContent === content) {
+      this.dispatchEventToListeners(Events.TOOLBAR_ITEMS_CHANGED);
+    }
   }
 
   #contextMenu(event: Event): void {
@@ -364,7 +417,21 @@ export class ImageView extends ImageViewBase {
     if (Common.ParsedURL.isPrivilegedScheme(this.#url)) {
       return;
     }
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.#url);
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.#url, this.#initiatorId());
+  }
+
+  /**
+   * The frame or worker that the image belongs to, which the browser attributes opening it in a new tab to; see
+   * {@link Components.Linkifier.openInNewTabInitiatorId}.
+   */
+  #initiatorId(): Components.Linkifier.OpenInNewTabInitiatorId|undefined {
+    const contentProvider = this.#contentProvider;
+    if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest ||
+        contentProvider instanceof SDK.Resource.Resource ||
+        contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
+      return Components.Linkifier.openInNewTabInitiatorId(contentProvider);
+    }
+    return undefined;
   }
 
   async #handleDrop(dataTransfer: DataTransfer): Promise<void> {

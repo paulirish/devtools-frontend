@@ -204,10 +204,9 @@ UI.ViewManager.registerViewExtension({
   commandPrompt: i18nLazyString(UIStrings.showPage),
   order: 2,
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
-  async loadView(universe) {
+  async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.NetworkNavigatorView.instance(
-        {forceNew: null, networkProjectManager: universe.networkProjectManager});
+    return Sources.SourcesNavigator.NetworkNavigatorView.instance();
   },
 });
 
@@ -219,10 +218,9 @@ UI.ViewManager.registerViewExtension({
   order: 4,
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   condition: () => !Root.Runtime.Runtime.isTraceApp(),
-  async loadView(universe) {
+  async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.OverridesNavigatorView.instance(
-        {forceNew: null, networkProjectManager: universe.networkProjectManager});
+    return Sources.SourcesNavigator.OverridesNavigatorView.instance();
   },
 });
 
@@ -234,9 +232,9 @@ UI.ViewManager.registerViewExtension({
   order: 5,
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   condition: () => Root.Runtime.getPathName() !== '/bundled/worker_app.html' && !Root.Runtime.Runtime.isTraceApp(),
-  async loadView(universe) {
+  async loadView() {
     const Sources = await loadSourcesModule();
-    return new Sources.SourcesNavigator.ContentScriptsNavigatorView(universe.networkProjectManager);
+    return new Sources.SourcesNavigator.ContentScriptsNavigatorView();
   },
 });
 

@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {before, describe, it} from 'mocha';
+import {beforeEach, describe, it} from 'mocha';
 
+import {setupLocaleHooks} from '../../../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
 import type * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
@@ -13,8 +14,9 @@ import {getComputationDataFromFixture} from '../testing/testing.js';
 const {FirstContentfulPaint} = Lantern.Metrics;
 
 describe('Metrics: Lantern FCP', function() {
+  setupLocaleHooks();
   let parsedTrace: Trace.TraceModel.ParsedTrace;
-  before(async function() {
+  beforeEach(async function() {
     parsedTrace = await TraceLoader.traceEngine(this, 'lantern/progressive-app/trace.json.gz');
   });
 
@@ -93,4 +95,17 @@ describe('Metrics: Lantern FCP', function() {
     assert.isFalse(makeNode({resourceType: 'Font', priority: 'VeryHigh', renderBlocking: 'non_blocking'})
                        .hasRenderBlockingPriority());
   });
+
+  it('should compute predicted value across multiple main-frame navigations and client-side redirects',
+     async function() {
+       const redirectTrace = await TraceLoader.traceEngine(this, 'lantern/redirect/trace.json.gz');
+       const redirectData = await getComputationDataFromFixture(this, {parsedTrace: redirectTrace});
+       const redirectResult = FirstContentfulPaint.compute(redirectData);
+       assert.strictEqual(Math.round(redirectResult.timing), 3480);
+
+       const multiNavTrace = await TraceLoader.traceEngine(this, 'multiple-navigations-client-side-redirect.json.gz');
+       const multiNavData = await getComputationDataFromFixture(this, {parsedTrace: multiNavTrace});
+       const multiNavResult = FirstContentfulPaint.compute(multiNavData);
+       assert.strictEqual(Math.round(multiNavResult.timing), 6296);
+     });
 });

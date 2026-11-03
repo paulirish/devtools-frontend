@@ -121,11 +121,12 @@ interface ViewInput {
   timings: SelectorTiming[];
   onContextMenu: (event: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => void;
 }
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 const DEFAULT_VIEW: View = (input, _output, target) => {
   render(
       html`
+      <style>${timelineSelectorStatsViewStyles}</style>
       <devtools-data-grid striped name=${i18nString(UIStrings.selectorStats)}
           @contextmenu=${input.onContextMenu.bind(input)}>
         <table>
@@ -213,7 +214,6 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
 
   constructor(parsedTrace: Trace.TraceModel.ParsedTrace|null, view: View = DEFAULT_VIEW) {
     super();
-    this.registerRequiredCSS(timelineSelectorStatsViewStyles);
 
     this.#view = view;
     this.#selectorLocations = new Map<string, Protocol.CSS.SourceRange[]>();
@@ -273,11 +273,10 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
         this.#onContextMenu(event);
       },
     };
-    const viewOutput = {};
-    this.#view(viewInput, viewOutput, this.contentElement);
+    this.#view(viewInput, undefined, this.contentElement);
   }
 
-  private getDescendentNodeCount(node: SDK.DOMModel.DOMNode|null): number {
+  #getDescendentNodeCount(node: SDK.DOMModel.DOMNode|null): number {
     if (!node) {
       return 0;
     }
@@ -288,14 +287,14 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     const childNodes = node.children();
     if (childNodes) {
       for (const childNode of childNodes) {
-        numberOfDescendentNode += this.getDescendentNodeCount(childNode);
+        numberOfDescendentNode += this.#getDescendentNodeCount(childNode);
       }
     }
 
     return numberOfDescendentNode;
   }
 
-  private async updateInvalidationCount(events: Trace.Types.Events.RecalcStyle[]): Promise<void> {
+  async #updateInvalidationCount(events: Trace.Types.Events.RecalcStyle[]): Promise<void> {
     if (!this.#parsedTrace) {
       return;
     }
@@ -358,7 +357,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
         for (const node of nodes.nodeList) {
           if (nodes.subtree) {
             // TODO: this count is live and might have changed since the trace event.
-            timing.invalidation_count += this.getDescendentNodeCount(node);
+            timing.invalidation_count += this.#getDescendentNodeCount(node);
           } else {
             timing.invalidation_count += 1;
           }
@@ -367,7 +366,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     }
   }
 
-  private async aggregateEvents(events: Trace.Types.Events.RecalcStyle[]): Promise<void> {
+  async #aggregateEvents(events: Trace.Types.Events.RecalcStyle[]): Promise<void> {
     if (!this.#parsedTrace) {
       return;
     }
@@ -402,7 +401,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     }
 
     this.#lastStatsSourceEventOrEvents = events;
-    await this.updateInvalidationCount(events);
+    await this.#updateInvalidationCount(events);
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       const selectorStats = event ? this.#parsedTrace.data.SelectorStats.dataForRecalcStyleEvent.get(event) : undefined;
@@ -454,7 +453,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       [SelectorTimingsKey.InvalidationCount]: sums[SelectorTimingsKey.InvalidationCount],
     });
 
-    this.#timings = await this.processSelectorTimings(timings);
+    this.#timings = await this.#processSelectorTimings(timings);
   }
 
   setAggregatedEvents(events: Trace.Types.Events.RecalcStyle[]): void {
@@ -462,12 +461,12 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       return;
     }
 
-    void this.aggregateEvents(events).then(() => {
+    void this.#aggregateEvents(events).then(() => {
       this.requestUpdate();
     });
   }
 
-  private async processSelectorTimings(timings: Trace.Types.Events.SelectorTiming[]): Promise<SelectorTiming[]> {
+  async #processSelectorTimings(timings: Trace.Types.Events.SelectorTiming[]): Promise<SelectorTiming[]> {
     async function toSourceFileLocation(
         cssModel: SDK.CSSModel.CSSModel, styleSheetId: Protocol.DOM.StyleSheetId, selectorText: string,
         selectorLocations: Map<string, Protocol.CSS.SourceRange[]>):

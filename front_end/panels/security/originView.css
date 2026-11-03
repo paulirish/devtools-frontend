@@ -77,7 +77,7 @@
 
 .security-origin-view .details-table-row > td:first-child {
   color: var(--sys-color-token-subtle);
-  width: calc(120px + 1em);
+  width: calc(var(--sys-size-21) + 1em); /* 128px label column + 1em right padding */
   text-align: right;
   padding-right: 1em;
 }
@@ -100,10 +100,6 @@
   margin-left: 126px;
 }
 
-.security-origin-view .sct-toggle {
-  margin-left: 145px;
-  padding-top: 5px;
-}
 
 .security-origin-view .details-table .empty-san {
   color: var(--sys-color-state-disabled);

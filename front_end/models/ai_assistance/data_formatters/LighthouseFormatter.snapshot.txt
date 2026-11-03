@@ -8,6 +8,15 @@ Lighthouse Version: 12.0.0
 ## Category Scores
 - Performance: 80
 - Accessibility: 100
+
+## Failing audits
+Only audit titles and scores are listed below. Load the `lighthouse` skill and call `getLighthouseAudits` with the relevant `categoryId` to retrieve full audit descriptions, diagnostics, and failing elements.
+
+### Performance (categoryId: "performance")
+- First Audit: 80
+
+### Accessibility (categoryId: "accessibility")
+- No failing audits.
 === end content
 
 Title: LighthouseFormatter generates audits for a category
@@ -44,7 +53,7 @@ The following audits in this category have a score below 90 and may need attenti
       * **Wasted Bytes**: 1 kB
       * **Node**: div.main
       * **Node path**: 1,HTML,1,BODY,5,DIV
-      * **Location**: https://example.com/script.js:10:5
+      * **Location**: https://example.com/script.js:11:5
     - Item:
       * **URL**: https://example.com/style.css
       * **Wasted Bytes**: 512 B
@@ -92,7 +101,7 @@ The following audits in this category have a score below 90 and may need attenti
     - Item:
       * **Failing Elements**: html
       * **Failing Elements path**: 1,HTML
-      * **Failing Elements explanation**: Fix all of the following:   Document does not have a main landmark
+      * **Failing Elements explanation**: Fix all of the following: Document does not have a main landmark
 === end content
 
 Title: LighthouseFormatter formats table details with subItems
@@ -134,13 +143,237 @@ The following audits in this category have a score below 90 and may need attenti
       * **Est Savings**: 16.9 kB
 === end content
 
-Title: LighthouseFormatter lists failing audits grouped by category with the category ID
+Title: LighthouseFormatter formats 0-based source locations as 1-based
 Content:
+# Audits for Accessibility
+Category description.
+
+The following audits in this category have a score below 90 and may need attention:
+- **Buttons do not have an accessible name**: 0
+  * Audit description.
+
+    - Item:
+      * **Location**: https://example.com/app.js:1:0
+    - Item:
+      * **Location**: https://example.com/no-line.js
+=== end content
+
+Title: LighthouseFormatter collapses multi-line values onto a single line
+Content:
+# Audits for Accessibility
+Category description spanning two lines.
+
+The following audits in this category have a score below 90 and may need attention:
+- **Buttons do not have an accessible name**: 0
+  * Audit description spanning two lines.
+
+    - Item:
+      * **Failing Elements**: button
+      * **Failing Elements explanation**: Fix any of the following: Element does not have inner text; aria-label attribute does not exist
+      * **Schema**: { "type": "object", "properties": {} }
+=== end content
+
+Title: LighthouseFormatter formats audit explanations and warnings
+Content:
+# Audits for Agentic Browsing
+
+The following audits in this category have a score below 90 and may need attention:
+- **llms.txt is valid**: 0
+  * Checks whether /llms.txt exists and is valid.
+  * Explanation: Failed to fetch https://example.com/llms.txt: HTTP 404 Not Found
+  * Warning: First warning message
+  * Warning: Second warning spanning two lines
+=== end content
+
+Title: LighthouseFormatter includes gatherMode and fraction-scored categories in summary
+Content:
+# Lighthouse Report Summary
+URL: https://example.com
+Fetch Time: 2025-01-01T00:00:00.000Z
+Lighthouse Version: 12.0.0
+Mode: navigation
+
+## Category Scores
+- Performance: 80
+- Agentic Browsing: 1/2 audits passed
+
 ## Failing audits
+Only audit titles and scores are listed below. Load the `lighthouse` skill and call `getLighthouseAudits` with the relevant `categoryId` to retrieve full audit descriptions, diagnostics, and failing elements.
 
 ### Performance (categoryId: "performance")
 - First Audit: 80
 
-### Accessibility (categoryId: "accessibility")
+### Agentic Browsing (categoryId: "agentic-browsing")
+- llms.txt is valid: 0
+=== end content
+
+Title: LighthouseFormatter surfaces errored audits
+Content:
+# Lighthouse Report Summary
+URL: https://example.com
+Fetch Time: 2025-01-01T00:00:00.000Z
+Lighthouse Version: 12.0.0
+
+## Category Scores
+- Performance: 50
+
+## Failing audits
+Only audit titles and scores are listed below. Load the `lighthouse` skill and call `getLighthouseAudits` with the relevant `categoryId` to retrieve full audit descriptions, diagnostics, and failing elements.
+
+### Performance (categoryId: "performance")
+- First Audit: 80
+- Errored Audit: Error (Audit execution timed out)
+
+# Audits for Performance
+
+The following audits in this category have a score below 90 and may need attention:
+- **First Audit**: 80 (1.2s)
+  * Description of first audit
+
+The following audits in this category errored:
+- **Errored Audit**: Error
+  * An audit that threw an error during execution.
+  * Error: Audit execution timed out
+=== end content
+
+Title: LighthouseFormatter excludes hidden audits
+Content:
+# Lighthouse Report Summary
+URL: https://example.com
+Fetch Time: 2025-01-01T00:00:00.000Z
+Lighthouse Version: 12.0.0
+
+## Category Scores
+- Performance: 100
+
+## Failing audits
+Only audit titles and scores are listed below. Load the `lighthouse` skill and call `getLighthouseAudits` with the relevant `categoryId` to retrieve full audit descriptions, diagnostics, and failing elements.
+
+### Performance (categoryId: "performance")
 - No failing audits.
+
+# Audits for Performance
+
+All audits in this category passed (score >= 90).
+=== end content
+
+Title: LighthouseFormatter formats list details with list-section, table, and node items
+Content:
+# Audits for Performance
+
+The following audits in this category have a score below 90 and may need attention:
+- **LCP breakdown**: 30
+  * Each subpath has specific improvement strategies.
+
+    - Item:
+      * **Subpart**: Time to first byte
+      * **Duration**: 120 ms
+    - Item:
+      * **Subpart**: Element render delay
+      * **Duration**: 480 ms
+
+    **LCP Element**
+    The largest contentful paint element on the page.
+    - **Element**: Hero Heading
+    - **Element selector**: main > h1.hero
+    - **Element path**: 1,HTML,1,BODY,0,MAIN,0,H1
+    - **Element explanation**: Fix any of the following: Element is delayed by render-blocking script
+=== end content
+
+Title: LighthouseFormatter formats checklist details and wrapped text/url values
+Content:
+# Audits for Performance
+
+The following audits in this category have a score below 90 and may need attention:
+- **LCP request discovery**: 40
+  * Optimize LCP by making the LCP image discoverable from the HTML immediately.
+
+    - fetchpriority=high should be applied: Failed
+    - Request is discoverable in initial document: Passed
+    - lazy load not applied: Passed
+
+    **LCP Resource**
+    https://example.com/hero.jpg
+
+    **Note**
+    Add fetchpriority="high" to the image element.
+
+    - Item:
+      * **Resource**: https://example.com/hero.jpg
+      * **Advice**: Preload this image
+=== end content
+
+Title: LighthouseFormatter formats network-tree details inside a list section
+Content:
+# Audits for Performance
+
+The following audits in this category have a score below 90 and may need attention:
+- **Network dependency tree**: 0
+  * Avoid chaining critical requests.
+
+    Maximum critical path latency: 650 ms
+    - https://example.com/ (200 ms, 4.1 kB) (longest chain)
+      - https://example.com/styles.css (450 ms, 8.2 kB) (longest chain)
+        - https://example.com/font.woff2 (650 ms, 16.4 kB) (longest chain)
+      - https://example.com/app.js (400 ms, 2 kB)
+=== end content
+
+Title: LighthouseFormatter surfaces non-hidden informative audits with details
+Content:
+# Lighthouse Report Summary
+URL: https://example.com
+Fetch Time: 2025-01-01T00:00:00.000Z
+Lighthouse Version: 12.0.0
+
+## Category Scores
+- Agentic Browsing: 0/0 audits passed
+- Performance: 80
+
+## Failing audits
+Only audit titles and scores are listed below. Load the `lighthouse` skill and call `getLighthouseAudits` with the relevant `categoryId` to retrieve full audit descriptions, diagnostics, and failing elements.
+
+### Agentic Browsing (categoryId: "agentic-browsing")
+- No audits scored below 90, but these informative audits report findings:
+  - Informative Audit With Score 1
+
+### Performance (categoryId: "performance")
+- First Audit: 80
+- Informative audits:
+  - Minimize main-thread work
+
+# Audits for Agentic Browsing
+
+Informative audits:
+- **Informative Audit With Score 1**: informative (1 item found)
+  * Informative audit whose score is 1.
+
+    - Item:
+      * **Name**: exampleItem
+
+# Audits for Performance
+
+The following audits in this category have a score below 90 and may need attention:
+- **First Audit**: 80 (1.2s)
+  * Description of first audit
+
+Informative audits:
+- **Minimize main-thread work**: informative (2.5 s)
+  * Consider reducing the time spent parsing, compiling and executing JS.
+
+    - Item:
+      * **Category**: Script Evaluation
+      * **Time Spent**: 1,800 ms
+=== end content
+
+Title: LighthouseFormatter filters webmcp-registered-tools table columns to tool and description
+Content:
+# Audits for Agentic Browsing
+
+Informative audits:
+- **Registered WebMCP tools**: informative (1 tool registered)
+  * Lists WebMCP tools registered on the page.
+
+    - Item:
+      * **Tool Name**: searchProducts
+      * **Description**: Searches the product catalog by keyword.
 === end content

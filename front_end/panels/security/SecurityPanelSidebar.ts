@@ -11,10 +11,10 @@ import {Directives, html, nothing, render, type TemplateResult} from '../../ui/l
 
 import lockIconStyles from './lockIcon.css.js';
 import {
-  createHighlightedUrl,
   getSecurityStateIconForDetailedView,
   getSecurityStateIconForOverview,
   OriginGroup,
+  renderHighlightedUrl,
 } from './SecurityPanel.js';
 import sidebarStyles from './sidebar.css.js';
 
@@ -86,7 +86,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                 output.onShowOrigin(origin);
               }}>
             ${renderIcon(icon)}
-            ${createHighlightedUrl(origin, state)}
+            ${renderHighlightedUrl(origin, state)}
           </li>
         `;
         // clang-format on
@@ -219,7 +219,6 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
   constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
-    this.registerRequiredCSS(lockIconStyles, sidebarStyles);
   }
 
   set onShowOrigin(callback: (origin: Platform.DevToolsPath.UrlString|null) => void) {
@@ -270,37 +269,6 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
   clearOrigins(): void {
     this.#origins.clear();
     this.requestUpdate();
-  }
-
-  // Used in web tests
-  elementsByOrigin(): Map<string, {
-    select: (omitFocus?: boolean, selectedByUser?: boolean) => void,
-    showElement: () => void,
-    origin: () => string,
-    securityState: () => Protocol.Security.SecurityState | undefined,
-  }> {
-    const map = new Map<string, {
-      select: (omitFocus?: boolean, selectedByUser?: boolean) => void,
-      showElement: () => void,
-      origin: () => string,
-      securityState: () => Protocol.Security.SecurityState | undefined,
-    }>();
-    for (const [origin, state] of this.#origins.entries()) {
-      const element = {
-        select: () => {
-          this.#selectedElementId = origin;
-          this.requestUpdate();
-          this.#onShowOrigin?.(origin);
-        },
-        showElement: () => {
-          this.#onShowOrigin?.(origin);
-        },
-        origin: () => origin,
-        securityState: () => state,
-      };
-      map.set(origin, element);
-    }
-    return map;
   }
 
   set selectedOrigin(origin: Platform.DevToolsPath.UrlString|null) {

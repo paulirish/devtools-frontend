@@ -133,8 +133,8 @@ export function installDragHandle(
     startDelay?: number, mouseDownPreventDefault = true): void {
   function onMouseDown(event: Event): void {
     const dragHandler = new DragHandler();
-    const dragStart = (): void => dragHandler.elementDragStart(
-        element, elementDragStart, elementDrag, elementDragEnd, cursor, event, mouseDownPreventDefault);
+    const dragStart = (): void => dragHandler.elementDragStart(element, elementDragStart, elementDrag, elementDragEnd,
+                                                               cursor, event, mouseDownPreventDefault);
     if (startDelay) {
       startTimer = window.setTimeout(dragStart, startDelay);
     } else {
@@ -159,10 +159,10 @@ export function installDragHandle(
   }
 }
 
-export function elementDragStart(
-    targetElement: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null,
-    elementDrag: (arg0: MouseEvent) => void, elementDragEnd: ((arg0: MouseEvent) => void)|null, cursor: string|null,
-    event: Event): void {
+export function elementDragStart(targetElement: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null,
+                                 elementDrag: (arg0: MouseEvent) => void,
+                                 elementDragEnd: ((arg0: MouseEvent) => void)|null, cursor: string|null,
+                                 event: Event): void {
   const dragHandler = new DragHandler();
   dragHandler.elementDragStart(targetElement, elementDragStart, elementDrag, elementDragEnd, cursor, event);
 }
@@ -208,10 +208,9 @@ class DragHandler {
     DragHandler.rootForMouseOut = null;
   }
 
-  elementDragStart(
-      targetElement: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null,
-      elementDrag: (arg0: MouseEvent) => void|boolean, elementDragEnd: ((arg0: MouseEvent) => void)|null,
-      cursor: string|null, ev: Event, preventDefault = true): void {
+  elementDragStart(targetElement: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null,
+                   elementDrag: (arg0: MouseEvent) => void|boolean, elementDragEnd: ((arg0: MouseEvent) => void)|null,
+                   cursor: string|null, ev: Event, preventDefault = true): void {
     const event = (ev as MouseEvent);
     // Only drag upon left button. Right will likely cause a context menu. So will ctrl-click on mac.
     if (event.button || (Host.Platform.isMac() && event.ctrlKey)) {
@@ -229,8 +228,8 @@ class DragHandler {
     const targetDocument = (event.target instanceof Node && event.target.ownerDocument) as Document;
     this.elementDraggingEventListener = elementDrag;
     this.elementEndDraggingEventListener = elementDragEnd;
-    console.assert(
-        (DragHandler.documentForMouseOut || targetDocument) === targetDocument, 'Dragging on multiple documents.');
+    console.assert((DragHandler.documentForMouseOut || targetDocument) === targetDocument,
+                   'Dragging on multiple documents.');
     DragHandler.documentForMouseOut = targetDocument;
     DragHandler.rootForMouseOut = event.target instanceof Node && event.target.getRootNode() || null;
     this.dragEventsTargetDocument = targetDocument;
@@ -345,7 +344,7 @@ export function isBeingEdited(node?: Node|null): boolean {
 
   let currentElement: (Element|null)|Element = element;
   while (currentElement) {
-    if (elementsBeingEdited.has(element)) {
+    if (elementsBeingEdited.has(currentElement)) {
       return true;
     }
     currentElement = currentElement.parentElementOrShadowHost();
@@ -476,8 +475,8 @@ function modifiedHexValue(hexString: string, event: Event): string|null {
   return resultString;
 }
 
-export function modifiedFloatNumber(
-    number: number, event: Event, modifierMultiplier?: number, range?: {min?: number, max?: number}): number|null {
+export function modifiedFloatNumber(number: number, event: Event, modifierMultiplier?: number,
+                                    range?: {min?: number, max?: number}): number|null {
   const direction = getValueModificationDirection(event);
   if (!direction) {
     return null;
@@ -835,28 +834,6 @@ export function endBatchUpdate(): void {
   }
 }
 
-export function animateFunction(
-    window: Window, func: (...args: any[]) => void, params: Array<{
-      from: number,
-      to: number,
-    }>,
-    duration: number, animationComplete?: (() => void)): () => void {
-  const start = window.performance.now();
-  let raf = window.requestAnimationFrame(animationStep);
-
-  function animationStep(timestamp: number): void {
-    const progress = Platform.NumberUtilities.clamp((timestamp - start) / duration, 0, 1);
-    func(...params.map(p => p.from + (p.to - p.from) * progress));
-    if (progress < 1) {
-      raf = window.requestAnimationFrame(animationStep);
-    } else if (animationComplete) {
-      animationComplete();
-    }
-  }
-
-  return () => window.cancelAnimationFrame(raf);
-}
-
 export class LongClickController {
   private readonly element: Element;
   private readonly callback: (arg0: Event) => void;
@@ -868,10 +845,9 @@ export class LongClickController {
   }|undefined;
   private longClickInterval!: number|undefined;
 
-  constructor(
-      element: Element, callback: (arg0: Event) => void,
-      isEditKeyFunc: (arg0: KeyboardEvent) => boolean = (event):
-          boolean => Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
+  constructor(element: Element, callback: (arg0: Event) => void,
+              isEditKeyFunc: (arg0: KeyboardEvent) => boolean = (event):
+                  boolean => Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
     this.element = element;
     this.callback = callback;
     this.editKey = isEditKeyFunc;
@@ -1021,14 +997,14 @@ export function createInput(className?: string, type?: string, jslogContext?: st
     element.type = type;
   }
   if (jslogContext) {
-    element.setAttribute(
-        'jslog', `${VisualLogging.textField().track({keydown: 'Enter', change: true}).context(jslogContext)}`);
+    element.setAttribute('jslog',
+                         `${VisualLogging.textField().track({keydown: 'Enter', change: true}).context(jslogContext)}`);
   }
   return element;
 }
 
-export function createSelect(
-    name: string, options: string[]|Array<Map<string, string[]>>|Set<string>): HTMLSelectElement {
+export function createSelect(name: string,
+                             options: string[]|Array<Map<string, string[]>>|Set<string>): HTMLSelectElement {
   const select = document.createElement('select');
   ARIAUtils.setLabel(select, name);
   for (const option of options) {
@@ -1108,8 +1084,8 @@ export function createIconLabel(
  * @returns the pair of `HTMLLabelElement` and `HTMLInputElement`.
  * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/radio
  */
-export function createRadioButton(
-    name: string, title: string, jslogContext: string): {label: HTMLLabelElement, radio: HTMLInputElement} {
+export function createRadioButton(name: string, title: string,
+                                  jslogContext: string): {label: HTMLLabelElement, radio: HTMLInputElement} {
   const label = document.createElement('label');
   const radio = label.createChild('input');
   radio.type = 'radio';
@@ -1153,7 +1129,7 @@ export function setTitle(element: HTMLElement, title: string): void {
 
 export class CheckboxLabel extends HTMLElement {
   static readonly observedAttributes: string[] =
-      ['checked', 'disabled', 'indeterminate', 'name', 'title', 'aria-label', 'small'];
+      ['checked', 'disabled', 'indeterminate', 'name', 'title', 'aria-label', 'small', 'jslogcontext'];
 
   readonly #shadowRoot!: DocumentFragment;
   #checkboxElement!: HTMLInputElement;
@@ -1178,14 +1154,13 @@ export class CheckboxLabel extends HTMLElement {
     this.#textElement.createChild('slot');
   }
 
-  static create(
-      title?: Platform.UIString.LocalizedString, checked?: boolean, subtitle?: Platform.UIString.LocalizedString,
-      jslogContext?: string, small?: boolean, tooltip?: Platform.UIString.LocalizedString): CheckboxLabel {
+  static create(title?: Platform.UIString.LocalizedString, checked?: boolean,
+                subtitle?: Platform.UIString.LocalizedString, jslogContext?: string, small?: boolean,
+                tooltip?: Platform.UIString.LocalizedString): CheckboxLabel {
     const element = document.createElement('devtools-checkbox');
     element.#checkboxElement.checked = Boolean(checked);
     if (jslogContext) {
-      element.#checkboxElement.setAttribute(
-          'jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
+      element.jslogContext = jslogContext;
     }
     if (title !== undefined) {
       element.#textElement.textContent = title;
@@ -1204,7 +1179,7 @@ export class CheckboxLabel extends HTMLElement {
     return element;
   }
 
-  attributeChangedCallback(name: string, _oldValue: string|null, newValue: string|null): void {
+  attributeChangedCallback(name: string, oldValue: string|null, newValue: string|null): void {
     if (name === 'checked') {
       this.#checkboxElement.checked = newValue !== null;
     } else if (name === 'disabled') {
@@ -1220,6 +1195,24 @@ export class CheckboxLabel extends HTMLElement {
       this.#checkboxElement.ariaLabel = newValue;
     } else if (name === 'small') {
       this.#checkboxElement.classList.toggle('small', newValue !== null);
+    } else if (name === 'jslogcontext' && oldValue !== newValue) {
+      const oldCheckbox = this.#checkboxElement;
+      const hadFocus = this.shadowRoot?.activeElement === oldCheckbox;
+      const newCheckbox = oldCheckbox.cloneNode(false) as HTMLInputElement;
+      newCheckbox.checked = oldCheckbox.checked;
+      newCheckbox.disabled = oldCheckbox.disabled;
+      newCheckbox.indeterminate = oldCheckbox.indeterminate;
+      if (newValue) {
+        newCheckbox.setAttribute('jslog', `${VisualLogging.toggle().track({change: true}).context(newValue)}`);
+      } else {
+        newCheckbox.removeAttribute('jslog');
+      }
+      newCheckbox.addEventListener('change', () => this.dispatchEvent(new Event('change')));
+      oldCheckbox.replaceWith(newCheckbox);
+      this.#checkboxElement = newCheckbox;
+      if (hadFocus) {
+        newCheckbox.focus();
+      }
     }
   }
 
@@ -1244,7 +1237,10 @@ export class CheckboxLabel extends HTMLElement {
   }
 
   set checked(checked: boolean) {
-    this.toggleAttribute('checked', checked);
+    // Coerce explicitly: `toggleAttribute(name, undefined)` toggles the
+    // attribute instead of removing it, which would flip the state when a
+    // Lit `.checked=${...}` binding receives `undefined`.
+    this.toggleAttribute('checked', Boolean(checked));
   }
 
   get small(): boolean {
@@ -1287,13 +1283,25 @@ export class CheckboxLabel extends HTMLElement {
     return this.#checkboxElement.name;
   }
 
+  set jslogContext(jslogContext: string|null|undefined) {
+    if (jslogContext) {
+      this.setAttribute('jslogcontext', jslogContext);
+    } else {
+      this.removeAttribute('jslogcontext');
+    }
+  }
+
+  get jslogContext(): string|null {
+    return this.getAttribute('jslogcontext');
+  }
+
   override click(): void {
     this.#checkboxElement.click();
   }
 
   /** Only to be used when the checkbox label is 'generated' (a regex, a className, etc). Most checkboxes should be create()'d with UIStrings */
-  static createWithStringLiteral(title?: string, checked?: boolean, jslogContext?: string, small?: boolean):
-      CheckboxLabel {
+  static createWithStringLiteral(title?: string, checked?: boolean, jslogContext?: string,
+                                 small?: boolean): CheckboxLabel {
     const stringLiteral = title as Platform.UIString.LocalizedString;
     return CheckboxLabel.create(stringLiteral, checked, undefined, jslogContext, small);
   }
@@ -1387,13 +1395,16 @@ export class DevToolsCloseButton extends HTMLElement {
 // eslint-disable-next-line @devtools/enforce-custom-element-prefix
 customElements.define('dt-close-button', DevToolsCloseButton);
 
-export function bindInput(
-    input: HTMLInputElement, apply: (arg0: string) => void, validate: (arg0: string) => boolean, numeric: boolean,
-    modifierMultiplier?: number): (arg0: string) => void {
+export function bindInput(input: HTMLInputElement, apply: (arg0: string) => void, validate: (arg0: string) => boolean,
+                          numeric: boolean, modifierMultiplier?: number): {
+  setValue: (arg0: string) => void,
+  cleanup: () => void,
+} {
+  const onFocus = input.select.bind(input);
   input.addEventListener('change', onChange, false);
   input.addEventListener('input', onInput, false);
   input.addEventListener('keydown', onKeyDown, false);
-  input.addEventListener('focus', input.select.bind(input), false);
+  input.addEventListener('focus', onFocus, false);
 
   function onInput(): void {
     input.classList.toggle('error-input', !validate(input.value));
@@ -1442,12 +1453,18 @@ export function bindInput(
     input.value = value;
   }
 
-  return setValue;
+  function cleanup(): void {
+    input.removeEventListener('change', onChange, false);
+    input.removeEventListener('input', onInput, false);
+    input.removeEventListener('keydown', onKeyDown, false);
+    input.removeEventListener('focus', onFocus, false);
+  }
+
+  return {setValue, cleanup};
 }
 
-export function trimText(
-    context: CanvasRenderingContext2D, text: string, maxWidth: number,
-    trimFunction: (arg0: string, arg1: number) => string): string {
+export function trimText(context: CanvasRenderingContext2D, text: string, maxWidth: number,
+                         trimFunction: (arg0: string, arg1: number) => string): string {
   const maxLength = 200;
   if (maxWidth <= 10) {
     return '';
@@ -1557,8 +1574,8 @@ export class MessageDialog {
     const shadowRoot = createShadowRootWithCoreStyles(dialog.contentElement, {cssFile: confirmDialogStyles});
     const content = shadowRoot.createChild('div', 'widget');
     await new Promise(resolve => {
-      const okButton = createTextButton(
-          i18nString(UIStrings.ok), resolve, {jslogContext: 'confirm', variant: Buttons.Button.Variant.PRIMARY});
+      const okButton = createTextButton(i18nString(UIStrings.ok), resolve,
+                                        {jslogContext: 'confirm', variant: Buttons.Button.Variant.PRIMARY});
       content.createChild('span', 'header').textContent = header;
       content.createChild('div', 'message').createChild('span').textContent = message;
       content.createChild('div', 'button').appendChild(okButton);
@@ -1574,7 +1591,7 @@ export class MessageDialog {
 }
 
 export class ConfirmDialog {
-  static async show(message: string, header?: string, where?: Element|Document|Widget,
+  static async show(message: string, header?: string, where?: Element|Document|WidgetUtils.AnyWidget,
                     options?: ConfirmDialogOptions): Promise<boolean> {
     const dialog = new Dialog(options?.jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MEASURE_CONTENT);
@@ -1628,8 +1645,8 @@ export const isScrolledToBottom = (element: Element): boolean => {
   return Math.abs(element.scrollTop + element.clientHeight - element.scrollHeight) <= 2;
 };
 
-export function createSVGChild<K extends keyof SVGElementTagNameMap>(
-    element: Element, childType: K, className?: string): SVGElementTagNameMap[K] {
+export function createSVGChild<K extends keyof SVGElementTagNameMap>(element: Element, childType: K,
+                                                                     className?: string): SVGElementTagNameMap[K] {
   const child = element.ownerDocument.createElementNS('http://www.w3.org/2000/svg', childType);
   if (className) {
     child.setAttribute('class', className);
@@ -2202,9 +2219,8 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
     template.values = template.values.map(patchValue);
 
     function isLitTemplate(value: unknown): value is Lit.TemplateResult<1> {
-      return Boolean(
-          typeof value === 'object' && value && '_$litType$' in value && 'strings' in value && 'values' in value &&
-          value['_$litType$'] === 1);
+      return Boolean(typeof value === 'object' && value && '_$litType$' in value && 'strings' in value &&
+                     'values' in value && value['_$litType$'] === 1);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2259,8 +2275,8 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
       this.removeChildren();
       this.#contentTemplate = this.createChild('template');
       this.#mutationObserver.disconnect();
-      this.#mutationObserver.observe(
-          this.#contentTemplate.content, {childList: true, attributes: true, subtree: true, characterData: true});
+      this.#mutationObserver.observe(this.#contentTemplate.content,
+                                     {childList: true, attributes: true, subtree: true, characterData: true});
     }
     HTMLElementWithLightDOMTemplate.patchLitTemplate(template);
     // eslint-disable-next-line @devtools/no-lit-render-outside-of-view
@@ -2358,15 +2374,18 @@ export function getDevToolsBoundingElement(): HTMLElement {
 /**
  * @deprecated Prefer {@link bindToSetting} as this function leaks the checkbox via the setting listener.
  */
-export const bindCheckbox = function(
-    input: CheckboxLabel, setting: Common.Settings.Setting<boolean>, metric?: UserMetricOptions): void {
-  const setValue = bindCheckboxImpl(input, setting.set.bind(setting), metric);
+export const bindCheckbox = function(input: CheckboxLabel, setting: Common.Settings.Setting<boolean>,
+                                     metric?: UserMetricOptions): void {
+  const {setValue} = bindCheckboxImpl(input, setting.set.bind(setting), metric);
   setting.addChangeListener(event => setValue(event.data));
   setValue(setting.get());
 };
 
-export const bindCheckboxImpl = function(
-    input: CheckboxLabel, apply: (value: boolean) => void, metric?: UserMetricOptions): (value: boolean) => void {
+export const bindCheckboxImpl = function(input: CheckboxLabel, apply: (value: boolean) => void,
+                                         metric?: UserMetricOptions): {
+  setValue: (value: boolean) => void,
+  cleanup: () => void,
+} {
   input.addEventListener('change', onInputChanged, false);
 
   function onInputChanged(): void {
@@ -2385,10 +2404,15 @@ export const bindCheckboxImpl = function(
     }
   }
 
-  return function setValue(value: boolean): void {
-    if (value !== input.checked) {
-      input.checked = value;
-    }
+  return {
+    setValue(value: boolean): void {
+      if (value !== input.checked) {
+        input.checked = value;
+      }
+    },
+    cleanup(): void {
+      input.removeEventListener('change', onInputChanged, false);
+    },
   };
 };
 
@@ -2418,21 +2442,17 @@ export const bindToSetting =
       // be able to remove it again.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let setValue: (value: any) => void;
+      let cleanup: (() => void)|undefined;
       function settingChanged(): void {
         setValue(setting.get());
       }
 
       if (setting.type() === Common.Settings.SettingType.BOOLEAN || typeof setting.defaultValue === 'boolean') {
-        let attachedButton: Buttons.Button.Button|undefined;
-        let clickListener: (() => void)|undefined;
-
         return Directives.ref(e => {
           if (e === undefined) {
             setting.removeChangeListener(settingChanged);
-            if (attachedButton && clickListener) {
-              attachedButton.removeEventListener('click', clickListener);
-              attachedButton = undefined;
-            }
+            cleanup?.();
+            cleanup = undefined;
             return;
           }
           if (jslog) {
@@ -2444,17 +2464,19 @@ export const bindToSetting =
           setting.addChangeListener(settingChanged);
 
           if (e instanceof Buttons.Button.Button) {
-            attachedButton = e;
-            clickListener = (): void => {
+            const clickListener = (): void => {
               (setting as Common.Settings.Setting<boolean>).set(!setting.get());
             };
             e.addEventListener('click', clickListener);
+            cleanup = () => {
+              e.removeEventListener('click', clickListener);
+            };
             setValue = (value: boolean): void => {
               e.toggled = value;
             };
           } else {
-            setValue =
-                bindCheckboxImpl(e as CheckboxLabel, (setting as Common.Settings.Setting<boolean>).set.bind(setting));
+            ({setValue, cleanup} =
+                 bindCheckboxImpl(e as CheckboxLabel, (setting as Common.Settings.Setting<boolean>).set.bind(setting)));
           }
           setValue(setting.get());
         });
@@ -2466,6 +2488,8 @@ export const bindToSetting =
         return Directives.ref(e => {
           if (e === undefined) {
             setting.removeChangeListener(settingChanged);
+            cleanup?.();
+            cleanup = undefined;
             return;
           }
 
@@ -2473,14 +2497,14 @@ export const bindToSetting =
             e.setAttribute('jslog', jslogBuilder.toString());
           }
           setting.addChangeListener(settingChanged);
-          setValue = bindInput(e as HTMLInputElement, setting.set.bind(setting), (value: string) => {
-            try {
-              new RegExp(value);
-              return true;
-            } catch {
-              return false;
-            }
-          }, /* numeric */ false);
+          ({setValue, cleanup} = bindInput(e as HTMLInputElement, setting.set.bind(setting), (value: string) => {
+             try {
+               new RegExp(value);
+               return true;
+             } catch {
+               return false;
+             }
+           }, /* numeric */ false));
           setValue(setting.get());
         });
       }
@@ -2489,6 +2513,8 @@ export const bindToSetting =
         return Directives.ref(e => {
           if (e === undefined) {
             setting.removeChangeListener(settingChanged);
+            cleanup?.();
+            cleanup = undefined;
             return;
           }
 
@@ -2496,8 +2522,8 @@ export const bindToSetting =
             e.setAttribute('jslog', jslogBuilder.toString());
           }
           setting.addChangeListener(settingChanged);
-          setValue = bindInput(
-              e as HTMLInputElement, setting.set.bind(setting), stringValidator ?? (() => true), /* numeric */ false);
+          ({setValue, cleanup} = bindInput(e as HTMLInputElement, setting.set.bind(setting),
+                                           stringValidator ?? (() => true), /* numeric */ false));
           setValue(setting.get());
         });
       }

@@ -125,14 +125,14 @@ export interface ViewInput {
   queryParameters: SDK.NetworkRequest.NameValue[]|null;
   objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree|null;
   onPayloadContextMenu(contextMenu: UI.ContextMenu.ContextMenu): void;
-  onPayloadToggle(expanded: boolean): void;
+  onPayloadToggle(expanded: boolean, recursively?: boolean): void;
 
   /** Raw binary content data for the request body (when base64-encoded by backend). */
   binaryPayloadContentData: TextUtils.ContentData.ContentData|null;
   requestUrl: Platform.DevToolsPath.UrlString;
 }
 
-export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const createViewSourceToggle = (viewSource: boolean, callback: (value: boolean) => void): LitTemplate =>
       html`<devtools-button
@@ -204,7 +204,9 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
       <li role=treeitem class="source-code object-properties-section-root-element object-properties-section"
           toggle-on-click
           ?open=${objectTree.expanded}
-          @expand=${(e: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onPayloadToggle(e.detail.expanded)}
+          @expand=${
+        (e: UI.TreeOutline.TreeViewElement.ExpandEvent) =>
+            input.onPayloadToggle(e.detail.expanded, e.detail.recursively)}
           @contextmenu=${onPayloadContextMenu}>
         ${objectTree.object.description}
         ${objectTree.object.hasChildren ? ObjectUI.ObjectPropertiesSection.renderObjectTree(objectTree) : nothing}
@@ -418,20 +420,6 @@ export class RequestPayloadView extends UI.Widget.VBox {
     this.request?.removeEventListener(SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.#refreshFormData, this);
   }
 
-  private addEntryContextMenuHandler(
-      treeElement: UI.TreeOutline.TreeElement, menuItem: string, jslogContext: string, getValue: () => string): void {
-    treeElement.listItemElement.addEventListener('contextmenu', event => {
-      event.consume(true);
-      const contextMenu = new UI.ContextMenu.ContextMenu(event);
-      const copyValueHandler = (): void => {
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.NetworkPanelCopyValue);
-        Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(getValue());
-      };
-      contextMenu.clipboardSection().appendItem(menuItem, copyValueHandler, {jslogContext});
-      void contextMenu.show();
-    });
-  }
-
   override performUpdate(): void {
     if (!this.request) {
       return;
@@ -500,15 +488,20 @@ export class RequestPayloadView extends UI.Widget.VBox {
             },
         );
       },
-      onPayloadToggle: (expanded: boolean): void => {
-        if (this.#objectTree) {
-          this.#objectTree.expanded = expanded;
+      onPayloadToggle: (expanded: boolean, recursively = false): void => {
+        if (!this.#objectTree) {
+          return;
         }
+        if (expanded && recursively) {
+          void this.#objectTree.expandRecursively();
+          return;
+        }
+        this.#objectTree.expanded = expanded;
       },
       binaryPayloadContentData: this.#binaryPayloadContentData,
       requestUrl: this.request?.url() ?? Platform.DevToolsPath.EmptyUrlString,
     };
-    this.#view(input, {}, this.element);
+    this.#view(input, undefined, this.element);
   }
 
   #refreshFormData(): void {

@@ -22,6 +22,8 @@ import {
   removeCustomAnchorsMovedListener,
   resolveCommentAnchor,
   resolveCommentAnchorElement,
+  setStickyOccluders,
+  STICKY_OCCLUDER_ATTRIBUTE,
 } from './CommentAnchorResolver.js';
 
 export const COMMENT_MODE_CURSOR = 'var(--comment-cursor)';
@@ -37,7 +39,6 @@ export interface PinPositionData {
   top: number;
   left: number;
   visible: boolean;
-  index: number;
 }
 
 export interface HighlightRectData {
@@ -238,8 +239,8 @@ export class CommentOverlayManager extends Common.ObjectWrapper.ObjectWrapper<Ev
     return this.#pinPositions;
   }
 
-  getHighlightRects(): HighlightRectData[] {
-    return this.#highlightRects;
+  getHighlight(threadId: string): HighlightRectData|undefined {
+    return this.#highlightRects.find(h => h.id === threadId);
   }
 
   getAnchorElement(thread: CommentThread): Element|undefined {
@@ -395,7 +396,19 @@ export class CommentOverlayManager extends Common.ObjectWrapper.ObjectWrapper<Ev
    */
   #rematchAllComments(root: Document|Element = document): void {
     clearClippingAncestorsCache();
-    const jslogElements = deepQuerySelectorAll(root, '[jslog]');
+    // Single deep traversal shared by anchor rematching and sticky occluder clipping.
+    const scannedElements = deepQuerySelectorAll(root, `[jslog], [${STICKY_OCCLUDER_ATTRIBUTE}]`);
+    const jslogElements: Element[] = [];
+    const stickyOccluders: Element[] = [];
+    for (const el of scannedElements) {
+      if (el.hasAttribute('jslog')) {
+        jslogElements.push(el);
+      }
+      if (el.hasAttribute(STICKY_OCCLUDER_ATTRIBUTE)) {
+        stickyOccluders.push(el);
+      }
+    }
+    setStickyOccluders(stickyOccluders);
     const oldElements = new Set<Element>();
     const newElements = new Set<Element>();
 
@@ -490,7 +503,6 @@ export class CommentOverlayManager extends Common.ObjectWrapper.ObjectWrapper<Ev
         top: scrollY + visibleRect.top - 12 + offsetY,
         left: scrollX + visibleRect.right - 12,
         visible: true,
-        index: thread.index,
       });
 
       newHighlights.push({
@@ -561,7 +573,7 @@ export class CommentOverlayManager extends Common.ObjectWrapper.ObjectWrapper<Ev
    */
   stop(): void {
     document.body.style.cursor = '';
-    clearClippingAncestorsCache();
+    setStickyOccluders(null);
     this.clearDraftThreads();
     this.#removeClickListener();
     this.#removeScrollListener();
@@ -872,6 +884,7 @@ export class CommentOverlayManager extends Common.ObjectWrapper.ObjectWrapper<Ev
         'data-target-id',
         'aria-expanded',
         'data-file-path',
+        STICKY_OCCLUDER_ATTRIBUTE,
       ],
     });
   }

@@ -150,7 +150,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     <style>${requestConditionsDrawerStyles}</style>
     <devtools-toolbar jslog=${VisualLogging.toolbar()}>
       <devtools-checkbox
-        ?checked=${input.enabled}
+        .checked=${input.enabled}
         @click=${input.toggleEnabled}
         .jslogContext=${'network.enable-request-blocking'}>
         ${i18nString(UIStrings.enableBlockingAndThrottling)}
@@ -207,7 +207,12 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     `}
     `,
       // clang-format on
-      target, {container: {classes: (!input.enabled && input.conditions.length > 0) ? ['blocking-disabled'] : []}});
+      target, {
+        container: {
+          classes: (!input.enabled && input.conditions.length > 0) ? ['blocking-disabled'] : [],
+          attributes: {jslog: `${VisualLogging.panel('network.blocked-urls').track({resize: true})}`},
+        },
+      });
 };
 
 function renderItem({
@@ -368,7 +373,7 @@ function renderItem({
 interface AffectedCountViewInput {
   count: number;
 }
-type AffectedCountView = (input: AffectedCountViewInput, output: object, target: HTMLElement) => void;
+type AffectedCountView = (input: AffectedCountViewInput, output: undefined, target: HTMLElement) => void;
 export const AFFECTED_COUNT_DEFAULT_VIEW: AffectedCountView = (input, output, target) => {
   render(html`${i18nString(UIStrings.dAffected, {PH1: input.count})}`, target,
          {container: {classes: ['blocked-url-count']}});
@@ -410,7 +415,7 @@ export class AffectedCountWidget extends UI.Widget.Widget {
       return;
     }
 
-    this.#view({count: this.#lookUpRequestCount(this.#condition)}, {}, this.element);
+    this.#view({count: this.#lookUpRequestCount(this.#condition)}, undefined, this.element);
   }
 
   override wasShown(): void {
@@ -461,7 +466,6 @@ export class RequestConditionsDrawer extends UI.Widget.VBox {
 
   constructor(target?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(target, {
-      jslog: `${VisualLogging.panel('network.blocked-urls').track({resize: true})}`,
       useShadowDom: true,
     });
     this.#view = view;

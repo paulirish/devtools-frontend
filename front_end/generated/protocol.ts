@@ -2679,9 +2679,10 @@ export namespace Browser {
 
   export interface AddMockCameraRequest {
     /**
-     * Required non-empty identifier for the mock camera. This is mapped to an
-     * internal virtual-device identifier and is not the MediaDeviceInfo.deviceId
-     * exposed to the page.
+     * Required non-empty identifier for the mock camera within the current
+     * DevTools session. Different sessions can use the same identifier
+     * without replacing each other's cameras. This is not the
+     * MediaDeviceInfo.deviceId exposed to the page.
      */
     deviceId: string;
   }
@@ -12248,6 +12249,7 @@ export namespace Network {
     PreProvisionedKeyNotFound = 'PreProvisionedKeyNotFound',
     AttestationCertificationError = 'AttestationCertificationError',
     AttestationSigningError = 'AttestationSigningError',
+    FederatedRegistrationRedirected = 'FederatedRegistrationRedirected',
   }
 
   /**
@@ -12304,6 +12306,7 @@ export namespace Network {
     RefreshedAsWaiter = 'RefreshedAsWaiter',
     TransientSigningError = 'TransientSigningError',
     InScopeRefreshNotYetNeeded = 'InScopeRefreshNotYetNeeded',
+    Canceled = 'Canceled',
   }
 
   /**
@@ -13393,12 +13396,28 @@ export namespace Network {
 
   export interface DirectUDPSocketJoinedMulticastGroupEvent {
     identifier: RequestId;
+    /**
+     * Multicast group address.
+     */
     IPAddress: string;
+    /**
+     * Source address of a source-specific multicast (SSM) membership. Absent
+     * for any-source multicast (ASM) memberships.
+     */
+    sourceAddress?: string;
   }
 
   export interface DirectUDPSocketLeftMulticastGroupEvent {
     identifier: RequestId;
+    /**
+     * Multicast group address.
+     */
     IPAddress: string;
+    /**
+     * Source address of a source-specific multicast (SSM) membership. Absent
+     * for any-source multicast (ASM) memberships.
+     */
+    sourceAddress?: string;
   }
 
   /**
@@ -16567,6 +16586,11 @@ export namespace Page {
     sendLastFrame?: boolean;
   }
 
+  export const enum StartScreenRecordingRequestCaptureArea {
+    Target = 'target',
+    BrowserWindow = 'browserWindow',
+  }
+
   export interface StartScreenRecordingRequest {
     audio?: boolean;
     /**
@@ -16581,6 +16605,10 @@ export namespace Page {
      * Maximum frame rate in frames per second.
      */
     frameRate?: integer;
+    /**
+     * The area to record. Defaults to `target`.
+     */
+    captureArea?: StartScreenRecordingRequestCaptureArea;
   }
 
   export interface StartScreenRecordingResponse extends ProtocolResponseWithError {
@@ -17497,6 +17525,7 @@ export namespace Preload {
     PrerenderHostReused = 'PrerenderHostReused',
     FormSubmitWhenPrerendering = 'FormSubmitWhenPrerendering',
     CrossDocumentRestart = 'CrossDocumentRestart',
+    PrefetchFailedCrossOriginSubframe = 'PrefetchFailedCrossOriginSubframe',
   }
 
   /**

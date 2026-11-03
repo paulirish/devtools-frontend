@@ -8,7 +8,7 @@ import sinon from 'sinon';
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {querySelectorErrorOnMissing, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createFakeSetting} from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
@@ -50,6 +50,35 @@ describe('UIUtils', () => {
       renderElementIntoDOM(el);
       el.focus();
       assert.isTrue(UI.UIUtils.isEditing());
+    });
+  });
+
+  describe('isBeingEdited', () => {
+    it('returns true for the edited element and its descendants', () => {
+      const parent = document.createElement('div');
+      const child = parent.createChild('span');
+      const grandChild = child.createChild('b');
+      UI.UIUtils.markBeingEdited(parent, true);
+      try {
+        assert.isTrue(UI.UIUtils.isBeingEdited(parent));
+        assert.isTrue(UI.UIUtils.isBeingEdited(child));
+        assert.isTrue(UI.UIUtils.isBeingEdited(grandChild));
+      } finally {
+        UI.UIUtils.markBeingEdited(parent, false);
+      }
+      assert.isFalse(UI.UIUtils.isBeingEdited(parent));
+      assert.isFalse(UI.UIUtils.isBeingEdited(grandChild));
+    });
+
+    it('returns false for an element outside of the edited subtree', () => {
+      const edited = document.createElement('div');
+      const other = document.createElement('div');
+      UI.UIUtils.markBeingEdited(edited, true);
+      try {
+        assert.isFalse(UI.UIUtils.isBeingEdited(other));
+      } finally {
+        UI.UIUtils.markBeingEdited(edited, false);
+      }
     });
   });
 
@@ -807,12 +836,15 @@ describe('bindToSetting (string)', () => {
     const container = document.createElement('div');
     renderElementIntoDOM(container);
     const inputRef = Lit.Directives.createRef<HTMLInputElement>();
-    Lit.render(html`<input ${Lit.Directives.ref(inputRef)} ${bindToSetting(setting, opts)}>`, container);
+    const render = () => {
+      Lit.render(html`<input ${Lit.Directives.ref(inputRef)} ${bindToSetting(setting, opts)}>`, container);
+    };
+    render();
 
     const input = inputRef.value;
     assert.exists(input);
 
-    return {input, setting, container};
+    return {input, setting, container, render};
   }
 
   it('shows the current value on initial render', () => {
@@ -872,6 +904,24 @@ describe('bindToSetting (string)', () => {
 
     assert.isFalse(input.isConnected);
     assert.strictEqual(input.value, 'defaultValue');
+
+    input.value = 'new value via user edit';
+    input.dispatchEvent(new Event('change'));
+
+    assert.strictEqual(setting.get(), 'new value via change listener');
+  });
+
+  it('does not stack listeners across multiple renders', () => {
+    const {setting, input, render} = setup();
+    const setSpy = sinon.spy(setting, 'set');
+    for (let i = 0; i < 4; i++) {
+      render();
+    }
+
+    input.value = 'new value via user edit';
+    input.dispatchEvent(new Event('change'));
+
+    sinon.assert.calledOnceWithExactly(setSpy, 'new value via user edit');
   });
 });
 
@@ -882,14 +932,17 @@ describe('bindToSetting (boolean)', () => {
     const container = document.createElement('div');
     renderElementIntoDOM(container);
     const inputRef = Lit.Directives.createRef<UI.UIUtils.CheckboxLabel>();
-    Lit.render(
-        html`<devtools-checkbox ${Lit.Directives.ref(inputRef)} ${bindToSetting(setting, opts)}></devtools-checkbox>`,
-        container);
+    const render = () => {
+      Lit.render(
+          html`<devtools-checkbox ${Lit.Directives.ref(inputRef)} ${bindToSetting(setting, opts)}></devtools-checkbox>`,
+          container);
+    };
+    render();
 
     const input = inputRef.value;
     assert.exists(input);
 
-    return {input, setting, container};
+    return {input, setting, container, render};
   }
 
   it('shows the current value on initial render', () => {
@@ -935,6 +988,24 @@ describe('bindToSetting (boolean)', () => {
 
     assert.isFalse(input.isConnected);
     assert.isTrue(input.checked);
+
+    input.checked = true;
+    input.dispatchEvent(new Event('change'));
+
+    assert.isFalse(setting.get());
+  });
+
+  it('does not stack listeners across multiple renders', () => {
+    const {setting, input, render} = setup();
+    const setSpy = sinon.spy(setting, 'set');
+    for (let i = 0; i < 4; i++) {
+      render();
+    }
+
+    input.checked = false;
+    input.dispatchEvent(new Event('change'));
+
+    sinon.assert.calledOnceWithExactly(setSpy, false);
   });
 });
 
@@ -999,6 +1070,89 @@ describe('bindToSetting (devtools-button)', () => {
 
     assert.isFalse(input.isConnected);
     assert.isTrue(input.toggled);
+  });
+});
+
+describe('CheckboxLabel', () => {
+  it('treats a non-boolean falsy checked value as unchecked instead of toggling', () => {
+    const checkbox = document.createElement('devtools-checkbox');
+    checkbox.checked = true;
+    assert.isTrue(checkbox.checked);
+
+    checkbox.checked = undefined as unknown as boolean;
+    assert.isFalse(checkbox.checked);
+
+    checkbox.checked = undefined as unknown as boolean;
+    assert.isFalse(checkbox.checked);
+  });
+
+  it('stays unchecked across re-renders of a .checked binding that is undefined', () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    function renderCheckbox(checked: boolean|undefined): void {
+      Lit.render(html`<devtools-checkbox .checked=${checked}>Label</devtools-checkbox>`, container);
+    }
+
+    renderCheckbox(true);
+    renderCheckbox(undefined);
+    const checkbox = querySelectorErrorOnMissing<UI.UIUtils.CheckboxLabel>(container, 'devtools-checkbox');
+    assert.isFalse(checkbox.checked);
+
+    renderCheckbox(false);
+    renderCheckbox(undefined);
+    assert.isFalse(checkbox.checked);
+  });
+
+  it('replaces the internal input with a new one when jslogContext changes', () => {
+    const checkbox = document.createElement('devtools-checkbox');
+    renderElementIntoDOM(checkbox);
+    checkbox.checked = true;
+    checkbox.disabled = false;
+    checkbox.indeterminate = true;
+    checkbox.name = 'test-name';
+    checkbox.title = 'test-title';
+    checkbox.ariaLabel = 'test-aria-label';
+    checkbox.small = true;
+
+    const firstInput = checkbox.shadowRoot?.querySelector('input');
+    assert.exists(firstInput);
+    assert.isNull(firstInput.getAttribute('jslog'));
+
+    checkbox.focus();
+    assert.strictEqual(checkbox.shadowRoot?.activeElement, firstInput);
+
+    checkbox.jslogContext = 'test-context';
+    const secondInput = checkbox.shadowRoot?.querySelector('input');
+    assert.exists(secondInput);
+    assert.notStrictEqual(secondInput, firstInput);
+    assert.isFalse(firstInput.isConnected);
+    assert.strictEqual(checkbox.jslogContext, 'test-context');
+    assert.strictEqual(secondInput.getAttribute('jslog'), 'Toggle; track: change; context: test-context');
+    assert.isTrue(secondInput.checked);
+    assert.isFalse(secondInput.disabled);
+    assert.isTrue(secondInput.indeterminate);
+    assert.strictEqual(secondInput.name, 'test-name');
+    assert.strictEqual(secondInput.title, 'test-title');
+    assert.strictEqual(secondInput.ariaLabel, 'test-aria-label');
+    assert.isTrue(secondInput.classList.contains('small'));
+    assert.strictEqual(checkbox.shadowRoot?.activeElement, secondInput);
+
+    // Setting the same jslogContext keeps the existing internal input.
+    checkbox.jslogContext = 'test-context';
+    assert.strictEqual(checkbox.shadowRoot?.querySelector('input'), secondInput);
+
+    // Change events on the replaced input still propagate from the host element.
+    const changeSpy = sinon.spy();
+    checkbox.addEventListener('change', changeSpy);
+    secondInput.dispatchEvent(new Event('change'));
+    sinon.assert.calledOnce(changeSpy);
+
+    checkbox.jslogContext = undefined;
+    const thirdInput = checkbox.shadowRoot?.querySelector('input');
+    assert.exists(thirdInput);
+    assert.notStrictEqual(thirdInput, secondInput);
+    assert.isNull(checkbox.jslogContext);
+    assert.isNull(thirdInput.getAttribute('jslog'));
   });
 });
 

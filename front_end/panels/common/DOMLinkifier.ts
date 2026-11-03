@@ -52,7 +52,7 @@ interface ViewInput {
   onMouseLeave: () => void;
 }
 
-export type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 const DEFAULT_VIEW: View = (input, _output, target: HTMLElement) => {
   // clang-format off
@@ -139,7 +139,7 @@ export class DOMNodeLink extends UI.Widget.Widget {
       ariaDescription: options.ariaDescription,
     };
     if (!this.#node) {
-      this.#view(viewInput, {}, this.contentElement);
+      this.#view(viewInput, undefined, this.contentElement);
       return;
     }
 
@@ -154,13 +154,13 @@ export class DOMNodeLink extends UI.Widget.Widget {
     // they always have the same ancestor. See crbug.com/340633630.
     if (node.isViewTransitionPseudoNode()) {
       viewInput.pseudo = `::${this.#node.pseudoType()}(${this.#node.pseudoIdentifier()})`;
-      this.#view(viewInput, {}, this.contentElement);
+      this.#view(viewInput, undefined, this.contentElement);
       return;
     }
 
     if (options.textContent) {
       viewInput.tagName = options.textContent;
-      this.#view(viewInput, {}, this.contentElement);
+      this.#view(viewInput, undefined, this.contentElement);
       return;
     }
 
@@ -193,16 +193,17 @@ export class DOMNodeLink extends UI.Widget.Widget {
       }
       viewInput.pseudo = pseudoText;
     }
-    this.#view(viewInput, {}, this.contentElement);
+    this.#view(viewInput, undefined, this.contentElement);
   }
 }
 
 interface DeferredViewInput {
   preventKeyboardFocus?: boolean;
+  textContent?: string;
   onClick: () => void;
 }
 
-type DeferredView = (input: DeferredViewInput, output: object, target: HTMLElement) => void;
+type DeferredView = (input: DeferredViewInput, output: undefined, target: HTMLElement) => void;
 
 const DEFERRED_DEFAULT_VIEW: DeferredView = (input, _output, target: HTMLElement) => {
   // clang-format off
@@ -213,7 +214,7 @@ const DEFERRED_DEFAULT_VIEW: DeferredView = (input, _output, target: HTMLElement
           tabindex=${input.preventKeyboardFocus ? -1 : 0}
           @click=${input.onClick}
           @mousedown=${(e: Event) => e.consume()}>
-        <slot></slot>
+        <slot>${input.textContent ?? nothing}</slot>
       </button>`, target);
   // clang-format on
 };
@@ -224,9 +225,8 @@ export class DeferredDOMNodeLink extends UI.Widget.Widget {
   #styleSheetId: Protocol.DOM.StyleSheetId|undefined = undefined;
   #view: DeferredView;
 
-  constructor(
-      element?: HTMLElement, deferredNode?: SDK.DOMModel.DeferredDOMNode, options?: Options,
-      styleSheetId?: Protocol.DOM.StyleSheetId, view: DeferredView = DEFERRED_DEFAULT_VIEW) {
+  constructor(element?: HTMLElement, deferredNode?: SDK.DOMModel.DeferredDOMNode, options?: Options,
+              styleSheetId?: Protocol.DOM.StyleSheetId, view: DeferredView = DEFERRED_DEFAULT_VIEW) {
     super(element, {useShadowDom: true});
     this.element.classList.remove('vbox');
     this.#deferredNode = deferredNode;
@@ -236,9 +236,34 @@ export class DeferredDOMNodeLink extends UI.Widget.Widget {
     this.performUpdate();
   }
 
+  set deferredNode(deferredNode: SDK.DOMModel.DeferredDOMNode|undefined) {
+    if (this.#deferredNode === deferredNode) {
+      return;
+    }
+    this.#deferredNode = deferredNode;
+    this.requestUpdate();
+  }
+
+  set options(options: Options|undefined) {
+    if (this.#options === options) {
+      return;
+    }
+    this.#options = options;
+    this.requestUpdate();
+  }
+
+  set styleSheetId(styleSheetId: Protocol.DOM.StyleSheetId|undefined) {
+    if (this.#styleSheetId === styleSheetId) {
+      return;
+    }
+    this.#styleSheetId = styleSheetId;
+    this.requestUpdate();
+  }
+
   override performUpdate(): void {
-    const viewInput = {
+    const viewInput: DeferredViewInput = {
       preventKeyboardFocus: this.#options?.preventKeyboardFocus,
+      textContent: this.#options?.textContent,
       onClick: () => {
         this.#deferredNode?.resolve?.(node => {
           if (node && this.#styleSheetId) {
@@ -255,7 +280,7 @@ export class DeferredDOMNodeLink extends UI.Widget.Widget {
         });
       },
     };
-    this.#view(viewInput, {}, this.contentElement);
+    this.#view(viewInput, undefined, this.contentElement);
   }
 }
 

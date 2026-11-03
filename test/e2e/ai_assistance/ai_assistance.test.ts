@@ -42,6 +42,10 @@ describe('AI Assistance', function() {
         if (!request.streamId) {
           throw new Error('No streamId');
         }
+        if (call >= messages.length) {
+          cb({statusCode: 500, response: ''});
+          throw new Error(`Unexpected AIDA request (call ${call + 1}, only ${messages.length} mocked)`);
+        }
         // An array entry is one response with several parts, such as
         // several function calls.
         const response = JSON.stringify(Array.isArray(messages[call]) ? messages[call] : [messages[call]]);
@@ -93,12 +97,13 @@ describe('AI Assistance', function() {
   async function enableDebugModeForFreestyler(devtoolsPage: DevToolsPage): Promise<void> {
     await devtoolsPage.waitForFunction(async () => {
       return await devtoolsPage.evaluate(() => {
-        return 'setAiAssistanceStructuredLogEnabled' in window;
+        return 'setDevToolsAIDebug' in window;
       });
     });
     await devtoolsPage.evaluate(() => {
-      // @ts-expect-error different context
-      setAiAssistanceStructuredLogEnabled(true);
+      if ('setDevToolsAIDebug' in window && typeof window.setDevToolsAIDebug === 'function') {
+        window.setDevToolsAIDebug({assistance: true});
+      }
     });
   }
 
@@ -184,6 +189,8 @@ describe('AI Assistance', function() {
     if (sideEffectCount && throwOnSideEffect) {
       throw new Error('Unexpected side effect');
     }
+    await devtoolsPage.waitFor('section.chat-message.answer.is-last-message .ai-assistance-feedback-row');
+    await devtoolsPage.waitForNone('devtools-spinner');
     return JSON.parse(await devtoolsPage.evaluate((): string => {
       return localStorage.getItem('aiAssistanceStructuredLog') as string;
     })) as Log[];
@@ -825,7 +832,8 @@ describe('AI Assistance', function() {
         {functionResponse: {name: 'executeJavaScript', response: {result: '{"display":"block"}'}}},
       ],
     });
-    await devToolsPage.click('pierce/details.walkthrough-inline summary');
+    await devToolsPage.click('aria/Show thinking for prompt What are the color and display of this element?');
+    await devToolsPage.waitFor('details.walkthrough-inline[open]');
     await devToolsPage.waitForElementWithTextContent('Reading the color');
     await devToolsPage.waitForElementWithTextContent('Reading the display');
   });
@@ -1147,9 +1155,9 @@ describe('AI Assistance', function() {
       // 2. Verify two round-trips occurred: tool invocation, followed by tool output response.
       assert.lengthOf(aidaRoundTrips, 2, 'Expected two round-trips to AIDA: tool invocation and tool response.');
 
-      // Round-trip 1: Only learnSkills is declared initially.
+      // Round-trip 1: Only baseline tools (learnSkills and suggestFollowUps) are declared initially.
       const initialTools = aidaRoundTrips[0].request.function_declarations?.map(decl => decl.name) ?? [];
-      assert.deepEqual(initialTools, ['learnSkills']);
+      assert.deepEqual(initialTools, ['learnSkills', 'suggestFollowUps']);
 
       // Round-trip 2: Contains functionResponse for learnSkills and registers styling tools (executeJavaScript, getStyles).
       const secondRequest = aidaRoundTrips[1].request;

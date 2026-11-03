@@ -613,7 +613,7 @@ export abstract class ObjectTreeNodeBase extends Common.ObjectWrapper.ObjectWrap
     }
   }
 
-  async expandRecursively(maxDepth: number): Promise<void> {
+  async expandRecursively(maxDepth = 3): Promise<void> {
     for (const node of this.#walk(maxDepth, n => n.canExpandRecursively)) {
       await node.populateChildrenIfNeeded();
       node.expanded = true;
@@ -1313,10 +1313,15 @@ export class ObjectPropertiesSectionWidget extends UI.Widget.Widget {
     this.requestUpdate();
   }
 
-  onExpand = (expanded: boolean): void => {
-    if (this.#root) {
-      this.#root.expanded = expanded;
+  onExpand = (expanded: boolean, recursively = false): void => {
+    if (!this.#root) {
+      return;
     }
+    if (expanded && recursively) {
+      void this.#root.expandRecursively();
+      return;
+    }
+    this.#root.expanded = expanded;
   };
   override performUpdate(): void {
     if (!this.#root) {
@@ -1331,7 +1336,7 @@ export class ObjectPropertiesSectionWidget extends UI.Widget.Widget {
       onRootItemContextMenu: this.onRootItemContextMenu,
       onExpand: this.onExpand,
     },
-               {}, this.contentElement);
+               undefined, this.contentElement);
   }
 
   override onDetach(): void {
@@ -1442,7 +1447,7 @@ export function populateObjectTreeContextMenu(contextMenu: UI.ContextMenu.Contex
 
 interface ObjectTreeViewInput extends ContextMenuHandlers {
   onShowAllProperties: (node: ObjectTreeNode) => void;
-  onExpand: (node: ObjectTreeNodeBase, expanded: boolean) => void;
+  onExpand: (node: ObjectTreeNodeBase, expanded: boolean, recursively?: boolean) => void;
   renderAsSubtree: boolean;
   objectTree?: ObjectTree;
   linkifier?: Components.Linkifier.Linkifier;
@@ -1450,7 +1455,7 @@ interface ObjectTreeViewInput extends ContextMenuHandlers {
   skipProto: boolean;
   skipGettersAndSetters: boolean;
 }
-type ObjectTreeView = (input: ObjectTreeViewInput, output: object, target: HTMLElement) => void;
+type ObjectTreeView = (input: ObjectTreeViewInput, output: undefined, target: HTMLElement) => void;
 const OBJECT_TREE_DEFAULT_VIEW: ObjectTreeView = (input, output, target) => {
   const objectTree = input.objectTree;
   if (!objectTree) {
@@ -1466,7 +1471,7 @@ const OBJECT_TREE_DEFAULT_VIEW: ObjectTreeView = (input, output, target) => {
     };
 
     const onExpand = (e: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      input.onExpand(property, e.detail.expanded);
+      input.onExpand(property, e.detail.expanded, e.detail.recursively);
       e.consume(true);
     };
     const childCount = (property.children?.properties?.length ?? 0) +
@@ -1510,7 +1515,7 @@ const OBJECT_TREE_DEFAULT_VIEW: ObjectTreeView = (input, output, target) => {
 
   function renderArrayGroup(child: ArrayGroupTreeNode): LitTemplate {
     const onExpand = (e: UI.TreeOutline.TreeViewElement.ExpandEvent): void => {
-      input.onExpand(child, e.detail.expanded);
+      input.onExpand(child, e.detail.expanded, e.detail.recursively);
       e.consume(true);
     };
 
@@ -1632,6 +1637,8 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
   #renderAsSubtree = false;
   #skipProto = false;
   #skipGettersAndSetters = false;
+  #observedNodes = new Set<ObjectTreeNodeBase>();
+  #wasConnectedToTemplateOrDocument = false;
   readonly #view: ObjectTreeView;
 
   constructor(element?: HTMLElement, view: ObjectTreeView = OBJECT_TREE_DEFAULT_VIEW) {
@@ -1668,6 +1675,7 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
       child.addEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
       child.addEventListener(ObjectTreeNodeBase.Events.VALUE_CHANGED, this.requestUpdate, this);
       child.addEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
+      this.#observedNodes.add(child);
       if (child.expanded) {
         await this.#populateChildrenIfNeeded(child);
       }
@@ -1684,7 +1692,11 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
     }
   }
 
-  onExpand = (node: ObjectTreeNodeBase, expanded: boolean): void => {
+  onExpand = (node: ObjectTreeNodeBase, expanded: boolean, recursively = false): void => {
+    if (expanded && recursively) {
+      void node.expandRecursively().then(() => this.requestUpdate());
+      return;
+    }
     if (node.expanded !== expanded) {
       node.expanded = expanded;
       this.requestUpdate();
@@ -1739,12 +1751,23 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
     if (val === this.#objectTree) {
       return;
     }
-    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
-    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
+    this.#unobserveAll();
     this.#objectTree = val;
     this.#objectTree?.addEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
     this.#objectTree?.addEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
     this.requestUpdate();
+  }
+
+  #unobserveAll(): void {
+    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
+    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
+    for (const child of this.#observedNodes) {
+      child.removeEventListener(ObjectTreeNodeBase.Events.FILTER_CHANGED, this.requestUpdate, this);
+      child.removeEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
+      child.removeEventListener(ObjectTreeNodeBase.Events.VALUE_CHANGED, this.requestUpdate, this);
+      child.removeEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
+    }
+    this.#observedNodes.clear();
   }
 
   get linkifier(): Components.Linkifier.Linkifier|undefined {
@@ -1784,15 +1807,26 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
   }
 
   override async performUpdate(): Promise<void> {
+    const root = this.contentElement.getRootNode();
+    if (root instanceof Document || root instanceof DocumentFragment || root instanceof ShadowRoot) {
+      this.#wasConnectedToTemplateOrDocument = true;
+    } else if (this.#wasConnectedToTemplateOrDocument) {
+      this.#unobserveAll();
+      return;
+    }
     if (this.#objectTree?.expanded) {
       await this.#populateChildrenIfNeeded(this.#objectTree);
     }
-    this.#view(this, {}, this.contentElement);
+    this.#view(this, undefined, this.contentElement);
+  }
+
+  override willHide(): void {
+    super.willHide();
+    this.#unobserveAll();
   }
 
   override onDetach(): void {
-    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
-    this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
+    this.#unobserveAll();
   }
 
   override wasShown(): void {
@@ -1801,6 +1835,7 @@ export class ObjectTreeWidget extends UI.Widget.Widget {
     this.#objectTree?.removeEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
     this.#objectTree?.addEventListener(ObjectTreeNodeBase.Events.CHILDREN_CHANGED, this.requestUpdate, this);
     this.#objectTree?.addEventListener(ObjectTreeNodeBase.Events.EXPANDED_CHANGED, this.requestUpdate, this);
+    this.requestUpdate();
   }
 }
 
@@ -1822,10 +1857,10 @@ interface ObjectPropertiesSectionViewInput {
   skipProto: boolean;
   showOverflow: boolean;
   onRootItemContextMenu: (menu: UI.ContextMenu.ContextMenu) => void;
-  onExpand: (expanded: boolean) => void;
+  onExpand: (expanded: boolean, recursively?: boolean) => void;
 }
 
-type ObjectPropertiesSectionView = (input: ObjectPropertiesSectionViewInput, output: object, target: HTMLElement) =>
+type ObjectPropertiesSectionView = (input: ObjectPropertiesSectionViewInput, output: undefined, target: HTMLElement) =>
     void;
 
 export const OBJECT_PROPERTIES_SECTION_DEFAULT_VIEW: ObjectPropertiesSectionView = (input, _output, target) => {
@@ -1849,8 +1884,8 @@ export const OBJECT_PROPERTIES_SECTION_DEFAULT_VIEW: ObjectPropertiesSectionView
         <style>${objectPropertiesSectionStyles}</style>
         <li role="treeitem" class="object-properties-section-root-element" toggle-on-click ?open=${
                      input.objectTree.expanded} @expand=${
-                     (e: Event) => input.onExpand((e as UI.TreeOutline.TreeViewElement.ExpandEvent)
-                                                      .detail.expanded)} @contextmenu=${onRootItemContextMenuHandler}>
+                     (e: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onExpand(
+                         e.detail.expanded, e.detail.recursively)} @contextmenu=${onRootItemContextMenuHandler}>
           ${input.title}
           <ul role="group" ${widget(ObjectTreeWidget, {
                    objectTree: input.objectTree,
@@ -2169,7 +2204,9 @@ export class ObjectPropertyWidget extends UI.Widget.Widget {
     this.#removePropertyListeners();
     this.#property = property;
     this.#search = property.search;
-    this.#addPropertyListeners();
+    if (this.isShowing()) {
+      this.#addPropertyListeners();
+    }
     this.requestUpdate();
   }
 
@@ -2187,6 +2224,11 @@ export class ObjectPropertyWidget extends UI.Widget.Widget {
     this.#search?.removeEventListener(UI.TreeOutline.TreeSearch.Events.SEARCH_CHANGED, this.requestUpdate, this);
   }
 
+  override willHide(): void {
+    super.willHide();
+    this.#removePropertyListeners();
+  }
+
   override onDetach(): void {
     this.#removePropertyListeners();
   }
@@ -2195,6 +2237,7 @@ export class ObjectPropertyWidget extends UI.Widget.Widget {
     super.wasShown();
     this.#removePropertyListeners();
     this.#addPropertyListeners();
+    this.requestUpdate();
   }
 
   get expanded(): boolean {
@@ -2284,7 +2327,7 @@ interface ExpandableTextViewInput {
   byteCount: number;
   text: string;
 }
-type ExpandableTextView = (input: ExpandableTextViewInput, output: object, target: HTMLElement) => void;
+type ExpandableTextView = (input: ExpandableTextViewInput, output: undefined, target: HTMLElement) => void;
 const EXPANDABLE_TEXT_DEFAULT_VIEW: ExpandableTextView = (input, output, target) => {
   const totalBytesText = i18n.ByteUtilities.bytesToString(input.byteCount);
   const canExpand = input.text.length < ExpandableTextPropertyValue.MAX_DISPLAYABLE_TEXT_LENGTH;
@@ -2368,7 +2411,7 @@ export class ExpandableTextPropertyValue extends UI.Widget.Widget {
       maxLength: this.#maxLength,
       text: this.#text,
     };
-    this.#view(input, {}, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 }
 

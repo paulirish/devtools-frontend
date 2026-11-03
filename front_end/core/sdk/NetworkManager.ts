@@ -763,6 +763,11 @@ export class FetchDispatcher implements ProtocolProxyApi.FetchDispatcher {
   }
 }
 
+function multicastMembership(event: Pick<Protocol.Network.DirectUDPSocketJoinedMulticastGroupEvent, 'IPAddress'>&
+                             {sourceAddress?: string}): string {
+  return event.sourceAddress ? `${event.IPAddress}@${event.sourceAddress}` : event.IPAddress;
+}
+
 export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
   readonly #manager: NetworkManager;
   readonly #multitargetNetworkManager: MultitargetNetworkManager;
@@ -922,7 +927,8 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
   }
 
   requestForLoaderId(loaderId: Protocol.Network.LoaderId): NetworkRequest|null {
-    return this.#requestsByLoaderId.get(loaderId) || null;
+    return this.#requestsByLoaderId.get(loaderId) ||
+        this.#multitargetNetworkManager.inflightMainResourceRequests.get(loaderId) || null;
   }
 
   resourceChangedPriority({requestId, newPriority}: Protocol.Network.ResourceChangedPriorityEvent): void {
@@ -1743,8 +1749,9 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     if (!networkRequest.directSocketInfo.joinedMulticastGroups) {
       networkRequest.directSocketInfo.joinedMulticastGroups = new Set();
     }
-    if (!networkRequest.directSocketInfo.joinedMulticastGroups.has(event.IPAddress)) {
-      networkRequest.directSocketInfo.joinedMulticastGroups.add(event.IPAddress);
+    const membership = multicastMembership(event);
+    if (!networkRequest.directSocketInfo.joinedMulticastGroups.has(membership)) {
+      networkRequest.directSocketInfo.joinedMulticastGroups.add(membership);
       this.updateNetworkRequest(networkRequest);
     }
   }
@@ -1754,7 +1761,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     if (!networkRequest?.directSocketInfo?.joinedMulticastGroups) {
       return;
     }
-    if (networkRequest.directSocketInfo.joinedMulticastGroups.delete(event.IPAddress)) {
+    if (networkRequest.directSocketInfo.joinedMulticastGroups.delete(multicastMembership(event))) {
       this.updateNetworkRequest(networkRequest);
     }
   }

@@ -6,6 +6,7 @@ import {assert} from 'chai';
 import sinon from 'sinon';
 
 import {describe, it} from '../../../test/api/mocha-interface.js';
+import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
 import * as SDK from './sdk.js';
@@ -816,4 +817,238 @@ describe('CSSModel Keyframes, Style Formatting, and Iframe Styles', () => {
     assert.notStrictEqual(rule.header?.frameId, documentNode.frameId());
     assert.strictEqual(rule.header?.frameId, contentDoc.frameId());
   });
+
+  it('resolves !important precedence across cascade layers and the :host context step',
+     async ({inspectedPage, universe}) => {
+       const {cssModel, nodeId} = await setupPage(inspectedPage, universe, `
+         <style>
+           @layer first, second;
+           @layer second {
+             de-mo {
+               color: red !important;
+               padding: 20px !important;
+             }
+             #inspected {
+               margin: 20px !important;
+             }
+           }
+           @layer first {
+             de-mo {
+               color: green !important;
+               margin: 10px !important;
+             }
+             #inspected {
+               margin: 30px !important;
+             }
+           }
+           @layer {
+             de-mo {
+               font-size: 12px !important;
+             }
+           }
+           @layer {
+             de-mo {
+               font-size: 16px !important;
+             }
+           }
+           de-mo {
+             color: blue !important;
+             display: block !important;
+             opacity: 1;
+             padding: 10px !important;
+           }
+         </style>
+         <de-mo id="inspected" style="padding: 30px !important">
+           <template shadowrootmode="open">
+             <style>
+               :host {
+                 display: contents !important;
+                 opacity: 0.5;
+               }
+             </style>
+           </template>
+         </de-mo>
+       `);
+
+       const matchedResult = await cssModel.getMatchedStyles(nodeId);
+       assert.isNotNull(matchedResult);
+
+       const findProperty = (name: string, value: string): SDK.CSSProperty.CSSProperty => {
+         for (const style of matchedResult.nodeStyles()) {
+           for (const prop of style.leadingProperties()) {
+             if (prop.name === name && prop.value === value) {
+               return prop;
+             }
+           }
+         }
+         assert.fail(`Property ${name}: ${value} not found`);
+       };
+
+       // Earlier @layer (first) !important beats later @layer (second) !important and unlayered !important.
+       assert.strictEqual(matchedResult.propertyState(findProperty('color', 'green !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('color', 'red !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.strictEqual(matchedResult.propertyState(findProperty('color', 'blue !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       // Higher specificity (#inspected) !important within the same earlier @layer (first) wins.
+       assert.strictEqual(matchedResult.propertyState(findProperty('margin', '30px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('margin', '10px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.strictEqual(matchedResult.propertyState(findProperty('margin', '20px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       // Earlier anonymous @layer !important beats later anonymous @layer !important.
+       assert.strictEqual(matchedResult.propertyState(findProperty('font-size', '12px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('font-size', '16px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       // Inline style !important beats layered and unlayered !important in the same tree scope.
+       assert.strictEqual(matchedResult.propertyState(findProperty('padding', '30px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('padding', '20px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.strictEqual(matchedResult.propertyState(findProperty('padding', '10px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       // :host !important in inner shadow tree beats outer document rule !important,
+       // while normal outer document rule beats normal :host rule.
+       assert.strictEqual(matchedResult.propertyState(findProperty('display', 'contents !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('display', 'block !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.strictEqual(matchedResult.propertyState(findProperty('opacity', '1')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findProperty('opacity', '0.5')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+     });
+
+  it('resolves shadow host, ::slotted(), animation, user-agent, and attribute styles across cascade contexts',
+     async ({inspectedPage, universe}) => {
+       updateHostConfig({devToolsAnimationStylesInStylesTab: {enabled: true}});
+       const {domModel, cssModel, nodeId} = await setupPage(inspectedPage, universe, `
+         <style>
+           @keyframes fade {
+             from, to { opacity: 0.4; }
+           }
+           #inspected {
+             opacity: 1;
+             animation: fade 2s infinite;
+             padding: 20px !important;
+           }
+         </style>
+         <x-outer>
+           <template shadowrootmode="open">
+             <style>
+               ::slotted(#inspected) {
+                 color: green;
+                 background-color: pink !important;
+                 padding: 10px !important;
+               }
+               ::slotted(#inspected)::before {
+                 content: "x";
+                 color: green;
+                 background-color: pink !important;
+               }
+             </style>
+             <slot></slot>
+           </template>
+           <div id="inspected">
+             <template shadowrootmode="open">
+               <style>
+                 :host {
+                   display: inline-block;
+                   color: red;
+                   background-color: lightgreen !important;
+                 }
+                 :host::before {
+                   content: "x";
+                   color: red;
+                   background-color: lightgreen !important;
+                 }
+               </style>
+               <ul id="inner-list" type="square">
+                 <li>item</li>
+               </ul>
+             </template>
+           </div>
+         </x-outer>
+       `);
+
+       const findPropertyIn = (styles: SDK.CSSMatchedStyles.CSSMatchedStyles, name: string,
+                               value: string): SDK.CSSProperty.CSSProperty => {
+         for (const style of styles.nodeStyles()) {
+           for (const prop of style.leadingProperties()) {
+             if (prop.name === name && prop.value === value) {
+               return prop;
+             }
+           }
+         }
+         assert.fail(`Property ${name}: ${value} not found`);
+       };
+
+       const matchedResult = await cssModel.getMatchedStyles(nodeId);
+       assert.exists(matchedResult);
+
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'opacity', '0.4')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       const staticOpacity = findPropertyIn(matchedResult, 'opacity', '1');
+       assert.strictEqual(matchedResult.propertyState(staticOpacity), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.isTrue(matchedResult.isPropertyOverriddenByAnimation(staticOpacity));
+
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'display', 'inline-block')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'display', 'block')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'color', 'green')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'color', 'red')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       assert.strictEqual(
+           matchedResult.propertyState(findPropertyIn(matchedResult, 'background-color', 'lightgreen !important')),
+           SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(
+           matchedResult.propertyState(findPropertyIn(matchedResult, 'background-color', 'pink !important')),
+           SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'padding', '10px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(matchedResult.propertyState(findPropertyIn(matchedResult, 'padding', '20px !important')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       const inspectedNode = domModel.nodeForId(nodeId);
+       assert.exists(inspectedNode);
+
+       const beforeNode = inspectedNode.beforePseudoElement();
+       assert.exists(beforeNode);
+       const beforeMatched = await cssModel.getMatchedStyles(beforeNode.id);
+       assert.exists(beforeMatched);
+       assert.strictEqual(beforeMatched.propertyState(findPropertyIn(beforeMatched, 'color', 'green')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(beforeMatched.propertyState(findPropertyIn(beforeMatched, 'color', 'red')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+       assert.strictEqual(
+           beforeMatched.propertyState(findPropertyIn(beforeMatched, 'background-color', 'lightgreen !important')),
+           SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(
+           beforeMatched.propertyState(findPropertyIn(beforeMatched, 'background-color', 'pink !important')),
+           SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+       const shadowRoot = inspectedNode.shadowRoots()[0];
+       assert.exists(shadowRoot);
+       await shadowRoot.getSubtree(2, true);
+       const listNodeId = await domModel.querySelector(shadowRoot.id, '#inner-list');
+       assert.exists(listNodeId);
+       const listMatched = await cssModel.getMatchedStyles(listNodeId);
+       assert.exists(listMatched);
+       assert.strictEqual(listMatched.propertyState(findPropertyIn(listMatched, 'list-style-type', 'square')),
+                          SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+       assert.strictEqual(listMatched.propertyState(findPropertyIn(listMatched, 'list-style-type', 'disc')),
+                          SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+     });
 });

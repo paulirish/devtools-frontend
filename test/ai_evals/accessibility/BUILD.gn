@@ -1,0 +1,29 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/typescript/typescript.gni")
+
+node_ts_library("accessibility") {
+  sources = [
+    "a11y-aria-hidden-focus.test.ts",
+    "a11y-button-name.test.ts",
+    "a11y-color-contrast.test.ts",
+    "a11y-devtools-features.test.ts",
+    "a11y-fix-all-blindness-names-labels.test.ts",
+    "a11y-fix-all-cognitive-structure.test.ts",
+    "a11y-fix-all-deaf-media-captions.test.ts",
+    "a11y-fix-all-deafblind-aria-links.test.ts",
+    "a11y-fix-all-low-vision-contrast.test.ts",
+    "a11y-fix-all-mobility-keyboard-focus.test.ts",
+    "a11y-form-label.test.ts",
+    "a11y-heading-order.test.ts",
+    "a11y-image-alt.test.ts",
+    "a11y-link-in-text-block.test.ts",
+  ]
+
+  ts_deps = [
+    "..:harness_library",
+    "../helpers",
+  ]
+}

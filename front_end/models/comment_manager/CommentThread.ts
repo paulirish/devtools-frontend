@@ -22,7 +22,10 @@ export interface DOMNodeAnchorSignature {
 export interface TimelineAnchorSignature {
   /** Identifier of the trace to scope comments to a specific recording */
   traceId: string;
-  /** Serializable key from Trace.EventsSerializer (e.g. 'r-123', 'p-1-2-3-4', 's-5') */
+  /**
+   * Serializable key from Trace.EventsSerializer (e.g. 'r-123', 'p-1-2-3-4', 's-5'), or
+   * 'fc-<chartLocation>-<entryIndex>' for flame chart entries that EventsSerializer cannot key.
+   */
   traceEventKey: string;
   /** Primary event title or category name */
   entryName: string;
@@ -51,6 +54,22 @@ export interface CommentAnchorSignature {
   editor?: EditorAnchorSignature;
   /** Optional timeline flamechart anchor coordinates for Performance panel trace entries */
   timeline?: TimelineAnchorSignature;
+  /**
+   * Optional formatted lines that give the AI agent context about the
+   * anchored target beyond the VE path and text signature, for example the
+   * timing and warnings of a Performance panel trace entry. CD4ABridge
+   * appends each line to the comment text that it sends to the agent.
+   *
+   * These lines are only context for the agent. They are not used to
+   * re-match the anchor to its target; the other fields of this signature
+   * do that.
+   *
+   * Currently only the Performance panel sets this field. Before adding
+   * context here, consider whether it belongs in a new field on this
+   * signature instead. This field is only for text that is already
+   * formatted for the agent, not for data that other code needs to read.
+   */
+  agentContext?: string[];
 }
 
 export interface Comment {
@@ -77,20 +96,19 @@ export interface CommentThreadOptions {
 }
 
 export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
-  static #nextIndex = 1;
-
-  static resetIndex(): void {
-    CommentThread.#nextIndex = 1;
-  }
-
   readonly id: string = crypto.randomUUID();
   readonly anchor: CommentAnchorSignature;
   /** True for comments generated from the change tracker. */
   readonly isGeneratedComment: boolean;
-  #savedIndex?: number;
+  #isOrphaned = false;
   comments: Comment[];
   status: CommentThreadStatus = 'DRAFT';
-  transmitted: boolean = false;
+  #transmitted = false;
+  /**
+   * False until the developer has opened the thread since the agent last
+   * responded. Only meaningful for RESOLVED threads.
+   */
+  responseSeen: boolean = false;
 
   constructor(options: CommentThreadOptions) {
     super();
@@ -99,8 +117,34 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     this.isGeneratedComment = Boolean(options.isGeneratedComment);
   }
 
-  get index(): number {
-    return this.#savedIndex ?? CommentThread.#nextIndex;
+  get isOrphaned(): boolean {
+    return this.#isOrphaned;
+  }
+
+  setOrphaned(isOrphaned: boolean): void {
+    if (this.#isOrphaned === isOrphaned) {
+      return;
+    }
+    this.#isOrphaned = isOrphaned;
+    this.dispatchEventToListeners(Events.CHANGED);
+  }
+
+  /**
+   * True once the thread has been taken by the agent (e.g. via CD4ABridge).
+   */
+  get transmitted(): boolean {
+    return this.#transmitted;
+  }
+
+  /**
+   * Marks the thread as taken by the agent.
+   */
+  markTransmitted(): void {
+    if (this.#transmitted) {
+      return;
+    }
+    this.#transmitted = true;
+    this.dispatchEventToListeners(Events.CHANGED);
   }
 
   /**
@@ -120,8 +164,9 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes
 
   /**
    * Records UMA for a developer-authored comment when it leaves the DRAFT state.
+   * Returns true if this is the first user comment. Returns false otherwise.
    */
-  #recordCommentCreated(): void {
+  #recordCommentCreated(queued: boolean = false): void {
     if (this.isGeneratedComment) {
       return;
     }
@@ -131,15 +176,17 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     }
     Host.userMetrics.commentCreated(1);
     Host.userMetrics.commentSize(text.length);
+    if (queued) {
+      Host.userMetrics.commentQueued(1);
+    }
+
+    return;
   }
 
   save(text?: string, author: 'DEVELOPER'|'AGENT' = 'DEVELOPER'): void {
     let changed = this.#saveText(text, author);
     if (this.status === 'DRAFT') {
-      this.#recordCommentCreated();
-      if (this.#savedIndex === undefined) {
-        this.#savedIndex = CommentThread.#nextIndex++;
-      }
+      this.#recordCommentCreated(true);
       this.status = 'ACTIVE';
       changed = true;
     }
@@ -167,9 +214,6 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes
       this.#recordCommentCreated();
     }
     if (this.status === 'DRAFT' || this.status === 'ACTIVE') {
-      if (this.#savedIndex === undefined) {
-        this.#savedIndex = CommentThread.#nextIndex++;
-      }
       this.status = 'SENT_TO_AGENT';
       changed = true;
     }
@@ -179,17 +223,38 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper<EventTypes
   }
 
   resolve(replyText?: string): void {
-    if (replyText && replyText.trim().length > 0) {
+    const reply = replyText?.trim();
+    if (reply) {
       this.comments.push({
         author: 'AGENT',
-        text: replyText.trim(),
+        text: reply,
         timestamp: Date.now(),
       });
     }
-    if (this.#savedIndex === undefined) {
-      this.#savedIndex = CommentThread.#nextIndex++;
+    // A new response, or a thread that is newly resolved, has not been seen yet.
+    if (this.status !== 'RESOLVED' || reply) {
+      this.responseSeen = false;
     }
     this.status = 'RESOLVED';
     this.dispatchEventToListeners(Events.CHANGED);
+  }
+
+  /**
+   * Marks the agent response of a RESOLVED thread as seen by the developer.
+   */
+  markResponseSeen(): void {
+    if (this.status !== 'RESOLVED' || this.responseSeen) {
+      return;
+    }
+    this.responseSeen = true;
+    this.dispatchEventToListeners(Events.CHANGED);
+  }
+}
+
+export class RevealableThread {
+  constructor(
+      readonly thread: CommentThread,
+      readonly position?: {left: number, top: number},
+  ) {
   }
 }

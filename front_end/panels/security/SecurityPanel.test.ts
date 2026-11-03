@@ -16,6 +16,7 @@ import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHe
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
 import {getMainFrame, navigate} from '../../testing/ResourceTreeHelpers.js';
+import {render} from '../../ui/lit/lit.js';
 import * as NetworkForward from '../network/forward/forward.js';
 
 import * as Security from './security.js';
@@ -41,18 +42,23 @@ function createSecurityDetails(overrides: Partial<Protocol.Network.SecurityDetai
   };
 }
 
-describe('createHighlightedUrl', () => {
+describe('renderHighlightedUrl', () => {
+  function renderUrl(url: Platform.DevToolsPath.UrlString, securityState: string): Element {
+    const container = document.createElement('div');
+    render(Security.SecurityPanel.renderHighlightedUrl(url, securityState), container);
+    assert.isNotNull(container.firstElementChild);
+    return container.firstElementChild;
+  }
+
   it('renders a URL without a scheme separator as plain text', () => {
-    const highlightedUrl =
-        Security.SecurityPanel.createHighlightedUrl(urlString`foo.bar`, Protocol.Security.SecurityState.Secure);
+    const highlightedUrl = renderUrl(urlString`foo.bar`, Protocol.Security.SecurityState.Secure);
 
     assert.strictEqual(highlightedUrl.textContent, 'foo.bar');
     assert.isFalse(highlightedUrl.classList.contains('highlighted-url'));
   });
 
   it('renders a URL with a highlighted scheme', () => {
-    const highlightedUrl =
-        Security.SecurityPanel.createHighlightedUrl(urlString`https://foo.bar`, Protocol.Security.SecurityState.Secure);
+    const highlightedUrl = renderUrl(urlString`https://foo.bar`, Protocol.Security.SecurityState.Secure);
 
     assert.strictEqual(highlightedUrl.textContent, 'https://foo.bar');
     assert.isTrue(highlightedUrl.classList.contains('highlighted-url'));
@@ -958,6 +964,24 @@ describeWithEnvironment('SecurityPanel', () => {
     assert.lengthOf(unknownOriginElements, 1);
     const unknownOriginElement = querySelectorErrorOnMissing(unknownOriginElements[0], '.highlighted-url');
     assert.strictEqual(unknownOriginElement.textContent, 'https://does-not-resolve.test');
+  });
+
+  it('shows informational explanations after regular explanations', () => {
+    const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+    renderElementIntoDOM(securityPanel);
+    const securityModel = target.model(Security.SecurityModel.SecurityModel);
+    assert.exists(securityModel);
+
+    const pageVisibleSecurityState = new Security.SecurityModel.PageVisibleSecurityState(
+        Protocol.Security.SecurityState.Secure, null, null, ['pkp-bypassed']);
+    securityModel.dispatchEventToListeners(Security.SecurityModel.Events.VisibleSecurityStateChanged,
+                                           pageVisibleSecurityState);
+
+    const titles = securityPanel.mainView.contentElement.querySelectorAll('.security-explanation-title');
+    assert.deepEqual(Array.from(titles, title => title.textContent), [
+      'Resources - all served securely',
+      'Certificate - Public-Key-Pinning bypassed',
+    ]);
   });
 
   it('shows an explanation for blocked mixed content and clears it on navigation', () => {

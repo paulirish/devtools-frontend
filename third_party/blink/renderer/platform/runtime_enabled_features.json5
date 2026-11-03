@@ -316,13 +316,6 @@
       status: "experimental",
       implied_by: ["CorsRFC1918"],
     },
-    {
-      // Interest Group JS API/runtimeflag.
-      name: "AdInterestGroupAPI",
-      origin_trial_feature_name: "AdInterestGroupAPI",
-      implied_by: ["Fledge", "Parakeet"],
-      public: true,
-    },
     // Adjust the end of the next paragraph if the end position for the
     // paragraph is updated while moving the paragraph. See
     // https://crbug.com/329121649
@@ -389,6 +382,10 @@
     // When enabled, redact elements with --webkit-text-security.
     {
       name: "AIPageContentElementCSSRedaction",
+      status: "stable",
+    },
+    {
+      name: "AIPageContentIncludeMathML",
       status: "stable",
     },
     {
@@ -604,10 +601,6 @@
       status: "stable",
     },
     {
-      name: "AllImagesPaintedSentToElementTiming",
-      status: "experimental",
-    },
-    {
       name: "AllowContentInitiatedDataUrlNavigations",
       base_feature: "none",
     },
@@ -769,7 +762,6 @@
     },
     {
       name: "AttributionReporting",
-      status: "stable",
       base_feature: "none",
       public: true,
     },
@@ -799,6 +791,10 @@
     {
       name: "AudioVideoTracks",
       status: "experimental",
+    },
+    {
+      name: "AudioWorkletProcessorErrorEventType",
+      status: "stable",
     },
     {
       // Shared MessagePort between AudioWorklet and AudioWorkletGlobalScope.
@@ -996,7 +992,7 @@
     },
     {
       name: "BlockingFocusWithoutUserActivation",
-      status: "experimental",
+      status: "stable",
       origin_trial_feature_name: "BlockingFocusWithoutUserActivation",
     },
     {
@@ -1202,11 +1198,26 @@
       status: "stable",
     },
     {
+      // Updates the sequential focus navigation starting point when moving the
+      // caret with the keyboard during caret browsing.
+      // https://crbug.com/567653181
+      name: "CaretBrowsingSequentialFocusStartingPoint",
+      status: "stable",
+    },
+    {
       // Keeps the caret outside an editable atomic inline - e.g.
       // <div contenteditable style="display:inline-block"> - for a click that
       // landed next to the box rather than on it.
       // https://crbug.com/40780191
       name: "CaretOutsideEditableAtomicInline",
+      status: "stable",
+    },
+    {
+      // Keeps the bar caret width independent of the element transform scale,
+      // so scaling an editable down does not fade the caret away and scaling it
+      // up does not make it fat.
+      // https://crbug.com/353556446
+      name: "CaretWidthIgnoresTransform",
       status: "stable",
     },
     {
@@ -1256,6 +1267,13 @@
       // behaviors are triggered. It should not affect behavior.
       // This flag shipped in M157 and can be removed in M160.
       name: "CleanUpActivationBehavior",
+      status: "stable",
+    },
+    {
+      // Killswitch for preventing cross-origin relatedTarget on boundary
+      // events.
+      // https://issues.chromium.org/issues/574379564
+      name: "ClearCrossOriginRelatedTarget",
       status: "stable",
     },
     {
@@ -1367,15 +1385,6 @@
       status: "stable",
     },
     {
-      name: "CompositeBGColorAnimation",
-      public: true,
-      status: "stable",
-      base_feature: "none",
-    },
-    {
-      name: "CompositeBoxShadowAnimation",
-    },
-    {
       name: "CompositeClipPathAnimation",
       status: "stable",
       public: true,
@@ -1391,6 +1400,11 @@
         "Win": "stable",
       },
       base_feature: "none",
+    },
+    {
+      // Precompute :hover styles and apply hover effects on the compositor
+      // without involving the main thread.
+      name: "CompositeHoverStyle",
     },
     {
       name: "CompositingDecisionAtAnimationPhaseBoundaries"
@@ -1452,6 +1466,12 @@
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
       status: "experimental",
+    },
+    {
+      name: "ConsistentFormControlPaintSnapping",
+      // Keep checkbox/radio painted size constant regardless of sub-pixel
+      // position. https://crbug.com/41288048
+      status: "stable",
     },
     {
       name: "ConstructableStylesheetCache",
@@ -1646,7 +1666,12 @@
       // https://drafts.csswg.org/css-values-4/ Appendix A
       // https://drafts.csswg.org/css-backgrounds/#layering
       // https://github.com/w3c/csswg-drafts/issues/7164
+      // Ship in M159, should be removed in M161.
       name: "CSSBackgroundLayerCountIndependence",
+      status: "stable",
+    },
+    {
+      name: "CSSBorderRadiusSideShorthands",
       status: "experimental",
     },
     // https://chromestatus.com/feature/5459864205393920
@@ -1741,7 +1766,7 @@
     },
     {
       name: "CSSCustomHighlightUniversalSelector",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "CSSCustomMedia",
@@ -1761,14 +1786,14 @@
       // The 'flow-start' and 'flow-end' box alignment keywords.
       // https://github.com/w3c/csswg-drafts/issues/14052
       name: "CSSFlowStartAndEnd",
-      status: "experimental",
+      status: "stable",
     },
     {
       // Serialize 'flex-start' and 'flex-end' as 'flow-start' and 'flow-end'
       // in computed styles.
       // https://github.com/w3c/csswg-drafts/issues/14052
       name: "CSSFlowStartAndEndSerialization",
-      status: "experimental",
+      status: "stable",
       depends_on: ["CSSFlowStartAndEnd"],
     },
     {
@@ -1909,7 +1934,7 @@
       // :muted, and :volume-locked for media elements.
       // https://drafts.csswg.org/selectors/#resource-pseudos
       name: "CSSMediaElementPseudos",
-      status: "experimental",
+      status: "stable",
     },
     {
       // https://drafts.csswg.org/css-values-5/#progress
@@ -1923,6 +1948,15 @@
     },
     {
       name: "CSSNestedPseudoElements",
+      status: "stable",
+    },
+    {
+      // Math functions that return a <number> (e.g. round(), sign()) keep
+      // the percent hint of their arguments, so that e.g.
+      // calc(100% / round(100% / 10px)) is a <length-percentage> rather
+      // than a <percentage>.
+      // https://drafts.csswg.org/css-values-4/#calc-type-checking
+      name: "CSSNumberMathFunctionPercentHint",
       status: "stable",
     },
     {
@@ -1972,6 +2006,12 @@
     {
       name: "CSSProgressNotation",
       status: "stable",
+    },
+    // https://drafts.csswg.org/css-values-5/#progress
+    // progress() no-clamp keyword and equal start and end values
+    {
+      name: "CSSProgressNotationNoClamp",
+      status: "experimental",
     },
     {
       // For ::column pseudo-element for fragment styling.
@@ -2039,12 +2079,6 @@
       // unintentionally exposed to author sheets. UA rule is now using
       // -internal-textarea-auto instead.
       name: "CSSResizeAuto",
-      status: "stable",
-    },
-    {
-      // Kill switch for integrity() enforcement on CSS image and SVG
-      // document resources. See also: CSSURLRequestModifiers
-      name: "CSSResourceIntegrityEnforcement",
       status: "stable",
     },
     {
@@ -2197,7 +2231,7 @@
     },
     {
       name: "CSSTextDecorationSkipSpaces",
-      status: "stable",
+      status: "experimental",
     },
     {
       // crbug.com/417306102
@@ -2222,6 +2256,14 @@
       // https://issues.chromium.org/41297237: CSS `text-transform: full-width` value
       name: "CSSTextTransformFullWidth",
       status: "experimental",
+    },
+    {
+      // Enable Unicode uppercasing to Mtavruli. Disable to restore the legacy
+      // mapping if font regressions are reported in the field.
+      // TODO(crbug.com/40127672): Remove this kill switch and the legacy mapping
+      // two milestones after the Stable launch, if rollback is no longer needed.
+      name: "CSSTextTransformGeorgianUppercase",
+      status: "stable",
     },
     {
       // crbug.com/41297237: Support multi-keyword values in CSS `text-transform`.
@@ -2325,6 +2367,11 @@
     {
       // https://chromestatus.com/feature/5134293578285056
       name: "Database",
+    },
+    {
+      // Killswitch for https://crbug.com/40622827
+      name: "DateTimeFieldTypeWithoutSelection",
+      status: "stable",
     },
     {
       // https://crbug.com/473454959
@@ -2436,6 +2483,11 @@
         "ChromeOS": "stable",
         "default": "experimental",
       },
+    },
+    {
+      name: "DeviceBoundSessionJsApi",
+      status: "experimental",
+      base_feature: "none",
     },
     {
       name: "DeviceOrientationRequestPermission",
@@ -2598,13 +2650,6 @@
       base_feature: "none",
     },
     {
-      // Kill switch for including non-exposed <object> and <embed> elements in
-      // document named properties. crbug.com/551807991
-      // Lands in M155 and can be removed in M157.
-      name: "DocumentNamedPropertiesIgnoreExposedness",
-      status: "stable",
-    },
-    {
       // Fix iframe unload events not firing during document.open()
       // https://crbug.com/40947017
       // Lands in M144; remove this flag in M146 after the milestone rolls.
@@ -2734,6 +2779,14 @@
       status: "stable",
     },
     {
+      // When enabled, the cursor needs to move past the drag start threshold in
+      // absolute screen coordinates rather than window relative coordinates.
+      // See https://crbug.com/40943926 and
+      // https://html.spec.whatwg.org/multipage/dnd.html#security-risks-in-the-drag-and-drop-model
+      name: "DragThresholdRequiresMouseMovement",
+      status: "stable",
+    },
+    {
       // See: crrev.com/c/7874048
       // Diagnostic flag to gather data for a case when compositable animations lack snapshots without a known reason.
       name: "DumpForAbsentKeyframeSnapshots",
@@ -2845,10 +2898,6 @@
       name: "EndpointInclusiveCommitStyles",
       status: "stable",
     },
-    {
-      name: "EnforceAnonymityExposure",
-      status: "stable",
-    },
     // When enabled, the LCP algorithm ignores image entropy for the first
     // video frame. See crbug.com/434659232.
     {
@@ -2886,6 +2935,11 @@
       // https://drafts.csswg.org/web-animations-2/#triggers
       name: "EventTrigger",
       status: "experimental",
+    },
+    {
+      // https://crbug.com/578672563
+      name: "ExclusionSpaceCopyOnWrite",
+      status: "stable",
     },
     {
       name: "ExperimentalContentSecurityPolicyFeatures",
@@ -2938,9 +2992,10 @@
     {
       name: "EyeDropperAPI",
       status: {
-        // EyeDropper UI is available on ChromeOS, Linux (x11), Mac, and Win.
+        // EyeDropper UI is available on Android, ChromeOS, Linux (x11), Mac, and Win.
         // This list should match the supported operating systems for the
         // kEyeDropper base::Feature.
+        "Android": "stable",
         "ChromeOS": "stable",
         "Linux": "stable",
         "Mac": "stable",
@@ -2955,6 +3010,14 @@
     {
       name: "FaceDetector",
       status: "experimental",
+    },
+    {
+      name: "FastCompositionCharacterBounds",
+      status: "stable",
+    },
+    {
+      name: "FastPlainTextRangeCreateRange",
+      status: "stable",
     },
     {
       name: "FastPositionIterator",
@@ -3222,6 +3285,17 @@
       status: "stable",
     },
     {
+      // Enables asymmetric diacritic matching in Find-in-Page so base
+      // characters match diacritic variants while explicit diacritics only
+      // match that diacritic (https://crbug.com/40518349).
+      name: "FindInPageAsymmetricDiacriticSearch",
+      status: "test",
+    },
+    {
+      name: "FirstLetterParagraphOffsets",
+      status: "stable",
+    },
+    {
       // https://github.com/w3c/csswg-drafts/issues/13926
       name: "FirstLineAndLetterExcludeInputTextarea",
       status: "stable",
@@ -3255,95 +3329,6 @@
     // OOPIFs.
     {
       name: "FixVisualRectRemoteViewportTransform",
-      status: "stable",
-    },
-    {
-      name: "Fledge",
-      public: true,
-    },
-    {
-      // Enables deal support within auctions.
-      name: "FledgeAuctionDealSupport",
-      status: "test",
-    },
-    {
-      name: "FledgeBiddingAndAuctionServerAPI",
-      origin_trial_feature_name: "FledgeBiddingAndAuctionServer",
-      origin_trial_allows_third_party: true,
-      base_feature: "none",
-      status: "stable",
-    },
-    {
-      name: "FledgeBiddingAndAuctionServerAPIMultiSeller",
-      status: "stable",
-    },
-    {
-      name: "FledgeClickiness",
-      status: "test",
-    },
-    {
-      name: "FledgeCustomMaxAuctionAdComponents",
-      status: "stable",
-    },
-    {
-      // Enables using a 'deprecatedRenderURLReplacements' field within the
-      // Protected Audience ad auction config.
-      name: "FledgeDeprecatedRenderURLReplacements",
-      public: true,
-      status: "stable",
-    },
-    {
-      name: "FledgeDirectFromSellerSignalsHeaderAdSlot",
-      status: "stable",
-    },
-    {
-      // Feature flag to control removal, in case we run into unexpected
-      // breakage.
-      //
-      // TODO(crbug.com/384481095): Remove in a few milestones, along with the
-      // implementation code.
-      name: "FledgeDirectFromSellerSignalsWebBundles",
-    },
-    {
-      name: "FledgeMultiBid",
-      public: true,
-      status: "stable",
-    },
-    {
-      // Enables the private model training API in Protected Audience.
-      // https://github.com/WICG/turtledove/blob/main/PA_private_model_training.md
-      name: "FledgePrivateModelTraining",
-      status: "test",
-    },
-    {
-      // Enables real time reporting API in Protected Audience.
-      // https://github.com/WICG/turtledove/blob/main/PA_real_time_monitoring.md
-      name: "FledgeRealTimeReporting",
-      public: true,
-      status: "stable",
-    },
-    {
-      // Enables the ability to set seller nonces on the header response and
-      // use bidNonce in bids.
-      name: "FledgeSellerNonce",
-      status: "stable",
-    },
-    {
-      // Enables having `executionMode` in the auctionConfig to use for seller scripts.
-      name: "FledgeSellerScriptExecutionMode",
-      status: "test",
-    },
-    {
-      name: "FledgeTrustedSignalsKVv1CreativeScanning",
-      status: "test",
-    },
-    {
-      name: "FledgeTrustedSignalsKVv2ContextualData",
-      depends_on: ["FledgeTrustedSignalsKVv2Support"],
-      status: "test",
-    },
-    {
-      name: "FledgeTrustedSignalsKVv2Support",
       status: "stable",
     },
     {
@@ -3500,6 +3485,10 @@
       origin_trial_feature_name: "GamepadRawInputChangeEvent",
       base_feature: "none",
       public: true,
+    },
+    {
+      name: "GamepadUserActivationFocus",
+      status: "stable",
     },
     {
       name: "GamepadWindowEventHandlers",
@@ -3660,6 +3649,13 @@
       status: "experimental",
     },
     {
+      // Kill switch for hiding the selection of a readonly text control
+      // once the control is no longer focused, matching editable controls.
+      // https://crbug.com/40768970
+      name: "HideUnfocusedReadonlyTextControlSelection",
+      status: "stable",
+    },
+    {
       // Kill switch for setting `display: none` on the media controls
       // container when it is not needed.
       // Lands in M147 and can be removed in M149. https://crbug.com/40591804
@@ -3683,6 +3679,14 @@
       // Fixes incorrect hit-test results for layers without CSS transforms.
       // https://crbug.com/464173566
       name: "HitTestContainerTransformStateForPreserve3d",
+      status: "stable",
+    },
+    {
+      // Kill switch for https://crbug.com/576771254. List-based hit tests
+      // (such as elementsFromPoint()) add the culled inline ancestors of an
+      // inline item that has a self-painting layer, such as a
+      // position:relative child.
+      name: "HitTestCulledInlineOfSelfPaintingChild",
       status: "stable",
     },
     {
@@ -3786,6 +3790,14 @@
       status: "test",
     },
     {
+      // Defers image loads triggered from
+      // HTMLPlugInElement::CustomStyleForLayoutObject to a DOM manipulation
+      // task instead of loading synchronously during style recalc.
+      // https://crbug.com/575053155
+      name: "HTMLPlugInDeferStyleRecalcImageLoad",
+      status: "stable",
+    },
+    {
       // When enabled, specifies visual affordances for printing such as headers,
       // footers and page numbers, to be PDF annotations.
       // See section 14.8.2.2.1 here for info:
@@ -3813,7 +3825,7 @@
     },
     {
       name: "ICUCapitalization",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "IgnoreLetterSpacingInCursiveScripts",
@@ -3833,6 +3845,15 @@
       // x-descriptors.
       // https://crbug.com/41385706
       name: "ImageSrcsetReselection",
+      status: "stable",
+    },
+    {
+      // Srcset images also re-select the best candidate on viewport/zoom
+      // changes when the src attribute was the selected (implicit 1x)
+      // candidate.
+      // https://crbug.com/560379372
+      name: "ImageSrcsetReselectionForSrcCandidate",
+      depends_on: ["ImageSrcsetReselection"],
       status: "stable",
     },
     {
@@ -3869,6 +3890,11 @@
       status: "stable",
     },
     {
+      // Initial letter block-axis positioning fixes. See crbug.com/573256240
+      name: "InitialLetterBlockPositioning",
+      status: "stable",
+    },
+    {
       // See crbug.com/40695399
       name: "InlineBlockLineNavigation",
       status: "stable",
@@ -3876,7 +3902,12 @@
     {
       // See crbug.com/40910996 crbug.com/569803503
       name: "InlineContainingBlockSkipOpaque",
-      status: "test",
+      status: "stable",
+    },
+    {
+      // crbug.com/576888320
+      name: "InlineCursorMoveToEarlierFragmentainer",
+      status: "stable",
     },
     {
       name: "InlineCursorSkipNonIfc",
@@ -3957,12 +3988,13 @@
     {
       // https://chromestatus.com/feature/5152834368700416
       name: "InstallElement",
-      status: {"Android": "", "default": "test"},
-      origin_trial_feature_name: "InstallElement",
-      origin_trial_os: ["win", "mac", "linux", "chromeos"],
+      status: {
+        "Android": "",
+        "iOS": "",
+        "Fuchsia": "",
+        "default": "stable",
+      },
       public: true,
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
     },
     {
       name: "InstallOnDeviceSpeechRecognition",
@@ -3985,6 +4017,13 @@
       // If enabled, BeginMainFrame will always be requested when there are
       // active IntersectionObservers and also active composited animations.
       name: "IntersectionObserverCompositedAnimationsForceMainFrames",
+      status: "stable",
+    },
+    {
+      // Lets invalidation sets use "is focused" as a feature, so that a
+      // selector like `.a :focus` only invalidates the focused descendant of
+      // `.a` instead of its whole subtree. Kill switch.
+      name: "InvalidationSetFocusFeature",
       status: "stable",
     },
     {
@@ -4013,6 +4052,11 @@
       base_feature: "none",
     },
     {
+      // Skips keyboard activation when focus is on a descendant. Shipped in M158.
+      name: "KeyboardActivationFocusCheck",
+      status: "stable",
+    },
+    {
       // Checks interactive content using EventPath captured at
       // dispatch start instead of current DOM state. This was
       // added in M145 and can be removed after M147.
@@ -4031,7 +4075,7 @@
         "Mac": "stable",
         "Linux": "stable",
         "ChromeOS": "stable",
-        "Android": "test",
+        "Android": "stable",
         "default": "",
       },
       base_feature_status: "enabled",
@@ -4040,14 +4084,6 @@
     {
       name: "LanguageDetectionAPIForWorkers",
       public: true,
-    },
-    {
-      name: "LayoutCloneForScrollableOverflowChange",
-      status: "stable",
-    },
-    {
-      name: "LayoutContainingBlockReturnsBox",
-      status: "stable",
     },
     {
       name: "LayoutIgnoreMarginsForSticky",
@@ -4123,6 +4159,7 @@
     {
       // crbug.com/542686223 crbug.com/568304685
       name: "LineBreakerHanKerningEnd",
+      status: "stable",
     },
     {
       // Reverse origin trial allowing sites to opt out of Local Network Access
@@ -4189,9 +4226,7 @@
       // PerformanceLongAnimationFrameTiming and forcedStyleDuration and
       // forcedLayoutDuration to PerformanceScriptTiming
       name: "LongAnimationFrameStyleDuration",
-      origin_trial_feature_name: "LongAnimationFrameStyleDuration",
-      origin_trial_allows_third_party: true,
-      status: "experimental",
+      status: "stable",
     },
     {
       // Extends the Long Animation Frame (LoAF) API to Web Workers. Reports a
@@ -4259,6 +4294,10 @@
       status: "stable",
     },
     {
+      name: "MarkAncestorsOnDisplayLockUnlock",
+      status: "stable",
+    },
+    {
       name: "MaskDeserializationTimeForCrossOriginMessages",
       status: "stable",
     },
@@ -4269,7 +4308,7 @@
     {
       // Enables MathMLAnchorElement
       name: "MathMLAnchorElement",
-      status: "test",
+      status: "experimental",
     },
     {
       // Enables mirroring for stretchy and large MathML operators when
@@ -4319,6 +4358,11 @@
       status: "experimental",
       implied_by: ["MediaCaptureBackgroundBlur"],
       base_feature: "none",
+    },
+    {
+      // Enables camera and microphone preview for <camera>, <microphone>, and
+      // <usermedia> elements.
+      name: "MediaCaptureElementPreview",
     },
     {
       name: "MediaCaptureVoiceIsolation",
@@ -4410,11 +4454,6 @@
       status: "experimental",
     },
     {
-      // Killswitch M149. Functionality changed in M151.
-      name: "MergeStickyLayers",
-      status: "stable",
-    },
-    {
       name: "MessagePortCloseEvent",
       status: "test",
     },
@@ -4473,6 +4512,7 @@
     // Optimization for monospace text.
     {
       name: "MonospaceGlyphCompaction",
+      status: "stable",
     },
     // Move the selection to the last position in the list item. See
     // https://crbug.com/331841851
@@ -4487,8 +4527,16 @@
       status: "stable",
     },
     {
+      // Clamp a column-count:auto multicol container's max-content inline
+      // size to column-width per css-sizing-4. Kill switch for
+      // crbug.com/41459384.
+      name: "MulticolColumnWidthMaxContentClamp",
+      status: "stable",
+    },
+    {
       // Support Nastaliq script. crbug.com/569667449
       name: "NastaliqScript",
+      status: "stable",
     },
     {
       name: "NavigateEventDeferCrossDocumentCommit",
@@ -4539,6 +4587,17 @@
       base_feature: "none",
     },
     {
+      // See crbug.com/567611289
+      // Per https://www.w3.org/TR/web-animations-1/
+      // #the-effect-value-of-a-keyframe-animation-effect:
+      // Keyframes not affecting the target property are to be removed prior
+      // to populating interval endpoints. Blink's longstanding behavior was
+      // not spec-compliant. Introducing a kill-switch to allow a quick revert
+      // should this be a breaking change for sites.
+      name: "NeutralKeyframeEasingCompliance",
+      status: "stable"
+    },
+    {
       // See crbug.com/521921832
       // Any potential behavioral changes excepting bugfixes from the V2 implementation (including
       // changes to when the histogram is reported, like early-outs in Animation::PreCommit) are behind
@@ -4556,6 +4615,12 @@
       name: "NewHTMLSettingMethods",
       status: "stable",
       depends_on: ["SetHTMLCanRunScripts", "TrustedTypesCreateParserOptions"]
+    },
+    {
+      // Kill switch for the NodeIterator position fix after subtree removal.
+      // https://crbug.com/532607274
+      name: "NodeIteratorRemovalFix",
+      status: "stable",
     },
     {
       // Fix for https://crbug.com/482862753
@@ -4662,7 +4727,7 @@
     },
     {
       name: "OfflineAudioContextIncrementalRendering",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "OffscreenCanvasGetContextAttributes",
@@ -4909,13 +4974,16 @@
       status: "stable",
     },
     {
-      name: "PaintUnderInvalidationChecking",
-      settable_from_internals: true,
+      // Makes images generated by the "content" property on a pseudo element
+      // (which are laid out as anonymous LayoutImages) eligible for Paint
+      // Timing, attributed to the originating element. See
+      // https://github.com/w3c/element-timing/issues/74.
+      name: "PaintTimingContentImagePseudoElements",
+      status: "experimental",
     },
     {
-      // PARAKEET ad serving runtime flag/JS API.
-      name: "Parakeet",
-      origin_trial_feature_name: "Parakeet",
+      name: "PaintUnderInvalidationChecking",
+      settable_from_internals: true,
     },
     {
       name: "PartitionVisitedLinkDatabaseWithSelfLinks",
@@ -4930,6 +4998,11 @@
       public: true,
       status: "experimental",
       base_feature: "none",
+    },
+    {
+      // Lets a payment app set the size of its Payment Handler window through
+      // the `preferredSize` option of PaymentRequestEvent.openWindow().
+      name: "PaymentHandlerStaticCustomSize",
     },
     {
       // https://chromestatus.com/feature/5198846820352000
@@ -4987,6 +5060,7 @@
     {
       name: "PermissionsPolicyForSharedWorkers",
       status: "experimental",
+      public: true,
     },
     {
       name: "PermissionsRequestRevoke",
@@ -5049,6 +5123,13 @@
     },
     {
       name: "PositionOutsideTabSpanCheckSiblingNode",
+      status: "stable",
+    },
+    {
+      // Kill switch for https://crbug.com/382679385 which recomputes the
+      // dimensions of an out-of-flow positioned box when computing dimensions
+      // changes its scrollbars.
+      name: "PositionTryFreezeScrollbars",
       status: "stable",
     },
     {
@@ -5117,10 +5198,6 @@
       // foreign content in the HTML preload scanner. Ships in M155 and can be
       // removed in M158. https://crbug.com/40728681
       name: "PreloadScannerImprovements",
-      status: "stable",
-    },
-    {
-      name: "PrePaintBoxInvalidatorUsesFragments",
       status: "stable",
     },
     {
@@ -5326,12 +5403,6 @@
       name: "RecheckParentDuringNodeVectorInsertion",
       status: "stable",
     },
-    // If enabled, both Accept-Language HTTP header and JavaScript getter will
-    // be reduced.
-    {
-      name: "ReduceAcceptLanguage",
-      base_feature: "none",
-    },
     // If enabled, the minor version of the User-Agent string will be reduced.
     // This User-Agent Reduction feature has been enabled starting from M101,
     // but we still keep this flag for future phase tests.
@@ -5439,6 +5510,11 @@
       status: "stable",
     },
     {
+      // https://crbug.com/567626030
+      name: "ReplaceCompositionActualInsertedLength",
+      status: "test",
+    },
+    {
       // Kill switch for painting non-SVG replaced normal-flow stacking
       // contexts inline with their siblings.
       // This was set to experimental due to crbug.com/532229489.
@@ -5470,7 +5546,13 @@
       status: "stable",
     },
     {
-      name: "ResponsiveIframes",
+      // Kill switch for https://crbug.com/570579609.
+      name: "ResponsiveIframesShrink",
+      status: "stable",
+    },
+    {
+      // Kill switch for https://crbug.com/565383556.
+      name: "ResponsiveIframesSingleAxisIcb",
       status: "stable",
     },
     {
@@ -5631,6 +5713,10 @@
       // Spec: https://wicg.github.io/sanitizer-api/
       // Tracking bug: crbug.com/356601280
       name: "SanitizerAPI",
+      status: "stable",
+    },
+    {
+      name: "SanitizeWorkerErrorPropagation",
       status: "stable",
     },
     {
@@ -5829,6 +5915,16 @@
       depends_on: ["CustomizableSelectMultiplePopup"],
     },
     {
+      // Makes minor tweaks to edge cases with the <selectedcontent> element.
+      // The prior set of spec-driven changes to the selectedcontent element
+      // were called "SelectedcontentSpec", so this one is called
+      // "SelectedcontentSpec2".
+      // https://github.com/whatwg/html/pull/12263
+      // Enabled in M156, can be removed in M159.
+      name: "SelectedcontentSpec2",
+      status: "stable",
+    },
+    {
       // See https://crbug.com/40664519
       // Disabled due to UI freeze issues, see https://crbug.com/448833953.
       name: "SelectionAndFocusedVisiblePositionMatch",
@@ -5874,6 +5970,23 @@
     {
       // See https://chromestatus.com/feature/4811835974615040
       name: "SelectivePermissionsIntervention",
+      status: "stable",
+    },
+    {
+      // Opens the <select> picker when clicking an associated <label> element.
+      // https://issues.chromium.org/issues/565410880
+      // Enabled in M157 and can be removed in M160.
+      name: "SelectLabelClickOpensPicker",
+      status: "stable",
+      depends_on: ["CleanUpActivationBehavior"],
+    },
+    {
+      // This sets the background-color of the body inside of the
+      // appearance:auto select popup for windows/linux to Canvas to avoid a
+      // situation with unreadable text in the popup.
+      // https://issues.chromium.org/issues/468205016
+      // Enabled in M157, safe to remove in M161.
+      name: "SelectPopupBackground",
       status: "stable",
     },
     {
@@ -5931,8 +6044,8 @@
       status: "test",
     },
     {
-      // Adds the `shadowRoots` option to the Focusable constructors (and the
-      // constructor that takes a Focusable), which exposes focusable items
+      // Adds the `exposedShadowRoots` option to the Focusable constructors (and
+      // the constructor that takes a Focusable), which exposes focusable items
       // inside those shadow trees.
       // https://crbug.com/565786176
       name: "SequentialFocusPrimitivesShadowRoots",
@@ -6049,6 +6162,7 @@
     },
     {
       name: "SharedWorker",
+      browser_process_read_write_access: true,
       public: true,
       status: "stable",
     },
@@ -6107,6 +6221,14 @@
       status: "stable",
     },
     {
+      name: "SkipHtmlInterchangeInForeignContent",
+      status: "stable",
+    },
+    {
+      name: "SkipInitialForcedScrollbar",
+      status: "test",
+    },
+    {
       // Kill switch for crbug.com/41254682: skips paint invalidation for
       // paint-only style changes (e.g. animation frames) on objects that were
       // and stay visibility:hidden.
@@ -6155,6 +6277,12 @@
       },
     },
     {
+      // https://chromestatus.com/feature/5141169477648384
+      name: "SmartCardContextRelease",
+      depends_on: ["SmartCard"],
+      status: "test",
+    },
+    {
       name: "SmartZoom",
       base_feature: "none",
       public: true,
@@ -6176,8 +6304,9 @@
       // (isolated contexts) rather than via the static flag, so a static
       // dependency would keep this feature off everywhere it matters. Actual
       // exposure is gated by MulticastController's Exposed() clause.
+      // https://chromestatus.com/feature/6208452397498368
       name: "SourceSpecificMulticastInDirectSockets",
-      status: "test",
+      status: "stable",
     },
     {
       // Whether spatial navigation should use cursor inheritance to exclude
@@ -6247,6 +6376,15 @@
       name: "SrcsetSelectionMatchesImageSet",
       status: "stable",
     },
+    // Supports two-dimensional source sizes ("contain"/"cover" <length>
+    // <length>) in sizes, takes the srcset 'h' descriptor and the width/height
+    // attributes into account during source selection, and makes auto-sizes
+    // take the content box height and object-fit into account.
+    // https://github.com/whatwg/html/pull/13053
+    {
+      name: "SrcsetTwoDimensionalSizes",
+      status: "experimental",
+    },
     // Used as argument in attribute of stable-release functions/interfaces
     // where a runtime-enabled feature name is required for correct IDL syntax.
     // This is a global flag; do not change its status.
@@ -6269,6 +6407,20 @@
       status: "stable",
     },
     {
+      // Without this flag, an IntersectionObserver target inside a
+      // render-throttled iframe will continue to compute its intersection state
+      // as long as `NeedsLayout()` is `false` for its containing document. This
+      // is a faulty mechanism, as `NeedsLayout()` does not reliably indicate
+      // whether a document's rendering is out of date. When the flag is enabled
+      // all IntersectionObserver targets inside an iframe that becomes
+      // throttled will promptly generate a "not intersecting" notification.
+      // This is a web-visible change in behavior (though it does not reveal any
+      // new information), so it's hidden behind a flag to provide a kill switch
+      // in the event of breakage.
+      name: "StaleIntersectionGeometryForThrottledFrames",
+      status: "stable",
+    },
+    {
       // See https://github.com/w3c/csswg-drafts/issues/9398
       name: "StandardizedBrowserZoom",
       status: "stable",
@@ -6280,11 +6432,6 @@
       origin_trial_type: "deprecation",
       origin_trial_allows_insecure: true,
       origin_trial_allows_third_party: true,
-    },
-    {
-      // Killswitch M149.
-      name: "StickyPositionHasOverflowPerAxis",
-      status: "stable",
     },
     {
       // Preserves the sticky user activation state after a page navigates to
@@ -6402,6 +6549,10 @@
       status: "stable",
     },
     {
+      name: "SvgHyperlinkElementUtils",
+      status: "experimental",
+    },
+    {
       name: "SvgIgnoreNegativeEllipseRadii",
       status: "stable",
     },
@@ -6468,7 +6619,14 @@
     },
     {
       name: "SVGTextPathSideAttribute",
-      status: "experimental",
+      status: "stable",
+    },
+    {
+      // Kill switch for treating a code point that extends the previous
+      // typographic character as non-addressable when consuming x/y/dx/dy/
+      // rotate lists. crbug.com/41007184
+      name: "SvgTextPositioningGraphemeClusters",
+      status: "stable",
     },
     {
       name: "SvgUseNestedResourceDocuments",
@@ -6476,6 +6634,10 @@
     },
     {
       name: "SvgUseNestedResourceDocumentsDelayLoad",
+      status: "stable",
+    },
+    {
+      name: "SyncCrossDocumentAnimationTiming",
       status: "stable",
     },
     {
@@ -6502,13 +6664,6 @@
       // `bordercolor` attribute always propagates. Matches Gecko when disabled.
       // See crbug.com/40745409.
       name: "TableCellBorderColorInherit",
-      status: "stable",
-    },
-    {
-      // Remove <table>'s explicit `border-color: gray` UA stylesheet rule,
-      // since it is non-standard. See crbug.com/494554835.
-      // This shipped in M149, was updated in M151, and can be removed in M153.
-      name: "TableDefaultBorderColorCurrentColor",
       status: "stable",
     },
     {
@@ -6589,6 +6744,11 @@
       status: "stable",
     },
     {
+      // Kill switch for crbug.com/572900416.
+      name: "TextAreaPlaceholderBreakAriaHiddenUpdate",
+      status: "stable",
+    },
+    {
       name: "TextAreaResizerFixedSize",
       status: "stable",
     },
@@ -6621,6 +6781,11 @@
       // crbug.com/368657256
       name: "TextEmphasisPositionAuto",
       status: "experimental",
+    },
+    {
+      // https://crbug.com/578671521
+      name: "TextEncodingDetectorTldHint",
+      status: "stable",
     },
     {
       name: "TextFragmentAPI",
@@ -6720,7 +6885,6 @@
       name: "TopicsAPI",
       base_feature: "none",
       public: true,
-      status: "stable",
     },
     // This feature allows touch dragging and a context menu to occur
     // simultaneously, with the assumption that the menu is non-modal.  Without
@@ -6772,8 +6936,18 @@
       base_feature: "none",
     },
     {
+      // If enabled and opted-in per property, style tracks the animating
+      // element(s) that each property's computed value is derived from.
+      // Used when deciding which animations can run on the compositor.
       name: "TrackAnimatedSources",
-      status: "test",
+      status: "stable",
+    },
+    {
+      // Also tracks properties that inherit-by-default, such as `color`.
+      // On a separate flag to collect data on runtime performance impact.
+      name: "TrackAnimatedSourcesForInheritedProperties",
+      depends_on: ["TrackAnimatedSources"],
+      status: "experimental",
     },
     {
       name: "TransferableRTCDataChannel",
@@ -6828,6 +7002,13 @@
     },
     {
       name: "TrustedTypesUseCodeLike",
+      status: "experimental",
+    },
+    {
+      // Make the browser process verify user activation notification calls
+      // from renderers before updating its own states and propagating the
+      // information to other renderers (https://crbug.com/40091540).
+      name: "TrustedUserActivationTriggers",
       status: "experimental",
     },
     {
@@ -6928,6 +7109,10 @@
       status: {
         "ChromeOS": "stable",
       },
+    },
+    {
+      name: "UsedPositionRelativeInsets",
+      status: "stable",
     },
     {
       // Android currently uses low-quality interpolation, while other platforms
@@ -7044,6 +7229,21 @@
       status: "test",
     },
     {
+      // Kill switch for https://crbug.com/568974861, which prevents painting
+      // view transition content (which may contain cross-origin frames) under
+      // SVG reference filters.
+      name: "ViewTransitionPreventSvgFilterPaint",
+      status: "stable",
+    },
+    {
+      // Kill switch. Doesn't generate the ::view-transition pseudo-element
+      // tree when capturing the outgoing document of a cross-document view
+      // transition, since the animation runs on the new document. This avoids
+      // extra style and layout passes in the capture frame.
+      name: "ViewTransitionSkipPseudoTreeForNavigationCapture",
+      status: "stable",
+    },
+    {
       // Kill switch for https://crbug.com/569098933. Doesn't snap the browser
       // controls to fully shown when capturing the outgoing document of a
       // cross-document view transition if the browser controls have zero
@@ -7053,6 +7253,13 @@
     },
     {
       name: "VisibilityCollapseColumn",
+    },
+    {
+      // Kill switch for https://crbug.com/569257985. Allows animation-tainted
+      // var() data to be substituted into -internal-visited-* properties
+      // whenever it may be substituted into their unvisited counterparts.
+      name: "VisitedAnimationTaintedSubstitution",
+      status: "stable",
     },
     {
       // Guards the removal of legacy visual rect inflation when mapping through
@@ -7086,12 +7293,13 @@
     {
       // https://chromestatus.com/feature/5183481574850560
       name: "WebAppInstallation",
-      status: {"Android": "", "default": "test"},
-      origin_trial_feature_name: "WebAppInstallation",
-      origin_trial_os: ["win", "mac", "linux", "chromeos"],
+      status: {
+        "Android": "",
+        "iOS": "",
+        "Fuchsia": "",
+        "default": "stable",
+      },
       public: true,
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
     },
     {
       // This needs to be kept as a runtime flag
@@ -7410,9 +7618,15 @@
       copied_from_base_feature_if: "overridden",
       // Note that `depends_on` isn't supported by origin trials.
       implied_by: [
+        "WebMCPContinuations",
         "WebMCPDeclarativeFileInput",
         "WebMCPFormAssociatedCustomElements"
       ],
+      status: "experimental",
+    },
+    {
+      name: "WebMCPContinuations",
+      public: true,
       status: "experimental",
     },
     {
@@ -7515,8 +7729,7 @@
     },
     {
       name: "WebTransportAnticipatedConcurrentIncomingStreams",
-      status: "experimental",
-      base_feature: "none",
+      status: "stable",
     },
     {
       name: "WebTransportApplicationProtocol",
@@ -7550,11 +7763,11 @@
     },
     {
       name: "WebTransportDraining",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "WebTransportExportKeyingMaterial",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "WebTransportHeaders",
@@ -7734,6 +7947,12 @@
       depends_on: ["WebXR"],
       status: "stable",
     },
+    // Normalize DOM wheel pixel deltas for inherited pinch zoom in child
+    // widgets without changing the native event used for scrolling.
+    {
+      name: "WheelEventDeltaExternalPageScale",
+      status: "stable",
+    },
     // Expose the momentum field in mouse wheel events that indicates whether an
     // event is synthesized by the platform to simulate scroll inertia after the
     // user has ended the physical scroll interaction.
@@ -7763,6 +7982,23 @@
       status: "stable",
     },
     {
+      // Supports the "split", "splitposition", and "splitsize" features in
+      // window.open(), and the "windowfeatures" content attribute on <a>,
+      // <area>, and <form>, which request that the new content be opened in a
+      // split tab alongside the opener.
+      //
+      // The base::Feature is enabled by default, and serves as a kill switch
+      // for the browser-side implementation. The Blink side follows the
+      // RuntimeEnabledFeature status unless the base::Feature is overridden,
+      // in which case both sides follow the override. This keeps the renderer
+      // and browser consistent, so that the browser can reject split requests
+      // from a renderer when the base::Feature is disabled.
+      name: "WindowOpenSplitTab",
+      status: "experimental",
+      base_feature_status: "enabled",
+      copied_from_base_feature_if: "overridden",
+    },
+    {
       // Fixes an issue where Ctrl+Right Arrow skips punctuation before a newline.
       name: "WordSkipSpacesPunctuationFix",
       status: "stable",
@@ -7790,6 +8026,7 @@
       // if XSLT is enabled (e.g. reverse origin trial or CAP alerts).
       // https://crbug.com/441911594
       name: "XMLParsingRust",
+      status: "experimental",
     },
     {
       // Enables the Rust XML parser for situations where we know
@@ -7798,7 +8035,7 @@
       // with its responseXML document.
       // https://crbug.com/466303347
       name: "XMLRustForNonXslt",
-      status: "stable",
+      status: "experimental",
     },
     {
       name: "XMLSerializerConsistentDefaultNsDeclMatching",
@@ -7815,7 +8052,6 @@
       // See XSLTSpecialTrial below.
       // crbug.com/435623334.
       name: "XSLT",
-      status: "stable",
       public: true,
       origin_trial_feature_name: "XSLT",
       origin_trial_type: "deprecation",

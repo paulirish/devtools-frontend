@@ -80,11 +80,12 @@ interface PropertiesWidgetInput {
   allChildrenFiltered: boolean;
 }
 
-type View = (input: PropertiesWidgetInput, output: object, target: HTMLElement) => void;
+type View = (input: PropertiesWidgetInput, output: undefined, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   // clang-format off
   render(html`
+    <style>${propertiesWidgetStyles}</style>
     <div jslog=${VisualLogging.pane('element-properties').track({resize: true})}>
       <div class="hbox properties-widget-toolbar">
         <devtools-toolbar class="styles-pane-toolbar" role="presentation">
@@ -140,7 +141,6 @@ export class PropertiesWidget extends UI.Widget.VBox {
 
   constructor(view: View = DEFAULT_VIEW) {
     super({useShadowDom: true});
-    this.registerRequiredCSS(propertiesWidgetStyles);
 
     this.showAllPropertiesSetting = getShowAllPropertiesSetting();
     this.showAllPropertiesSetting.addChangeListener(this.onFilterChanged.bind(this));
@@ -235,15 +235,14 @@ export class PropertiesWidget extends UI.Widget.VBox {
           this.#objectTree?.children?.arrayRanges?.some(() => true) ||
           this.#objectTree?.children?.internalProperties?.some(c => !c.isFiltered) ||
           this.#objectTree?.children?.properties?.some(c => !c.isFiltered));
-    this.#view(
-        {
-          onFilterChanged: this.onFilterChanged.bind(this),
-          onRegexToggled: this.onRegexToggled.bind(this),
-          isRegex: this.#isRegex,
-          allChildrenFiltered,
-          objectTree: this.#objectTree,
-        },
-        {}, this.contentElement);
+    this.#view({
+      onFilterChanged: this.onFilterChanged.bind(this),
+      onRegexToggled: this.onRegexToggled.bind(this),
+      isRegex: this.#isRegex,
+      allChildrenFiltered,
+      objectTree: this.#objectTree,
+    },
+               undefined, this.contentElement);
   }
 
   private onNodeChange(

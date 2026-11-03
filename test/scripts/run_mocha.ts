@@ -33,7 +33,7 @@ export function loadScriptTests(): string[] {
                         exclude: p => p.includes('/fixtures/') || p.includes('\\fixtures\\'),
                       });
                     })
-                    .filter(f => f.endsWith('.test.ts') || f.endsWith('.test.js') || f.endsWith('_test.js'))
+                    .filter(f => f.endsWith('.test.ts') || f.endsWith('.test.js'))
                     .map(t => path.normalize(t))
                     .filter(
                         t => TestConfig.tests.some((spec: string) => {
@@ -63,7 +63,7 @@ TestConfig.tests = TestConfig.tests.map(testId => {
 void run({
   require: [
     path.join(SOURCE_ROOT, 'node_modules', 'source-map-support', 'register.js'),
-    path.join(SOURCE_ROOT, 'test', 'unit', 'mocha-hooks.ts'),
+    path.join(SOURCE_ROOT, 'test', 'scripts', 'mocha_hooks.ts'),
   ],
   spec: loadScriptTests(),
   timeout: 4_000,

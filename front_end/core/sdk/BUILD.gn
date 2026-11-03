@@ -158,6 +158,8 @@ devtools_entrypoint("bundle") {
     "../../generated",
   ]
 
+  data_deps = [ "../../entrypoints/wasmparser_worker:worker_entrypoint" ]
+
   visibility = [ "*" ]
 }
 
@@ -168,6 +170,8 @@ ts_library("unittests") {
     "Connections.test.ts",
     "RehydratingConnection.test.ts",
   ]
+
+  data = [ "RehydratingConnection.snapshot.txt" ]
 
   ts_deps = [
     ":bundle",
@@ -245,6 +249,8 @@ devtools_foundation_module("foundation_unittests") {
     "TraceObject.test.ts",
     "WebAuthnModel.test.ts",
   ]
+
+  data = [ "AccessibilityModel.snapshot.txt" ]
 
   ts_deps = [
     ":bundle",

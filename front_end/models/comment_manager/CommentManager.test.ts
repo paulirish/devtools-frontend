@@ -102,23 +102,6 @@ describe('CommentManager', () => {
     assert.lengthOf(threadChangedEvents, 2);
   });
 
-  it('assigns incrementing index to saved threads', () => {
-    const anchor: CommentManager.CommentManager.CommentAnchorSignature = {
-      vePath: 'Panel: elements > TreeItem: rule',
-      textSignature: 'color: red;',
-    };
-
-    const thread1 = manager.createCommentThread(anchor, 'First comment');
-    assert.strictEqual(thread1.index, 1);
-    thread1.save();
-    assert.strictEqual(thread1.index, 1);
-
-    const thread2 = manager.createCommentThread(anchor, 'Second comment');
-    assert.strictEqual(thread2.index, 2);
-    thread2.save();
-    assert.strictEqual(thread2.index, 2);
-  });
-
   it('creates and retrieves comment threads with TimelineAnchorSignature', () => {
     const anchor: CommentManager.CommentManager.CommentAnchorSignature = {
       vePath: 'Panel: timeline > FlameChart: main',
@@ -186,6 +169,18 @@ describe('CommentManager', () => {
     assert.isEmpty(thread.comments);
     assert.isTrue(thread.isGeneratedComment);
     assert.strictEqual(thread.status, 'DRAFT');
+  });
+
+  it('creates comment thread with empty string text', () => {
+    const anchor: CommentManager.CommentManager.CommentAnchorSignature = {
+      vePath: 'Panel: elements > TreeOutline > TreeItem',
+      textSignature: 'div.header',
+    };
+    const thread = manager.createCommentThread(anchor, '');
+
+    assert.isNotNull(thread);
+    assert.lengthOf(thread.comments, 1);
+    assert.strictEqual(thread.comments[0].text, '');
   });
 
   it('returns undefined for non-existent comment thread ID', () => {
@@ -288,6 +283,25 @@ describe('CommentManager', () => {
     // Resolving thread with agent reply
     manager.resolveCommentThread(thread2.id, 'Agent reply');
     assert.lengthOf(manager.takeComments(), 0);
+  });
+
+  it('dispatches COMMENT_THREADS_CHANGED when takeComments() marks threads as transmitted', () => {
+    const anchor: CommentManager.CommentManager.CommentAnchorSignature = {
+      vePath: 'Panel: elements > TreeItem: rule',
+      textSignature: 'color: red;',
+    };
+    const thread = manager.createCommentThread(anchor, 'Comment', 'DEVELOPER');
+    thread.sendToAgent();
+
+    const changedSpy = sinon.spy();
+    manager.addEventListener(CommentManager.CommentManager.Events.COMMENT_THREADS_CHANGED, changedSpy);
+
+    manager.takeComments();
+    sinon.assert.calledOnce(changedSpy);
+
+    // Nothing new to take, so no further change is dispatched.
+    manager.takeComments();
+    sinon.assert.calledOnce(changedSpy);
   });
 
   it('supports timeline anchor signatures with traceId', () => {

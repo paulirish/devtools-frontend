@@ -73,7 +73,7 @@ interface ViewInput {
   loadThroughTargetSetting: Common.Settings.Setting<boolean>;
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   // clang-format off
@@ -133,7 +133,7 @@ export class DeveloperResourcesView extends UI.Widget.VBox {
     const {loading, resources} = this.#loader.getScopedNumberOfResources();
     const input = {
       onFilterChanged: (e: CustomEvent<string>) => {
-        this.onFilterChanged(e.detail);
+        this.#onFilterChanged(e.detail);
       },
       items: this.#loader.getResourcesLoaded().values(),
       selectedItem: this.#selectedItem,
@@ -145,8 +145,7 @@ export class DeveloperResourcesView extends UI.Widget.VBox {
       numLoading: loading,
       loadThroughTargetSetting: this.#loader.getLoadThroughTargetSetting(),
     };
-    const output = {};
-    this.#view(input, output, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 
   async select(resource: SDK.PageResourceLoader.PageResource): Promise<void> {
@@ -160,7 +159,7 @@ export class DeveloperResourcesView extends UI.Widget.VBox {
     return this.#selectedItem;
   }
 
-  private onFilterChanged(text: string): void {
+  #onFilterChanged(text: string): void {
     const textFilterRegExp = text ? Platform.StringUtilities.createPlainTextSearchRegex(text, 'i') : null;
     if (textFilterRegExp) {
       this.#filters = [

@@ -4,6 +4,7 @@
 
 import * as fs from 'node:fs';
 import * as http from 'node:http';
+import * as path from 'node:path';
 // Sinon fake timers will override globalThis.setTimeout when unit tests run in Node.js.
 // Import setTimeout directly from node:timers to guarantee access to the native timer.
 import {setTimeout as nativeSetTimeout} from 'node:timers';
@@ -70,6 +71,7 @@ export function buildTestProperties(exactTestId: string, coarseName: string, fin
       fileName: string,
     },
   },
+  tags: Array<{key: string, value: string}>,
 } {
   return {
     testId: sanitizedTestId(exactTestId),
@@ -87,6 +89,7 @@ export function buildTestProperties(exactTestId: string, coarseName: string, fin
         fileName: `//${coarseName}${fineName}`,
       },
     },
+    tags: [{key: 'test_name', value: exactTestId}],
   };
 }
 
@@ -238,6 +241,29 @@ export function sendTestResult(results: TestResult): void {
   }
   pendingResults.push(results);
   takeAndSendResults();
+}
+
+/**
+ * Writes a minimal JSON Test Results Format v3 file to `outputPath`.
+ * Required by Chromium's `standard_isolated_script_merge.py` when running
+ * under `//testing/test.gni`'s `script_test` template on Swarming, even when
+ * individual test results are streamed directly to ResultDB via ResultSink.
+ */
+export function writeIsolatedScriptTestOutput(
+    outputPath: string, {numFailures, interrupted = false}: {numFailures: number, interrupted?: boolean}): void {
+  const resolvedPath = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(resolvedPath), {recursive: true});
+  const data = {
+    version: 3,
+    interrupted,
+    path_delimiter: '/',
+    seconds_since_epoch: Date.now() / 1000,
+    num_failures_by_type: {
+      FAIL: numFailures,
+    },
+    tests: {},
+  };
+  fs.writeFileSync(resolvedPath, JSON.stringify(data, null, 2));
 }
 
 // When Node's event loop empties, flush all remaining queued batches sequentially before exiting.

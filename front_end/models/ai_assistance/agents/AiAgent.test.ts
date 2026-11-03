@@ -7,6 +7,7 @@ import {beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Host from '../../../core/host/host.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import {mockAidaClient, MockAidaPayloadLimitError, MockAidaQuotaError} from '../../../testing/AiAssistanceHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
@@ -422,6 +423,77 @@ describe('AiAgent', () => {
         },
       ]);
     });
+
+    it('should yield unknown error and log diagnostic details when model returns an empty text response without tool calls',
+       async () => {
+         const mockStorage: Storage = {
+           length: 0,
+           clear: () => {},
+           getItem: (key: string) => key === 'devToolsAiDebug' ?
+               JSON.stringify({assistance: true, gca: false, codeGenComplete: false}) :
+               null,
+           key: () => null,
+           removeItem: () => {},
+           setItem: () => {},
+         };
+         sinon.stub(Platform.HostRuntime.HOST_RUNTIME, 'getLocalStorage').returns(mockStorage);
+         const consoleLogStub = sinon.stub(console, 'log');
+         const agent = new AiAgentMock({
+           aidaClient: mockAidaClient([[{explanation: '', metadata: {rpcGlobalId: 123}}]]),
+         });
+
+         const responses = await Array.fromAsync(agent.run('query', {selected: mockConversationContext()}));
+
+         assert.deepEqual(responses, [
+           {
+             type: AiAssistance.AiAgent.ResponseType.QUERYING,
+           },
+           {
+             type: AiAssistance.AiAgent.ResponseType.ERROR,
+             error: AiAssistance.AiAgent.ErrorType.UNKNOWN,
+           },
+         ]);
+         sinon.assert.calledWithExactly(consoleLogStub,
+                                        '[AiAgent] Model returned an empty text response without tool calls:',
+                                        {step: 1, rpcId: 123, functionCalls: undefined});
+       });
+
+    it('should yield unknown error and log functionCalls when model returns an empty text response with only suggestFollowUps',
+       async () => {
+         const mockStorage: Storage = {
+           length: 0,
+           clear: () => {},
+           getItem: (key: string) => key === 'devToolsAiDebug' ?
+               JSON.stringify({assistance: true, gca: false, codeGenComplete: false}) :
+               null,
+           key: () => null,
+           removeItem: () => {},
+           setItem: () => {},
+         };
+         sinon.stub(Platform.HostRuntime.HOST_RUNTIME, 'getLocalStorage').returns(mockStorage);
+         const consoleLogStub = sinon.stub(console, 'log');
+         const functionCalls: [Host.AidaClient.AidaFunctionCall] = [
+           {name: 'suggestFollowUps', args: {suggestions: ['Follow-up question']}},
+         ];
+         const agent = new AiAgentMock({
+           aidaClient: mockAidaClient([[{explanation: '', functionCalls}]]),
+         });
+
+         const responses = await Array.fromAsync(agent.run('query', {selected: mockConversationContext()}));
+
+         assert.deepEqual(responses, [
+           {
+             type: AiAssistance.AiAgent.ResponseType.QUERYING,
+           },
+           {
+             type: AiAssistance.AiAgent.ResponseType.ERROR,
+             error: AiAssistance.AiAgent.ErrorType.UNKNOWN,
+           },
+         ]);
+         sinon.assert.calledWithExactly(consoleLogStub,
+                                        '[AiAgent] Model returned an empty text response without tool calls:',
+                                        {step: 1, rpcId: undefined, functionCalls});
+       });
 
     it('should yield quota error when aida throws AidaQuotaError', async () => {
       const agent = new AiAgentMock({
@@ -1433,6 +1505,42 @@ describe('AiAgent', () => {
       const parsed = agent.parseTextResponseForSuggestions('SUGGESTIONS: ["Why does [type=text] fail?", "Ano');
       assert.strictEqual(parsed.answer, '');
       assert.isUndefined(parsed.suggestions);
+    });
+  });
+
+  describe('sanitizeSuggestionsList', () => {
+    it('returns non-empty string items from a valid array', () => {
+      const result = AiAssistance.AiAgent.sanitizeSuggestionsList(['first suggestion', 'second suggestion']);
+      assert.deepEqual(result, ['first suggestion', 'second suggestion']);
+    });
+
+    it('returns undefined for non-array inputs', () => {
+      assert.isUndefined(AiAssistance.AiAgent.sanitizeSuggestionsList(null));
+      assert.isUndefined(AiAssistance.AiAgent.sanitizeSuggestionsList(undefined));
+      assert.isUndefined(AiAssistance.AiAgent.sanitizeSuggestionsList('not an array'));
+      assert.isUndefined(AiAssistance.AiAgent.sanitizeSuggestionsList(123));
+      assert.isUndefined(AiAssistance.AiAgent.sanitizeSuggestionsList({suggestions: ['test']}));
+    });
+
+    it('filters out non-string items and empty strings', () => {
+      const result = AiAssistance.AiAgent.sanitizeSuggestionsList([123, '', 'valid', null, '   ', {}]);
+      assert.deepEqual(result, ['valid']);
+    });
+
+    it('collapses whitespace and newlines into single spaces and trims edges', () => {
+      const result = AiAssistance.AiAgent.sanitizeSuggestionsList(['  line 1\n\nline 2   extra   spaces  ']);
+      assert.deepEqual(result, ['line 1 line 2 extra spaces']);
+    });
+
+    it('truncates items longer than 200 characters to 200 characters', () => {
+      const longItem = 'a'.repeat(250);
+      const result = AiAssistance.AiAgent.sanitizeSuggestionsList([longItem]);
+      assert.deepEqual(result, ['a'.repeat(200)]);
+    });
+
+    it('returns undefined when all items are filtered out', () => {
+      const result = AiAssistance.AiAgent.sanitizeSuggestionsList(['', '   ', '\n\t']);
+      assert.isUndefined(result);
     });
   });
 });

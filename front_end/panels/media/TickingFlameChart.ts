@@ -1,15 +1,45 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
-
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import {html, render, type TemplateResult} from '../../ui/lit/lit.js';
 
 import {Bounds, formatMillisecondsToSeconds} from './TickingFlameChartHelpers.js';
+
+const UIStrings = {
+  /**
+   * @description Name of an event shown in the hover popover of the media
+   * panel timeline.
+   * @example {Play} PH1
+   */
+  name: 'Name: {PH1}',
+  /**
+   * @description Duration of an event shown in the hover popover of the media
+   * panel timeline, given as a start time and an end time in seconds.
+   * @example {1.00s} PH1
+   * @example {2.50s} PH2
+   */
+  duration: 'Duration: {PH1} - {PH2}',
+  /**
+   * @description Duration of an event that is still ongoing, shown in the
+   * hover popover of the media panel timeline.
+   * @example {1.00s} PH1
+   */
+  durationLive: 'Duration: {PH1} - LIVE!',
+  /**
+   * @description Time of an instantaneous event shown in the hover popover of
+   * the media panel timeline.
+   * @example {1.00s} PH1
+   */
+  time: 'Time: {PH1}',
+} as const;
+const str_ = i18n.i18n.registerUIStrings('panels/media/TickingFlameChart.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const defaultFont = '11px ' + Host.Platform.fontFamily();
 function getGroupDefaultTextColor(): string {
@@ -57,6 +87,30 @@ export interface EventProperties {
   color?: string;
 }
 
+export interface EventPopoverInput {
+  title: string;
+  startTimeReadable: string;
+  live: boolean;
+  durationReadable?: string;
+}
+
+/**
+ * Renders the hover popover contents for an event on the timeline.
+ */
+export function renderEventPopover(input: EventPopoverInput): TemplateResult {
+  // clang-format off
+  return html`
+    <span>${i18nString(UIStrings.name, {PH1: input.title})}</span>
+    <br>
+    ${input.live ?
+      html`<span>${i18nString(UIStrings.durationLive, {PH1: input.startTimeReadable})}</span>` :
+      input.durationReadable !== undefined ?
+        html`<span>${i18nString(UIStrings.duration, {PH1: input.startTimeReadable, PH2: input.durationReadable})}</span>` :
+        html`<span>${i18nString(UIStrings.time, {PH1: input.startTimeReadable})}</span>`}
+  `;
+  // clang-format on
+}
+
 /**
  * Wrapper class for each event displayed on the timeline.
  */
@@ -71,10 +125,9 @@ export class Event {
   #color: string;
   #fontColor: string;
 
-  constructor(
-      timelineData: PerfUI.FlameChart.FlameChartTimelineData, eventHandlers: EventHandlers,
-      eventProperties: EventProperties|
-      undefined = {color: undefined, duration: undefined, level: 0, name: '', startTime: 0}) {
+  constructor(timelineData: PerfUI.FlameChart.FlameChartTimelineData, eventHandlers: EventHandlers,
+              eventProperties: EventProperties|
+              undefined = {color: undefined, duration: undefined, level: 0, name: '', startTime: 0}) {
     // These allow the event to privately change it's own data in the timeline.
     this.timelineData = timelineData;
     this.setLive = eventHandlers.setLive;
@@ -103,21 +156,19 @@ export class Event {
   }
 
   /**
-   * Render hovertext into the |htmlElement|
+   * The data shown in the hover popover for this event.
    */
-  decorate(htmlElement: HTMLElement): void {
-    htmlElement.createChild('span').textContent = `Name: ${this.title}`;
-    htmlElement.createChild('br');
-
+  popoverInput(): EventPopoverInput {
     const startTimeReadable = formatMillisecondsToSeconds(this.startTime, 2);
-    if (this.#live) {
-      htmlElement.createChild('span').textContent = `Duration: ${startTimeReadable} - LIVE!`;
-    } else if (!isNaN(this.duration)) {
-      const durationReadable = formatMillisecondsToSeconds(this.duration + this.startTime, 2);
-      htmlElement.createChild('span').textContent = `Duration: ${startTimeReadable} - ${durationReadable}`;
-    } else {
-      htmlElement.createChild('span').textContent = `Time: ${startTimeReadable}`;
-    }
+    const durationReadable = !this.#live && !isNaN(this.duration) ?
+        formatMillisecondsToSeconds(this.duration + this.startTime, 2) :
+        undefined;
+    return {
+      title: this.title,
+      startTimeReadable,
+      live: this.#live,
+      durationReadable,
+    };
   }
 
   /**
@@ -174,6 +225,61 @@ export class Event {
   }
 }
 
+class FlameChartWidget extends PerfUI.FlameChart.FlameChart {
+  #onScroll?: (scrollTickCount: number, scrollPositionRatio: number) => void;
+
+  constructor(element?: HTMLElement) {
+    super(new TickingFlameChartDataProvider(new Bounds(0, 1000, 30000, 1000), () => {}),
+          new TickingFlameChartDelegate(), {}, element);
+    this.disableRangeSelection();
+    this.bindCanvasEvent('wheel', e => {
+      const wheelEvent = e as WheelEvent;
+      // TODO: is this a good divisor? does it account for high precision scroll wheels?
+      // low precision scroll wheels?
+      const scrollTickCount = Math.round(wheelEvent.deltaY / 50);
+      const scrollPositionRatio = wheelEvent.offsetX / (wheelEvent.srcElement as HTMLElement).clientWidth;
+      this.#onScroll?.(scrollTickCount, scrollPositionRatio);
+    });
+  }
+
+  set provider(provider: PerfUI.FlameChart.FlameChartDataProvider) {
+    this.setDataProvider(provider);
+  }
+
+  set chartDelegate(delegate: PerfUI.FlameChart.FlameChartDelegate) {
+    this.setDelegate(delegate);
+  }
+
+  set onScroll(onScroll: (scrollTickCount: number, scrollPositionRatio: number) => void) {
+    this.#onScroll = onScroll;
+  }
+}
+
+export interface TickingFlameChartViewInput {
+  dataProvider: PerfUI.FlameChart.FlameChartDataProvider;
+  delegate: PerfUI.FlameChart.FlameChartDelegate;
+  windowTimes: {low: number, high: number};
+  onScroll: (scrollTickCount: number, scrollPositionRatio: number) => void;
+}
+
+export type TickingFlameChartView = (input: TickingFlameChartViewInput, output: undefined, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: TickingFlameChartView = (input, _output, target) => {
+  // clang-format off
+  render(html`
+    <devtools-widget
+      class="flex-auto vbox"
+      ${UI.Widget.widget(FlameChartWidget, {
+        provider: input.dataProvider,
+        chartDelegate: input.delegate,
+        windowTimes: {min: input.windowTimes.low, max: input.windowTimes.high, animate: true},
+        onScroll: input.onScroll,
+      })}
+    ></devtools-widget>
+  `, target);
+  // clang-format on
+};
+
 export class TickingFlameChart extends UI.Widget.VBox {
   private intervalTimer: number;
   private lastTimestamp: number;
@@ -183,12 +289,14 @@ export class TickingFlameChart extends UI.Widget.VBox {
   private readonly bounds: Bounds;
   private readonly dataProvider: TickingFlameChartDataProvider;
   private readonly delegate: TickingFlameChartDelegate;
-  private readonly chartGroupExpansionSetting: Common.Settings.Setting<Object>;
-  private readonly chart: PerfUI.FlameChart.FlameChart;
   private stoppedPermanently?: boolean;
+  readonly #view: TickingFlameChartView;
+  readonly #boundOnScroll = this.onScroll.bind(this);
 
-  constructor() {
-    super();
+  constructor(elementOrOptions?: HTMLElement|UI.Widget.WidgetOptions, view: TickingFlameChartView = DEFAULT_VIEW) {
+    // @ts-expect-error
+    super(elementOrOptions);
+    this.#view = view;
 
     // set to update once per second _while the tab is active_
     this.intervalTimer = 0;
@@ -207,26 +315,17 @@ export class TickingFlameChart extends UI.Widget.VBox {
     // Delegate doesn't do much for now.
     this.delegate = new TickingFlameChartDelegate();
 
-    // Chart settings.
-    this.chartGroupExpansionSetting =
-        Common.Settings.Settings.instance().createSetting('media-flame-chart-group-expansion', {});
+    this.performUpdate();
+  }
 
-    // Create the chart.
-    this.chart =
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // @ts-expect-error
-        new PerfUI.FlameChart.FlameChart(this.dataProvider, this.delegate, this.chartGroupExpansionSetting);
-
-    // TODO: needs to have support in the delegate for supporting this.
-    this.chart.disableRangeSelection();
-
-    // Scrolling should change the current bounds, and repaint the chart.
-    this.chart.bindCanvasEvent('wheel', e => {
-      this.onScroll(e as WheelEvent);
-    });
-
-    // Add the chart.
-    this.chart.show(this.contentElement);
+  override performUpdate(): void {
+    this.#view({
+      dataProvider: this.dataProvider,
+      delegate: this.delegate,
+      windowTimes: {low: this.bounds.low, high: this.bounds.high},
+      onScroll: this.#boundOnScroll,
+    },
+               undefined, this.contentElement);
   }
 
   /**
@@ -268,11 +367,7 @@ export class TickingFlameChart extends UI.Widget.VBox {
     }
   }
 
-  private onScroll(e: WheelEvent): void {
-    // TODO: is this a good divisor? does it account for high precision scroll wheels?
-    // low precision scroll wheels?
-    const scrollTickCount = Math.round(e.deltaY / 50);
-    const scrollPositionRatio = e.offsetX / (e.srcElement as HTMLElement).clientWidth;
+  private onScroll(scrollTickCount: number, scrollPositionRatio: number): void {
     if (scrollTickCount > 0) {
       this.bounds.zoomOut(scrollTickCount, scrollPositionRatio);
     } else {
@@ -336,8 +431,7 @@ export class TickingFlameChart extends UI.Widget.VBox {
       this.bounds.addMax(duration);
     }
     this.dataProvider.updateMaxTime(this.bounds);
-    this.chart.setWindowTimes(this.bounds.low, this.bounds.high, true);
-    this.chart.scheduleUpdate();
+    this.performUpdate();
   }
 }
 
@@ -418,13 +512,12 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
       throw new Error(`level ${properties['level']} is above the maximum allowed of ${this.maxLevel}`);
     }
 
-    const event = new Event(
-        this.#timelineData, {
-          setLive: this.setLive.bind(this),
-          setComplete: this.setComplete.bind(this),
-          updateMaxTime: this.updateMaxTimeHandle,
-        },
-        properties);
+    const event = new Event(this.#timelineData, {
+      setLive: this.setLive.bind(this),
+      setComplete: this.setComplete.bind(this),
+      updateMaxTime: this.updateMaxTimeHandle,
+    },
+                            properties);
 
     this.eventMap.set(event.id, event);
     return event;
@@ -482,9 +575,8 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
     return defaultFont;
   }
 
-  decorateEntry(
-      _index: number, _context: CanvasRenderingContext2D, _text: string|null, _barX: number, _barY: number,
-      _barWidth: number, _barHeight: number, _unclippedBarX: number, _timeToPixelRatio: number): boolean {
+  decorateEntry(_index: number, _context: CanvasRenderingContext2D, _text: string|null, _barX: number, _barY: number,
+                _barWidth: number, _barHeight: number, _unclippedBarX: number, _timeToPixelRatio: number): boolean {
     return false;
   }
 
@@ -492,10 +584,9 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
     return false;
   }
 
-  preparePopoverElement(index: number): Element|null {
-    const element = document.createElement('div');
-    (this.eventMap.get(index) as Event).decorate(element);
-    return element;
+  preparePopoverElement(index: number): TemplateResult|null {
+    const event = this.eventMap.get(index);
+    return event ? renderEventPopover(event.popoverInput()) : null;
   }
 
   formatValue(value: number, _precision?: number): string {

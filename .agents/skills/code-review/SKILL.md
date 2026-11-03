@@ -26,31 +26,82 @@ Use it for self-review before upload and for reviewing other people's CLs.
   - Read the CL description first. Then check that the diff does what the
     description says, and nothing else.
 
-## 2. Consult the specialized skills
+## 2. Consult the specialized skills and rules
 
-Load the skill that matches what the diff touches, and apply its rules:
+Load the skill or `.agents/rules/` files that match what the diff touches, and apply their rules:
 
-| If the diff touches… | Use skill |
+| If the diff touches… | Load skill or rules |
 | :--- | :--- |
 | Any `import` statement, or a new cross-module dependency | `devtools-imports` |
 | `UI.Widget`, lit-html views, components, CSS | `ui-widgets` |
-| Reviewing UI and widgets (`front_end/(panels|ui)/**/*.{ts,css}`) | `review-ui-widgets` |
+| Reviewing UI and widgets (`front_end/(panels|ui)/**/*.{ts,css}`) | `.agents/rules/ui-and-widgets/*.md` |
 | Migration of legacy imperative DOM to widgets or Lit | `ui-eng-vision-orchestrator` (and its sub-skills) |
 | New or changed tests: choosing unit, API, or E2E | `devtools-testing-guidance` |
-| Reviewing tests (`*.test.ts`, `test/**`, `front_end/testing/**`) | `review-tests` |
+| Reviewing tests (`*.test.ts`, `test/**`, `front_end/testing/**`) | `.agents/rules/tests/*.md` |
 | Tests that use `describeWithEnvironment` or `describeWithMockConnection`, or foundation modules | `foundation-test-migration` |
 | Ported Chromium web tests (`web_tests/http/tests/devtools`) | `migrate-chromium-test` |
 | Flaky or disabled tests, or `it.skip` / `it.skipOnPlatforms` | `fix-tests` |
-| `UIStrings` / user-facing text | `devtools-ux-writing-refactor` |
 | Rendering user-controlled strings (URLs, names, console text) | `devtools-unicode-escaping` |
 | `front_end/models/*`, `BUILD.gn`, `devtools_grd_files.gni`, entrypoints | `devtools-model-management` |
-| Reviewing foundation, models, and build configs (`front_end/(core|models|entrypoints|generated)/**`, `BUILD.gn`, `*.gni`) | `review-models-core` |
+| Reviewing foundation, models, and build configs (`front_end/(core|models|entrypoints|generated)/**`, `BUILD.gn`, `*.gni`) | `.agents/rules/models-and-core/*.md` |
 | Merging modules or consolidating `BUILD.gn` | `merging-devtools-module` |
 | `Settings` registrations and descriptors | `devtools-setting-migration` |
 | Stack traces, source maps, `DebuggerWorkspaceBinding` | `devtools-source-maps` |
 | Building, running tests, or lint | `devtools-verification` |
 
-## 3. Test correctness (the most common review feedback)
+## 3. Boundaries vs. Interiors
+
+- **Enforce module boundaries strictly:** Prioritize boundary invariants—module
+  entrypoints (`foo.ts`, `foo-meta.ts`), GN `visibility` and dependency edges,
+  strict `core -> models -> ui -> panels` layering, `SettingDescriptor`
+  placement in the lowest layer where used, public widget/component APIs
+  (`DEFAULT_VIEW` input/output contracts), CDP protocol contracts, and test
+  validity.
+- **Avoid uncodified interior style nits:** Do not flag subjective stylistic
+  preferences inside module interiors unless backed by a lint rule or an
+  explicit rule under `.agents/rules/`.
+
+## 4. Shared False-Positive Guards
+
+Check these guards before reporting any finding (including general review
+findings):
+
+- **Lit `@SomeEvent=${handler}` bindings on `<devtools-widget>` (or a
+  widget's `element`):**
+  - **Do not flag** `@SomeEvent=${handler}` as "never fires" or "lowercased
+    by the HTML parser" when the child widget class is built with
+    `Common.ObjectWrapper.eventMixin(...)` on top of `UI.Widget.Widget` /
+    `UI.Widget.VBox` / `UI.Widget.HBox`:
+    1. `eventMixin.dispatchEventToListeners` (`front_end/core/common/Object.ts`)
+       also calls `this.dispatchDOMEvent(new CustomEvent(eventType, {detail: eventData[0]}))`,
+       and `Widget.dispatchDOMEvent` dispatches it on `widget.element` (which
+       is the `<devtools-widget>` host element when instantiated with `widget()`).
+    2. Lit preserves the exact case of `@`, `.`, and `?` binding names by
+       reading the original template strings (`attrNames[]` in
+       `front_end/third_party/lit/lib/lit.js`), not the lowercased attribute
+       names from the HTML parser. So `@PaintProfilerRequested` registers
+       `addEventListener('PaintProfilerRequested', ...)`, and `event.detail`
+       carries the first payload argument.
+  - **Do flag** it when:
+    1. The event source extends `Common.ObjectWrapper.ObjectWrapper` directly
+       or holds one by composition instead of `eventMixin` on `UI.Widget` (it
+       has no `dispatchDOMEvent`, so no DOM `CustomEvent` is fired).
+    2. The listener is attached on an ancestor element above the widget's
+       host element (`new CustomEvent(...)` in `Object.ts` does not set
+       `bubbles: true`).
+    3. The `@SomeEvent` handler reads `(event as any).data` instead of
+       `(event as CustomEvent<T>).detail`.
+- **Multi-line `html` template whitespace (`front_end/ui/lit/strip-whitespace.ts`):**
+  - **Do not flag** newlines and indentation spaces between expressions and
+    inline elements in multi-line `html` templates from `ui/lit/lit.js`.
+    DevTools' custom `html` tag strips `\n\s*` outside `<...>` tags at
+    runtime.
+- **Generated `.css.js` imports in `<style>${styles}</style>`:**
+  - **Do not flag** interpolating `*.css.js` default imports into `<style>`
+    in Lit templates. Generated `.css.js` files export plain CSS strings, not
+    `CSSStyleSheet` objects.
+
+## 5. Test correctness (the most common review feedback)
 
 - **Tautological tests:** A test must exercise real production code. If a
   mock does the thing the test asserts (for example, a mocked `DOM.undo` that
@@ -79,7 +130,7 @@ Load the skill that matches what the diff touches, and apply its rules:
 - **Fail fast:** Throw or assert when a required value is missing. Don't let
   the test time out later.
 
-## 4. Test hygiene and cleanup
+## 6. Test hygiene and cleanup
 
 - Pair every `beforeEach` singleton creation with a cleanup in `afterEach`
   (for example, `CSSWorkspaceBinding.removeInstance()` or
@@ -93,7 +144,7 @@ Load the skill that matches what the diff touches, and apply its rules:
 - Remove guards that were copied from helpers for no reason (for example,
   `if (!stub.called) …` in a test that stubs the method only once).
 
-## 5. Code clarity
+## 7. Code clarity
 
 - Don't take detours to reach a value. If a module is imported, call
   `TextUtils.TextRange.TextRange.fromObject(...)` directly instead of going
@@ -106,7 +157,7 @@ Load the skill that matches what the diff touches, and apply its rules:
   without being removed, and async work that continues after a widget is
   detached.
 
-## 6. CL hygiene
+## 8. CL hygiene
 
 - The description explains *why*, including external dependencies (for
   example, "V8 will stop emitting X; this must land first").
@@ -117,7 +168,7 @@ Load the skill that matches what the diff touches, and apply its rules:
 - Disabled tests reference a bug.
 - Presubmit, lint, and format pass. See `devtools-verification`.
 
-## 7. Writing review comments
+## 9. Writing review comments
 
 - Be specific: cite file and line, explain the concrete failure mode (such as
   a leak, a hang, or "passes vacuously"), and suggest a fix. Include a code

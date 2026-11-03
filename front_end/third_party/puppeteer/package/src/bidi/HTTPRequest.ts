@@ -20,7 +20,7 @@ import {
   InterceptResolutionAction,
 } from '../api/HTTPRequest.js';
 import {PageEvent} from '../api/Page.js';
-import type {Logger} from '../common/Debug.js';
+import {DEBUG_PREFIXES, type Logger} from '../common/Debug.js';
 import {UnsupportedOperation} from '../common/Errors.js';
 import {stringToBase64} from '../util/encoding.js';
 
@@ -174,6 +174,15 @@ export class BidiHTTPRequest extends HTTPRequest {
     return await this.#request.fetchPostData();
   }
 
+  override async content(): Promise<Uint8Array | undefined> {
+    try {
+      return await this.#request.getRequestContent();
+    } catch (err) {
+      this.#logger?.(DEBUG_PREFIXES.error)?.(err);
+      return;
+    }
+  }
+
   override headers(): Record<string, string> {
     // Callers should not be allowed to mutate internal structure.
     const headers: Record<string, string> = {};
@@ -315,18 +324,29 @@ export class BidiHTTPRequest extends HTTPRequest {
     const credentials = this.#frame.page()._credentials;
     if (credentials && !this.#authenticationHandled) {
       this.#authenticationHandled = true;
-      void this.#request.continueWithAuth({
-        action: 'provideCredentials',
-        credentials: {
-          type: 'password',
-          username: credentials.username,
-          password: credentials.password,
-        },
-      });
+      await this.#request
+        .continueWithAuth({
+          action: 'provideCredentials',
+          credentials: {
+            type: 'password',
+            username: credentials.username,
+            password: credentials.password,
+          },
+        })
+        .catch(error => {
+          // The request may have been canceled or the page closed before the
+          // auth challenge could be answered. Tolerate these errors instead of
+          // rejecting, which would surface as an unhandled rejection.
+          this.#logger(DEBUG_PREFIXES.error)?.(error);
+        });
     } else {
-      void this.#request.continueWithAuth({
-        action: 'cancel',
-      });
+      await this.#request
+        .continueWithAuth({
+          action: 'cancel',
+        })
+        .catch(error => {
+          this.#logger(DEBUG_PREFIXES.error)?.(error);
+        });
     }
   };
 

@@ -16,6 +16,7 @@ import * as AIAssistanceModel from '../../../models/ai_assistance/ai_assistance.
 import type * as Workspace from '../../../models/workspace/workspace.js';
 import {
   assertScreenshot,
+  doubleRaf,
   querySelectorErrorOnMissing,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
@@ -34,6 +35,7 @@ import {
   type ViewFunctionStub,
 } from '../../../testing/ViewFunctionHelpers.js';
 import * as Snackbars from '../../../ui/components/snackbars/snackbars.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lighthouse from '../../lighthouse/lighthouse.js';
 import * as AiAssistance from '../ai_assistance.js';
 
@@ -572,7 +574,7 @@ describeWithEnvironment('ChatMessage', () => {
 
     sinon.assert.calledOnceWithExactly(
         openInNewTabStub,
-        urlString`https://support.google.com/legal/troubleshooter/1114905?hl=en#ts=1115658%2C13380504`);
+        urlString`https://support.google.com/legal/troubleshooter/1114905?hl=en#ts=1115658%2C13380504`, undefined);
   });
 
   it('should show actions when it is not the last message and it is loading', async () => {
@@ -646,7 +648,7 @@ describeWithEnvironment('ChatMessage', () => {
           step: {
             state: {type: 'completed'},
             title: 'Step 1',
-            code: 'console.log("test")',
+            action: 'console.log("test")',
           },
         },
       ],
@@ -749,7 +751,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'in_progress'},
               title: 'Investigating XYZ',
-              code: 'console.log("test")',
+              action: 'console.log("test")',
             },
           },
         ],
@@ -780,7 +782,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'in_progress'},
               title: 'Investigating XYZ',
-              code: 'console.log("test")',
+              action: 'console.log("test")',
             },
           },
         ],
@@ -854,7 +856,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'in_progress'},
               title: 'Investigating XYZ',
-              code: 'console.log("test")',
+              action: 'console.log("test")',
             },
           },
         ],
@@ -901,7 +903,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'completed'},
               title: 'Investigating XYZ',
-              code: 'console.log("test")',
+              action: 'console.log("test")',
             },
           },
         ],
@@ -932,7 +934,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'completed'},
               title: 'Investigating XYZ',
-              code: 'console.log("test")',
+              action: 'console.log("test")',
               // Don't need a proper widget for this test
               widgets: [{} as AIAssistanceModel.AiAgent.ComputedStyleAiWidget],
             },
@@ -999,7 +1001,7 @@ describeWithEnvironment('ChatMessage', () => {
                 },
               },
               title: 'Side Effect Step',
-              code: 'doSomethingDangerous()',
+              action: 'doSomethingDangerous()',
             },
           },
         ],
@@ -1056,7 +1058,7 @@ describeWithEnvironment('ChatMessage', () => {
                 },
               },
               title: 'Side Effect Step',
-              code: 'doSomethingDangerous()',
+              action: 'doSomethingDangerous()',
             },
           },
         ],
@@ -1118,7 +1120,7 @@ describeWithEnvironment('ChatMessage', () => {
                 },
               },
               title: 'Side Effect Step',
-              code: 'doSomethingDangerous()',
+              action: 'doSomethingDangerous()',
             },
           },
         ],
@@ -1153,12 +1155,12 @@ describeWithEnvironment('ChatMessage', () => {
       const stepA: AiAssistance.ChatMessage.Step = {
         state: {type: 'needs_approval', sideEffectDialog: {description: null, onAnswer: () => {}}},
         title: 'Setting the color',
-        code: 'a()',
+        action: 'a()',
       };
       const stepB: AiAssistance.ChatMessage.Step = {
         state: {type: 'needs_approval', sideEffectDialog: {description: null, onAnswer: () => {}}},
         title: 'Setting the background color',
-        code: 'b()',
+        action: 'b()',
       };
       const walkthrough = {...DEFAULT_WALKTHROUGH, isInlined: true, isExpanded: false};
       const target = renderView({
@@ -1207,7 +1209,7 @@ describeWithEnvironment('ChatMessage', () => {
                 },
               },
               title: 'Side Effect Step',
-              code: 'doSomethingDangerous()',
+              action: 'doSomethingDangerous()',
             },
           },
         ],
@@ -1239,7 +1241,7 @@ describeWithEnvironment('ChatMessage', () => {
             step: {
               state: {type: 'canceled'},
               title: 'Side Effect Step',
-              code: 'doSomethingDangerous()',
+              action: 'doSomethingDangerous()',
             },
           },
         ],
@@ -1261,9 +1263,7 @@ describeWithEnvironment('ChatMessage', () => {
     });
 
     describe('permission prompt', () => {
-      function createPermissionPromptMessage(
-          dialog: Partial<AiAssistance.ChatMessage.ConfirmSideEffectDialog> = {},
-          ): AiAssistance.ChatMessage.ModelChatMessage {
+      function createPermissionPromptMessage(): AiAssistance.ChatMessage.ModelChatMessage {
         return {
           entity: AiAssistance.ChatMessage.ChatMessageEntity.MODEL,
           parts: [
@@ -1277,21 +1277,16 @@ describeWithEnvironment('ChatMessage', () => {
                     permissionTitle: 'Allow reading cookie values?',
                     permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE,
                     onAnswer: () => {},
-                    ...dialog,
                   },
                 },
                 title: 'Reading cookie values and metadata',
-                code: 'getCookieValues({cookieNames: ["session"]})',
+                action: 'getCookieValues({cookieNames: ["session"]})',
               },
             },
           ],
           rpcId: 99,
           id: '1',
         };
-      }
-
-      function getButtons(target: HTMLElement): HTMLElement[] {
-        return Array.from(target.querySelectorAll<HTMLElement>('.permission-prompt devtools-button'));
       }
 
       beforeEach(() => {
@@ -1306,84 +1301,11 @@ describeWithEnvironment('ChatMessage', () => {
         assert.isNotNull(target.querySelector('.side-effect-confirmation'));
       });
 
-      it('renders the title, description and code', () => {
+      it('renders neither UI when the flag is on because ChatView renders the prompt', () => {
         const target = renderView({message: createPermissionPromptMessage()});
+
+        assert.isNull(target.querySelector('.permission-prompt'));
         assert.isNull(target.querySelector('.side-effect-confirmation'));
-
-        const prompt = querySelectorErrorOnMissing(target, '.permission-prompt');
-        assert.strictEqual(prompt.querySelector('.permission-prompt-title')?.textContent,
-                           'Allow reading cookie values?');
-        assert.include(prompt.querySelector('.permission-prompt-description')?.textContent,
-                       'The AI wants to read the cookie "session"');
-
-        const codeBlock = querySelectorErrorOnMissing<HTMLElement&{code: string}>(prompt, 'devtools-code-block');
-        assert.strictEqual(codeBlock.code, 'getCookieValues({cookieNames: ["session"]})');
-        assert.strictEqual(codeBlock.shadowRoot?.querySelector('.heading-text')?.textContent, 'Code to execute');
-        assert.include(codeBlock.shadowRoot?.querySelector('.notice')?.textContent, 'Use code snippets with caution');
-      });
-
-      it('falls back to a generic title when the tool has none', () => {
-        const target = renderView({message: createPermissionPromptMessage({permissionTitle: undefined})});
-        assert.strictEqual(target.querySelector('.permission-prompt-title')?.textContent, 'Allow this action?');
-      });
-
-      it('offers Skip and Allow once for ALLOW_ONCE', () => {
-        const onAnswer = sinon.stub();
-        const target = renderView({message: createPermissionPromptMessage({onAnswer})});
-
-        const buttons = getButtons(target);
-        assert.deepEqual(buttons.map(b => b.textContent?.trim()), ['Skip', 'Yes, allow this time']);
-
-        buttons[0].click();
-        buttons[1].click();
-        assert.deepEqual(onAnswer.args.map(([decision]) => decision), [
-          AIAssistanceModel.Tool.PermissionDecision.REJECT,
-          AIAssistanceModel.Tool.PermissionDecision.ALLOW_ONCE,
-        ]);
-      });
-
-      it('offers Skip, Always allow and Allow once for ALLOW_ONCE_OR_ALWAYS', () => {
-        const onAnswer = sinon.stub();
-        const target = renderView({
-          message: createPermissionPromptMessage({
-            onAnswer,
-            permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE_OR_ALWAYS,
-          }),
-        });
-
-        const buttons = getButtons(target);
-        assert.deepEqual(buttons.map(b => b.textContent?.trim()),
-                         ['Skip', 'Yes, always allow', 'Yes, allow this time']);
-
-        buttons[1].click();
-        sinon.assert.calledOnceWithExactly(onAnswer, AIAssistanceModel.Tool.PermissionDecision.ALLOW_ALWAYS);
-      });
-
-      it('renders the data disclaimer', () => {
-        const target = renderView({message: createPermissionPromptMessage()});
-
-        const footer = querySelectorErrorOnMissing(target, '.permission-prompt-footer');
-        assert.strictEqual(footer.textContent?.trim(),
-                           'Relevant data is sent to Google. Change permissions in settings at any time.');
-      });
-
-      it('renders the ALLOW_ONCE prompt', async () => {
-        const target = document.createElement('div');
-        renderElementIntoDOM(target, {includeCommonStyles: true});
-        renderView({message: createPermissionPromptMessage()}, target);
-        await assertScreenshot('ai_assistance/permission_prompt_allow_once.png');
-      });
-
-      it('renders the ALLOW_ONCE_OR_ALWAYS prompt', async () => {
-        const target = document.createElement('div');
-        renderElementIntoDOM(target, {includeCommonStyles: true});
-        renderView({
-          message: createPermissionPromptMessage({
-            permissionPrompt: AIAssistanceModel.Tool.PermissionPrompt.ALLOW_ONCE_OR_ALWAYS,
-          }),
-        },
-                   target);
-        await assertScreenshot('ai_assistance/permission_prompt_allow_once_or_always.png');
       });
     });
 
@@ -2045,7 +1967,8 @@ describeWithEnvironment('ChatMessage', () => {
         id: '1',
       };
 
-      const targetElement = renderView({message});
+      const targetElement =
+          renderView({message}, renderElementIntoDOM(new UI.Widget.Widget()).contentElement as HTMLDivElement);
       const widgetHeader = await waitFor('.widget-header', targetElement);
       assert.isNotNull(widgetHeader);
       assert.strictEqual(
@@ -2054,10 +1977,17 @@ describeWithEnvironment('ChatMessage', () => {
       );
 
       const devtoolsWidget = await waitFor(
-          'devtools-performance-agent-network-track',
-          targetElement,
-      );
+                                 'devtools-widget.network-track-widget',
+                                 targetElement,
+                                 ) as HTMLElement;
       assert.isNotNull(devtoolsWidget);
+      await doubleRaf();
+      const container = querySelectorErrorOnMissing(devtoolsWidget, 'devtools-widget.container');
+      const canvas = container.shadowRoot?.querySelector('canvas');
+      assert.exists(canvas);
+      assert.isAtLeast(container.getBoundingClientRect().height, 150);
+      assert.isAtLeast(canvas.clientHeight, 148);
+      assert.isAbove(canvas.clientWidth, 0);
     });
 
     it('renders quota error message', async () => {

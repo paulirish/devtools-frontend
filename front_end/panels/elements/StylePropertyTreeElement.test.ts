@@ -20,10 +20,12 @@ import {dispatchClickEvent, renderElementIntoDOM} from '../../testing/DOMHelpers
 import {createTarget, describeWithEnvironment, setupActionRegistry} from '../../testing/EnvironmentHelpers.js';
 import {expectCalled, spyCall} from '../../testing/ExpectStubCall.js';
 import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
+import {someMutations} from '../../testing/MutationHelpers.js';
 import {
   getMatchedStyles,
   getMatchedStylesWithBlankRule,
   getMatchedStylesWithStylesheet,
+  ruleMatch,
 } from '../../testing/StyleHelpers.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Tooltips from '../../ui/components/tooltips/tooltips.js';
@@ -31,13 +33,12 @@ import {Icon} from '../../ui/kit/kit.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as LegacyUI from '../../ui/legacy/legacy.js';
-import * as Lit from '../../ui/lit/lit.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 
 import * as ElementsComponents from './components/components.js';
 import * as Elements from './elements.js';
 
-const {html} = Lit;
 describeWithEnvironment('StylePropertyTreeElement', () => {
   let stylesSidebarPane: Elements.StylesSidebarPane.StylesSidebarPane;
   let computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel;
@@ -565,6 +566,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       treeElement.updateTitle();
       const {valueElement} = treeElement;
       assert.exists(valueElement);
+      renderElementIntoDOM(valueElement, {allowMultipleChildren: true});
       const check = (message: string, expected: string): void => {
         assert.strictEqual(treeElement.renderedPropertyText(), expected, message);
       };
@@ -717,7 +719,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       // The shadow editor renders the colors of its shadow anew with every change, which discards edits made to them
       // before. In the app, opening the color picker closes the shadow editor, so the colors are only edited once the
       // shadow editor is done with the shadow here as well. For that reason, the swatches are looked up late.
-      const angle = first.nextElementSibling?.querySelector('devtools-css-angle');
+      const angle = first.parentElement?.querySelector('devtools-css-angle');
       assert.exists(angle);
       parts[0] = 'inset 12px 13px 14px 15px hsl(200deg, 50%, 25%)';
       edit('changing the hue', text(),
@@ -730,7 +732,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
            () => typeIntoShadowEditor(secondEditor, 'blur', '3px'));
       commit(text());
 
-      const color = second.nextElementSibling?.querySelector('devtools-color-swatch');
+      const color = second.parentElement?.querySelector('devtools-color-swatch');
       assert.exists(color);
       parts[1] = '1px 2px 3px #ff8000';
       edit('picking a color for the second shadow', text(), () => pickColor(color, '#ff8000'));
@@ -852,6 +854,24 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       await applyStyleText.lastCall.returnValue;
 
       commit('position-area: bottom center');
+    });
+
+    it('initializes the position-area editor with the computed value when the authored value uses var()', async () => {
+      mockVariableMap['--area'] = 'top left';
+      const stylePropertyTreeElement = getTreeElement('position-area', 'var(--area)');
+      stylePropertyTreeElement.updateTitle();
+      assert.exists(stylePropertyTreeElement.valueElement);
+
+      const button = stylePropertyTreeElement.valueElement.querySelector<HTMLElement>('.position-area-swatch-icon');
+      assert.exists(button);
+      button.click();
+
+      sinon.assert.calledOnce(showPopover);
+      const editor = showPopover.firstCall.args[0];
+      assert.instanceOf(editor, InlineEditor.PositionAreaEditor.PositionAreaEditor);
+      assert.exists(editor.area);
+      assert.strictEqual(InlineEditor.PositionAreaEditor.stringifyPositionArea(editor.area), 'top left');
+      hideLastPopover();
     });
   });
 
@@ -1014,8 +1034,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.treeOutline = new LegacyUI.TreeOutline.TreeOutline();
       stylePropertyTreeElement.updateTitle();
 
-      const popoverContents =
-          stylePropertyTreeElement.listItemElement.querySelector('devtools-tooltip > devtools-css-variable-value-view');
+      const popoverElement =
+          stylePropertyTreeElement.listItemElement.querySelector('devtools-tooltip > .css-variable-value-view');
+      assert.exists(popoverElement);
+      const popoverContents = LegacyUI.Widget.Widget.get(popoverElement);
       assert.instanceOf(popoverContents, ElementsComponents.CSSVariableValueView.CSSVariableValueView);
       const {details} = popoverContents;
       assert.exists(details);
@@ -1428,7 +1450,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
       assert.deepEqual(evaluations.flat().map(line => {
         const div = document.createElement('div');
-        Lit.render(line, div);
+        render(line, div);
         return div.textContent;
       }),
                        [
@@ -1475,9 +1497,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         assert.exists(stylePropertyTreeElement.valueElement);
         renderElementIntoDOM(stylePropertyTreeElement.valueElement, {allowMultipleChildren: true});
 
-        assert.strictEqual(
-            stylePropertyTreeElement.valueElement?.firstElementChild instanceof InlineEditor.Swatches.CSSShadowSwatch,
-            success);
+        assert.strictEqual(stylePropertyTreeElement.valueElement?.firstElementChild?.firstElementChild instanceof
+                               InlineEditor.Swatches.CSSShadowSwatch,
+                           success);
         assert.strictEqual(stylePropertyTreeElement.valueElement?.innerText, value);
       };
 
@@ -1543,10 +1565,12 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     it('renders the shadow swatch and color swatch', () => {
       const stylePropertyTreeElement = getTreeElement('box-shadow', 'inset 10px 10px blue');
       stylePropertyTreeElement.updateTitle();
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
 
-      assert.instanceOf(
-          stylePropertyTreeElement.valueElement?.firstElementChild, InlineEditor.Swatches.CSSShadowSwatch);
-      const colorSwatch = stylePropertyTreeElement.valueElement?.querySelector('devtools-color-swatch');
+      assert.instanceOf(stylePropertyTreeElement.valueElement.firstElementChild?.firstElementChild,
+                        InlineEditor.Swatches.CSSShadowSwatch);
+      const colorSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-color-swatch');
       assert.exists(colorSwatch);
       assert.strictEqual(colorSwatch.color?.asString(), 'blue');
     });
@@ -1554,30 +1578,36 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     it('renders multiple icons for multiple shadows', () => {
       const stylePropertyTreeElement = getTreeElement('box-shadow', 'inset 10px 11px blue, notashadow, 6px 5px red');
       stylePropertyTreeElement.updateTitle();
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
 
-      const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('css-shadow-swatch');
+      const swatches = stylePropertyTreeElement.valueElement.querySelectorAll('css-shadow-swatch');
       assert.exists(swatches);
       assert.lengthOf(swatches, 2);
-      assert.strictEqual((swatches[0].nextElementSibling as HTMLElement).innerText, 'inset 10px 11px blue');
-      assert.strictEqual((swatches[1].nextElementSibling as HTMLElement).innerText, '6px 5px red');
+      assert.strictEqual(swatches[0].parentElement?.innerText, 'inset 10px 11px blue');
+      assert.strictEqual(swatches[1].parentElement?.innerText, '6px 5px red');
     });
 
     it('correctly parses text-shadow', () => {
       const stylePropertyTreeElement =
           getTreeElement('text-shadow', 'inset 10px 11px blue, 6px 5px red, 5px 5px 0 0 yellow');
       stylePropertyTreeElement.updateTitle();
-      const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('css-shadow-swatch');
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+      const swatches = stylePropertyTreeElement.valueElement.querySelectorAll('css-shadow-swatch');
       assert.exists(swatches);
       assert.lengthOf(swatches, 1);
-      assert.strictEqual((swatches[0].nextElementSibling as HTMLElement).innerText, '6px 5px red');
+      assert.strictEqual(swatches[0].parentElement?.innerText, '6px 5px red');
     });
 
     it('renders a color-mix child', () => {
       const stylePropertyTreeElement = getTreeElement('box-shadow', '10px 11px color-mix(in srgb, red, blue)');
       stylePropertyTreeElement.updateTitle();
-      assert.instanceOf(
-          stylePropertyTreeElement.valueElement?.firstElementChild, InlineEditor.Swatches.CSSShadowSwatch);
-      const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('devtools-color-mix-swatch');
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+      assert.instanceOf(stylePropertyTreeElement.valueElement.firstElementChild?.firstElementChild,
+                        InlineEditor.Swatches.CSSShadowSwatch);
+      const swatches = stylePropertyTreeElement.valueElement.querySelectorAll('devtools-color-mix-swatch');
       assert.exists(swatches);
     });
 
@@ -1592,8 +1622,8 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('css-shadow-swatch');
       assert.exists(swatches);
       assert.lengthOf(swatches, 2);
-      assert.strictEqual((swatches[0].nextElementSibling as HTMLElement).innerText, 'var(--offset) red');
-      assert.strictEqual((swatches[1].nextElementSibling as HTMLElement).innerText, 'var(--shadow)');
+      assert.strictEqual(swatches[0].parentElement?.innerText, 'var(--offset) red');
+      assert.strictEqual(swatches[1].parentElement?.innerText, 'var(--shadow)');
     });
 
     it('opens a shadow editor with the correct values', () => {
@@ -1602,7 +1632,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       const stylePropertyTreeElement =
           getTreeElement('box-shadow', 'var(--offset) red, inset 8px 9px 10px 11px yellow');
       stylePropertyTreeElement.updateTitle();
-      const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('css-shadow-swatch');
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+      const swatches = stylePropertyTreeElement.valueElement.querySelectorAll('css-shadow-swatch');
       assert.exists(swatches);
       assert.lengthOf(swatches, 2);
 
@@ -1685,7 +1717,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       mockVariableMap['--props'] = '12px 13px red';
       const stylePropertyTreeElement = getTreeElement('box-shadow', '10px 11px red, var(--props)');
       stylePropertyTreeElement.updateTitle();
-      const swatches = stylePropertyTreeElement.valueElement?.querySelectorAll('css-shadow-swatch');
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+      const swatches = stylePropertyTreeElement.valueElement.querySelectorAll('css-shadow-swatch');
       assert.exists(swatches);
       assert.lengthOf(swatches, 2);
 
@@ -1824,11 +1858,11 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
           SDK.CSSPropertyParserMatchers.ShadowType.BOX_SHADOW, properties, renderingContext);
 
       const container = document.createElement('div');
-      model.renderContents(container);
+      render(model.renderContents(), container);
       assert.strictEqual(container.innerText, '10px y var()');
 
       model.setBlurRadius(new InlineEditor.CSSShadowEditor.CSSLength(12, 'px'));
-      model.renderContents(container);
+      render(model.renderContents(), container);
       assert.strictEqual(container.innerText, '10px y 12px spread');
       assert.deepEqual(properties.map(p => p.source), [null, null, null, null]);
     });
@@ -1889,7 +1923,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
       stylePropertyTreeElement.updateTitle();
       await (await waitForDecorationPromise).result;
-      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement!.querySelector('devtools-link-swatch')!;
+      assert.exists(stylePropertyTreeElement.valueElement);
+      await someMutations(stylePropertyTreeElement.valueElement);
+      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch');
+      assert.exists(anchorFunctionLinkSwatch);
 
       renderElementIntoDOM(anchorFunctionLinkSwatch);
       assert.strictEqual(anchorFunctionLinkSwatch.linkElement?.textContent, '--identifier');
@@ -1904,8 +1941,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
       await (await waitForDecorationPromise).result;
       assert.exists(stylePropertyTreeElement.valueElement);
+      await someMutations(stylePropertyTreeElement.valueElement);
       renderElementIntoDOM(stylePropertyTreeElement.valueElement);
-      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch')!;
+      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch');
+      assert.exists(anchorFunctionLinkSwatch);
       anchorFunctionLinkSwatch.dispatchEvent(new Event('mouseenter'));
 
       sinon.assert.calledOnce(highlightMock);
@@ -1920,8 +1959,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
       await (await waitForDecorationPromise).result;
       assert.exists(stylePropertyTreeElement.valueElement);
+      await someMutations(stylePropertyTreeElement.valueElement);
       renderElementIntoDOM(stylePropertyTreeElement.valueElement);
-      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement!.querySelector('devtools-link-swatch')!;
+      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch');
+      assert.exists(anchorFunctionLinkSwatch);
       anchorFunctionLinkSwatch.dispatchEvent(new Event('mouseleave'));
 
       sinon.assert.calledOnce(hideDOMNodeHighlightStub);
@@ -1936,8 +1977,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
       await (await waitForDecorationPromise).result;
       assert.exists(stylePropertyTreeElement.valueElement);
+      await someMutations(stylePropertyTreeElement.valueElement);
       renderElementIntoDOM(stylePropertyTreeElement.valueElement);
-      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement!.querySelector('devtools-link-swatch')!;
+      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch');
+      assert.exists(anchorFunctionLinkSwatch);
       anchorFunctionLinkSwatch.linkElement?.click();
 
       sinon.assert.calledOnce(revealStub);
@@ -1949,8 +1992,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         Promise<HTMLDivElement> {
       sinon.stub(stylesSidebarPane.node()!, 'getAnchorBySpecifier').resolves(data.anchorNode);
       const content = document.createElement('div');
-      await Elements.StylePropertyTreeElement.AnchorFunctionRenderer.decorateAnchorForAnchorLink(
-          stylesSidebarPane, content, data);
+      render(await Elements.StylePropertyTreeElement.AnchorFunctionRenderer.decorateAnchorForAnchorLink(
+                 stylesSidebarPane, data),
+             content);
       return content;
     }
 
@@ -2025,7 +2069,8 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         };
         const component = await createAnchorFunctionLinkSwatch(data);
 
-        assert.isEmpty(component.innerHTML);
+        assert.isEmpty(component.children);
+        assert.isEmpty(component.textContent);
       });
 
       it('should render icon link when `anchorNode` is resolved correctly', async () => {
@@ -2117,8 +2162,10 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
       stylePropertyTreeElement.updateTitle();
       await (await waitForDecorationPromise).result;
+      assert.exists(stylePropertyTreeElement.valueElement);
+      await someMutations(stylePropertyTreeElement.valueElement);
 
-      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement!.querySelector('devtools-link-swatch');
+      const anchorFunctionLinkSwatch = stylePropertyTreeElement.valueElement.querySelector('devtools-link-swatch');
       assert.exists(anchorFunctionLinkSwatch);
     });
   });
@@ -2287,17 +2334,16 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
   });
 
   describe('CSSWideKeywordRenderer', () => {
-    function mockResolvedKeyword(propertyName: string, _keyword: SDK.CSSMetadata.CSSWideKeyword, propertyValue = ''):
-        sinon.SinonStubbedInstance<SDK.CSSProperty.CSSProperty> {
-      const originalDeclaration = sinon.createStubInstance(SDK.CSSProperty.CSSProperty);
+    function mockResolvedKeyword(propertyName: string, _keyword: SDK.CSSMetadata.CSSWideKeyword,
+                                 propertyValue = ''): SDK.CSSProperty.CSSProperty {
+      const originalDeclaration =
+          new SDK.CSSProperty.CSSProperty(sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration), 0,
+                                          propertyName, propertyValue, false, false, true, false);
       sinon.stub(matchedStyles, 'resolveGlobalKeyword')
           .callsFake(
               (property, keyword) => property.name === propertyName && property.value === keyword ?
                   new SDK.CSSMatchedStyles.CSSValueSource(originalDeclaration) :
                   null);
-      originalDeclaration.name = propertyName;
-      originalDeclaration.value = propertyValue;
-      originalDeclaration.ownerStyle = sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration);
       return originalDeclaration;
     }
 
@@ -2339,6 +2385,67 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
       assert.notExists(stylePropertyTreeElement.valueElement?.querySelector('devtools-link-swatch'));
     });
+  });
+
+  describe('!important', () => {
+    const cases: Array<{
+      description: string,
+      value: string,
+      attributes?: Record<string, string>,
+      inherited?: Protocol.CSS.CSSProperty[],
+    }> =
+        [
+          {description: 'a color', value: 'red'},
+          {description: 'attr()', value: 'attr(data-color type(<color>))', attributes: {'data-color': 'red'}},
+          {
+            description: 'a CSS-wide keyword',
+            value: 'inherit',
+            inherited: [{name: '--red', value: 'red !important', important: true}],
+          },
+        ];
+
+    for (const {description, value, attributes, inherited} of cases) {
+      it(`renders the color of an important variable set to ${description}`, async () => {
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+        node.nodeType.returns(1);
+        node.getAttribute.callsFake(name => attributes?.[name]);
+        const parent = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        parent.id = 2 as Protocol.DOM.NodeId;
+        parent.nodeType.returns(1);
+        node.parentNode = parent;
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          node,
+          matchedPayload: [ruleMatch(
+              'div',
+              [
+                {name: '--red', value: `${value} !important`, important: true},
+                {name: 'color', value: 'var(--red)'},
+              ],
+              )],
+          inheritedPayload: [{matchedCSSRules: [ruleMatch('div', inherited ?? [])]}],
+        });
+        for (const property of matchedStyles.nodeStyles()[0].allProperties()) {
+          const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement({
+            stylesContainer: stylesSidebarPane,
+            section: sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection),
+            matchedStyles,
+            property,
+            isShorthand: false,
+            inherited: false,
+            overloaded: false,
+            newProperty: false,
+          });
+
+          stylePropertyTreeElement.updateTitle();
+
+          const colorSwatch = stylePropertyTreeElement.valueElement?.querySelector('devtools-color-swatch');
+          assert.exists(colorSwatch);
+          assert.strictEqual(colorSwatch.color?.asString(), 'red');
+        }
+      });
+    }
   });
 
   describe('PositionAreaRenderer', () => {
@@ -2437,6 +2544,28 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       assert.isTrue(values[0].classList.contains('inactive-value'));
       assert.isFalse(values[1].classList.contains('inactive-value'));
       assert.isTrue(values[2].classList.contains('inactive-value'));
+    });
+
+    it('does not mark !important as inactive when the last fallback is inactive', () => {
+      sinon.stub(matchedStyles, 'activePositionFallbackIndex').returns(0);
+      sinon.stub(matchedStyles, 'positionTryRules').returns([]);
+      const stylePropertyTreeElement =
+          getTreeElement('position-try-fallbacks', '--top, flip-block, --bottom !important');
+      stylePropertyTreeElement.updateTitle();
+      assert.exists(stylePropertyTreeElement.valueElement);
+      renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+      assert.strictEqual(stylePropertyTreeElement.valueElement.innerText, '--top, flip-block, --bottom !important');
+      const spans = stylePropertyTreeElement.valueElement.querySelectorAll<HTMLSpanElement>(':scope > span');
+      assert.deepEqual(Array.from(spans, span => ({
+                                           text: span.innerText,
+                                           inactive: span.classList.contains('inactive-value'),
+                                         })),
+                       [
+                         {text: '--top', inactive: false},
+                         {text: ', flip-block', inactive: true},
+                         {text: ', --bottom', inactive: true},
+                         {text: '!important', inactive: false},
+                       ]);
     });
 
     it('renders the position-try swatch in default and forced states', () => {
@@ -2553,6 +2682,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       const popoverOpenSpy = spyCall(Elements.StylePropertyTreeElement.LengthRenderer.prototype, 'getTooltipValue');
       popover.showPopover();
       await (await popoverOpenSpy).result;
+      await someMutations(popover);
       assert.strictEqual(popover.deepInnerText(), '15px');
     });
 
@@ -2658,7 +2788,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
 
       sinon.assert.calledOnce(strikeOutSpy);
-      await strikeOutSpy.returnValues[0];
+      await Promise.all(strikeOutSpy.returnValues);
       const args = stylePropertyTreeElement.valueElement?.querySelectorAll(
                        ':scope > span > span:not(.tracing-anchor)') as NodeListOf<HTMLSpanElement>;
       assert.lengthOf(args, 3);
@@ -2699,7 +2829,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       stylePropertyTreeElement.updateTitle();
 
       sinon.assert.calledOnce(strikeOutSpy);
-      await strikeOutSpy.returnValues[0];
+      await Promise.all(strikeOutSpy.returnValues);
       const args = stylePropertyTreeElement.valueElement?.querySelectorAll(
                        ':scope > span > span:not(.tracing-anchor)') as NodeListOf<HTMLSpanElement>;
       assert.lengthOf(args, 2);
@@ -2729,17 +2859,25 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
           sinon.spy(Elements.StylePropertyTreeElement.MathFunctionRenderer.prototype, 'applyEvaluation');
       const property = addProperty('width', 'calc(1 + 1)');
 
-      const view = new Elements.CSSValueTraceView.CSSValueTraceView(undefined, () => {});
+      const viewFunction = sinon.stub<Parameters<Elements.CSSValueTraceView.View>>();
+      const view = new Elements.CSSValueTraceView.CSSValueTraceView(undefined, viewFunction);
       await view.showTrace(
           property, null, matchedStyles, new Map(),
           Elements.StylePropertyTreeElement.getPropertyRenderers(
               property.name, property.ownerStyle, stylesSidebarPane, matchedStyles, null, new Map(), null),
           false, 0, false);
+      await view.updateComplete;
 
       sinon.assert.calledOnce(evaluationSpy);
-      const originalText = evaluationSpy.args[0][0].textContent;
-      await evaluationSpy.returnValues[0];
-      assert.strictEqual(originalText, evaluationSpy.args[0][0].textContent);
+      assert.isNull(await evaluationSpy.returnValues[0]);
+      sinon.assert.calledOnce(viewFunction);
+      const {evaluations} = viewFunction.args[0][0];
+      assert.deepEqual(evaluations.flat().map(line => {
+        const div = document.createElement('div');
+        render(line, div);
+        return div.textContent;
+      }),
+                       ['calc(1 + 1)']);
     });
 
     it('should try to resolve the values for the correct property name', async () => {
@@ -2982,23 +3120,22 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     const openTooltipPromise1 = new Promise<unknown>(r => openTooltipStub.callsFake(r));
     const stylePropertyTreeElement = getTreeElement('color', 'color-mix(in srgb, red, blue)');
     stylePropertyTreeElement.updateTitle();
-    const tooltip = stylePropertyTreeElement.valueElement?.querySelector(
-                        'devtools-tooltip:not([jslogcontext="elements.css-value-trace"])') as Tooltips.Tooltip.Tooltip |
-        null | undefined;
+    assert.exists(stylePropertyTreeElement.valueElement);
+    renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+    const tooltip = stylePropertyTreeElement.valueElement.querySelector<Tooltips.Tooltip.Tooltip>(
+        'devtools-tooltip:not([jslogcontext="elements.css-value-trace"])');
     assert.exists(tooltip);
-    renderElementIntoDOM(tooltip);
     tooltip.showTooltip();
     await openTooltipPromise1;
-    tooltip.remove();
+    stylePropertyTreeElement.valueElement.remove();
 
     const openTooltipPromise2 = new Promise<unknown>(r => openTooltipStub.callsFake(r));
     stylePropertyTreeElement.updateTitle();
-    const tooltip2 =
-        stylePropertyTreeElement.valueElement?.querySelector(
-            'devtools-tooltip:not([jslogcontext="elements.css-value-trace"])') as Tooltips.Tooltip.Tooltip |
-        null | undefined;
+    assert.exists(stylePropertyTreeElement.valueElement);
+    renderElementIntoDOM(stylePropertyTreeElement.valueElement);
+    const tooltip2 = stylePropertyTreeElement.valueElement.querySelector<Tooltips.Tooltip.Tooltip>(
+        'devtools-tooltip:not([jslogcontext="elements.css-value-trace"])');
     assert.exists(tooltip2);
-    renderElementIntoDOM(tooltip2);
     await openTooltipPromise2;
     assert.notStrictEqual(tooltip, tooltip2);
   });
@@ -3022,13 +3159,15 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     const treeElementWithTooltip = getTreeElement('color', 'blue');
     treeElementWithTooltip.treeOutline = new LegacyUI.TreeOutline.TreeOutline();
     treeElementWithTooltip.updateTitle();
-    renderElementIntoDOM(treeElementWithTooltip.listItemElement);
+    stylesSidebarPane.contentElement.appendChild(treeElementWithTooltip.listItemElement);
+    renderElementIntoDOM(stylesSidebarPane);
     const tooltip = treeElementWithTooltip.listItemElement.querySelector(
         'devtools-tooltip[jslogcontext="elements.css-property-doc"]');
     assert.instanceOf(tooltip, Tooltips.Tooltip.Tooltip);
 
     tooltip.showPopover();
     assert.isTrue(tooltip.open);
+    assert.exists(tooltip.firstElementChild);
     tooltip.hidePopover();
     assert.isFalse(tooltip.open);
 
@@ -3037,6 +3176,8 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         .set(false);
     tooltip.showPopover();
     assert.isFalse(tooltip.open);
+
+    treeElementWithTooltip.updateTitle();
   });
 
   it('does not show a variable tooltip on custom property names in function rules', async () => {
@@ -4180,7 +4321,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
     // Builds a CSS.CSSStyle payload for `text` the way the backend would report it for a style that
     // starts at the beginning of the style sheet.
-    function stylePayload(text: string): Protocol.CSS.CSSStyle {
+    function stylePayload(text: string, styleSheetId = liveStyleSheetId): Protocol.CSS.CSSStyle {
       const textObject = new TextUtils.Text.Text(text);
       const toRange = (start: number, end: number): Protocol.CSS.SourceRange => {
         const startPosition = textObject.positionFromOffset(start);
@@ -4204,7 +4345,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         });
       }
       return {
-        styleSheetId: liveStyleSheetId,
+        styleSheetId,
         cssText: text,
         cssProperties,
         shorthandEntries: [],
@@ -4227,7 +4368,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       connection.setSuccessHandler('CSS.getStyleSheetText', () => ({text: sheetText}));
       setStyleTextsStub = sinon.stub().callsFake((params: Protocol.CSS.SetStyleTextsRequest) => {
         sheetText = params.edits[0].text;
-        return {styles: [stylePayload(sheetText)]};
+        return {styles: [stylePayload(sheetText, params.edits[0].styleSheetId)]};
       });
       connection.setHandler('CSS.setStyleTexts', null);
       connection.setSuccessHandler('CSS.setStyleTexts', setStyleTextsStub);
@@ -4285,6 +4426,30 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       container.appendChild(section.element);
       renderElementIntoDOM(container);
       return section;
+    }
+
+    function addMatchedSection(section: Elements.StylePropertiesSection.StylePropertiesSection, cssText: string): void {
+      const matchedStyles = section.matchedStyles;
+      const styleSheetId = 'matched-sheet' as Protocol.DOM.StyleSheetId;
+      const rule = new SDK.CSSRule.CSSStyleRule(matchedStyles.cssModel(), {
+        selectorList: {selectors: [{text: 'div'}], text: 'div'},
+        origin: Protocol.CSS.StyleSheetOrigin.Regular,
+        styleSheetId,
+        style: stylePayload(cssText, styleSheetId),
+      });
+      const matchedSection = new Elements.StylePropertiesSection.StylePropertiesSection(
+          stylesSidebarPane, matchedStyles, rule.style, 1, null, null, null);
+      stylesSidebarPane.allSections().push(matchedSection);
+      matchedStyles.cssModel().addEventListener(SDK.CSSModel.Events.StyleSheetChanged, event => {
+        if (event.data.edit) {
+          rule.style.rebase(event.data.edit);
+        }
+      });
+      section.element.parentElement?.appendChild(matchedSection.element);
+      const resolveProperty = matchedStyles.resolveProperty.bind(matchedStyles);
+      sinon.stub(matchedStyles, 'resolveProperty')
+          .callsFake((name, ownerStyle) => resolveProperty(name, ownerStyle) ??
+                         rule.style.allProperties().findLast(prop => prop.name === name) ?? null);
     }
 
     function treeElementAt(section: Elements.StylePropertiesSection.StylePropertiesSection,
@@ -4688,6 +4853,99 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         sinon.assert.calledOnceWithExactly(
             changeTracker.trackChange,
             'Enabled style property "font-weight: bold" in rule "element.style"',
+            sinon.match.object,
+        );
+      });
+
+      it('tracks only net property changes from StyleEditorWidget when the popover closes', async () => {
+        const section = await createLiveSection('display: flex; flex-direction: row;', {inline: true});
+        const triggerButton =
+            treeElementAt(section, 0).listItemElement.querySelector<HTMLElement>('.styles-pane-button');
+        assert.exists(triggerButton);
+        triggerButton.click();
+        await waitFor(() => stylesSidebarPane.swatchPopoverHelper().isShowing());
+
+        const widget = Elements.StyleEditorWidget.StyleEditorWidget.instance();
+        await widget.onPropertySelected(
+            new ElementsComponents.StylePropertyEditor.PropertySelectedEvent('flex-direction', 'column'));
+        await widget.onPropertySelected(
+            new ElementsComponents.StylePropertyEditor.PropertySelectedEvent('flex-direction', 'column-reverse'));
+        await widget.onPropertySelected(
+            new ElementsComponents.StylePropertyEditor.PropertySelectedEvent('justify-content', 'center'));
+        await widget.onPropertyDeselected(
+            new ElementsComponents.StylePropertyEditor.PropertyDeselectedEvent('justify-content', 'center'));
+        await widget.onPropertySelected(
+            new ElementsComponents.StylePropertyEditor.PropertySelectedEvent('align-items', 'stretch'));
+
+        sinon.assert.notCalled(changeTracker.trackChange);
+
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+
+        sinon.assert.calledTwice(changeTracker.trackChange);
+        sinon.assert.calledWithExactly(
+            changeTracker.trackChange.firstCall,
+            'Changed style property "flex-direction" from "row" to "column-reverse" in rule "element.style"',
+            sinon.match.object,
+        );
+        sinon.assert.calledWithExactly(
+            changeTracker.trackChange.secondCall,
+            'Added style property "align-items: stretch" to rule "element.style"',
+            sinon.match.object,
+        );
+      });
+
+      it('tracks only net property changes from PositionAreaRenderer when the popover closes', async () => {
+        const section = await createLiveSection('position-area: top left; justify-self: end;', {inline: true});
+        addMatchedSection(section, 'justify-self: start;');
+        const button = treeElementAt(section, 0).valueElement?.querySelector<HTMLElement>('.position-area-swatch-icon');
+        assert.exists(button);
+
+        const showSpy = sinon.spy(stylesSidebarPane.swatchPopoverHelper(), 'show');
+        button.click();
+        sinon.assert.calledOnce(showSpy);
+        const editor = showSpy.firstCall.args[0];
+        assert.instanceOf(editor, InlineEditor.PositionAreaEditor.PositionAreaEditor);
+
+        const selectArea = async(area: string): Promise<void> => {
+          const parsed = InlineEditor.PositionAreaEditor.parsePositionArea(area);
+          assert.exists(parsed);
+          editor.dispatchEventToListeners(InlineEditor.PositionAreaEditor.Events.POSITION_AREA_CHANGED, parsed);
+          await waitFor(() => declarations().includes(`position-area: ${area}`));
+        };
+        const setAlignment = async(propertyName: string, value?: string): Promise<void> => {
+          editor.dispatchEventToListeners(InlineEditor.PositionAreaEditor.Events.PROPERTY_CHANGED,
+                                          {propertyName, value});
+          await waitFor(() => value ? declarations().includes(`${propertyName}: ${value}`) :
+                                      !declarations().some(decl => decl.startsWith(`${propertyName}:`)));
+        };
+
+        await selectArea('center');
+        await selectArea('bottom right');
+        await setAlignment('align-self', 'start');
+        await setAlignment('align-self', 'center');
+        await setAlignment('justify-self', 'center');
+        await setAlignment('justify-self');
+
+        sinon.assert.notCalled(changeTracker.trackChange);
+
+        const trackChangePromise = expectCalled(changeTracker.trackChange, {callCount: 3});
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+        await trackChangePromise;
+
+        sinon.assert.calledThrice(changeTracker.trackChange);
+        sinon.assert.calledWithExactly(
+            changeTracker.trackChange,
+            'Changed style property "position-area" from "top left" to "bottom right" in rule "element.style"',
+            sinon.match.object,
+        );
+        sinon.assert.calledWithExactly(
+            changeTracker.trackChange,
+            'Added style property "align-self: center" to rule "element.style"',
+            sinon.match.object,
+        );
+        sinon.assert.calledWithExactly(
+            changeTracker.trackChange,
+            'Removed style property "justify-self: end" from rule "element.style"',
             sinon.match.object,
         );
       });

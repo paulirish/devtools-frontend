@@ -58,6 +58,19 @@ describe('RunLighthouseTool', () => {
         action: 'runLighthouse(\'accessibility\', \'snapshot\')',
       });
     });
+
+    it('formats title, thought, and action defaulting to navigation mode for agentic-browsing when mode is omitted',
+       () => {
+         const displayInfo = tool.displayInfoFromArgs({
+           explanation: 'Checking agent readiness',
+           categoryId: 'agentic-browsing',
+         });
+         assert.deepEqual(displayInfo, {
+           title: 'Running Lighthouse audits: agentic-browsing (navigation)',
+           thought: 'Checking agent readiness',
+           action: 'runLighthouse(\'agentic-browsing\', \'navigation\')',
+         });
+       });
   });
 
   describe('handler', () => {
@@ -119,6 +132,22 @@ describe('RunLighthouseTool', () => {
       });
     });
 
+    it('defaults to navigation mode for agentic-browsing when mode is omitted', async () => {
+      const recordingStub = sinon.stub().resolves({status: 'completed', report: mockReport});
+      const context: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseRecordingCapability = {
+        runLighthouse: recordingStub,
+      };
+
+      const result =
+          await tool.handler({explanation: 'agentic browsing audit', categoryId: 'agentic-browsing'}, context);
+      assertIsContext(result);
+      sinon.assert.calledOnceWithExactly(recordingStub, {
+        mode: 'navigation',
+        categoryIds: ['agentic-browsing'],
+        isAIControlled: true,
+      });
+    });
+
     it('returns error when the run fails', async () => {
       const recordingStub = sinon.stub().resolves({status: 'failed'});
       const context: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseRecordingCapability = {
@@ -148,6 +177,20 @@ describe('RunLighthouseTool', () => {
       const result = await tool.handler({explanation: 're-audit', categoryId: 'accessibility'}, context);
       assertIsError(result);
       assert.strictEqual(result.error, 'Error: Failed to record new audits: Navigation timed out');
+    });
+
+    it('returns error without running Lighthouse when category does not support the requested mode', async () => {
+      const recordingStub = sinon.stub().resolves({status: 'completed', report: mockReport});
+      const context: AiAssistance.Tool.BaseToolCapability&AiAssistance.Tool.LighthouseRecordingCapability = {
+        runLighthouse: recordingStub,
+      };
+      const result = await tool.handler(
+          {explanation: 'interaction audit', categoryId: 'agentic-browsing', mode: 'timespan'}, context);
+      assertIsError(result);
+      assert.strictEqual(
+          result.error,
+          'Error: Category "agentic-browsing" does not support "timespan" mode. Supported modes: navigation, snapshot.');
+      sinon.assert.notCalled(recordingStub);
     });
   });
 });

@@ -65,7 +65,7 @@ export interface FunctionPrimitiveParams extends BaseFunctionParam {
 
 export interface FunctionArrayParam extends BaseFunctionParam {
   type: ParametersTypes.ARRAY;
-  items: FunctionPrimitiveParams;
+  items: FunctionPrimitiveParams|FunctionObjectParam;
 }
 
 export interface FunctionObjectParam<T extends string|number|symbol = string> extends BaseFunctionParam {
@@ -465,11 +465,35 @@ export interface AidaChunkResponse {
   functionCallChunk?: {
     functionCall: AidaFunctionCall,
   };
-  error?: string;
+  /**
+   * Error information returned in the chunk.
+   * Supports direct AIDA stream chunk error strings (for example,
+   * "RESOURCE_EXHAUSTED: quota exceeded") and structured google.rpc.Status
+   * error objects translated from GCA stream chunks (for example,
+   * {"code": 429, "message": "You have exhausted your capacity on this model.", "status": "RESOURCE_EXHAUSTED", "details": [...]}).
+   */
+  error?: string|Record<string, unknown>;
+}
+
+// Reads `devToolsAiDebug` directly because `core/host` cannot depend on `models/ai-utils`.
+function isGcaDebugMode(): boolean {
+  try {
+    const raw = Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.getItem('devToolsAiDebug');
+    if (!raw) {
+      return false;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return false;
+    }
+    return Boolean((parsed as Record<string, unknown>).gca);
+  } catch {
+    return false;
+  }
 }
 
 export function debugLog(...log: unknown[]): void {
-  if (!Boolean(Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.getItem('debugAiServicesEnabled'))) {
+  if (!isGcaDebugMode()) {
     return;
   }
 

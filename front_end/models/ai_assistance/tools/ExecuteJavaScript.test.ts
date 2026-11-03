@@ -17,7 +17,6 @@ import {updateHostConfig} from '../../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
 import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
-import * as Formatter from '../../formatter/formatter.js';
 import * as AiAssistance from '../ai_assistance.js';
 
 describe('ExecuteJavaScriptTool', () => {
@@ -27,17 +26,8 @@ describe('ExecuteJavaScriptTool', () => {
   let element: sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>;
   let target: sinon.SinonStubbedInstance<SDK.Target.Target>;
   let domModel: sinon.SinonStubbedInstance<SDK.DOMModel.DOMModel>;
-  let formatStub: sinon.SinonStub;
 
   beforeEach(() => {
-    formatStub = sinon.stub(Formatter.FormatterWorkerPool.FormatterWorkerPool.prototype, 'format')
-                     .callsFake(async (_mimeType, content) => {
-                       return {
-                         content,
-                         mapping: {original: [], formatted: []},
-                       };
-                     });
-
     target = sinon.createStubInstance(SDK.Target.Target);
     target.model.returns(null);
 
@@ -79,6 +69,15 @@ describe('ExecuteJavaScriptTool', () => {
     assertIsResult(response);
     assert.strictEqual(response.result, '{"success": true}');
     sinon.assert.calledOnce(mockExecJs);
+    assert.strictEqual(mockExecJs.firstCall.args[0], `async function ($0, data) {
+  try {
+    console.log("hello")
+    ;
+    return data;
+  } catch (error) {
+    return error;
+  }
+}`);
   });
 
   it('returns error when execution context node is missing', async () => {
@@ -337,57 +336,107 @@ describe('ExecuteJavaScriptTool', () => {
     });
   });
 
-  describe('validateAndFormatCode', () => {
-    const {validateAndFormatCode} = AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool;
+  describe('validateCode', () => {
+    const {validateCode} = AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool;
 
-    it('formats valid JS code correctly', async () => {
-      formatStub.resolves({
-        content: 'const a = 1;\nconst b = 2;',
-        mapping: {original: [], formatted: []},
-      });
-      const result = await validateAndFormatCode('const a=1;const b=2;');
-      assert.strictEqual(result.formattedCode, 'const a = 1;\nconst b = 2;');
-      assert.isUndefined(result.error);
-    });
-
-    it('returns the original code when the formatter fails', async () => {
-      formatStub.rejects(new Error('Unexpected token'));
-      const result = await validateAndFormatCode('const a = ;');
-      assert.isUndefined(result.error);
-      assert.strictEqual(result.formattedCode, 'const a = ;');
-    });
-
-    const SIZE_ERROR_HEADER =
-        'Error: The code was not run because it exceeds size limits after formatting (indented with 2 spaces):';
+    const SIZE_ERROR_HEADER = 'Error: The code was not run because it exceeds size limits:';
     const LONG_LINES_ADVICE = '- Lines longer than 120 characters. Break them into shorter lines, ' +
         'for example by splitting long strings or selectors with concatenation, ' +
         'or by putting arguments on separate lines:';
 
-    it('returns an error with the line count when formatted code exceeds 40 lines', async () => {
+    it('accepts multi-line arrow function expressions and computed style queries', () => {
+      const code = `const banner = Array.from(document.querySelectorAll('*')).find(el =>
+  el.id?.toLowerCase().includes('banner') ||
+  el.className?.toLowerCase().includes('banner') ||
+  el.getAttribute('role') === 'banner'
+);
+
+const data = {
+  bannerFound: !!banner,
+  tagName: banner?.tagName,
+  id: banner?.id,
+  className: banner?.className,
+  innerHTML: banner?.innerHTML,
+  rect: banner?.getBoundingClientRect(),
+  computedStyle: banner ? {
+    display: window.getComputedStyle(banner).display,
+    visibility: window.getComputedStyle(banner).visibility,
+    opacity: window.getComputedStyle(banner).opacity,
+    width: window.getComputedStyle(banner).width,
+    height: window.getComputedStyle(banner).height
+  } : null
+};`;
+      assert.isUndefined(validateCode(code));
+    });
+
+    it('accepts multi-line filter predicates with logical operators', () => {
+      const codeWithDetailedMap = `const ads = Array.from(document.querySelectorAll('*')).filter(el =>
+  /ad|banner|promo|camp/i.test(el.id + el.className) &&
+  !el.classList.contains('site-header')
+);
+
+const data = ads.map(el => ({
+  tag: el.tagName,
+  id: el.id,
+  class: el.className,
+  visible: el.offsetWidth > 0,
+  text: el.innerText.substring(0, 50)
+}));`;
+      assert.isUndefined(validateCode(codeWithDetailedMap));
+
+      const codeWithCompactMap = `const ads = Array.from(document.querySelectorAll('*')).filter(el =>
+  /ad|banner|promo|camp/i.test(el.id + el.className) &&
+  !el.classList.contains('site-header')
+);
+const data = ads.map(el => ({tag: el.tagName, id: el.id, class: el.className}));`;
+      assert.isUndefined(validateCode(codeWithCompactMap));
+    });
+
+    it('accepts multi-line chained array methods and attribute selectors', () => {
+      const code =
+          `const data = Array.from(document.querySelectorAll('[class*="banner"], [id*="banner"], [class*="ad"], [id*="ad"]'))
+  .filter(el => !el.classList.contains('site-header'))
+  .map(el => ({
+    tag: el.tagName,
+    id: el.id,
+    class: el.className,
+    visible: el.offsetParent !== null
+  }));`;
+      assert.isUndefined(validateCode(code));
+    });
+
+    it('returns an error with the line count when code exceeds 40 lines', () => {
       const longCode = Array.from({length: 45}, (_, i) => `const var${i} = ${i};`).join('\n');
-      const result = await validateAndFormatCode(longCode);
       assert.strictEqual(
-          result.error,
+          validateCode(longCode),
           `${SIZE_ERROR_HEADER}\n` +
               '- The code is 45 lines (max 40). Split the logic into smaller calls and return intermediate results in `data`.',
       );
     });
 
-    it('returns an error with the line number, length, and preview when a line exceeds 120 characters', async () => {
-      const longLineCode = `if (true) {\n  const longVar = "${'a'.repeat(130)}";\n}`;
-      const result = await validateAndFormatCode(longLineCode);
+    it('returns an error when multiple statements or conditions are crammed onto a single line over 120 characters', () => {
+      const crammedOneLiner =
+          'const banner = Array.from(document.querySelectorAll(\'*\')).find(el => el.id?.toLowerCase().includes(\'banner\') || el.className?.toLowerCase().includes(\'banner\') || el.getAttribute(\'role\') === \'banner\');';
       assert.strictEqual(
-          result.error,
+          validateCode(crammedOneLiner),
+          `${SIZE_ERROR_HEADER}\n${LONG_LINES_ADVICE}\n` +
+              '  - Line 1 is 200 characters: `const banner = Array.from(document.querySelectorAll(\'*\')).f…`',
+      );
+    });
+
+    it('returns an error with the line number, length, and preview when a line exceeds 120 characters', () => {
+      const longLineCode = `if (true) {\n  const longVar = "${'a'.repeat(130)}";\n}`;
+      assert.strictEqual(
+          validateCode(longLineCode),
           `${SIZE_ERROR_HEADER}\n${LONG_LINES_ADVICE}\n` +
               `  - Line 2 is 151 characters: \`const longVar = "${'a'.repeat(42)}…\``,
       );
     });
 
-    it('reports at most 3 long lines and counts the rest', async () => {
+    it('reports at most 3 long lines and counts the rest', () => {
       const longLinesCode = Array.from({length: 5}, (_, i) => `const v${i} = "${'b'.repeat(120)}";`).join('\n');
-      const result = await validateAndFormatCode(longLinesCode);
       assert.strictEqual(
-          result.error,
+          validateCode(longLinesCode),
           `${SIZE_ERROR_HEADER}\n${LONG_LINES_ADVICE}\n` +
               `  - Line 1 is 134 characters: \`const v0 = "${'b'.repeat(47)}…\`\n` +
               `  - Line 2 is 134 characters: \`const v1 = "${'b'.repeat(47)}…\`\n` +
@@ -396,24 +445,22 @@ describe('ExecuteJavaScriptTool', () => {
       );
     });
 
-    it('returns an error with the character count when total character count exceeds 2500', async () => {
+    it('returns an error with the character count when total character count exceeds 2500', () => {
       const bulkCode = Array.from({length: 30}, (_, i) => `const var${i} = "${'x'.repeat(75)}";`).join('\n');
-      const result = await validateAndFormatCode(bulkCode);
       assert.strictEqual(
-          result.error,
+          validateCode(bulkCode),
           `${SIZE_ERROR_HEADER}\n` +
               '- The code is 2779 characters (max 2500). Remove unneeded code or split the logic into smaller calls.',
       );
     });
 
-    it('reports every exceeded limit in one error', async () => {
+    it('reports every exceeded limit in one error', () => {
       const code = [
         `const longVar = "${'a'.repeat(130)}";`,
         ...Array.from({length: 40}, (_, i) => `const var${i} = "${'x'.repeat(50)}";`),
       ].join('\n');
-      const result = await validateAndFormatCode(code);
       assert.strictEqual(
-          result.error,
+          validateCode(code),
           `${SIZE_ERROR_HEADER}\n` +
               '- The code is 41 lines (max 40). Split the logic into smaller calls and return intermediate results in `data`.\n' +
               `${LONG_LINES_ADVICE}\n` +
@@ -422,30 +469,22 @@ describe('ExecuteJavaScriptTool', () => {
       );
     });
 
-    it('accepts code that is exactly 40 lines', async () => {
+    it('accepts code that is exactly 40 lines', () => {
       const code = Array.from({length: 40}, (_, i) => `const var${i} = ${i};`).join('\n');
-      const result = await validateAndFormatCode(code);
-      assert.isUndefined(result.error);
-      assert.strictEqual(result.formattedCode, code);
+      assert.isUndefined(validateCode(code));
     });
 
-    it('accepts lines of exactly 120 characters and exactly 2500 characters in total', async () => {
+    it('accepts lines of exactly 120 characters and exactly 2500 characters in total', () => {
       const code = [
         ...Array.from({length: 20}, () => `// ${'x'.repeat(117)}`),
         `// ${'x'.repeat(77)}`,
       ].join('\n');
-      const result = await validateAndFormatCode(code);
-      assert.isUndefined(result.error);
-      assert.strictEqual(result.formattedCode, code);
+      assert.isUndefined(validateCode(code));
     });
   });
 
-  it('formats code and executes successfully when V2 architecture is enabled', async () => {
+  it('validates code and executes successfully when V2 architecture is enabled', async () => {
     updateHostConfig({devToolsAiV2Architecture: {enabled: true}});
-    formatStub.resolves({
-      content: 'const a = 1;\nconst b = 2;',
-      mapping: {original: [], formatted: []},
-    });
     const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
     const mockScope = {
       install: sinon.stub().resolves(),
@@ -466,7 +505,7 @@ describe('ExecuteJavaScriptTool', () => {
         {
           explanation: 'Check element',
           title: 'Title',
-          code: 'const a=1;const b=2;',
+          code: 'const a = 1;\nconst b = 2;',
         },
         context,
     );
@@ -477,10 +516,6 @@ describe('ExecuteJavaScriptTool', () => {
   it('returns error result when V2 architecture is enabled and code violates limits', async () => {
     updateHostConfig({devToolsAiV2Architecture: {enabled: true}});
     const longCode = Array.from({length: 45}, (_, i) => `const var${i} = ${i};`).join('\n');
-    formatStub.resolves({
-      content: longCode,
-      mapping: {original: [], formatted: []},
-    });
     const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
     const mockScope = {
       install: sinon.stub().resolves(),
@@ -508,6 +543,99 @@ describe('ExecuteJavaScriptTool', () => {
 
     assertIsError(response);
     assert.match(response.error, /The code is 45 lines \(max 40\)/);
+  });
+
+  describe('blocked network requests', () => {
+    const HINT_PHRASE = 'Network access (e.g., fetch, XMLHttpRequest) is blocked for JavaScript run by this tool';
+    const SKILL_PHRASE = 'load the `network` skill with `learnSkills`';
+
+    const defaultArgs = {
+      explanation: 'Fetch reviews',
+      title: 'Fetching reviews',
+      code: 'const data = await fetch("/api/reviews");',
+    };
+
+    function createContext(observation: string) {
+      return {
+        getExecutionContextNode: () => element,
+        execJs: sinon.stub().resolves(observation),
+        changeManager: new AiAssistance.ChangeManager.ChangeManager(),
+        createExtensionScope: sinon.stub().returns({
+          install: sinon.stub().resolves(),
+          uninstall: sinon.stub().resolves(),
+        }),
+        getOriginLock: (): AiAssistance.Tool.OriginLockState => ({
+          status: 'ESTABLISHED_ORIGIN',
+          origin: SDK.SecurityOrigin.SecurityOrigin.create('https://example.com'),
+        }),
+      };
+    }
+
+    describe('with the V2 architecture', () => {
+      beforeEach(() => {
+        updateHostConfig({devToolsAiV2Architecture: {enabled: true}});
+      });
+
+      it('explains that network access is blocked and points to the network tools when fetch fails', async () => {
+        const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+        const response = await tool.handler(defaultArgs, createContext('Error: Failed to fetch'));
+
+        assertIsResult(response);
+        assert.include(response.result, 'Error: Failed to fetch\n');
+        assert.include(response.result, HINT_PHRASE);
+        assert.include(response.result, SKILL_PHRASE);
+        assert.include(response.result, 'listNetworkRequests');
+      });
+
+      it('explains that network access is blocked when a synchronous XMLHttpRequest fails', async () => {
+        const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+        const xhrError =
+            'Error: Failed to execute \'send\' on \'XMLHttpRequest\': Failed to load \'https://example.com/api/reviews\'.';
+        const response = await tool.handler(defaultArgs, createContext(xhrError));
+
+        assertIsResult(response);
+        assert.include(response.result, `${xhrError}\n`);
+        assert.include(response.result, HINT_PHRASE);
+      });
+
+      it('does not add the hint when a dynamic import fails', async () => {
+        const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+        const importError = 'Error: Failed to fetch dynamically imported module: https://example.com/module.js';
+        const response = await tool.handler(defaultArgs, createContext(importError));
+
+        assertIsResult(response);
+        assert.strictEqual(response.result, importError);
+      });
+
+      it('does not add the hint when an XMLHttpRequest fails for a reason unrelated to the network', async () => {
+        const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+        const stateError =
+            'Error: Failed to execute \'send\' on \'XMLHttpRequest\': The object\'s state must be OPENED.';
+        const response = await tool.handler(defaultArgs, createContext(stateError));
+
+        assertIsResult(response);
+        assert.strictEqual(response.result, stateError);
+      });
+
+      it('does not add the hint to returned data that contains a network error message', async () => {
+        const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+        const response = await tool.handler(defaultArgs, createContext('\'Failed to fetch reviews\''));
+
+        assertIsResult(response);
+        assert.strictEqual(response.result, '\'Failed to fetch reviews\'');
+      });
+    });
+
+    it('explains that network access is blocked without pointing to the network tools in V1', async () => {
+      const tool = new AiAssistance.ExecuteJavaScript.ExecuteJavaScriptTool();
+      const response = await tool.handler(defaultArgs, createContext('Error: Failed to fetch'));
+
+      assertIsResult(response);
+      assert.include(response.result, 'Error: Failed to fetch\n');
+      assert.include(response.result, HINT_PHRASE);
+      assert.notInclude(response.result, 'listNetworkRequests');
+      assert.notInclude(response.result, 'learnSkills');
+    });
   });
 
   describe('origin locking', () => {

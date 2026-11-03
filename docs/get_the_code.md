@@ -8,7 +8,7 @@ In order to make changes to DevTools frontend, build, run, test, and submit chan
 
 As a standalone project, Chrome DevTools frontend can be checked out and built independently from Chromium. The main advantage is not having to check out and build Chromium.
 
-However, to run layout tests, you need to use the [chromium checkout](#Chromium-checkout) or [integrated checkout](#Integrated-checkout).
+However, to run layout tests, you need to use the [Chromium checkout](#Chromium-checkout).
 
 ### Checking out source
 
@@ -334,6 +334,14 @@ Follow [instructions](https://www.chromium.org/developers/how-tos/get-the-code)
 to check out Chromium. The DevTools front-end code is located inside the
 `third_party/devtools-frontend/src/` folder (after running `gclient sync`).
 
+`node_modules/` is not part of the devtools-frontend git tree: `gclient sync`,
+run from `chromium/src`, downloads the archive pinned in
+`third_party/devtools-frontend/src/DEPS` and extracts it (see
+[dependencies.md](cookbook/dependencies.md)). Whenever you check out a
+different DevTools revision or branch in `third_party/devtools-frontend/src`,
+run `gclient sync` again before building; `git checkout` or `git rebase`
+alone do not update `node_modules/`.
+
 ### Build
 
 The [instructions](https://www.chromium.org/developers/how-tos/get-the-code) on
@@ -438,74 +446,9 @@ git rebase
 popd
 ```
 
-## Integrated checkout
-
-**This solution is experimental, please report any trouble that you run into!**
-
-The integrated workflow offers the best of both worlds, and allows for working
-on both Chromium and DevTools frontend side-by-side.
-
-A full [Chromium checkout](#Chromium-checkout) is a pre-requisite for the
-following steps.
-
-### Untrack the existing devtools-frontend submodule
-
-First, you need to untrack the existing devtools-frontend submodule in the chromium checkout. This ensures that devtools
-isn't dragged along whenever you update your chromium dependencies.
-
-In `chromium/src`, run `gclient sync` to make sure you have installed all required submodules.
-
-```bash
-gclient sync
-```
-
-Then, disable `gclient sync` for DevTools frontend inside of Chromium by editing `.gclient` config. From
-`chromium/src/`, run
-
-```bash
-vim "$(gclient root)/.gclient"
-```
-
-In the `custom_deps` section, insert this line:
-
-```python
-"src/third_party/devtools-frontend/src": None,
-```
-
-For the integrated checkout, create a single gclient project that automatically `gclient sync`s all dependencies for both
-repositories. After checking out chromium, modify the `.gclient` file for `chromium/src` to add the DevTools project:
-
-```python
-solutions = [
-  {
-    # Chromium src project
-    "name": "src",
-    "url": "https://chromium.googlesource.com/chromium/src.git",
-    "custom_deps": {
-      "src/third_party/devtools-frontend/src": None,
-    },
-  },
-  {
-    # devtools-frontend project
-    "name": "devtools-frontend",
-    "managed": False,
-    "url": "https://chromium.googlesource.com/devtools/devtools-frontend.git",
-  }
-]
-```
-
-Do not run `gclient sync` now, first create the symlink. In the same directory as the .gclient file, run:
-
-```bash
-ln -s src/third_party/devtools-frontend/src devtools-frontend
-```
-
-If you did run `gclient sync` first, remove the devtools-frontend directory and start over.
-
-Run `gclient sync` after creating the link to fetch the dependencies for the standalone checkout.
-
-### Known issues
-
-- GN/Siso wrappers in `depot_tools` don't assume the side-by-side solutions, and
-  always use the binaries in Chromium. Please make sure updating Chromium when
-  you get a build error.
+Finish with another `gclient sync` so that `node_modules/` (and the other
+dependencies pinned in the DevTools `DEPS`) match the DevTools revision you
+ended up on. If you switch back and forth across the revision that moved
+`node_modules/` out of git, `gclient sync` repairs the directory on its own
+(`ensure_node_modules` hook); in the worst case it asks you to run it once
+more.

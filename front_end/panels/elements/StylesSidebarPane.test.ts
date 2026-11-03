@@ -33,7 +33,6 @@ import {html} from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 import * as PanelsCommon from '../common/common.js';
 
-import type * as ElementsComponents from './components/components.js';
 import * as Elements from './elements.js';
 
 describe('StylesSidebarPane', () => {
@@ -618,6 +617,63 @@ describe('StylesSidebarPane', () => {
         assertBlockVisibility([false, true, false, true]);
       });
 
+      it('merges universal highlight rules into named highlight blocks', async () => {
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const outerNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        outerNode.nodeName.returns('div');
+        outerNode.id = 1 as Protocol.DOM.NodeId;
+        const targetNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        targetNode.nodeName.returns('h1');
+        targetNode.id = 2 as Protocol.DOM.NodeId;
+        targetNode.pseudoElements.returns(new Map());
+        targetNode.parentNode = outerNode;
+
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node: targetNode,
+          pseudoPayload: [{
+            pseudoType: Protocol.DOM.PseudoType.Highlight,
+            matches: [
+              ruleMatch('#target::highlight(*)', {color: 'red', 'background-color': 'yellow'}),
+              ruleMatch('#target::highlight(foo)', {color: 'green'}),
+            ],
+          }],
+          inheritedPseudoPayload: [{
+            pseudoElements: [{
+              pseudoType: Protocol.DOM.PseudoType.Highlight,
+              matches: [ruleMatch('#outer::highlight(foo)', {color: 'blue', 'background-color': 'gray'})],
+            }],
+          }],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+
+        const blocks = sectionBlocks.slice(1).map(block => ({
+                                                    title: block.titleElement()?.textContent,
+                                                    sections: block.sections.map(section => section.headerText()),
+                                                  }));
+        assert.deepEqual(blocks, [
+          {title: 'Pseudo ::highlight(foo) element', sections: ['#target::highlight(foo)', '#target::highlight(*)']},
+          {title: 'Inherited from ::highlight(foo) pseudo of ', sections: ['#outer::highlight(foo)']},
+          {title: 'Pseudo ::highlight(*) element', sections: ['#target::highlight(*)']},
+        ]);
+
+        const [, universalSection, outerSection] = sectionBlocks.slice(1).flatMap(block => block.sections);
+        const propertyStates = (section: Elements.StylePropertiesSection.StylePropertiesSection) =>
+            section.style().leadingProperties().map(property => [property.name, matchedStyles.propertyState(property)]);
+        assert.deepEqual(propertyStates(universalSection), [
+          ['color', SDK.CSSMatchedStyles.PropertyState.OVERLOADED],
+          ['background-color', SDK.CSSMatchedStyles.PropertyState.ACTIVE],
+        ]);
+        assert.deepEqual(propertyStates(outerSection), [
+          ['color', SDK.CSSMatchedStyles.PropertyState.OVERLOADED],
+          ['background-color', SDK.CSSMatchedStyles.PropertyState.OVERLOADED],
+        ]);
+      });
+
       it('renders media queries', async () => {
         const stylesSidebarPane =
             new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
@@ -654,9 +710,9 @@ describe('StylesSidebarPane', () => {
         assert.lengthOf(sections, 1);
         const section = sections[0];
 
-        const mediaQueryElements = section.element.querySelectorAll('devtools-css-query');
+        const mediaQueryElements = section.element.querySelectorAll('.css-query');
         assert.lengthOf(mediaQueryElements, 1);
-        const mediaQueryElement = mediaQueryElements[0] as ElementsComponents.CSSQuery.CSSQuery;
+        const mediaQueryElement = mediaQueryElements[0];
 
         const queryDiv = mediaQueryElement.shadowRoot?.querySelector('.query');
         assert.exists(queryDiv);
@@ -705,7 +761,7 @@ describe('StylesSidebarPane', () => {
         assert.lengthOf(sections, 1);
         const section = sections[0];
 
-        const mediaQueryElements = section.element.querySelectorAll('devtools-css-query');
+        const mediaQueryElements = section.element.querySelectorAll('.css-query');
         assert.lengthOf(mediaQueryElements, 2);
 
         const queryTexts = Array.from(mediaQueryElements).map(el => {
@@ -2350,6 +2406,8 @@ describe('StylesSidebarPane', () => {
       });
 
       it('cleans up toolbar when the feature is disabled', async () => {
+        const detachSpy =
+            sinon.spy(PanelsCommon.AiCodeCompletionSummaryToolbar.AiCodeCompletionSummaryToolbar.prototype, 'detach');
         const providerConfig = stylesSidebarPane.aiCodeCompletionConfig;
         assert.exists(providerConfig);
         providerConfig.onFeatureEnabled();
@@ -2357,6 +2415,7 @@ describe('StylesSidebarPane', () => {
 
         providerConfig.onFeatureDisabled();
 
+        sinon.assert.calledOnce(detachSpy);
         assert.notExists(
             stylesWrapper.contentElement.querySelector('div.ai-code-completion-summary-toolbar-container'));
       });
@@ -4338,7 +4397,7 @@ describeWithEnvironment('StylesSidebarPane Inactive Styles', () => {
     assert.isTrue(nestedSection.isInactive(), 'Nested @starting-style rule should be inactive');
     assert.isFalse(normalSection.isInactive(), 'Normal rule should remain active');
 
-    const cssQuery = nestedSection.element.querySelector('devtools-css-query');
+    const cssQuery = nestedSection.element.querySelector('.css-query');
     assert.isNotNull(cssQuery);
     assert.isNotNull(cssQuery.querySelector('devtools-icon.styles-section-status'));
     assert.isNotNull(cssQuery.querySelector('devtools-icon.section-collapse-icon'));
@@ -4748,8 +4807,8 @@ describeWithEnvironment('StylesSidebarPane updates, completions, and media/keyfr
     });
     const blocks =
         await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map(), null);
-    const q1 = blocks[0].sections[0].element.querySelector('devtools-css-query')?.shadowRoot?.querySelector('.query');
-    const q2 = blocks[0].sections[1].element.querySelector('devtools-css-query')?.shadowRoot?.querySelector('.query');
+    const q1 = blocks[0].sections[0].element.querySelector('.css-query')?.shadowRoot?.querySelector('.query');
+    const q2 = blocks[0].sections[1].element.querySelector('.css-query')?.shadowRoot?.querySelector('.query');
     assert.include(q1?.textContent ?? '', '(max-width: 900px)');
     assert.include(q2?.textContent ?? '', '(min-width: 500px)');
   });

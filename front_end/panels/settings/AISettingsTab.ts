@@ -17,10 +17,11 @@ import * as uiI18n from '../../ui/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import {PanelUtils} from '../utils/utils.js';
 
 import aiSettingsTabStyles from './aiSettingsTab.css.js';
 
-const {html, nothing, render, Directives: {ifDefined, classMap}} = Lit;
+const {html, nothing, render, Directives: {ifDefined, classMap, ref}} = Lit;
 
 const UIStrings = {
   /**
@@ -243,6 +244,32 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const UIStringsNotTranslate = {
+  /**
+   * @description Header of the list of AI tools allowed to run without asking user permission.
+   */
+  allowedTools: 'Allowed tools',
+  /**
+   * @description Explains the list of AI tools allowed to run without asking user permission.
+   */
+  allowedToolsDescription:
+      'Tools in this list can be run by the AI agent without asking. Remove them if you want to be asked for permission every time.',
+  /**
+   * @description Title of a button that removes an AI tool from the list of allowed tools.
+   */
+  removeAllowedTool: 'Remove from allowed tools',
+  /**
+   * @description Text shown in the list of allowed AI tools when the list is empty.
+   */
+  noAllowedTools: 'No tools allowed yet',
+} as const;
+const lockedString = i18n.i18n.lockedString;
+
+export interface AllowedTool {
+  toolName: AiAssistanceModel.Tool.ToolName;
+  displayName: string;
+}
+
 interface SettingItem {
   iconName: string;
   text: Common.UIString.LocalizedString;
@@ -268,13 +295,20 @@ interface ViewInput {
   disabledReasons: string[];
   sharedDisclaimerBulletPoints: Array<{icon: string, text: Common.UIString.LocalizedString|Lit.LitTemplate}>;
   settingToParams: Map<string, AiSettingParams>;
+  isNaturalLanguageInterfaceEnabled: boolean;
+  allowedTools: AllowedTool[];
   expandSetting(settingName: string): void;
   toggleSetting(settingName: string, ev: Event): void;
+  removeAllowedTool(name: AiAssistanceModel.Tool.ToolName): void;
 }
 
-type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
+interface ViewOutput {
+  highlightAllowedTools?: () => void;
+}
 
-export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, _output, target): void => {
+type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+
+export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, output, target): void => {
   // Disabled until https://crbug.com/1079231 is fixed.
   // clang-format off
   const disabledReasonsExplainer = input.disabledReasons.length ? html`
@@ -383,6 +417,40 @@ export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, _output, target): void
     `;
   });
 
+  const renderAllowedTool = (tool: AllowedTool): Lit.TemplateResult => html`
+    <div class="allowed-tool-row" data-tool-name=${tool.toolName}>
+      <span class="allowed-tool-name">${tool.displayName}</span>
+      <devtools-button
+        .data=${{
+          variant: Buttons.Button.Variant.ICON,
+          size: Buttons.Button.Size.SMALL,
+          iconName: 'bin',
+          title: lockedString(UIStringsNotTranslate.removeAllowedTool),
+          accessibleLabel: lockedString(`Remove ${tool.displayName} from allowed tools`),
+          jslogContext: 'ai-remove-allowed-tool',
+        } as Buttons.Button.ButtonData}
+        @click=${() => input.removeAllowedTool(tool.toolName)}
+      ></devtools-button>
+    </div>
+  `;
+
+  const allowedTools = input.isNaturalLanguageInterfaceEnabled ? html`
+    <div class="allowed-tools-section" jslog=${VisualLogging.section('ai-allowed-tools')}
+      ${ref(el => {
+        output.highlightAllowedTools = el ? () => PanelUtils.highlightElement(el as HTMLElement) : undefined;
+      })}>
+      <h2 class="allowed-tools-title">${lockedString(UIStringsNotTranslate.allowedTools)}</h2>
+      <div class="allowed-tools-card">
+        <div class="allowed-tools-description">${lockedString(UIStringsNotTranslate.allowedToolsDescription)}</div>
+        ${input.allowedTools.length ? input.allowedTools.map(renderAllowedTool) : html`
+          <div class="allowed-tool-row">
+            <span>${lockedString(UIStringsNotTranslate.noAllowedTools)}</span>
+          </div>
+        `}
+      </div>
+    </div>
+  ` : nothing;
+
   render(html`
     <style>${Input.checkboxStyles}</style>
     <style>${aiSettingsTabStyles}</style>
@@ -395,6 +463,7 @@ export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, _output, target): void
           ${settings}
         </div>
       ` : nothing}
+      ${allowedTools}
     </div></div>
   `, target);
   // clang-format on
@@ -402,6 +471,7 @@ export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, _output, target): void
 
 export class AISettingsTab extends UI.Widget.VBox {
   #view: View;
+  #viewOutput: ViewOutput = {};
   #consoleInsightsSetting: AiAssistanceModel.AiSetting.AiSetting<boolean>;
   #aiAnnotationsSetting?: Common.Settings.Setting<boolean>;
   #aiAssistanceSetting: AiAssistanceModel.AiSetting.AiSetting<boolean>;
@@ -412,6 +482,8 @@ export class AISettingsTab extends UI.Widget.VBox {
   // Setting to parameters needed to display it in the UI.
   // To display a a setting, it needs to be added to this map.
   #settingToParams = new Map<string, AiSettingParams>();
+  #alwaysAllowedTools =
+      new AiAssistanceModel.AlwaysAllowedTools.AlwaysAllowedTools(Common.Settings.Settings.instance());
 
   constructor(view?: View) {
     super();
@@ -496,16 +568,21 @@ export class AISettingsTab extends UI.Widget.VBox {
       disabledReasons: this.#getDisabledReasons(),
       sharedDisclaimerBulletPoints: this.#getSharedDisclaimerBulletPoints(),
       settingToParams: this.#settingToParams,
+      isNaturalLanguageInterfaceEnabled: AiAssistanceModel.AiUtils.isNaturalLanguageInterfaceEnabled(),
+      allowedTools: this.#getAllowedTools(),
       expandSetting: this.#expandSetting.bind(this),
       toggleSetting: this.#toggleSetting.bind(this),
+      removeAllowedTool: this.#removeAllowedTool.bind(this),
     };
-    this.#view(viewInput, undefined, this.contentElement);
+    this.#view(viewInput, this.#viewOutput, this.contentElement);
   }
 
   override wasShown(): void {
     super.wasShown();
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
+    this.#alwaysAllowedTools.addEventListener(AiAssistanceModel.AlwaysAllowedTools.Events.TOOLS_CHANGED,
+                                              this.requestUpdate, this);
     const initialAvailability = Host.AidaClient.HostConfigTracker.instance().aidaAvailability;
     if (initialAvailability !== undefined) {
       this.#updateAidaAvailability(initialAvailability);
@@ -517,6 +594,32 @@ export class AISettingsTab extends UI.Widget.VBox {
     super.willHide();
     Host.AidaClient.HostConfigTracker.instance().removeEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
+    this.#alwaysAllowedTools.removeEventListener(AiAssistanceModel.AlwaysAllowedTools.Events.TOOLS_CHANGED,
+                                                 this.requestUpdate, this);
+  }
+
+  #getAllowedTools(): AllowedTool[] {
+    return this.#alwaysAllowedTools.list()
+        .map(tn => {
+          const tool = AiAssistanceModel.ToolRegistry.ToolRegistry.get(tn as string);
+          return {toolName: tn, displayName: tool?.displayName ?? tn};
+        })
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
+  #removeAllowedTool(name: AiAssistanceModel.Tool.ToolName): void {
+    this.#alwaysAllowedTools.remove(name);
+  }
+
+  /**
+   * Called by `SettingsScreen.Revealer` after this tab is shown via `Common.Revealer.reveal(setting)`.
+   */
+  highlightObject(object: Object): void {
+    if (!(object instanceof Common.Settings.Setting) ||
+        object.name !== AiAssistanceModel.AlwaysAllowedTools.alwaysAllowedToolsSettingDescriptor.name) {
+      return;
+    }
+    void this.updateComplete.then(() => this.#viewOutput.highlightAllowedTools?.());
   }
 
   // Define all parameter needed to render a setting

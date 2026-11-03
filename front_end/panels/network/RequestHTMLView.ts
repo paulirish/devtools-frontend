@@ -12,7 +12,7 @@ interface ViewInput {
   dataURL: string|null;
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   // Forbid to run JavaScript and set unique origin.
@@ -31,18 +31,37 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
 };
 
 export class RequestHTMLView extends UI.Widget.VBox {
-  readonly #dataURL: string;
+  #dataURL = '';
   readonly #view: View;
-  private constructor(dataURL: string, view = DEFAULT_VIEW) {
-    super({useShadowDom: true});
 
-    this.#dataURL = dataURL;
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element, {useShadowDom: true});
     this.#view = view;
   }
 
   static create(contentData: TextUtils.ContentData.ContentData): RequestHTMLView|null {
     const dataURL = contentData.asDataUrl();
-    return dataURL ? new RequestHTMLView(dataURL) : null;
+    if (!dataURL) {
+      return null;
+    }
+    const view = new RequestHTMLView();
+    view.dataURL = dataURL;
+    return view;
+  }
+
+  get dataURL(): string {
+    return this.#dataURL;
+  }
+
+  set dataURL(dataURL: string) {
+    // Only data: URLs are allowed to be rendered in the sandboxed preview
+    // frame; this used to be guaranteed by the private constructor.
+    const safeURL = dataURL.startsWith('data:') ? dataURL : '';
+    if (this.#dataURL === safeURL) {
+      return;
+    }
+    this.#dataURL = safeURL;
+    this.requestUpdate();
   }
 
   override wasShown(): void {
@@ -56,6 +75,6 @@ export class RequestHTMLView extends UI.Widget.VBox {
   }
 
   override performUpdate(): void {
-    this.#view({dataURL: this.#dataURL}, {}, this.contentElement);
+    this.#view({dataURL: this.#dataURL}, undefined, this.contentElement);
   }
 }

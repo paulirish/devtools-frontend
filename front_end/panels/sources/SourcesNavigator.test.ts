@@ -14,10 +14,11 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as Bindings from '../../models/bindings/bindings.js';
+import type * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {assertScreenshot, raf, renderElementIntoDOM, setTestUniverseForWidgets} from '../../testing/DOMHelpers.js';
 import {deinitializeGlobalVars} from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {dispatchEvent} from '../../testing/MockConnection.js';
@@ -38,7 +39,6 @@ describe('NetworkNavigatorView', () => {
   setupLocaleHooks();
   let workspace: Workspace.Workspace.WorkspaceImpl;
   let backend: MockDebuggerBackend;
-  let networkProjectManager: Bindings.NetworkProject.NetworkProjectManager;
 
   beforeEach(async () => {
     backend = new MockDebuggerBackend();
@@ -63,8 +63,18 @@ describe('NetworkNavigatorView', () => {
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
-    networkProjectManager = new Bindings.NetworkProject.NetworkProjectManager();
+    setTestUniverseForWidgets(backend.universe);
   });
+
+  async function createNetworkNavigatorView(): Promise<Sources.NavigatorView.NavigatorView> {
+    const networkNavigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+    renderElementIntoDOM(networkNavigatorView);
+    await networkNavigatorView.updateComplete;
+    const navigatorView =
+        networkNavigatorView.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
+    assert.exists(navigatorView);
+    return navigatorView;
+  }
 
   afterEach(async () => {
     await deinitializeGlobalVars();
@@ -107,8 +117,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const folder = rootElement.firstChild();
       const file = folder?.firstChild();
@@ -137,8 +146,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       assert.lengthOf(rootElement.children(), 0);
 
@@ -146,8 +154,7 @@ describe('NetworkNavigatorView', () => {
     });
 
     it('reveals main frame target on navigation', async () => {
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
 
       const rootElement = navigatorView.scriptsTree.rootElement();
       assert.strictEqual(rootElement.childCount(), 1);
@@ -163,8 +170,7 @@ describe('NetworkNavigatorView', () => {
 
     it('reveals main frame target when added', async () => {
       target.setInspectedURL(urlString`http://example.com/`);
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
 
       const rootElement = navigatorView.scriptsTree.rootElement();
       assert.strictEqual(rootElement.childCount(), 1);
@@ -173,63 +179,63 @@ describe('NetworkNavigatorView', () => {
       assert.isTrue(navigatorView.scriptsTree.firstChild()?.firstChild()?.selected);
     });
 
-    it('does not add inline style stylesheets without sourceURL as standalone items in NetworkNavigatorView', () => {
-      void backend.universe.cssWorkspaceBinding;
+    it('does not add inline style stylesheets without sourceURL as standalone items in NetworkNavigatorView',
+       async () => {
+         void backend.universe.cssWorkspaceBinding;
 
-      const frameId = 'main-frame-id' as Protocol.Page.FrameId;
-      dispatchEvent(target, 'CSS.styleSheetAdded', {
-        header: {
-          styleSheetId: 'inline-sheet' as Protocol.DOM.StyleSheetId,
-          frameId,
-          sourceURL: 'http://example.com/',
-          origin: Protocol.CSS.StyleSheetOrigin.Regular,
-          title: '',
-          disabled: false,
-          isInline: true,
-          isMutable: false,
-          isConstructed: false,
-          startLine: 4,
-          startColumn: 8,
-          length: 25,
-          endLine: 4,
-          endColumn: 33,
-          hasSourceURL: false,
-        },
-      });
-      dispatchEvent(target, 'CSS.styleSheetAdded', {
-        header: {
-          styleSheetId: 'external-sheet' as Protocol.DOM.StyleSheetId,
-          frameId,
-          sourceURL: 'http://example.com/external.css',
-          origin: Protocol.CSS.StyleSheetOrigin.Regular,
-          title: '',
-          disabled: false,
-          isInline: false,
-          isMutable: false,
-          isConstructed: false,
-          startLine: 0,
-          startColumn: 0,
-          length: 40,
-          endLine: 2,
-          endColumn: 0,
-          hasSourceURL: false,
-        },
-      });
+         const frameId = 'main-frame-id' as Protocol.Page.FrameId;
+         dispatchEvent(target, 'CSS.styleSheetAdded', {
+           header: {
+             styleSheetId: 'inline-sheet' as Protocol.DOM.StyleSheetId,
+             frameId,
+             sourceURL: 'http://example.com/',
+             origin: Protocol.CSS.StyleSheetOrigin.Regular,
+             title: '',
+             disabled: false,
+             isInline: true,
+             isMutable: false,
+             isConstructed: false,
+             startLine: 4,
+             startColumn: 8,
+             length: 25,
+             endLine: 4,
+             endColumn: 33,
+             hasSourceURL: false,
+           },
+         });
+         dispatchEvent(target, 'CSS.styleSheetAdded', {
+           header: {
+             styleSheetId: 'external-sheet' as Protocol.DOM.StyleSheetId,
+             frameId,
+             sourceURL: 'http://example.com/external.css',
+             origin: Protocol.CSS.StyleSheetOrigin.Regular,
+             title: '',
+             disabled: false,
+             isInline: false,
+             isMutable: false,
+             isConstructed: false,
+             startLine: 0,
+             startColumn: 0,
+             length: 40,
+             endLine: 2,
+             endColumn: 0,
+             hasSourceURL: false,
+           },
+         });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
-      const rootElement = navigatorView.scriptsTree.rootElement();
-      const exampleComNode = rootElement.firstChild();
-      assert.exists(exampleComNode);
+         const navigatorView = await createNetworkNavigatorView();
+         const rootElement = navigatorView.scriptsTree.rootElement();
+         const exampleComNode = rootElement.firstChild();
+         assert.exists(exampleComNode);
 
-      const childTitles = exampleComNode.children().map(child => child.title);
-      assert.include(childTitles, 'external.css');
-      assert.lengthOf(childTitles.filter(title => title === '(index)'), 1);
-      assert.deepEqual(childTitles, ['(index)', 'gtm.js', 'external.css', 'favicon.ico']);
-    });
+         const childTitles = exampleComNode.children().map(child => child.title);
+         assert.include(childTitles, 'external.css');
+         assert.lengthOf(childTitles.filter(title => title === '(index)'), 1);
+         assert.deepEqual(childTitles, ['(index)', 'gtm.js', 'external.css', 'favicon.ico']);
+       });
   });
 
-  it('updates in scope change', () => {
+  it('updates in scope change', async () => {
     const target = backend.createTarget();
     const {project} = createContentProviderUISourceCodes({
       items: [
@@ -253,8 +259,7 @@ describe('NetworkNavigatorView', () => {
     });
 
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
-    const navigatorView =
-        Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+    const navigatorView = await createNetworkNavigatorView();
 
     let rootElement = navigatorView.scriptsTree.rootElement();
     assert.strictEqual(rootElement.childCount(), 1);
@@ -281,7 +286,7 @@ describe('NetworkNavigatorView', () => {
       target = backend.createTarget();
     });
 
-    it('selects just once when removing multiple sibling source codes', () => {
+    it('selects just once when removing multiple sibling source codes', async () => {
       const {project} = createContentProviderUISourceCodes({
         items: [
           {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
@@ -299,8 +304,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
@@ -326,7 +330,7 @@ describe('NetworkNavigatorView', () => {
       otherProject.removeProject();
     });
 
-    it('selects parent after removing all children', () => {
+    it('selects parent after removing all children', async () => {
       const {project} = createContentProviderUISourceCodes({
         items: [
           {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
@@ -337,8 +341,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const nodeExampleCom = rootElement.firstChild();
       assert.exists(nodeExampleCom);
@@ -387,8 +390,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
@@ -443,8 +445,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
@@ -503,8 +504,7 @@ describe('NetworkNavigatorView', () => {
           target, {content: '42', url: 'http://example.com/b.js', executionContextId: 2, hasSourceURL: false}, null);
       await backend.addScript(target, {content: '42', url: 'http://example.com/c.js', hasSourceURL: false}, null);
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
@@ -587,8 +587,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
@@ -625,8 +624,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
@@ -669,8 +667,7 @@ describe('NetworkNavigatorView', () => {
         target,
       });
 
-      const navigatorView =
-          Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true, networkProjectManager});
+      const navigatorView = await createNetworkNavigatorView();
       const rootElement = navigatorView.scriptsTree.rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
@@ -710,7 +707,6 @@ describe('FilesNavigatorView', () => {
 
   let workspace: Workspace.Workspace.WorkspaceImpl;
   let backend: MockDebuggerBackend;
-  let networkProjectManager: Bindings.NetworkProject.NetworkProjectManager;
 
   beforeEach(() => {
     backend = new MockDebuggerBackend();
@@ -733,25 +729,49 @@ describe('FilesNavigatorView', () => {
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
 
+    UI.ActionRegistration.maybeRemoveActionExtension('sources.add-folder-to-workspace');
+    UI.ActionRegistration.registerActionExtension({
+      actionId: 'sources.add-folder-to-workspace',
+      iconClass: UI.ActionRegistration.IconClass.PLUS,
+      title: () => 'Add folder to workspace' as Platform.UIString.LocalizedString,
+      category: UI.ActionRegistration.ActionCategory.SOURCES,
+    });
     const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
 
-    const automaticFileSystemManager =
-        sinon.createStubInstance(Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager);
     sinon.stub(Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager, 'instance')
-        .returns(automaticFileSystemManager);
+        .returns(backend.universe.automaticFileSystemManager);
 
-    networkProjectManager = new Bindings.NetworkProject.NetworkProjectManager();
+    setTestUniverseForWidgets(backend.universe);
   });
 
+  async function createFilesNavigatorView(): Promise<Sources.NavigatorView.NavigatorView> {
+    const filesNavigatorView = new Sources.SourcesNavigator.FilesNavigatorView();
+    renderElementIntoDOM(filesNavigatorView, {includeCommonStyles: true});
+    await filesNavigatorView.updateComplete;
+    const navigatorView =
+        filesNavigatorView.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
+    assert.exists(navigatorView);
+    await navigatorView.updateComplete;
+    await raf();
+    return navigatorView;
+  }
   afterEach(async () => {
     await deinitializeGlobalVars();
   });
 
-  it('shows context menu on placeholder', () => {
-    const navigatorView = new Sources.SourcesNavigator.FilesNavigatorView(networkProjectManager);
+  it('renders the empty state with placeholder and automatic file system nudge', async () => {
+    sinon.stub(backend.universe.automaticFileSystemManager, 'availability').get(() => 'available');
+    await createFilesNavigatorView();
+
+    await assertScreenshot('sources/files-navigator-empty.png');
+  });
+
+  it('shows context menu on placeholder', async () => {
+    const navigatorView = new Sources.SourcesNavigator.FilesNavigatorView();
     const contextMenuSpy = sinon.spy(navigatorView, 'handleContextMenu');
-    navigatorView.performUpdate();
+    renderElementIntoDOM(navigatorView);
+    await navigatorView.updateComplete;
 
     const placeholderContainer = navigatorView.contentElement.querySelector('devtools-widget');
     assert.exists(placeholderContainer);
@@ -782,7 +802,9 @@ describe('FilesNavigatorView', () => {
       universe: backend.universe,
     });
 
-    const navigatorView = new Sources.SourcesNavigator.FilesNavigatorView(networkProjectManager);
+    const navigatorView = await createFilesNavigatorView();
+
+    await assertScreenshot('sources/files-navigator-populated.png');
 
     const rootElement = navigatorView.scriptsTree.rootElement();
     const children = rootElement.children();
@@ -816,7 +838,7 @@ describe('FilesNavigatorView', () => {
       universe: backend.universe,
     });
 
-    const navigatorView = new Sources.SourcesNavigator.FilesNavigatorView(networkProjectManager);
+    const navigatorView = await createFilesNavigatorView();
 
     // Stub createFile on the platform file system to simulate successful creation.
     const createFileStub = sinon.stub(project.fileSystem(), 'createFile');
@@ -853,7 +875,6 @@ describe('OverridesNavigatorView', () => {
 
   let workspace: Workspace.Workspace.WorkspaceImpl;
   let backend: MockDebuggerBackend;
-  let networkProjectManager: Bindings.NetworkProject.NetworkProjectManager;
 
   beforeEach(() => {
     backend = new MockDebuggerBackend();
@@ -876,11 +897,29 @@ describe('OverridesNavigatorView', () => {
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
 
-    networkProjectManager = new Bindings.NetworkProject.NetworkProjectManager();
+    setTestUniverseForWidgets(backend.universe);
   });
+
+  async function createOverridesNavigatorView(): Promise<Sources.NavigatorView.NavigatorView> {
+    const overridesNavigatorView = Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true});
+    renderElementIntoDOM(overridesNavigatorView, {includeCommonStyles: true});
+    await overridesNavigatorView.updateComplete;
+    const navigatorView =
+        overridesNavigatorView.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
+    assert.exists(navigatorView);
+    await navigatorView.updateComplete;
+    await raf();
+    return navigatorView;
+  }
 
   afterEach(async () => {
     await deinitializeGlobalVars();
+  });
+
+  it('renders the empty state with placeholder', async () => {
+    await createOverridesNavigatorView();
+
+    await assertScreenshot('sources/overrides-navigator-empty.png');
   });
 
   it('marks override items as active (has-mapped-files) when overrides are enabled', async () => {
@@ -896,8 +935,9 @@ describe('OverridesNavigatorView', () => {
         .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
         .set(true);
 
-    const navigatorView =
-        Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true, networkProjectManager});
+    const navigatorView = await createOverridesNavigatorView();
+
+    await assertScreenshot('sources/overrides-navigator-populated.png');
 
     const rootElement = navigatorView.scriptsTree.rootElement();
     const children = rootElement.children();
@@ -938,8 +978,9 @@ describe('OverridesNavigatorView', () => {
 
     const countSettingListeners = (): number =>
         Common.Settings.Settings.instance().eventTargetForTest.listeners?.get(enabledSetting.name)?.size ?? 0;
-    const navigatorView =
-        Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true, networkProjectManager});
+    const navigatorView = Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true});
+    renderElementIntoDOM(navigatorView);
+    await navigatorView.updateComplete;
     const toolbar = navigatorView.contentElement.querySelector('.navigator-toolbar');
     assert.exists(toolbar);
     const checkbox = toolbar.querySelector('devtools-checkbox');
@@ -959,6 +1000,7 @@ describe('OverridesNavigatorView', () => {
         networkPersistenceManager.once(Persistence.NetworkPersistenceManager.Events.LOCAL_OVERRIDES_PROJECT_UPDATED);
     enabledSetting.set(false);
     await overridesUpdated;
+    await navigatorView.updateComplete;
 
     assert.strictEqual(countSettingListeners(), listenerCount);
     const checkboxes = toolbar.querySelectorAll('devtools-checkbox');

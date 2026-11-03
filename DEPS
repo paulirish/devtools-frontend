@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '16c326db38d947d404e1ad0dc1e252b30c7b96e8',
+  'build_revision': 'dcfbfb3307995747c34073cb12031317cd5e61e2',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '54989aa9486c639962bec871e62404cbe3ea1667',
+  'buildtools_revision': 'd0d4c192e3c718016b3a0c5d44ccec632bccfe96',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'adc980f99321774eacdec2efe93308d7b23a6c12',
+  'depot_tools_revision': '816da11f80777dcf8c10bdaa84df18450dcba12a',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': 'b8141806c6b0382b0b741d5c23d45c85168644e6',
+  'inspector_protocol_revision': 'e7943497823b2371b2b012986f36d5c9b94b8fc5',
 
   # Keeping track of the last time we rolled the browser protocol files.
-  'chromium_browser_protocol_revision' : 'c5ce2678a166707ca2cf67fc47ab17bfc213e541',
+  'chromium_browser_protocol_revision' : '481a581fe3e96f2a21db53a085901a0133f30e1d',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '9f796802e5d633c96dbe97e0b6683d5e62594f9f',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:f90c3d9df882a9da4a66457f47dd3d99b3df3dd5',
+  'gn_version': 'git_revision:ed7fee04cb30b96ed40ef188acfad5417349e399',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -52,7 +52,7 @@ vars = {
   # Note: This var is no longer referenced in the body of this DEPS file.
   # However it is used by the roll script (scripts/deps/roll_deps.py) to ease
   # version resolution. DO NOT REMOVE!
-  'chrome': '158.0.8104.0',
+  'chrome': '159.0.8139.2',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -65,7 +65,7 @@ vars = {
   'cpython3_version': 'version:3@3.11.9.chromium.38',
 
   # siso CIPD package version
-  'siso_version': 'git_revision:7ab4814901b3c7afc2dddf2ed1a6ff238a0d85c5',
+  'siso_version': 'git_revision:c508213533aa5cd425b69cb0f66e53522d77022d',
 
   # Fetches the AI Evals testing data.
   'checkout_devtools_ai_evals': False,
@@ -259,6 +259,25 @@ deps = {
           },
       ],
   },
+  # npm packages for the build and test toolchain, extracted into
+  # node_modules/ from a deterministic archive produced by
+  # scripts/deps/manage_node_deps.py (see docs/cookbook/dependencies.md).
+  # Only `non_git_source`: devtools-frontend is in Chromium's recursedeps, so
+  # this one entry serves standalone and Chromium checkouts alike.
+  'node_modules': {
+    'dep_type': 'gcs',
+    'bucket': 'chromium-nodejs',
+    'condition': 'non_git_source',
+    'objects': [
+      {
+        'object_name': 'devtools-frontend/c67f72622077f8d20a0d641e63f95772120577b846ace3e3d434db9f13188350',
+        'sha256sum': 'c67f72622077f8d20a0d641e63f95772120577b846ace3e3d434db9f13188350',
+        'size_bytes': 25471299,
+        'generation': 1792758257766269,
+        'output_file': 'node_modules.tar.gz',
+      },
+    ],
+  },
   "scripts/ai_assistance/suite/outputs": {
     "dep_type": "gcs",
     'condition': 'checkout_ai_evals == True',
@@ -278,10 +297,10 @@ deps = {
     'bucket': 'chrome-for-testing-public',
     'objects': [
       {
-        'object_name': '158.0.8104.0/win64/chrome-win64.zip',
-        'sha256sum': '6efd2bd40ceb3dbdc496953d33eae71312bd09257d2829d61ae2f495e2bb14e3',
-        'size_bytes': 210341912,
-        'generation': 1791952996015856,
+        'object_name': '159.0.8139.2/win64/chrome-win64.zip',
+        'sha256sum': '3320c2dd6ac790867b5515b10098933dc1215d3fbae0345ba231577a031e1f5d',
+        'size_bytes': 215285166,
+        'generation': 1793642718669926,
       },
     ],
   },
@@ -291,10 +310,10 @@ deps = {
     'bucket': 'chrome-for-testing-public',
     'objects': [
       {
-        'object_name': '158.0.8104.0/mac-x64/chrome-mac-x64.zip',
-        'sha256sum': '8dbdfd8b2768488890a9f16edb94d78a320cd7627dd05a7be5e55073987be49d',
-        'size_bytes': 208626002,
-        'generation': 1791960162792775,
+        'object_name': '159.0.8139.2/mac-x64/chrome-mac-x64.zip',
+        'sha256sum': '3c1ad8abee32e14e012aaff1100bca7c5261994d92d87bec93faa30133dc2320',
+        'size_bytes': 214483998,
+        'generation': 1793646430082148,
       },
     ],
   },
@@ -304,10 +323,10 @@ deps = {
     'bucket': 'chrome-for-testing-public',
     'objects': [
       {
-        'object_name': '158.0.8104.0/mac-arm64/chrome-mac-arm64.zip',
-        'sha256sum': '8a2d732fda1fe6af073884b33298e188575a1abba08bf7d6224fe293109bdb21',
-        'size_bytes': 197838281,
-        'generation': 1791953740820351,
+        'object_name': '159.0.8139.2/mac-arm64/chrome-mac-arm64.zip',
+        'sha256sum': '528997f97afa374d2e25a03ea26fd4c49df5717da31ac9de82ee13033370ea84',
+        'size_bytes': 202714498,
+        'generation': 1793644207205781,
       },
     ],
   },
@@ -317,10 +336,10 @@ deps = {
     'bucket': 'chrome-for-testing-public',
     'objects': [
       {
-        'object_name': '158.0.8104.0/linux64/chrome-linux64.zip',
-        'sha256sum': '6d15a1a00e6c8a97d04783ccb3ee0ec79ecf964dca75aff5ca8e39c3a270fa1b',
-        'size_bytes': 202355055,
-        'generation': 1791951285551907,
+        'object_name': '159.0.8139.2/linux64/chrome-linux64.zip',
+        'sha256sum': 'c324d5b32b9bedb40cc9ca1b54ff35332df2c2994961b6aff8ca78c4a3b5d860',
+        'size_bytes': 209834854,
+        'generation': 1793641215718169,
       },
     ],
   },
@@ -384,6 +403,17 @@ deps = {
 
 hooks = [
   {
+    # gclient re-extracts the `node_modules` archive based on its stamp
+    # files, not on the extracted tree. Checking out a revision from before
+    # node_modules left git and coming back leaves a valid stamp next to an
+    # empty directory; this re-extracts the archive gclient keeps there.
+    # Unconditional so that it also runs in Chromium checkouts (recursedeps);
+    # it is a no-op wherever gclient did not extract the archive (Cog).
+    'name': 'ensure_node_modules',
+    'pattern': '.',
+    'action': ['python3', 'scripts/deps/ensure_node_modules.py'],
+  },
+  {
     # Ensure that the DEPS'd "depot_tools" has its self-update capability
     # disabled.
     'name': 'disable_depot_tools_selfupdate',
@@ -406,7 +436,6 @@ hooks = [
   {
     'name': 'emscripten',
     'pattern': '.',
-    'condition': 'build_with_chromium == False',
     'action': ['vpython3', 'scripts/deps/download_emscripten.py', Var('emscripten_tag'), 'third_party/emscripten-releases'],
   },
   {

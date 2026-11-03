@@ -3,11 +3,19 @@
 # found in the LICENSE file.
 
 import("../../scripts/build/ninja/copy.gni")
+import("../../scripts/build/ninja/script_test.gni")
+import("../../scripts/build/ninja/vars.gni")
 import("../../scripts/build/typescript/typescript.gni")
+
+if (!devtools_build_with_bundled_chromium_deps) {
+  import("//build/config/cast.gni")
+  import("//build/config/chromeos/args.gni")
+}
 
 group("e2e") {
   testonly = true
   deps = [
+    ":devtools_e2e_tests",
     ":test_inputs",
     ":tests",
     "resources",
@@ -66,8 +74,33 @@ node_ts_library("tests") {
 generated_file("test_inputs") {
   testonly = true
   outputs = [ "$target_gen_dir/tests.txt" ]
+  data = outputs
   data_keys = [ "tests" ]
   rebase = target_gen_dir
 
   deps = [ ":tests" ]
+}
+
+node_script_test("devtools_e2e_tests") {
+  script = "$target_gen_dir/run-mocha.js"
+
+  data_deps = [
+    ":test_inputs",
+    ":tests",
+    "../../:favicon",
+    "../../scripts/hosted_mode",
+    "resources",
+  ]
+
+  if (!devtools_build_with_bundled_chromium_deps) {
+    if (!is_ios && !is_android && !is_castos && !is_fuchsia &&
+        !is_chromeos_device) {
+      data_deps += [ "//chrome" ]
+    }
+  } else {
+    data_deps += [ "../../front_end" ]
+    if (!build_with_chromium) {
+      data = [ devtools_location_prepend + "third_party/chrome/" ]
+    }
+  }
 }

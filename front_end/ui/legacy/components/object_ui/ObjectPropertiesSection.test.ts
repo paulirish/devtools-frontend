@@ -653,7 +653,7 @@ describeWithEnvironment('ObjectPropertiesSection', () => {
         onRootItemContextMenu: () => {},
         onExpand: () => {},
       },
-                                                                              {}, container);
+                                                                              undefined, container);
       renderElementIntoDOM(container);
       await UI.Widget.Widget.allUpdatesComplete;
       await raf();
@@ -694,7 +694,7 @@ describeWithEnvironment('ObjectPropertiesSection', () => {
       onRootItemContextMenu: () => {},
       onExpand: () => {},
     },
-                                                                            {}, container);
+                                                                            undefined, container);
     renderElementIntoDOM(container);
     await UI.Widget.Widget.allUpdatesComplete;
     await raf();
@@ -736,7 +736,7 @@ describeWithEnvironment('ObjectPropertiesSection', () => {
       onRootItemContextMenu: () => {},
       onExpand: () => {},
     },
-                                                                            {}, container);
+                                                                            undefined, container);
     renderElementIntoDOM(container);
     await UI.Widget.Widget.allUpdatesComplete;
     await raf();
@@ -838,6 +838,58 @@ describeWithEnvironment('ObjectPropertiesSection', () => {
     assert.exists(treeWidget.contentElement.querySelector('[data-object-property-name-for-test="foo"]'));
     assert.isNull(treeWidget.contentElement.querySelector('[data-object-property-name-for-test="get foo"]'));
     assert.isNull(treeWidget.contentElement.querySelector('[data-object-property-name-for-test="set foo"]'));
+    treeWidget.detach();
+  });
+
+  it('removes root and child node listeners when ObjectTreeWidget is hidden or switched to another tree', async () => {
+    const object = SDK.RemoteObject.RemoteObject.fromLocalObject({foo: 1});
+    const objectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(object, {
+      readOnly: true,
+      propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
+    });
+    objectTree.expanded = true;
+
+    const treeWidget = new ObjectUI.ObjectPropertiesSection.ObjectTreeWidget();
+    treeWidget.objectTree = objectTree;
+    renderElementIntoDOM(treeWidget);
+    await UI.Widget.Widget.allUpdatesComplete;
+    await raf();
+
+    const child = objectTree.children?.properties?.[0];
+    assert.exists(child);
+    const hasWidgetListener = (node: ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase): boolean =>
+        Boolean(node.listeners?.get(ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase.Events.EXPANDED_CHANGED)) &&
+        Array
+            .from(node.listeners?.get(ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase.Events.EXPANDED_CHANGED) ??
+                  [])
+            .some(tuple => tuple.thisObject === treeWidget);
+
+    assert.isTrue(hasWidgetListener(objectTree));
+    assert.isTrue(hasWidgetListener(child));
+
+    const secondObject = SDK.RemoteObject.RemoteObject.fromLocalObject({bar: 2});
+    const secondObjectTree = new ObjectUI.ObjectPropertiesSection.ObjectTree(secondObject, {
+      readOnly: true,
+      propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
+    });
+    secondObjectTree.expanded = true;
+    treeWidget.objectTree = secondObjectTree;
+    await UI.Widget.Widget.allUpdatesComplete;
+    await raf();
+
+    assert.isFalse(hasWidgetListener(objectTree));
+    assert.isFalse(hasWidgetListener(child));
+
+    const secondChild = secondObjectTree.children?.properties?.[0];
+    assert.exists(secondChild);
+    assert.isTrue(hasWidgetListener(secondObjectTree));
+    assert.isTrue(hasWidgetListener(secondChild));
+
+    treeWidget.setHideOnDetach();
+    treeWidget.detach();
+
+    assert.isFalse(hasWidgetListener(secondObjectTree));
+    assert.isFalse(hasWidgetListener(secondChild));
   });
 
   it('does not edit readonly values', async () => {
@@ -919,6 +971,26 @@ describeWithEnvironment('ObjectPropertiesSection', () => {
     firstInput.startEditing();
     const [secondInput] = await secondExpectedCall;
     assert.isTrue(secondInput.editing);
+    section.detach();
+  });
+
+  it('only listens to property node events while ObjectPropertyWidget is shown', () => {
+    const property = new SDK.RemoteObject.RemoteObjectProperty(
+        'name', SDK.RemoteObject.RemoteObject.fromLocalObject(42), true, true);
+    const node = new ObjectUI.ObjectPropertiesSection.ObjectTreeNode(property, undefined, {
+      readOnly: false,
+      propertiesMode: ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.OWN_AND_INTERNAL_AND_INHERITED,
+    });
+    const section = new ObjectUI.ObjectPropertiesSection.ObjectPropertyWidget();
+    section.property = node;
+    assert.isFalse(node.hasEventListeners(ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase.Events.VALUE_CHANGED));
+
+    renderElementIntoDOM(section);
+    assert.isTrue(node.hasEventListeners(ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase.Events.VALUE_CHANGED));
+
+    section.setHideOnDetach();
+    section.detach();
+    assert.isFalse(node.hasEventListeners(ObjectUI.ObjectPropertiesSection.ObjectTreeNodeBase.Events.VALUE_CHANGED));
   });
 
   function createAndRenderPropertyValue(value: SDK.RemoteObject.RemoteObject, wasThrown: boolean,
@@ -1528,5 +1600,62 @@ describeWithEnvironment('ObjectTreeExpansionTracker', () => {
     assert.strictEqual(thud.childCount(), 1);
     const wibble = thud.childAt(0)!;
     assert.isFalse(wibble.expanded);
+  });
+
+  it('expands root and child tree elements recursively via TreeOutline', async () => {
+    const object = SDK.RemoteObject.RemoteObject.fromLocalObject({
+      foo: {
+        bar: {
+          baz: {
+            quux: {
+              corge: 'plugh',
+            },
+          },
+        },
+      },
+    });
+
+    const section = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionWidget();
+    section.root = object;
+    section.title = html`JSON`;
+    assert.exists(section.objectTree);
+    renderElementIntoDOM(section);
+    await section.updateComplete;
+    await raf();
+
+    const rootElement = getRootTreeElement(section);
+    assert.isFalse(rootElement.expanded);
+
+    await rootElement.expandRecursively();
+    await UI.Widget.Widget.allUpdatesComplete;
+    await raf();
+
+    assert.isTrue(rootElement.expanded);
+    assert.strictEqual(rootElement.childCount(), 1);
+    const foo = rootElement.childAt(0);
+    assert.exists(foo);
+    assert.isTrue(foo.expanded);
+
+    assert.strictEqual(foo.childCount(), 1);
+    const bar = foo.childAt(0);
+    assert.exists(bar);
+    assert.isTrue(bar.expanded);
+
+    assert.strictEqual(bar.childCount(), 1);
+    const baz = bar.childAt(0);
+    assert.exists(baz);
+    assert.isTrue(baz.expanded);
+
+    assert.strictEqual(baz.childCount(), 1);
+    const quux = baz.childAt(0);
+    assert.exists(quux);
+    assert.isFalse(quux.expanded);
+
+    await quux.expandRecursively();
+    await UI.Widget.Widget.allUpdatesComplete;
+    await raf();
+
+    assert.isTrue(quux.expanded);
+    assert.strictEqual(quux.childCount(), 1);
   });
 });

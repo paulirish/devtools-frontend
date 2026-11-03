@@ -59,9 +59,7 @@ export interface ViewInput {
   onDownloadClick: () => void;
 }
 
-export type ViewOutput = Record<string, never>;
-
-export type View = (input: ViewInput, output: ViewOutput, target: DocumentFragment) => void;
+export type View = (input: ViewInput, output: undefined, target: DocumentFragment) => void;
 
 // clang-format off
 export const DEFAULT_VIEW: View = (input, output, target) => {
@@ -164,7 +162,7 @@ export class StatusDialog extends UI.Widget.VBox<ShadowRoot> {
   }
 
   finish(): void {
-    this.stopTimer();
+    this.#stopTimer();
     this.#hideStopButton = true;
     this.requestUpdate();
   }
@@ -192,7 +190,7 @@ export class StatusDialog extends UI.Widget.VBox<ShadowRoot> {
 
   remove(): void {
     (this.element.parentNode as HTMLElement)?.classList.remove('opaque', 'tinted');
-    this.stopTimer();
+    this.#stopTimer();
     this.detach();
   }
 
@@ -226,7 +224,7 @@ export class StatusDialog extends UI.Widget.VBox<ShadowRoot> {
     this.#updateTimerTick();
   }
 
-  private stopTimer(): void {
+  #stopTimer(): void {
     if (!this.#timeUpdateTimer) {
       return;
     }
@@ -266,7 +264,7 @@ export class StatusDialog extends UI.Widget.VBox<ShadowRoot> {
             void this.#downloadRawTraceAfterError();
           },
         },
-        {},
+        undefined,
         this.contentElement,
     );
     this.#focusStopButton = false;

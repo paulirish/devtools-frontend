@@ -35,9 +35,12 @@ function renderView(inputOverrides: Partial<Parameters<typeof DEFAULT_VIEW>[0]> 
         title: {text: 'div#container.grid'},
         comments: [],
         status: 'SENT_TO_AGENT',
+        transmitted: false,
         commentText: '',
+        placeholder: 'Ctrl + \u21b5 to queue comments',
         isEditing: false,
         isQueueModifierPressed: false,
+        elementRemoved: false,
         textAreaRef: Lit.Directives.createRef(),
         onAddComment: () => {},
         onDeleteQueuedComment: () => {},
@@ -77,6 +80,18 @@ describeWithEnvironment('CommentThreadWidget DEFAULT_VIEW', () => {
     await assertScreenshot('comments/comment_thread_widget_submitted.png');
   });
 
+  it('renders a developer comment taken by the agent', async () => {
+    const comments: CommentManager.CommentManager.Comment[] = [
+      {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
+    ];
+    const target = renderView({comments, transmitted: true});
+    renderElementIntoDOM(target, {includeCommonStyles: true});
+    const spinner = target.querySelector('devtools-spinner');
+    assert.isNotNull(spinner);
+    spinner.active = false;
+    await assertScreenshot('comments/comment_thread_widget_working.png');
+  });
+
   it('renders a queued developer comment', async () => {
     const comments: CommentManager.CommentManager.Comment[] = [
       {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
@@ -114,6 +129,51 @@ describeWithEnvironment('CommentThreadWidget DEFAULT_VIEW', () => {
     await assertScreenshot('comments/comment_thread_widget_agent_response.png');
   });
 
+  const LONG_AGENT_RESPONSE =
+      Array.from({length: 20}, (_, i) => `${i + 1}. Updated rule \`.grid-item-${i + 1}\` to use \`margin: 8px;\``)
+          .join('\n');
+
+  it('caps the thread body height and makes it scrollable for long agent responses', () => {
+    const comments: CommentManager.CommentManager.Comment[] = [
+      {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
+      {author: 'AGENT', text: LONG_AGENT_RESPONSE, timestamp: 1},
+    ];
+    const target = renderView({comments, status: 'RESOLVED'});
+    renderElementIntoDOM(target, {includeCommonStyles: true});
+
+    const threadBody = target.querySelector<HTMLElement>('.thread-body');
+    assert.exists(threadBody);
+    assert.strictEqual(getComputedStyle(threadBody).overflowY, 'auto');
+    assert.isAbove(threadBody.scrollHeight, threadBody.clientHeight);
+  });
+
+  it('does not make the thread body scrollable for short agent responses', () => {
+    const comments: CommentManager.CommentManager.Comment[] = [
+      {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
+      {author: 'AGENT', text: 'Updated the rule to use `margin: 8px;`', timestamp: 1},
+    ];
+    const target = renderView({comments, status: 'RESOLVED'});
+    renderElementIntoDOM(target, {includeCommonStyles: true});
+
+    const threadBody = target.querySelector<HTMLElement>('.thread-body');
+    assert.exists(threadBody);
+    assert.strictEqual(threadBody.scrollHeight, threadBody.clientHeight);
+  });
+
+  it('renders an agent response with the element removed banner', async () => {
+    const comments: CommentManager.CommentManager.Comment[] = [
+      {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
+      {
+        author: 'AGENT',
+        text: 'Updated the rule to use `margin: 8px;`',
+        timestamp: 1,
+      },
+    ];
+    const target = renderView({comments, status: 'RESOLVED', elementRemoved: true});
+    renderElementIntoDOM(target, {includeCommonStyles: true});
+    await assertScreenshot('comments/comment_thread_widget_element_removed.png');
+  });
+
   it('keeps sent status within widget bounds when title is long', () => {
     const comments: CommentManager.CommentManager.Comment[] = [
       {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
@@ -133,6 +193,23 @@ describeWithEnvironment('CommentThreadWidget DEFAULT_VIEW', () => {
     const sentRect = sentStatusEl.getBoundingClientRect();
 
     assert.isAtMost(sentRect.right, widgetRect.right);
+  });
+
+  it('does not render the element removed banner by default', () => {
+    const target = renderView();
+    assert.isNull(target.querySelector('.element-removed-banner'));
+  });
+
+  it('renders the element removed banner when elementRemoved is true', () => {
+    const comments: CommentManager.CommentManager.Comment[] = [
+      {author: 'DEVELOPER', text: 'Align this to the grid', timestamp: 0},
+      {author: 'AGENT', text: 'Updated the rule to use `margin: 8px;`', timestamp: 1},
+    ];
+    const target = renderView({comments, elementRemoved: true});
+
+    const banner = target.querySelector('.element-removed-banner');
+    assert.isNotNull(banner);
+    assert.strictEqual(banner.textContent?.trim(), 'The element is no longer available');
   });
 });
 
@@ -157,6 +234,15 @@ describeWithEnvironment('CommentThreadWidget header status in DEFAULT_VIEW', () 
     const target = renderView({comments, status: 'SENT_TO_AGENT'});
 
     assert.isNotNull(target.querySelector('.sent-status'));
+    assert.isNull(target.querySelector('.working-status'));
+    assert.isNull(target.querySelector('.delete-button'));
+  });
+
+  it('shows the working status instead of the sent status once the agent takes the thread', () => {
+    const target = renderView({comments, status: 'SENT_TO_AGENT', transmitted: true});
+
+    assert.isNull(target.querySelector('.sent-status'));
+    assert.isNotNull(target.querySelector('.working-status devtools-spinner'));
     assert.isNull(target.querySelector('.delete-button'));
   });
 
@@ -372,6 +458,18 @@ describeWithEnvironment('CommentThreadWidget presenter', () => {
     assert.strictEqual(view.input.commentText, '');
   });
 
+  it('passes the transmitted state to the view input', async () => {
+    const view = createViewFunctionStub(CommentThreadWidget);
+    const widget = new CommentThreadWidget(undefined, view);
+    widget.status = 'SENT_TO_AGENT';
+    widget.performUpdate();
+    assert.isFalse(view.input.transmitted);
+
+    widget.transmitted = true;
+    widget.performUpdate();
+    assert.isTrue(view.input.transmitted);
+  });
+
   it('focuses the textarea when shown', async () => {
     const view = createViewFunctionStub(CommentThreadWidget);
     const widget = new CommentThreadWidget(undefined, view);
@@ -516,5 +614,16 @@ describeWithEnvironment('CommentThreadWidget presenter', () => {
     } finally {
       widget.detach();
     }
+  });
+
+  it('passes elementRemoved to view input', async () => {
+    const view = createViewFunctionStub(CommentThreadWidget);
+    const widget = new CommentThreadWidget(undefined, view);
+    widget.performUpdate();
+    assert.isFalse(view.input.elementRemoved);
+
+    widget.elementRemoved = true;
+    await widget.updateComplete;
+    assert.isTrue(view.input.elementRemoved);
   });
 });

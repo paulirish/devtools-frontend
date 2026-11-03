@@ -85,6 +85,7 @@ devtools_ui_module("unittests") {
     "PlayerListView.test.ts",
     "PlayerMessagesView.test.ts",
     "PlayerPropertiesView.test.ts",
+    "TickingFlameChart.test.ts",
     "TickingFlameChartHelpers.test.ts",
   ]
 
@@ -96,5 +97,7 @@ devtools_ui_module("unittests") {
     "../../generated",
     "../../testing",
     "../../ui/components/render_coordinator:bundle",
+    "../../ui/legacy:bundle",
+    "../../ui/legacy/components/perf_ui:bundle",
   ]
 }

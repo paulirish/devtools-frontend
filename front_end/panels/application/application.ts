@@ -24,6 +24,7 @@ import * as OpenedWindowDetailsView from './OpenedWindowDetailsView.js';
 import * as OriginTrialTreeView from './OriginTrialTreeView.js';
 import * as PreloadingView from './preloading/PreloadingView.js';
 import * as PreloadingTreeElement from './PreloadingTreeElement.js';
+import * as PrivateVerificationTokensView from './PrivateVerificationTokensView.js';
 import * as ReportingApiTreeElement from './ReportingApiTreeElement.js';
 import * as ReportingApiView from './ReportingApiView.js';
 import * as ResourcesPanel from './ResourcesPanel.js';
@@ -34,6 +35,7 @@ import * as ServiceWorkerUpdateCycleView from './ServiceWorkerUpdateCycleView.js
 import * as StorageBucketsTreeElement from './StorageBucketsTreeElement.js';
 import * as StorageItemsToolbar from './StorageItemsToolbar.js';
 import * as StorageView from './StorageView.js';
+import * as SubAppsView from './SubAppsView.js';
 import * as TrustTokensTreeElement from './TrustTokensTreeElement.js';
 import * as WebMCPTreeElement from './WebMCPTreeElement.js';
 import * as WebMCPView from './WebMCPView.js';
@@ -62,6 +64,7 @@ export {
   OriginTrialTreeView,
   PreloadingTreeElement,
   PreloadingView,
+  PrivateVerificationTokensView,
   ReportingApiTreeElement,
   ReportingApiView,
   ResourcesPanel,
@@ -72,6 +75,7 @@ export {
   StorageBucketsTreeElement,
   StorageItemsToolbar,
   StorageView,
+  SubAppsView,
   TrustTokensTreeElement,
   WebMCPTreeElement,
   WebMCPView,

@@ -43,6 +43,7 @@ describe('CSSMatchedStyles', () => {
                       {name: '--foo', value: 'active-foo'},
                       {name: '--baz', value: 'active-baz !important', important: true},
                       {name: '--baz', value: 'passive-baz'},
+                      {name: '--use-baz', value: 'var(--baz)'},
                       {name: '--dark', value: 'darkgrey'},
                       {name: '--empty', value: ''},
                       {name: '--empty2', value: 'var(--empty)'},
@@ -82,7 +83,7 @@ describe('CSSMatchedStyles', () => {
 
     it('should correctly compute the value of an expression that uses a variable', async () => {
       await testCssValueEquals('--foo', 'active-foo');
-      await testCssValueEquals('--baz', 'active-baz !important');
+      await testCssValueEquals('--baz', 'active-baz');
       await testCssValueEquals('--does-not-exist', null);
       await testCssValueEquals('--dark', 'darkgrey');
       await testCssValueEquals('--light', 'lightgrey');
@@ -94,6 +95,10 @@ describe('CSSMatchedStyles', () => {
       await testCssValueEquals('--empty2', '');
       await testCssValueEquals('---', 'blue');
       await testCssValueEquals('---triple-dash', 'blue');
+    });
+
+    it('does not include !important in the value of a referenced variable', async () => {
+      await testCssValueEquals('--use-baz', 'active-baz');
     });
 
     it('correctly resolves the declaration', async () => {
@@ -316,6 +321,29 @@ describe('CSSMatchedStyles', () => {
       });
       assert.strictEqual(
           matchedStyles.computeCSSVariable(matchedStyles.nodeStyles()[0], '--color')?.value, 'inherited-color');
+    });
+
+    it('resolves vars with css keywords and !important', async () => {
+      const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      node.id = 1 as Protocol.DOM.NodeId;
+      const parent = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      parent.id = 2 as Protocol.DOM.NodeId;
+      node.parentNode = parent;
+      const matchedStyles = await getMatchedStyles({
+        connection,
+        matchedPayload: [
+          ruleMatch('div', [{name: '--color', value: 'inherit !important', important: true}]),
+          ruleMatch('div', [{name: '--color', value: 'revert-rule !important', important: true}]),
+        ],
+        inheritedPayload: [{
+          matchedCSSRules: [
+            ruleMatch('div', [{name: '--color', value: 'inherited-color !important', important: true}]),
+          ],
+        }],
+        node,
+      });
+      assert.strictEqual(matchedStyles.computeCSSVariable(matchedStyles.nodeStyles()[0], '--color')?.value,
+                         'inherited-color');
     });
 
     it('correcty handles cycles', async () => {
@@ -943,6 +971,7 @@ describe('CSSMatchedStyles', () => {
       {name: 'data-test-loop-2', value: 'var(--test-loop-1, 2px)'},
       {name: 'data-test-loop-indirect-2', value: 'attr(data-test-loop-1 type(<length>), 6px)'},
       {name: 'data-test-number', value: '70'},
+      {name: 'data-test-important', value: '70 !important'},
       {name: 'data-test-length', value: 'attr(data-test-number in)'},
       {name: 'data-test-bad-unit', value: 'attr(data-test-number parsecs, 2px)'},
       {name: 'data-test-bad-type', value: 'attr(data-test-number type(<nomber>), 2)'},
@@ -984,7 +1013,7 @@ describe('CSSMatchedStyles', () => {
           });
     }
 
-    const variables: Array<{name: string, value: string, expected: string | null}> = [
+    const variables: Array<{name: string, value: string, expected: string | null, important?: boolean}> = [
       {name: '--test-missing', value: 'attr(data-nonexistent)', expected: '""'},
       {name: '--test-missing-fallback', value: 'attr(data-nonexistent, 2px)', expected: '2px'},
       {name: '--test-missing-var-indirect', value: 'var(--test-missing, 2px)', expected: '""'},
@@ -1038,6 +1067,14 @@ describe('CSSMatchedStyles', () => {
         expected: '4',
       },
       {name: '--test-cant-parse', value: 'attr(data-cant-parse type(*), red)', expected: 'red'},
+      {name: '--test-important-attr', value: 'attr(data-test-important type(<number>), 2px)', expected: '2px'},
+      {name: '--test-important-raw-string', value: 'attr(data-test-important raw-string)', expected: '"70 !important"'},
+      {
+        name: '--test-important-declaration',
+        value: 'attr(data-test-number type(<number>)) !important',
+        important: true,
+        expected: '70',
+      },
     ];
 
     const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
@@ -1990,6 +2027,282 @@ describe('CSSMatchedStyles', () => {
       assert.lengthOf(styles, 1);
       assert.strictEqual((styles[0].parentRule as SDK.CSSRule.CSSStyleRule).selectorText(), 'div');
       assert.deepEqual(propertyTexts(styles[0]), ['display: block', 'unicode-bidi: isolate']);
+    });
+  });
+
+  it('resolves !important precedence across UserAgent, Injected, and Regular origins', async () => {
+    const uaRule = ruleMatch('div',
+                             [
+                               {name: 'color', value: 'black', important: true},
+                               {name: 'margin', value: '0px'},
+                             ],
+                             {origin: Protocol.CSS.StyleSheetOrigin.UserAgent});
+    const injectedLowSpecRule = ruleMatch('div',
+                                          [
+                                            {name: 'color', value: 'green', important: true},
+                                            {name: 'margin', value: '10px', important: true},
+                                          ],
+                                          {origin: Protocol.CSS.StyleSheetOrigin.Injected});
+    const regularRule = ruleMatch('.cls',
+                                  [
+                                    {name: 'color', value: 'red', important: true},
+                                    {name: 'margin', value: '20px', important: true},
+                                    {name: 'padding', value: '10px', important: true},
+                                  ],
+                                  {origin: Protocol.CSS.StyleSheetOrigin.Regular});
+    const injectedHighSpecRule = ruleMatch('#inspected',
+                                           [
+                                             {name: 'padding', value: '20px', important: true},
+                                           ],
+                                           {origin: Protocol.CSS.StyleSheetOrigin.Injected});
+
+    const matchedStyles = await getMatchedStyles({
+      connection,
+      matchedPayload: [uaRule, injectedLowSpecRule, regularRule, injectedHighSpecRule],
+    });
+
+    const [injectedHighSpecStyle, regularStyle, injectedLowSpecStyle, uaStyle] = matchedStyles.nodeStyles();
+
+    // UserAgent !important overrides both Injected and Regular !important rules.
+    assert.strictEqual(matchedStyles.propertyState(uaStyle.allProperties()[0]),
+                       SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+    assert.strictEqual(matchedStyles.propertyState(injectedLowSpecStyle.allProperties()[0]),
+                       SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    assert.strictEqual(matchedStyles.propertyState(regularStyle.allProperties()[0]),
+                       SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+    // Injected and Regular share the author origin: higher specificity wins for !important.
+    assert.strictEqual(matchedStyles.propertyState(regularStyle.allProperties()[1]),
+                       SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+    assert.strictEqual(matchedStyles.propertyState(injectedLowSpecStyle.allProperties()[1]),
+                       SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    assert.strictEqual(matchedStyles.propertyState(uaStyle.allProperties()[1]),
+                       SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+    assert.strictEqual(matchedStyles.propertyState(injectedHighSpecStyle.allProperties()[0]),
+                       SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+    assert.strictEqual(matchedStyles.propertyState(regularStyle.allProperties()[2]),
+                       SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+  });
+
+  describe('shadow cascade context', () => {
+    function createStubNode(id: number, backendNodeId: number, parentNode: SDK.DOMModel.DOMNode|null = null):
+        sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode> {
+      const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      node.id = id as Protocol.DOM.NodeId;
+      node.backendNodeId.returns(backendNodeId as Protocol.DOM.BackendNodeId);
+      node.nodeType.returns(SDK.DOMModel.NodeType.ELEMENT_NODE);
+      node.parentNode = parentNode;
+      return node;
+    }
+
+    function findProperty(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, name: string,
+                          value: string): SDK.CSSProperty.CSSProperty {
+      for (const style of matchedStyles.nodeStyles()) {
+        for (const prop of style.allProperties()) {
+          if (prop.name === name && prop.value === value) {
+            return prop;
+          }
+        }
+      }
+      assert.fail(`Property ${name}: ${value} not found`);
+    }
+
+    it('keeps animations, transitions, attribute styles, and :host rules active on shadow hosts', async () => {
+      const docScope = 10 as Protocol.DOM.BackendNodeId;
+      const shadowScope = 30 as Protocol.DOM.BackendNodeId;
+      const docNode = createStubNode(1, docScope);
+      const hostNode = createStubNode(2, 20, docNode);
+      hostNode.getTreeRoot.returns(docNode);
+      const shadowRoot = createStubNode(3, shadowScope, hostNode);
+      hostNode.shadowRoots.returns([shadowRoot]);
+
+      const uaRule = ruleMatch('div',
+                               [
+                                 {name: 'display', value: 'block'},
+                                 {name: 'list-style-type', value: 'disc'},
+                               ],
+                               {origin: Protocol.CSS.StyleSheetOrigin.UserAgent});
+      const hostRule = ruleMatch(':host',
+                                 [
+                                   {name: 'display', value: 'inline-block'},
+                                   {name: 'opacity', value: '0.8'},
+                                   {name: 'transform', value: 'scale(1)'},
+                                 ],
+                                 {originTreeScopeNodeId: shadowScope});
+      const docRule = ruleMatch('#host',
+                                [
+                                  {name: 'opacity', value: '1'},
+                                  {name: 'transform', value: 'scale(2)'},
+                                ],
+                                {originTreeScopeNodeId: docScope});
+
+      const matchedStyles = await getMatchedStyles({
+        connection,
+        node: hostNode,
+        matchedPayload: [uaRule, hostRule, docRule],
+        attributesPayload: {
+          cssProperties: [{name: 'list-style-type', value: 'square'}],
+          shorthandEntries: [],
+        },
+        animationStylesPayload: [{
+          style: {
+            cssProperties: [{name: 'opacity', value: '0.4'}],
+            shorthandEntries: [],
+          },
+        }],
+        transitionsStylePayload: {
+          cssProperties: [{name: 'transform', value: 'scale(3)'}],
+          shorthandEntries: [],
+        },
+      });
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'opacity', '0.4')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      const docOpacity = findProperty(matchedStyles, 'opacity', '1');
+      assert.strictEqual(matchedStyles.propertyState(docOpacity), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'opacity', '0.8')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      assert.isTrue(matchedStyles.isPropertyOverriddenByAnimation(docOpacity));
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'transform', 'scale(3)')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      const docTransform = findProperty(matchedStyles, 'transform', 'scale(2)');
+      assert.strictEqual(matchedStyles.propertyState(docTransform), SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'transform', 'scale(1)')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      assert.isTrue(matchedStyles.isPropertyOverriddenByAnimation(docTransform));
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'list-style-type', 'square')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'list-style-type', 'disc')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'display', 'inline-block')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'display', 'block')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    });
+
+    it('resolves normal and !important precedence across :host, ::slotted(), and element scope', async () => {
+      const docScope = 10 as Protocol.DOM.BackendNodeId;
+      const outerShadowScope = 30 as Protocol.DOM.BackendNodeId;
+      const innerShadowScope = 60 as Protocol.DOM.BackendNodeId;
+
+      const docNode = createStubNode(1, docScope);
+      const outerHost = createStubNode(2, 20, docNode);
+      const innerHost = createStubNode(5, 50, outerHost);
+      innerHost.getTreeRoot.returns(docNode);
+      const innerShadowRoot = createStubNode(6, innerShadowScope, innerHost);
+      innerHost.shadowRoots.returns([innerShadowRoot]);
+      innerHost.hasAssignedSlot.returns(true);
+
+      const hostRule = ruleMatch(':host',
+                                 [
+                                   {name: 'color', value: 'red'},
+                                   {name: 'background-color', value: 'lightgreen', important: true},
+                                 ],
+                                 {originTreeScopeNodeId: innerShadowScope});
+      const slottedRule = ruleMatch('::slotted(#inner)',
+                                    [
+                                      {name: 'color', value: 'green'},
+                                      {name: 'margin', value: '10px'},
+                                      {name: 'background-color', value: 'pink', important: true},
+                                      {name: 'padding', value: '10px', important: true},
+                                    ],
+                                    {originTreeScopeNodeId: outerShadowScope});
+      const docRule = ruleMatch('#inner',
+                                [
+                                  {name: 'margin', value: '20px'},
+                                  {name: 'padding', value: '20px', important: true},
+                                ],
+                                {originTreeScopeNodeId: docScope});
+
+      const matchedStyles = await getMatchedStyles({
+        connection,
+        node: innerHost,
+        matchedPayload: [hostRule, slottedRule, docRule],
+        inlinePayload: {
+          cssProperties: [{name: 'padding', value: '30px', important: true}],
+          shorthandEntries: [],
+        },
+      });
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'color', 'green')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'color', 'red')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'margin', '20px')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'margin', '10px')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'background-color', 'lightgreen')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'background-color', 'pink')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'padding', '10px')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'padding', '20px')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'padding', '30px')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+    });
+
+    it('unwraps pseudo-element nodes when resolving shadow and ::slotted() cascade context', async () => {
+      const docScope = 10 as Protocol.DOM.BackendNodeId;
+      const outerShadowScope = 30 as Protocol.DOM.BackendNodeId;
+      const innerShadowScope = 60 as Protocol.DOM.BackendNodeId;
+
+      const docNode = createStubNode(1, docScope);
+      const outerHost = createStubNode(2, 20, docNode);
+      const innerHost = createStubNode(5, 50, outerHost);
+      innerHost.getTreeRoot.returns(docNode);
+      const innerShadowRoot = createStubNode(6, innerShadowScope, innerHost);
+      innerHost.shadowRoots.returns([innerShadowRoot]);
+      innerHost.hasAssignedSlot.returns(true);
+
+      const beforeNode = createStubNode(7, 70, innerHost);
+      beforeNode.pseudoType.returns(Protocol.DOM.PseudoType.Before);
+
+      const hostBeforeRule = ruleMatch(':host::before',
+                                       [
+                                         {name: 'color', value: 'red'},
+                                         {name: 'background-color', value: 'lightgreen', important: true},
+                                       ],
+                                       {originTreeScopeNodeId: innerShadowScope});
+      const slottedBeforeRule = ruleMatch('::slotted(#inner)::before',
+                                          [
+                                            {name: 'color', value: 'green'},
+                                            {name: 'background-color', value: 'pink', important: true},
+                                            {name: 'padding', value: '10px', important: true},
+                                          ],
+                                          {originTreeScopeNodeId: outerShadowScope});
+      const docBeforeRule = ruleMatch('#inner::before', [{name: 'padding', value: '20px', important: true}],
+                                      {originTreeScopeNodeId: docScope});
+
+      const matchedStyles = await getMatchedStyles({
+        connection,
+        node: beforeNode,
+        matchedPayload: [hostBeforeRule, slottedBeforeRule, docBeforeRule],
+      });
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'color', 'green')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'color', 'red')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'background-color', 'lightgreen')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'background-color', 'pink')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
+
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'padding', '10px')),
+                         SDK.CSSMatchedStyles.PropertyState.ACTIVE);
+      assert.strictEqual(matchedStyles.propertyState(findProperty(matchedStyles, 'padding', '20px')),
+                         SDK.CSSMatchedStyles.PropertyState.OVERLOADED);
     });
   });
 });

@@ -13,6 +13,7 @@ import type * as NetworkTimeCalculator from '../network_time_calculator/network_
 
 import {AccessibilityAgent} from './agents/AccessibilityAgent.js';
 import {
+  type ActionResponse,
   type AgentOptions,
   type AiAgent,
   type AllowedOriginResult,
@@ -32,6 +33,7 @@ import {PerformanceAgent} from './agents/PerformanceAgent.js';
 import {StorageAgent} from './agents/StorageAgent.js';
 import {StylingAgent} from './agents/StylingAgent.js';
 import {AiAgent2} from './AiAgent2.js';
+import type {AlwaysAllowedTools} from './AlwaysAllowedTools.js';
 import type {ChangeManager} from './ChangeManager.js';
 import {DOMNodeContext} from './contexts/DOMNodeContext.js';
 import {FileContext} from './contexts/FileContext.js';
@@ -80,6 +82,7 @@ export interface AiConversationOptions {
   networkTimeCalculator?: NetworkTimeCalculator.NetworkTransferTimeCalculator;
   lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   aiHistoryStorage?: AiHistoryStorage;
+  alwaysAllowedTools?: AlwaysAllowedTools;
   targetManager?: SDK.TargetManager.TargetManager;
 }
 
@@ -88,6 +91,11 @@ export class AiConversation {
     const history = (serializedConversation.history as SerializedResponseData[]).map(entry => {
       if (entry.type === ResponseType.SIDE_EFFECT) {
         return {...entry, confirm: () => {}};
+      }
+      if (entry.type === ResponseType.ACTION && 'code' in entry) {
+        // Entries saved before `ActionResponse.code` was renamed to `action`.
+        const {code, ...rest} = entry as ActionResponse & {code?: string};
+        return {...rest, action: rest.action ?? code};
       }
       return entry;
     });
@@ -121,6 +129,7 @@ export class AiConversation {
   #networkTimeCalculator?: NetworkTimeCalculator.NetworkTransferTimeCalculator;
   readonly #aiHistoryStorage: AiHistoryStorage;
   readonly #targetManager: SDK.TargetManager.TargetManager;
+  readonly #alwaysAllowedTools?: AlwaysAllowedTools;
 
   constructor(options: AiConversationOptions) {
     const {
@@ -137,6 +146,7 @@ export class AiConversation {
       aiHistoryStorage = AiUtils.AiHistoryStorage.AiHistoryStorage.instance(),
       // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
       targetManager = SDK.TargetManager.TargetManager.instance(),
+      alwaysAllowedTools,
     } = options;
     this.#changeManager = changeManager;
     this.#aidaClient = aidaClient;
@@ -146,6 +156,7 @@ export class AiConversation {
     this.#lighthouseRecording = lighthouseRecording;
     this.#aiHistoryStorage = aiHistoryStorage;
     this.#targetManager = targetManager;
+    this.#alwaysAllowedTools = alwaysAllowedTools;
 
     this.id = id;
     this.#isReadOnly = isReadOnly;
@@ -280,8 +291,8 @@ export class AiConversation {
           if (!item.output) {
             break;
           }
-          if (item.code) {
-            contentParts.push(`**Code executed:**\n\`\`\`\n${item.code.trim()}\n\`\`\``);
+          if (item.action) {
+            contentParts.push(`**Code executed:**\n\`\`\`\n${item.action.trim()}\n\`\`\``);
           }
           contentParts.push(`**Data returned:**\n\`\`\`\n${item.output}\n\`\`\``);
           break;
@@ -400,6 +411,7 @@ export class AiConversation {
       lighthouseRecording: this.#lighthouseRecording,
       history,
       targetManager: this.#targetManager,
+      alwaysAllowedTools: this.#alwaysAllowedTools,
     };
 
     this.#agent = Root.Runtime.hostConfig.devToolsAiV2Architecture?.enabled ? new AiAgent2({

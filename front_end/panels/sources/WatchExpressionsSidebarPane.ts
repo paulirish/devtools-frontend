@@ -45,7 +45,6 @@ import * as StackTrace from '../../models/stack_trace/stack_trace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
@@ -101,7 +100,7 @@ interface ViewInput {
   onCopyWatchExpression(watchExpression: WatchExpression): void;
   onDeleteAll(): unknown;
   onAddExpression(): unknown;
-  onExpand(e: WatchExpression, expanded: boolean): unknown;
+  onExpand(e: WatchExpression, expanded: boolean, recursively?: boolean): unknown;
   watchExpressions: WatchExpression[];
 }
 export interface WatchExpressionPromptViewInput {
@@ -298,7 +297,7 @@ export class WatchExpressionPromptWidget extends UI.Widget.Widget {
   }
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const onContextMenu = (watchExpression: WatchExpression|undefined, event: Event): void => {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
@@ -352,7 +351,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
           class=${classMap({'watch-expression-tree-item': true, 'watch-expression-editing': e.editing })}
           ?open=${Boolean(e.result?.expanded)}
           @keydown=${onExpressionKeydown.bind(undefined, e)}
-          @expand=${(event: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onExpand(e, event.detail.expanded)}
+          @expand=${(event: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onExpand(e, event.detail.expanded, event.detail.recursively)}
           role=treeitem>
             <devtools-widget ${widget(WatchExpressionPromptWidget, {
               expression: e,
@@ -374,6 +373,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
   render(
       // clang-format off
       html`
+      <style>${watchExpressionsSidebarPaneStyles}</style>
       ${input.watchExpressions.length === 0
         ? html`<div class=gray-info-message tabindex=-1 >
         ${i18nString(UIStrings.noWatchExpressions)}
@@ -409,7 +409,6 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
   #expansionTrackers = new Map<string, ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker>();
   constructor() {
     super({useShadowDom: true});
-    this.registerRequiredCSS(watchExpressionsSidebarPaneStyles, objectValueStyles);
 
     this.#watchExpressions = [];
     this.#watchExpressionsSetting =
@@ -549,13 +548,18 @@ export class WatchExpressionsSidebarPane extends UI.Widget.VBox implements UI.Ac
         this.saveExpressions();
         this.requestUpdate();
       },
-      onExpand: (e: WatchExpression, expanded: boolean): void => {
-        if (e.result) {
-          e.result.expanded = expanded;
+      onExpand: (e: WatchExpression, expanded: boolean, recursively = false): void => {
+        if (!e.result) {
+          return;
         }
+        if (expanded && recursively) {
+          void e.result.expandRecursively().then(() => this.requestUpdate());
+          return;
+        }
+        e.result.expanded = expanded;
       },
     },
-               {}, this.contentElement);
+               undefined, this.contentElement);
   }
 
   #getExpansionTracker(expression: string): ObjectUI.ObjectPropertiesSection.ObjectTreeExpansionTracker {

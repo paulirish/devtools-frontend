@@ -83,6 +83,7 @@ describe('Custom devices', () => {
     await devToolsPage.tabForward();  // Focus device type.
     await devToolsPage.tabForward();  // Focus folder.
     await devToolsPage.pressKey('Enter');
+    await devToolsPage.waitFor('#form-container:not(.hide-container)');
 
     await devToolsPage.tabForward();  // Focus info icon
     await devToolsPage.tabForward();  // Focus help button
@@ -95,6 +96,7 @@ describe('Custom devices', () => {
     await devToolsPage.tabForward();  // Focus delete button.
     await devToolsPage.tabForward();  // Focus Add brand button.
     await devToolsPage.pressKey('Space');
+    await devToolsPage.waitFor('#ua-brand-2-input:focus');
 
     await devToolsPage.typeText('Friendly Dragon');
     await devToolsPage.tabForward();  //  Focus second row brand version.
@@ -183,6 +185,7 @@ describe('Custom devices', () => {
 
     // Make sure the device name field is what's focused.
     await devToolsPage.waitFor(FOCUSED_DEVICE_NAME_FIELD_SELECTOR);
+    await devToolsPage.waitFor('input[type="checkbox"][value="Desktop"]:checked');
 
     await setInputValue(FULL_BROWSER_VERSION_INPUT_SELECTOR, '1.1.5', devToolsPage);
 

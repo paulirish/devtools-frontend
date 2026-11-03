@@ -146,6 +146,59 @@ describe('DOMModel API Test', () => {
     });
     assert.strictEqual(evaluatedId, 'node');
   });
+
+  it('saves nodes from same-origin iframes to temporary variables in the correct frame',
+     async ({inspectedPage, universe}) => {
+       const primaryTarget = universe.targetManager.primaryPageTarget();
+       assert.isNotNull(primaryTarget);
+
+       const domModel = primaryTarget.model(SDK.DOMModel.DOMModel);
+       assert.isNotNull(domModel);
+
+       const consoleModel = primaryTarget.model(SDK.ConsoleModel.ConsoleModel);
+       assert.isNotNull(consoleModel);
+
+       await inspectedPage.goToHtml(`
+         <iframe id="frame" srcdoc="<div id='child'></div>"></iframe>
+       `);
+
+       const documentNode = await domModel.requestDocument();
+       assert.isNotNull(documentNode);
+       await documentNode.getSubtree(10, true);
+
+       const iframeNode = findNode(documentNode, n => n.getAttribute('id') === 'frame');
+       const childNode = findNode(documentNode, n => n.getAttribute('id') === 'child');
+       assert.isNotNull(iframeNode);
+       assert.isNotNull(childNode);
+       if (!iframeNode || !childNode) {
+         assert.fail('Could not find test nodes');
+       }
+
+       let commandEvaluatedPromise = consoleModel.once(SDK.ConsoleModel.Events.CommandEvaluated);
+       await iframeNode.saveNodeToTempVariable();
+       let commandEvaluated = await commandEvaluatedPromise;
+       assert.strictEqual(commandEvaluated.commandMessage.messageText, 'temp1');
+       assert.strictEqual(commandEvaluated.result?.description, 'iframe#frame');
+
+       const parentTempVariableId = await inspectedPage.evaluate(() => {
+         return (window as unknown as {temp1?: HTMLIFrameElement}).temp1?.id;
+       });
+       assert.strictEqual(parentTempVariableId, 'frame');
+
+       commandEvaluatedPromise = consoleModel.once(SDK.ConsoleModel.Events.CommandEvaluated);
+       await childNode.saveNodeToTempVariable();
+       commandEvaluated = await commandEvaluatedPromise;
+       assert.strictEqual(commandEvaluated.commandMessage.messageText, 'temp1');
+       assert.strictEqual(commandEvaluated.result?.description, 'div#child');
+
+       const childTempVariableId = await inspectedPage.evaluate(() => {
+         const childWindow =
+             (document.getElementById('frame') as HTMLIFrameElement).contentWindow as (Window & {temp1?: HTMLElement}) |
+             null;
+         return childWindow?.temp1?.id;
+       });
+       assert.strictEqual(childTempVariableId, 'child');
+     });
 });
 
 describe('DOMModel queries, search, frames, markers, and attributes', () => {
@@ -354,7 +407,7 @@ describe('DOMModel queries, search, frames, markers, and attributes', () => {
        assert.isNotNull(aNode);
 
        aNode.setMarker('attr1', true);
-       assert.strictEqual(aNode.marker('attr1'), true);
+       assert.isTrue(aNode.marker('attr1'));
        assert.deepEqual(
            [
              container.subtreeMarkerCount,
@@ -366,33 +419,33 @@ describe('DOMModel queries, search, frames, markers, and attributes', () => {
 
        child2.setMarker('attr2', 'value');
        assert.strictEqual(child2.marker('attr2'), 'value');
-       assert.strictEqual(aNode.marker('attr1'), true);
+       assert.isTrue(aNode.marker('attr1'));
        assert.deepEqual([container.subtreeMarkerCount, child2.subtreeMarkerCount, aNode.subtreeMarkerCount], [2, 2, 1]);
 
        child2.setMarker('attr1', true);
        assert.strictEqual(child2.marker('attr2'), 'value');
-       assert.strictEqual(child2.marker('attr1'), true);
-       assert.strictEqual(aNode.marker('attr1'), true);
+       assert.isTrue(child2.marker('attr1'));
+       assert.isTrue(aNode.marker('attr1'));
        assert.deepEqual([container.subtreeMarkerCount, child2.subtreeMarkerCount, aNode.subtreeMarkerCount], [3, 3, 1]);
 
        aNode.setMarker('attr1', 'anotherValue');
        child2.setMarker('attr2', 'anotherValue');
        assert.strictEqual(aNode.marker('attr1'), 'anotherValue');
        assert.strictEqual(child2.marker('attr2'), 'anotherValue');
-       assert.strictEqual(child2.marker('attr1'), true);
+       assert.isTrue(child2.marker('attr1'));
        assert.deepEqual([container.subtreeMarkerCount, child2.subtreeMarkerCount, aNode.subtreeMarkerCount], [3, 3, 1]);
 
        aNode.setMarker('attr1', null);
        assert.isNull(aNode.marker('attr1'));
        assert.strictEqual(child2.marker('attr2'), 'anotherValue');
-       assert.strictEqual(child2.marker('attr1'), true);
+       assert.isTrue(child2.marker('attr1'));
        assert.deepEqual([container.subtreeMarkerCount, child2.subtreeMarkerCount, aNode.subtreeMarkerCount], [2, 2, 0]);
 
        const aRemoved = domModel.once(SDK.DOMModel.Events.NodeRemoved);
        await aNode.removeNode();
        await aRemoved;
        assert.strictEqual(child2.marker('attr2'), 'anotherValue');
-       assert.strictEqual(child2.marker('attr1'), true);
+       assert.isTrue(child2.marker('attr1'));
        assert.deepEqual([container.subtreeMarkerCount, child2.subtreeMarkerCount], [2, 2]);
 
        const child2Removed = domModel.once(SDK.DOMModel.Events.NodeRemoved);

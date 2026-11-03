@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../core/host/host.js';
-import type * as Platform from '../../../core/platform/platform.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as TextUtils from '../../../core/text_utils/text_utils.js';
@@ -12,18 +12,21 @@ import * as AiUtils from '../../ai-utils/ai-utils.js';
 import type * as LHModel from '../../lighthouse/lighthouse.js';
 import type * as Trace from '../../trace/trace.js';
 import type * as Workspace from '../../workspace/workspace.js';
+import type {AlwaysAllowedTools} from '../AlwaysAllowedTools.js';
 import {dispatchAiAssistanceDoneEvent} from '../DOMHelpers.js';
 import {
   type ContextHandlerResult,
   type DataHandlerResult,
   PermissionDecision,
-  type PermissionPrompt,
+  PermissionPrompt,
+  type ToolName,
 } from '../tools/Tool.js';
 
-const {debugLog, isStructuredLogEnabled} = AiUtils.Debug;
+const {debugLog, isDebugMode} = AiUtils.Debug;
 
 type UrlString = Platform.DevToolsPath.UrlString;
 const MAX_SUGGESTION_LENGTH = 200;
+export const SUGGEST_FOLLOW_UPS_FUNCTION_NAME = 'suggestFollowUps';
 
 /**
  * The types of event in the response stream that `AiConversation#run()`
@@ -59,7 +62,8 @@ const MAX_SUGGESTION_LENGTH = 200;
  * ## Events for one tool call
  *
  * `AiAgent#callFunction()` yields these. All events for one call carry the
- * same `callId`.
+ * same `callId`. The `suggestFollowUps` function never yields tool call UI
+ * events (`TITLE`, `THOUGHT`, `ACTION`).
  *
  * ```
  * TITLE?, THOUGHT?              from the tool's displayInfoFromArgs()
@@ -83,7 +87,11 @@ const MAX_SUGGESTION_LENGTH = 200;
  * every function call in a response as one `MODEL` turn. The next request
  * carries one `functionResponse` per call, in the same order. A denied call
  * gets a response that says it did not run. After a context change, each call
- * that did not run gets a "Not executed" response.
+ * that did not run gets a "Not executed" response. In the final response,
+ * `suggestFollowUps` is not recorded in the history. When called prematurely
+ * alongside other tools, its suggestions are ignored and it receives a
+ * `functionResponse` instructing the model to call `suggestFollowUps` only in
+ * the final response.
  *
  * ## Saved history
  *
@@ -227,13 +235,11 @@ export interface ThoughtResponse extends ToolCallEvent {
 export interface SideEffectResponse extends ToolCallEvent {
   type: ResponseType.SIDE_EFFECT;
   description: string|null;
-  /**
-   * No agent sets this field. The code comes from the preceding `ACTION`.
-   */
-  code?: string;
+  javascriptCode?: string;
   confirm: (decision: PermissionDecision) => void;
   permissionPrompt?: PermissionPrompt;
   permissionTitle?: string;
+  toolName?: string;
 }
 
 /**
@@ -275,7 +281,7 @@ export interface ActionResponse extends ToolCallEvent {
    * code, such as `executeJavaScript`. For other tools it is a readable form of
    * the call.
    */
-  code?: string;
+  action?: string;
   /**
    * The tool's result, error message, or the denial message. Missing on the
    * code-only `ACTION` that precedes an approval prompt.
@@ -351,6 +357,7 @@ export interface AgentOptions {
   allowedOrigin?: () => AllowedOriginResult;
   lighthouseRecording?: (overrides?: LHModel.RunTypes.RunOverrides) => Promise<LHModel.RunTypes.RunResult>;
   targetManager?: SDK.TargetManager.TargetManager;
+  alwaysAllowedTools?: AlwaysAllowedTools;
 }
 
 export interface ParsedAnswer {
@@ -669,16 +676,18 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
    * - `title`: the step heading, sent as `TITLE`.
    * - `thought`: optional explanation shown in the step, sent as `THOUGHT`.
    * - `action`: the text shown in the step's code box, sent as
-   *   `ACTION.code`. It is real code only for tools that run code, such as
-   *   `executeJavaScript`. For other tools it is a readable form of the call,
-   *   for example `getInsightDetails('NAVIGATION_0', 'LCPBreakdown')`, and is
-   *   never executed.
+   *   `ACTION.action`. It is a readable form of the call, for example
+   *   `getInsightDetails('NAVIGATION_0', 'LCPBreakdown')`, and is never
+   *   executed.
+   * - `javascriptCode`: the exact JavaScript the tool runs in the page, sent
+   *   as `SIDE_EFFECT.javascriptCode` and shown in the permission prompt.
+   *   Only set by tools that execute JavaScript, such as `executeJavaScript`.
    * - `suggestions`: `AiAgent` does not use this field.
    */
   displayInfoFromArgs?: (
       args: Args,
       ) => {
-    title?: string, thought?: string, action?: string, suggestions?: [string, ...string[]],
+    title?: string, thought?: string, action?: string, javascriptCode?: string, suggestions?: [string, ...string[]],
   };
   /**
    * Choices the permission prompt offers when the handler returns
@@ -765,6 +774,7 @@ export abstract class AiAgent<T> {
   readonly #functionDeclarations = new Map<string, FunctionDeclaration<Record<string, unknown>, unknown>>();
   readonly #allowedOrigin?: () => AllowedOriginResult;
   readonly #targetManager: SDK.TargetManager.TargetManager;
+  readonly #alwaysAllowedTools?: AlwaysAllowedTools;
 
   /**
    * Used in the debug mode and evals.
@@ -801,6 +811,7 @@ export abstract class AiAgent<T> {
     this.#allowedOrigin = opts.allowedOrigin;
     // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
     this.#targetManager = opts.targetManager ?? SDK.TargetManager.TargetManager.instance();
+    this.#alwaysAllowedTools = opts.alwaysAllowedTools;
   }
 
   async enhanceQuery(query: string, selected: ConversationContext<T>|null,
@@ -946,10 +957,7 @@ export abstract class AiAgent<T> {
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('SUGGESTIONS:')) {
-        try {
-          suggestions = sanitizeSuggestions(trimmed.substring('SUGGESTIONS:'.length).trim());
-        } catch {
-        }
+        suggestions = sanitizeSuggestions(trimmed.substring('SUGGESTIONS:'.length).trim());
       } else {
         answerLines.push(line);
       }
@@ -959,10 +967,7 @@ export abstract class AiAgent<T> {
     // the case where the suggestions are part of the last line of the answer.
     if (!suggestions && answerLines.at(-1)?.includes('SUGGESTIONS:')) {
       const [answer, suggestionsText] = answerLines[answerLines.length - 1].split('SUGGESTIONS:', 2);
-      try {
-        suggestions = sanitizeSuggestions(suggestionsText.trim());
-      } catch {
-      }
+      suggestions = sanitizeSuggestions(suggestionsText.trim());
       answerLines[answerLines.length - 1] = answer;
     }
 
@@ -1113,36 +1118,18 @@ export abstract class AiAgent<T> {
 
       this.#history.push(request.current_message);
 
-      if (textResponse) {
-        const parsedResponse = this.parseTextResponse(textResponse);
-        if (!('answer' in parsedResponse)) {
-          throw new Error('Expected a completed response to have an answer');
-        }
-        if (!functionCalls) {
-          debugLog(`[AiAgent] Step ${i + 1}: Model returned text response:`, parsedResponse.answer);
-          this.#history.push({
-            parts: [{
-              text: parsedResponse.answer,
-            }],
-            role: Host.AidaClient.Role.MODEL,
-          });
-        }
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceAnswerReceived);
-        yield await this.finalizeAnswer({
-          type: ResponseType.ANSWER,
-          text: parsedResponse.answer,
-          suggestions: parsedResponse.suggestions,
-          complete: true,
-          rpcId,
-        });
-        if (!functionCalls) {
-          break;
-        }
+      // If the model calls other tools alongside suggestFollowUps, the investigation is still in progress,
+      // so premature suggestions are discarded until the concluding turn.
+      const hasOtherFunctionCalls =
+          Boolean(functionCalls?.some(call => call.name !== SUGGEST_FOLLOW_UPS_FUNCTION_NAME));
+      if (!functionCalls || !hasOtherFunctionCalls) {
+        yield* this.#handleFinalResponse(i, textResponse, functionCalls, rpcId);
+        break;
       }
 
-      if (!functionCalls) {
-        yield this.#createErrorResponse(ErrorType.UNKNOWN);
-        break;
+      if (textResponse) {
+        const parsedResponse = this.parseTextResponse(textResponse);
+        yield await this.#createCompletedAnswer(parsedResponse.answer, rpcId);
       }
 
       debugLog(`[AiAgent] Step ${i + 1}: Model requested function calls:`, functionCalls);
@@ -1169,10 +1156,70 @@ export abstract class AiAgent<T> {
       request = this.buildRequest(outcome.functionResponses, Host.AidaClient.Role.ROLE_UNSPECIFIED);
     }
 
-    if (isStructuredLogEnabled()) {
+    if (isDebugMode()) {
       dispatchAiAssistanceDoneEvent();
     }
     return;
+  }
+
+  /**
+   * Handles the final model response of a run when no further tool calls need
+   * to execute.
+   *
+   * - If `textResponse` is empty, yields an `UNKNOWN` error.
+   * - Otherwise, records the answer as a `MODEL` turn in `#history` (excluding
+   *   `suggestFollowUps`) and yields a completed `ANSWER` with follow-up
+   *   suggestions.
+   */
+  async *
+      #handleFinalResponse(
+          stepIndex: number,
+          textResponse: string,
+          functionCalls: FunctionCalls|undefined,
+          rpcId: Host.AidaClient.RpcGlobalId|undefined,
+          ): AsyncGenerator<ResponseData, void, void> {
+    if (!textResponse) {
+      debugLog('[AiAgent] Model returned an empty text response without tool calls:',
+               {step: stepIndex + 1, rpcId, functionCalls});
+      yield this.#createErrorResponse(ErrorType.UNKNOWN);
+      return;
+    }
+
+    const lastSuggestCall = functionCalls?.findLast(call => call.name === SUGGEST_FOLLOW_UPS_FUNCTION_NAME);
+    const followUpSuggestions = sanitizeSuggestionsList(lastSuggestCall?.args?.suggestions);
+    const parsedResponse = this.parseTextResponse(textResponse);
+    debugLog(`[AiAgent] Step ${stepIndex + 1}: Model returned text response:`, parsedResponse.answer);
+    this.#history.push({
+      parts: [{
+        text: parsedResponse.answer,
+      }],
+      role: Host.AidaClient.Role.MODEL,
+    });
+    // Fall back to text-parsed `SUGGESTIONS:` while server-side preambles still
+    // emit text directives.
+    // TODO(b/568697679): Remove `parsedResponse.suggestions` fallback once
+    // `suggestFollowUps` is deployed and the server-side preamble is updated.
+    const suggestions = followUpSuggestions ?? parsedResponse.suggestions;
+    yield await this.#createCompletedAnswer(parsedResponse.answer, rpcId, suggestions);
+  }
+
+  /**
+   * Records the `AiAssistanceAnswerReceived` user metric and builds a
+   * completed `ANSWER` response through `finalizeAnswer()`.
+   */
+  async #createCompletedAnswer(
+      text: string,
+      rpcId?: Host.AidaClient.RpcGlobalId,
+      suggestions?: [string, ...string[]],
+      ): Promise<AnswerResponse> {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceAnswerReceived);
+    return await this.finalizeAnswer({
+      type: ResponseType.ANSWER,
+      text,
+      suggestions,
+      complete: true,
+      rpcId,
+    });
   }
 
   /**
@@ -1199,6 +1246,19 @@ export abstract class AiAgent<T> {
     const functionResponses: Host.AidaClient.Part[] = [];
     try {
       for (const [index, functionCall] of functionCalls.entries()) {
+        if (functionCall.name === SUGGEST_FOLLOW_UPS_FUNCTION_NAME) {
+          functionResponses.push({
+            functionResponse: {
+              name: functionCall.name,
+              response: {
+                result:
+                    'Ignored: call suggestFollowUps only in the final response after all other tool calls complete.',
+              },
+            },
+          });
+          continue;
+        }
+
         const allowedOriginResult = this.#allowedOrigin?.();
         if (allowedOriginResult && 'blocked' in allowedOriginResult) {
           // Stop if the page navigated before the origin was locked.
@@ -1313,10 +1373,12 @@ export abstract class AiAgent<T> {
     }
     debugLog(`[AiAgent] Executing tool '${name}' with args:`, args);
 
-    let code;
+    let action;
+    let javascriptCode;
     if (call.displayInfoFromArgs) {
-      const {title, thought, action: callCode} = call.displayInfoFromArgs(args);
-      code = callCode;
+      const {title, thought, action: callAction, javascriptCode: callJavascriptCode} = call.displayInfoFromArgs(args);
+      action = callAction;
+      javascriptCode = callJavascriptCode;
       if (title) {
         yield {
           type: ResponseType.TITLE,
@@ -1344,7 +1406,9 @@ export abstract class AiAgent<T> {
     // results.
     const runHandler = async(handlerOptions?: FunctionHandlerOptions): Promise<ToolResult<unknown>> => {
       try {
-        return await call.handler(args, handlerOptions);
+        const isAlwaysAllowed = call.permissionPrompt === PermissionPrompt.ALLOW_ONCE_OR_ALWAYS &&
+            this.#alwaysAllowedTools?.isAllowed(name as ToolName);
+        return await call.handler(args, isAlwaysAllowed ? {...handlerOptions, approved: true} : handlerOptions);
       } catch (err) {
         debugLog(`[AiAgent] Tool '${name}' threw:`, err);
         return {error: `Error: ${err instanceof Error ? err.message : String(err)}`};
@@ -1360,11 +1424,11 @@ export abstract class AiAgent<T> {
     }
 
     if ('requiresApproval' in result) {
-      if (code) {
+      if (action) {
         yield {
           type: ResponseType.ACTION,
           callId,
-          code,
+          action,
           canceled: false,
         };
       }
@@ -1393,8 +1457,10 @@ export abstract class AiAgent<T> {
         callId,
         confirm: sideEffectConfirmationPromiseWithResolvers.resolve,
         description: result.description,
+        javascriptCode,
         permissionPrompt: call.permissionPrompt,
         permissionTitle: call.permissionTitle,
+        toolName: name,
       };
 
       let decision = PermissionDecision.REJECT;
@@ -1403,11 +1469,14 @@ export abstract class AiAgent<T> {
       } finally {
         options?.signal?.removeEventListener('abort', onAbort);
       }
+      if (decision === PermissionDecision.ALLOW_ALWAYS) {
+        this.#alwaysAllowedTools?.allow(name as ToolName);
+      }
       if (decision === PermissionDecision.REJECT) {
         yield {
           type: ResponseType.ACTION,
           callId,
-          code,
+          action,
           output: 'Error: User denied code execution with side effects.',
           canceled: true,
         };
@@ -1441,7 +1510,7 @@ export abstract class AiAgent<T> {
       yield {
         type: ResponseType.ACTION,
         callId,
-        code,
+        action,
         output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
         widgets: result.widgets,
         canceled: false,
@@ -1454,7 +1523,7 @@ export abstract class AiAgent<T> {
       yield {
         type: ResponseType.ACTION,
         callId,
-        code,
+        action,
         output: result.error,
         canceled: false,
         toolName: name,
@@ -1495,13 +1564,14 @@ export abstract class AiAgent<T> {
       };
     }
 
-    if (isStructuredLogEnabled() && aidaResponse) {
+    if (isDebugMode() && aidaResponse) {
       this.#structuredLog.push({
         request: structuredClone(request),
         aidaResponse,
       });
       try {
-        localStorage.setItem('aiAssistanceStructuredLog', JSON.stringify(this.#structuredLog));
+        Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.setItem('aiAssistanceStructuredLog',
+                                                                     JSON.stringify(this.#structuredLog));
       } catch (err) {
         console.warn('Failed to write to local storage "aiAssistanceStructuredLog":', err);
       }
@@ -1532,13 +1602,16 @@ export abstract class AiAgent<T> {
 }
 
 /**
- * Parses `suggestions` as a JSON array and returns its non-empty string items,
- * with whitespace collapsed and each item truncated to `MAX_SUGGESTION_LENGTH`.
- * Returns `undefined` if the value is not an array or no items remain.
- * Throws if `suggestions` is not valid JSON.
+ * Validates and sanitizes raw follow-up suggestions from the model (either
+ * `args.suggestions` from a `suggestFollowUps` tool call or a `JSON.parse`d
+ * `SUGGESTIONS:` text directive).
+ *
+ * Expects `parsed` to be a `string[]`, but accepts `unknown` because model
+ * output is untrusted. Returns non-empty string items with whitespace
+ * collapsed and each item truncated to `MAX_SUGGESTION_LENGTH`, or
+ * `undefined` if `parsed` is not an array or no valid items remain.
  */
-export function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefined {
-  const parsed = JSON.parse(suggestions);
+export function sanitizeSuggestionsList(parsed: unknown): [string, ...string[]]|undefined {
   if (!Array.isArray(parsed)) {
     return undefined;
   }
@@ -1558,6 +1631,23 @@ export function sanitizeSuggestions(suggestions: string): [string, ...string[]]|
     return undefined;
   }
   return sanitized as [string, ...string[]];
+}
+
+/**
+ * Parses `suggestions` as a JSON array and returns its non-empty string items,
+ * with whitespace collapsed and each item truncated to `MAX_SUGGESTION_LENGTH`.
+ * Returns `undefined` if `suggestions` is not valid JSON, not an array, or no
+ * items remain.
+ *
+ * TODO(b/568697679): Remove this JSON-string wrapper and consolidate into a
+ * single function once legacy `SUGGESTIONS:` text parsing is removed.
+ */
+export function sanitizeSuggestions(suggestions: string): [string, ...string[]]|undefined {
+  try {
+    return sanitizeSuggestionsList(JSON.parse(suggestions));
+  } catch {
+    return undefined;
+  }
 }
 
 /**

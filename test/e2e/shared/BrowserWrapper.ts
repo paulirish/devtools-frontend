@@ -9,10 +9,17 @@ import * as url from 'node:url';
 import * as puppeteer from 'puppeteer-core';
 
 import {setupBrowserProcessIO} from '../../conductor/events.js';
-import {GEN_DIR} from '../../conductor/paths.js';
+import {DEVTOOLS_BUNDLED_CHROMIUM_DEPS, GEN_DIR} from '../../conductor/paths.js';
 import {TestConfig} from '../../conductor/test_config.js';
 
 import {chromeLogin, configureDevToolsPreferences} from './auth-helper.js';
+
+/**
+ * Crashpad stores dumps in a shared per-user directory, which can contain
+ * dumps from earlier runs. Only dumps written after the test runner loaded
+ * belong to the current test run.
+ */
+const RUNNER_START_TIME = Date.now();
 
 export class BrowserWrapper {
   browser: puppeteer.Browser;
@@ -38,15 +45,17 @@ export class BrowserWrapper {
       return;
     }
     for (const file of fs.readdirSync(crashesPath)) {
+      const source = path.join(crashesPath, file);
       const target = path.join(TestConfig.artifactsDir, file);
       if (fs.existsSync(target)) {
         continue;
       }
+      const stat = fs.statSync(source, {throwIfNoEntry: false});
+      if (!stat || stat.mtimeMs < RUNNER_START_TIME) {
+        continue;
+      }
       console.error('Collecting crash dump:', file);
-      fs.copyFileSync(
-          path.join(crashesPath, file),
-          path.join(TestConfig.artifactsDir, file),
-      );
+      fs.copyFileSync(source, target);
     }
   }
 
@@ -156,10 +165,19 @@ export class Launcher {
   }
 
   static async launchChrome(settings: BrowserSettings, serverPort: number): Promise<puppeteer.Browser> {
-    const frontEndDirectory = url.pathToFileURL(
-        path.join(GEN_DIR, 'front_end'),
+    const overriddenFeatures = new Set(
+        [...TestConfig.enabledFeatures, ...TestConfig.disabledFeatures].map(f => f.split(':')[0]),
     );
-    const disabledFeatures = settings.disabledFeatures ?? DEFAULT_BROWSER_SETTINGS.disabledFeatures;
+    const disabledFeatures = [
+      ...(settings.disabledFeatures ?? DEFAULT_BROWSER_SETTINGS.disabledFeatures)
+          .filter(f => !overriddenFeatures.has(f.split(':')[0])),
+      ...TestConfig.disabledFeatures,
+    ];
+    const enabledFeatures = [
+      ...(settings.enabledFeatures ?? DEFAULT_BROWSER_SETTINGS.enabledFeatures)
+          .filter(f => !overriddenFeatures.has(f.split(':')[0])),
+      ...TestConfig.enabledFeatures,
+    ];
     const launchArgs = [
       '--enable-experimental-web-platform-features',
       // This fingerprint may be generated from the certificate using
@@ -171,13 +189,27 @@ export class Launcher {
       `--privacy-sandbox-enrollment-overrides=https://localhost:${serverPort}`,
       '--remote-allow-origins=*',
       '--ignore-certificate-errors-spki-list=KLy6vv6synForXwI6lDIl+D3ZrMV6Y1EMTY6YpOcAos=',
-      `--custom-devtools-frontend=${frontEndDirectory}`,
       '--site-per-process',  // Default on Desktop anyway, but ensure that we always use out-of-process frames when we intend to.
       '--disable-gpu',
       '--enable-crash-reporter',
-      `--disable-features=${disabledFeatures.join(',')}`,
       `--remote-debugging-port=0`,
     ];
+    if (disabledFeatures.length > 0) {
+      launchArgs.push(`--disable-features=${disabledFeatures.join(',')}`);
+    }
+    if (enabledFeatures.length > 0) {
+      launchArgs.push(`--enable-features=${enabledFeatures.join(',')}`);
+    }
+
+    // In a chromium checkout with devtools_bundled_chromium_deps False, DevTools is bundled
+    // into the //chrome binary.
+    // Otherwise we use a pre-built CfT with --custom-devtools-frontend.
+    if (DEVTOOLS_BUNDLED_CHROMIUM_DEPS) {
+      const frontEndDirectory = url.pathToFileURL(
+          path.join(GEN_DIR, 'front_end'),
+      );
+      launchArgs.push(`--custom-devtools-frontend=${frontEndDirectory}`);
+    }
 
     const ignoreDefaultArgs = [
       '--disable-crash-reporter',
@@ -191,8 +223,12 @@ export class Launcher {
     }
 
     // CDP commands in e2e and interaction should not generally take
-    // more than 20 seconds, but performance tests might require more time.
-    const protocolTimeout = TestConfig.debug ? 0 : TestConfig.isPerfTest ? 120_000 : 20_000;
+    // more than 20 seconds, but performance and AI eval tests might require more time
+    // (AI evals execute the full multi-turn LLM + tool loop inside a single evaluate call).
+    const protocolTimeout = TestConfig.debug ? 0 :
+        TestConfig.isPerfTest                ? 120_000 :
+        TestConfig.isAiEvalTest              ? 180_000 :
+                                               20_000;
     const executablePath = TestConfig.chromeBinary;
     const headless = TestConfig.headless;
 
@@ -225,13 +261,6 @@ export class Launcher {
     if (!opts.headless) {
       launchArgs.push(`--window-size=${windowWidth},${windowHeight}`);
     }
-    const enabledFeatures = settings.enabledFeatures ?? DEFAULT_BROWSER_SETTINGS.enabledFeatures;
-    // TODO: remove
-    const envChromeFeatures = process.env['CHROME_FEATURES'];
-    if (envChromeFeatures) {
-      enabledFeatures.push(envChromeFeatures);
-    }
-    launchArgs.push(`--enable-features=${enabledFeatures.join(',')}`);
 
     opts.args = launchArgs;
     return await puppeteer.launch(opts);
@@ -244,6 +273,7 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
     'FencedFrames',
     'PrivacySandboxAdsAPIsOverride',
     'AutofillEnableDevtoolsIssues',
+    'DevToolsProtocolMonitor',
     'DevToolsVeLogging:testing/true',
     'CADisplayLink',
   ],

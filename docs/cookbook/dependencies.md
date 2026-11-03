@@ -54,23 +54,69 @@ reviewers and typically avoids inflating the bundle size.
 
 For all third-party packages that are used either as part of the DevTools build
 process or to augment engineers workflows (for example linters), we add them to
-`scripts/deps/manage_node_deps.py`. This Python script has been approved by
-Chromium licensing to be used, on the basis that it enforces all packages have a
-license that is compatible with a set of pre-defined licensees.
+`package.json`; `scripts/deps/manage_node_deps.py` installs them. This Python
+script has been approved by Chromium licensing to be used, on the basis that it
+enforces all packages have a license that is compatible with a set of
+pre-defined licensees.
 
-If you want to use a new package as tooling process in engineer workflows, you
-can add the package to the `package.json` and run `./dt install-deps` to
-check in the new contents.
+`node_modules/` is not checked into git. `gclient sync` downloads it as one
+archive from `gs://chromium-nodejs/devtools-frontend/<sha256>`, pinned by the
+`node_modules` entry in `DEPS`, the same way Chromium's WebUI toolchain and
+chromium-bidi ship their npm dependencies. Local edits inside `node_modules/`
+only last until the next `gclient sync` that changes the pin.
+
+gclient decides whether to re-extract the archive from the stamp files it
+keeps in `node_modules/`, not from the extracted tree. Checking out a revision
+from before `node_modules/` left git restores the tracked tree over the
+extracted one and leaves the stamps alone; checking out a later revision again
+deletes the tracked files, and `gclient sync` would consider the now empty
+directory up to date. The `ensure_node_modules` hook
+(`scripts/deps/ensure_node_modules.py`) catches this and re-extracts the
+archive that gclient leaves in `node_modules/node_modules.tar.gz`; if that
+archive is missing, it removes the stamps and asks you to run `gclient sync`
+once more.
+
+To add or update a package:
+
+1. Change the version in `package.json`.
+2. Run `./dt install-deps`. It runs `npm install`, post-processes the tree,
+   checks licenses, applies `scripts/deps/npm_exclude.txt`, verifies that
+   every `node_modules/` path referenced from GN or Python build files still
+   exists and writes a deterministic `out/node_modules.tar.gz` (sorted
+   entries, zeroed timestamps and ownership: the same tree always has the
+   same sha256).
+3. Build and test against the new tree: `./dt build && ./dt test`.
+4. Run `./dt install-deps --upload`. It uploads the archive (a no-op if the
+   object exists) and updates `DEPS`. This needs write access to the bucket;
+   otherwise ask an infra owner (`config/owner/INFRA_OWNERS`) to run it on
+   your branch.
+5. Upload the CL: `package.json`, `package-lock.json` and the `DEPS` change.
+   Presubmit checks that these change together; add a
+   `Skip-Node-Modules-Check: <reason>` footer for intentional exceptions.
+
+Reviewers can rebuild the archive from the lockfile with `./dt install-deps`
+and compare the printed sha256 with `DEPS`.
 
 Only add new license types to `LICENSES` after you received approval from
 `opensource-licensing@google.com`. Their response time is typically within 24
 hours, so this typically is not a big hurdle.
 
 To avoid excessive package updates, it is typically easiest to update all
-packages in `manage_node_deps.py` once a month. Since NPM packages can have a
-lot of (shared) transitive dependencies, updating the packages on a specific day
-increases the chances that shared dependencies are deduplicated and thus result
-in smaller repository sizes.
+packages once a month. Since NPM packages can have a lot of (shared) transitive
+dependencies, updating the packages on a specific day increases the chances
+that shared dependencies are deduplicated and thus result in a smaller archive.
+
+#### The exclude list
+
+`scripts/deps/npm_exclude.txt` holds rsync filter rules that drop files the
+build and tests don't need (tests, docs, source maps, non-declaration
+TypeScript sources, dotfiles, ...) before the archive is built. Keep rules come
+first and the first matching rule wins. Prefer generic patterns. A
+package-specific rule goes into the "package-specific drops" section with a
+comment saying why the files are unused, and must be measured and verified
+with a full build, test and lint run, because the reference check only knows
+about paths mentioned in GN and Python files, not about what Node resolves at
+runtime. Check such rules again when the package in question is updated.
 
 > **WARNING:** Updating tools such as Rollup and TypeScript will cause all build
 > cache output to be purged, as they are part of all DevTools modules. Whenever

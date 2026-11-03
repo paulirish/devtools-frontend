@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../core/host/host.js';
-import type * as LHModel from '../../lighthouse/lighthouse.js';
+import * as LHModel from '../../lighthouse/lighthouse.js';
 import {LighthouseContext} from '../contexts/LighthouseContext.js';
 import type {LighthouseCategoryArg} from '../data_formatters/LighthouseFormatter.js';
 
@@ -21,6 +21,12 @@ export interface RunLighthouseArgs extends ToolArgs {
   explanation: string;
   categoryId: LighthouseCategoryArg;
   mode?: LHModel.RunTypes.RunMode;
+}
+
+// Runtime fallback in case an LLM call omits the required `mode` argument.
+// "agentic-browsing" defaults to "navigation" because its WebMCP gatherers only run during navigation.
+function resolveMode(params: RunLighthouseArgs): LHModel.RunTypes.RunMode {
+  return params.mode ?? (params.categoryId === 'agentic-browsing' ? 'navigation' : 'snapshot');
 }
 
 /**
@@ -45,32 +51,42 @@ export class RunLighthouseTool implements
       },
       categoryId: {
         type: Host.AidaClient.ParametersTypes.STRING,
-        // The experimental 'agentic-browsing' category is intentionally omitted from the prompt description so the agent does not invoke it unprompted. It is also excluded when 'all' is provided.
+        // The experimental 'agentic-browsing' category is listed separately from the standard categories and restricted to explicit user requests so the agent does not invoke it unprompted. It is also excluded when 'all' is provided (see `LighthouseController.getCategoryIDs`).
         description:
-            'Lighthouse category. Use "all" to run all categories, or specify a category: "accessibility", "performance", "best-practices", "seo".',
+            'Lighthouse category. Use "all" to run all categories, or specify a category: "accessibility", "performance", "best-practices", "seo". Use "agentic-browsing" only when the user explicitly asks for an agentic browsing audit (how well AI agents can navigate and use the page, including WebMCP). "all" does not include "agentic-browsing". Run "agentic-browsing" in "navigation" mode, because its WebMCP audits only run in "navigation" mode.',
         nullable: false,
       },
       mode: {
         type: Host.AidaClient.ParametersTypes.STRING,
         description:
-            'Lighthouse execution mode: "navigation", "snapshot", "timespan". Use "navigation" for initial full audits unless the user requested otherwise or in-page changes are being evaluated. Defaults to "snapshot".',
-        nullable: true,
+            'Lighthouse execution mode: "navigation", "snapshot", or "timespan". Use "navigation" to reload the page and run all audits (including page-load metrics and WebMCP gatherers); note that reloading resets unsaved in-page DOM or CSS modifications. Use "snapshot" to audit the current DOM state without reloading (preserving live edits, though navigation-only audits such as WebMCP are skipped). Use "timespan" to audit user interactions (supported only by "performance" and "best-practices").',
+        nullable: false,
       },
     },
-    required: ['explanation', 'categoryId'],
+    required: ['explanation', 'categoryId', 'mode'],
   };
 
   displayInfoFromArgs(params: RunLighthouseArgs): {title: string, thought: string, action: string} {
+    const mode = resolveMode(params);
     return {
-      title: `Running Lighthouse audits: ${params.categoryId} (${params.mode ?? 'snapshot'})`,
+      title: `Running Lighthouse audits: ${params.categoryId} (${mode})`,
       thought: params.explanation,
-      action: `runLighthouse('${params.categoryId}', '${params.mode ?? 'snapshot'}')`,
+      action: `runLighthouse('${params.categoryId}', '${mode}')`,
     };
   }
 
   async handler(params: RunLighthouseArgs, context: BaseToolCapability&LighthouseRecordingCapability):
       Promise<ContextHandlerResult<LHModel.ReporterTypes.ReportJSON>> {
-    const mode = params.mode ?? 'snapshot';
+    const mode = resolveMode(params);
+    if (params.categoryId !== 'all') {
+      const supportedModes = LHModel.RunTypes.CATEGORY_SUPPORTED_MODES[params.categoryId];
+      if (!supportedModes?.includes(mode)) {
+        return {
+          error: `Error: Category "${params.categoryId}" does not support "${mode}" mode. Supported modes: ${
+              supportedModes ? supportedModes.join(', ') : 'none'}.`,
+        };
+      }
+    }
     try {
       // Passing undefined for categoryIds instructs the Lighthouse runner to audit all categories supported by the mode when isAIControlled is true.
       const result = await context.runLighthouse({

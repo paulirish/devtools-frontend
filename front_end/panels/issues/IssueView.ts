@@ -193,13 +193,12 @@ class AffectedMixedContentView extends AffectedResourcesView {
       cell.title = mixedContent.insecureURL;
     }
 
-    this.appendIssueDetailCell(
-        element, AffectedMixedContentView.translateStatus(mixedContent.resolutionStatus),
-        'affected-resource-mixed-content-info');
+    this.appendIssueDetailCell(element, AffectedMixedContentView.#translateStatus(mixedContent.resolutionStatus),
+                               'affected-resource-mixed-content-info');
     this.affectedResources.appendChild(element);
   }
 
-  private static translateStatus(resolutionStatus: Protocol.Audits.MixedContentResolutionStatus):
+  static #translateStatus(resolutionStatus: Protocol.Audits.MixedContentResolutionStatus):
       Platform.UIString.LocalizedString {
     switch (resolutionStatus) {
       case Protocol.Audits.MixedContentResolutionStatus.MixedContentBlocked:
@@ -241,7 +240,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     this.toggleOnClick = true;
     this.listItemElement.classList.add('issue');
     this.childrenListElement.classList.add('issue-body');
-    this.childrenListElement.classList.add(IssueView.getBodyCSSClass(this.#issue.getKind()));
+    this.childrenListElement.classList.add(IssueView.#getBodyCSSClass(this.#issue.getKind()));
 
     this.affectedResources = this.#createAffectedResources();
     this.#affectedResourceViews = [
@@ -284,7 +283,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     this.#affectedResourceViews.forEach(view => view.setIssue(issue));
   }
 
-  private static getBodyCSSClass(issueKind: IssuesManager.Issue.IssueKind): string {
+  static #getBodyCSSClass(issueKind: IssuesManager.Issue.IssueKind): string {
     switch (issueKind) {
       case IssuesManager.Issue.IssueKind.BREAKING_CHANGE:
         return 'issue-kind-breaking-change';
@@ -356,7 +355,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     title.textContent = this.#description.title;
     header.appendChild(title);
     if (this.#hiddenIssuesMenu) {
-      header.appendChild(this.#hiddenIssuesMenu);
+      this.#hiddenIssuesMenu.show(header, undefined, /* suppressOrphanWidgetError= */ true);
     }
     this.#updateFromIssue();
     this.listItemElement.appendChild(header);
@@ -396,18 +395,15 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     }
     this.listItemElement.classList.toggle('hidden-issue', this.#issue.isHidden());
     if (this.#hiddenIssuesMenu) {
-      const data: Components.HideIssuesMenu.HiddenIssuesMenuData = {
-        menuItemLabel: this.#issue.isHidden() ? i18nString(UIStrings.unhideIssuesLikeThis) :
-                                                i18nString(UIStrings.hideIssuesLikeThis),
-        menuItemAction: () => {
-          const setting = IssuesManager.IssuesManager.getHideIssueByCodeSetting();
-          const values = setting.get();
-          values[this.#issue.code()] = this.#issue.isHidden() ? IssuesManager.IssuesManager.IssueStatus.UNHIDDEN :
-                                                                IssuesManager.IssuesManager.IssueStatus.HIDDEN;
-          setting.set(values);
-        },
+      this.#hiddenIssuesMenu.menuItemLabel = this.#issue.isHidden() ? i18nString(UIStrings.unhideIssuesLikeThis) :
+                                                                      i18nString(UIStrings.hideIssuesLikeThis);
+      this.#hiddenIssuesMenu.menuItemAction = () => {
+        const setting = IssuesManager.IssuesManager.getHideIssueByCodeSetting();
+        const values = setting.get();
+        values[this.#issue.code()] = this.#issue.isHidden() ? IssuesManager.IssuesManager.IssueStatus.UNHIDDEN :
+                                                              IssuesManager.IssuesManager.IssueStatus.HIDDEN;
+        setting.set(values);
       };
-      this.#hiddenIssuesMenu.data = data;
     }
   }
 

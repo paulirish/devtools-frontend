@@ -30,7 +30,7 @@ interface ViewInput {
   onSelect: (uiSourceCode: Workspace.UISourceCode.UISourceCode|null) => void;
   sourceCodes: Set<Workspace.UISourceCode.UISourceCode>;
 }
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const tooltip = (uiSourceCode: Workspace.UISourceCode.UISourceCode): string =>
       uiSourceCode.contentType().isFromSourceMap() ?
@@ -85,7 +85,7 @@ export class ChangesSidebar extends ChangesSidebarBase {
       this.#workspaceDiff.modifiedUISourceCodes().forEach(this.#removeUISourceCode.bind(this));
       this.#workspaceDiff.removeEventListener(
           WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED,
-          this.uiSourceCodeModifiedStatusChanged,
+          this.#uiSourceCodeModifiedStatusChanged,
           this,
       );
     }
@@ -93,7 +93,7 @@ export class ChangesSidebar extends ChangesSidebarBase {
     this.#workspaceDiff.modifiedUISourceCodes().forEach(this.#addUISourceCode.bind(this));
     this.#workspaceDiff.addEventListener(
         WorkspaceDiff.WorkspaceDiff.Events.MODIFIED_STATUS_CHANGED,
-        this.uiSourceCodeModifiedStatusChanged,
+        this.#uiSourceCodeModifiedStatusChanged,
         this,
     );
     this.requestUpdate();
@@ -109,7 +109,7 @@ export class ChangesSidebar extends ChangesSidebarBase {
       sourceCodes: this.#sourceCodes,
       selectedSourceCode: this.#selectedUISourceCode,
     };
-    this.#view(input, {}, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 
   #selectionChanged(
@@ -174,7 +174,7 @@ export class ChangesSidebar extends ChangesSidebarBase {
     this.requestUpdate();
   }
 
-  private uiSourceCodeModifiedStatusChanged(
+  #uiSourceCodeModifiedStatusChanged(
       event: Common.EventTarget.EventTargetEvent<WorkspaceDiff.WorkspaceDiff.ModifiedStatusChangedEvent>,
       ): void {
     const {isModified, uiSourceCode} = event.data;

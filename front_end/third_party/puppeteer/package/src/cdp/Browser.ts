@@ -29,6 +29,7 @@ import {
   type LaunchPWAOptions,
   type GetPWAStateOptions,
   type PWAState,
+  type NetworkRestrictions,
 } from '../api/Browser.js';
 import {BrowserContextEvent} from '../api/BrowserContext.js';
 import {CDPSessionEvent} from '../api/CDPSession.js';
@@ -106,16 +107,6 @@ export class CdpBrowser extends BrowserBase {
       logger,
     );
 
-    if (allowlist) {
-      const version = await browser.#getVersion();
-      const majorVersion = parseInt(
-        version.product.match(/\d+/)?.[0] ?? '0',
-        10,
-      );
-      if (majorVersion < 149) {
-        throw new Error('The allowlist option require Chrome 149 or greater.');
-      }
-    }
     if (acceptInsecureCerts) {
       await connection.send('Security.setIgnoreCertificateErrors', {
         ignore: true,
@@ -244,6 +235,21 @@ export class CdpBrowser extends BrowserBase {
 
   _targetManager(): TargetManager {
     return this.#targetManager;
+  }
+
+  override async restrictNetwork(
+    conditions?: NetworkRestrictions | null,
+  ): Promise<void> {
+    await this.#targetManager.setNetworkConditions(conditions);
+    // Only update the state once the target manager has accepted the new
+    // conditions so that failures (e.g. invalid URL patterns) do not leave
+    // the browser and connection out of sync with the target manager.
+    this.#hasNetworkRestrictions = Boolean(
+      (conditions?.blocklist && conditions.blocklist.length > 0) ||
+      (conditions?.allowlist && conditions.allowlist.length > 0),
+    );
+    this.#connection.rejectEmulateNetworkConditionsCalls =
+      this.#hasNetworkRestrictions;
   }
 
   #setIsPageTargetCallback(isPageTargetCallback?: IsPageTargetCallback): void {
@@ -502,26 +508,43 @@ export class CdpBrowser extends BrowserBase {
     path: string,
     options?: ExtensionInstallOptions,
   ): Promise<string> {
+    const existingTargetIds = new Set(
+      this._targetManager().getDiscoveredTargetInfos().keys(),
+    );
     const {id} = await this.#connection.send('Extensions.loadUnpacked', {
       path,
       enableInIncognito: options?.enabledInIncognito ?? false,
     });
+    await this.#destroyExtensionServiceWorkerTargets(id, existingTargetIds);
     this.#extensions.delete(id);
     return id;
   }
 
   override async uninstallExtension(id: string): Promise<void> {
     await this.#connection.send('Extensions.uninstall', {id});
+    await this.#destroyExtensionServiceWorkerTargets(id);
+    this.#extensions.delete(id);
+  }
 
-    // Currently sending the Extensions.uninstall command does not trigger
-    // the Target.targetDestroyed event for service workers. This causes
-    // flakiness in the extension tests.
+  async #destroyExtensionServiceWorkerTargets(
+    id: string,
+    existingTargetIds?: ReadonlySet<string>,
+  ): Promise<void> {
+    // Currently sending Extensions.loadUnpacked (when re-installing an
+    // existing extension) or Extensions.uninstall does not trigger the
+    // Target.targetDestroyed event for replaced/uninstalled service workers.
+    // This causes flakiness in extension tests and leaves stale targets in
+    // browser.targets().
     // TODO(nroscino): Remove this once the event is correctly emitted.
     const targetDestroyedPromises = [];
     for (const [targetId, targetInfo] of this._targetManager()
       .getDiscoveredTargetInfos()
       .entries()) {
-      if (targetInfo.url.includes(id) && targetInfo.type === 'service_worker') {
+      if (
+        (!existingTargetIds || existingTargetIds.has(targetId)) &&
+        targetInfo.url.includes(id) &&
+        targetInfo.type === 'service_worker'
+      ) {
         this._targetManager().addToIgnoreTarget(targetId);
         targetDestroyedPromises.push(
           new Promise(resolve => {
@@ -536,8 +559,6 @@ export class CdpBrowser extends BrowserBase {
       }
     }
     await Promise.all(targetDestroyedPromises);
-
-    this.#extensions.delete(id);
   }
 
   override async installPWA(options: InstallPWAOptions): Promise<string> {

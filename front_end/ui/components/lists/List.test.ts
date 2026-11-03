@@ -18,8 +18,8 @@ import * as Lists from './lists.js';
 
 const {html, render} = Lit;
 
-async function renderListComponent(
-    items: Lit.TemplateResult, editable?: boolean, deletable?: boolean): Promise<Lists.List.List> {
+async function renderListComponent(items: Lit.TemplateResult, editable?: boolean,
+                                   deletable?: boolean): Promise<Lists.List.List> {
   const component = new Lists.List.List();
   if (editable) {
     component.editable = true;
@@ -75,11 +75,10 @@ describe('List', () => {
   });
 
   it('shows only the edit button when editable is set', async () => {
-    const component = await renderListComponent(
-        html`
+    const component = await renderListComponent(html`
       <p>Item 1</p>
     `,
-        true);
+                                                true);
     assert.isNotNull(component.shadowRoot);
 
     const buttons = component.shadowRoot.querySelectorAll('devtools-button');
@@ -90,11 +89,10 @@ describe('List', () => {
   });
 
   it('shows only the remove button when deletable is set', async () => {
-    const component = await renderListComponent(
-        html`
+    const component = await renderListComponent(html`
       <p>Item 1</p>
     `,
-        undefined, true);
+                                                undefined, true);
     assert.isNotNull(component.shadowRoot);
 
     const buttons = component.shadowRoot.querySelectorAll('devtools-button');
@@ -134,13 +132,45 @@ describe('List', () => {
     assert.isNotNull(component.shadowRoot.querySelector('devtools-button[title="Remove"]'));
   });
 
+  it('supports per-item editable and deletable attributes on child elements', async () => {
+    const component = await renderListComponent(html`
+      <p>Read-only item</p>
+      <p editable deletable>Custom item</p>
+    `);
+    assert.isNotNull(component.shadowRoot);
+
+    const listItems = component.shadowRoot.querySelectorAll('li[role="listitem"]');
+    assert.lengthOf(listItems, 2);
+    assert.isNull(listItems[0].querySelector('.controls-container'));
+    assert.isNotNull(listItems[1].querySelector('devtools-button[title="Edit"]'));
+    assert.isNotNull(listItems[1].querySelector('devtools-button[title="Remove"]'));
+
+    let deletedIndex = -1;
+    component.addEventListener('delete', event => {
+      deletedIndex = event.detail.index;
+    });
+    listItems[0].dispatchEvent(
+        new KeyboardEvent('keydown', {bubbles: true, cancelable: true, composed: true, key: 'Delete'}));
+    assert.strictEqual(deletedIndex, -1);
+
+    listItems[1].dispatchEvent(
+        new KeyboardEvent('keydown', {bubbles: true, cancelable: true, composed: true, key: 'Delete'}));
+    assert.strictEqual(deletedIndex, 1);
+
+    const customChild = component.querySelectorAll('p')[1];
+    customChild.removeAttribute('editable');
+    customChild.removeAttribute('deletable');
+    await RenderCoordinator.done();
+
+    assert.isNull(component.shadowRoot.querySelectorAll('li[role="listitem"]')[1].querySelector('.controls-container'));
+  });
+
   it('dispatches an "edit" event when the edit button is clicked', async () => {
-    const component = await renderListComponent(
-        html`
+    const component = await renderListComponent(html`
       <p>Item 1</p>
       <p>Item 2</p>
     `,
-        true, false);
+                                                true, false);
     assert.isNotNull(component.shadowRoot);
 
     const listItems = component.shadowRoot.querySelectorAll('li');
@@ -157,12 +187,11 @@ describe('List', () => {
   });
 
   it('dispatches a "delete" event when the remove button is clicked', async () => {
-    const component = await renderListComponent(
-        html`
+    const component = await renderListComponent(html`
       <p>Item 1</p>
       <p>Item 2</p>
     `,
-        false, true);
+                                                false, true);
     assert.isNotNull(component.shadowRoot);
 
     const listItems = component.shadowRoot.querySelectorAll('li');
@@ -176,6 +205,33 @@ describe('List', () => {
 
     const event = await eventPromise;
     assert.deepEqual(event.detail, {index: 0});
+  });
+
+  it('dispatches a "delete" event when Delete is pressed on a list item', async () => {
+    const component = await renderListComponent(html`
+      <p>Item 1</p>
+      <p>Item 2</p>
+    `,
+                                                false, true);
+    assert.isNotNull(component.shadowRoot);
+
+    const secondItem = component.shadowRoot.querySelectorAll('li')[1];
+    const eventPromise = getEventPromise<Lists.List.ItemRemoveEvent>(component, 'delete');
+    const deleteEvent = new KeyboardEvent('keydown', {bubbles: true, cancelable: true, composed: true, key: 'Delete'});
+    secondItem.dispatchEvent(deleteEvent);
+
+    const event = await eventPromise;
+    assert.deepEqual(event.detail, {index: 1});
+    assert.isTrue(deleteEvent.defaultPrevented);
+
+    const backspaceEventPromise = getEventPromise<Lists.List.ItemRemoveEvent>(component, 'delete');
+    const backspaceEvent =
+        new KeyboardEvent('keydown', {bubbles: true, cancelable: true, composed: true, key: 'Backspace'});
+    secondItem.dispatchEvent(backspaceEvent);
+
+    const backspaceEventDetail = await backspaceEventPromise;
+    assert.deepEqual(backspaceEventDetail.detail, {index: 1});
+    assert.isTrue(backspaceEvent.defaultPrevented);
   });
 
   it('adds an item when a new child is appended', async () => {

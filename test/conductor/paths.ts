@@ -12,6 +12,7 @@ export const CHECKOUT_ROOT: string = path.join(import.meta.dirname, '..', build.
 export const BUILD_ROOT: string = path.join(import.meta.dirname, '..', build.BUILD_ROOT);
 export const GEN_DIR: string = path.join(BUILD_ROOT, 'gen', path.relative(CHECKOUT_ROOT, SOURCE_ROOT));
 export const BUILD_WITH_CHROMIUM: boolean = build.BUILD_WITH_CHROMIUM;
+export const DEVTOOLS_BUNDLED_CHROMIUM_DEPS: boolean = build.DEVTOOLS_BUNDLED_CHROMIUM_DEPS;
 export const TEST_ID_REGEX: RegExp = /^(.*\.[tj]s):(.*)$/;
 
 function rebase(fromRoot: string, toRoot: string, filename: string, newExt?: string) {
@@ -95,6 +96,23 @@ export class TestId<Pair extends PathPair = PathPair> {
     }
     return new TestId(pathPair, subTestId);
   }
+}
+
+/**
+ * Converts a test ID or file path (such as `front_end/core/common/Color.test.ts:case_name`
+ * from ResultDB or TestExpectations) into an absolute path in GEN_DIR with a `.js` extension.
+ */
+export function resolveBuildTestId(spec: string): string {
+  let file = spec;
+  let caseName: string|undefined;
+  if (TEST_ID_REGEX.test(spec)) {
+    const match = spec.match(TEST_ID_REGEX)!;
+    file = match[1];
+    caseName = match[2];
+  }
+  const jsFile = file.replace(/\.ts$/, '.js');
+  const absoluteJsFile = path.isAbsolute(jsFile) ? jsFile : path.join(GEN_DIR, jsFile);
+  return caseName !== undefined ? `${absoluteJsFile}:${caseName}` : absoluteJsFile;
 }
 
 export function defaultChromePath(): string {

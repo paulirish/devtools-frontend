@@ -75,13 +75,13 @@ interface ViewInput {
     scope: SDK.DebuggerModel.ScopeChainEntry,
     objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree,
   }>|null;
-  onToggle: (objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree, expanded: boolean) => void;
+  onToggle: (objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree, expanded: boolean, recursively?: boolean) => void;
   onContextMenu: (
       objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree,
       contextMenu: UI.ContextMenu.ContextMenu,
       ) => void;
 }
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const createScopeSection = ({scope, objectTree}: {
     scope: SDK.DebuggerModel.ScopeChainEntry,
@@ -100,9 +100,8 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               class="scope-chain-sidebar-pane-section"
               aria-label=${title}
               ?open=${objectTree.expanded}
-              @expand=${(e: Event) => {
-                const customEvent = e as UI.TreeOutline.TreeViewElement.ExpandEvent;
-                input.onToggle(objectTree, customEvent.detail.expanded);
+              @expand=${(e: UI.TreeOutline.TreeViewElement.ExpandEvent) => {
+                input.onToggle(objectTree, e.detail.expanded, e.detail.recursively);
               }}
               @contextmenu=${(e: Event) => {
                 const contextMenu = new UI.ContextMenu.ContextMenu(e);
@@ -142,7 +141,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
           input.isPaused ? i18nString(UIStrings.loading) : i18nString(UIStrings.notPaused)}</div>`}
     `,
       // clang-format on
-      target);
+      target, {container: {attributes: {jslog: `${VisualLogging.section('sources.scope-chain')}`}}});
 };
 
 function scopeTitle(scope: SDK.DebuggerModel.ScopeChainEntry): {title: string, subtitle: string|null} {
@@ -189,7 +188,6 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
 
   constructor(target?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(target, {
-      jslog: `${VisualLogging.section('sources.scope-chain')}`,
       useShadowDom: true,
     });
 
@@ -232,7 +230,11 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
       linkifier: this.#linkifier,
       isPaused: Boolean(this.#scopeChainModel),
       scopeChain: this.#scopeChain,
-      onToggle: (objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree, expanded: boolean) => {
+      onToggle: (objectTree: ObjectUI.ObjectPropertiesSection.ObjectTree, expanded: boolean, recursively = false) => {
+        if (expanded && recursively) {
+          void objectTree.expandRecursively().then(() => this.requestUpdate());
+          return;
+        }
         objectTree.expanded = expanded;
         this.requestUpdate();
       },
@@ -264,7 +266,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
         );
       },
     },
-               {}, this.contentElement);
+               undefined, this.contentElement);
   }
 
   #buildScopeChain({scopeChain}: SourceMapScopes.ScopeChainModel.ScopeChain): void {

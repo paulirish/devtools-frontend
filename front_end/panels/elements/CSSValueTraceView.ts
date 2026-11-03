@@ -26,11 +26,11 @@ export interface ViewInput {
 
 export type View = (
     input: ViewInput,
-    output: object,
+    output: undefined,
     target: HTMLElement,
     ) => void;
 
-function defaultView(input: ViewInput, output: object, target: HTMLElement): void {
+function defaultView(input: ViewInput, output: undefined, target: HTMLElement): void {
   const substitutions = [...input.substitutions];
   const evaluations = [...input.evaluations];
   const finalResult = evaluations.pop() ?? substitutions.pop();
@@ -42,6 +42,8 @@ function defaultView(input: ViewInput, output: object, target: HTMLElement): voi
   // clang-format off
   render(
     html`
+      <style>${cssValueTraceViewStyles}</style>
+      <style>${stylePropertiesTreeOutlineStyles}</style>
       <div role=dialog class="css-value-trace monospace" @keydown=${onKeyDown}>
         ${substitutions.map(line => html`
           <span class="trace-line-icon" aria-label="is equal to">\u21b3</span>
@@ -111,10 +113,6 @@ export class CSSValueTraceView extends UI.Widget.VBox {
 
   constructor(element?: HTMLElement, view: View = defaultView) {
     super(element, {useShadowDom: true});
-    this.registerRequiredCSS(
-        cssValueTraceViewStyles,
-        stylePropertiesTreeOutlineStyles,
-    );
     this.#view = view;
     this.requestUpdate();
   }
@@ -221,7 +219,7 @@ export class CSSValueTraceView extends UI.Widget.VBox {
       evaluations: this.#evaluations,
       onToggle: () => this.onResize(),
     };
-    this.#view(viewInput, {}, this.contentElement);
+    this.#view(viewInput, undefined, this.contentElement);
     const tabStop = this.contentElement.querySelector('[tabindex]');
     this.setDefaultFocusedElement(tabStop);
     if (tabStop && this.#pendingFocus) {

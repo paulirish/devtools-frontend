@@ -1245,6 +1245,18 @@ describe('NetworkManager', () => {
         assert.deepEqual(request!.directSocketInfo?.joinedMulticastGroups, new Set(['237.132.100.17']));
         assert.lengthOf(updatedRequests, 0);
       });
+
+      it('directUDPSocketJoinedMulticastGroup keeps memberships for different sources of a group apart', () => {
+        const sourceA = {identifier: mockIdentifier, IPAddress: '232.1.1.1', sourceAddress: '192.0.2.100'};
+        const sourceB = {identifier: mockIdentifier, IPAddress: '232.1.1.1', sourceAddress: '192.0.2.101'};
+
+        networkDispatcher.directUDPSocketJoinedMulticastGroup(sourceA);
+        networkDispatcher.directUDPSocketJoinedMulticastGroup(sourceB);
+
+        assert.deepEqual(request!.directSocketInfo?.joinedMulticastGroups,
+                         new Set(['232.1.1.1@192.0.2.100', '232.1.1.1@192.0.2.101']));
+        assert.lengthOf(updatedRequests, 2);
+      });
     });
 
     describe('on Leave Multicast Group events', () => {
@@ -1319,6 +1331,17 @@ describe('NetworkManager', () => {
 
         assert.deepEqual(request!.directSocketInfo?.joinedMulticastGroups, new Set());
         assert.lengthOf(updatedRequests, 0);
+      });
+
+      it('directUDPSocketLeftMulticastGroup removes only the membership for its source', () => {
+        request!.directSocketInfo!.joinedMulticastGroups = new Set(['232.1.1.1@192.0.2.100', '232.1.1.1@192.0.2.101']);
+        updatedRequests.length = 0;
+        const sourceA = {identifier: mockIdentifier, IPAddress: '232.1.1.1', sourceAddress: '192.0.2.100'};
+
+        networkDispatcher.directUDPSocketLeftMulticastGroup(sourceA);
+
+        assert.deepEqual(request!.directSocketInfo?.joinedMulticastGroups, new Set(['232.1.1.1@192.0.2.101']));
+        assert.lengthOf(updatedRequests, 1);
       });
     });
   });
@@ -1639,6 +1662,45 @@ describe('MultitargetNetworkManager', () => {
 
     assert.strictEqual(SDK.NetworkManager.NetworkManager.forRequest(request), workerNetworkManager);
     assert.isNotOk(multiTargetNetworkManager.inflightMainResourceRequests.has(requestId));
+  });
+
+  it('finds in-flight main resource requests across targets by loaderId', async () => {
+    const parentTarget = universe.createTarget({});
+    const subframeTarget = universe.createTarget({parentTarget, type: SDK.Target.Type.FRAME});
+
+    const parentNetworkManager = parentTarget.model(SDK.NetworkManager.NetworkManager)!;
+    const subframeNetworkManager = subframeTarget.model(SDK.NetworkManager.NetworkManager)!;
+
+    const requestId = 'loader-1' as Protocol.Network.RequestId;
+    const loaderId = 'loader-1' as Protocol.Network.LoaderId;
+    const requestPromise = parentNetworkManager.once(SDK.NetworkManager.Events.RequestStarted);
+    parentNetworkManager.dispatcher.requestWillBeSent({
+      requestId,
+      loaderId,
+      documentURL: 'http://example.com/subframe.html',
+      request: {
+        url: 'http://example.com/subframe.html',
+        method: 'GET',
+        headers: {},
+        initialPriority: Protocol.Network.ResourcePriority.High,
+        referrerPolicy: Protocol.Network.RequestReferrerPolicy.NoReferrer,
+      },
+      timestamp: 1 as Protocol.Network.MonotonicTime,
+      wallTime: 1 as Protocol.Network.TimeSinceEpoch,
+      initiator: {type: Protocol.Network.InitiatorType.Other},
+      redirectHasExtraInfo: false,
+    });
+
+    const {request} = await requestPromise;
+    assert.strictEqual(subframeNetworkManager.requestForLoaderId(loaderId), request);
+
+    subframeNetworkManager.dispatcher.loadingFinished({
+      requestId,
+      timestamp: 2 as Protocol.Network.MonotonicTime,
+      encodedDataLength: 0,
+    });
+
+    assert.strictEqual(subframeNetworkManager.requestForLoaderId(loaderId), request);
   });
 
   it('uses main frame to get certificate', () => {
@@ -2152,13 +2214,11 @@ describe('RequestConditions', () => {
     });
 
     it('correctly maps ruleIds to conditions', async () => {
-      const {universe, agent, emulateNetworkConditionsByRule} = stubAgent();
+      const {universe, emulateNetworkConditionsByRule} = stubAgent();
       const multitargetNetworkManager = universe.multitargetNetworkManager;
       const requestConditions = multitargetNetworkManager.requestConditions;
 
       const ruleId = 'mock-rule-id-1';
-      emulateNetworkConditionsByRule.resolves({ruleIds: [ruleId], getError: () => undefined});
-
       const throttlingCondition = SDK.NetworkManager.RequestCondition.createFromSetting({
         urlPattern: '*://example.com:*' as SDK.NetworkManager.URLPatternConstructorString,
         enabled: true,
@@ -2166,9 +2226,10 @@ describe('RequestConditions', () => {
       },
                                                                                         universe.settings);
       requestConditions.add(throttlingCondition);
+      emulateNetworkConditionsByRule.resolves({ruleIds: [ruleId], getError: () => undefined});
       requestConditions.conditionsEnabled = true;
 
-      await requestConditions.applyConditions(false, null, agent);
+      await requestConditions.conditionsAppliedForTest();
 
       const conditions = requestConditions.conditionsForId(ruleId);
       assert.strictEqual(conditions?.conditions, SDK.NetworkManager.Slow3GConditions);
@@ -3058,7 +3119,11 @@ describe('InterceptedRequest', () => {
           false);
       const uiSourceCode = networkProject.createUISourceCode(
           urlString`https://www.example.com/utf16.html`, Common.ResourceType.resourceTypes.Document);
-      networkProject.addUISourceCode(uiSourceCode);
+      networkProject.addUISourceCodeWithProvider(
+          uiSourceCode,
+          TextUtils.StaticContentProvider.StaticContentProvider.fromString(
+              uiSourceCode.url(), Common.ResourceType.resourceTypes.Document, ''),
+          null, 'text/html');
 
       const interceptedRequest = new SDK.NetworkManager.InterceptedRequest(
           universe.multitargetNetworkManager, fetchAgent, request, Protocol.Network.ResourceType.Document, requestId,

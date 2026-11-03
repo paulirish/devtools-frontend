@@ -127,10 +127,14 @@ export class PreloadingGrid extends UI.Widget.VBox {
   #pageURL?: Platform.DevToolsPath.UrlString;
   #onSelect?: ({rowId}: {rowId: string}) => void;
 
-  constructor(view?: View) {
-    super();
-    this.#view = view ?? PRELOADING_GRID_DEFAULT_VIEW;
+  constructor(element?: HTMLElement, view: View = PRELOADING_GRID_DEFAULT_VIEW) {
+    super(element);
+    this.#view = view;
     this.requestUpdate();
+  }
+
+  get rows(): PreloadingGridRow[]|undefined {
+    return this.#rows;
   }
 
   set rows(rows: PreloadingGridRow[]) {
@@ -138,12 +142,23 @@ export class PreloadingGrid extends UI.Widget.VBox {
     this.requestUpdate();
   }
 
+  get pageURL(): Platform.DevToolsPath.UrlString|undefined {
+    return this.#pageURL;
+  }
+
   set pageURL(pageURL: Platform.DevToolsPath.UrlString) {
     this.#pageURL = pageURL;
     this.requestUpdate();
   }
 
+  get onSelect(): (({rowId}: {rowId: string}) => void)|undefined {
+    return this.#onSelect;
+  }
+
   set onSelect(onSelect: ({rowId}: {rowId: string}) => void) {
+    if (this.#onSelect === onSelect) {
+      return;
+    }
     this.#onSelect = onSelect;
     this.requestUpdate();
   }

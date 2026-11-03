@@ -66,6 +66,25 @@ describeWithEnvironment('ApplicationPanelSidebar', () => {
     assert.isUndefined(sidebar.adsTreeElement);
   });
 
+  it('shows Private Verification Tokens when the config is enabled', async () => {
+    updateHostConfig({devToolsPrivateVerificationTokens: {enabled: true}});
+    const panel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const showViewSpy = sinon.spy(panel, 'showView');
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+    assert.exists(sidebar.privateVerificationTokensTreeElement);
+
+    sidebar.privateVerificationTokensTreeElement.onselect(false);
+    sinon.assert.calledOnceWithExactly(
+        showViewSpy, sinon.match.instanceOf(Application.PrivateVerificationTokensView.PrivateVerificationTokensView));
+  });
+
+  it('does not show Private Verification Tokens when the config is disabled', async () => {
+    updateHostConfig({devToolsPrivateVerificationTokens: {enabled: false}});
+    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+    assert.isUndefined(sidebar.privateVerificationTokensTreeElement);
+  });
+
   it('shows cookies for all frames', async () => {
     Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
     const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
@@ -639,6 +658,107 @@ describeWithEnvironment('IndexedDBTreeElement live update', () => {
 
     sinon.assert.calledTwice(loadObjectStoreDataStub);
     sinon.assert.calledTwice(loadIndexDataStub);
+  });
+
+  it('shows Sub Apps or Sibling Sub Apps depending on the fetched data', async () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const getSubApps = sinon.stub(resourceTreeModel, 'getSubApps').resolves([]);
+    const getSiblingSubApps = sinon.stub(resourceTreeModel, 'getSiblingSubApps').resolves([]);
+
+    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+    assert.exists(sidebar.subAppsTreeElement);
+    assert.isTrue(sidebar.subAppsTreeElement.hidden);
+    assert.strictEqual(sidebar.subAppsTreeElement.title, 'Sub apps');
+
+    const sampleSubApps: Protocol.Page.SubApp[] = [
+      {
+        name: 'Child App',
+        scope: 'https://example.com/child/',
+        manifestId: 'https://example.com/child/',
+        startUrl: 'https://example.com/child/',
+      },
+    ];
+
+    // Inspecting a sub-app: its siblings are listed, so the node is titled
+    // "Sibling sub apps".
+    getSiblingSubApps.resolves(sampleSubApps);
+    await sidebar.subAppsTreeElement.update(resourceTreeModel);
+    assert.isFalse(sidebar.subAppsTreeElement.hidden);
+    assert.strictEqual(sidebar.subAppsTreeElement.title, 'Sibling sub apps');
+    assert.deepEqual(sidebar.subAppsTreeElement.getSubApps(), sampleSubApps);
+
+    getSiblingSubApps.resolves([]);
+    getSubApps.resolves(sampleSubApps);
+    await sidebar.subAppsTreeElement.update(resourceTreeModel);
+    assert.isFalse(sidebar.subAppsTreeElement.hidden);
+    assert.strictEqual(sidebar.subAppsTreeElement.title, 'Sub apps');
+    assert.deepEqual(sidebar.subAppsTreeElement.getSubApps(), sampleSubApps);
+
+    getSubApps.resolves([]);
+    await sidebar.subAppsTreeElement.update(resourceTreeModel);
+    assert.isTrue(sidebar.subAppsTreeElement.hidden);
+  });
+
+  it('ignores results of a superseded sub-apps update', async () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+    const getSubApps = sinon.stub(resourceTreeModel, 'getSubApps').resolves([]);
+    sinon.stub(resourceTreeModel, 'getSiblingSubApps').resolves([]);
+
+    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+
+    const staleSubApps: Protocol.Page.SubApp[] = [{
+      name: 'Stale App',
+      scope: 'https://example.com/stale/',
+      manifestId: 'https://example.com/stale/',
+      startUrl: 'https://example.com/stale/',
+    }];
+    const latestSubApps: Protocol.Page.SubApp[] = [{
+      name: 'Latest App',
+      scope: 'https://example.com/latest/',
+      manifestId: 'https://example.com/latest/',
+      startUrl: 'https://example.com/latest/',
+    }];
+
+    const {promise: staleResponse, resolve: resolveStale} = Promise.withResolvers<Protocol.Page.SubApp[]>();
+    getSubApps.returns(staleResponse);
+    const staleUpdate = sidebar.subAppsTreeElement.update(resourceTreeModel);
+
+    getSubApps.resolves(latestSubApps);
+    await sidebar.subAppsTreeElement.update(resourceTreeModel);
+    assert.deepEqual(sidebar.subAppsTreeElement.getSubApps(), latestSubApps);
+
+    resolveStale(staleSubApps);
+    await staleUpdate;
+    assert.deepEqual(sidebar.subAppsTreeElement.getSubApps(), latestSubApps);
+  });
+
+  it('fetches sub-apps from ResourceTreeModel on initialization', async () => {
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assert.exists(resourceTreeModel);
+
+    const sampleSubApps: Protocol.Page.SubApp[] = [
+      {
+        name: 'Child App',
+        scope: 'https://example.com/child/',
+        manifestId: 'https://example.com/child/',
+        startUrl: 'https://example.com/child/',
+      },
+    ];
+    sinon.stub(resourceTreeModel, 'getSubApps').resolves(sampleSubApps);
+    sinon.stub(resourceTreeModel, 'getSiblingSubApps').resolves([]);
+
+    Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+    const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+    assert.exists(sidebar.subAppsTreeElement.latestUpdateForTest);
+    await sidebar.subAppsTreeElement.latestUpdateForTest;
+
+    assert.isFalse(sidebar.subAppsTreeElement.hidden);
+    assert.strictEqual(sidebar.subAppsTreeElement.title, 'Sub apps');
+    assert.deepEqual(sidebar.subAppsTreeElement.getSubApps(), sampleSubApps);
   });
 
   describe('ResourcesPanel toolbar', () => {

@@ -55,7 +55,7 @@ import * as Snippets from '../snippets/snippets.js';
 
 import {CallStackSidebarPane} from './CallStackSidebarPane.js';
 import {DebuggerPausedMessage} from './DebuggerPausedMessage.js';
-import {NavigatorView} from './NavigatorView.js';
+import {SourcesNavigatorView} from './SourcesNavigator.js';
 import sourcesPanelStyles from './sourcesPanel.css.js';
 import {type EditorClosedEvent, Events, SourcesView} from './SourcesView.js';
 import {ThreadsSidebarPane} from './ThreadsSidebarPane.js';
@@ -781,12 +781,14 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const viewManager = UI.ViewManager.ViewManager.instance();
     for (const view of viewManager.viewsForLocation(UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW)) {
       const navigatorView = await view.widget();
-      if (navigatorView instanceof NavigatorView && navigatorView.acceptProject(uiSourceCode.project())) {
-        navigatorView.revealUISourceCode(uiSourceCode, true);
+      if (navigatorView instanceof SourcesNavigatorView && navigatorView.acceptProject(uiSourceCode.project())) {
         this.navigatorTabbedLocation.tabbedPane().selectTab(view.viewId(), true);
         if (!skipReveal) {
           this.#setNavigatorSidebarOpen(true);
-          await navigatorView.updateComplete;
+        }
+        await navigatorView.updateComplete;
+        navigatorView.revealUISourceCode(uiSourceCode, true);
+        if (!skipReveal) {
           navigatorView.focus();
         }
         break;
@@ -916,7 +918,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
   #editorClosed({data: {uiSourceCode}}: Common.EventTarget.EventTargetEvent<EditorClosedEvent>): void {
     const context = UI.Context.Context.instance();
-    if (context.flavor(Workspace.UISourceCode.UISourceCode) === uiSourceCode) {
+    const currentFlavor = context.flavor(Workspace.UISourceCode.UISourceCode);
+    const flavorScriptId = currentFlavor?.canonicalScriptId();
+    if (currentFlavor === uiSourceCode || (flavorScriptId && flavorScriptId === uiSourceCode.canonicalScriptId())) {
       context.setFlavor(Workspace.UISourceCode.UISourceCode, null);
     }
   }
@@ -1586,7 +1590,7 @@ export const QUICK_SOURCE_DEFAULT_VIEW: QuickSourceViewFunc = (input, _output, t
     <div class="sources-view-wrapper vbox flex-auto">
       ${input.sourcesView ? widget(UI.Widget.WrapperWidget, {widget: input.sourcesView}) : nothing}
     </div>
-  `, target);
+  `, target, {container: {attributes: {jslog: `${VisualLogging.panel('sources.quick').track({resize: true})}`}}});
   // clang-format on
 };
 
@@ -1596,7 +1600,7 @@ export class QuickSourceView extends UI.Widget.VBox {
   #showInWrapper = false;
 
   constructor(view: QuickSourceViewFunc = QUICK_SOURCE_DEFAULT_VIEW) {
-    super({jslog: `${VisualLogging.panel('sources.quick').track({resize: true})}`});
+    super();
     this.#view = view;
     this.#sourcesView = SourcesPanel.instance().sourcesView();
     this.performUpdate();

@@ -1,125 +1,476 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
+
+import '../../ui/components/request_link_icon/request_link_icon.js';
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
+import type * as Logs from '../../models/logs/logs.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
+import type * as RequestLinkIcon from '../../ui/components/request_link_icon/request_link_icon.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
+import * as UI from '../../ui/legacy/legacy.js';
+import {html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 
 import {AffectedItem, AffectedResourcesView} from './AffectedResourcesView.js';
 import type {IssueView} from './IssueView.js';
 
+const {widget} = UI.Widget;
+
+export interface RequestCellData {
+  affectedRequest: Protocol.Audits.AffectedRequest;
+  linkToPreflight?: boolean;
+  highlightHeader?: {section: NetworkForward.UIRequestLocation.UIHeaderSection, name: string};
+  additionalOnClickAction?: () => void;
+}
+
+export interface SourceLocationData {
+  target: SDK.Target.Target|null;
+  scriptId: Protocol.Runtime.ScriptId|null;
+  url: Platform.DevToolsPath.UrlString;
+  lineNumber: number;
+  columnNumber?: number;
+}
+
+export interface CorsRow {
+  request: RequestCellData;
+  isWarning: boolean;
+  preflight?: RequestCellData;
+  header: string;
+  problem: string;
+  failedParameter: string;
+  initiatorOrigin: string;
+  resourceIPAddressSpace: string;
+  initiatorIPAddressSpace: string;
+  initiatorIsSecureContext: boolean|undefined;
+  sourceLocation?: SourceLocationData;
+}
+
+export interface ViewInput {
+  issueCode?: IssuesManager.CorsIssue.IssueCode;
+  rows: CorsRow[];
+  requestResolver: Logs.RequestResolver.RequestResolver;
+}
+
+export type View = (input: ViewInput, _output: undefined, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  const renderStatus = (isWarning: boolean): LitTemplate => html`
+    <td class=${isWarning ? 'affected-resource-report-only-status' : 'affected-resource-blocked-status'}>
+      ${isWarning ? i18nString(UIStrings.warning) : i18nString(UIStrings.blocked)}
+    </td>
+  `;
+
+  const renderRequestCell = (request: RequestCellData): LitTemplate => {
+    // clang-format off
+    return html`
+      <td class="affected-resource-cell">
+        <devtools-request-link-icon .data=${{
+          ...request,
+          requestResolver: input.requestResolver,
+          displayURL: true,
+        } as RequestLinkIcon.RequestLinkIcon.RequestLinkIconData}></devtools-request-link-icon>
+      </td>
+    `;
+    // clang-format on
+  };
+
+  const renderPreflightCell = (preflight: RequestCellData|undefined): LitTemplate =>
+      preflight ? renderRequestCell(preflight) : html`<td></td>`;
+
+  const renderCodeExampleCell = (text: string): LitTemplate => html`<td class="code-example">${text}</td>`;
+
+  const renderSourceLocationCell = (location: SourceLocationData|undefined): LitTemplate => {
+    if (!location) {
+      return html`<td class="affected-source-location"></td>`;
+    }
+    // clang-format off
+    return html`
+      <td class="affected-source-location">${
+        widget(Components.Linkifier.ScriptLocationLink, {
+          target: location.target ?? undefined,
+          scriptId: location.scriptId ?? undefined,
+          sourceURL: location.url,
+          lineNumber: location.lineNumber,
+          options: {
+            columnNumber: location.columnNumber,
+            maxLength: UI.UIUtils.MaxLengthForDisplayedURLsInConsole,
+            jslogContext: 'source-location',
+          },
+        })}</td>
+    `;
+    // clang-format on
+  };
+
+  const renderSecureContextCell = (isSecureContext: boolean|undefined): LitTemplate => html`
+    <td>${
+      isSecureContext === undefined ? nothing :
+          isSecureContext           ? i18nString(UIStrings.secure) :
+                                      i18nString(UIStrings.insecure)}</td>
+  `;
+
+  const renderExtraHeaderColumns = (issueCode: IssuesManager.CorsIssue.IssueCode): LitTemplate => {
+    switch (issueCode) {
+      case IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequestIfProblematic)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.header)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.problem)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.invalidValue)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.WILDCARD_ORIGN_NOT_ALLOWED:
+        return html`<td class="affected-resource-header">${i18nString(UIStrings.preflightRequestIfProblematic)}</td>`;
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequest)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.problem)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.ORIGIN_MISMATCH:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequestIfProblematic)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.initiatorContext)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.allowedOrigin)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.ALLOW_CREDENTIALS_REQUIRED:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequestIfProblematic)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.allowCredentialsValueFromHeader)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.INSECURE_LOCAL_NETWORK:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.resourceAddressSpace)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.initiatorAddressSpace)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.initiatorContext)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequest)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.disallowedRequestMethod)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.preflightRequest)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.disallowedRequestHeader)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.DISALLOWED_BY_MODE:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.initiatorContext)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.sourceLocation)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME:
+        // clang-format off
+        return html`
+          <td class="affected-resource-header">${i18nString(UIStrings.initiatorContext)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.sourceLocation)}</td>
+          <td class="affected-resource-header">${i18nString(UIStrings.unsupportedScheme)}</td>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.NO_CORS_REDIRECT_MODE_NOT_FOLLOW:
+        return html`<td class="affected-resource-header">${i18nString(UIStrings.sourceLocation)}</td>`;
+      case IssuesManager.CorsIssue.IssueCode.REDIRECT_CONTAINS_CREDENTIALS:
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_MISSING_ALLOW_EXTERNAL:
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_INVALID_ALLOW_EXTERNAL:
+      case IssuesManager.CorsIssue.IssueCode.INVALID_LOCAL_NETWORK_ACCESS:
+      case IssuesManager.CorsIssue.IssueCode.LOCAL_NETWORK_ACCESS_PERMISSION_DENIED:
+        return nothing;
+      default:
+        Platform.assertNever(issueCode, 'Unknown issue code: ' + issueCode);
+    }
+  };
+
+  const renderRow = (issueCode: IssuesManager.CorsIssue.IssueCode, row: CorsRow): LitTemplate => {
+    switch (issueCode) {
+      case IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderPreflightCell(row.preflight)}
+            ${renderCodeExampleCell(row.header)}
+            <td>${row.problem}</td>
+            ${renderCodeExampleCell(row.failedParameter)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.WILDCARD_ORIGN_NOT_ALLOWED:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderPreflightCell(row.preflight)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderPreflightCell(row.preflight)}
+            <td>${row.problem}</td>
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.ORIGIN_MISMATCH:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderPreflightCell(row.preflight)}
+            ${renderCodeExampleCell(row.initiatorOrigin)}
+            ${renderCodeExampleCell(row.failedParameter)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.ALLOW_CREDENTIALS_REQUIRED:
+      case IssuesManager.CorsIssue.IssueCode.METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE:
+      case IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderPreflightCell(row.preflight)}
+            ${renderCodeExampleCell(row.failedParameter)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.INSECURE_LOCAL_NETWORK:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            <td>${row.resourceIPAddressSpace}</td>
+            <td>${row.initiatorIPAddressSpace}</td>
+            ${renderSecureContextCell(row.initiatorIsSecureContext)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.DISALLOWED_BY_MODE:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderCodeExampleCell(row.initiatorOrigin)}
+            ${renderSourceLocationCell(row.sourceLocation)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderCodeExampleCell(row.initiatorOrigin)}
+            ${renderSourceLocationCell(row.sourceLocation)}
+            ${renderCodeExampleCell(row.failedParameter)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.NO_CORS_REDIRECT_MODE_NOT_FOLLOW:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+            ${renderSourceLocationCell(row.sourceLocation)}
+          </tr>
+        `;
+        // clang-format on
+      case IssuesManager.CorsIssue.IssueCode.REDIRECT_CONTAINS_CREDENTIALS:
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_MISSING_ALLOW_EXTERNAL:
+      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_INVALID_ALLOW_EXTERNAL:
+      case IssuesManager.CorsIssue.IssueCode.INVALID_LOCAL_NETWORK_ACCESS:
+      case IssuesManager.CorsIssue.IssueCode.LOCAL_NETWORK_ACCESS_PERMISSION_DENIED:
+        // clang-format off
+        return html`
+          <tr class="affected-resource-directive">
+            ${renderRequestCell(row.request)}
+            ${renderStatus(row.isWarning)}
+          </tr>
+        `;
+        // clang-format on
+      default:
+        Platform.assertNever(issueCode, 'Unknown issue code: ' + issueCode);
+    }
+  };
+
+  const issueCode = input.issueCode;
+  // clang-format off
+  render(issueCode ? html`
+    <tr>
+      <td class="affected-resource-header">${i18nString(UIStrings.request)}</td>
+      <td class="affected-resource-header">${i18nString(UIStrings.status)}</td>
+      ${renderExtraHeaderColumns(issueCode)}
+    </tr>
+    ${input.rows.map(row => renderRow(issueCode, row))}
+  ` : nothing, target);
+  // clang-format on
+};
+
 const UIStrings = {
   /**
-   * @description Label in the Issues panel for the number of affected requests in the CORS affected resources table.
+   * @description Label in the Issues panel for the number of affected requests
+   * in the CORS affected resources table.
    */
   nRequests: '{n, plural, =1 {# request} other {# requests}}',
   /**
-   * @description Violation status in the Issues panel indicating that a CORS issue produced a warning.
+   * @description Violation status in the Issues panel indicating that a CORS
+   * issue produced a warning.
    */
   warning: 'Warning',
   /**
-   * @description Violation status in the Issues panel indicating that a CORS request was blocked.
+   * @description Violation status in the Issues panel indicating that a CORS
+   * request was blocked.
    */
   blocked: 'Blocked',
   /**
-   * @description Column header in the Issues panel for request status in the CORS affected resources table.
+   * @description Column header in the Issues panel for request status in the
+   * CORS affected resources table.
    */
   status: 'Status',
   /**
-   * @description Column header in the Issues panel for network requests in the CORS affected resources table.
+   * @description Column header in the Issues panel for network requests in the
+   * CORS affected resources table.
    */
   request: 'Request',
   /**
-   * @description Column header in the Issues panel for resource addresses in the CORS affected resources table.
+   * @description Column header in the Issues panel for resource addresses in
+   * the CORS affected resources table.
    */
   resourceAddressSpace: 'Resource address',
   /**
-   * @description Column header in the Issues panel for initiator addresses in the CORS affected resources table.
+   * @description Column header in the Issues panel for initiator addresses in
+   * the CORS affected resources table.
    */
   initiatorAddressSpace: 'Initiator address',
   /**
-   * @description Context status in the Issues panel indicating a secure initiator context.
+   * @description Context status in the Issues panel indicating a secure
+   * initiator context.
    */
   secure: 'Secure',
   /**
-   * @description Context status in the Issues panel indicating an insecure initiator context.
+   * @description Context status in the Issues panel indicating an insecure
+   * initiator context.
    */
   insecure: 'Insecure',
   /**
-   * @description Column header in the Issues panel for initiator context in the CORS affected resources table.
+   * @description Column header in the Issues panel for initiator context in the
+   * CORS affected resources table.
    */
   initiatorContext: 'Initiator context',
   /**
-   * @description Column header in the Issues panel for preflight requests when problematic in the CORS affected resources table.
+   * @description Column header in the Issues panel for preflight requests when
+   * problematic in the CORS affected resources table.
    */
   preflightRequestIfProblematic: 'Preflight request (if problematic)',
   /**
-   * @description Column header in the Issues panel for preflight requests in the CORS affected resources table.
+   * @description Column header in the Issues panel for preflight requests in
+   * the CORS affected resources table.
    */
   preflightRequest: 'Preflight request',
   /**
-   * @description Column header in the Issues panel for HTTP header names in the CORS affected resources table.
+   * @description Column header in the Issues panel for HTTP header names in the
+   * CORS affected resources table.
    */
   header: 'Header',
   /**
-   * @description Column header in the Issues panel for problem descriptions in the CORS affected resources table.
+   * @description Column header in the Issues panel for problem descriptions in
+   * the CORS affected resources table.
    */
   problem: 'Problem',
   /**
-   * @description Column header in the Issues panel for invalid header values in the CORS affected resources table.
+   * @description Column header in the Issues panel for invalid header values in
+   * the CORS affected resources table.
    */
   invalidValue: 'Invalid value (if available)',
   /**
-   * @description Problem description in the Issues panel indicating that a required CORS response header was missing.
+   * @description Problem description in the Issues panel indicating that a
+   * required CORS response header was missing.
    */
   problemMissingHeader: 'Missing header',
   /**
-   * @description Problem description in the Issues panel indicating that a CORS response header contained multiple values.
+   * @description Problem description in the Issues panel indicating that a CORS
+   * response header contained multiple values.
    */
   problemMultipleValues: 'Multiple values',
   /**
-   * @description Problem description in the Issues panel indicating that a CORS response header contained an invalid value.
+   * @description Problem description in the Issues panel indicating that a CORS
+   * response header contained an invalid value.
    */
   problemInvalidValue: 'Invalid value',
   /**
-   * @description Problem description in the Issues panel indicating that the preflight response was a redirect.
+   * @description Problem description in the Issues panel indicating that the
+   * preflight response was a redirect.
    */
   preflightDisallowedRedirect: 'Response to preflight was a redirect',
   /**
-   * @description Problem description in the Issues panel indicating that the preflight request HTTP status was not successful.
+   * @description Problem description in the Issues panel indicating that the
+   * preflight request HTTP status was not successful.
    */
   preflightInvalidStatus: 'HTTP status of preflight request didn’t indicate success',
   /**
-   * @description Column header in the Issues panel for allowed origins in the CORS affected resources table.
+   * @description Column header in the Issues panel for allowed origins in the
+   * CORS affected resources table.
    */
   allowedOrigin: 'Allowed origin (from header)',
   /**
-   * @description Column header in the Issues panel for the Access-Control-Allow-Credentials header value in the CORS affected resources table.
+   * @description Column header in the Issues panel for the
+   * Access-Control-Allow-Credentials header value in the CORS affected
+   * resources table.
    */
   allowCredentialsValueFromHeader: '`Access-Control-Allow-Credentials` header value',
   /**
-   * @description Column header in the Issues panel for disallowed request methods in the CORS affected resources table.
+   * @description Column header in the Issues panel for disallowed request
+   * methods in the CORS affected resources table.
    */
   disallowedRequestMethod: 'Disallowed request method',
   /**
-   * @description Column header in the Issues panel for disallowed request headers in the CORS affected resources table.
+   * @description Column header in the Issues panel for disallowed request
+   * headers in the CORS affected resources table.
    */
   disallowedRequestHeader: 'Disallowed request header',
   /**
-   * @description Column header in the Issues panel for source locations in the CORS affected resources table.
+   * @description Column header in the Issues panel for source locations in the
+   * CORS affected resources table.
    */
   sourceLocation: 'Source location',
   /**
-   * @description Column header in the Issues panel for unsupported URL schemes in the CORS affected resources table.
+   * @description Column header in the Issues panel for unsupported URL schemes
+   * in the CORS affected resources table.
    */
   unsupportedScheme: 'Unsupported scheme',
   /**
-   * @description Problem description in the Issues panel indicating that a network request failed.
+   * @description Problem description in the Issues panel indicating that a
+   * network request failed.
    */
   failedRequest: 'Failed request',
 } as const;
@@ -127,112 +478,34 @@ const str_ = i18n.i18n.registerUIStrings('panels/issues/CorsIssueDetailsView.ts'
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CorsIssueDetailsView extends AffectedResourcesView {
-  constructor(parent: IssueView, issue: IssuesManager.IssueAggregator.AggregatedIssue, jslogContext: string) {
-    super(parent, issue, jslogContext);
-    this.affectedResourcesCountElement.classList.add('cors-issue-affected-resource-label');
-  }
+  readonly #view: View;
+  readonly #onRequestClick = (): void => {
+    Host.userMetrics.issuesPanelResourceOpened(IssuesManager.Issue.IssueCategory.CORS, AffectedItem.REQUEST);
+  };
 
-  #appendStatus(element: HTMLElement, isWarning: boolean): void {
-    const status = document.createElement('td');
-    if (isWarning) {
-      status.classList.add('affected-resource-report-only-status');
-      status.textContent = i18nString(UIStrings.warning);
-    } else {
-      status.classList.add('affected-resource-blocked-status');
-      status.textContent = i18nString(UIStrings.blocked);
-    }
-    element.appendChild(status);
+  constructor(parent: IssueView, issue: IssuesManager.IssueAggregator.AggregatedIssue, jslogContext: string,
+              view: View = DEFAULT_VIEW) {
+    super(parent, issue, jslogContext);
+    this.#view = view;
+    this.affectedResourcesCountElement.classList.add('cors-issue-affected-resource-label');
   }
 
   protected getResourceNameWithCount(count: number): Platform.UIString.LocalizedString {
     return i18nString(UIStrings.nRequests, {n: count});
   }
 
-  #appendDetails(issueCode: IssuesManager.CorsIssue.IssueCode, issues: Iterable<IssuesManager.CorsIssue.CorsIssue>):
-      void {
-    const header = document.createElement('tr');
-    this.appendColumnTitle(header, i18nString(UIStrings.request));
-    this.appendColumnTitle(header, i18nString(UIStrings.status));
-    switch (issueCode) {
-      case IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequestIfProblematic));
-        this.appendColumnTitle(header, i18nString(UIStrings.header));
-        this.appendColumnTitle(header, i18nString(UIStrings.problem));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidValue));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.WILDCARD_ORIGN_NOT_ALLOWED:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequestIfProblematic));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequest));
-        this.appendColumnTitle(header, i18nString(UIStrings.problem));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.ORIGIN_MISMATCH:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequestIfProblematic));
-        this.appendColumnTitle(header, i18nString(UIStrings.initiatorContext));
-        this.appendColumnTitle(header, i18nString(UIStrings.allowedOrigin));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.ALLOW_CREDENTIALS_REQUIRED:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequestIfProblematic));
-        this.appendColumnTitle(header, i18nString(UIStrings.allowCredentialsValueFromHeader));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.INSECURE_LOCAL_NETWORK:
-        this.appendColumnTitle(header, i18nString(UIStrings.resourceAddressSpace));
-        this.appendColumnTitle(header, i18nString(UIStrings.initiatorAddressSpace));
-        this.appendColumnTitle(header, i18nString(UIStrings.initiatorContext));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequest));
-        this.appendColumnTitle(header, i18nString(UIStrings.disallowedRequestMethod));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE:
-        this.appendColumnTitle(header, i18nString(UIStrings.preflightRequest));
-        this.appendColumnTitle(header, i18nString(UIStrings.disallowedRequestHeader));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.REDIRECT_CONTAINS_CREDENTIALS:
-        // The default columns suffice.
-        break;
-      case IssuesManager.CorsIssue.IssueCode.DISALLOWED_BY_MODE:
-        this.appendColumnTitle(header, i18nString(UIStrings.initiatorContext));
-        this.appendColumnTitle(header, i18nString(UIStrings.sourceLocation));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME:
-        this.appendColumnTitle(header, i18nString(UIStrings.initiatorContext));
-        this.appendColumnTitle(header, i18nString(UIStrings.sourceLocation));
-        this.appendColumnTitle(header, i18nString(UIStrings.unsupportedScheme));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.NO_CORS_REDIRECT_MODE_NOT_FOLLOW:
-        this.appendColumnTitle(header, i18nString(UIStrings.sourceLocation));
-        break;
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_MISSING_ALLOW_EXTERNAL:
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_INVALID_ALLOW_EXTERNAL:
-      case IssuesManager.CorsIssue.IssueCode.INVALID_LOCAL_NETWORK_ACCESS:
-      case IssuesManager.CorsIssue.IssueCode.LOCAL_NETWORK_ACCESS_PERMISSION_DENIED:
-        // The default columns suffice.
-        break;
-      default:
-        Platform.assertNever(issueCode, 'Unknow issue code ' + issueCode);
-    }
-
-    this.affectedResources.appendChild(header);
-    let count = 0;
+  #appendDetails(issueCode: IssuesManager.CorsIssue.IssueCode,
+                 issues: Iterable<IssuesManager.CorsIssue.CorsIssue>): void {
+    const rows: CorsRow[] = [];
     for (const issue of issues) {
-      count++;
-      this.#appendDetail(issueCode, issue);
+      rows.push(this.#createDetailRow(issueCode, issue));
     }
-    this.updateAffectedResourceCount(count);
+    const input: ViewInput = {issueCode, rows, requestResolver: this.requestResolver};
+    this.#view(input, undefined, this.affectedResources);
+    this.updateAffectedResourceCount(rows.length);
   }
 
-  #appendSecureContextCell(element: HTMLElement, isSecureContext: boolean|undefined): void {
-    if (isSecureContext === undefined) {
-      this.appendIssueDetailCell(element, '');
-      return;
-    }
-    this.appendIssueDetailCell(
-        element, isSecureContext ? i18nString(UIStrings.secure) : i18nString(UIStrings.insecure));
-  }
-
-  private static getHeaderFromError(corsError: Protocol.Network.CorsError): string {
+  static #getHeaderFromError(corsError: Protocol.Network.CorsError): string {
     switch (corsError) {
       case Protocol.Network.CorsError.InvalidAllowHeadersPreflightResponse:
         return 'Access-Control-Allow-Headers';
@@ -262,7 +535,7 @@ export class CorsIssueDetailsView extends AffectedResourcesView {
     return '';
   }
 
-  private static getProblemFromError(corsErrorStatus: Protocol.Network.CorsErrorStatus): string {
+  static #getProblemFromError(corsErrorStatus: Protocol.Network.CorsErrorStatus): string {
     switch (corsErrorStatus.corsError) {
       case Protocol.Network.CorsError.InvalidAllowHeadersPreflightResponse:
       case Protocol.Network.CorsError.InvalidAllowMethodsPreflightResponse:
@@ -285,171 +558,119 @@ export class CorsIssueDetailsView extends AffectedResourcesView {
     throw new Error('Invalid Argument');
   }
 
-  #appendDetail(issueCode: IssuesManager.CorsIssue.IssueCode, issue: IssuesManager.CorsIssue.CorsIssue): void {
-    const element = document.createElement('tr');
-    element.classList.add('affected-resource-directive');
-
+  #createDetailRow(issueCode: IssuesManager.CorsIssue.IssueCode, issue: IssuesManager.CorsIssue.CorsIssue): CorsRow {
     const details = issue.details();
     const corsErrorStatus = details.corsErrorStatus;
     const corsError = details.corsErrorStatus.corsError;
 
     const highlightHeader = {
       section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
-      name: CorsIssueDetailsView.getHeaderFromError(corsError),
+      name: CorsIssueDetailsView.#getHeaderFromError(corsError),
     };
 
     const opts = {
-      additionalOnClickAction(): void {
-        Host.userMetrics.issuesPanelResourceOpened(IssuesManager.Issue.IssueCategory.CORS, AffectedItem.REQUEST);
-      },
+      additionalOnClickAction: this.#onRequestClick,
     };
 
-    switch (issueCode) {
-      case IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        if (corsError.includes('Preflight')) {
-          element.appendChild(
-              this.createRequestCell(details.request, {...opts, linkToPreflight: true, highlightHeader}));
-        } else {
-          this.appendIssueDetailCell(element, '');
-        }
-        this.appendIssueDetailCell(element, CorsIssueDetailsView.getHeaderFromError(corsError), 'code-example');
-        this.appendIssueDetailCell(element, CorsIssueDetailsView.getProblemFromError(details.corsErrorStatus));
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter, 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.WILDCARD_ORIGN_NOT_ALLOWED:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        if (corsError.includes('Preflight')) {
-          element.appendChild(
-              this.createRequestCell(details.request, {...opts, linkToPreflight: true, highlightHeader}));
-        } else {
-          this.appendIssueDetailCell(element, '');
-        }
-        break;
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID: {
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        const specialHighlightHeader = corsError === Protocol.Network.CorsError.PreflightInvalidStatus ?
-            {
-              section: NetworkForward.UIRequestLocation.UIHeaderSection.GENERAL,
-              name: 'Status-Code',
-            } :
-            highlightHeader;
-        element.appendChild(this.createRequestCell(
-            details.request, {...opts, linkToPreflight: true, highlightHeader: specialHighlightHeader}));
-        this.appendIssueDetailCell(element, CorsIssueDetailsView.getProblemFromError(details.corsErrorStatus));
-        break;
-      }
-      case IssuesManager.CorsIssue.IssueCode.ORIGIN_MISMATCH:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        if (corsError.includes('Preflight')) {
-          element.appendChild(
-              this.createRequestCell(details.request, {...opts, linkToPreflight: true, highlightHeader}));
-        } else {
-          this.appendIssueDetailCell(element, '');
-        }
-        this.appendIssueDetailCell(element, details.initiatorOrigin ?? '', 'code-example');
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter, 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.ALLOW_CREDENTIALS_REQUIRED:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        if (corsError.includes('Preflight')) {
-          element.appendChild(
-              this.createRequestCell(details.request, {...opts, linkToPreflight: true, highlightHeader}));
-        } else {
-          this.appendIssueDetailCell(element, '');
-        }
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter, 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.INSECURE_LOCAL_NETWORK:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        this.appendIssueDetailCell(element, details.resourceIPAddressSpace ?? '');
-        this.appendIssueDetailCell(element, details.clientSecurityState?.initiatorIPAddressSpace ?? '');
-        this.#appendSecureContextCell(element, details.clientSecurityState?.initiatorIsSecureContext);
-        break;
-      case IssuesManager.CorsIssue.IssueCode.METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        element.appendChild(this.createRequestCell(details.request, {...opts, linkToPreflight: true, highlightHeader}));
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter, 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE:
-        element.appendChild(this.createRequestCell(details.request, {
-          ...opts,
-          highlightHeader: {
-            section: NetworkForward.UIRequestLocation.UIHeaderSection.REQUEST,
-            name: corsErrorStatus.failedParameter,
-          },
-        }));
-        this.#appendStatus(element, details.isWarning);
-        element.appendChild(this.createRequestCell(details.request, {
-          ...opts,
-          linkToPreflight: true,
-          highlightHeader: {
-            section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
-            name: 'Access-Control-Allow-Headers',
-          },
-        }));
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter, 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.REDIRECT_CONTAINS_CREDENTIALS:
-        element.appendChild(this.createRequestCell(details.request, {
-          ...opts,
-          highlightHeader: {
-            section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
-            name: CorsIssueDetailsView.getHeaderFromError(corsError),
-          },
-        }));
-        this.#appendStatus(element, details.isWarning);
-        break;
-      case IssuesManager.CorsIssue.IssueCode.DISALLOWED_BY_MODE:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        this.appendIssueDetailCell(element, details.initiatorOrigin ?? '', 'code-example');
-        this.appendSourceLocation(element, details.location, issue.model()?.getTargetIfNotDisposed());
-        break;
-      case IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME:
-        element.appendChild(this.createRequestCell(details.request, {
-          ...opts,
-          highlightHeader: {
-            section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
-            name: CorsIssueDetailsView.getHeaderFromError(corsError),
-          },
-        }));
-        this.#appendStatus(element, details.isWarning);
-        this.appendIssueDetailCell(element, details.initiatorOrigin ?? '', 'code-example');
-        this.appendSourceLocation(element, details.location, issue.model()?.getTargetIfNotDisposed());
-        this.appendIssueDetailCell(element, details.corsErrorStatus.failedParameter ?? '', 'code-example');
-        break;
-      case IssuesManager.CorsIssue.IssueCode.NO_CORS_REDIRECT_MODE_NOT_FOLLOW:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        this.appendSourceLocation(element, details.location, issue.model()?.getTargetIfNotDisposed());
-        break;
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_MISSING_ALLOW_EXTERNAL:
-      case IssuesManager.CorsIssue.IssueCode.PREFLIGHT_INVALID_ALLOW_EXTERNAL:
-      case IssuesManager.CorsIssue.IssueCode.INVALID_LOCAL_NETWORK_ACCESS:
-      case IssuesManager.CorsIssue.IssueCode.LOCAL_NETWORK_ACCESS_PERMISSION_DENIED:
-        element.appendChild(this.createRequestCell(details.request, opts));
-        this.#appendStatus(element, details.isWarning);
-        break;
-      default:
-        Platform.assertNever(issueCode, 'Unknown issue code: ' + issueCode);
+    let request: RequestCellData;
+    if (issueCode === IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE) {
+      request = {
+        affectedRequest: details.request,
+        ...opts,
+        highlightHeader: {
+          section: NetworkForward.UIRequestLocation.UIHeaderSection.REQUEST,
+          name: corsErrorStatus.failedParameter,
+        },
+      };
+    } else if (issueCode === IssuesManager.CorsIssue.IssueCode.REDIRECT_CONTAINS_CREDENTIALS ||
+               issueCode === IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME) {
+      request = {
+        affectedRequest: details.request,
+        ...opts,
+        highlightHeader,
+      };
+    } else {
+      request = {
+        affectedRequest: details.request,
+        ...opts,
+      };
     }
 
-    this.affectedResources.appendChild(element);
+    let preflight: RequestCellData|undefined;
+    if (issueCode === IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID) {
+      const specialHighlightHeader = corsError === Protocol.Network.CorsError.PreflightInvalidStatus ? {
+        section: NetworkForward.UIRequestLocation.UIHeaderSection.GENERAL,
+        name: 'Status-Code',
+      } :
+                                                                                                       highlightHeader;
+      preflight = {
+        affectedRequest: details.request,
+        ...opts,
+        linkToPreflight: true,
+        highlightHeader: specialHighlightHeader,
+      };
+    } else if (issueCode === IssuesManager.CorsIssue.IssueCode.METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE) {
+      preflight = {affectedRequest: details.request, ...opts, linkToPreflight: true, highlightHeader};
+    } else if (issueCode === IssuesManager.CorsIssue.IssueCode.HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE) {
+      preflight = {
+        affectedRequest: details.request,
+        ...opts,
+        linkToPreflight: true,
+        highlightHeader: {
+          section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
+          name: 'Access-Control-Allow-Headers',
+        },
+      };
+    } else if ((issueCode === IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES ||
+                issueCode === IssuesManager.CorsIssue.IssueCode.WILDCARD_ORIGN_NOT_ALLOWED ||
+                issueCode === IssuesManager.CorsIssue.IssueCode.ORIGIN_MISMATCH ||
+                issueCode === IssuesManager.CorsIssue.IssueCode.ALLOW_CREDENTIALS_REQUIRED) &&
+               corsError.includes('Preflight')) {
+      preflight = {affectedRequest: details.request, ...opts, linkToPreflight: true, highlightHeader};
+    }
+
+    let problem = '';
+    if (issueCode === IssuesManager.CorsIssue.IssueCode.INVALID_HEADER_VALUES ||
+        issueCode === IssuesManager.CorsIssue.IssueCode.PREFLIGHT_RESPONSE_INVALID) {
+      problem = CorsIssueDetailsView.#getProblemFromError(details.corsErrorStatus);
+    }
+
+    let sourceLocation: SourceLocationData|undefined;
+    if ((issueCode === IssuesManager.CorsIssue.IssueCode.DISALLOWED_BY_MODE ||
+         issueCode === IssuesManager.CorsIssue.IssueCode.CORS_DISABLED_SCHEME ||
+         issueCode === IssuesManager.CorsIssue.IssueCode.NO_CORS_REDIRECT_MODE_NOT_FOLLOW) &&
+        details.location) {
+      sourceLocation = {
+        target: issue.model()?.getTargetIfNotDisposed() || null,
+        scriptId: details.location.scriptId || null,
+        url: details.location.url as Platform.DevToolsPath.UrlString,
+        lineNumber: details.location.lineNumber,
+        columnNumber: details.location.columnNumber,
+      };
+    }
+
+    return {
+      request,
+      isWarning: details.isWarning,
+      preflight,
+      header: CorsIssueDetailsView.#getHeaderFromError(corsError),
+      problem,
+      failedParameter: details.corsErrorStatus.failedParameter ?? '',
+      initiatorOrigin: details.initiatorOrigin ?? '',
+      resourceIPAddressSpace: details.resourceIPAddressSpace ?? '',
+      initiatorIPAddressSpace: details.clientSecurityState?.initiatorIPAddressSpace ?? '',
+      initiatorIsSecureContext: details.clientSecurityState?.initiatorIsSecureContext,
+      sourceLocation,
+    };
   }
 
   update(): void {
-    this.clear();
+    this.requestResolver.clear();
     const issues = this.issue.getCorsIssues();
     const issue = issues.values().next();
     if (issue.done) {
+      const input: ViewInput = {rows: [], requestResolver: this.requestResolver};
+      this.#view(input, undefined, this.affectedResources);
       this.updateAffectedResourceCount(0);
     } else {
       this.#appendDetails(issue.value.code(), issues);

@@ -28,7 +28,6 @@ if (TestConfig.tests.length === 0) {
   TestConfig.tests.push(
       path.join(GEN_DIR, 'front_end'),
       path.join(GEN_DIR, 'inspector_overlay'),
-      path.join(GEN_DIR, 'test', 'harness', 'unit'),
   );
 }
 
@@ -211,10 +210,22 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
       '--force-device-scale-factor=1',
     ];
 
+    const overriddenFeatures = new Set(
+        [...TestConfig.enabledFeatures, ...TestConfig.disabledFeatures].map(f => f.split(':')[0]),
+    );
+    const disabledFeatures = [
+      ...['DialMediaRouteProvider', 'WebUIReloadButton'].filter(f => !overriddenFeatures.has(f.split(':')[0])),
+      ...TestConfig.disabledFeatures,
+    ];
+    const featureFlags = [
+      ...(disabledFeatures.length > 0 ? [`--disable-features=${disabledFeatures.join(',')}`] : []),
+      ...(TestConfig.enabledFeatures.length > 0 ? [`--enable-features=${TestConfig.enabledFeatures.join(',')}`] : []),
+    ];
+
     return [
       '--remote-allow-origins=*',
       '--use-mock-keychain',
-      '--disable-features=DialMediaRouteProvider,WebUIReloadButton',
+      ...featureFlags,
       '--password-store=basic',
       '--disable-extensions',
       '--disable-gpu',
@@ -372,6 +383,13 @@ const TestExpectationsReporter = function(this: any, baseReporterDecorator: any)
       this.write(`\n[TestExpectations] ${unexpectedPassesCount} unexpected passes! Overriding exit code to 1.\n`);
       _results.exitCode = 1;
     }
+
+    if (TestConfig.isolatedScriptTestOutput) {
+      ResultsDb.writeIsolatedScriptTestOutput(TestConfig.isolatedScriptTestOutput, {
+        numFailures: Math.max(0, unexpectedFailures) + unexpectedPassesCount,
+        interrupted: Boolean(_results.disconnected || _results.error),
+      });
+    }
   };
 };
 TestExpectationsReporter.$inject = ['baseReporterDecorator'];
@@ -512,10 +530,17 @@ function testsEntrypointMiddleware(config: any) {
 testsEntrypointMiddleware.$inject = ['config'];
 
 export default function(config: any): void {
-  const targetDir = path.relative(SOURCE_ROOT, GEN_DIR);
+  const targetDir = path.relative(CHECKOUT_ROOT, GEN_DIR);
   const devToolsRoot = path.relative(CHECKOUT_ROOT, SOURCE_ROOT);
+  let logLevel = config.LOG_ERROR;
+  if (TestConfig.verbose === 1) {
+    logLevel = config.LOG_INFO;
+  } else if (TestConfig.verbose >= 2) {
+    logLevel = config.LOG_DEBUG;
+  }
   const options = {
     basePath: CHECKOUT_ROOT,
+    logLevel,
     autoWatchBatchDelay: 1000,
     failOnEmptyTestSuite: false,
 

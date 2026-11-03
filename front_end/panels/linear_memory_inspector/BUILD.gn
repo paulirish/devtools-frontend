@@ -12,6 +12,7 @@ devtools_ui_module("linear_memory_inspector") {
   sources = [
     "LinearMemoryInspectorController.ts",
     "LinearMemoryInspectorPane.ts",
+    "LinearMemoryInspectorView.ts",
   ]
 
   ts_deps = [
@@ -23,6 +24,7 @@ devtools_ui_module("linear_memory_inspector") {
     "../../ui/kit:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/object_ui:bundle",
+    "../../ui/lit:bundle",
     "../../ui/visual_logging:bundle",
     "./components:bundle",
   ]
@@ -71,6 +73,7 @@ devtools_ui_module("unittests") {
     ":bundle",
     "../../core/sdk:bundle",
     "../../testing",
+    "../../ui/legacy:bundle",
     "./components:bundle",
   ]
 }

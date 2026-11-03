@@ -103,7 +103,9 @@
   position: relative;
   padding: var(--sys-size-1) var(--sys-size-10) var(--sys-size-1) 0;
   margin-left: var(--sys-size-11);
-  min-height: 18px;
+  /* 16px (--sys-size-8) single-line content/medium-icon box
+   * + 2 * 1px (--sys-size-1) top & bottom padding */
+  min-height: calc(var(--sys-size-8) + 2 * var(--sys-size-1));
   flex: auto;
   display: flex;
   align-items: flex-end;
@@ -117,7 +119,7 @@
   color: var(--sys-color-token-subtle);
   user-select: none;
   flex: none;
-  margin-right: 5px;
+  margin-right: var(--sys-size-3);
 }
 
 .message-level-icon,
@@ -200,7 +202,7 @@
   display: flex;
   flex-direction: column;
   margin: var(--sys-size-3);
-  border-radius: 5px;
+  border-radius: var(--sys-shape-corner-extra-small);
 
   /* Console ANSI color */
   --console-color-black: #000;
@@ -548,7 +550,7 @@
   --width: var(--sys-size-11);
 
   align-items: center;
-  border-radius: 50%;
+  border-radius: var(--sys-shape-corner-full);
   border: none;
   /* todo: extract to global styles and make it work with dark mode. */
   box-shadow: 0 1px 3px 1px rgb(0 0 0 / 15%), 0 1px 2px 0 rgb(0 0 0 / 30%); /* stylelint-disable-line plugin/use_theme_colors */

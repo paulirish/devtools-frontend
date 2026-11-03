@@ -27,6 +27,7 @@ import {
   EnvFunctionMatcher,
   FlexGridGridLanesMatcher,
   GridTemplateMatcher,
+  ImportantMatcher,
   LengthMatcher,
   LightDarkColorMatcher,
   LinearGradientMatcher,
@@ -140,6 +141,10 @@ function cleanUserAgentPayload(payload: Protocol.CSS.RuleMatch[]): Protocol.CSS.
   }
 }
 
+function parseCustomHighlightName(selectorText: string): string|null {
+  return selectorText.match(/::highlight\(([^)]+)\)/)?.[1] ?? null;
+}
+
 /**
  * Return a mapping of the highlight names in the specified RuleMatch to
  * the indices of selectors in that selector list with that highlight name.
@@ -164,15 +169,15 @@ function cleanUserAgentPayload(payload: Protocol.CSS.RuleMatch[]): Protocol.CSS.
  * list associated with ruleMatch. The indices correspond to the selectors in the rule
  * associated with the key's highlight name.
  */
-function customHighlightNamesToMatchingSelectorIndices(ruleMatch: Protocol.CSS.RuleMatch): Map<string, number[]> {
+function customHighlightNamesToMatchingSelectorIndices(ruleMatch: Protocol.CSS.RuleMatch,
+                                                       highlightNames: Set<string>): Map<string, number[]> {
   const highlightNamesToMatchingSelectors = new Map<string, number[]>();
 
   for (let i = 0; i < ruleMatch.matchingSelectors.length; i++) {
     const matchingSelectorIndex = ruleMatch.matchingSelectors[i];
     const selectorText = ruleMatch.rule.selectorList.selectors[matchingSelectorIndex].text;
-    const highlightNameMatch = selectorText.match(/::highlight\((.*)\)/);
-    if (highlightNameMatch) {
-      const highlightName = highlightNameMatch[1];
+    const highlightName = parseCustomHighlightName(selectorText);
+    if (highlightName) {
       const selectorsForName = highlightNamesToMatchingSelectors.get(highlightName);
       if (selectorsForName) {
         selectorsForName.push(matchingSelectorIndex);
@@ -181,7 +186,34 @@ function customHighlightNamesToMatchingSelectorIndices(ruleMatch: Protocol.CSS.R
       }
     }
   }
+
+  const universalSelectors = highlightNamesToMatchingSelectors.get('*');
+  if (universalSelectors) {
+    for (const highlightName of highlightNames) {
+      const selectorsForName = highlightNamesToMatchingSelectors.get(highlightName) ?? [];
+      highlightNamesToMatchingSelectors.set(highlightName, [...selectorsForName, ...universalSelectors]);
+    }
+  }
   return highlightNamesToMatchingSelectors;
+}
+
+function getCustomHighlightNames(pseudoPayload: Protocol.CSS.PseudoElementMatches[]): Set<string> {
+  const highlightNames = new Set<string>();
+  for (const entryPayload of pseudoPayload) {
+    if (entryPayload.pseudoType !== Protocol.DOM.PseudoType.Highlight || !entryPayload.matches) {
+      continue;
+    }
+    for (const ruleMatch of entryPayload.matches) {
+      for (const matchingSelectorIndex of ruleMatch.matchingSelectors) {
+        const selectorText = ruleMatch.rule.selectorList.selectors[matchingSelectorIndex].text;
+        const highlightName = parseCustomHighlightName(selectorText);
+        if (highlightName && highlightName !== '*') {
+          highlightNames.add(highlightName);
+        }
+      }
+    }
+  }
+  return highlightNames;
 }
 
 function queryMatches(style: CSSStyleDeclaration): boolean {
@@ -198,12 +230,21 @@ function queryMatches(style: CSSStyleDeclaration): boolean {
   return true;
 }
 
-function treeScopeDistance(node: DOMNode, property: CSSProperty): number {
-  if (!property.ownerStyle.parentRule && property.ownerStyle.type !== Type.Inline) {
-    return -1;
+function originatingElement(node: DOMNode): DOMNode {
+  let current = node;
+  while (current.pseudoType() && current.parentNode) {
+    current = current.parentNode;
   }
-  const root = node.getTreeRoot();
-  const nodeId = property.ownerStyle.parentRule?.treeScope ?? root?.backendNodeId();
+  return current;
+}
+
+function treeScopeNodeId(node: DOMNode, property: CSSProperty): Protocol.DOM.BackendNodeId|undefined {
+  return property.ownerStyle.type === Type.Inline ? node.getTreeRoot()?.backendNodeId() :
+                                                    property.ownerStyle.parentRule?.treeScope;
+}
+
+function treeScopeDistance(node: DOMNode, property: CSSProperty): number {
+  const nodeId = treeScopeNodeId(node, property);
   if (nodeId === undefined) {
     return -1;
   }
@@ -219,7 +260,7 @@ function treeScopeDistance(node: DOMNode, property: CSSProperty): number {
  */
 export function distanceToTreeScope(node: DOMNode, treeScope: Protocol.DOM.BackendNodeId): number {
   let distance = 0;
-  for (let ancestor: DOMNode|null = node; ancestor; ancestor = ancestor.parentNode) {
+  for (let ancestor: DOMNode|null = node.shadowRoots()?.[0] ?? node; ancestor; ancestor = ancestor.parentNode) {
     if (ancestor.backendNodeId() === treeScope) {
       return distance;
     }
@@ -564,13 +605,14 @@ export class CSSMatchedStyles {
    * This helper function takes a list of rule matches and generates separate NodeCascades
    * for each custom highlight name that was matched.
    */
-  private buildSplitCustomHighlightCascades(
-      rules: Protocol.CSS.RuleMatch[], node: DOMNode, isInherited: boolean,
-      pseudoCascades: Map<string, NodeCascade[]>): void {
+  private buildSplitCustomHighlightCascades(rules: Protocol.CSS.RuleMatch[], node: DOMNode, isInherited: boolean,
+                                            highlightNames: Set<string>,
+                                            pseudoCascades: Map<string, NodeCascade[]>): void {
     const splitHighlightRules = new Map<string, CSSStyleDeclaration[]>();
 
     for (let j = rules.length - 1; j >= 0; --j) {
-      const highlightNamesToMatchingSelectorIndices = customHighlightNamesToMatchingSelectorIndices(rules[j]);
+      const highlightNamesToMatchingSelectorIndices =
+          customHighlightNamesToMatchingSelectorIndices(rules[j], highlightNames);
 
       for (const [highlightName, matchingSelectors] of highlightNamesToMatchingSelectorIndices) {
         const pseudoRule = new CSSStyleRule(this.#cssModel, rules[j].rule);
@@ -613,6 +655,8 @@ export class CSSMatchedStyles {
 
     const pseudoCascades = new Map<Protocol.DOM.PseudoType, NodeCascade[]>();
     const customHighlightPseudoCascades = new Map<string, NodeCascade[]>();
+    const highlightNames = getCustomHighlightNames(
+        [...pseudoPayload, ...(inheritedPseudoPayload || []).flatMap(entry => entry.pseudoElements)]);
     for (let i = 0; i < pseudoPayload.length; ++i) {
       const entryPayload = pseudoPayload[i];
       // PseudoElement nodes are not created unless "content" css property is set.
@@ -621,8 +665,8 @@ export class CSSMatchedStyles {
       const rules = entryPayload.matches || [];
 
       if (entryPayload.pseudoType === Protocol.DOM.PseudoType.Highlight) {
-        this.buildSplitCustomHighlightCascades(
-            rules, this.#node, false /* #isInherited */, customHighlightPseudoCascades);
+        this.buildSplitCustomHighlightCascades(rules, this.#node, false /* #isInherited */, highlightNames,
+                                               customHighlightPseudoCascades);
       } else {
         for (let j = rules.length - 1; j >= 0; --j) {
           const pseudoRule = new CSSStyleRule(this.#cssModel, rules[j].rule);
@@ -651,8 +695,8 @@ export class CSSMatchedStyles {
           const rules = inheritedEntryPayload.matches || [];
 
           if (inheritedEntryPayload.pseudoType === Protocol.DOM.PseudoType.Highlight) {
-            this.buildSplitCustomHighlightCascades(
-                rules, parentNode, true /* #isInherited */, customHighlightPseudoCascades);
+            this.buildSplitCustomHighlightCascades(rules, parentNode, true /* #isInherited */, highlightNames,
+                                                   customHighlightPseudoCascades);
           } else {
             const pseudoStyles = [];
             for (let k = rules.length - 1; k >= 0; --k) {
@@ -1174,26 +1218,66 @@ class NodeCascade {
   }
 
   #needsCascadeContextStep(): boolean {
-    if (!this.#node.isInShadowTree()) {
+    const node = originatingElement(this.#node);
+    if (!node.isInShadowTree() && !node.shadowRoots()?.length && !node.hasAssignedSlot()) {
       return false;
     }
 
-    if (this.#node.ancestorShadowRoot()?.shadowRootType() === 'user-agent') {
+    if (node.ancestorShadowRoot()?.shadowRootType() === 'user-agent') {
       // In UA shadow dom, only standards-track pseudo elements override style attributes. -webkit-* and -internal-*
       // pseudos are still exempt from that to retain legacy behavior.
-      const pseudoElement = this.#node.getAttribute('pseudo');
+      const pseudoElement = node.getAttribute('pseudo');
       return !pseudoElement?.startsWith('-webkit-') && !pseudoElement?.startsWith('-internal-');
     }
 
     return true;
   }
 
+  #shouldOverload(activeProperty: CSSProperty, propertyWithHigherSpecificity: CSSProperty): boolean {
+    if (activeProperty.important !== propertyWithHigherSpecificity.important) {
+      return activeProperty.important;
+    }
+
+    const node = originatingElement(this.#node);
+    if (!activeProperty.important) {
+      if (propertyWithHigherSpecificity.ownerStyle.type !== Type.Inline || !this.#needsCascadeContextStep()) {
+        return false;
+      }
+      const inlineDistance = treeScopeDistance(node, propertyWithHigherSpecificity);
+      return inlineDistance >= 0 && treeScopeDistance(node, activeProperty) > inlineDistance;
+    }
+
+    // TODO(crbug.com/40225557): Distinguish user-origin from author-origin injected stylesheets in CDP.
+    const activeIsUA = Boolean(activeProperty.ownerStyle.parentRule?.isUserAgent());
+    const higherSpecIsUA = Boolean(propertyWithHigherSpecificity.ownerStyle.parentRule?.isUserAgent());
+    if (activeIsUA !== higherSpecIsUA) {
+      return activeIsUA;
+    }
+
+    if (this.#needsCascadeContextStep()) {
+      const activeScope = treeScopeNodeId(node, activeProperty);
+      const higherSpecScope = treeScopeNodeId(node, propertyWithHigherSpecificity);
+      if (activeScope !== undefined && higherSpecScope !== undefined && activeScope !== higherSpecScope) {
+        if (propertyWithHigherSpecificity.ownerStyle.type !== Type.Inline) {
+          return true;
+        }
+        const inlineDistance = treeScopeDistance(node, propertyWithHigherSpecificity);
+        return inlineDistance >= 0 && treeScopeDistance(node, activeProperty) < inlineDistance;
+      }
+    }
+
+    const activeRule = activeProperty.ownerStyle.parentRule;
+    const higherSpecRule = propertyWithHigherSpecificity.ownerStyle.parentRule;
+    if (activeRule instanceof CSSStyleRule && higherSpecRule instanceof CSSStyleRule) {
+      return layerIdentifier(activeRule) !== layerIdentifier(higherSpecRule);
+    }
+
+    return false;
+  }
+
   private updatePropertyState(propertyWithHigherSpecificity: CSSProperty, canonicalName: string): void {
     const activeProperty = this.activeProperties.get(canonicalName);
-    if (activeProperty?.important && !propertyWithHigherSpecificity.important ||
-        activeProperty && this.#needsCascadeContextStep() &&
-            treeScopeDistance(this.#node, activeProperty) >
-                treeScopeDistance(this.#node, propertyWithHigherSpecificity)) {
+    if (activeProperty && this.#shouldOverload(activeProperty, propertyWithHigherSpecificity)) {
       this.propertiesState.set(propertyWithHigherSpecificity, PropertyState.OVERLOADED);
       return;
     }
@@ -1208,6 +1292,17 @@ class NodeCascade {
     this.propertiesState.set(propertyWithHigherSpecificity, PropertyState.ACTIVE);
     this.activeProperties.set(canonicalName, propertyWithHigherSpecificity);
   }
+}
+
+// TODO(crbug.com/40225557): Report unique layer IDs in CDP to distinguish anonymous layers without source ranges.
+function layerIdentifier(rule: CSSStyleRule): string {
+  return rule.layers
+      .map(layer => layer.text ||
+               `anonymous:${layer.styleSheetId ?? ''}:${
+                        layer.range ? `${layer.range.startLine}:${layer.range.startColumn}:${layer.range.endLine}:${
+                                          layer.range.endColumn}` :
+                                      ''}`)
+      .join('.');
 }
 
 function isRegular(declaration: CSSProperty|CSSRegisteredProperty): declaration is CSSProperty {
@@ -1490,19 +1585,23 @@ class DOMInheritanceCascade {
       return null;
     }
 
-    if (definedValue.declaration.declaration instanceof CSSProperty && definedValue.declaration.value &&
-        CSSMetadata.isCSSWideKeyword(definedValue.declaration.value)) {
-      const resolvedProperty =
-          this.resolveGlobalKeyword(definedValue.declaration.declaration, definedValue.declaration.value);
+    while (definedValue.declaration.declaration instanceof CSSProperty && definedValue.declaration.value) {
+      const value = PropertyParser
+                        .matchDeclaration(`--${variableName}`, definedValue.declaration.value, [new ImportantMatcher()])
+                        ?.getComputedPropertyValueText()
+                        .trim();
+      if (!value || !CSSMetadata.isCSSWideKeyword(value)) {
+        break;
+      }
+      const resolvedProperty = this.resolveGlobalKeyword(definedValue.declaration.declaration, value);
       if (!resolvedProperty) {
         return definedValue;
       }
       const declaration = new CSSValueSource(resolvedProperty);
-      const {value} = declaration;
-      if (!value) {
+      if (!declaration.value) {
         return definedValue;
       }
-      definedValue = {declaration, value};
+      definedValue = {declaration, value: declaration.value};
     }
 
     const ast = PropertyParser.tokenizeDeclaration(`--${variableName}`, definedValue.value);
@@ -1623,9 +1722,10 @@ class DOMInheritanceCascade {
             }
             return evaluateFallback(match.fallback, match.matching);
           }),
+      ...(declaration ? [new ImportantMatcher()] : []),
     ]);
     const decl = PropertyParser.ASTUtils.siblings(PropertyParser.ASTUtils.declValue(matching.ast.tree));
-    const declText = decl.length > 0 ? matching.getComputedTextRange(decl[0], decl[decl.length - 1]) : '';
+    const declText = decl.length > 0 ? matching.getComputedTextRange(decl[0], decl[decl.length - 1]).trim() : '';
     const hasUnresolvedSubstitutions =
         decl.length > 0 && matching.hasUnresolvedSubstitutionsRange(decl[0], decl[decl.length - 1]);
     const computedText = hasUnresolvedSubstitutions ? null : declText;

@@ -13,22 +13,18 @@ new RuleTester().run('no-new-lit-element-components', rule, {
       code: 'class A extends B {}',
       filename: 'front_end/components/test.ts',
     },
-    {
-      name: 'allows LitElement in recorder (relative path)',
-      code: 'class A extends LitElement {}',
-      filename: 'front_end/panels/recorder/test.ts',
-    },
-    {
-      name: 'allows LitElement in recorder (absolute path)',
-      code: 'class A extends LitElement {}',
-      filename: '/usr/local/domain/home/user/devtools/devtools-frontend/front_end/panels/recorder/test.ts',
-    },
   ],
   invalid: [
     {
-      name: 'disallows extending LitElement outside recorder panel',
+      name: 'disallows extending LitElement',
       code: 'class A extends LitElement {}',
       filename: 'front_end/components/test.ts',
+      errors: [{messageId: 'noNewLitElementComponents'}],
+    },
+    {
+      name: 'disallows extending Lit.LitElement',
+      code: 'class A extends Lit.LitElement {}',
+      filename: 'front_end/ui/components/suggestion_input/SuggestionInput.ts',
       errors: [{messageId: 'noNewLitElementComponents'}],
     },
   ],

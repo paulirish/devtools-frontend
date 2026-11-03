@@ -40,7 +40,9 @@
   gap: var(--sys-size-3);
   padding: var(--sys-size-4);
   flex-shrink: 0;
-  width: 74px;
+  /* 80px (--sys-size-19) minus 6px (--sys-size-4) padding step so all
+   * 7 columns (518px) fit inside the 532px card slot without overflow. */
+  width: calc(var(--sys-size-19) - var(--sys-size-4));
 }
 
 .input {
@@ -65,10 +67,6 @@
   color: var(--sys-color-on-surface);
   text-align: center;
   position: relative;
-
-  & > input {
-    scroll-margin-left: 5px;
-  }
 }
 
 .conditions-list-text:last-child {
@@ -134,13 +132,13 @@
 
 .cpu-preset-calibrate .button-container {
   display: flex;
-  gap: 10px;
+  gap: var(--sys-size-5);
 }
 
 .cpu-preset-calibrate .text-container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sys-size-5);
 }
 
 .text-with-icon {
@@ -152,4 +150,47 @@
 .conditions-list-header {
   font-weight: bold;
   border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+}
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: none;
+  background: var(--sys-color-surface3);
+  overflow: hidden;
+}
+
+.editor-content {
+  flex: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.editor-content input {
+  margin-right: 10px;
+}
+
+.editor-content input.error-input {
+  background-color: var(--sys-color-cdt-base-container);
+}
+
+.editor-buttons {
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 5px;
+  gap: var(--sys-size-6);
+}
+
+.list-widget-input-validation-error {
+  color: var(--sys-color-error);
+  margin: 0 5px;
+}
+
+.editor-container ~ .add-conditions-button {
+  display: none;
 }

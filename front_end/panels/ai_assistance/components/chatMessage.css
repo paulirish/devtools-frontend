@@ -164,10 +164,9 @@
 
     .answer-body-wrapper {
       @container(min-width: 700px) {
-        /* Purposefully not using design system variables, this is a
-         * specific size to indent the content in and align it with the
-         * walkthrough CTA. */
-        padding-left: 35px;
+        /* Indent the content to align with the walkthrough CTA
+         * (icon width + flex gap + button horizontal padding). */
+        padding-left: calc(var(--sys-size-9) + var(--sys-size-2) + var(--sys-size-6));
       }
     }
 
@@ -393,53 +392,6 @@
   .side-effect-buttons-container {
     display: flex;
     gap: var(--sys-size-4);
-  }
-
-  .permission-prompt {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sys-size-5);
-    padding: var(--sys-size-6);
-    border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
-    border-radius: var(--sys-shape-corner-medium-small);
-    background-color: var(--sys-color-cdt-base-container);
-
-    .permission-prompt-header {
-      display: flex;
-      align-items: center;
-      gap: var(--sys-size-4);
-
-      devtools-icon {
-        width: var(--sys-size-8);
-        height: var(--sys-size-8);
-        color: var(--sys-color-on-surface);
-      }
-    }
-
-    .permission-prompt-title {
-      font: var(--sys-typescale-body4-medium);
-      margin: 0;
-    }
-
-    .permission-prompt-description {
-      margin: 0;
-    }
-
-    .permission-prompt-code {
-      --code-block-background-color: var(--sys-color-surface1);
-    }
-
-    .permission-prompt-footer {
-      font: var(--sys-typescale-body4-regular);
-      color: var(--sys-color-on-surface-subtle);
-      margin: 0;
-    }
-
-    .permission-prompt-buttons {
-      display: flex;
-      justify-content: flex-end;
-      gap: var(--sys-size-4);
-    }
   }
 
   .walkthrough-toggle-container {

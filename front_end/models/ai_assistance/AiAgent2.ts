@@ -17,7 +17,8 @@ import {
   type ParsedResponse,
   type RequestOptions,
   ResponseType,
-  sanitizeSuggestions,
+  sanitizeSuggestionsList,
+  SUGGEST_FOLLOW_UPS_FUNCTION_NAME,
 } from './agents/AiAgent.js';
 import {type ExecuteJsAgentOptions, executeJsCode} from './agents/ExecuteJavascript.js';
 import {ChangeManager} from './ChangeManager.js';
@@ -59,20 +60,22 @@ Your role is to help web developers debug, analyze, and optimize web application
 # Workflow
 1. **Analyze**: Understand the user's intent, the context provided, and what they are trying to achieve.
 2. **Investigate**: Proactively use your learned skills and tools to gather live data. Do not make assumptions or guess without sufficient evidence.
-3. **Diagnose**: Explore multiple potential explanations and solutions. Distinguish between the primary root cause and contributing factors.
-4. **Respond**: Provide a structured, clear, and actionable response.
+3. **Evaluate**: Synthesize the live data. If the user is debugging an issue, explore multiple potential explanations and distinguish between the primary root cause and contributing factors.
+4. **Respond**: Match your response format and depth to the user's question.
 
 # Response Structure
-If the user asks a question that requires an investigation or debugging, use this structure:
-* **Root Cause(s)**: Point out the root cause(s) of the problem.
-  - Example: "**Root Cause**: [reason]" or "**Root Causes**:" followed by a bulleted list.
-* **Suggestion(s)**: List actionable solution suggestion(s) in order of impact.
-  - Example: "**Suggestion**: [Suggestion]" or "**Suggestions**:" followed by a bulleted list.
+* **Informational or exploratory questions** (e.g., asking what a network request, script, element, or storage entry is or does):
+  - Answer directly and concisely in 1–2 short paragraphs or a compact list of key facts.
+  - Do NOT include "**Root Cause**" or "**Suggestions**" sections, and do not add unrequested optimization advice when nothing is broken.
+* **Debugging or optimization questions** (e.g., asking why something fails, renders incorrectly, or is slow, or how to improve/fix it):
+  - **Root Cause(s)**: Point out the root cause(s) of the problem.
+    - Example: "**Root Cause**: [reason]" or "**Root Causes**:" followed by a bulleted list.
+  - **Suggestion(s)**: List actionable solution suggestion(s) in order of impact.
+    - Example: "**Suggestion**: [Suggestion]" or "**Suggestions**:" followed by a bulleted list.
 
 # Follow-up Suggestions
-* Output a list of suggested follow-up queries or actions for the user at the very end of your response.
-* The format MUST be SUGGESTIONS: ["suggestion 1", "suggestion 2"] on its own single line.
-* Ensure suggestions are relevant, concise, and helpful next steps for the user.
+* At the end of your response, call the \`suggestFollowUps\` function to provide 1 to 3 relevant, concise follow-up queries or actions for the user.
+* Do not write follow-up suggestions as text in your response.
 
 # Constraints
 * **CRITICAL**: You are a web development assistant. NEVER provide answers to questions of unrelated topics (such as legal advice, financial advice, personal opinions, medical advice, religion, race, politics, sexuality, gender, or any other non-web-development topics). If asked about these, respond with: "Sorry, I can't answer that. I'm best at questions about web development and debugging."
@@ -143,7 +146,7 @@ function removeDirectiveFromLastLine(lines: string[], textBeforeDirective: strin
  */
 function parseSuggestionsArray(array: string): {suggestions: [string, ...string[]]|undefined}|null {
   try {
-    return {suggestions: sanitizeSuggestions(array)};
+    return {suggestions: sanitizeSuggestionsList(JSON.parse(array))};
   } catch {
     // Invalid JSON: the caller decides whether the line is still a directive.
     return null;
@@ -308,6 +311,27 @@ export class AiAgent2 extends AiAgent<unknown> {
           loadedSkills: loadedSkills.length > 0 ? loadedSkills : undefined,
         };
       },
+    });
+    this.#declaredTools.add(SUGGEST_FOLLOW_UPS_FUNCTION_NAME);
+    this.declareFunction<{suggestions: string[]}>(SUGGEST_FOLLOW_UPS_FUNCTION_NAME, {
+      description: 'Provides suggested follow-up queries or actions for the user at the end of the response.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: 'Parameters for follow-up suggestions',
+        properties: {
+          suggestions: {
+            type: Host.AidaClient.ParametersTypes.ARRAY,
+            items: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'A concise follow-up query or action (under 60 characters).',
+            },
+            description: '1 to 3 concise follow-up queries or actions relevant to the response.',
+          },
+        },
+        required: ['suggestions'],
+      },
+      // Never called: AiAgent#run() and AiAgent#runFunctionCalls() intercept suggestFollowUps directly.
+      handler: async () => ({result: 'Suggestions recorded.'}),
     });
   }
 

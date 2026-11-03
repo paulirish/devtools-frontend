@@ -18,19 +18,30 @@ import {
 import {
   BUILD_ROOT,
   defaultChromePath,
+  resolveBuildTestId,
   SOURCE_ROOT,
   TEST_ID_REGEX,
 } from './paths.js';
 import {shardFilter} from './sharding.js';
 
-const argv = yargs(expandResponseFiles(hideBin(process.argv))).help(false).parseSync()['_'] as string[];
+function sliceArrayFromElement(array: string[], element: string) {
+  const index = array.lastIndexOf(element);
+  return index < 0 ? array : array.slice(index + 1);
+}
+
+const argv = sliceArrayFromElement(expandResponseFiles(hideBin(process.argv)), '--');
 
 const options = commandLineArgs(yargs(argv)).help(false).parseSync();
 interface Config {
   tests: string[];
+  excludedTests: string[];
   verbose: number;
   artifactsDir: string;
   chromeBinary: string;
+  /** Additional Chrome features to enable, from `--enable-features`. */
+  enabledFeatures: string[];
+  /** Additional Chrome features to disable, from `--disable-features`. */
+  disabledFeatures: string[];
   debug: boolean;
   headless: boolean;
   coverage: boolean;
@@ -46,6 +57,7 @@ interface Config {
   shardNumber: number;
   shardBias: number;
   isAiAgent: boolean;
+  isAiEvalTest: boolean;
   isLuci: boolean;
   isPerfTest: boolean;
   expectationsFile?: string;
@@ -53,11 +65,7 @@ interface Config {
   forceScreenshots: boolean;
   otaUsername?: string;
   otaPassword?: string;
-}
-
-function sliceArrayFromElement(array: string[], element: string) {
-  const index = array.lastIndexOf(element);
-  return index < 0 ? array : array.slice(index + 1);
+  isolatedScriptTestOutput?: string;
 }
 
 const diffBehaviors = asArray(options['on-diff']);
@@ -84,6 +92,10 @@ const diffUpdateFilters = sliceArrayFromElement(
 const onDiffUpdateAll = onDiffUpdate.length > 0 && diffUpdateFilters.length === 0;
 const onDiffUpdateSelected = onDiffUpdate.length > 0 ? diffUpdateFilters : false;
 
+function parseFeatures(value?: string|string[]): string[] {
+  return asArray(value).flatMap(v => v.split(',')).map(f => f.trim()).filter(Boolean);
+}
+
 function mochaGrep(): Config['mochaGrep'] {
   if (!(options['grep'] ?? options['fgrep'])) {
     return {};
@@ -97,16 +109,37 @@ function mochaGrep(): Config['mochaGrep'] {
   return grep;
 }
 
-function getTestsFromOptions() {
-  const tests = options['tests'];
-  if (Array.isArray(tests)) {
-    return tests;
+function getFilterTokens(): string[] {
+  const tokens: string[] = [];
+  for (const filterArg of asArray(options['isolated-script-test-filter'])) {
+    for (const token of filterArg.split('::').map(t => t.trim()).filter(Boolean)) {
+      tokens.push(token);
+    }
   }
+  for (const filterFile of asArray(options['isolated-script-test-filter-file'])) {
+    const content = fs.readFileSync(path.resolve(filterFile), 'utf-8');
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.split('#')[0].trim();
+      if (!line) {
+        continue;
+      }
+      for (const token of line.split('::').map(t => t.trim()).filter(Boolean)) {
+        tokens.push(token);
+      }
+    }
+  }
+  return tokens;
+}
 
-  if (typeof tests === 'string') {
-    return [tests];
-  }
-  return [];
+function getTestsFromOptions(): {tests: string[], excludedTests: string[]} {
+  const rawTests = asArray(options['tests'] as string | string[] | undefined);
+  const filterTokens = getFilterTokens();
+  const positiveFilters = filterTokens.filter(t => !t.startsWith('-'));
+  const negativeFilters = filterTokens.filter(t => t.startsWith('-')).map(t => t.slice(1)).filter(Boolean);
+  return {
+    tests: [...rawTests, ...positiveFilters.map(resolveBuildTestId)],
+    excludedTests: negativeFilters.map(resolveBuildTestId),
+  };
 }
 
 function runProcess(
@@ -150,18 +183,28 @@ export function isAIAgent(): boolean {
 }
 
 const getDefaultArtifactDir = () => {
+  if (options['isolated-script-test-output']) {
+    const outDir = path.dirname(path.resolve(options['isolated-script-test-output']));
+    fs.mkdirSync(outDir, {recursive: true});
+    return outDir;
+  }
   const artifactsPath = path.join(BUILD_ROOT, 'artifacts');
-  if (!fs.existsSync(artifactsPath)) {
+  if (fs.existsSync(BUILD_ROOT) && !fs.existsSync(artifactsPath)) {
     fs.mkdirSync(artifactsPath, {recursive: true});
   }
   return artifactsPath;
 };
 
+const {tests: parsedTests, excludedTests: parsedExcludedTests} = getTestsFromOptions();
+
 export const TestConfig: Config = {
-  tests: getTestsFromOptions(),
+  tests: parsedTests,
+  excludedTests: parsedExcludedTests,
   verbose: Number(options['verbose'] ?? 0),
   artifactsDir: options['artifacts-dir'] || getDefaultArtifactDir(),
   chromeBinary: options['chrome-binary'] ?? defaultChromePath(),
+  enabledFeatures: parseFeatures(options['enable-features']),
+  disabledFeatures: parseFeatures(options['disable-features']),
   debug: options['debug'],
   headless: options['headless'] === undefined ? !options['debug'] : options['headless'],
   coverage: options['coverage'],
@@ -180,6 +223,7 @@ export const TestConfig: Config = {
   shardNumber: options['shard-number'],
   shardBias: options['shard-bias'],
   isAiAgent: isAIAgent(),
+  isAiEvalTest: false,
   isLuci: process.env['LUCI_CONTEXT'] !== undefined,
   isPerfTest: false,
   expectationsFile: options['expectations-file'],
@@ -187,6 +231,7 @@ export const TestConfig: Config = {
   forceScreenshots: Boolean(options['force-screenshots']),
   otaUsername: options['ota-username'],
   otaPassword: options['ota-password'],
+  isolatedScriptTestOutput: options['isolated-script-test-output'],
 };
 
 export function shuffleTests(tests: string[]): string[] {

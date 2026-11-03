@@ -64,6 +64,16 @@ UI.ActionRegistration.registerActionExtension({
     const CommonModule = await loadCommonModule();
     return new CommonModule.CommentsOverlayWidget.ActionDelegate();
   },
+  bindings: [
+    {
+      shortcut: 'Ctrl+Shift+K',
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
+    },
+    {
+      shortcut: 'Meta+Shift+K',
+      platform: UI.ActionRegistration.Platforms.MAC,
+    },
+  ],
 });
 
 UI.Toolbar.registerToolbarItem({
@@ -78,10 +88,20 @@ UI.Toolbar.registerToolbarItem({
 
 Common.Revealer.registerRevealer({
   contextTypes() {
-    return [CommentManager.CommentManager.CommentThread];
+    return [CommentManager.CommentThread.RevealableThread];
   },
   async loadRevealer() {
     const CommonModule = await loadCommonModule();
     return new CommonModule.CommentsOverlayWidget.ThreadRevealer();
+  },
+});
+
+UI.ContextMenu.registerProvider({
+  contextTypes() {
+    return [Node];
+  },
+  async loadProvider() {
+    const CommonModule = await loadCommonModule();
+    return new CommonModule.CommentsOverlayWidget.ContextMenuProvider();
   },
 });

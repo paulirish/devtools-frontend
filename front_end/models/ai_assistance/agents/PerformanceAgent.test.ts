@@ -22,6 +22,7 @@ import {
 import {getInsightOrError, stubInsightModel} from '../../../testing/InsightHelpers.js';
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {createNetworkRequest} from '../../../testing/NetworkRequestHelpers.js';
+import {setupRuntimeHooks} from '../../../testing/RuntimeHelpers.js';
 import {setupSettingsHooks} from '../../../testing/SettingsHelpers.js';
 import {SnapshotTester} from '../../../testing/SnapshotTester.js';
 import {TestUniverse} from '../../../testing/TestUniverse.js';
@@ -86,6 +87,7 @@ async function loadTrace(context: Mocha.Context|Mocha.Suite|null, name: string,
 describe('PerformanceAgent', function() {
   setupLocaleHooks();
   setupSettingsHooks();
+  setupRuntimeHooks();
 
   const snapshotTester = new SnapshotTester(this, import.meta);
   let universe: TestUniverse;
@@ -583,7 +585,7 @@ code
 
       assert.exists(action);
       assert.strictEqual(action.type, 'action');
-      assert.strictEqual(action.code, 'getNetworkTrackSummary({min: 658799706428, max: 658804825864})');
+      assert.strictEqual(action.action, 'getNetworkTrackSummary({min: 658799706428, max: 658804825864})');
       assert.strictEqual(action.output, expectedOutput);
       assert.isFalse(action.canceled);
 
@@ -840,7 +842,7 @@ code
       assert.lengthOf(action.widgets, 2);
       assert.strictEqual(action.widgets[0].name, 'TIMELINE_RANGE_SUMMARY');
       assert.strictEqual(action.widgets[1].name, 'BOTTOM_UP_TREE');
-      assert.strictEqual(action.code, 'getMainThreadTrackSummaryByLabel(\'LCPBreakdown\')');
+      assert.strictEqual(action.action, 'getMainThreadTrackSummaryByLabel(\'LCPBreakdown\')');
       assert.strictEqual(action.output, expectedOutput);
       assert.isFalse(action.canceled);
       assert.strictEqual(action.type, 'action');

@@ -138,7 +138,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
                       str_, valueId,
                       Object.fromEntries(Object.entries(placeholders).map(
                           ([key, {title, href}]) =>
-                              [key, html`<devtools-link href=${href}>${title}</devtools-link>`])));
+                              [key, html`<devtools-link href=${href} allow-privileged>${title}</devtools-link>`])));
                   return html`
                       <div class="key">${key}</div>
                       <div class="value">${value}</div>
@@ -155,10 +155,10 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
         </div>`;
     // clang-format on
   }
-  render(template, target);
+  render(template, target, {container: {classes: ['flex-none']}});
 };
 
-export class PreloadingDisabledInfobar extends UI.Widget.VBox {
+export class PreloadingDisabledInfobar extends UI.Widget.VBox<ShadowRoot> {
   #view: View;
   #disabledByPreference = false;
   #disabledByDataSaver = false;
@@ -166,8 +166,8 @@ export class PreloadingDisabledInfobar extends UI.Widget.VBox {
   #disabledByHoldbackPrefetchSpeculationRules = false;
   #disabledByHoldbackPrerenderSpeculationRules = false;
 
-  constructor(view: View = DEFAULT_VIEW) {
-    super({useShadowDom: true});
+  constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
+    super(element, {useShadowDom: 'pure'});
     this.#view = view;
   }
 

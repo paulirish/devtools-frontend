@@ -262,6 +262,9 @@ class Simulator<T = Lantern.AnyNetworkObject> {
       if (!connection) {
         return;
       }
+      if (this.nodeTimings.getQueued(node).queuedTime === totalElapsedTime) {
+        connection.setH2OverflowBytesDownloaded(0);
+      }
     }
 
     this.markNodeAsInProgress(node, totalElapsedTime);
@@ -430,6 +433,7 @@ class Simulator<T = Lantern.AnyNetworkObject> {
             {
               startTime: timing.startTime,
               endTime: timing.endTime,
+              queuedTime: timing.queuedTime,
               duration: timing.endTime - timing.startTime,
             },
           ];

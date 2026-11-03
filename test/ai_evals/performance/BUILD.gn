@@ -1,0 +1,26 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../scripts/build/typescript/typescript.gni")
+
+node_ts_library("performance") {
+  sources = [
+    "cls-dynamic-element-shift.test.ts",
+    "cls-good-cwv-check.test.ts",
+    "cls-layout-animations.test.ts",
+    "cls-unsized-image.test.ts",
+    "cls-webfont-loading.test.ts",
+    "lcp-good-cwv-check.test.ts",
+    "lcp-high-ttfb.test.ts",
+    "lcp-load-delay-low-priority.test.ts",
+    "lcp-load-delay-request-chain.test.ts",
+    "lcp-load-duration-large-font.test.ts",
+    "lcp-load-duration-large-image.test.ts",
+  ]
+
+  ts_deps = [
+    "..:harness_library",
+    "../helpers",
+  ]
+}

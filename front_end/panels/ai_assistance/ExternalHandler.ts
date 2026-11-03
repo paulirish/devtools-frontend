@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 import * as Host from '../../core/host/host.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as TimelinePanel from '../timeline/timeline.js';
 
 export type ContextType = 'NETWORK_REQUEST';
 
@@ -53,7 +55,7 @@ export function getMatchingFlavorContext(
 }
 
 export async function handleExternalAIRequest(options: ExternalAIRequestOptions): Promise<unknown[]> {
-  localStorage.setItem('aiAssistanceStructuredLogEnabled', 'true');
+  AiAssistanceModel.Debug.setDevToolsAIDebug({assistance: true});
   localStorage.removeItem('aiAssistanceStructuredLog');
 
   const conversationType = resolveConversationType(options.context?.type);
@@ -64,6 +66,9 @@ export async function handleExternalAIRequest(options: ExternalAIRequestOptions)
     data: [],
     isReadOnly: false,
     aidaClient,
+    performanceRecordAndReload: Root.Runtime.hostConfig.devToolsAiV2Architecture?.enabled ?
+        () => TimelinePanel.TimelinePanel.TimelinePanel.executeRecordAndReload() :
+        undefined,
   });
 
   const resolvedContext = getMatchingFlavorContext(options.context);
@@ -72,7 +77,11 @@ export async function handleExternalAIRequest(options: ExternalAIRequestOptions)
   }
 
   for (const prompt of options.prompts) {
-    await Array.fromAsync(conversation.run(prompt));
+    for await (const item of conversation.run(prompt)) {
+      if (item.type === AiAssistanceModel.AiAgent.ResponseType.SIDE_EFFECT && typeof item.confirm === 'function') {
+        item.confirm(AiAssistanceModel.Tool.PermissionDecision.ALLOW_ONCE);
+      }
+    }
   }
 
   const logsRaw = localStorage.getItem('aiAssistanceStructuredLog');

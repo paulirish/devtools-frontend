@@ -714,7 +714,7 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     });
   }
 
-  #getRegisteredPropertyDetails(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
+  getRegisteredPropertyDetails(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
       ElementsComponents.CSSVariableValueView.RegisteredPropertyDetails|undefined {
     const registration = matchedStyles.getRegisteredProperty(variableName);
     const goToDefinition = (): void => this.jumpToSection(variableName, REGISTERED_PROPERTY_SECTION_NAME);
@@ -723,19 +723,10 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
 
   getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
                          variableName: string): ElementsComponents.CSSVariableValueView.CSSVariableParserError|null {
-    const registrationDetails = this.#getRegisteredPropertyDetails(matchedStyles, variableName);
+    const registrationDetails = this.getRegisteredPropertyDetails(matchedStyles, variableName);
     return registrationDetails ?
         new ElementsComponents.CSSVariableValueView.CSSVariableParserError(registrationDetails) :
         null;
-  }
-
-  getVariablePopoverContents(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string,
-                             computedValue: string|null): ElementsComponents.CSSVariableValueView.CSSVariableValueView {
-    return new ElementsComponents.CSSVariableValueView.CSSVariableValueView({
-      variableName,
-      value: computedValue ?? undefined,
-      details: this.#getRegisteredPropertyDetails(matchedStyles, variableName),
-    });
   }
 
   private async fetchComputedStylesFor(nodeId: Protocol.DOM.NodeId|undefined): Promise<Map<string, string>|null> {
@@ -1105,8 +1096,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     this.hasMatchedStyles = matchedStyles !== null && node !== null;
     if (!this.hasMatchedStyles) {
       this.sectionBlocks = [];
-      this.sectionsContainer.contentElement.removeChildren();
       this.sectionsContainer.detachChildWidgets();
+      this.sectionsContainer.contentElement.removeChildren();
       this.noMatchesElement.classList.remove('hidden');
       return;
     }
@@ -1134,8 +1125,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       }
     }
 
-    this.sectionsContainer.contentElement.removeChildren();
     this.sectionsContainer.detachChildWidgets();
+    this.sectionsContainer.contentElement.removeChildren();
     const fragment = document.createDocumentFragment();
 
     let index = 0;
@@ -1690,6 +1681,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
 
   private createStylesSidebarToolbar(): HTMLElement {
     const container = this.contentElement.createChild('div', 'styles-sidebar-pane-toolbar-container');
+    // Sticky toolbar: comment overlays for rules scrolled under it are clipped (see CommentAnchorResolver).
+    container.setAttribute('data-sticky-occluder', '');
     container.role = 'toolbar';
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = hbox.createChild('devtools-toolbar', 'styles-pane-toolbar');
@@ -1834,6 +1827,7 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   }
 
   #cleanupAiCodeCompletion(): void {
+    this.#aiCodeCompletionSummaryToolbar?.detach();
     this.#aiCodeCompletionSummaryToolbarContainer?.remove();
     this.#aiCodeCompletionSummaryToolbarContainer = undefined;
     this.#aiCodeCompletionSummaryToolbar = undefined;

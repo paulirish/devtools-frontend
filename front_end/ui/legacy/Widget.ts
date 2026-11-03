@@ -266,6 +266,9 @@ function setUpLifecycleTracking<WidgetT extends AnyWidget>(element: HTMLElement)
   }
 
   tracker.onDisconnect = () => {
+    if (element.parentElement instanceof WidgetElement && element.parentElement.controlsChildWidget(element)) {
+      return;
+    }
     const widget = Widget.get(element);
     if (widget) {
       widget.setHideOnDetach();
@@ -285,7 +288,7 @@ function setUpLifecycleTracking<WidgetT extends AnyWidget>(element: HTMLElement)
         (element.parentNode instanceof DocumentFragment) ? element.parentNode : element.parentElementOrShadowHost();
     if (!parent) {
       widget.markAsRoot();
-    } else {
+    } else if (!(parent instanceof WidgetElement && parent.controlsChildWidget(element))) {
       widget.show(parent as HTMLElement, undefined, /* suppressOrphanWidgetError= */ true);
     }
   };
@@ -298,6 +301,10 @@ export class WidgetElement<WidgetT extends AnyWidget> extends HTMLElement {
 
   getWidget(): WidgetT|undefined {
     return Widget.get(this) as WidgetT | undefined;
+  }
+
+  controlsChildWidget(_child: HTMLElement): boolean {
+    return false;
   }
 
   connectedCallback(): void {
@@ -321,19 +328,29 @@ export class WidgetElement<WidgetT extends AnyWidget> extends HTMLElement {
   }
 
   override appendChild<T extends Node>(child: T): T {
-    const widget = child instanceof HTMLElement ? Widget.get(child) : null;
-    if (widget) {
-      widget.show(this, undefined, /* suppressOrphanWidgetError= */ true);
-      return child;
+    if (child instanceof HTMLElement) {
+      const widget = Widget.get(child);
+      if (widget) {
+        if (this.controlsChildWidget(child)) {
+          return originalAppendChild.call(this, child) as T;
+        }
+        widget.show(this, undefined, /* suppressOrphanWidgetError= */ true);
+        return child;
+      }
     }
     return super.appendChild(child);
   }
 
   override insertBefore<T extends Node>(child: T, referenceChild: Node): T {
-    const widget = child instanceof HTMLElement ? Widget.get(child) : null;
-    if (widget) {
-      widget.show(this, referenceChild, /* suppressOrphanWidgetError= */ true);
-      return child;
+    if (child instanceof HTMLElement) {
+      const widget = Widget.get(child);
+      if (widget) {
+        if (this.controlsChildWidget(child)) {
+          return originalInsertBefore.call(this, child, referenceChild) as T;
+        }
+        widget.show(this, referenceChild, /* suppressOrphanWidgetError= */ true);
+        return child;
+      }
     }
     return super.insertBefore(child, referenceChild);
   }
@@ -586,14 +603,14 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
     }
     this.#shadowRoot = this.element.shadowRoot;
     if (options?.useShadowDom && !this.#shadowRoot) {
-      this.element.classList.add('vbox');
-      this.element.classList.add('flex-auto');
       this.#shadowRoot = createShadowRootWithCoreStyles(this.element, {
         delegatesFocus: options?.delegatesFocus,
       });
       if (options.useShadowDom === 'pure') {
         this.#contentElement = (this.#shadowRoot as unknown as ContentTypeT);
       } else {
+        this.element.classList.add('vbox');
+        this.element.classList.add('flex-auto');
         const div = document.createElement('div');
         this.#shadowRoot.appendChild(div);
         this.#contentElement = (div as unknown as ContentTypeT);
@@ -935,6 +952,10 @@ export class Widget<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElem
 
   detach(overrideHideOnDetach?: boolean): void {
     if (!this.#parentWidget && !this.#isRoot) {
+      if (overrideHideOnDetach && this.element.parentElement) {
+        decrementWidgetCounter(this.element.parentElement, this.element);
+        originalRemoveChild.call(this.element.parentElement, this.element);
+      }
       return;
     }
 
@@ -1371,7 +1392,6 @@ export class HBox<ContentTypeT extends HTMLElement|DocumentFragment = HTMLElemen
     if (this.contentElement instanceof HTMLElement) {
       this.contentElement.classList.add('hbox');
     } else {
-      this.element.classList.remove('vbox');
       this.element.classList.add('hbox');
     }
   }

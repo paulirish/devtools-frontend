@@ -12,8 +12,10 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Logs from '../../models/logs/logs.js';
-import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {dispatchEvent} from '../../testing/MockConnection.js';
 import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
+import {getMainFrame} from '../../testing/ResourceHelpers.js';
 
 import * as Network from './network.js';
 
@@ -1069,10 +1071,33 @@ describeWithEnvironment('NetworkLogView', () => {
       assert.isNull(icon);
     });
 
-    it('does not open privileged URLs in a new tab on double-click', () => {
+    for (const url of ['chrome-extension://nnkmpipfcdgmkgepigmhifcgbddoohgk/secret.html',
+                       'chrome://settings/reset',
+                       'devtools://devtools/bundled/devtools_app.html',
+                       'file:///etc/passwd',
+                       'blob:devtools://devtools/0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0',
+    ]) {
+      it(`does not open non-web-safe URL ${url} in a new tab on double-click`, () => {
+        const openInNewTabStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'openInNewTab');
+        const request = createNetworkRequest({
+          url,
+          resourceType: Common.ResourceType.resourceTypes.Document,
+        });
+
+        const networkRequestNode = new Network.NetworkDataGridNode.NetworkRequestNode(
+            {} as Network.NetworkDataGridNode.NetworkLogViewInterface, request);
+        const el = document.createElement('div');
+        networkRequestNode.renderCell(el, 'name');
+        el.dispatchEvent(new MouseEvent('dblclick'));
+
+        sinon.assert.notCalled(openInNewTabStub);
+      });
+    }
+
+    it('opens web-safe URLs in a new tab on double-click', () => {
       const openInNewTabStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'openInNewTab');
       const request = createNetworkRequest({
-        url: 'chrome-extension://nnkmpipfcdgmkgepigmhifcgbddoohgk/secret.html',
+        url: 'https://www.example.com/',
         resourceType: Common.ResourceType.resourceTypes.Document,
       });
 
@@ -1082,7 +1107,43 @@ describeWithEnvironment('NetworkLogView', () => {
       networkRequestNode.renderCell(el, 'name');
       el.dispatchEvent(new MouseEvent('dblclick'));
 
-      sinon.assert.notCalled(openInNewTabStub);
+      sinon.assert.calledOnceWithExactly(openInNewTabStub, urlString`https://www.example.com/`, undefined);
+    });
+
+    it('attributes the new tab to the frame of the request on double-click', () => {
+      const openInNewTabStub = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'openInNewTab');
+      const target = createTarget();
+      const frame = getMainFrame(target);
+      const requestId = 'REQUEST_ID' as Protocol.Network.RequestId;
+      const url = urlString`https://www.example.com/`;
+      dispatchEvent(target, 'Network.requestWillBeSent', {
+        requestId,
+        loaderId: frame.loaderId,
+        documentURL: frame.url,
+        request: {
+          url,
+          method: 'GET',
+          headers: {},
+          initialPriority: Protocol.Network.ResourcePriority.Medium,
+          referrerPolicy: Protocol.Network.RequestReferrerPolicy.NoReferrer,
+        },
+        timestamp: 1,
+        wallTime: 1,
+        initiator: {type: Protocol.Network.InitiatorType.Other},
+        redirectHasExtraInfo: false,
+        type: Protocol.Network.ResourceType.Document,
+        frameId: frame.id,
+      });
+      const request = target.model(SDK.NetworkManager.NetworkManager)?.requestForId(requestId);
+      assert.exists(request);
+
+      const networkRequestNode = new Network.NetworkDataGridNode.NetworkRequestNode(
+          {} as Network.NetworkDataGridNode.NetworkLogViewInterface, request);
+      const el = document.createElement('div');
+      networkRequestNode.renderCell(el, 'name');
+      el.dispatchEvent(new MouseEvent('dblclick'));
+
+      sinon.assert.calledOnceWithExactly(openInNewTabStub, url, frame.id);
     });
   });
 

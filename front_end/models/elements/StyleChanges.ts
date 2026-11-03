@@ -95,3 +95,107 @@ export function trackStylePropertyToggle(
   }
   tracker.trackChange(describeStylePropertyToggle(toggle), buildAnchor(STYLES_PANE_VE_PATH, node));
 }
+
+export function trackStyleRuleAdded(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    selector: string,
+    ): void {
+  if (!tracker?.isTracking) {
+    return;
+  }
+  const trimmedSelector = Platform.StringUtilities.collapseWhitespace(selector.trim());
+  if (!trimmedSelector) {
+    return;
+  }
+  tracker.trackChange(
+      `Added style rule "${trimValue(trimmedSelector)}"`,
+      buildAnchor(STYLES_PANE_VE_PATH, node),
+  );
+}
+
+function trackRuleHeaderChange(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    headerDescription: string,
+    oldText: string,
+    newText: string,
+    ): void {
+  if (!tracker?.isTracking) {
+    return;
+  }
+  const trimmedOld = Platform.StringUtilities.collapseWhitespace(oldText.trim());
+  const trimmedNew = Platform.StringUtilities.collapseWhitespace(newText.trim());
+  if (!trimmedOld || !trimmedNew || trimmedOld === trimmedNew) {
+    return;
+  }
+  tracker.trackChange(
+      `Changed ${headerDescription} from "${trimValue(trimmedOld)}" to "${trimValue(trimmedNew)}"`,
+      buildAnchor(STYLES_PANE_VE_PATH, node),
+  );
+}
+
+export function trackStyleSelectorChange(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    oldSelector: string,
+    newSelector: string,
+    ): void {
+  trackRuleHeaderChange(tracker, node, 'style rule selector', oldSelector, newSelector);
+}
+
+export function trackPropertyRuleNameChange(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    oldName: string,
+    newName: string,
+    ): void {
+  trackRuleHeaderChange(tracker, node, '@property rule name', oldName, newName);
+}
+
+export function trackKeyframeKeyChange(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    oldKey: string,
+    newKey: string,
+    ): void {
+  trackRuleHeaderChange(tracker, node, 'keyframe key', oldKey, newKey);
+}
+
+export type StyleQueryType = '@media'|'@container'|'@supports'|'@scope'|'@navigation';
+
+function describeStyleQueryChange(queryType: StyleQueryType, oldQuery: string, newQuery: string): string {
+  if (!newQuery) {
+    return `Cleared ${queryType} query "${trimValue(oldQuery)}"`;
+  }
+  return `Changed ${queryType} query from "${trimValue(oldQuery)}" to "${trimValue(newQuery)}"`;
+}
+
+export function trackStyleQueryChange(
+    tracker: ChangeTracker.ChangeTracker.ChangeTracker|undefined,
+    node: SDK.DOMModel.DOMNode,
+    queryType: StyleQueryType,
+    oldQuery: string,
+    newQuery: string,
+    ): void {
+  if (!tracker?.isTracking) {
+    return;
+  }
+  const trimmedOld = Platform.StringUtilities.collapseWhitespace(oldQuery.trim());
+  const trimmedNew = Platform.StringUtilities.collapseWhitespace(newQuery.trim());
+  if (trimmedOld === trimmedNew) {
+    return;
+  }
+  // Empty `trimmedOld` is unreachable as empty queries are not editable in the Styles pane.
+  if (!trimmedOld) {
+    return;
+  }
+  // Only `@media` and `@scope` allow empty query text in CSS.
+  if (!trimmedNew && queryType !== '@media' && queryType !== '@scope') {
+    return;
+  }
+  tracker.trackChange(
+      describeStyleQueryChange(queryType, trimmedOld, trimmedNew),
+      buildAnchor(STYLES_PANE_VE_PATH, node),
+  );
+}

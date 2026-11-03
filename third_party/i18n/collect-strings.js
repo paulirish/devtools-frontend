@@ -6,9 +6,27 @@
  */
 
 import * as fs from 'node:fs';
+import {createRequire, enableCompileCache} from 'node:module';
 import * as path from 'node:path';
 
-import * as tsc from 'typescript';
+/** @type {typeof import('typescript')|undefined} */
+let typescript;
+
+/**
+ * TODO(victorporof): Check if this can be removed once TS v7.1 is released.
+ * Loads TypeScript with `require` on first use. When an ES module imports this
+ * large CommonJS package, Node also detects its format and scans its exports.
+ * `require` skips both steps. The Node compile cache keeps the compiled package
+ * on disk for the next run.
+ * @return {typeof import('typescript')}
+ */
+function loadTypeScript() {
+  if (!typescript) {
+    enableCompileCache();
+    typescript = createRequire(import.meta.url)('typescript');
+  }
+  return typescript;
+}
 
 export {collectAndBakeCtcStrings} from './bake-ctc-to-lhl.js';
 
@@ -540,6 +558,7 @@ export function createPsuedoLocaleStrings(messages) {
  * @return {string}
  */
 function getIdentifier(node) {
+  const tsc = loadTypeScript();
   if (!node.name || !tsc.isIdentifier(node.name)) {
     throw new Error('no Identifier found');
   }
@@ -553,6 +572,7 @@ function getIdentifier(node) {
  * @return {string}
  */
 function getToken(node) {
+  const tsc = loadTypeScript();
   if (!node.initializer) {
     throw new Error('no Token found');
   }
@@ -574,6 +594,7 @@ function getToken(node) {
  * @return {Record<string, ParsedUIString>}
  */
 export function parseUIStrings(sourceStr) {
+  const tsc = loadTypeScript();
   const tsAst = tsc.createSourceFile(
       'uistrings',
       sourceStr,
@@ -643,14 +664,19 @@ const strings = {};
  * Collects all LHL messsages defined in UIString from Javascript files in dir,
  * and converts them into CTC.
  * @param {string} directory
+ * @param {string[]} [files] The files to scan, relative to `directory`.
+ *     Defaults to all files that IGNORED_PATH_COMPONENTS keeps.
+ * @param {Map<string, {source: string, parsed: Record<string, ParsedUIString>}>} [cache]
+ *     The parsed UIStrings of each file from an earlier run. Files with the
+ *     same UIStrings source reuse the parse. New parses are added.
  * @return {Record<string, CtcMessage>}
  */
-export function collectAllStringsInDir(directory) {
+export function collectAllStringsInDir(directory, files, cache) {
   // If CWD is contains "third_party" (e.g. in a full Chromium checkout) then
   // *all* paths will be ignored. To avoid this, make the directory relative to
   // CWD.
   directory = path.relative(process.cwd(), directory);
-  const files = fs.globSync('**/*.{js,ts}', {
+  files ??= fs.globSync('**/*.{js,ts}', {
     cwd: directory,
     exclude: IGNORED_PATH_COMPONENTS,
   });
@@ -667,7 +693,12 @@ export function collectAllStringsInDir(directory) {
     // just parse the UIStrings substring to avoid ES version issues, save time, etc
     const justUIStrings = `const ${regexMatch[1]};`;
 
-    const parsedMessages = parseUIStrings(justUIStrings);
+    let cached = cache?.get(absolutePath);
+    if (cached?.source !== justUIStrings) {
+      cached = {source: justUIStrings, parsed: parseUIStrings(justUIStrings)};
+      cache?.set(absolutePath, cached);
+    }
+    const parsedMessages = cached.parsed;
     for (const [key, parsed] of Object.entries(parsedMessages)) {
       const {message, description, meaning, examples} = parsed;
 

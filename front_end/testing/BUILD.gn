@@ -62,7 +62,10 @@ ts_library("testing") {
     "test_setup.ts",
   ]
 
-  deps = [ "../core/i18n/locales" ]
+  data_deps = [
+    "../core/i18n/locales",
+    "../panels/timeline/fixtures/traces",
+  ]
 
   ts_deps = [
     "../../extension-api",
@@ -159,6 +162,8 @@ ts_library("unittests") {
     "SnapshotTester.test.ts",
     "SourceMapEncoder.test.ts",
   ]
+
+  data = [ "SnapshotTester.snapshot.txt" ]
 
   ts_deps = [
     ":testing",

@@ -9,6 +9,7 @@ group("test") {
   testonly = true
   deps = [
     ":api_tests",
+    ":e2e_tests",
     ":run",
     ":unittests",
     "ai_evals",
@@ -25,7 +26,15 @@ group("api_tests") {
     "../front_end:api_test_inputs",
     "../front_end:api_tests",
     "api",
-    "api:run_devtools_api_tests",
+    "api:devtools_api_tests",
+  ]
+}
+
+group("e2e_tests") {
+  testonly = true
+  deps = [
+    "e2e",
+    "e2e:devtools_e2e_tests",
   ]
 }
 
@@ -34,13 +43,14 @@ group("unittests") {
   deps = [
     "../front_end:test_inputs",
     "../front_end:unittests",
+    "../inspector_overlay:test_inputs",
     "../inspector_overlay:unittests",
     "../mcp:foundation_unittests",
     "shared",
+    "unit:devtools_node_unit_tests",
+    "unit:devtools_unit_tests",
     "unit:karma",
     "unit:mocha",
-    "unit:run_devtools_node_unit_tests",
-    "unit:run_devtools_unit_tests",
   ]
 }
 
@@ -61,5 +71,6 @@ generated_file("build_config") {
     CHECKOUT_ROOT = rebase_path("//", target_gen_dir)
     BUILD_ROOT = rebase_path(root_build_dir, target_gen_dir)
     BUILD_WITH_CHROMIUM = build_with_chromium
+    DEVTOOLS_BUNDLED_CHROMIUM_DEPS = devtools_build_with_bundled_chromium_deps
   }
 }

@@ -5,10 +5,12 @@
 import {assert} from 'chai';
 import {afterEach, beforeEach, describe, it} from 'mocha';
 
+import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
 describe('SyntheticEvents', function() {
+  setupLocaleHooks();
   beforeEach(() => {
     Trace.Helpers.SyntheticEvents.SyntheticEventsManager.reset();
   });
@@ -40,7 +42,7 @@ describe('SyntheticEvents', function() {
   });
 
   describe('SyntheticBased registration', () => {
-    it('stores synthetic based events at the same index as their corresponding raw event in the source array',
+    it('resolves synthetic based events from the index of their corresponding raw event',
        async function() {
          const contents = await TraceLoader.fixtureContents(this, 'web-dev.json.gz');
          const rawEvents = 'traceEvents' in contents ? contents.traceEvents as Trace.Types.Events.Event[] : contents;
@@ -53,13 +55,9 @@ describe('SyntheticEvents', function() {
          const syntheticEventsManager = Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager();
          for (const syntheticEvent of allSyntheticEvents) {
            const rawEventIndex = rawEvents.indexOf(syntheticEvent.rawSourceEvent);
-           // Test synthetic events are stored in the correct position.
+           // Test each synthetic event resolves from its raw event index.
            assert.strictEqual(syntheticEventsManager.syntheticEventForRawEventIndex(rawEventIndex), syntheticEvent);
          }
-         const allSyntheticEventsInManagerCount = syntheticEventsManager.getSyntheticTraces().reduce(
-             (count, event) => event !== undefined ? (count + 1) : 0, 0);
-         // Test synthetic events are stored only once.
-         assert.strictEqual(allSyntheticEventsInManagerCount, allSyntheticEvents.length);
        });
   });
 });

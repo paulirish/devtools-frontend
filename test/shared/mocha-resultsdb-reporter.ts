@@ -57,8 +57,9 @@ export class ResultsDbReporter extends Mocha.reporters.Base {
   htmlResult: fs.WriteStream|undefined;
 
   localResultsPath(): string|undefined {
-    return !ResultsDb.available() && this.suitePrefix ? path.join(GEN_DIR, 'test', this.suitePrefix, 'results.html') :
-                                                        undefined;
+    return !ResultsDb.available() && this.suitePrefix && fs.existsSync(GEN_DIR) ?
+        path.join(GEN_DIR, 'test', this.suitePrefix, 'results.html') :
+        undefined;
   }
 
   constructor(runner: Mocha.Runner, options?: Mocha.MochaOptions) {
@@ -186,10 +187,11 @@ export class ResultsDbReporter extends Mocha.reporters.Base {
     const testRetry = ((test as unknown) as TestRetry);
     const {exactTestId, coarseName, fineName, caseName} =
         generateExactTestId(GEN_DIR, test.file!, test.titlePath(), SOURCE_ROOT);
+    const properties = ResultsDb.buildTestProperties(exactTestId, coarseName, fineName, caseName);
     const result = {
       duration: `${((test.duration || 1) * .001).toFixed(3)}s`,
-      tags: [{key: 'run', value: String(testRetry.currentRetry() + 1)}],
-      ...ResultsDb.buildTestProperties(exactTestId, coarseName, fineName, caseName),
+      ...properties,
+      tags: [...properties.tags, {key: 'run', value: String(testRetry.currentRetry() + 1)}],
     };
     const hookName = this.maybeHook(test);
     if (hookName) {
@@ -216,6 +218,12 @@ export class ResultsDbReporter extends Mocha.reporters.Base {
       process.stdout.write(
           `\n[TestExpectations] ${this.unexpectedPassesCount} unexpected passes! Overriding exit code to 1.\n`);
       process.exitCode = 1;
+    }
+
+    if (TestConfig.isolatedScriptTestOutput) {
+      ResultsDb.writeIsolatedScriptTestOutput(TestConfig.isolatedScriptTestOutput, {
+        numFailures: Math.max(0, unexpectedFailures) + this.unexpectedPassesCount,
+      });
     }
 
     const localResults = this.localResultsPath();

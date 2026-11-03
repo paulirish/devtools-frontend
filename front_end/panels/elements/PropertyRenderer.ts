@@ -11,7 +11,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {Directive, html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
+import {AsyncDirective, Directive, html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
@@ -55,7 +55,7 @@ export type RendererBase<MatchT extends SDK.CSSPropertyParser.Match> = abstract 
 
 export interface MatchRenderer<MatchT extends SDK.CSSPropertyParser.Match> {
   readonly matchType: Platform.Constructor.Constructor<MatchT>;
-  render(match: MatchT, context: RenderingContext): Node[]|LitTemplate;
+  render(match: MatchT, context: RenderingContext): LitTemplate;
 }
 
 // A mixin to automatically expose the match type on specific renrerers
@@ -64,7 +64,7 @@ export function rendererBase<MatchT extends SDK.CSSPropertyParser.Match>(
     matchT: Platform.Constructor.Constructor<MatchT>): RendererBase<MatchT> {
   abstract class RendererBaseClass implements MatchRenderer<MatchT> {
     readonly matchType = matchT;
-    render(_match: MatchT, _context: RenderingContext): Node[]|LitTemplate {
+    render(_match: MatchT, _context: RenderingContext): LitTemplate {
       return nothing;
     }
   }
@@ -194,6 +194,50 @@ function highlight(highlighting: Highlighting|undefined, match: SDK.CSSPropertyP
   return html`${template}${highlightDirective(highlighting, match)}`;
 }
 
+class LazyEvaluationBlackboard {
+  #result?: LitTemplate;
+  callback?: (result: LitTemplate) => void;
+  readonly #asyncEvalCallback: () => Promise<LitTemplate|null>;
+
+  constructor(asyncEvalCallback: () => Promise<LitTemplate|null>) {
+    this.#asyncEvalCallback = asyncEvalCallback;
+  }
+
+  get result(): LitTemplate|undefined {
+    return this.#result;
+  }
+
+  set result(val: LitTemplate) {
+    if (this.#result === val) {
+      return;
+    }
+    this.#result = val;
+    this.callback?.(val);
+  }
+
+  readonly asyncEvalCallback = async(): Promise<boolean> => {
+    const result = await this.#asyncEvalCallback();
+    if (result) {
+      this.result = result;
+    }
+    return Boolean(result);
+  };
+}
+
+class LazyEvaluationDirective extends AsyncDirective.AsyncDirective {
+  render(
+      placeholder: LitTemplate,
+      blackboard: LazyEvaluationBlackboard,
+      ): LitTemplate {
+    blackboard.callback = result => {
+      if (this.isConnected) {
+        this.setValue(result);
+      }
+    };
+    return blackboard.result ?? placeholder;
+  }
+}
+const lazyEvaluation = AsyncDirective.directive(LazyEvaluationDirective);
 /**
  * This class is used to guide value tracing when passed to the Renderer. Tracing has two phases. First, substitutions
  * such as var() are applied step by step. In each step, all vars in the value are replaced by their definition until no
@@ -321,11 +365,11 @@ export class TracingContext {
 
   // After rendering the arguments of a function call, the TracingContext produced by TracingContext#evaluation need to
   // be passed here to determine whether the "current" function call should be evaluated or not. If so, the
-  // evaluation callback is run. The callback should return synchronously an array of Nodes as placeholder to be
-  // rendered immediately and optionally a callback for asynchronous updates of the placeholder nodes. The callback
-  // returns a boolean indicating whether the update was successful or not.
+  // evaluation callback is run. The callback should return synchronously a template as placeholder to be
+  // rendered immediately and optionally a callback for asynchronous updates of the template.
   applyEvaluation(children: TracingContext[],
-                  evaluation: () => ({placeholder: Node[], asyncEvalCallback?: () => Promise<boolean>})): Node[]|null {
+                  evaluation: () => {template: LitTemplate, asyncEvalCallback?: () => Promise<LitTemplate|null>}):
+      LitTemplate|null {
     if (this.#evaluationCount === 0 || children.some(child => child.#appliedEvaluations >= this.#evaluationCount)) {
       this.#setHasMoreEvaluations(true);
       children.forEach(child => this.#asyncEvalCallbacks.push(...child.#asyncEvalCallbacks));
@@ -333,9 +377,15 @@ export class TracingContext {
     }
     this.#setAppliedEvaluations(children.map(child => child.#appliedEvaluations).reduce((a, b) => Math.max(a, b), 0) +
                                 1);
-    const {placeholder, asyncEvalCallback} = evaluation();
-    this.#asyncEvalCallbacks.push(asyncEvalCallback);
-    return placeholder;
+    const result = evaluation();
+    if (!result.asyncEvalCallback) {
+      this.#asyncEvalCallbacks.push(result.asyncEvalCallback);
+      return result.template;
+    }
+
+    const blackboard = new LazyEvaluationBlackboard(result.asyncEvalCallback);
+    this.#asyncEvalCallbacks.push(blackboard.asyncEvalCallback);
+    return html`${lazyEvaluation(result.template, blackboard)}`;
   }
 
   #setHasMoreSubstitutions(): void {
@@ -529,7 +579,7 @@ export class EditableContent extends UI.Widget.Widget<DocumentFragment> {
 
   constructor(element?: HTMLElement, view: EditableContentView = EDITABLE_CONTENT_DEFAULT_VIEW) {
     super(element, {useShadowDom: 'pure'});
-    this.element.classList.remove('vbox', 'flex-auto', 'widget');
+    this.element.classList.remove('widget');
     this.#view = view;
     // Render synchronously so that `<slot name="icon">` is in the DOM before synchronous callers dispatch edits.
     this.performUpdate();
@@ -652,13 +702,6 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
     return {nodes: html`${nodes}`, cssControls};
   }
 
-  static renderInto(nodeOrNodes: CodeMirror.SyntaxNode|CodeMirror.SyntaxNode[], context: RenderingContext,
-                    parent: HTMLElement|DocumentFragment): {nodes: LitTemplate, cssControls: CSSControlMap} {
-    const {nodes, cssControls} = this.render(nodeOrNodes, context);
-    render(nodes, parent);
-    return {nodes, cssControls};
-  }
-
   renderedMatchForTest(_nodes: LitTemplate, _match: SDK.CSSPropertyParser.Match): void {
   }
 
@@ -668,8 +711,7 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
         this.#context.renderers.get(match.constructor as Platform.Constructor.Constructor<SDK.CSSPropertyParser.Match>);
     if (renderer || match instanceof SDK.CSSPropertyParserMatchers.TextMatch) {
       const rendered = renderer?.render(match, this.#context) ?? html`<span>${match.text}</span>`;
-      const output =
-          highlight(this.#context.tracing?.highlighting, match, Array.isArray(rendered) ? html`${rendered}` : rendered);
+      const output = highlight(this.#context.tracing?.highlighting, match, rendered);
       this.renderedMatchForTest(output, match);
       if (this.#output.some(t => t !== nothing)) {
         const spacing = precedingSpace(node, this.#context.ast, this.#matchedResult);

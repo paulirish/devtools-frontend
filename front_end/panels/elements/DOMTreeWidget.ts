@@ -120,7 +120,7 @@ interface ViewInput {
   selectedClosingTag: boolean;
 
   onSelect: (node: SDK.DOMModel.DOMNode, isClosingTag: boolean, selectedByUser: boolean) => void;
-  onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean) => void;
+  onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean, recursively?: boolean) => void;
   onContextMenu: (node: SDK.DOMModel.DOMNode, event: MouseEvent) => void;
   onClearMaxRows: () => void;
   onHoverNode: (node: SDK.DOMModel.DOMNode|null, showInfo: boolean, isClosingTag: boolean) => void;
@@ -231,7 +231,6 @@ function isBeingEditedAsHTML(state: Pick<ViewInput, 'multilineEditingNode'|'node
 
 function getVisibleChildren(node: SDK.DOMModel.DOMNode, {showComments}: TreeOptions): SDK.DOMModel.DOMNode[] {
   const children: SDK.DOMModel.DOMNode[] = [];
-  children.push(...DOMTreeElementWidget.visibleShadowRoots(node));
 
   const contentDocument = node.contentDocument();
   if (contentDocument) {
@@ -259,6 +258,8 @@ function getVisibleChildren(node: SDK.DOMModel.DOMNode, {showComments}: TreeOpti
   if (beforePseudo) {
     children.push(beforePseudo);
   }
+
+  children.push(...DOMTreeElementWidget.visibleShadowRoots(node));
 
   children.push(...node.carouselPseudoElements());
 
@@ -659,7 +660,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
       if (!isCollapsible) {
         return;
       }
-      input.onExpand(node, event.detail.expanded);
+      input.onExpand(node, event.detail.expanded, event.detail.recursively);
     };
 
     const isDragOver = input.dragOverNode?.node === node && !input.dragOverNode.isClosingTag;
@@ -688,6 +689,16 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
     const onContextMenu = (event: MouseEvent): void => {
       event.stopPropagation();
       input.onContextMenu(node, event);
+    };
+
+    // Prevent the native word selection on double click. The double click
+    // starts inline editing instead. Inside an active inline editor the
+    // native selection must stay enabled.
+    const onMouseDown = (event: MouseEvent): void => {
+      if (event.detail < 2 || UI.UIUtils.isBeingEdited(event.target as Node)) {
+        return;
+      }
+      event.preventDefault();
     };
 
     const onDragStart = (event: DragEvent): void => {
@@ -733,6 +744,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
           @select=${on((event: UI.TreeOutline.TreeViewElement.SelectEvent) => onSelect(false, Boolean(event.detail?.selectedByUser)))}
           @expand=${on(onExpand)}
           @mousemove=${on(onMouseMove(/* isClosingTag= */ false))}
+          @mousedown=${on(onMouseDown)}
           @contextmenu=${on(onContextMenu)}
           @dragstart=${on(onDragStart)}
           @dragover=${on(onDragOver(/* isClosingTag= */ false))}
@@ -816,6 +828,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target:
                     @select=${on((event: UI.TreeOutline.TreeViewElement.SelectEvent) => onSelect(true, Boolean(event.detail?.selectedByUser)))}
                     @contextmenu=${on(onContextMenu)}
                     @mousemove=${on(onMouseMove(/* isClosingTag= */ true))}
+                    @mousedown=${on(onMouseDown)}
                     @dragstart=${on(onDragStart)}
                     @dragover=${on(onDragOver(/* isClosingTag= */ true))}
                     @dragleave=${on(onDragLeave)}
@@ -1533,10 +1546,24 @@ export class DOMTreeWidget extends UI.Widget.Widget {
     }
     if (expanded) {
       this.#expandedNodes.add(node);
+      // Children that are not collapsible (e.g. the document element) render
+      // without an expand arrow, so their children must be fetched eagerly.
+      const expandNotCollapsibleChildren = (): void => {
+        for (const child of node.children() ?? []) {
+          // Check the Set directly instead of isNodeExpanded(), because
+          // isNodeExpanded() always returns true for non-collapsible nodes.
+          if (isNotCollapsible(child) && !this.#expandedNodes.has(child)) {
+            this.setNodeExpanded(child, true);
+          }
+        }
+      };
       if (!node.children() && (node.childNodeCount() || node.isIframe() || node.nodeType() === Node.DOCUMENT_NODE)) {
         void node.getChildNodes(() => {
+          expandNotCollapsibleChildren();
           this.performUpdate();
         });
+      } else {
+        expandNotCollapsibleChildren();
       }
       this.onElementExpanded();
     } else {
@@ -1777,7 +1804,11 @@ export class DOMTreeWidget extends UI.Widget.Widget {
         node.highlight();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.ChangeInspectedNodeInElementsPanel);
       },
-      onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean) => {
+      onExpand: (node: SDK.DOMModel.DOMNode, expanded: boolean, recursively = false) => {
+        if (expanded && recursively) {
+          void this.expandRecursively(node);
+          return;
+        }
         this.setNodeExpanded(node, expanded);
       },
       onContextMenu: (node: SDK.DOMModel.DOMNode, event: MouseEvent) => {

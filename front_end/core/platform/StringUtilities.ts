@@ -5,6 +5,15 @@
 import type {Brand} from './Brand.js';
 
 let graphemeSegmenter: Intl.Segmenter|null = null;
+// Excludes control characters (0x00-0x1F, 0x7F) to prevent splitting \r\n, which forms a single grapheme cluster.
+const PRINTABLE_ASCII_REGEX = /^[\x20-\x7e]*$/;
+
+function getGraphemeSegmenter(): Intl.Segmenter {
+  if (!graphemeSegmenter) {
+    graphemeSegmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  }
+  return graphemeSegmenter;
+}
 
 export const escapeCharacters = (inputString: string, charsToEscape: string): string => {
   let foundChar = false;
@@ -315,6 +324,15 @@ export const isExtendedKebabCase = (inputStr: string): boolean => {
   return EXTENDED_KEBAB_CASE_REGEXP.test(inputStr);
 };
 
+/**
+ * Replaces any sequence of non-alphanumeric characters with a single dash, strips leading and
+ * trailing dashes, and converts letters to lowercase, leaving a kebab-case identifier usable as viewId.
+ * If the input contains only non-alphanumeric characters, returns a falsy empty string.
+ */
+export const sanitizeIdentifier = (id: string): Lowercase<string> => {
+  return id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') as Lowercase<string>;
+};
+
 export const toTitleCase = (inputStr: string): string => {
   return inputStr.substring(0, 1).toUpperCase() + inputStr.substring(1);
 };
@@ -415,8 +433,6 @@ export const trimMiddle = (str: string, maxLength: number): string => {
     return str;
   }
 
-  const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
-
   // If the max length is so small it can't fit the ellipsis, just return the ellipsis.
   const ellipsis = '…';
   const ellipsisLength = 1;
@@ -428,6 +444,16 @@ export const trimMiddle = (str: string, maxLength: number): string => {
   const freeSpace = maxLength - ellipsisLength;
   const leftCount = Math.ceil(freeSpace / 2);
   const rightCount = Math.floor(freeSpace / 2);
+
+  // Printable ASCII characters (0x20-0x7E) cannot form multi-code-unit grapheme clusters.
+  // Checking one extra character inside each truncation boundary guarantees both slice boundaries
+  // fall between graphemes and the string contains at least maxLength + 1 graphemes.
+  if (PRINTABLE_ASCII_REGEX.test(str.slice(0, leftCount + 1)) &&
+      PRINTABLE_ASCII_REGEX.test(str.slice(str.length - rightCount - 1))) {
+    return str.slice(0, leftCount) + ellipsis + str.slice(str.length - rightCount);
+  }
+
+  const segmenter = getGraphemeSegmenter();
 
   let currentGraphemeCount = 0;
   let leftEndIndex = 0;
@@ -475,7 +501,17 @@ export const trimEndWithMaxLength = (str: string, maxLength: number): string => 
 
   const ellipsis = '…';
   const ellipsisLength = 1;
-  const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  if (maxLength <= ellipsisLength) {
+    return ellipsis;
+  }
+
+  // Printable ASCII characters (0x20-0x7E) cannot form multi-code-unit grapheme clusters.
+  // Checking up to maxLength + 1 characters guarantees at least maxLength + 1 graphemes in O(maxLength).
+  if (PRINTABLE_ASCII_REGEX.test(str.slice(0, maxLength + 1))) {
+    return str.slice(0, maxLength - ellipsisLength) + ellipsis;
+  }
+
+  const segmenter = getGraphemeSegmenter();
   const iterator = segmenter.segment(str)[Symbol.iterator]();
 
   let lastSegmentIndex = 0;
@@ -517,11 +553,11 @@ export const truncateToCodeUnitLength = (str: string, maxCodeUnits: number): str
   if (str.length <= maxCodeUnits) {
     return str;
   }
-  if (!graphemeSegmenter) {
-    graphemeSegmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  if (PRINTABLE_ASCII_REGEX.test(str.slice(0, maxCodeUnits + 1))) {
+    return str.slice(0, maxCodeUnits);
   }
   let lastSafeIndex = 0;
-  for (const {index, segment} of graphemeSegmenter.segment(str)) {
+  for (const {index, segment} of getGraphemeSegmenter().segment(str)) {
     if (index + segment.length > maxCodeUnits) {
       break;
     }
@@ -782,11 +818,16 @@ function isCsvFormula(value: string): boolean {
  *    the value with a single quote (`'`) tells spreadsheet apps to treat the
  *    cell as literal text (and they hide the leading `'` when displaying it).
  *    - Example without commas: `=SUM(A1:A2)` -> `'=SUM(A1:A2)`
- * 2. RFC 4180 structural CSV quoting:
- *    If the cell also contains commas (`,`), double quotes (`"`), or newlines,
- *    it is wrapped in `"..."` (with inner `"` doubled to `""`) so CSV parsers
- *    do not split the cell across columns or rows.
+ * 2. Structural CSV quoting (RFC 4180, extended):
+ *    If the cell also contains commas (`,`), semicolons (`;`), tabs, double
+ *    quotes (`"`), or newlines, it is wrapped in `"..."` (with inner `"`
+ *    doubled to `""`) so CSV parsers do not split the cell across columns or
+ *    rows. `;` and tab are included because spreadsheet apps can use them as
+ *    the column separator (for example, Excel in many locales uses `;`).
+ *    Without quotes, `x;=1+1` would split into a new cell that starts with
+ *    `=` and skips the `'` prefix from step 1.
  *    - Example with commas: `=SUM(1,2)` -> `"'=SUM(1,2)"`
+ *    - Example with a semicolon: `x;=1+1` -> `"x;=1+1"`
  *    - Example starting with a literal quote: `"=SUM(1,2)"` -> `"""=SUM(1,2)"""`
  *      (not treated as a formula since the first character is `"`, not `=`).
  */
@@ -794,13 +835,13 @@ export const escapeCsvCell = function(value: string): string {
   // Step 1: Prefix formula-like text with `'` so spreadsheets render it as literal text.
   let escaped = isCsvFormula(value) ? `'${value}` : value;
 
-  // Step 2: Apply standard RFC 4180 double-quoting if the cell contains quotes,
-  // commas, or line breaks so the CSV structure stays intact.
+  // Step 2: Apply double-quoting if the cell contains quotes, any common
+  // column separator, or line breaks so the CSV structure stays intact.
   if (escaped.includes('"')) {
     escaped = escaped.replace(/"/g, '""');
     return `"${escaped}"`;
   }
-  if (escaped.includes(',') || escaped.includes('\n') || escaped.includes('\r')) {
+  if (/[,;\t\r\n]/.test(escaped)) {
     return `"${escaped}"`;
   }
   return escaped;

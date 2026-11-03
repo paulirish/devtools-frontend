@@ -106,7 +106,7 @@ function renderFrameSuffix(frame: StackTrace.StackTrace.ParsedErrorStackFrame): 
   return Lit.nothing;
 }
 
-const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElement): void => {
+const DEFAULT_VIEW = (input: ViewInput, _output: undefined, target: HTMLElement): void => {
   const renderError = (error: Bindings.SymbolizedError.SymbolizedError, isCause: boolean): Lit.LitTemplate => {
     if (error instanceof Bindings.SymbolizedError.UnparsableError) {
       // linkifyWithCustomLinkifier() returns a Widget for long strings, which Lit
@@ -165,7 +165,11 @@ const DEFAULT_VIEW = (input: ViewInput, _output: object, target: HTMLElement): v
   };
 
   // clang-format off
-  render(html`<span class="symbolized-error-widget">${renderError(input.error, false)}</span>`, target);
+  render(
+      html`<span class="symbolized-error-widget">${renderError(input.error, false)}</span>`,
+      target,
+      {container: {classes: ['symbolized-error-widget-host']}},
+  );
   // clang-format on
 };
 
@@ -176,7 +180,7 @@ export class SymbolizedErrorWidget extends UI.Widget.Widget {
 
   constructor(element?: HTMLElement, view: typeof DEFAULT_VIEW = DEFAULT_VIEW) {
     const host = element || document.createElement('span');
-    super(host, {classes: ['symbolized-error-widget-host']});
+    super(host);
     this.#view = view;
   }
 
@@ -225,6 +229,6 @@ export class SymbolizedErrorWidget extends UI.Widget.Widget {
       error: this.#error,
       ignoreListManager: this.#ignoreListManager,
     };
-    this.#view(input, {}, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 }

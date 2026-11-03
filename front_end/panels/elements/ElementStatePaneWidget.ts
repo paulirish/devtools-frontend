@@ -69,6 +69,8 @@ enum SpecificPseudoStates {
   AUTOFILL = 'autofill',
   OPEN = 'open',
   TARGET_CURRENT = 'target-current',
+  BUFFERING = 'buffering',
+  STALLED = 'stalled',
 }
 
 interface ElementState {
@@ -84,7 +86,7 @@ interface ViewInput {
   onStateCheckboxClicked: (event: MouseEvent) => void;
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 export const DEFAULT_VIEW: View = (input, _output, target) => {
   const createElementStateCheckbox = (state: ElementState): TemplateResult => {
@@ -92,7 +94,7 @@ export const DEFAULT_VIEW: View = (input, _output, target) => {
     return html`
         <div id=${state.state}>
           <devtools-checkbox class="small" @click=${input.onStateCheckboxClicked}
-              jslog=${VisualLogging.toggle(state.state).track({change: true})} ?checked=${state.checked} ?disabled=${state.disabled}
+              jslog=${VisualLogging.toggle(state.state).track({change: true})} .checked=${Boolean(state.checked)} ?disabled=${state.disabled}
               title=${':' + state.state}>
           <span class="source-code">${':' + state.state}</span>
         </devtools-checkbox>
@@ -184,6 +186,8 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
     this.#states.set(SpecificPseudoStates.OPEN, {state: SpecificPseudoStates.OPEN, type: 'specific'});
     this.#states.set(
         SpecificPseudoStates.TARGET_CURRENT, {state: SpecificPseudoStates.TARGET_CURRENT, type: 'specific'});
+    this.#states.set(SpecificPseudoStates.BUFFERING, {state: SpecificPseudoStates.BUFFERING, type: 'specific'});
+    this.#states.set(SpecificPseudoStates.STALLED, {state: SpecificPseudoStates.STALLED, type: 'specific'});
 
     setDualStateCheckboxes(SpecificPseudoStates.VALID, SpecificPseudoStates.INVALID);
     setDualStateCheckboxes(SpecificPseudoStates.USER_VALID, SpecificPseudoStates.USER_INVALID);
@@ -254,7 +258,7 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
       states: [...this.#states.values()],
       onStateCheckboxClicked: this.onStateCheckboxClicked.bind(this),
     };
-    this.#view(viewInput, {}, this.contentElement);
+    this.#view(viewInput, undefined, this.contentElement);
   }
 
   async #updateElementSpecificStatesTable(node: SDK.DOMModel.DOMNode|null = null): Promise<void> {
@@ -399,6 +403,12 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
     } else {
       hideSpecificCheckbox(SpecificPseudoStates.TARGET_CURRENT, true);
     }
+
+    // :buffering and :stalled are independent. Forcing :stalled does not force
+    // :buffering, even though a real stalled media element is also buffering.
+    const isMediaElement = isElementOfTypes(node, ['audio', 'video']);
+    hideSpecificCheckbox(SpecificPseudoStates.BUFFERING, !isMediaElement);
+    hideSpecificCheckbox(SpecificPseudoStates.STALLED, !isMediaElement);
   }
 }
 

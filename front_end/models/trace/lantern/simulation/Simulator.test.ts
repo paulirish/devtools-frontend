@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {after, before, describe, it} from 'mocha';
+import {after, before, beforeEach, describe, it} from 'mocha';
 
 import type * as Protocol from '../../../../generated/protocol.js';
+import {setupLocaleHooks} from '../../../../testing/LocaleHelpers.js';
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
 import * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
@@ -72,17 +73,21 @@ function cpuTask({tid, ts, duration}: {
 }
 
 describe('DependencyGraph/Simulator', () => {
+  setupLocaleHooks();
   // Insulate the simulator tests from DNS multiplier changes
   let originalDNSMultiplier = 1;
   let realTraceGraph: Lantern.Graph.Node<Trace.Types.Events.SyntheticNetworkRequest>;
 
-  before(async function() {
+  before(() => {
+    originalDNSMultiplier = DNSCache.rttMultiplier;
+    DNSCache.rttMultiplier = 1;
+  });
+
+  beforeEach(async function() {
     const parsedTrace = await TraceLoader.traceEngine(this, 'lantern/progressive-app/trace.json.gz');
     const trace = toLanternTrace(parsedTrace.traceEvents);
     const requests = Trace.LanternComputationData.createNetworkRequests(trace, parsedTrace.data);
     realTraceGraph = Trace.LanternComputationData.createGraph(requests, trace, parsedTrace.data);
-    originalDNSMultiplier = DNSCache.rttMultiplier;
-    DNSCache.rttMultiplier = 1;
   });
 
   after(() => {
@@ -198,10 +203,10 @@ describe('DependencyGraph/Simulator', () => {
       const result = simulator.simulate(nodeA);
       // should be 800ms A, then 1000 ms total for B, C, D in serial
       assert.strictEqual(result.timeInMs, 1950);
-      assertNodeTiming(result, nodeA, {startTime: 0, endTime: 950});
-      assertNodeTiming(result, nodeB, {startTime: 950, endTime: 1050});
-      assertNodeTiming(result, nodeC, {startTime: 1050, endTime: 1650});
-      assertNodeTiming(result, nodeD, {startTime: 1650, endTime: 1950});
+      assertNodeTiming(result, nodeA, {startTime: 0, endTime: 950, queuedTime: 0});
+      assertNodeTiming(result, nodeB, {startTime: 950, endTime: 1050, queuedTime: 950});
+      assertNodeTiming(result, nodeC, {startTime: 1050, endTime: 1650, queuedTime: 950});
+      assertNodeTiming(result, nodeD, {startTime: 1650, endTime: 1950, queuedTime: 950});
     });
 
     it('should simulate basic network waterfall graphs with CPU', () => {
@@ -309,12 +314,12 @@ describe('DependencyGraph/Simulator', () => {
 
       // should be 3 RTs + SRT for rootNode (950ms)
       // should be 1 RT  + SRT for image nodes in observed order (650ms)
-      assertNodeTiming(result, rootNode, {startTime: 0, endTime: 950});
-      assertNodeTiming(result, imageNodes[4], {startTime: 950, endTime: 1600});
-      assertNodeTiming(result, imageNodes[3], {startTime: 1600, endTime: 2250});
-      assertNodeTiming(result, imageNodes[2], {startTime: 2250, endTime: 2900});
-      assertNodeTiming(result, imageNodes[1], {startTime: 2900, endTime: 3550});
-      assertNodeTiming(result, imageNodes[0], {startTime: 3550, endTime: 4200});
+      assertNodeTiming(result, rootNode, {startTime: 0, endTime: 950, queuedTime: 0});
+      assertNodeTiming(result, imageNodes[4], {startTime: 950, endTime: 1600, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[3], {startTime: 1600, endTime: 2250, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[2], {startTime: 2250, endTime: 2900, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[1], {startTime: 2900, endTime: 3550, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[0], {startTime: 3550, endTime: 4200, queuedTime: 950});
     });
 
     it('should start network requests in priority order to break startTime ties', () => {
@@ -338,12 +343,12 @@ describe('DependencyGraph/Simulator', () => {
 
       // should be 3 RTs + SRT for rootNode (950ms)
       // should be 1 RT  + SRT for image nodes in priority order (650ms)
-      assertNodeTiming(result, rootNode, {startTime: 0, endTime: 950});
-      assertNodeTiming(result, imageNodes[4], {startTime: 950, endTime: 1600});
-      assertNodeTiming(result, imageNodes[3], {startTime: 1600, endTime: 2250});
-      assertNodeTiming(result, imageNodes[2], {startTime: 2250, endTime: 2900});
-      assertNodeTiming(result, imageNodes[1], {startTime: 2900, endTime: 3550});
-      assertNodeTiming(result, imageNodes[0], {startTime: 3550, endTime: 4200});
+      assertNodeTiming(result, rootNode, {startTime: 0, endTime: 950, queuedTime: 0});
+      assertNodeTiming(result, imageNodes[4], {startTime: 950, endTime: 1600, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[3], {startTime: 1600, endTime: 2250, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[2], {startTime: 2250, endTime: 2900, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[1], {startTime: 2900, endTime: 3550, queuedTime: 950});
+      assertNodeTiming(result, imageNodes[0], {startTime: 3550, endTime: 4200, queuedTime: 950});
     });
 
     it('should simulate two graphs in a row', () => {
@@ -448,9 +453,11 @@ describe('DependencyGraph/Simulator', () => {
 
     it('should preserve H2 overflow bytes when a parallel CPU node completes mid-download', () => {
       const h2Defaults = {protocol: 'h2', connectionId: 1};
+      const rootNode = new CPUNode(cpuTask({duration: 1}));
       const nodeA = new NetworkNode(request({startTime: 0, endTime: 1, transferSize: 7300, ...h2Defaults}));
       const nodeB = new NetworkNode(request({startTime: 1, endTime: 2, transferSize: 36500, ...h2Defaults}));
-      nodeA.addDependent(nodeB);
+      rootNode.addDependent(nodeA);
+      rootNode.addDependent(nodeB);
 
       const simulator = new Simulator({
         rtt: 150,
@@ -460,23 +467,38 @@ describe('DependencyGraph/Simulator', () => {
         observedThroughput: 1,
       });
 
-      const resultWithoutCpu = simulator.simulate(nodeA);
+      const resultWithoutCpu = simulator.simulate(rootNode);
       assert.strictEqual(resultWithoutCpu.nodeTimings.get(nodeB)?.duration, 150);
 
       const cpuNode = new CPUNode(cpuTask({duration: 50}));
       nodeA.addDependent(cpuNode);
 
-      const resultWithCpu = simulator.simulate(nodeA);
+      const resultWithCpu = simulator.simulate(rootNode);
       assert.strictEqual(resultWithCpu.nodeTimings.get(nodeB)?.duration, 150);
 
       // Also verify when the parallel CPU node completes mid-download of the first (unwarmed) H2 request.
-      const rootNode = new CPUNode(cpuTask({duration: 1}));
-      rootNode.addDependent(nodeA);
       const cpuNodeDuringColdRequest = new CPUNode(cpuTask({duration: 50}));
       rootNode.addDependent(cpuNodeDuringColdRequest);
 
       const resultWithCpuDuringColdRequest = simulator.simulate(rootNode);
       assert.strictEqual(resultWithCpuDuringColdRequest.nodeTimings.get(nodeB)?.duration, 150);
+    });
+
+    it('should not carry over H2 overflow bytes to sequential dependent requests', () => {
+      const h2Defaults = {protocol: 'h2', connectionId: 1};
+      const nodeA = new NetworkNode(request({startTime: 0, endTime: 1, transferSize: 7300, ...h2Defaults}));
+      const nodeB = new NetworkNode(request({startTime: 1, endTime: 2, transferSize: 7300, ...h2Defaults}));
+      nodeA.addDependent(nodeB);
+
+      const simulator = new Simulator({
+        rtt: 150,
+        throughput: 1e9,
+        serverResponseTimeByOrigin,
+        observedThroughput: 1,
+      });
+
+      const result = simulator.simulate(nodeA);
+      assert.strictEqual(result.nodeTimings.get(nodeB)?.duration, 150);
     });
   });
 

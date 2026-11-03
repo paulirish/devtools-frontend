@@ -18,7 +18,7 @@ Adhere strictly to the Model-View-Presenter (MVP) architecture.
 * Location: Co-located in the same file as its View.
 * MUST extend a base `UI.Widget` class (e.g., `UI.Widget.Widget`). Note that `UI.Widget.Widget` is not an `HTMLElement` and must be appended via `.show()` or `UI.Widget.widget`
 * Constructor MUST assign the injected view function to a private `#view` field.
-* Constructor MUST call `super()`. If taking `element?: HTMLElement`, pass it to `super(element)`. `super(true)` is forbidden.
+* Constructor MUST call `super()`. If taking `element?: HTMLElement`, pass it to `super(element)`. `super(true)` is forbidden. Do not pass `classes` or `jslog` in `WidgetOptions` (`super(..., {classes: [...], jslog: ...})`); instead, pass container CSS classes and `jslog` via the third parameter of `render(template, target, {container: {classes: [...], attributes: {jslog: ...}}})` in the view function (and if the widget uses shadow DOM, pass `useShadowDom: 'pure'` and extend `Widget<ShadowRoot>` / `VBox<ShadowRoot>` with `target: HTMLElement|DocumentFragment` so `render()` applies `container.classes` and `container.attributes` to the shadow host `this.element`).
 * Dependencies from `Universe` SHOULD be requested via static `INJECT`: `static override readonly INJECT = [...] as const;` and received as constructor parameter #2 (`[dep1, dep2]: UI.Widget.WidgetDependencies<typeof MyWidget>`).
 * Styling MUST be handled within the View. `this.registerCSSFiles()` is forbidden.
 * Initial render MUST be triggered in `override wasShown(): void` by calling `this.requestUpdate()`.
@@ -34,6 +34,7 @@ Adhere strictly to the Model-View-Presenter (MVP) architecture.
   * `target`: The HTML element to render into.
 * The `input` parameter MUST NOT be destructured. Always use `input.propertyName`.
 * Responsibility: Render a `lit-html` template into `target`.
+  * **Template Formatting & Whitespace:** The custom `html` tag from `ui/lit/lit.js` (`front_end/ui/lit/strip-whitespace.ts`) automatically strips `\n\s*` outside of `<...>` tags at runtime, so multi-line formatting between text interpolations and inline elements (`<span>`, etc.) does not introduce whitespace text nodes.
 * MUST NOT hold state, fetch data, or perform business logic.
 
 #### Helper Functions in Views
@@ -59,10 +60,18 @@ const DEFAULT_VIEW = (input: ViewInput, output: ViewOutput, target: HTMLElement)
 ### Composition
 
 * To render a child widget, the parent's View MUST use the lit-html directive `UI.Widget.widget`.
+* **Prefer `${widget(WidgetClass, {params})}` directly as a child expression** over `<devtools-widget ${widget(WidgetClass, {params})}></devtools-widget>`. Only use an explicit `<devtools-widget>` tag when you need to set other HTML attributes/classes, apply additional directives (such as `widgetRef` or `ref`), or provide child nodes.
+* **Strongly prefer the two-argument `widget(WidgetClass, {params})` form** over the single-argument factory callback `widget(element => new WidgetClass(element, ...))`. The two-argument form automatically updates properties and calls `requestUpdate()` on subsequent renders, whereas a factory callback only runs once on initial instantiation.
+* If a child widget currently exposes imperative setter methods (e.g., `setStorageKey(key)` or `setStorageBucket(bucket)`) instead of public properties/setters, convert them into standard TypeScript setters (`set storageKey(key)`, `set storageBucket(bucket)`) on the child widget so it can be instantiated and updated declaratively via the two-argument `widget(WidgetClass, {params})` directive.
 * Configuration is passed via the parameters.
-* Properties passed from a parent MUST be declared as public fields on the child presenter class.
+* Properties passed from a parent MUST be declared as public fields or setters on the child presenter class.
 * The framework automatically updates these properties and calls `requestUpdate()` on the child when the parent re-renders.
-* **Pre-existing Widget Instances (`WrapperWidget`):** To render an existing `UI.Widget` instance (such as locations created by `UI.ViewManager`: `TabbedViewLocation.tabbedPane()`, `StackLocation.widget()`) declaratively without creating a custom wrapper class, use `${widget(UI.Widget.WrapperWidget, {widget: myWidgetInstance})}`. `WrapperWidget` automatically forwards constraints, handles attach/detach lifecycle, and supports dynamic widget replacement.
+* **Avoid `UI.Widget.WrapperWidget`:** Do **NOT** pass `UI.Widget` instances (such as `new ChildWidget()`, `UI.TabbedPane.TabbedPane` / `tabbedLocation.tabbedPane()`, `StackLocation.widget()`, `UI.ListWidget.ListWidget`, or `UI.SplitWidget.SplitWidget`) via `ViewInput` to wrap in `UI.Widget.WrapperWidget`.
+  * **Child widgets:** Refactor the child widget to accept `element?: HTMLElement` in its constructor and setters for its state, and instantiate it declaratively in the view with `${widget(ChildWidget, {...})}`.
+  * **`TabbedPane` and `StackLocation`:** Create tabbed panes and stack panes declaratively in the view using `<devtools-tabbed-pane>` (or `${widget(UI.TabbedPane.TabbedPane, ...)}`) and `<devtools-stack-pane>` rather than passing a `TabbedPane` or `StackLocation.widget()` instance through `ViewInput` to `WrapperWidget`.
+  * **`UI.ListWidget.ListWidget` and `UI.ListWidget.Delegate`:** Do NOT keep `this.list` and `UI.ListWidget.Delegate` on the presenter (calling `this.list.clear()`, `this.list.appendItem()`, `this.list.addNewItem()`, rendering `renderItem`/`beginEdit` into a `DocumentFragment`, and mounting `this.list` via `WrapperWidget`). Replace `ListWidget` + `ListWidget.Delegate` with `<devtools-list>` (`ui/components/lists/lists.js`) driven by pure `ViewInput` data and callbacks (using `<devtools-prompt>`, an inline editor row, or `UI.Dialog.Dialog` for editing). If legacy `ListWidget.Editor` DOM/screenshot goldens must be preserved temporarily in an incremental CL, move `ListWidget` + `ListWidget.Delegate` ownership into the view layer (e.g. a small view-layer child class extending `UI.ListWidget.ListWidget` directly and instantiated via `${widget(...)}` in `DEFAULT_VIEW`, without `WrapperWidget`) so the presenter only passes pure data and callbacks in `ViewInput`.
+  * `WrapperWidget` is only justified when reparenting a shared stateful singleton across multiple containers (such as `ConsoleView.instance()` or `SourcesView`) or bridging an opaque `UI.Widget` returned by an external factory. Remember that `WrapperWidget` sets `display: contents` on its `<devtools-widget>` host element, so never put sizing, border, or background classes on that `<devtools-widget>` host (wrap it in a `<div>` instead).
+* **Listening to Child Widget Events (`eventMixin`):** When a child `UI.Widget` uses `Common.ObjectWrapper.eventMixin(UI.Widget.Widget)`, calling `this.dispatchEventToListeners(Events.FOO, payload)` also dispatches a non-bubbling `new CustomEvent(Events.FOO, {detail: payload})` on the widget's host `<devtools-widget>` element. Parent Lit templates can listen declaratively with `<devtools-widget ${widget(ChildWidget, {...})} @Foo=${(e: CustomEvent<Payload>) => input.onFoo(e.detail)}></devtools-widget>` (Lit preserves the case of `@Foo` from the template string). This only works on the `<devtools-widget>` element itself (the `CustomEvent` does not bubble) and only for `UI.Widget` classes using `eventMixin` (plain `ObjectWrapper` subclasses do not have `dispatchDOMEvent`).
 
 ## Refactoring Legacy Components
 
@@ -108,7 +117,7 @@ render(html`
 
 ### Legacy Interop & Refs
 *   **Raw Elements:** Use `Directives.ref` (from `ui/lit/lit.js`) to obtain a reference to a raw `HTMLElement` if needed for imperative APIs (e.g., `splitWidget.installResizer(element)`).
-*   **Child Widgets:** Use `UI.Widget.widgetRef` to obtain the class instance of a child widget if you need to call methods on it directly (though declarative data flow is preferred).
+*   **Child Widgets:** Use `UI.Widget.widgetRef` to obtain the class instance of a child widget inside the view function if you need to call imperative methods on it. **Do NOT store child widget instances on `ViewOutput` as a final result** (doing so is only acceptable temporarily in intermediate migration CLs). Instead, either supply all needed configuration declaratively through setters/inputs on the child widget, or if imperative calls are strictly necessary, expose narrow action functions on `ViewOutput` (e.g., `output.doLayout = () => splitWidget.doLayout()`, `output.revealPosition = pos => childWidget.revealPosition(pos)`). Do not keep `get*ForTest()` methods that return child widget instances via `ViewOutput`; tests should query rendered `<devtools-widget>` elements via `.getWidget()` or assert on `ViewInput` via `createViewFunctionStub`.
 
 ### Dependencies
 

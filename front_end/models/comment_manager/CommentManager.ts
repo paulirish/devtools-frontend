@@ -48,11 +48,6 @@ export class CommentManager extends Common.ObjectWrapper.ObjectWrapper<EventType
   #commentMode = false;
   #agentAttached = false;
 
-  constructor() {
-    super();
-    CommentThread.resetIndex();
-  }
-
   #onThreadChanged(): void {
     this.dispatchEventToListeners(Events.COMMENT_THREADS_CHANGED, this.getCommentThreads());
   }
@@ -93,12 +88,12 @@ export class CommentManager extends Common.ObjectWrapper.ObjectWrapper<EventType
       author: 'DEVELOPER'|'AGENT' = 'DEVELOPER',
       isGeneratedComment?: boolean,
       ): CommentThread {
-    const comments: Comment[] = text ? [{
+    const comments: Comment[] = text !== undefined ? [{
       author,
       text,
       timestamp: Date.now(),
     }] :
-                                       [];
+                                                     [];
     const thread = new CommentThread({
       anchor,
       comments,
@@ -123,7 +118,7 @@ export class CommentManager extends Common.ObjectWrapper.ObjectWrapper<EventType
     const threads: CommentThread[] = [];
     for (const thread of this.#commentThreads.values()) {
       if (thread.status === 'SENT_TO_AGENT' && !thread.transmitted) {
-        thread.transmitted = true;
+        thread.markTransmitted();
         threads.push(thread);
       }
     }
@@ -174,7 +169,6 @@ export class CommentManager extends Common.ObjectWrapper.ObjectWrapper<EventType
       thread.removeEventListener(CommentThreadEvents.CHANGED, this.#onThreadChanged, this);
     }
     this.#commentThreads.clear();
-    CommentThread.resetIndex();
     this.dispatchEventToListeners(Events.COMMENT_THREADS_CHANGED, []);
   }
 }

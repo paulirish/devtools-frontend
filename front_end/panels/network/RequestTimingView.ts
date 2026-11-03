@@ -305,7 +305,7 @@ interface ViewInput {
   wasThrottled?: SDK.NetworkManager.AppliedNetworkConditions;
 }
 
-type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 export const DEFAULT_VIEW: View = (input, output, target) => {
   const serverTimings = input.request.serverTimings ?? [];
   const requestStartTime = input.request.startTime;
@@ -649,7 +649,7 @@ export class RequestTimingView extends UI.Widget.VBox {
       wasThrottled: conditions?.urlPattern ? conditions : undefined,
       timeRanges,
     };
-    this.#view(input, {}, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 
   set request(request: SDK.NetworkRequest.NetworkRequest) {
@@ -664,7 +664,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   set calculator(calculator: NetworkTimeCalculator.NetworkTimeCalculator) {
     this.#calculator = calculator;
     if (this.isShowing()) {
-      this.#calculator.addEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.boundaryChanged, this);
+      this.#calculator.addEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.#boundaryChanged, this);
       this.requestUpdate();
     }
   }
@@ -673,7 +673,7 @@ export class RequestTimingView extends UI.Widget.VBox {
     super.wasShown();
     this.#request?.addEventListener(SDK.NetworkRequest.Events.TIMING_CHANGED, this.requestUpdate, this);
     this.#request?.addEventListener(SDK.NetworkRequest.Events.FINISHED_LOADING, this.requestUpdate, this);
-    this.#calculator?.addEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.boundaryChanged, this);
+    this.#calculator?.addEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.#boundaryChanged, this);
     this.requestUpdate();
   }
 
@@ -681,10 +681,10 @@ export class RequestTimingView extends UI.Widget.VBox {
     super.willHide();
     this.#request?.removeEventListener(SDK.NetworkRequest.Events.TIMING_CHANGED, this.requestUpdate, this);
     this.#request?.removeEventListener(SDK.NetworkRequest.Events.FINISHED_LOADING, this.requestUpdate, this);
-    this.#calculator?.removeEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.boundaryChanged, this);
+    this.#calculator?.removeEventListener(NetworkTimeCalculator.Events.BOUNDARIES_CHANGED, this.#boundaryChanged, this);
   }
 
-  private boundaryChanged(): void {
+  #boundaryChanged(): void {
     const minimumBoundary = this.calculator.minimumBoundary();
     if (minimumBoundary !== this.#lastMinimumBoundary) {
       this.#lastMinimumBoundary = minimumBoundary;

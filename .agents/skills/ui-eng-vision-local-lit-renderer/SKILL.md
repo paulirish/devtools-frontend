@@ -124,16 +124,68 @@ existing element containers.
     *   The Gerrit Code Review UI cannot identify moved blocks of unchanged code.
     *   If blocks of code need to be reordered, create a "prefactoring" change that first extracts the code that needs to be reordered into a named helper functions and pause the migration, waiting user confirmation.
 
-12. **Embedding Pre-Existing `UI.Widget` Instances via `UI.Widget.WrapperWidget`**:
+12. **Composing Child `UI.Widget`s & Pre-Existing Instances**:
 
-    *   Use `${widget(UI.Widget.WrapperWidget, {widget: input.childWidget})}` when
-        embedding widgets owned by `UI.ViewManager`
-        (`TabbedViewLocation.tabbedPane()`, `StackLocation.widget()`) or when
-        conditionally moving a shared widget instance between containers
-        (`{widget: shouldShow ? this.#sharedWidget : null}`).
-    *   `WrapperWidget` automatically handles showing and detaching the inner
-        widget and forwards calculateConstraints without requiring custom wrapper
-        classes.
+    *   **Prefer `${widget(ChildWidgetClass, {params})}` Over `<devtools-widget>`**:
+        Prefer `${widget(ChildWidgetClass, {params})}` directly as a child
+        expression instead of `<devtools-widget ${widget(ChildWidgetClass, {params})}></devtools-widget>`.
+        Only use an explicit `<devtools-widget>` tag when you need to set other
+        HTML attributes/classes, apply additional directives (such as `widgetRef`
+        or `ref`), or provide child nodes.
+    *   **Strongly Prefer Two-Argument `widget(ChildWidgetClass, {params})`**:
+        When instantiating child widgets in a Lit template, strongly prefer the
+        two-argument form `widget(ChildWidgetClass, {propA: input.a, propB: input.b})`
+        over the single-argument factory `widget(element => new ChildWidgetClass(element))`.
+        The two-argument form automatically propagates updated parameters and
+        schedules `requestUpdate()` on re-renders, whereas a factory callback only
+        runs once on initial creation. If the child widget currently uses
+        `setFoo()` methods instead of setters, convert them into `set foo()`
+        setters on the child widget so you can use the two-argument `widget()`
+        directive.
+    *   **No Widget References on `ViewOutput`**: Do not store child widget
+        references on `ViewOutput` (e.g., `output.childWidget = w`) as a final
+        result (only acceptable temporarily in intermediate CLs). Supply all
+        configuration through setters on the child widget, or if imperative
+        actions are strictly required, expose individual functions on `ViewOutput`
+        (e.g., `output.doLayout = () => w.doLayout()`).
+    *   **Avoid `UI.Widget.WrapperWidget`**: Do **NOT** instantiate child widgets
+        or layout containers (`new ChildWidget()`, `UI.TabbedPane.TabbedPane` /
+        `tabbedLocation.tabbedPane()`, `StackLocation.widget()`,
+        `UI.ListWidget.ListWidget`, `UI.SplitWidget.SplitWidget`) in the
+        constructor/presenter and pass them via `ViewInput` to
+        `UI.Widget.WrapperWidget`.
+        *   **Child widgets**: Refactor the child widget to accept
+            `element?: HTMLElement` in its constructor and setters for its state,
+            and instantiate it declaratively with `${widget(ChildWidget, {...})}`.
+        *   **`TabbedPane` and `StackLocation`**: Create tabbed panes and stack
+            panes declaratively in the view using `<devtools-tabbed-pane>` (or
+            `${widget(UI.TabbedPane.TabbedPane, ...)}`) and
+            `<devtools-stack-pane>` instead of wrapping a `TabbedPane` or
+            `StackLocation.widget()` in `WrapperWidget`.
+    *   **Migrating `UI.ListWidget.ListWidget` + `UI.ListWidget.Delegate`**: Do
+        NOT keep `this.list = new UI.ListWidget.ListWidget(this)` and `implements
+        UI.ListWidget.Delegate` on the presenter, convert `renderItem` /
+        `beginEdit` to render into a `DocumentFragment`, and pass `list` via
+        `ViewInput` to `WrapperWidget`. Instead:
+        1. **Recommended**: Replace `ListWidget` + `ListWidget.Delegate` with
+           `<devtools-list>` (`ui/components/lists/lists.js`), passing pure data
+           (`items`, `editingIndex`, `validationError`) and callbacks in
+           `ViewInput`, and handling editing via `<devtools-prompt>`, an inline
+           editor row, or `UI.Dialog.Dialog`.
+        2. **Incremental fallback (if preserving `ListWidget.Editor` screenshot
+           goldens temporarily)**: Move `ListWidget` + `ListWidget.Delegate`
+           ownership out of the presenter into a view-layer child class
+           extending `UI.ListWidget.ListWidget` directly and instantiated via
+           `${widget(...)}` in `DEFAULT_VIEW` (with an imperative trigger on
+           `ViewOutput` if needed, and without `WrapperWidget`), keeping
+           `ViewInput` pure data and callbacks.
+    *   `WrapperWidget` is only justified when reparenting a shared stateful
+        singleton across multiple containers (such as `ConsoleView.instance()`
+        or `SourcesView`) or bridging an opaque `UI.Widget` returned by an
+        external factory. Note that `WrapperWidget` sets `display: contents` on
+        its `<devtools-widget>` host, so never put sizing, border, or background
+        classes on the `<devtools-widget>` hosting `WrapperWidget` (wrap it in a
+        `<div>` instead).
 
 13. **Declarative `<devtools-split-view>` Guidelines**:
 
@@ -186,5 +238,4 @@ existing element containers.
 5.  ❓ **Split Views**: Does `<devtools-split-view>` have `flex: auto; height: 100%;` CSS and reuse existing split settings?
 6.  ❓ **String Audit**: Did I verify that any removed `UIStrings` weren't from accidentally dropped UI branches?
 7.  ❓ **Build**: Does the code compile and do visual tests pass with 0% diff?
-
 
