@@ -8,6 +8,7 @@ import sinon from 'sinon';
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import * as Tooltips from '../../../ui/components/tooltips/tooltips.js';
 
 import * as ElementsComponents from './components.js';
 
@@ -102,7 +103,7 @@ describe('CSSQuery', () => {
     };
     matchedStyles.computeCSSVariable.callsFake((_style, name) => name === '--foo' ? variableValue : null);
 
-    component.parseStyleQueries(matchedStyles, style, node, '');
+    component.parseStyleQueries(matchedStyles, style, node, new Tooltips.Tooltip.IdFactory());
 
     const swatch = component.contentElement.querySelector('devtools-link-swatch');
     assert.exists(swatch);
@@ -110,5 +111,33 @@ describe('CSSQuery', () => {
 
     swatch.linkElement?.click();
     sinon.assert.calledOnce(clickListener);
+  });
+
+  it('shows a closing brace when collapsed with a collapse icon', () => {
+    const container = document.createElement('div');
+    container.classList.add('collapsed');
+
+    const component = new ElementsComponents.CSSQuery.CSSQuery();
+    renderElementIntoDOM(component);
+    component.element.classList.add('has-collapse-icon');
+    component.data = {
+      queryPrefix: '@media',
+      queryText: '(min-width: 10px)',
+      jslogContext: 'foo',
+    };
+    component.show(container);
+    renderElementIntoDOM(container);
+
+    const openBrace = component.contentElement.querySelector<HTMLElement>('.sidebar-pane-open-brace');
+    assert.isNotNull(openBrace, 'open brace element should exist');
+
+    assert.strictEqual(getComputedStyle(openBrace, '::after').content, '"}"');
+
+    container.classList.remove('collapsed');
+    assert.strictEqual(getComputedStyle(openBrace, '::after').content, 'none');
+
+    container.classList.add('collapsed');
+    component.element.classList.remove('has-collapse-icon');
+    assert.strictEqual(getComputedStyle(openBrace, '::after').content, 'none');
   });
 });

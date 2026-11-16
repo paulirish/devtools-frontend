@@ -11,9 +11,19 @@ import * as MarkdownView from '../../ui/components/markdown_view/markdown_view.j
 
 let registeredLinks = false;
 
+export interface ReleaseNoteAnnouncement {
+  title: string;
+  description: string;
+  link?: {
+    url: Platform.DevToolsPath.UrlString,
+    text: string,
+  };
+}
+
 export interface ReleaseNote {
   version: number;
   header: string;
+  announcement?: ReleaseNoteAnnouncement;
   markdownLinks: Array<{key: string, link: string}>;
   videoLinks: Array<{description: string, link: Platform.DevToolsPath.UrlString, type?: VideoType}>;
   link: string;
@@ -40,22 +50,30 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 156,
-  header: 'New in DevTools (November 2026)',
+  version: 159,
+  header: 'New in DevTools (December 2026)',
+  announcement: {
+    title: 'Modern Web Guidance is now stable!',
+    description: 'Upgrade your coding agents with expert-vetted web development best practices.',
+    link: {
+      url: 'https://goo.gle/mwg-stable' as Platform.DevToolsPath.UrlString,
+      text: 'Read the announcement',
+    },
+  },
   markdownLinks: [
     {
       key: 'mcp',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-november-2026/#mcp',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-december-2026/#mcp',
     },
     {
       key: 'sources',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-november-2026/#sources',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-december-2026/#sources',
     },
     {
-      key: 'web-install-manifest-diagnosti',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-november-2026/#web-install-manifest-diagnosti',
+      key: 'performance',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-december-2026/#performance',
     },
   ],
   videoLinks: [],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-november-2026/',
+  link: 'https://developer.chrome.com/blog/new-in-devtools-december-2026/',
 };

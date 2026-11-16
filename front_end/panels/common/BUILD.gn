@@ -14,9 +14,9 @@ generate_css("css_files") {
     "badgeNotification.css",
     "commentThreadWidget.css",
     "commentsOverlay.css",
+    "commentsStatusBarPill.css",
     "domLinkifier.css",
     "gdpSignUpDialog.css",
-    "geminiRebrandPromoDialog.css",
   ]
 }
 
@@ -33,7 +33,6 @@ devtools_ui_module("common") {
     "ExtensionServer.ts",
     "ExtensionView.ts",
     "GdpSignUpDialog.ts",
-    "GeminiRebrandPromoDialog.ts",
     "PersistenceUtils.ts",
   ]
   ts_deps = [

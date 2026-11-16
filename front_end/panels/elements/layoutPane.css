@@ -79,7 +79,7 @@
     margin-top: var(--sys-size-6);
     color: var(--sys-color-token-tag);
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--sys-size-29), 100%), 1fr));
     gap: var(--sys-size-5);
   }
 
@@ -96,7 +96,7 @@
 
   select {
     min-width: 0;
-    max-width: 150px;
+    max-width: var(--sys-size-23);
   }
 
   .color-picker {
@@ -108,8 +108,8 @@
     cursor: default;
     display: inline-block;
     flex: none;
-    height: 10px;
-    width: 10px;
+    height: var(--sys-size-6);
+    width: var(--sys-size-6);
     position: relative;
 
     &:focus-within {
@@ -135,7 +135,6 @@
   .node-text-container {
     line-height: var(--sys-typescale-body4-line-height);
     padding: 0 0.5ex;
-    border-radius: 5px;
   }
 
 }

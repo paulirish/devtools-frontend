@@ -16,7 +16,7 @@ import * as CommonPanels from '../common/common.js';
 
 import commentsPaneStyles from './commentsPane.css.js';
 
-const {html, render, i18nTemplate, Directives: {ref, repeat}} = Lit;
+const {html, render, i18nTemplate, Directives: {classMap, ref, repeat}} = Lit;
 const {widget} = UI.Widget;
 const {computeCommentTitle, inputDisclaimer} = CommonPanels.CommentThreadWidget;
 type Title = CommonPanels.CommentThreadWidget.Title;
@@ -55,7 +55,7 @@ const UIStrings = {
   /**
    * @description Button text for sending comments to the agent.
    */
-  sendToAgent: 'Send to Agent',
+  sendToAgent: 'Send to agent',
   /**
    * @description Status text shown next to a spinner when a comment thread is being processed by the agent.
    */
@@ -164,6 +164,7 @@ function renderThreadStatus(
     case 'RESOLVED':
       return html`
         <devtools-button
+          class="see-response-button"
           .data=${{
             variant: Buttons.Button.Variant.TEXT,
             jslogContext: 'comments-see-response',
@@ -247,7 +248,13 @@ export const DEFAULT_VIEW: View = (input: ViewInput, output: ViewOutput, target:
               }
             }}
             jslog=${VisualLogging.item('comment-thread').track({click: true})}>
-            <div class="comment-pin-badge" aria-hidden="true"></div>
+            <div
+              class=${classMap({
+                'comment-pin-badge': true,
+                resolved: item.thread.status === 'RESOLVED',
+              })}
+              aria-hidden="true">
+            </div>
             <span class="anchor-chip ${item.thread.isOrphaned ? 'orphaned' : ''}">
               ${'node' in item.title ?
                 widget(CommonPanels.DOMLinkifier.DOMNodeLink, {
@@ -337,14 +344,16 @@ export const DEFAULT_VIEW: View = (input: ViewInput, output: ViewOutput, target:
             ${i18nString(UIStrings.sent)}
           </button>
         </div>
-        <button
-          class="toolbar-button"
-          title=${i18nString(UIStrings.clearComments)}
-          aria-label=${i18nString(UIStrings.clearComments)}
+        <devtools-button
+          .data=${{
+            variant: Buttons.Button.Variant.TOOLBAR,
+            iconName: 'clear',
+            title: i18nString(UIStrings.clearComments),
+            accessibleLabel: i18nString(UIStrings.clearComments),
+            jslogContext: 'clear-comments',
+          } as Buttons.Button.ButtonData}
           @click=${input.onClearAll}
-          jslog=${VisualLogging.action('clear-comments').track({ click: true })}>
-          <devtools-icon name="clear"></devtools-icon>
-        </button>
+        ></devtools-button>
       </div>
 
       ${hasThreads ? html`
@@ -388,7 +397,7 @@ export class CommentsPane extends UI.Widget.Widget {
   readonly #view: View;
   readonly #commentManager: CommentManager.CommentManager.CommentManager;
 
-  readonly #cachedTitles = new Map<string, Title>();
+  readonly #cachedTitles = new WeakMap<CommentManager.CommentManager.CommentThread, Title>();
   readonly #viewOutput: ViewOutput = {};
   #activeTab: Tab = 'queued';
   // Set while a tab click smoothly scrolls the list. Scroll events then don't
@@ -475,7 +484,6 @@ export class CommentsPane extends UI.Widget.Widget {
   };
 
   #handleClearAll = (): void => {
-    this.#cachedTitles.clear();
     this.#commentManager.clear();
     this.requestUpdate();
   };
@@ -493,7 +501,6 @@ export class CommentsPane extends UI.Widget.Widget {
   };
 
   #handleDeleteThread = (threadId: string): void => {
-    this.#cachedTitles.delete(threadId);
     this.#commentManager.removeCommentThread(threadId);
     this.requestUpdate();
   };
@@ -511,10 +518,10 @@ export class CommentsPane extends UI.Widget.Widget {
   };
 
   async #toViewData(thread: CommentManager.CommentManager.CommentThread): Promise<ThreadViewData> {
-    let title = this.#cachedTitles.get(thread.id);
+    let title = this.#cachedTitles.get(thread);
     if (!title) {
       title = await computeCommentTitle(thread.anchor);
-      this.#cachedTitles.set(thread.id, title);
+      this.#cachedTitles.set(thread, title);
     }
     return {
       thread,

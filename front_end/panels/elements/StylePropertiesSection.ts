@@ -63,6 +63,7 @@ import {
   type Context,
   GhostStylePropertyTreeElement,
   handleVarDefinitionActivate,
+  type StylePropertyData,
   StylePropertyTreeElement,
 } from './StylePropertyTreeElement.js';
 import type {StylesContainer} from './StylesContainer.js';
@@ -191,9 +192,7 @@ export class StylePropertiesSection {
 
   #customHeaderText: string|undefined;
   readonly #specificityTooltips: HTMLSpanElement;
-  static #nextSpecificityTooltipId = 0;
-  static #nextSectionTooltipIdPrefix = 0;
-  readonly sectionTooltipIdPrefix: number = StylePropertiesSection.#nextSectionTooltipIdPrefix++;
+  readonly sectionTooltipIdFactory: Tooltips.Tooltip.IdFactory = new Tooltips.Tooltip.IdFactory();
 
   private ghostStyleTreeElements: GhostStylePropertyTreeElement[] = [];
   #activeAiSuggestion?: ActiveAiSuggestion;
@@ -1113,7 +1112,7 @@ export class StylePropertiesSection {
       jslogContext: 'container-query',
     };
     if (style) {
-      const tooltipPrefix = `container-${this.sectionTooltipIdPrefix}-${this.nestingLevel}`;
+      const tooltipPrefix = this.sectionTooltipIdFactory.subfactory('container', this.nestingLevel);
       void containerQuery.getContainerForNode(this.matchedStyles.node().id).then(container => {
         if (container) {
           containerQueryElement.parseStyleQueries(this.matchedStyles, style, container.containerNode, tooltipPrefix);
@@ -1268,6 +1267,7 @@ export class StylePropertiesSection {
       if (lastAncestor && this.#collapseIcon && this.#statusElement) {
         this.#collapseIcon.slot = 'indent';
         lastAncestor.append(this.#collapseIcon, this.#statusElement);
+        lastAncestor.classList.add('has-collapse-icon');
       }
       this.#ancestorClosingBracesElement.firstElementChild?.classList.add('sidebar-pane-closing-brace');
     }
@@ -1314,17 +1314,24 @@ export class StylePropertiesSection {
     return (curSection?.editable) ? curSection : null;
   }
 
-  refreshUpdate(editedTreeElement: StylePropertyTreeElement): void {
-    this.stylesContainer.refreshUpdate(this, editedTreeElement);
+  findProperty(propertyOrName: SDK.CSSProperty.CSSProperty|string): StylePropertyData|undefined {
+    return this.propertiesTreeOutline.rootElement().children().findLast(
+        (child): child is StylePropertyTreeElement => child instanceof StylePropertyTreeElement &&
+            (typeof propertyOrName === 'string' ? child.property.name === propertyOrName :
+                                                  child.property === propertyOrName));
   }
 
-  updateVarFunctions(editedTreeElement: StylePropertyTreeElement): void {
-    if (!editedTreeElement.property.name.startsWith('--')) {
+  refreshUpdate(editedProperty: StylePropertyData): void {
+    this.stylesContainer.refreshUpdate(this, editedProperty);
+  }
+
+  updateVarFunctions(editedProperty: StylePropertyData): void {
+    if (!editedProperty.property.name.startsWith('--')) {
       return;
     }
     let child = this.propertiesTreeOutline.firstChild();
     while (child) {
-      if (child !== editedTreeElement && child instanceof StylePropertyTreeElement) {
+      if (child instanceof StylePropertyTreeElement && child !== editedProperty) {
         child.refreshIfComputedValueChanged();
       }
       child = child.traverseNextTreeElement(false /* skipUnrevealed */, null /* stayWithin */, true /* dontPopulate */);
@@ -1547,10 +1554,6 @@ export class StylePropertiesSection {
     this.markSelectorHighlights();
   }
 
-  static getNextSpecificityTooltipId(): string {
-    return `specificity-tooltip-${this.#nextSpecificityTooltipId++}`;
-  }
-
   renderSelectors(
       selectors: Array<{text: string, specificity?: Protocol.CSS.Specificity}>, matchingSelectors: boolean[],
       elementToSelectorIndex: WeakMap<Element, number>): void {
@@ -1567,7 +1570,8 @@ export class StylePropertiesSection {
       if (i > 0) {
         targetElement.append(', ');
       }
-      const specificityTooltipId = selector.specificity ? StylePropertiesSection.getNextSpecificityTooltipId() : null;
+      const specificityTooltipId =
+          selector.specificity ? this.sectionTooltipIdFactory.keyed('specificity-tooltip') : null;
       const span = targetElement.createChild('span', 'simple-selector');
       span.classList.toggle('selector-matches', matchingSelectors[i]);
       elementToSelectorIndex.set(span, i);

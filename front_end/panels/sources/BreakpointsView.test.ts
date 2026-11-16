@@ -17,12 +17,13 @@ import * as Workspace from '../../models/workspace/workspace.js';
 import {findMenuItemWithLabel, getContextMenuForElement} from '../../testing/ContextMenuHelpers.js';
 import {
   assertElements,
+  assertScreenshot,
   dispatchClickEvent,
   dispatchKeyDownEvent,
   renderElementIntoDOM,
+  setColorScheme,
 } from '../../testing/DOMHelpers.js';
 import {
-  deinitializeGlobalVars,
   describeWithEnvironment,
 } from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
@@ -160,12 +161,13 @@ class MockRevealer<T> implements Common.Revealer.Revealer<T> {
   }
 }
 
-async function createAndInitializeBreakpointsView(): Promise<Sources.BreakpointsView.BreakpointsView> {
+async function createAndInitializeBreakpointsView(options?: Parameters<typeof renderElementIntoDOM>[1]):
+    Promise<Sources.BreakpointsView.BreakpointsView> {
   // Force creation of a new BreakpointsView singleton so that it gets correctly re-wired with
   // the current controller singleton (to pick up the latest breakpoint state).
   const component = Sources.BreakpointsView.BreakpointsView.instance({forceNew: true});
   await RenderCoordinator.done();  // Wait until the initial rendering finishes.
-  renderElementIntoDOM(component);
+  renderElementIntoDOM(component, options);
   await component.updateComplete;
   return component;
 }
@@ -730,9 +732,18 @@ describe('BreakpointsSidebarController', () => {
     });
   });
 
-  afterEach(async () => {
-    await deinitializeGlobalVars();
-  });
+  function setupBreakpointResponder(url: string = 'test.js', lineNumber: number = 0) {
+    void backend.responderToBreakpointByUrlRequest(url, lineNumber)({
+      result: {
+        breakpointId: 'DUMMY_BREAKPOINT' as Protocol.Debugger.BreakpointId,
+        locations: [{
+          scriptId: '0' as Protocol.Runtime.ScriptId,
+          lineNumber,
+          columnNumber: 0,
+        }],
+      },
+    });
+  }
 
   const DEFAULT_BREAKPOINT:
       [Breakpoints.BreakpointManager.UserCondition, boolean, boolean, Breakpoints.BreakpointManager.BreakpointOrigin] =
@@ -752,6 +763,7 @@ describe('BreakpointsSidebarController', () => {
         Sources.BreakpointsView.BreakpointsSidebarController.instance({forceNew: true, breakpointManager, settings});
 
     // Add one breakpoint and collapse the tree.
+    setupBreakpointResponder();
     const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     assert.exists(b1);
     {
@@ -763,6 +775,7 @@ describe('BreakpointsSidebarController', () => {
     }
 
     // Add a new breakpoint and check if it's expanded as expected.
+    setupBreakpointResponder();
     const b2 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 3, ...DEFAULT_BREAKPOINT);
     assert.exists(b2);
     {
@@ -787,6 +800,7 @@ describe('BreakpointsSidebarController', () => {
         Sources.BreakpointsView.BreakpointsSidebarController.instance({forceNew: true, breakpointManager, settings});
 
     // Add one breakpoint and collapse the tree.
+    setupBreakpointResponder();
     const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     assert.exists(b1);
     {
@@ -798,6 +812,7 @@ describe('BreakpointsSidebarController', () => {
     }
 
     // Add a new non-user triggered breakpoint and check if it's still collapsed.
+    setupBreakpointResponder();
     const b2 = await breakpointManager.setBreakpoint(
         uiSourceCode, 0, 3, Breakpoints.BreakpointManager.EMPTY_BREAKPOINT_CONDITION, true, false,
         Breakpoints.BreakpointManager.BreakpointOrigin.OTHER);
@@ -823,6 +838,7 @@ describe('BreakpointsSidebarController', () => {
     const controller =
         Sources.BreakpointsView.BreakpointsSidebarController.instance({forceNew: true, breakpointManager, settings});
 
+    setupBreakpointResponder();
     const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     assert.exists(b1);
     controller.expandedStateChanged(url, false /* expanded */);
@@ -851,12 +867,14 @@ describe('BreakpointsSidebarController', () => {
     const controller =
         Sources.BreakpointsView.BreakpointsSidebarController.instance({forceNew: true, breakpointManager, settings});
 
+    setupBreakpointResponder();
     const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     assert.exists(b1);
     controller.expandedStateChanged(url, false /* expanded */);
     await b1.remove(false /* keepInStorage */);
 
     // A breakpoint that does not auto-expand shows up expanded again.
+    setupBreakpointResponder();
     const b2 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 3,
                                                      Breakpoints.BreakpointManager.EMPTY_BREAKPOINT_CONDITION, true,
                                                      false, Breakpoints.BreakpointManager.BreakpointOrigin.OTHER);
@@ -985,10 +1003,6 @@ describe('BreakpointsView', () => {
       debuggerWorkspaceBinding: backend.universe.debuggerWorkspaceBinding,
       settings: backend.universe.settings,
     });
-  });
-
-  afterEach(async () => {
-    await deinitializeGlobalVars();
   });
 
   it('correctly expands breakpoint groups', async () => {
@@ -1967,6 +1981,94 @@ describe('BreakpointsView', () => {
 
         assert.strictEqual(selected, lastBreakpointItem);
       });
+    });
+  });
+
+  describe('theme-aware styling', () => {
+    afterEach(() => {
+      setColorScheme('light');
+    });
+
+    async function createPopulatedBreakpointsView(): Promise<Sources.BreakpointsView.BreakpointsView> {
+      const component = await createAndInitializeBreakpointsView({includeCommonStyles: true});
+      const data: Sources.BreakpointsView.BreakpointsViewData = {
+        breakpointsActive: true,
+        pauseOnUncaughtExceptions: false,
+        pauseOnCaughtExceptions: false,
+        groups: [
+          {
+            name: 'test.js',
+            url: urlString`https://google.com/test.js`,
+            editable: true,
+            expanded: true,
+            breakpointItems: [
+              {
+                id: '1',
+                type: SDK.DebuggerModel.BreakpointType.REGULAR_BREAKPOINT,
+                location: '1',
+                codeSnippet: 'const a = 1;',
+                isHit: false,
+                status: Sources.BreakpointsView.BreakpointStatus.ENABLED,
+              },
+              {
+                id: '2',
+                type: SDK.DebuggerModel.BreakpointType.CONDITIONAL_BREAKPOINT,
+                location: '2',
+                codeSnippet: 'if (x > 0)',
+                isHit: false,
+                status: Sources.BreakpointsView.BreakpointStatus.ENABLED,
+                hoverText: 'x > 0',
+              },
+              {
+                id: '3',
+                type: SDK.DebuggerModel.BreakpointType.LOGPOINT,
+                location: '3',
+                codeSnippet: 'console.log(x);',
+                isHit: false,
+                status: Sources.BreakpointsView.BreakpointStatus.ENABLED,
+                hoverText: 'x',
+              },
+            ],
+          },
+        ],
+      };
+
+      component.data = data;
+      await RenderCoordinator.done();
+      await component.updateComplete;
+      return component;
+    }
+
+    it('renders type-indicator colors in light theme', async () => {
+      const component = await createPopulatedBreakpointsView();
+
+      const conditionalIndicator =
+          component.contentElement.querySelector('.breakpoint-item.conditional-breakpoint > label > .type-indicator');
+      const logpointIndicator =
+          component.contentElement.querySelector('.breakpoint-item.logpoint > label > .type-indicator');
+      assert.exists(conditionalIndicator);
+      assert.exists(logpointIndicator);
+
+      setColorScheme('light');
+      assert.strictEqual(getComputedStyle(conditionalIndicator).borderRightColor, 'rgb(233, 103, 37)');
+      assert.strictEqual(getComputedStyle(logpointIndicator).borderRightColor, 'rgb(255, 72, 150)');
+      await assertScreenshot('sources/breakpoints_view_light.png');
+    });
+
+    it('renders type-indicator colors in dark theme', async () => {
+      const component = await createPopulatedBreakpointsView();
+
+      const conditionalIndicator =
+          component.contentElement.querySelector('.breakpoint-item.conditional-breakpoint > label > .type-indicator');
+      const logpointIndicator =
+          component.contentElement.querySelector('.breakpoint-item.logpoint > label > .type-indicator');
+      assert.exists(conditionalIndicator);
+      assert.exists(logpointIndicator);
+
+      setColorScheme('dark');
+      assert.strictEqual(getComputedStyle(conditionalIndicator).borderRightColor, 'rgb(254, 141, 89)');
+      assert.strictEqual(getComputedStyle(logpointIndicator).borderRightColor, 'rgb(255, 132, 175)');
+      await assertScreenshot('sources/breakpoints_view_dark.png');
     });
   });
 });

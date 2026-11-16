@@ -28,6 +28,7 @@ import {type ExecutionContext, RuntimeModel} from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
 import {
   cacheDisabledSettingDescriptor,
+  customNetworkConditionsSettingDescriptor,
   monitoringXHREnabledSettingDescriptor,
   preserveNetworkLogSettingDescriptor,
   requestBlockingEnabledSettingDescriptor,
@@ -166,7 +167,7 @@ const CONNECTION_TYPES = new Map([
  */
 export function customUserNetworkConditionsSetting(settings: Common.Settings.Settings):
     Common.Settings.Setting<Conditions[]> {
-  return settings.moduleSetting<Conditions[]>('custom-network-conditions');
+  return settings.resolve(customNetworkConditionsSettingDescriptor);
 }
 
 export function activeNetworkThrottlingKeySetting(settings: Common.Settings.Settings):
@@ -757,9 +758,6 @@ export class FetchDispatcher implements ProtocolProxyApi.FetchDispatcher {
     void this.#multitargetNetworkManager.requestIntercepted(
         new InterceptedRequest(this.#multitargetNetworkManager, this.#fetchAgent, request, resourceType, requestId,
                                networkRequest, responseStatusCode, responseHeaders));
-  }
-
-  authRequired({}: Protocol.Fetch.AuthRequiredEvent): void {
   }
 }
 
@@ -1793,9 +1791,6 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
 
   deviceBoundSessionEventOccurred(_params: Protocol.Network.DeviceBoundSessionEventOccurredEvent): void {
     this.#manager.dispatchEventToListeners(Events.DeviceBoundSessionEventOccurred, _params);
-  }
-
-  policyUpdated(): void {
   }
 
   /**

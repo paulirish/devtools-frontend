@@ -38,8 +38,18 @@ const {DEFAULT_VIEW, WebMCPView, filterToolCalls} = Application.WebMCPView;
 function createTool(name: string, description: string, frameId: Protocol.Page.FrameId, target: SDK.Target.Target,
                     backendNodeId?: Protocol.DOM.BackendNodeId, inputSchema: unknown = {
                       type: 'object',
-                    }): WebMCP.WebMCPModel.Tool {
-  return new WebMCP.WebMCPModel.Tool({name, description, inputSchema, frameId, backendNodeId}, target);
+                    },
+                    outputSchema?: unknown): WebMCP.WebMCPModel.Tool {
+  return new WebMCP.WebMCPModel.Tool({
+    toolId: `${frameId}-${name}` as Protocol.WebMCP.ToolId,
+    name,
+    description,
+    inputSchema,
+    outputSchema,
+    frameId,
+    backendNodeId,
+  },
+                                     target);
 }
 const createDefaultViewInput = (): Application.WebMCPView.ViewInput => {
   return {
@@ -672,12 +682,14 @@ describe('WebMCPView Presenter', () => {
     model.toolsAdded({
       tools: [
         {
+          toolId: 'b-tool-id' as Protocol.WebMCP.ToolId,
           name: 'b-tool',
           description: 'desc1',
           inputSchema: {type: 'object'},
           frameId: 'frame1' as Protocol.Page.FrameId,
         },
         {
+          toolId: 'a-tool-id' as Protocol.WebMCP.ToolId,
           name: 'a-tool',
           description: 'desc2',
           inputSchema: {type: 'object'},
@@ -695,6 +707,7 @@ describe('WebMCPView Presenter', () => {
   it('updates selected tool', async () => {
     const {model, viewStub} = await setup();
     const toolProtocol = {
+      toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
       name: 'tool1',
       description: 'desc1',
       inputSchema: {type: 'object'},
@@ -712,6 +725,7 @@ describe('WebMCPView Presenter', () => {
   it('updates selected tool and parameters on reveal tool', async () => {
     const {model, viewStub} = await setup();
     const toolProtocol = {
+      toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
       name: 'tool1',
       description: 'desc1',
       inputSchema: {type: 'object'},
@@ -730,6 +744,7 @@ describe('WebMCPView Presenter', () => {
   it('invokes tool via onRunTool', async () => {
     const {model, viewStub} = await setup();
     const toolProtocol = {
+      toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
       name: 'tool1',
       description: 'desc1',
       inputSchema: {type: 'object'},
@@ -765,6 +780,7 @@ describe('WebMCPView Presenter', () => {
   it('updates when tools are removed', async () => {
     const {model, viewStub} = await setup();
     const tool = {
+      toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
       name: 'tool1',
       description: 'desc1',
       inputSchema: {type: 'object'},
@@ -782,6 +798,7 @@ describe('WebMCPView Presenter', () => {
   it('clears selected tool when it is removed', async () => {
     const {model, viewStub} = await setup();
     const toolProtocol = {
+      toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
       name: 'tool1',
       description: 'desc1',
       inputSchema: {type: 'object'},
@@ -829,6 +846,7 @@ describe('WebMCPView Presenter', () => {
     it('successfully populates a command', async () => {
       const {model, viewStub} = await setup();
       const toolProtocol = {
+        toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
         name: 'tool1',
         description: 'desc1',
         inputSchema: {type: 'object', properties: {arg1: {type: 'string'}}},
@@ -852,6 +870,7 @@ describe('WebMCPView Presenter', () => {
     it('fails to populate a command because the json doesn\'t parse', async () => {
       const {model, viewStub} = await setup();
       const toolProtocol = {
+        toolId: 'tool1-id' as Protocol.WebMCP.ToolId,
         name: 'tool1',
         description: 'desc1',
         inputSchema: {type: 'object'},
@@ -1126,6 +1145,70 @@ describe('ToolDetailsWidget', () => {
     assert.include(warning.textContent || '', 'This tool has been unregistered');
 
     await assertScreenshot('application/webmcp_tool_details_unregistered.png');
+  });
+
+  it('renders the output schema when provided', async () => {
+    const sdkTarget = createTarget();
+    const tool = createTool('my-tool', 'my description', 'frame1' as Protocol.Page.FrameId, sdkTarget, undefined,
+                            undefined, {type: 'object', properties: {result: {type: 'string'}}});
+
+    const widget = new Application.WebMCPView.ToolDetailsWidget();
+    renderElementIntoDOM(widget, {includeCommonStyles: true});
+    widget.tool = tool;
+    await widget.updateComplete;
+
+    const labels = [...widget.contentElement.querySelectorAll('.tool-details-grid .label')].map(l => l.textContent);
+    assert.include(labels, 'Output schema');
+    const schemaValue = widget.contentElement.querySelector('.tool-details-grid .value.schema');
+    assert.exists(schemaValue);
+    const tree = schemaValue.querySelector<UI.TreeOutline.TreeViewElement>('devtools-tree');
+    assert.exists(tree);
+    const getRows = (): string[] =>
+        tree.getInternalTreeOutlineForTest().rootElement().children().map(e => e.listItemElement.textContent ?? '');
+    while (getRows().length === 0 || getRows().some(row => !row)) {
+      await raf();
+    }
+    assert.deepEqual(getRows(), ['properties: {result: {type: "string"}}', 'type: "object"']);
+  });
+
+  it('does not overflow when the output schema preview is long', async () => {
+    const sdkTarget = createTarget();
+    const properties: Record<string, {type: string}> = {};
+    for (let i = 0; i < 20; i++) {
+      properties[`a_very_long_property_name_${i}`] = {type: 'string'};
+    }
+    const tool = createTool('my-tool', 'my description', 'frame1' as Protocol.Page.FrameId, sdkTarget, undefined,
+                            undefined, {type: 'object', properties});
+
+    const widget = new Application.WebMCPView.ToolDetailsWidget();
+    renderElementIntoDOM(widget, {includeCommonStyles: true, width: 300});
+    widget.tool = tool;
+    await widget.updateComplete;
+
+    const grid = widget.contentElement.querySelector('.tool-details-grid');
+    const tree = widget.contentElement.querySelector<UI.TreeOutline.TreeViewElement>('.value.schema devtools-tree');
+    assert.exists(grid);
+    assert.exists(tree);
+    while (tree.getInternalTreeOutlineForTest().rootElement().childCount() === 0) {
+      await raf();
+    }
+    await raf();
+    assert.isAtMost(tree.getBoundingClientRect().right, grid.getBoundingClientRect().right);
+    assert.isAtMost(grid.scrollWidth, grid.clientWidth);
+  });
+
+  it('does not render the output schema when omitted', async () => {
+    const sdkTarget = createTarget();
+    const tool = createTool('my-tool', 'my description', 'frame1' as Protocol.Page.FrameId, sdkTarget);
+
+    const widget = new Application.WebMCPView.ToolDetailsWidget();
+    renderElementIntoDOM(widget, {includeCommonStyles: true});
+    widget.tool = tool;
+    await widget.updateComplete;
+
+    const labels = [...widget.contentElement.querySelectorAll('.tool-details-grid .label')].map(l => l.textContent);
+    assert.notInclude(labels, 'Output schema');
+    assert.isNull(widget.contentElement.querySelector('.tool-details-grid .value.schema'));
   });
 });
 

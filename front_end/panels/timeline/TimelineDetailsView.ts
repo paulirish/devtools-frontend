@@ -35,7 +35,7 @@ import {
   AggregatedTimelineTreeView,
   BottomUpTimelineTreeView,
   CallTreeTimelineTreeView,
-  TimelineStackView,
+  GridNode,
   TimelineTreeView,
 } from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
@@ -179,12 +179,6 @@ export class TimelineDetailsPane extends TimelineDetailsPaneBase {
         this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_CLICKED, node.data);
       });
 
-      // If there's a heaviest stack sidebar view, also listen to hover within it.
-      if (view instanceof AggregatedTimelineTreeView) {
-        view.stackView.addEventListener(
-            TimelineStackView.Events.TREE_ROW_HOVERED,
-            node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, {node: node.data}));
-      }
     });
 
     this.#summaryContent.onTreeRowHovered = (node, events) => {
@@ -269,18 +263,18 @@ export class TimelineDetailsPane extends TimelineDetailsPaneBase {
           return;
         }
 
-        // Look for the equivalent GroupNode in the bottomUp tree using the node's reference `event`.
-        // Conceivably, we could match using the group ID instead.
-        const treeNode = bottomUp.eventToTreeNode.get(node.event);
-        if (!treeNode) {
+        // Match GroupNodes by group ID instead of scanning each group's events array.
+        const gridNode = node.isGroupNode() ?
+            bottomUp.dataGrid.rootNode().children.find((child): child is GridNode => child instanceof GridNode &&
+                                                           child.profileNode.id === node.id) ??
+                null :
+            bottomUp.gridNodeForEvent(node.event);
+        if (!gridNode) {
           return;
         }
-        bottomUp.selectProfileNode(treeNode, true);
+        bottomUp.selectProfileNode(gridNode.profileNode, true);
         // Reveal/expand the bottom up tree grid node.
-        const gridNode = bottomUp.dataGridNodeForTreeNode(treeNode);
-        if (gridNode) {
-          gridNode.expand();
-        }
+        gridNode.expand();
         break;
       }
       default: {
@@ -294,9 +288,7 @@ export class TimelineDetailsPane extends TimelineDetailsPaneBase {
       return this.lazySelectorStatsView;
     }
 
-    this.lazySelectorStatsView = new TimelineSelectorStatsView(
-        this.#parsedTrace,
-    );
+    this.lazySelectorStatsView = new TimelineSelectorStatsView(undefined, this.#parsedTrace);
     return this.lazySelectorStatsView;
   }
 

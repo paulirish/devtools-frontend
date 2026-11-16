@@ -183,10 +183,6 @@ const UIStringsNotTranslate = {
    */
   inputPlaceholderForNoContext: 'Ask AI Assistance',
   /**
-   * @description Placeholder text for the chat UI input with branding Gemini (do not translate)
-   */
-  inputPlaceholderForNoContextBranded: 'Ask Gemini',
-  /**
    * @description Placeholder text for the chat UI input.
    */
   inputPlaceholderForAccessibility: 'Ask a question about the selected Lighthouse report',
@@ -916,14 +912,33 @@ export class AiAssistancePanel extends UI.Panel.Panel {
   }
 
   async #handlePerformanceRecordAndReload(): Promise<Trace.TraceModel.ParsedTrace> {
-    return await TimelinePanel.TimelinePanel.TimelinePanel.executeRecordAndReload();
+    return await TimelinePanel.TimelinePanel.TimelinePanel.executeRecordAndReload({
+      signal: this.#runAbortController.signal,
+    });
   }
 
   async #handleLighthouseRun(overrides?: LHModel.RunTypes.RunOverrides): Promise<LHModel.RunTypes.RunResult> {
-    return await LighthousePanel.LighthousePanel.LighthousePanel.executeLighthouseRecording({
-      isAIControlled: true,
-      ...overrides,
-    });
+    return await LighthousePanel.LighthousePanel.LighthousePanel.executeLighthouseRecording(
+        {
+          isAIControlled: true,
+          ...overrides,
+        },
+        {
+          signal: this.#runAbortController.signal,
+        });
+  }
+
+  /**
+   * Returns true when `defaultType` is NONE only because AI Assistance is in the
+   * main tab bar. The main tab bar shows one tab at a time, so while AI
+   * Assistance is selected there, no domain panel (Elements, Network, ...) can be
+   * visible. In that case NONE does not mean that the user moved away, and
+   * callers must keep the current conversation and its context.
+   */
+  #isDomainPanelHiddenByMainTabBar(defaultType?: AiAssistanceModel.AiHistoryStorage.ConversationType): boolean {
+    return AiAssistanceModel.AiUtils.isContextSelectionEnabled() &&
+        defaultType === AiAssistanceModel.AiHistoryStorage.ConversationType.NONE &&
+        UI.ViewManager.ViewManager.instance().locationNameForViewId(AiAssistancePanel.panelName) === 'panel';
   }
 
   #getDefaultConversationType(): AiAssistanceModel.AiHistoryStorage.ConversationType|undefined {
@@ -976,6 +991,11 @@ export class AiAssistancePanel extends UI.Panel.Panel {
     }
 
     const targetConversationType = this.#getDefaultConversationType();
+    if (this.#conversation && this.#isDomainPanelHiddenByMainTabBar(targetConversationType)) {
+      // Keep the existing empty conversation instead of replacing it with a NONE conversation.
+      this.requestUpdate();
+      return;
+    }
     if (this.#conversation?.type === targetConversationType) {
       this.requestUpdate();
       // The above if makes sure even if we have an active agent it's empty
@@ -1033,8 +1053,9 @@ export class AiAssistancePanel extends UI.Panel.Panel {
 
     if (this.#conversation) {
       if (this.#conversation.isEmpty && AiAssistanceModel.AiUtils.isContextSelectionEnabled()) {
-        const context = this.#getConversationContext(this.#getDefaultConversationType());
-        this.#conversation.setContext(context);
+        const defaultType = this.#getDefaultConversationType();
+        const lookupType = this.#isDomainPanelHiddenByMainTabBar(defaultType) ? this.#conversation.type : defaultType;
+        this.#conversation.setContext(this.#getConversationContext(lookupType));
       } else {
         const previousContext = this.#conversation.selectedContext;
         const previousItem = previousContext?.getItem();
@@ -1117,6 +1138,9 @@ export class AiAssistancePanel extends UI.Panel.Panel {
         TimelinePanel.TimelinePanel.TimelinePanel, this.#bindTimelineTraceListener, this);
     this.#bindTimelineTraceListener();
     this.#selectDefaultAgentIfNeeded();
+    if (AiAssistanceModel.AiUtils.isNaturalLanguageInterfaceEnabled()) {
+      void VisualLogging.logFunctionCall('ai-allowed-tools-count', String(this.#alwaysAllowedTools.list().length));
+    }
 
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistancePanelOpened);
   }
@@ -1313,9 +1337,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
   }
 
   #getContextlessPlaceholder(): Platform.UIString.LocalizedString {
-    return AiAssistanceModel.AiUtils.isGeminiBranding() ?
-        lockedString(UIStringsNotTranslate.inputPlaceholderForNoContextBranded) :
-        lockedString(UIStringsNotTranslate.inputPlaceholderForNoContext);
+    return lockedString(UIStringsNotTranslate.inputPlaceholderForNoContext);
   }
 
   #getChatInputPlaceholder(): Platform.UIString.LocalizedString {
@@ -1853,6 +1875,9 @@ export class AiAssistancePanel extends UI.Panel.Panel {
       let announcedAnswerLoading = false;
       let announcedAnswerReady = false;
       for await (const data of items) {
+        const toolNameForLogging = 'toolName' in data && data.toolName !== undefined ?
+            Platform.StringUtilities.toKebabCase(data.toolName) :
+            undefined;
         switch (data.type) {
           case AiAssistanceModel.AiAgent.ResponseType.USER_QUERY: {
             this.#messages.push({
@@ -1904,6 +1929,15 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             step.widgets = data.widgets;
             step.state = {type: 'completed'};
             commitStep();
+            // Auto-loaded skills are logged for telemetry on the CONTEXT event without
+            // creating a user-facing walkthrough step, because the selected context may
+            // not be relevant to the user's question.
+            if (!this.#conversation?.isReadOnly && AiAssistanceModel.AiUtils.isAiV2Enabled() &&
+                data.autoLearnedSkills) {
+              for (const skill of data.autoLearnedSkills) {
+                void VisualLogging.logFunctionCall('ai-v2-auto-learn-skill', skill);
+              }
+            }
             break;
           }
           case AiAssistanceModel.AiAgent.ResponseType.TITLE: {
@@ -1937,8 +1971,6 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             const approvalStep = step;
             approvalStep.javascriptCode = data.javascriptCode;
             const promptShownAt = performance.now();
-            const toolNameForLogging =
-                data.toolName !== undefined ? Platform.StringUtilities.toKebabCase(data.toolName) : undefined;
             approvalStep.state = {
               type: 'needs_approval',
               sideEffectDialog: {
@@ -1983,14 +2015,18 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             step.output ??= data.output;
             step.widgets ??= data.widgets;
             commitStep();
-            if (AiAssistanceModel.AiUtils.isAiV2Enabled() && !this.#conversation?.isReadOnly) {
-              if (data.toolName === 'learnSkills') {
-                for (const skill of data.loadedSkills ?? []) {
-                  void VisualLogging.logFunctionCall('ai-v2-learn-skill', skill);
+            if (!this.#conversation?.isReadOnly) {
+              if (AiAssistanceModel.AiUtils.isAiV2Enabled()) {
+                if (data.toolName === 'learnSkills') {
+                  for (const skill of data.loadedSkills ?? []) {
+                    void VisualLogging.logFunctionCall('ai-v2-learn-skill', skill);
+                  }
+                } else if (toolNameForLogging) {
+                  void VisualLogging.logFunctionCall('ai-v2-tool-call', toolNameForLogging);
                 }
-              } else if (data.toolName) {
-                void VisualLogging.logFunctionCall('ai-v2-tool-call',
-                                                   Platform.StringUtilities.toKebabCase(data.toolName));
+              }
+              if (AiAssistanceModel.AiUtils.isNaturalLanguageInterfaceEnabled() && data.autoApproved) {
+                void VisualLogging.logFunctionCall('ai-permission-auto-allowed', toolNameForLogging);
               }
             }
             break;
@@ -2023,7 +2059,6 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             }
 
             // When there is an answer without any thinking steps, we don't want to show the thinking step.
-            // TODO(crbug.com/463323934): Remove specially handling this case.
             if (systemMessage.parts.length > 1) {
               const firstPart = systemMessage.parts[0];
               if (firstPart.type === 'step' && firstPart.step.state.type === 'in_progress' && !firstPart.step.thought &&
@@ -2062,9 +2097,13 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           }
 
           case AiAssistanceModel.AiAgent.ResponseType.CONTEXT_CHANGE: {
-            if (AiAssistanceModel.AiUtils.isAiV2Enabled() && !this.#conversation?.isReadOnly && data.toolName) {
-              void VisualLogging.logFunctionCall('ai-v2-tool-call',
-                                                 Platform.StringUtilities.toKebabCase(data.toolName));
+            if (!this.#conversation?.isReadOnly) {
+              if (AiAssistanceModel.AiUtils.isAiV2Enabled() && toolNameForLogging) {
+                void VisualLogging.logFunctionCall('ai-v2-tool-call', toolNameForLogging);
+              }
+              if (AiAssistanceModel.AiUtils.isNaturalLanguageInterfaceEnabled() && data.autoApproved) {
+                void VisualLogging.logFunctionCall('ai-permission-auto-allowed', toolNameForLogging);
+              }
             }
             this.#handleConversationContextChange(data.context);
             step.state = {type: 'completed'};

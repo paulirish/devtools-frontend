@@ -50,7 +50,7 @@ export enum Events {
 export const EventDescriptors: ReadonlyArray<readonly[Events, readonly string[], boolean?]> = [
   [Events.AppendedToURL, ['url']],
   [Events.CanceledSaveURL, ['url']],
-  [Events.ColorThemeChanged, []],
+  [Events.ColorThemeChanged, ['colorSource']],
   [Events.ContextMenuCleared, []],
   [Events.ContextMenuItemSelected, ['id']],
   [Events.DeviceCountUpdated, ['count']],
@@ -243,7 +243,7 @@ export interface DevicesDiscoveryConfig {
 export interface EventTypes {
   [Events.AppendedToURL]: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString;
   [Events.CanceledSaveURL]: Platform.DevToolsPath.UrlString;
-  [Events.ColorThemeChanged]: void;
+  [Events.ColorThemeChanged]: Root.Runtime.UserColorSource|void;
   [Events.ContextMenuCleared]: void;
   [Events.ContextMenuItemSelected]: number;
   [Events.DeviceCountUpdated]: number;
@@ -276,6 +276,7 @@ export type DispatchHttpRequestRequest = {
   path: string,
   method: 'GET',
   queryParams?: Record<string, string|string[]>,
+  headers?: Record<string, string>,
   streamId?: number,
   body?: never,
 }|{
@@ -283,6 +284,7 @@ export type DispatchHttpRequestRequest = {
   path: string,
   method: 'POST',
   queryParams?: Record<string, string|string[]>,
+  headers?: Record<string, string>,
   streamId?: number,
   // A JSON string containing the request body.
   body?: string,
@@ -579,5 +581,12 @@ export const enum EnumeratedHistogram {
   BuiltInAiAvailability = 'DevTools.BuiltInAiAvailability',
   ResendRequest = 'DevTools.ResendRequest',
   EditResendRequest = 'DevTools.EditResendRequest',
+  AiClientRequestResult = 'DevTools.AiClient.RequestResult',
+  AiClientRequestResultAiAssistance = 'DevTools.AiClient.RequestResult.AiAssistance',
+  AiClientRequestResultCodeComplete = 'DevTools.AiClient.RequestResult.CodeComplete',
+  AiClientRequestResultCodeGenerate = 'DevTools.AiClient.RequestResult.CodeGenerate',
+  AiClientRequestResultConsoleInsights = 'DevTools.AiClient.RequestResult.ConsoleInsights',
+  AiClientRequestResultConversationSummary = 'DevTools.AiClient.RequestResult.ConversationSummary',
+  AiClientRequestResultPerformanceAnnotations = 'DevTools.AiClient.RequestResult.PerformanceAnnotations',
   // LINT.ThenChange(/front_end/devtools_compatibility.js:EnumeratedHistogram)
 }

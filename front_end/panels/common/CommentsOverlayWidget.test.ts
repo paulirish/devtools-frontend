@@ -215,7 +215,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       widget.detach();
     });
 
-    it('uses a solid border for DRAFT threads', async () => {
+    it('uses a solid highlight border and outlined pin for DRAFT threads', async () => {
       const widget = await setupWidget();
       const el = createAnchor('hl-status-draft', 10);
       const thread = overlayManager.createComment(el, 'Comment');
@@ -226,12 +226,14 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       const highlights = await getHighlights(widget);
       assert.lengthOf(highlights, 1);
       assert.isFalse(highlights[0].classList.contains('resolved'));
+      const pinCursor = widget.contentElement.querySelector<HTMLElement>('.comment-pin .comment-cursor');
+      assert.isFalse(pinCursor?.classList.contains('resolved'));
 
       el.remove();
       widget.detach();
     });
 
-    it('uses a solid border for ACTIVE threads', async () => {
+    it('uses a solid highlight border and outlined pin for ACTIVE threads', async () => {
       const widget = await setupWidget();
       const el = createAnchor('hl-status-active', 10);
       const thread = overlayManager.createComment(el, 'Comment');
@@ -243,12 +245,14 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       const highlights = await getHighlights(widget);
       assert.lengthOf(highlights, 1);
       assert.isFalse(highlights[0].classList.contains('resolved'));
+      const pinCursor = widget.contentElement.querySelector<HTMLElement>('.comment-pin .comment-cursor');
+      assert.isFalse(pinCursor?.classList.contains('resolved'));
 
       el.remove();
       widget.detach();
     });
 
-    it('uses a solid border for SENT_TO_AGENT threads', async () => {
+    it('uses a solid highlight border and outlined pin for SENT_TO_AGENT threads', async () => {
       const widget = await setupWidget();
       const el = createAnchor('hl-status-sent-to-agent', 10);
       const thread = overlayManager.createComment(el, 'Comment');
@@ -260,12 +264,14 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       const highlights = await getHighlights(widget);
       assert.lengthOf(highlights, 1);
       assert.isFalse(highlights[0].classList.contains('resolved'));
+      const pinCursor = widget.contentElement.querySelector<HTMLElement>('.comment-pin .comment-cursor');
+      assert.isFalse(pinCursor?.classList.contains('resolved'));
 
       el.remove();
       widget.detach();
     });
 
-    it('uses a dashed border for RESOLVED threads', async () => {
+    it('uses a dashed highlight border and solid pin for RESOLVED threads', async () => {
       const widget = await setupWidget();
       const el = createAnchor('hl-status-resolved', 10);
       const thread = overlayManager.createComment(el, 'Comment');
@@ -277,6 +283,32 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       const highlights = await getHighlights(widget);
       assert.lengthOf(highlights, 1);
       assert.isTrue(highlights[0].classList.contains('resolved'));
+      const pinCursor = widget.contentElement.querySelector<HTMLElement>('.comment-pin .comment-cursor');
+      assert.isTrue(pinCursor?.classList.contains('resolved'));
+
+      el.remove();
+      widget.detach();
+    });
+
+    it('hides the pin of a RESOLVED thread unless the thread is open', async () => {
+      const widget = await setupWidget();
+      const el = createAnchor('pin-resolved', 10);
+      const thread = overlayManager.createComment(el, 'Comment');
+      assert.exists(thread);
+      thread.sendToAgent();
+      document.documentElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      thread.resolve('Done');
+
+      assert.isEmpty(await getHighlights(widget));
+      assert.isEmpty(widget.contentElement.querySelectorAll('.comment-pin'));
+
+      widget.openThread(thread.id);
+      assert.lengthOf(await getHighlights(widget), 1);
+      assert.lengthOf(widget.contentElement.querySelectorAll('.comment-pin'), 1);
+
+      document.documentElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      assert.isEmpty(await getHighlights(widget));
+      assert.isEmpty(widget.contentElement.querySelectorAll('.comment-pin'));
 
       el.remove();
       widget.detach();
@@ -1010,6 +1042,22 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       assert.isFalse(pressEscape().defaultPrevented);
       assert.isTrue(commentManager.isCommentMode());
     });
+
+    it('stops handling Escape once the widget is hidden while a draft thread is open', () => {
+      const widget = renderWidget();
+      const el = document.createElement('div');
+      el.setAttribute('jslog', 'TreeItem; context: escape-hidden-draft-test');
+      el.textContent = 'escape hidden draft content';
+      renderElementIntoDOM(el, {allowMultipleChildren: true});
+
+      commentManager.setCommentMode(true);
+      assert.isNotNull(overlayManager.createComment(el));
+      widget.detach();
+      el.remove();
+
+      assert.isFalse(pressEscape().defaultPrevented);
+      assert.isTrue(commentManager.isCommentMode());
+    });
   });
 
   it('closes draft comment thread UI, removes draft, and propagates click when clicking outside the popup',
@@ -1387,6 +1435,26 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
       assert.strictEqual(threads[1].comments.at(-1)?.text, 'Edited hovered');
       assert.notStrictEqual(threads[0].comments.at(-1)?.text, 'Edited hovered');
     });
+
+    it('clears the hover preview when the hovered thread is resolved', async () => {
+      let input = await setupWithSavedThreads(['hover-resolved']);
+      threads[0].sendToAgent();
+      input = await view.nextInput;
+
+      input.onPinMouseEnter(threads[0].id);
+      input = await view.nextInput;
+      assert.strictEqual(input.hoveredThread?.id, threads[0].id);
+      assert.strictEqual(input.hoveredPin?.id, threads[0].id);
+      assert.isTrue(input.hoveredPin?.visible);
+      assert.isNotNull(input.hoveredHighlight);
+
+      threads[0].resolve('Done');
+      input = await view.nextInput;
+      assert.isEmpty(input.pins.filter(p => p.visible));
+      assert.isNull(input.hoveredThread);
+      assert.isNull(input.hoveredPin);
+      assert.isNull(input.hoveredHighlight);
+    });
   });
 
   it('closes and removes the draft thread when clicking its own pin in comment mode', async () => {
@@ -1454,7 +1522,7 @@ describeWithEnvironment('CommentsOverlayWidget', () => {
     // while preserving the exact same DOM elements via keyed repeat().
     currentTop = 160;
     overlayManager.dispatchEventToListeners(Comments.CommentOverlayManager.Events.POSITIONS_UPDATED, {
-      pins: [{id: thread.id, top: 148, left: 158, visible: true}],
+      pins: [{id: thread.id, top: 148, left: 158, visible: true, resolved: false}],
       highlights: [{id: thread.id, top: 160, left: 50, width: 120, height: 30, visible: true}],
       isRealtimeSync: true,
     });

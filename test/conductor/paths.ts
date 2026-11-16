@@ -12,7 +12,6 @@ export const CHECKOUT_ROOT: string = path.join(import.meta.dirname, '..', build.
 export const BUILD_ROOT: string = path.join(import.meta.dirname, '..', build.BUILD_ROOT);
 export const GEN_DIR: string = path.join(BUILD_ROOT, 'gen', path.relative(CHECKOUT_ROOT, SOURCE_ROOT));
 export const BUILD_WITH_CHROMIUM: boolean = build.BUILD_WITH_CHROMIUM;
-export const DEVTOOLS_BUNDLED_CHROMIUM_DEPS: boolean = build.DEVTOOLS_BUNDLED_CHROMIUM_DEPS;
 export const TEST_ID_REGEX: RegExp = /^(.*\.[tj]s):(.*)$/;
 
 function rebase(fromRoot: string, toRoot: string, filename: string, newExt?: string) {
@@ -109,6 +108,15 @@ export function resolveBuildTestId(spec: string): string {
     const match = spec.match(TEST_ID_REGEX)!;
     file = match[1];
     caseName = match[2];
+  }
+  const normalizedFile = file.replaceAll('\\', '/');
+  const isScriptTest = [
+    'scripts/',
+    'test/ai_evals/report/',
+  ].some(dir => normalizedFile.startsWith(dir));
+  if (isScriptTest) {
+    const absoluteFile = path.join(SOURCE_ROOT, file);
+    return caseName !== undefined ? `${absoluteFile}:${caseName}` : absoluteFile;
   }
   const jsFile = file.replace(/\.ts$/, '.js');
   const absoluteJsFile = path.isAbsolute(jsFile) ? jsFile : path.join(GEN_DIR, jsFile);

@@ -88,13 +88,15 @@ devtools_foundation_module("ai_assistance") {
     "tools/ResolveDevtoolsNodePath.ts",
     "tools/RunLighthouse.ts",
     "tools/SelectTraceEventByKey.ts",
+    "tools/SetElementStyles.ts",
     "tools/Tool.ts",
     "tools/ToolRegistry.ts",
   ]
 
-  # We use public_deps here to avoid ts_library looking for a tsconfig
-  # for the generated skills files. This is a deviation from standard practice
-  # because the generated files are .js and types are provided globally.
+  # Generated skills emit *.skill.js and *.skill.d.ts without a tsconfig.
+  # Using public_deps ensures type-checking (_checked / _node_typecheck) waits
+  # for generation, forwards generated inputs through _sources for bundling,
+  # and propagates grd_files metadata in unbundled (!devtools_bundle) builds.
   public_deps = [ "skills:generate_skills" ]
 
   ts_deps = [
@@ -125,8 +127,6 @@ devtools_foundation_module("ai_assistance") {
 
 devtools_entrypoint("bundle") {
   entrypoint = "ai_assistance.ts"
-
-  deps = [ "skills:generate_skills" ]
 
   ts_deps = [
     ":ai_assistance",
@@ -227,6 +227,7 @@ devtools_foundation_module("foundation_unittests") {
     "tools/ResolveDevtoolsNodePath.test.ts",
     "tools/RunLighthouse.test.ts",
     "tools/SelectTraceEventByKey.test.ts",
+    "tools/SetElementStyles.test.ts",
     "tools/Tool.test.ts",
     "tools/ToolRegistry.test.ts",
   ]

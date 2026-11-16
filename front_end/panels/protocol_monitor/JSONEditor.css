@@ -80,7 +80,7 @@ ul {
 .editor-wrapper::after {
   content: "";
   display: block;
-  height: 50px;
+  height: var(--sys-size-16);
 }
 
 .clear-button,
@@ -92,7 +92,7 @@ ul {
 
 .clear-button,
 .delete-button {
-  margin-left: 5px;
+  margin-left: var(--sys-size-3);
 }
 
 .row:focus-within .delete-button,

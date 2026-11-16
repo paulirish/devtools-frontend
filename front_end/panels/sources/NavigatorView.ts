@@ -1,7 +1,6 @@
 // Copyright 2012 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable @devtools/no-imperative-dom-api */
 
 import '../../ui/components/spinners/spinners.js';
 import '../../ui/kit/kit.js';
@@ -18,7 +17,15 @@ import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as Lit from '../../ui/lit/lit.js';
+import {
+  CustomDirectives,
+  Directive,
+  Directives,
+  html,
+  nothing,
+  render,
+  type TemplateResult,
+} from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Snippets from '../snippets/snippets.js';
@@ -28,7 +35,9 @@ import navigatorTreeStyles from './navigatorTree.css.js';
 import navigatorViewStyles from './navigatorView.css.js';
 import {SearchSources} from './SearchSourcesView.js';
 
-const {html, render} = Lit;
+const {classMap, repeat} = Directives;
+const {widget} = UI.Widget;
+const on = Directive.directive(CustomDirectives.InterceptBindingDirective);
 
 const UIStrings = {
   /**
@@ -186,31 +195,6 @@ const TYPE_ORDERS = new Map([
   [Types.FileSystem, 100],
 ]);
 
-export interface ViewInput {
-  treeElement: HTMLElement;
-  showTree: boolean;
-}
-
-export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
-
-export const DEFAULT_VIEW: View = (input, _output, target): void => {
-  const showPlaceholder = !input.showTree;
-  // clang-format off
-  render(
-      html`
-        <style>${navigatorViewStyles}</style>
-        <slot name="header"></slot>
-        <div class="vbox flex-auto" ?hidden=${!showPlaceholder}>
-          <slot name="placeholder"></slot>
-        </div>
-        <div class="vbox flex-auto" ?hidden=${showPlaceholder}>
-          ${input.treeElement}
-        </div>
-      `,
-      target);
-  // clang-format on
-};
-
 export function iconTypeForNodeType(type: string): string {
   switch (type) {
     case Types.Domain:
@@ -245,13 +229,13 @@ export function contextForNodeType(type: string): string {
   return 'folder';
 }
 
-export function renderFolderLeadingIcon(type: string): Lit.TemplateResult {
+export function renderFolderLeadingIcon(type: string): TemplateResult {
   return html`<devtools-icon name=${iconTypeForNodeType(type)}></devtools-icon>`;
 }
 
 export function renderSourceTrailingIcons(uiSourceCode: Workspace.UISourceCode.UISourceCode,
                                           onSelectSource: (uiSourceCode: Workspace.UISourceCode.UISourceCode,
-                                                           focusSource: boolean) => void): Lit.TemplateResult[] {
+                                                           focusSource: boolean) => void): TemplateResult[] {
   if (!UI.ActionRegistry.ActionRegistry.instance().hasAction('drjones.sources-floating-button')) {
     return [];
   }
@@ -267,26 +251,20 @@ export function renderSourceTrailingIcons(uiSourceCode: Workspace.UISourceCode.U
       .iconName=${icon}
       .title=${action.title()}
       .jslogContext=${'ask-ai'}
-      @click=${{
-        handleEvent: (ev: Event) => {
-          ev.stopPropagation();
-          onSelectSource(uiSourceCode, false);
-          void action.execute();
-        },
-        capture: true,
+      @click=${(ev: Event) => {
+        ev.stopPropagation();
+        onSelectSource(uiSourceCode, false);
+        void action.execute();
       }}
-      @mousedown=${{
-        handleEvent: (ev: Event) => {
-          ev.stopPropagation();
-        },
-        capture: true,
+      @mousedown=${(ev: Event) => {
+        ev.stopPropagation();
       }}
     ></devtools-floating-button>
   </span>`];
   // clang-format on
 }
 
-export function renderGroupTrailingIcons(project: Workspace.Workspace.Project|null): Lit.TemplateResult[] {
+export function renderGroupTrailingIcons(project: Workspace.Workspace.Project|null): TemplateResult[] {
   if (!(project instanceof Persistence.AutomaticFileSystemWorkspaceBinding.FileSystem)) {
     return [];
   }
@@ -318,6 +296,277 @@ export function renderGroupTrailingIcons(project: Workspace.Workspace.Project|nu
   return [];
 }
 
+export interface ViewInput {
+  nodes: readonly NavigatorTreeNode[];
+  expandedNodes: WeakSet<NavigatorTreeNode>;
+  selectedNode: NavigatorTreeNode|null;
+  onExpand: (node: NavigatorTreeNode, expanded: boolean) => void;
+  onSelect: (node: NavigatorTreeNode, selectedByUser?: boolean) => void;
+  onDoubleClick: (node: NavigatorTreeNode, middleClick: boolean) => void;
+  onContextMenu: (node: NavigatorTreeNode, contextMenu: UI.ContextMenu.ContextMenu) => void;
+  onHover: (node: NavigatorTreeNode, hovered: boolean) => void;
+  onMouseDown: (node: NavigatorTreeNode) => void;
+  onSelectSource: (uiSourceCode: Workspace.UISourceCode.UISourceCode, focusSource: boolean) => void;
+  onCommitRename: (node: NavigatorUISourceCodeTreeNode, newTitle: string) => void;
+  onCancelRename: (node: NavigatorUISourceCodeTreeNode) => void;
+  showTree: boolean;
+}
+
+export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
+
+function nodeAriaLabel(node: NavigatorTreeNode): string {
+  if (node instanceof NavigatorUISourceCodeTreeNode) {
+    return `${node.uiSourceCode().name()}, ${node.type}`;
+  }
+  return `${node.mergedTitle()}, ${node.type}`;
+}
+
+function renderLeadingIcon(node: NavigatorTreeNode): TemplateResult {
+  if (node instanceof NavigatorUISourceCodeTreeNode) {
+    const icon = PanelUtils.getIconForSourceFile(node.uiSourceCode());
+    const binding = Persistence.Persistence.PersistenceImpl.instance().binding(node.uiSourceCode());
+    const networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
+    const isHeaderOverride = networkPersistenceManager.isActiveHeaderOverrides(node.uiSourceCode());
+    const hasDotBadge = Boolean(binding || isHeaderOverride);
+    const isDotPurple =
+        Boolean(binding ? networkPersistenceManager.project() === binding.fileSystem.project() : isHeaderOverride);
+    const badge = hasDotBadge ? (isDotPurple ? 'purple' : 'green') : 'none';
+    return html`<span class="leading-icons icons-container" data-badge=${badge}>${icon}</span>`;
+  }
+  const icon = renderFolderLeadingIcon(node.type);
+  return html`<span class="leading-icons icons-container">${icon}</span>`;
+}
+
+function renderTrailingIcons(node: NavigatorTreeNode, input: ViewInput): TemplateResult|typeof nothing {
+  if (node instanceof NavigatorUISourceCodeTreeNode) {
+    const trailing = renderSourceTrailingIcons(node.uiSourceCode(), input.onSelectSource);
+    return trailing.length > 0 ? html`<span class="trailing-icons icons-container">${trailing}</span>` : nothing;
+  }
+  if (node instanceof NavigatorGroupTreeNode) {
+    const trailing = renderGroupTrailingIcons(node.project);
+    return trailing.length > 0 ? html`<span class="trailing-icons icons-container">${trailing}</span>` : nothing;
+  }
+  return nothing;
+}
+
+export interface NavigatorSourceTitleViewInput {
+  title: string;
+  editing: boolean;
+  onCommit: (detail: string) => void;
+  onCancel: () => void;
+}
+
+export type NavigatorSourceTitleView = (input: NavigatorSourceTitleViewInput, output: undefined, target: HTMLElement) =>
+    void;
+
+export const DEFAULT_NAVIGATOR_SOURCE_TITLE_VIEW: NavigatorSourceTitleView = (input, _output, target) => {
+  const stopPropagationIfEditing = (event: Event): void => {
+    if (input.editing) {
+      event.stopPropagation();
+    }
+  };
+
+  // clang-format off
+  render(html`
+    <devtools-prompt
+      value=${input.title}
+      ?editing=${input.editing}
+      @commit=${(event: UI.TextPrompt.TextPromptElement.CommitEvent) => input.onCommit(event.detail)}
+      @cancel=${() => input.onCancel()}
+      @mousedown=${stopPropagationIfEditing}
+      @click=${stopPropagationIfEditing}
+      @dblclick=${stopPropagationIfEditing}>${input.title}</devtools-prompt>
+  `, target);
+  // clang-format on
+};
+
+export class NavigatorSourceTitleWidget extends UI.Widget.Widget {
+  #title = '';
+  #editing = false;
+  #view: NavigatorSourceTitleView;
+
+  onCommit?: (detail: string) => void;
+  onCancel?: () => void;
+
+  set title(title: string) {
+    if (this.#title === title) {
+      return;
+    }
+    this.#title = title;
+    this.requestUpdate();
+  }
+
+  get title(): string {
+    return this.#title;
+  }
+
+  set editing(editing: boolean) {
+    if (this.#editing === editing) {
+      return;
+    }
+    this.#editing = editing;
+    this.requestUpdate();
+  }
+
+  get editing(): boolean {
+    return this.#editing;
+  }
+
+  constructor(element?: HTMLElement, view: NavigatorSourceTitleView = DEFAULT_NAVIGATOR_SOURCE_TITLE_VIEW) {
+    super(element);
+    this.#view = view;
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    this.requestUpdate();
+  }
+
+  override performUpdate(): void {
+    const viewInput: NavigatorSourceTitleViewInput = {
+      title: this.#title,
+      editing: this.#editing,
+      onCommit: (detail: string) => this.onCommit?.(detail),
+      onCancel: () => this.onCancel?.(),
+    };
+    this.#view(viewInput, undefined, this.contentElement);
+  }
+}
+
+const TITLE_JSLOG = `${VisualLogging.value('title').track({change: true})}`;
+
+function renderTitle(node: NavigatorTreeNode, input: ViewInput): TemplateResult {
+  if (node instanceof NavigatorUISourceCodeTreeNode) {
+    return html`<span title=${node.computedTooltip()} class="tree-element-title" jslog=${TITLE_JSLOG}>
+      <devtools-widget ${widget(NavigatorSourceTitleWidget, {
+      title: node.title,
+      editing: node.isEditing,
+      onCommit: (detail: string) => input.onCommitRename(node, detail),
+      onCancel: () => input.onCancelRename(node),
+    })}></devtools-widget>
+    </span>`;
+  }
+  return html`<span title=${node.computedTooltip()} class="tree-element-title" data-title=${node.mergedTitle()}>${
+      node.mergedTitle()}</span>`;
+}
+
+function renderNode(node: NavigatorTreeNode, input: ViewInput): TemplateResult {
+  const children = node.effectiveChildren();
+  const isExpandable = node instanceof NavigatorFolderTreeNode ||
+      (node instanceof NavigatorGroupTreeNode &&
+       !(node.project instanceof Persistence.AutomaticFileSystemWorkspaceBinding.FileSystem)) ||
+      children.length > 0;
+  const isExpanded = input.expandedNodes.has(node) ||
+      (node instanceof NavigatorFolderTreeNode && input.expandedNodes.has(node.mergedLeafNode()));
+  const isSelected = (input.selectedNode === node ||
+                      (node instanceof NavigatorFolderTreeNode && input.selectedNode === node.mergedLeafNode())) &&
+      !(node instanceof NavigatorUISourceCodeTreeNode && node.isEditing);
+
+  const classes = {
+    'navigator-folder-tree-item': node instanceof NavigatorFolderTreeNode || node instanceof NavigatorGroupTreeNode,
+    'navigator-file-tree-item': node instanceof NavigatorUISourceCodeTreeNode,
+    ['navigator-' + node.type + '-tree-item']: true,
+    'is-from-source-map': Boolean(node.recursiveProperties.exclusivelySourceMapped),
+    'is-ignore-listed': Boolean(node.recursiveProperties.exclusivelyIgnored),
+    'has-mapped-files': node.hasMappedFiles,
+    selected: isSelected,
+  };
+
+  // clang-format off
+  return html`
+    <li role="treeitem"
+        data-title=${node.title}
+        data-node-id=${node.id}
+        class=${classMap(classes)}
+        ?open=${isExpanded}
+        ?selected=${isSelected}
+        aria-label=${nodeAriaLabel(node)}
+        jslog=${VisualLogging.treeItem(node instanceof NavigatorUISourceCodeTreeNode ? node.uiSourceCode().contentType().name() : contextForNodeType(node.type)).track({click: true})}
+        draggable=${node instanceof NavigatorUISourceCodeTreeNode ? 'true' : 'false'}
+        @expand=${on((e: UI.TreeOutline.TreeViewElement.ExpandEvent) => input.onExpand(node, e.detail.expanded))}
+        @select=${on((e: UI.TreeOutline.TreeViewElement.SelectEvent) => input.onSelect(node, Boolean(e.detail?.selectedByUser)))}
+        @enter=${on(() => {
+          if (node instanceof NavigatorUISourceCodeTreeNode) {
+            input.onSelectSource(node.uiSourceCode(), true);
+          }
+        })}
+        @keydown=${on((e: KeyboardEvent) => {
+          if (e.key === ' ' && node instanceof NavigatorUISourceCodeTreeNode && !node.isEditing) {
+            e.consume(true);
+            input.onSelectSource(node.uiSourceCode(), true);
+          }
+        })}
+        @click=${on((e: MouseEvent) => {
+          if (node instanceof NavigatorUISourceCodeTreeNode && e.button === 0) {
+            input.onSelectSource(node.uiSourceCode(), false);
+          }
+        })}
+        @dblclick=${on((e: MouseEvent) => input.onDoubleClick(node, e.button === 1))}
+        @contextmenu=${on((e: Event) => input.onContextMenu(node, new UI.ContextMenu.ContextMenu(e)))}
+        @dragstart=${on((e: DragEvent) => {
+          if (node instanceof NavigatorUISourceCodeTreeNode && e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', node.uiSourceCode().url());
+            e.dataTransfer.effectAllowed = 'copy';
+          }
+        })}
+        @mousedown=${on((e: MouseEvent) => {
+          if (e.button === 0) {
+            input.onMouseDown(node);
+          }
+        })}
+        @mousemove=${on(() => input.onHover(node, true))}
+        @mouseleave=${on(() => input.onHover(node, false))}
+    >
+      ${renderLeadingIcon(node)}
+      ${renderTitle(node, input)}
+      ${renderTrailingIcons(node, input)}
+      ${isExpandable ? html`
+        <ul role="group">
+          ${renderNodes(children, input)}
+        </ul>
+      ` : nothing}
+    </li>
+  `;
+  // clang-format on
+}
+
+function renderNodes(nodes: readonly NavigatorTreeNode[], input: ViewInput): TemplateResult {
+  return html`${repeat(nodes, node => node.id, node => renderNode(node, input))}`;
+}
+
+function onTreeKeyDown(input: ViewInput, event: KeyboardEvent): void {
+  if (event.key === ' ' && input.selectedNode instanceof NavigatorUISourceCodeTreeNode &&
+      !input.selectedNode.isEditing) {
+    event.consume(true);
+    input.onSelectSource(input.selectedNode.uiSourceCode(), true);
+  }
+}
+
+export const DEFAULT_VIEW: View = (input, _output, target): void => {
+  const showPlaceholder = !input.showTree;
+  // clang-format off
+  render(
+      html`
+        <style>${navigatorViewStyles}</style>
+        <slot name="header"></slot>
+        <div class="vbox flex-auto" ?hidden=${!showPlaceholder}>
+          <slot name="placeholder"></slot>
+        </div>
+        <div class="vbox flex-auto" ?hidden=${showPlaceholder}>
+          <devtools-tree autofocus navigation-variant hide-overflow
+            @keydown=${(e: KeyboardEvent) => onTreeKeyDown(input, e)}
+            .template=${html`
+            <style>${navigatorTreeStyles}</style>
+            <ul role="tree">
+              ${renderNodes(input.nodes, input)}
+            </ul>
+          `}></devtools-tree>
+        </div>
+      `,
+      target);
+  // clang-format on
+};
+
 export const enum Events {
   UI_SOURCE_CODE_ADDED = 'ui-source-code-added',
   SOURCE_SELECTED = 'source-selected',
@@ -337,112 +586,264 @@ const NavigatorViewBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.W
     Common.ObjectWrapper.eventMixin(UI.Widget.VBox);
 
 export class NavigatorView extends NavigatorViewBase implements SDK.TargetManager.Observer {
-  static override readonly INJECT: readonly[typeof Bindings.NetworkProject.NetworkProjectManager] =
-      [Bindings.NetworkProject.NetworkProjectManager] as const;
+  static override readonly INJECT: readonly[typeof Bindings.NetworkProject.NetworkProjectManager,
+                                            typeof Workspace.Workspace.WorkspaceImpl,
+                                            typeof Workspace.IgnoreListManager.IgnoreListManager,
+                                            typeof Persistence.Persistence.PersistenceImpl,
+                                            typeof Persistence.NetworkPersistenceManager.NetworkPersistenceManager,
+                                            typeof SDK.TargetManager.TargetManager,
+                                            typeof Common.Settings.Settings,
+  ] =
+      [
+        Bindings.NetworkProject.NetworkProjectManager,
+        Workspace.Workspace.WorkspaceImpl,
+        Workspace.IgnoreListManager.IgnoreListManager,
+        Persistence.Persistence.PersistenceImpl,
+        Persistence.NetworkPersistenceManager.NetworkPersistenceManager,
+        SDK.TargetManager.TargetManager,
+        Common.Settings.Settings,
+      ] as const;
 
-  scriptsTree: UI.TreeOutline.TreeOutlineInShadow;
-  private readonly uiSourceCodeNodes:
+  readonly #uiSourceCodeNodes:
       Platform.MapUtilities.Multimap<Workspace.UISourceCode.UISourceCode, NavigatorUISourceCodeTreeNode>;
-  private readonly subfolderNodes: Map<string, NavigatorFolderTreeNode>;
-  private readonly rootNode: NavigatorRootTreeNode;
-  private readonly frameNodes: Map<SDK.ResourceTreeModel.ResourceTreeFrame, NavigatorGroupTreeNode>;
-  private authoredNode?: NavigatorGroupTreeNode;
-  private deployedNode?: NavigatorGroupTreeNode;
-  private navigatorGroupByFolderSetting: Common.Settings.Setting<boolean>;
-  private navigatorJustMyCodeSetting: Common.Settings.Setting<boolean>;
-  private navigatorGroupByAuthoredSetting?: Common.Settings.Setting<boolean>;
+  readonly #subfolderNodes: Map<string, NavigatorFolderTreeNode>;
+  readonly rootNode: NavigatorRootTreeNode;
+  readonly #frameNodes: Map<SDK.ResourceTreeModel.ResourceTreeFrame, NavigatorGroupTreeNode>;
+  #authoredNode?: NavigatorGroupTreeNode;
+  #deployedNode?: NavigatorGroupTreeNode;
+  #navigatorGroupByFolderSetting: Common.Settings.Setting<boolean>;
+  #navigatorJustMyCodeSetting: Common.Settings.Setting<boolean>;
+  #navigatorGroupByAuthoredSetting?: Common.Settings.Setting<boolean>;
   #navigatorGroupByAuthoredChangeListener?: () => void;
   #enableAuthoredGrouping = false;
   #projectFilter?: (project: Workspace.Workspace.Project) => boolean;
-  #workspace = Workspace.Workspace.WorkspaceImpl.instance();
-  #initialized = false;
-  private groupByFrame?: boolean;
-  private groupByAuthored?: boolean;
-  private groupByDomain?: boolean;
-  private groupByFolder?: boolean;
-  private selectedNode: NavigatorTreeNode|null = null;
-  private expandedNodes = new WeakSet<NavigatorTreeNode>();
-  private readonly treeElementNodes = new WeakMap<UI.TreeOutline.TreeElement, NavigatorTreeNode>();
+  #workspace: Workspace.Workspace.WorkspaceImpl;
+  #subscribed = false;
+  #needsRegroup = false;
+  #prevJustMyCode?: boolean;
+  readonly #groupingChangedListener = this.#groupingChanged.bind(this);
+  readonly #ignoreListChangedListener = this.#ignoreListChanged.bind(this);
+  readonly #networkProjectManager: Bindings.NetworkProject.NetworkProjectManager;
+  readonly #ignoreListManager: Workspace.IgnoreListManager.IgnoreListManager;
+  readonly #persistence: Persistence.Persistence.PersistenceImpl;
+  readonly #networkPersistenceManager: Persistence.NetworkPersistenceManager.NetworkPersistenceManager;
+  readonly #targetManager: SDK.TargetManager.TargetManager;
+  readonly #settings: Common.Settings.Settings;
+  #groupByFrame?: boolean;
+  #groupByAuthored?: boolean;
+  #groupByDomain?: boolean;
+  #groupByFolder?: boolean;
+  #selectedNode: NavigatorTreeNode|null = null;
+  #expandedNodes = new WeakSet<NavigatorTreeNode>();
+  #renamingNode: NavigatorUISourceCodeTreeNode|null = null;
   #view: View;
 
   constructor(
       element?: HTMLElement,
-      [networkProjectManager]: UI.Widget.WidgetDependencies<typeof NavigatorView> =
-          [Bindings.NetworkProject.NetworkProjectManager.instance()],
+      [
+        networkProjectManager = Bindings.NetworkProject.NetworkProjectManager.instance(),
+        workspace = Workspace.Workspace.WorkspaceImpl.instance(),
+        ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance(),
+        persistence = Persistence.Persistence.PersistenceImpl.instance(),
+        networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance(),
+        targetManager = SDK.TargetManager.TargetManager.instance(),
+        settings = Common.Settings.Settings.instance(),
+      ]: Partial<UI.Widget.WidgetDependencies<typeof NavigatorView>> = [],
       view: View = DEFAULT_VIEW,
   ) {
     super(element, {useShadowDom: true});
     this.#view = view;
+    this.#networkProjectManager = networkProjectManager;
+    this.#workspace = workspace;
+    this.#ignoreListManager = ignoreListManager;
+    this.#persistence = persistence;
+    this.#networkPersistenceManager = networkPersistenceManager;
+    this.#targetManager = targetManager;
+    this.#settings = settings;
 
-    this.scriptsTree = new UI.TreeOutline.TreeOutlineInShadow(UI.TreeOutline.TreeVariant.NAVIGATION_TREE);
-    this.scriptsTree.registerRequiredCSS(navigatorTreeStyles);
-
-    this.scriptsTree.setHideOverflow(true);
-    this.scriptsTree.setComparator(this.treeElementsCompare.bind(this));
-    this.scriptsTree.setFocusable(false);
-    this.setDefaultFocusedElement(this.scriptsTree.element);
-    this.scriptsTree.addEventListener(UI.TreeOutline.Events.ElementAttached, () => this.requestUpdate());
-    this.scriptsTree.addEventListener(UI.TreeOutline.Events.ElementsDetached, () => this.requestUpdate());
-    this.scriptsTree.addEventListener(UI.TreeOutline.Events.ElementSelected, event => {
-      const node = this.nodeForTreeElement(event.data);
-      this.selectedNode = node ?? null;
-    });
-    this.scriptsTree.addEventListener(UI.TreeOutline.Events.ElementExpanded, event => {
-      const node = this.nodeForTreeElement(event.data);
-      if (node) {
-        this.expandedNodes.add(node);
-        node.populate();
-      }
-    });
-    this.scriptsTree.addEventListener(UI.TreeOutline.Events.ElementCollapsed, event => {
-      const node = this.nodeForTreeElement(event.data);
-      if (node) {
-        this.expandedNodes.delete(node);
-      }
-    });
-
-    this.uiSourceCodeNodes = new Platform.MapUtilities.Multimap();
-    this.subfolderNodes = new Map();
+    this.#uiSourceCodeNodes = new Platform.MapUtilities.Multimap();
+    this.#subfolderNodes = new Map();
 
     this.rootNode = new NavigatorRootTreeNode(this);
     this.rootNode.populate();
 
-    this.frameNodes = new Map();
+    this.#frameNodes = new Map();
     UI.ShortcutRegistry.ShortcutRegistry.instance().addShortcutListener(
-        this.contentElement, {'sources.rename': this.renameShortcut.bind(this)});
+        this.contentElement, {'sources.rename': this.#renameShortcut.bind(this)});
 
-    this.navigatorGroupByFolderSetting =
-        Common.Settings.Settings.instance().resolve(SettingsUI.SourcesSettings.navigatorGroupByFolderSettingDescriptor);
-    this.navigatorGroupByFolderSetting.addChangeListener(this.groupingChanged.bind(this));
-    this.navigatorJustMyCodeSetting =
-        Common.Settings.Settings.instance().resolve(SettingsUI.SourcesSettings.navigatorJustMyCodeSettingDescriptor);
-    this.navigatorJustMyCodeSetting.addChangeListener(this.groupingChanged.bind(this));
+    this.#navigatorGroupByFolderSetting =
+        this.#settings.resolve(SettingsUI.SourcesSettings.navigatorGroupByFolderSettingDescriptor);
+    this.#navigatorJustMyCodeSetting =
+        this.#settings.resolve(SettingsUI.SourcesSettings.navigatorJustMyCodeSettingDescriptor);
 
-    Workspace.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.ignoreListChanged.bind(this));
-
-    this.initGrouping();
-
-    Persistence.Persistence.PersistenceImpl.instance().addEventListener(
-        Persistence.Persistence.Events.BindingCreated, this.onBindingChanged, this);
-    Persistence.Persistence.PersistenceImpl.instance().addEventListener(
-        Persistence.Persistence.Events.BindingRemoved, this.onBindingChanged, this);
-    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().addEventListener(
-        Persistence.NetworkPersistenceManager.Events.REQUEST_FOR_HEADER_OVERRIDES_FILE_CHANGED,
-        this.#onRequestsForHeaderOverridesFileChanged, this);
-    SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.NAME_CHANGED, this.targetNameChanged, this);
-
-    SDK.TargetManager.TargetManager.instance().observeTargets(this);
-    networkProjectManager.addEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_ADDED,
-                                           this.frameAttributionAdded, this);
-    networkProjectManager.addEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_REMOVED,
-                                           this.frameAttributionRemoved, this);
+    this.#initGrouping();
     this.requestUpdate();
+  }
+
+  get ignoreListManager(): Workspace.IgnoreListManager.IgnoreListManager {
+    return this.#ignoreListManager;
+  }
+
+  get persistence(): Persistence.Persistence.PersistenceImpl {
+    return this.#persistence;
+  }
+
+  get settings(): Common.Settings.Settings {
+    return this.#settings;
   }
 
   override wasShown(): void {
     super.wasShown();
+    this.#subscribe();
     this.requestUpdate();
+  }
+
+  override willHide(): void {
+    super.willHide();
+    this.#unsubscribe();
+  }
+
+  #subscribe(): void {
+    if (this.#subscribed) {
+      return;
+    }
+    this.#subscribed = true;
+
+    this.#navigatorGroupByFolderSetting.addChangeListener(this.#groupingChangedListener);
+    this.#navigatorJustMyCodeSetting.addChangeListener(this.#groupingChangedListener);
+    if (this.#navigatorGroupByAuthoredSetting && this.#navigatorGroupByAuthoredChangeListener) {
+      this.#navigatorGroupByAuthoredSetting.addChangeListener(this.#navigatorGroupByAuthoredChangeListener);
+    }
+
+    this.#ignoreListManager.addChangeListener(this.#ignoreListChangedListener);
+
+    this.#persistence.addEventListener(Persistence.Persistence.Events.BindingCreated, this.#onBindingChanged, this);
+    this.#persistence.addEventListener(Persistence.Persistence.Events.BindingRemoved, this.#onBindingChanged, this);
+
+    this.#networkPersistenceManager.addEventListener(
+        Persistence.NetworkPersistenceManager.Events.REQUEST_FOR_HEADER_OVERRIDES_FILE_CHANGED,
+        this.#onRequestsForHeaderOverridesFileChanged, this);
+
+    this.#targetManager.addEventListener(SDK.TargetManager.Events.NAME_CHANGED, this.#targetNameChanged, this);
+    this.#targetManager.observeTargets(this);
+
+    this.#networkProjectManager.addEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_ADDED,
+                                                 this.#frameAttributionAdded, this);
+    this.#networkProjectManager.addEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_REMOVED,
+                                                 this.#frameAttributionRemoved, this);
+
+    const prevGroupByFolder = this.#groupByFolder;
+    const prevGroupByDomain = this.#groupByDomain;
+    const prevGroupByAuthored = this.#groupByAuthored;
+    const prevJustMyCode = this.#prevJustMyCode;
+    this.#initGrouping();
+    const groupingChanged = prevGroupByFolder !== this.#groupByFolder || prevGroupByDomain !== this.#groupByDomain ||
+        prevGroupByAuthored !== this.#groupByAuthored || prevJustMyCode !== this.#prevJustMyCode;
+    if (groupingChanged || this.#needsRegroup) {
+      this.#needsRegroup = false;
+      this.#groupingChanged();
+      return;
+    }
+
+    this.#resetWorkspace(this.#workspace);
+
+    const current = new Set(this.#workspace.uiSourceCodes());
+    const workspaceProjects = new Set(this.#workspace.projects());
+    const toRemove: Workspace.UISourceCode.UISourceCode[] = [];
+    for (const uiSourceCode of this.#uiSourceCodeNodes.keys()) {
+      if (!current.has(uiSourceCode) || !workspaceProjects.has(uiSourceCode.project()) ||
+          !this.#acceptsUISourceCode(uiSourceCode) ||
+          (this.#navigatorJustMyCodeSetting.get() &&
+           this.#ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(uiSourceCode))) {
+        toRemove.push(uiSourceCode);
+      }
+    }
+    if (toRemove.length > 0) {
+      this.#removeUISourceCodes(toRemove);
+    }
+
+    const rootOrDeployed = this.#rootOrDeployedNode();
+    for (const child of [...rootOrDeployed.children()]) {
+      if (child instanceof NavigatorGroupTreeNode && child.project && !workspaceProjects.has(child.project)) {
+        this.removeProject(child.project);
+      }
+    }
+
+    for (const uiSourceCode of current) {
+      if (!this.#uiSourceCodeNodes.has(uiSourceCode)) {
+        this.#addUISourceCode(uiSourceCode);
+      } else {
+        const frames = Bindings.NetworkProject.NetworkProject.framesForUISourceCode(uiSourceCode);
+        const desiredFrames =
+            new Set<SDK.ResourceTreeModel.ResourceTreeFrame|null>(frames.length > 0 ? frames : [null]);
+        for (const node of [...this.#uiSourceCodeNodes.get(uiSourceCode)]) {
+          if (!desiredFrames.has(node.frame())) {
+            this.#removeUISourceCodeNode(node);
+          }
+        }
+        const existingFrames = new Set(Array.from(this.#uiSourceCodeNodes.get(uiSourceCode), node => node.frame()));
+        for (const frame of desiredFrames) {
+          if (!existingFrames.has(frame)) {
+            this.#addUISourceCodeNode(uiSourceCode, frame);
+          }
+        }
+      }
+    }
+
+    if (this.#targetManager) {
+      const liveTargets = new Set(this.#targetManager.targets());
+      const scopeTarget = this.#targetManager.scopeTarget();
+      for (const child of [...rootOrDeployed.children()]) {
+        if (child.id.startsWith('target:')) {
+          const targetId = child.id.slice('target:'.length);
+          const target = this.#targetManager.targetById(targetId);
+          if (!target || !liveTargets.has(target) || target === scopeTarget) {
+            rootOrDeployed.removeChild(child);
+          } else {
+            child.setTitle(target.name());
+          }
+        }
+      }
+    }
+
+    this.rootNode.updateTitleRecursive();
+  }
+
+  #unsubscribe(): void {
+    if (!this.#subscribed) {
+      return;
+    }
+    this.#subscribed = false;
+
+    this.#navigatorGroupByFolderSetting.removeChangeListener(this.#groupingChangedListener);
+    this.#navigatorJustMyCodeSetting.removeChangeListener(this.#groupingChangedListener);
+    if (this.#navigatorGroupByAuthoredSetting && this.#navigatorGroupByAuthoredChangeListener) {
+      this.#navigatorGroupByAuthoredSetting.removeChangeListener(this.#navigatorGroupByAuthoredChangeListener);
+    }
+
+    this.#ignoreListManager.removeChangeListener(this.#ignoreListChangedListener);
+
+    this.#persistence.removeEventListener(Persistence.Persistence.Events.BindingCreated, this.#onBindingChanged, this);
+    this.#persistence.removeEventListener(Persistence.Persistence.Events.BindingRemoved, this.#onBindingChanged, this);
+
+    this.#networkPersistenceManager.removeEventListener(
+        Persistence.NetworkPersistenceManager.Events.REQUEST_FOR_HEADER_OVERRIDES_FILE_CHANGED,
+        this.#onRequestsForHeaderOverridesFileChanged, this);
+
+    this.#targetManager.removeEventListener(SDK.TargetManager.Events.NAME_CHANGED, this.#targetNameChanged, this);
+    this.#targetManager.unobserveTargets(this);
+
+    this.#networkProjectManager.removeEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_ADDED,
+                                                    this.#frameAttributionAdded, this);
+    this.#networkProjectManager.removeEventListener(Bindings.NetworkProject.Events.FRAME_ATTRIBUTION_REMOVED,
+                                                    this.#frameAttributionRemoved, this);
+
+    this.#workspace.removeEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this.#uiSourceCodeAddedCallback,
+                                        this);
+    this.#workspace.removeEventListener(Workspace.Workspace.Events.UISourceCodeRemoved,
+                                        this.#uiSourceCodeRemovedCallback, this);
+    this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectAdded, this.#projectAddedCallback, this);
+    this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectRemoved, this.#projectRemovedCallback, this);
   }
 
   get enableAuthoredGrouping(): boolean {
@@ -454,19 +855,26 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       return;
     }
     this.#enableAuthoredGrouping = enableAuthoredGrouping;
-    if (this.navigatorGroupByAuthoredSetting && this.#navigatorGroupByAuthoredChangeListener) {
-      this.navigatorGroupByAuthoredSetting.removeChangeListener(this.#navigatorGroupByAuthoredChangeListener);
-      this.navigatorGroupByAuthoredSetting = undefined;
+    if (this.#navigatorGroupByAuthoredSetting && this.#navigatorGroupByAuthoredChangeListener) {
+      this.#navigatorGroupByAuthoredSetting.removeChangeListener(this.#navigatorGroupByAuthoredChangeListener);
+      this.#navigatorGroupByAuthoredSetting = undefined;
       this.#navigatorGroupByAuthoredChangeListener = undefined;
     }
     if (enableAuthoredGrouping) {
-      this.navigatorGroupByAuthoredSetting = Common.Settings.Settings.instance().resolve(
-          SettingsUI.SourcesSettings.navigatorGroupByAuthoredSettingDescriptor);
-      this.#navigatorGroupByAuthoredChangeListener = this.groupingChanged.bind(this);
-      this.navigatorGroupByAuthoredSetting.addChangeListener(this.#navigatorGroupByAuthoredChangeListener);
+      this.#navigatorGroupByAuthoredSetting =
+          this.#settings.resolve(SettingsUI.SourcesSettings.navigatorGroupByAuthoredSettingDescriptor);
+      this.#navigatorGroupByAuthoredChangeListener = this.#groupingChanged.bind(this);
+      if (this.#subscribed) {
+        this.#navigatorGroupByAuthoredSetting.addChangeListener(this.#navigatorGroupByAuthoredChangeListener);
+      }
     }
-    if (this.#initialized && Boolean(this.groupByAuthored) !== Boolean(this.navigatorGroupByAuthoredSetting?.get())) {
-      this.groupingChanged();
+    if (Boolean(this.#groupByAuthored) !== Boolean(this.#navigatorGroupByAuthoredSetting?.get())) {
+      if (this.#subscribed) {
+        this.#initGrouping();
+        this.#groupingChanged();
+      } else {
+        this.#needsRegroup = true;
+      }
     }
     this.requestUpdate();
   }
@@ -480,13 +888,15 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       return;
     }
     this.#projectFilter = projectFilter;
-    if (this.#initialized) {
-      this.groupingChanged();
+    if (this.#subscribed) {
+      this.#groupingChanged();
+    } else {
+      this.#needsRegroup = true;
     }
     this.requestUpdate();
   }
 
-  private static nodeOrder(node: NavigatorTreeNode): number {
+  static #nodeOrder(node: NavigatorTreeNode): number {
     if (node.boostOrder) {
       return 0;
     }
@@ -509,8 +919,8 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   }
 
   static compareNodes(node1: NavigatorTreeNode, node2: NavigatorTreeNode): number {
-    const order1 = NavigatorView.nodeOrder(node1);
-    const order2 = NavigatorView.nodeOrder(node2);
+    const order1 = NavigatorView.#nodeOrder(node1);
+    const order2 = NavigatorView.#nodeOrder(node2);
 
     if (order1 > order2) {
       return 1;
@@ -518,7 +928,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     if (order1 < order2) {
       return -1;
     }
-    return 0;
+    return Platform.StringUtilities.naturalOrderComparator(node1.mergedTitle(), node2.mergedTitle());
   }
 
   static appendSearchItem(contextMenu: UI.ContextMenu.ContextMenu, path: string): void {
@@ -529,45 +939,37 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
         {jslogContext: path ? 'search-in-folder' : 'search-in-all-files'});
   }
 
-  private treeElementsCompare(treeElement1: UI.TreeOutline.TreeElement,
-                              treeElement2: UI.TreeOutline.TreeElement): number {
-    const node1 = this.nodeForTreeElement(treeElement1);
-    const node2 = this.nodeForTreeElement(treeElement2);
-    if (node1 && node2) {
-      const order = NavigatorView.compareNodes(node1, node2);
-      if (order !== 0) {
-        return order;
-      }
-    }
-    return Platform.StringUtilities.naturalOrderComparator(treeElement1.titleAsText(), treeElement2.titleAsText());
-  }
-
   override performUpdate(): void {
-    if (!this.#initialized) {
-      this.#initialized = true;
-      this.initGrouping();
-      this.resetWorkspace(this.#workspace);
-      this.#workspace.uiSourceCodes().forEach(this.addUISourceCode.bind(this));
-    }
+    const nodes = this.rootNode.effectiveChildren();
     this.#view({
-      treeElement: this.scriptsTree.element,
-      showTree: Boolean(this.scriptsTree.firstChild()),
+      nodes,
+      expandedNodes: this.#expandedNodes,
+      selectedNode: this.#selectedNode,
+      onExpand: this.#onExpand.bind(this),
+      onSelect: this.#onSelect.bind(this),
+      onDoubleClick: this.#onDoubleClick.bind(this),
+      onContextMenu: this.#onContextMenu.bind(this),
+      onHover: this.#onHover.bind(this),
+      onMouseDown: this.#onMouseDown.bind(this),
+      onSelectSource: this.sourceSelected.bind(this),
+      onCommitRename: this.#onCommitRename.bind(this),
+      onCancelRename: this.#onCancelRename.bind(this),
+      showTree: nodes.length > 0,
     },
                undefined, this.contentElement);
   }
 
-  private onBindingChanged(event: Common.EventTarget.EventTargetEvent<Persistence.Persistence.PersistenceBinding>):
-      void {
+  #onBindingChanged(event: Common.EventTarget.EventTargetEvent<Persistence.Persistence.PersistenceBinding>): void {
     const binding = event.data;
 
     let isFromSourceMap = false;
     // Update UISourceCode titles.
-    const networkNodes = this.uiSourceCodeNodes.get(binding.network);
+    const networkNodes = this.#uiSourceCodeNodes.get(binding.network);
     for (const networkNode of networkNodes) {
       networkNode.updateTitle();
       isFromSourceMap ||= networkNode.uiSourceCode().contentType().isFromSourceMap();
     }
-    const fileSystemNodes = this.uiSourceCodeNodes.get(binding.fileSystem);
+    const fileSystemNodes = this.#uiSourceCodeNodes.get(binding.fileSystem);
     for (const fileSystemNode of fileSystemNodes) {
       fileSystemNode.updateTitle();
       isFromSourceMap ||= fileSystemNode.uiSourceCode().contentType().isFromSourceMap();
@@ -579,9 +981,9 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     let folderPath = Platform.DevToolsPath.EmptyEncodedPathString;
     for (let i = 0; i < pathTokens.length - 1; ++i) {
       folderPath = Common.ParsedURL.ParsedURL.concatenate(folderPath, pathTokens[i]);
-      const folderId = this.folderNodeId(
-          binding.fileSystem.project(), null, null, binding.fileSystem.origin(), isFromSourceMap, folderPath);
-      const folderNode = this.subfolderNodes.get(folderId);
+      const folderId = this.#folderNodeId(binding.fileSystem.project(), null, null, binding.fileSystem.origin(),
+                                          isFromSourceMap, folderPath);
+      const folderNode = this.#subfolderNodes.get(folderId);
       if (folderNode) {
         folderNode.updateTitle();
       }
@@ -589,7 +991,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     }
 
     // Update fileSystem root title.
-    const fileSystemRoot = this.rootOrDeployedNode().child(binding.fileSystem.project().id());
+    const fileSystemRoot = this.#rootOrDeployedNode().child(binding.fileSystem.project().id());
     if (fileSystemRoot) {
       fileSystemRoot.updateTitle();
     }
@@ -598,120 +1000,172 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   #onRequestsForHeaderOverridesFileChanged(
       event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
     const headersFileUiSourceCode = event.data;
-    const networkNodes = this.uiSourceCodeNodes.get(headersFileUiSourceCode);
+    const networkNodes = this.#uiSourceCodeNodes.get(headersFileUiSourceCode);
     for (const networkNode of networkNodes) {
       networkNode.updateTitle();
     }
   }
 
-  override focus(): void {
-    this.scriptsTree.focus();
-  }
-
-  selectNode(node: NavigatorTreeNode, omitFocus?: boolean, selectedByUser?: boolean): void {
-    node.treeNode().select(omitFocus, selectedByUser);
+  selectNode(node: NavigatorTreeNode): void {
+    this.#selectedNode = node;
+    this.requestUpdate();
   }
 
   expandNode(node: NavigatorTreeNode): void {
-    node.treeNode().expand();
+    const leaf = node instanceof NavigatorFolderTreeNode ? node.mergedLeafNode() : node;
+    this.#expandedNodes.add(node);
+    this.#expandedNodes.add(leaf);
+    node.populate();
+    leaf.populate();
+    this.requestUpdate();
   }
 
   collapseNode(node: NavigatorTreeNode): void {
-    node.treeNode().collapse();
+    const leaf = node instanceof NavigatorFolderTreeNode ? node.mergedLeafNode() : node;
+    this.#expandedNodes.delete(node);
+    this.#expandedNodes.delete(leaf);
+    this.requestUpdate();
   }
 
   isNodeExpanded(node: NavigatorTreeNode): boolean {
-    return this.expandedNodes.has(node);
+    return this.#expandedNodes.has(node);
   }
 
   isNodeSelected(node: NavigatorTreeNode): boolean {
-    return this.selectedNode === node;
+    return this.#selectedNode === node;
   }
 
   setNodeSelected(node: NavigatorTreeNode): void {
-    this.selectedNode = node;
+    this.#selectedNode = node;
   }
 
   setNodeExpanded(node: NavigatorTreeNode): void {
-    this.expandedNodes.add(node);
+    this.#expandedNodes.add(node);
   }
 
-  setNodeForTreeElement(treeElement: UI.TreeOutline.TreeElement, node: NavigatorTreeNode): void {
-    this.treeElementNodes.set(treeElement, node);
+  isNodeSelectedOrDescendant(node: NavigatorTreeNode): boolean {
+    let curr: NavigatorTreeNode|null = this.#selectedNode;
+    while (curr) {
+      if (curr === node) {
+        return true;
+      }
+      curr = curr.parent;
+    }
+    return false;
+  }
+
+  deselectIfDescendant(node: NavigatorTreeNode): void {
+    if (this.isNodeSelectedOrDescendant(node)) {
+      this.#selectedNode = null;
+    }
+  }
+
+  #onExpand(node: NavigatorTreeNode, expanded: boolean): void {
+    const leaf = node instanceof NavigatorFolderTreeNode ? node.mergedLeafNode() : node;
+    if (expanded) {
+      this.#expandedNodes.add(node);
+      this.#expandedNodes.add(leaf);
+      node.populate();
+      leaf.populate();
+    } else {
+      this.#expandedNodes.delete(node);
+      this.#expandedNodes.delete(leaf);
+    }
+    this.requestUpdate();
+  }
+
+  #onSelect(node: NavigatorTreeNode, selectedByUser?: boolean): void {
+    if (!selectedByUser && this.#selectedNode !== null) {
+      return;
+    }
+    if (node instanceof NavigatorFolderTreeNode) {
+      this.#selectedNode = node.mergedLeafNode();
+    } else {
+      this.#selectedNode = node;
+    }
+  }
+
+  #onDoubleClick(node: NavigatorTreeNode, middleClick: boolean): void {
+    if (node instanceof NavigatorUISourceCodeTreeNode) {
+      this.sourceSelected(node.uiSourceCode(), !middleClick);
+    }
+  }
+
+  #onContextMenu(node: NavigatorTreeNode, contextMenu: UI.ContextMenu.ContextMenu): void {
+    this.selectNode(node);
+    if (node instanceof NavigatorUISourceCodeTreeNode) {
+      this.handleFileContextMenu(contextMenu, node);
+    } else if (node instanceof NavigatorFolderTreeNode || node instanceof NavigatorGroupTreeNode) {
+      this.handleFolderContextMenu(contextMenu, node);
+    }
+  }
+
+  #onHover(node: NavigatorTreeNode, hovered: boolean): void {
     if (node instanceof NavigatorFolderTreeNode || node instanceof NavigatorGroupTreeNode) {
-      node.updateTooltip(treeElement);
-      UI.ARIAUtils.setLabel(treeElement.listItemElement, `${treeElement.title}, ${node.type}`);
-    }
-    if (treeElement.selected) {
-      this.setNodeSelected(node);
-    }
-    if (treeElement.expanded) {
-      this.setNodeExpanded(node);
+      this.folderHovered(node, hovered);
     }
   }
 
-  nodeForTreeElement(treeElement: UI.TreeOutline.TreeElement): NavigatorTreeNode|undefined {
-    return this.treeElementNodes.get(treeElement);
-  }
-
-  /**
-   * Central place to add elements to the tree to
-   * enable focus if the tree has elements
-   */
-  appendChild(parent: UI.TreeOutline.TreeElement, child: UI.TreeOutline.TreeElement): void {
-    this.scriptsTree.setFocusable(true);
-    parent.appendChild(child);
-  }
-
-  /**
-   * Central place to remove elements from the tree to
-   * disable focus if the tree is empty
-   */
-  removeChild(parent: UI.TreeOutline.TreeElement, child: UI.TreeOutline.TreeElement): void {
-    parent.removeChild(child);
-    if (!this.scriptsTree.selectedTreeElement) {
-      this.selectedNode = null;
+  #onMouseDown(node: NavigatorTreeNode): void {
+    if (!(node instanceof NavigatorUISourceCodeTreeNode)) {
+      return;
     }
-    if (this.scriptsTree.rootElement().childCount() === 0) {
-      this.scriptsTree.setFocusable(false);
+    if (!this.shouldRenameOnMouseDown(node)) {
+      return;
     }
+    setTimeout(() => {
+      if (this.shouldRenameOnMouseDown(node)) {
+        this.rename(node, false);
+      }
+    }, 300);
   }
 
-  private resetWorkspace(workspace: Workspace.Workspace.WorkspaceImpl): void {
+  #onCommitRename(node: NavigatorUISourceCodeTreeNode, newTitle: string): void {
+    void node.commitRename(newTitle);
+  }
+
+  #onCancelRename(node: NavigatorUISourceCodeTreeNode): void {
+    node.cancelRename();
+  }
+
+  #resetWorkspace(workspace: Workspace.Workspace.WorkspaceImpl): void {
     // Clear old event listeners first.
-    if (this.#workspace) {
-      this.#workspace.removeEventListener(
-          Workspace.Workspace.Events.UISourceCodeAdded, this.uiSourceCodeAddedCallback, this);
-      this.#workspace.removeEventListener(
-          Workspace.Workspace.Events.UISourceCodeRemoved, this.uiSourceCodeRemovedCallback, this);
-      this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectAdded, this.projectAddedCallback, this);
-      this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectRemoved, this.projectRemovedCallback, this);
+    if (this.#subscribed && this.#workspace) {
+      this.#workspace.removeEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this.#uiSourceCodeAddedCallback,
+                                          this);
+      this.#workspace.removeEventListener(Workspace.Workspace.Events.UISourceCodeRemoved,
+                                          this.#uiSourceCodeRemovedCallback, this);
+      this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectAdded, this.#projectAddedCallback, this);
+      this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectRemoved, this.#projectRemovedCallback,
+                                          this);
     }
 
     this.#workspace = workspace;
-    this.#workspace.addEventListener(
-        Workspace.Workspace.Events.UISourceCodeAdded, this.uiSourceCodeAddedCallback, this);
-    this.#workspace.addEventListener(
-        Workspace.Workspace.Events.UISourceCodeRemoved, this.uiSourceCodeRemovedCallback, this);
-    this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectAdded, this.projectAddedCallback, this);
-    this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectRemoved, this.projectRemovedCallback, this);
-    this.#workspace.projects().forEach(this.projectAdded.bind(this));
-    this.computeUniqueFileSystemProjectNames();
+    if (this.#subscribed) {
+      this.#workspace.addEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this.#uiSourceCodeAddedCallback,
+                                       this);
+      this.#workspace.addEventListener(Workspace.Workspace.Events.UISourceCodeRemoved,
+                                       this.#uiSourceCodeRemovedCallback, this);
+      this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectAdded, this.#projectAddedCallback, this);
+      this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectRemoved, this.#projectRemovedCallback, this);
+    }
+    this.#workspace.projects().forEach(this.#projectAdded.bind(this));
+    this.#computeUniqueFileSystemProjectNames();
   }
 
-  private projectAddedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
+  #projectAddedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
     const project = event.data;
-    this.projectAdded(project);
+    this.#projectAdded(project);
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
-      this.computeUniqueFileSystemProjectNames();
+      this.#computeUniqueFileSystemProjectNames();
     }
   }
 
-  private projectRemovedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
+  #projectRemovedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
     const project = event.data;
     this.removeProject(project);
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
-      this.computeUniqueFileSystemProjectNames();
+      this.#computeUniqueFileSystemProjectNames();
     }
   }
 
@@ -722,44 +1176,43 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     return !project.isServiceProject();
   }
 
-  private frameAttributionAdded(
-      event: Common.EventTarget.EventTargetEvent<Bindings.NetworkProject.FrameAttributionEvent>): void {
+  #frameAttributionAdded(event: Common.EventTarget.EventTargetEvent<Bindings.NetworkProject.FrameAttributionEvent>):
+      void {
     const {uiSourceCode} = event.data;
-    if (!this.acceptsUISourceCode(uiSourceCode)) {
+    if (!this.#acceptsUISourceCode(uiSourceCode)) {
       return;
     }
 
     const addedFrame = (event.data.frame as SDK.ResourceTreeModel.ResourceTreeFrame | null);
     // This event does not happen for UISourceCodes without initial attribution.
-    this.addUISourceCodeNode(uiSourceCode, addedFrame);
+    this.#addUISourceCodeNode(uiSourceCode, addedFrame);
   }
 
-  private frameAttributionRemoved(
-      event: Common.EventTarget.EventTargetEvent<Bindings.NetworkProject.FrameAttributionEvent>): void {
+  #frameAttributionRemoved(event: Common.EventTarget.EventTargetEvent<Bindings.NetworkProject.FrameAttributionEvent>):
+      void {
     const {uiSourceCode} = event.data;
-    if (!this.acceptsUISourceCode(uiSourceCode)) {
+    if (!this.#acceptsUISourceCode(uiSourceCode)) {
       return;
     }
 
     const removedFrame = (event.data.frame as SDK.ResourceTreeModel.ResourceTreeFrame | null);
-    const node = Array.from(this.uiSourceCodeNodes.get(uiSourceCode)).find(node => node.frame() === removedFrame);
+    const node = Array.from(this.#uiSourceCodeNodes.get(uiSourceCode)).find(node => node.frame() === removedFrame);
     if (node) {
-      this.removeUISourceCodeNode(node);
+      this.#removeUISourceCodeNode(node);
     }
   }
 
-  private acceptsUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+  #acceptsUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
     return this.acceptProject(uiSourceCode.project());
   }
 
-  private addUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    if (this.navigatorJustMyCodeSetting.get() &&
-        Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
-            uiSourceCode)) {
+  #addUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    if (this.#navigatorJustMyCodeSetting.get() &&
+        this.#ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(uiSourceCode)) {
       return;
     }
 
-    if (!this.acceptsUISourceCode(uiSourceCode)) {
+    if (!this.#acceptsUISourceCode(uiSourceCode)) {
       return;
     }
 
@@ -770,16 +1223,16 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     const frames = Bindings.NetworkProject.NetworkProject.framesForUISourceCode(uiSourceCode);
     if (frames.length) {
       for (const frame of frames) {
-        this.addUISourceCodeNode(uiSourceCode, frame);
+        this.#addUISourceCodeNode(uiSourceCode, frame);
       }
     } else {
-      this.addUISourceCodeNode(uiSourceCode, null);
+      this.#addUISourceCodeNode(uiSourceCode, null);
     }
     this.dispatchEventToListeners(Events.UI_SOURCE_CODE_ADDED, uiSourceCode);
   }
 
-  private addUISourceCodeNode(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, frame: SDK.ResourceTreeModel.ResourceTreeFrame|null): void {
+  #addUISourceCodeNode(uiSourceCode: Workspace.UISourceCode.UISourceCode,
+                       frame: SDK.ResourceTreeModel.ResourceTreeFrame|null): void {
     const isFromSourceMap = uiSourceCode.contentType().isFromSourceMap();
     let path;
     if (uiSourceCode.project().type() === Workspace.Workspace.projectTypes.FileSystem) {
@@ -792,39 +1245,37 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     const project = uiSourceCode.project();
     const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
     const folderNode =
-        this.folderNode(uiSourceCode, project, target, frame, uiSourceCode.origin(), path, isFromSourceMap);
+        this.#folderNode(uiSourceCode, project, target, frame, uiSourceCode.origin(), path, isFromSourceMap);
     const uiSourceCodeNode = new NavigatorUISourceCodeTreeNode(this, uiSourceCode, frame);
     const existingNode = folderNode.child(uiSourceCodeNode.id);
     if (existingNode && existingNode instanceof NavigatorUISourceCodeTreeNode) {
-      this.uiSourceCodeNodes.set(uiSourceCode, existingNode);
+      this.#uiSourceCodeNodes.set(uiSourceCode, existingNode);
     } else {
       folderNode.appendChild(uiSourceCodeNode);
-      this.uiSourceCodeNodes.set(uiSourceCode, uiSourceCodeNode);
+      this.#uiSourceCodeNodes.set(uiSourceCode, uiSourceCodeNode);
       uiSourceCodeNode.updateTitleBubbleUp();
     }
-    this.selectDefaultTreeNode();
+    this.#selectDefaultTreeNode();
   }
 
-  private uiSourceCodeAddedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>):
-      void {
+  #uiSourceCodeAddedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
     const uiSourceCode = event.data;
-    this.addUISourceCode(uiSourceCode);
+    this.#addUISourceCode(uiSourceCode);
   }
 
-  private uiSourceCodeRemovedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>):
-      void {
-    this.removeUISourceCodes([event.data]);
+  #uiSourceCodeRemovedCallback(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
+    this.#removeUISourceCodes([event.data]);
   }
 
   tryAddProject(project: Workspace.Workspace.Project): void {
-    this.projectAdded(project);
+    this.#projectAdded(project);
     for (const uiSourceCode of project.uiSourceCodes()) {
-      this.addUISourceCode(uiSourceCode);
+      this.#addUISourceCode(uiSourceCode);
     }
   }
 
-  private projectAdded(project: Workspace.Workspace.Project): void {
-    const rootOrDeployed = this.rootOrDeployedNode();
+  #projectAdded(project: Workspace.Workspace.Project): void {
+    const rootOrDeployed = this.#rootOrDeployedNode();
     const FILE_SYSTEM_TYPES = [
       Workspace.Workspace.projectTypes.ConnectableFileSystem,
       Workspace.Workspace.projectTypes.FileSystem,
@@ -839,18 +1290,17 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
         Types.AutomaticFileSystem :
         Types.FileSystem;
     rootOrDeployed.appendChild(new NavigatorGroupTreeNode(this, project, project.id(), type, project.displayName()));
-    this.selectDefaultTreeNode();
+    this.#selectDefaultTreeNode();
   }
 
-  // TODO(einbinder) remove this code after crbug.com/964075 is fixed
-  private selectDefaultTreeNode(): void {
+  #selectDefaultTreeNode(): void {
     const children = this.rootNode.children();
-    if (children.length && !this.selectedNode) {
-      this.selectNode(children[0], true /* omitFocus */, false /* selectedByUser */);
+    if (children.length && !this.#selectedNode) {
+      this.selectNode(children[0]);
     }
   }
 
-  private computeUniqueFileSystemProjectNames(): void {
+  #computeUniqueFileSystemProjectNames(): void {
     const fileSystemProjects = this.#workspace.projectsForType(Workspace.Workspace.projectTypes.FileSystem);
     if (!fileSystemProjects.length) {
       return;
@@ -865,7 +1315,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       reversedIndex.add(reversedPathParts);
     }
 
-    const rootOrDeployed = this.rootOrDeployedNode();
+    const rootOrDeployed = this.#rootOrDeployedNode();
 
     for (let i = 0; i < fileSystemProjects.length; ++i) {
       const reversedPath = reversedPaths[i];
@@ -885,26 +1335,22 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   }
 
   removeProject(project: Workspace.Workspace.Project): void {
-    this.removeUISourceCodes(project.uiSourceCodes());
+    this.#removeUISourceCodes(project.uiSourceCodes());
     if (project.type() !== Workspace.Workspace.projectTypes.ConnectableFileSystem &&
         project.type() !== Workspace.Workspace.projectTypes.FileSystem) {
       return;
     }
-    const fileSystemNode = this.rootNode.child(project.id());
-    if (!fileSystemNode) {
-      return;
-    }
-    this.rootNode.removeChild(fileSystemNode);
+    const fileSystemNode = this.#rootOrDeployedNode().child(project.id()) ?? this.rootNode.child(project.id());
+    fileSystemNode?.parent?.removeChild(fileSystemNode);
   }
 
-  private folderNodeId(
-      project: Workspace.Workspace.Project, target: SDK.Target.Target|null,
-      frame: SDK.ResourceTreeModel.ResourceTreeFrame|null, projectOrigin: string, isFromSourceMap: boolean,
-      path: Platform.DevToolsPath.EncodedPathString): string {
+  #folderNodeId(project: Workspace.Workspace.Project, target: SDK.Target.Target|null,
+                frame: SDK.ResourceTreeModel.ResourceTreeFrame|null, projectOrigin: string, isFromSourceMap: boolean,
+                path: Platform.DevToolsPath.EncodedPathString): string {
     const projectId = project.type() === Workspace.Workspace.projectTypes.FileSystem ? project.id() : '';
-    let targetId = target && !(this.groupByAuthored && isFromSourceMap) ? target.id() : '';
-    let frameId = this.groupByFrame && frame ? frame.id : '';
-    if (this.groupByAuthored) {
+    let targetId = target && !(this.#groupByAuthored && isFromSourceMap) ? target.id() : '';
+    let frameId = this.#groupByFrame && frame ? frame.id : '';
+    if (this.#groupByAuthored) {
       if (isFromSourceMap) {
         targetId = 'Authored';
         frameId = '';
@@ -915,35 +1361,34 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     return targetId + ':' + projectId + ':' + frameId + ':' + projectOrigin + ':' + path;
   }
 
-  private folderNode(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, project: Workspace.Workspace.Project,
-      target: SDK.Target.Target|null, frame: SDK.ResourceTreeModel.ResourceTreeFrame|null,
-      projectOrigin: Platform.DevToolsPath.UrlString, path: Platform.DevToolsPath.EncodedPathString[],
-      fromSourceMap: boolean): NavigatorTreeNode {
+  #folderNode(uiSourceCode: Workspace.UISourceCode.UISourceCode, project: Workspace.Workspace.Project,
+              target: SDK.Target.Target|null, frame: SDK.ResourceTreeModel.ResourceTreeFrame|null,
+              projectOrigin: Platform.DevToolsPath.UrlString, path: Platform.DevToolsPath.EncodedPathString[],
+              fromSourceMap: boolean): NavigatorTreeNode {
     if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(uiSourceCode)) {
       return this.rootNode;
     }
 
-    if (target && !this.groupByFolder && !fromSourceMap) {
-      return this.domainNode(uiSourceCode, project, target, frame, projectOrigin);
+    if (target && !this.#groupByFolder && !fromSourceMap) {
+      return this.#domainNode(uiSourceCode, project, target, frame, projectOrigin);
     }
 
     const folderPath = Common.ParsedURL.ParsedURL.join(path, '/');
-    const folderId = this.folderNodeId(project, target, frame, projectOrigin, fromSourceMap, folderPath);
-    let folderNode = this.subfolderNodes.get(folderId);
+    const folderId = this.#folderNodeId(project, target, frame, projectOrigin, fromSourceMap, folderPath);
+    let folderNode = this.#subfolderNodes.get(folderId);
     if (folderNode) {
       return folderNode;
     }
 
     if (!path.length) {
       if (target) {
-        return this.domainNode(uiSourceCode, project, target, frame, projectOrigin);
+        return this.#domainNode(uiSourceCode, project, target, frame, projectOrigin);
       }
-      return this.rootOrDeployedNode().child(project.id()) as NavigatorTreeNode;
+      return this.#rootOrDeployedNode().child(project.id()) as NavigatorTreeNode;
     }
 
     const parentNode =
-        this.folderNode(uiSourceCode, project, target, frame, projectOrigin, path.slice(0, -1), fromSourceMap);
+        this.#folderNode(uiSourceCode, project, target, frame, projectOrigin, path.slice(0, -1), fromSourceMap);
     let type: string = Types.NetworkFolder;
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
       type = Types.FileSystemFolder;
@@ -951,18 +1396,17 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     const name = Common.ParsedURL.ParsedURL.encodedPathToRawPathString(path[path.length - 1]);
 
     folderNode = new NavigatorFolderTreeNode(this, project, folderId, type, folderPath, name, projectOrigin);
-    this.subfolderNodes.set(folderId, folderNode);
+    this.#subfolderNodes.set(folderId, folderNode);
     parentNode.appendChild(folderNode);
     return folderNode;
   }
 
-  private domainNode(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, project: Workspace.Workspace.Project,
-      target: SDK.Target.Target, frame: SDK.ResourceTreeModel.ResourceTreeFrame|null,
-      projectOrigin: string): NavigatorTreeNode {
+  #domainNode(uiSourceCode: Workspace.UISourceCode.UISourceCode, project: Workspace.Workspace.Project,
+              target: SDK.Target.Target, frame: SDK.ResourceTreeModel.ResourceTreeFrame|null,
+              projectOrigin: string): NavigatorTreeNode {
     const isAuthored = uiSourceCode.contentType().isFromSourceMap();
-    const frameNode = this.frameNode(project, target, frame, isAuthored);
-    if (!this.groupByDomain) {
+    const frameNode = this.#frameNode(project, target, frame, isAuthored);
+    if (!this.#groupByDomain) {
       return frameNode;
     }
     let domainNode = frameNode.child(projectOrigin);
@@ -970,39 +1414,38 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       return domainNode;
     }
 
-    domainNode = new NavigatorGroupTreeNode(
-        this, project, projectOrigin, Types.Domain, this.computeProjectDisplayName(target, projectOrigin));
+    domainNode = new NavigatorGroupTreeNode(this, project, projectOrigin, Types.Domain,
+                                            this.#computeProjectDisplayName(target, projectOrigin));
     if (frame && projectOrigin === Common.ParsedURL.ParsedURL.extractOrigin(frame.url)) {
       domainNode.boostOrder = true;
     }
     frameNode.appendChild(domainNode);
-    if (isAuthored && this.groupByAuthored) {
+    if (isAuthored && this.#groupByAuthored) {
       this.expandNode(domainNode);
     }
     return domainNode;
   }
 
-  private frameNode(
-      project: Workspace.Workspace.Project, target: SDK.Target.Target,
-      frame: SDK.ResourceTreeModel.ResourceTreeFrame|null, isAuthored: boolean): NavigatorTreeNode {
-    if (!this.groupByFrame || !frame || (this.groupByAuthored && isAuthored)) {
-      return this.targetNode(project, target, isAuthored);
+  #frameNode(project: Workspace.Workspace.Project, target: SDK.Target.Target,
+             frame: SDK.ResourceTreeModel.ResourceTreeFrame|null, isAuthored: boolean): NavigatorTreeNode {
+    if (!this.#groupByFrame || !frame || (this.#groupByAuthored && isAuthored)) {
+      return this.#targetNode(project, target, isAuthored);
     }
 
-    let frameNode = this.frameNodes.get(frame);
+    let frameNode = this.#frameNodes.get(frame);
     if (frameNode) {
       return frameNode;
     }
 
     frameNode = new NavigatorGroupTreeNode(this, project, target.id() + ':' + frame.id, Types.Frame,
                                            frame.displayName(), undefined, frame);
-    this.frameNodes.set(frame, frameNode);
+    this.#frameNodes.set(frame, frameNode);
 
     const parentFrame = frame.parentFrame();
     if (!parentFrame) {
       frameNode.boostOrder = true;
     }
-    this.frameNode(project, parentFrame ? parentFrame.resourceTreeModel().target() : target, parentFrame, isAuthored)
+    this.#frameNode(project, parentFrame ? parentFrame.resourceTreeModel().target() : target, parentFrame, isAuthored)
         .appendChild(frameNode);
     if (!parentFrame) {
       this.expandNode(frameNode);
@@ -1010,21 +1453,20 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     return frameNode;
   }
 
-  private targetNode(project: Workspace.Workspace.Project, target: SDK.Target.Target, isAuthored: boolean):
-      NavigatorTreeNode {
-    if (this.groupByAuthored && isAuthored) {
-      if (!this.authoredNode) {
-        this.authoredNode = new NavigatorGroupTreeNode(
-            this, null, 'group:Authored', Types.Authored, i18nString(UIStrings.authored),
-            i18nString(UIStrings.authoredTooltip));
-        this.rootNode.appendChild(this.authoredNode);
-        this.expandNode(this.authoredNode);
+  #targetNode(project: Workspace.Workspace.Project, target: SDK.Target.Target, isAuthored: boolean): NavigatorTreeNode {
+    if (this.#groupByAuthored && isAuthored) {
+      if (!this.#authoredNode) {
+        this.#authoredNode =
+            new NavigatorGroupTreeNode(this, null, 'group:Authored', Types.Authored, i18nString(UIStrings.authored),
+                                       i18nString(UIStrings.authoredTooltip));
+        this.rootNode.appendChild(this.#authoredNode);
+        this.expandNode(this.#authoredNode);
       }
-      return this.authoredNode;
+      return this.#authoredNode;
     }
 
-    const rootOrDeployed = this.rootOrDeployedNode();
-    if (target === SDK.TargetManager.TargetManager.instance().scopeTarget()) {
+    const rootOrDeployed = this.#rootOrDeployedNode();
+    if (target === this.#targetManager.scopeTarget()) {
       return rootOrDeployed;
     }
 
@@ -1038,20 +1480,20 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     return targetNode;
   }
 
-  private rootOrDeployedNode(): NavigatorTreeNode {
-    if (this.groupByAuthored) {
-      if (!this.deployedNode) {
-        this.deployedNode = new NavigatorGroupTreeNode(
-            this, null, 'group:Deployed', Types.Deployed, i18nString(UIStrings.deployed),
-            i18nString(UIStrings.deployedTooltip));
-        this.rootNode.appendChild(this.deployedNode);
+  #rootOrDeployedNode(): NavigatorTreeNode {
+    if (this.#groupByAuthored) {
+      if (!this.#deployedNode) {
+        this.#deployedNode =
+            new NavigatorGroupTreeNode(this, null, 'group:Deployed', Types.Deployed, i18nString(UIStrings.deployed),
+                                       i18nString(UIStrings.deployedTooltip));
+        this.rootNode.appendChild(this.#deployedNode);
       }
-      return this.deployedNode;
+      return this.#deployedNode;
     }
     return this.rootNode;
   }
 
-  private computeProjectDisplayName(target: SDK.Target.Target, projectOrigin: string): string {
+  #computeProjectDisplayName(target: SDK.Target.Target, projectOrigin: string): string {
     const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
     const executionContexts = runtimeModel ? runtimeModel.executionContexts() : [];
 
@@ -1092,7 +1534,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
 
   revealUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode, select?: boolean): NavigatorUISourceCodeTreeNode
       |null {
-    const nodes = this.uiSourceCodeNodes.get(uiSourceCode);
+    const nodes = this.#uiSourceCodeNodes.get(uiSourceCode);
     if (nodes.size === 0) {
       return null;
     }
@@ -1100,16 +1542,15 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     if (!node) {
       return null;
     }
-    if (this.selectedNode) {
-      // If the tree outline is being marked as "being edited" (i.e. we're renaming a file
-      // or choosing the name for a new snippet), we shall not proceed with revealing here,
-      // as that will steal focus from the input widget and thus cancel editing. The
-      // test/e2e/snippets/breakpoint.test.ts exercises this.
-      if (UI.UIUtils.isBeingEdited(this.scriptsTree.element)) {
+    if (this.#selectedNode) {
+      // If a file is currently being renamed (or choosing the name for a new snippet),
+      // we shall not proceed with revealing here, as that will steal focus from the
+      // input widget and thus cancel editing. The test/e2e/snippets/breakpoint.test.ts
+      // exercises this.
+      if (this.isRenaming()) {
         return null;
       }
-      this.selectedNode.treeNode().deselect();
-      this.selectedNode = null;
+      this.#selectedNode = null;
     }
     // TODO(dgozman): figure out revealing multiple.
     node.reveal(select);
@@ -1124,7 +1565,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   #isUISourceCodeOrAnyAncestorSelected(node: NavigatorUISourceCodeTreeNode): boolean {
     let currentNode: NavigatorTreeNode|null = node;
     while (currentNode) {
-      if (currentNode === this.selectedNode) {
+      if (currentNode === this.#selectedNode) {
         return true;
       }
       currentNode = currentNode.parent;
@@ -1135,13 +1576,13 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     return false;
   }
 
-  private removeUISourceCodes(uiSourceCodes: Iterable<Workspace.UISourceCode.UISourceCode>): void {
+  #removeUISourceCodes(uiSourceCodes: Iterable<Workspace.UISourceCode.UISourceCode>): void {
     const nodesWithSelectionOnPath: NavigatorUISourceCodeTreeNode[] = [];
     // First we remove source codes without any selection on their path to root, and only then
     // the ones with selection. This to avoid layout work associated with moving the selection
     // around (crbug.com/1409025).
     for (const uiSourceCode of uiSourceCodes) {
-      const nodes = this.uiSourceCodeNodes.get(uiSourceCode);
+      const nodes = this.#uiSourceCodeNodes.get(uiSourceCode);
       for (const node of nodes) {
         if (this.#isUISourceCodeOrAnyAncestorSelected(node)) {
           nodesWithSelectionOnPath.push(node);
@@ -1153,9 +1594,13 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     nodesWithSelectionOnPath.forEach(this.removeUISourceCodeNode.bind(this));
   }
 
-  private removeUISourceCodeNode(node: NavigatorUISourceCodeTreeNode): void {
+  removeUISourceCodeNode(node: NavigatorUISourceCodeTreeNode): void {
+    this.#removeUISourceCodeNode(node);
+  }
+
+  #removeUISourceCodeNode(node: NavigatorUISourceCodeTreeNode): void {
     const uiSourceCode = node.uiSourceCode();
-    this.uiSourceCodeNodes.delete(uiSourceCode, node);
+    this.#uiSourceCodeNodes.delete(uiSourceCode, node);
     const project = uiSourceCode.project();
     const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
     let frame = node.frame();
@@ -1172,7 +1617,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       if (!parentNode) {
         break;
       }
-      if ((parentNode === this.rootNode || parentNode === this.deployedNode) &&
+      if ((parentNode === this.rootNode || parentNode === this.#deployedNode) &&
           project.type() === Workspace.Workspace.projectTypes.FileSystem) {
         break;
       }
@@ -1184,23 +1629,22 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
         break;
       }
       if (currentNode.type === Types.Frame) {
-        this.discardFrame(
-            frame as SDK.ResourceTreeModel.ResourceTreeFrame,
-            Boolean(this.groupByAuthored) && uiSourceCode.contentType().isFromSourceMap());
+        this.#discardFrame(frame as SDK.ResourceTreeModel.ResourceTreeFrame,
+                           Boolean(this.#groupByAuthored) && uiSourceCode.contentType().isFromSourceMap());
         frame = (frame as SDK.ResourceTreeModel.ResourceTreeFrame).parentFrame();
       } else {
-        const folderId = this.folderNodeId(
-            project, target, frame, uiSourceCode.origin(), uiSourceCode.contentType().isFromSourceMap(),
-            currentNode instanceof NavigatorFolderTreeNode && currentNode.folderPath ||
-                Platform.DevToolsPath.EmptyEncodedPathString);
-        this.subfolderNodes.delete(folderId);
+        const folderId = this.#folderNodeId(project, target, frame, uiSourceCode.origin(),
+                                            uiSourceCode.contentType().isFromSourceMap(),
+                                            currentNode instanceof NavigatorFolderTreeNode && currentNode.folderPath ||
+                                                Platform.DevToolsPath.EmptyEncodedPathString);
+        this.#subfolderNodes.delete(folderId);
         parentNode.removeChild(currentNode);
       }
 
-      if (currentNode === this.authoredNode) {
-        this.authoredNode = undefined;
-      } else if (currentNode === this.deployedNode) {
-        this.deployedNode = undefined;
+      if (currentNode === this.#authoredNode) {
+        this.#authoredNode = undefined;
+      } else if (currentNode === this.#deployedNode) {
+        this.#deployedNode = undefined;
       }
 
       currentNode = parentNode;
@@ -1208,38 +1652,37 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   }
 
   reset(tearDownOnly?: boolean): void {
-    for (const node of this.uiSourceCodeNodes.valuesArray()) {
+    for (const node of this.#uiSourceCodeNodes.valuesArray()) {
       node.dispose();
     }
 
-    this.scriptsTree.removeChildren();
-    this.scriptsTree.setFocusable(false);
-    this.selectedNode = null;
-    this.expandedNodes = new WeakSet();
-    this.uiSourceCodeNodes.clear();
-    this.subfolderNodes.clear();
-    this.frameNodes.clear();
+    this.#selectedNode = null;
+    this.#renamingNode = null;
+    this.#expandedNodes = new WeakSet();
+    this.#uiSourceCodeNodes.clear();
+    this.#subfolderNodes.clear();
+    this.#frameNodes.clear();
     this.rootNode.reset();
-    this.authoredNode = undefined;
-    this.deployedNode = undefined;
+    this.#authoredNode = undefined;
+    this.#deployedNode = undefined;
     if (!tearDownOnly) {
       // Reset the workspace to repopulate filesystem folders.
-      this.resetWorkspace(Workspace.Workspace.WorkspaceImpl.instance());
+      this.#resetWorkspace(this.#workspace);
     }
+    this.requestUpdate();
   }
 
-  private async renameShortcut(): Promise<boolean> {
-    if (!(this.selectedNode instanceof NavigatorUISourceCodeTreeNode) ||
-        !this.selectedNode.uiSourceCode().canRename()) {
+  async #renameShortcut(): Promise<boolean> {
+    if (!(this.#selectedNode instanceof NavigatorUISourceCodeTreeNode) ||
+        !this.#selectedNode.uiSourceCode().canRename()) {
       return false;
     }
-    this.rename(this.selectedNode, false);
+    this.rename(this.#selectedNode, false);
     return true;
   }
 
-  private handleContextMenuCreate(
-      project: Workspace.Workspace.Project, path: Platform.DevToolsPath.EncodedPathString,
-      uiSourceCode?: Workspace.UISourceCode.UISourceCode): void {
+  #handleContextMenuCreate(project: Workspace.Workspace.Project, path: Platform.DevToolsPath.EncodedPathString,
+                           uiSourceCode?: Workspace.UISourceCode.UISourceCode): void {
     if (uiSourceCode) {
       const relativePath = Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.relativePath(uiSourceCode);
       relativePath.pop();
@@ -1248,12 +1691,12 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     void this.create(project, path, uiSourceCode);
   }
 
-  private handleContextMenuRename(node: NavigatorUISourceCodeTreeNode): void {
+  #handleContextMenuRename(node: NavigatorUISourceCodeTreeNode): void {
     this.rename(node, false);
   }
 
-  private async handleContextMenuExclude(
-      project: Workspace.Workspace.Project, path: Platform.DevToolsPath.EncodedPathString): Promise<void> {
+  async #handleContextMenuExclude(project: Workspace.Workspace.Project,
+                                  path: Platform.DevToolsPath.EncodedPathString): Promise<void> {
     const shouldExclude = await UI.UIUtils.ConfirmDialog.show(
         i18nString(UIStrings.folderWillNotBeShown), i18nString(UIStrings.excludeThisFolder), undefined,
         {jslogContext: 'exclude-folder-confirmation'});
@@ -1265,7 +1708,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     }
   }
 
-  private async handleContextMenuDelete(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
+  async #handleContextMenuDelete(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
     const shouldDelete = await UI.UIUtils.ConfirmDialog.show(
         i18nString(UIStrings.actionCannotBeUndone), i18nString(UIStrings.deleteThisFile), undefined,
         {jslogContext: 'delete-file-confirmation'});
@@ -1274,26 +1717,30 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     }
   }
 
-  fileDragStarted(node: NavigatorUISourceCodeTreeNode, event: DragEvent): void {
-    if (!event.dataTransfer) {
-      return;
-    }
-    event.dataTransfer.setData('text/plain', node.uiSourceCode().url());
-    event.dataTransfer.effectAllowed = 'copy';
-  }
-
   shouldRenameOnMouseDown(node: NavigatorUISourceCodeTreeNode): boolean {
-    if (!node.uiSourceCode().canRename() || !node.treeElement) {
+    if (!node.uiSourceCode().canRename()) {
       return false;
     }
-    return this.selectedNode === node && this.scriptsTree.element.hasFocus() &&
-        !UI.UIUtils.isBeingEdited(this.scriptsTree.element);
+    return this.#selectedNode === node && this.contentElement.hasFocus() && !this.isRenaming();
   }
 
-  handleFileContextMenu(event: Event, node: NavigatorUISourceCodeTreeNode): void {
+  startRenamingNode(node: NavigatorUISourceCodeTreeNode): void {
+    this.#renamingNode = node;
+  }
+
+  stopRenamingNode(node: NavigatorUISourceCodeTreeNode): void {
+    if (this.#renamingNode === node) {
+      this.#renamingNode = null;
+    }
+  }
+
+  isRenaming(): boolean {
+    return this.#renamingNode !== null;
+  }
+
+  handleFileContextMenu(contextMenu: UI.ContextMenu.ContextMenu, node: NavigatorUISourceCodeTreeNode): void {
     const uiSourceCode = node.uiSourceCode();
     if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(uiSourceCode)) {
-      const contextMenu = new UI.ContextMenu.ContextMenu(event);
       contextMenu.headerSection().appendItem(i18nString(UIStrings.run),
                                              () => Snippets.ScriptSnippetFileSystem.evaluateScriptSnippet(uiSourceCode),
                                              {jslogContext: 'run'});
@@ -1302,32 +1749,31 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       contextMenu.editSection().appendItem(i18nString(UIStrings.remove),
                                            () => uiSourceCode.project().deleteFile(uiSourceCode),
                                            {jslogContext: 'remove'});
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), this.handleSaveAs.bind(this, uiSourceCode),
+      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), this.#handleSaveAs.bind(this, uiSourceCode),
                                            {jslogContext: 'save-as'});
       void contextMenu.show();
       return;
     }
 
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.appendApplicableItems(uiSourceCode);
 
     const project = uiSourceCode.project();
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
-      contextMenu.editSection().appendItem(
-          i18nString(UIStrings.rename), this.handleContextMenuRename.bind(this, node), {jslogContext: 'rename'});
+      contextMenu.editSection().appendItem(i18nString(UIStrings.rename), this.#handleContextMenuRename.bind(this, node),
+                                           {jslogContext: 'rename'});
       contextMenu.editSection().appendItem(
           i18nString(UIStrings.makeACopy),
-          this.handleContextMenuCreate.bind(this, project, Platform.DevToolsPath.EmptyEncodedPathString, uiSourceCode),
+          this.#handleContextMenuCreate.bind(this, project, Platform.DevToolsPath.EmptyEncodedPathString, uiSourceCode),
           {jslogContext: 'make-a-copy'});
-      contextMenu.editSection().appendItem(
-          i18nString(UIStrings.delete), this.handleContextMenuDelete.bind(this, uiSourceCode),
-          {jslogContext: 'delete'});
+      contextMenu.editSection().appendItem(i18nString(UIStrings.delete),
+                                           this.#handleContextMenuDelete.bind(this, uiSourceCode),
+                                           {jslogContext: 'delete'});
     }
 
     void contextMenu.show();
   }
 
-  private async handleSaveAs(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
+  async #handleSaveAs(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
     uiSourceCode.commitWorkingCopy();
     const contentData = await uiSourceCode.requestContentData();
     if (TextUtils.ContentData.ContentData.isError(contentData)) {
@@ -1335,30 +1781,30 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       Common.Console.Console.instance().error(i18nString(UIStrings.saveAsFailed), /* show=*/ false);
       return;
     }
-    await Workspace.FileManager.FileManager.instance().save(this.addJSExtension(uiSourceCode.url()), contentData,
+    await Workspace.FileManager.FileManager.instance().save(this.#addJSExtension(uiSourceCode.url()), contentData,
                                                             /* forceSaveAs=*/ true);
     Workspace.FileManager.FileManager.instance().close(uiSourceCode.url());
   }
 
-  private addJSExtension(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.UrlString {
+  #addJSExtension(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.UrlString {
     return Common.ParsedURL.ParsedURL.concatenate(url, '.js');
   }
 
-  private async handleDeleteFolder(node: NavigatorTreeNode): Promise<void> {
+  async #handleDeleteFolder(node: NavigatorTreeNode): Promise<void> {
     const shouldRemove = await UI.UIUtils.ConfirmDialog.show(
         i18nString(UIStrings.actionCannotBeUndone), i18nString(UIStrings.deleteFolder), undefined,
         {jslogContext: 'delete-folder-confirmation'});
     if (shouldRemove) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideTabDeleteFolderContextMenu);
-      const topNode = this.findTopNonMergedNode(node);
-      await this.removeUISourceCodeFromProject(topNode);
-      await this.deleteDirectoryRecursively(topNode);
+      const topNode = this.#findTopNonMergedNode(node);
+      await this.#removeUISourceCodeFromProject(topNode);
+      await this.#deleteDirectoryRecursively(topNode);
     }
   }
 
-  private async removeUISourceCodeFromProject(node: NavigatorTreeNode): Promise<void> {
+  async #removeUISourceCodeFromProject(node: NavigatorTreeNode): Promise<void> {
     node.children().slice(0).forEach(async child => {
-      await this.removeUISourceCodeFromProject(child);
+      await this.#removeUISourceCodeFromProject(child);
     });
 
     if (node instanceof NavigatorUISourceCodeTreeNode) {
@@ -1366,17 +1812,15 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     }
   }
 
-  private async deleteDirectoryRecursively(node: NavigatorTreeNode): Promise<void> {
+  async #deleteDirectoryRecursively(node: NavigatorTreeNode): Promise<void> {
     if (!(node instanceof NavigatorFolderTreeNode)) {
       return;
     }
 
-    await Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance()
-        .project()
-        ?.deleteDirectoryRecursively(node.folderPath);
+    await this.#networkPersistenceManager.project()?.deleteDirectoryRecursively(node.folderPath);
   }
 
-  private findTopNonMergedNode(node: NavigatorTreeNode): NavigatorTreeNode {
+  #findTopNonMergedNode(node: NavigatorTreeNode): NavigatorTreeNode {
     // multiple folder nodes can be merged into one if it only contains one file
     // e.g. the folder of "abc.com/assets/css/button.css" can be "abc.com/assets/css"
     // find the top non-merged node (abc.com) recursively
@@ -1389,7 +1833,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       return node;
     }
 
-    return this.findTopNonMergedNode(node.parent);
+    return this.#findTopNonMergedNode(node.parent);
   }
 
   folderHovered(node: NavigatorTreeNode, hovered: boolean): void {
@@ -1400,17 +1844,18 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
           overlayModel.highlightFrame(node.frame.id);
         }
       } else {
-        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(SDK.TargetManager.TargetManager.instance());
+        SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(this.#targetManager);
       }
     }
   }
 
-  handleFolderContextMenu(event: Event, node: NavigatorFolderTreeNode|NavigatorGroupTreeNode): void {
-    const path =
-        node instanceof NavigatorFolderTreeNode ? node.folderPath : Platform.DevToolsPath.EmptyEncodedPathString;
-    const project = node.project || null;
+  handleFolderContextMenu(contextMenu: UI.ContextMenu.ContextMenu,
+                          node: NavigatorFolderTreeNode|NavigatorGroupTreeNode): void {
+    const activeNode = node instanceof NavigatorFolderTreeNode ? node.mergedLeafNode() : node;
+    const path = activeNode instanceof NavigatorFolderTreeNode ? activeNode.folderPath :
+                                                                 Platform.DevToolsPath.EmptyEncodedPathString;
+    const project = activeNode.project || null;
 
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (project?.type() !== Workspace.Workspace.projectTypes.ConnectableFileSystem) {
       NavigatorView.appendSearchItem(contextMenu, path);
     }
@@ -1429,26 +1874,26 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
           {jslogContext: 'open-folder'});
       if (project.canCreateFile()) {
         contextMenu.defaultSection().appendItem(i18nString(UIStrings.newFile), () => {
-          this.handleContextMenuCreate(project, path, undefined);
+          this.#handleContextMenuCreate(project, path, undefined);
         }, {jslogContext: 'new-file'});
       }
-    } else if (node instanceof NavigatorFolderTreeNode && node.origin && node.folderPath) {
-      const url = Common.ParsedURL.ParsedURL.concatenate(node.origin, '/', node.folderPath);
+    } else if (activeNode instanceof NavigatorFolderTreeNode && activeNode.origin && activeNode.folderPath) {
+      const url = Common.ParsedURL.ParsedURL.concatenate(activeNode.origin, '/', activeNode.folderPath);
       const options = {
-        isContentScript: node.recursiveProperties.exclusivelyContentScripts || false,
-        isKnownThirdParty: node.recursiveProperties.exclusivelyThirdParty || false,
-        isCurrentlyIgnoreListed: node.recursiveProperties.exclusivelyIgnored || false,
+        isContentScript: activeNode.recursiveProperties.exclusivelyContentScripts || false,
+        isKnownThirdParty: activeNode.recursiveProperties.exclusivelyThirdParty || false,
+        isCurrentlyIgnoreListed: activeNode.recursiveProperties.exclusivelyIgnored || false,
       };
-      for (const {text, callback, jslogContext} of Workspace.IgnoreListManager.IgnoreListManager.instance()
-               .getIgnoreListFolderContextMenuItems(url, options)) {
+      for (const {text, callback, jslogContext} of this.#ignoreListManager.getIgnoreListFolderContextMenuItems(
+               url, options)) {
         contextMenu.defaultSection().appendItem(text, callback, {jslogContext});
       }
     }
 
     if (project.canExcludeFolder(path)) {
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.excludeFolder), this.handleContextMenuExclude.bind(this, project, path),
-          {jslogContext: 'exclude-folder'});
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.excludeFolder),
+                                              this.#handleContextMenuExclude.bind(this, project, path),
+                                              {jslogContext: 'exclude-folder'});
     }
 
     if (project.type() === Workspace.Workspace.projectTypes.ConnectableFileSystem) {
@@ -1465,10 +1910,9 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
       if (Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(project) !==
           Persistence.PlatformFileSystem.PlatformFileSystemType.OVERRIDES) {
-        if (node instanceof NavigatorGroupTreeNode) {
+        if (activeNode instanceof NavigatorGroupTreeNode) {
           contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeFolderFromWorkspace), async () => {
-            const header =
-                i18nString(UIStrings.areYouSureYouWantToRemoveThis, {PH1: (node as NavigatorGroupTreeNode).title});
+            const header = i18nString(UIStrings.areYouSureYouWantToRemoveThis, {PH1: activeNode.title});
             const shouldRemove =
                 await UI.UIUtils.ConfirmDialog.show(i18nString(UIStrings.workspaceStopSyncing), header, undefined, {
                   okButtonLabel: i18nString(UIStrings.remove),
@@ -1479,9 +1923,9 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
             }
           }, {jslogContext: 'remove-folder-from-workspace'});
         }
-      } else if (!(node instanceof NavigatorGroupTreeNode)) {
+      } else if (!(activeNode instanceof NavigatorGroupTreeNode)) {
         contextMenu.defaultSection().appendItem(
-            i18nString(UIStrings.delete), this.handleDeleteFolder.bind(this, node), {jslogContext: 'delete'});
+            i18nString(UIStrings.delete), this.#handleDeleteFolder.bind(this, activeNode), {jslogContext: 'delete'});
       }
     }
 
@@ -1498,7 +1942,7 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
       }
       if (!committed) {
         uiSourceCode.remove();
-      } else if (node.treeElement?.listItemElement.hasFocus()) {
+      } else if (this.contentElement.hasFocus()) {
         this.sourceSelected(uiSourceCode, true);
       }
     }
@@ -1524,43 +1968,55 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     }
   }
 
-  private groupingChanged(): void {
+  #groupingChanged(): void {
     this.reset(true);
-    this.initGrouping();
+    this.#initGrouping();
     // Reset the workspace to repopulate filesystem folders.
-    this.resetWorkspace(Workspace.Workspace.WorkspaceImpl.instance());
-    this.#workspace.uiSourceCodes().forEach(this.addUISourceCode.bind(this));
+    this.#resetWorkspace(this.#workspace);
+    this.#workspace.uiSourceCodes().forEach(this.#addUISourceCode.bind(this));
   }
 
-  private ignoreListChanged(): void {
-    if (this.navigatorJustMyCodeSetting.get()) {
-      this.groupingChanged();
+  #ignoreListChanged(): void {
+    if (this.#navigatorJustMyCodeSetting.get()) {
+      this.#groupingChanged();
     } else {
       this.rootNode.updateTitleRecursive();
     }
   }
 
-  private initGrouping(): void {
-    this.groupByFrame = true;
-    this.groupByDomain = this.navigatorGroupByFolderSetting.get();
-    this.groupByFolder = this.groupByDomain;
-    if (this.navigatorGroupByAuthoredSetting) {
-      this.groupByAuthored = this.navigatorGroupByAuthoredSetting.get();
+  #initGrouping(): void {
+    this.#groupByFrame = true;
+    this.#groupByDomain = this.#navigatorGroupByFolderSetting.get();
+    this.#groupByFolder = this.#groupByDomain;
+    if (this.#navigatorGroupByAuthoredSetting) {
+      this.#groupByAuthored = this.#navigatorGroupByAuthoredSetting.get();
     } else {
-      this.groupByAuthored = false;
+      this.#groupByAuthored = false;
     }
+    this.#prevJustMyCode = this.#navigatorJustMyCodeSetting.get();
   }
 
-  protected resetForTest(): void {
+  protected resetForTest(groupBy?: {frame?: boolean, domain?: boolean, folder?: boolean}): void {
+    if (groupBy) {
+      if (typeof groupBy.frame === 'boolean') {
+        this.#groupByFrame = groupBy.frame;
+      }
+      if (typeof groupBy.domain === 'boolean') {
+        this.#groupByDomain = groupBy.domain;
+      }
+      if (typeof groupBy.folder === 'boolean') {
+        this.#groupByFolder = groupBy.folder;
+      }
+    }
     this.reset();
-    this.#workspace.uiSourceCodes().forEach(this.addUISourceCode.bind(this));
+    this.#workspace.uiSourceCodes().forEach(this.#addUISourceCode.bind(this));
   }
 
-  private discardFrame(frame: SDK.ResourceTreeModel.ResourceTreeFrame, isAuthored: boolean): void {
+  #discardFrame(frame: SDK.ResourceTreeModel.ResourceTreeFrame, isAuthored: boolean): void {
     if (isAuthored) {
       return;
     }
-    const node = this.frameNodes.get(frame);
+    const node = this.#frameNodes.get(frame);
     if (!node) {
       return;
     }
@@ -1568,9 +2024,9 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
     if (node.parent) {
       node.parent.removeChild(node);
     }
-    this.frameNodes.delete(frame);
+    this.#frameNodes.delete(frame);
     for (const child of frame.childFrames) {
-      this.discardFrame(child, isAuthored);
+      this.#discardFrame(child, isAuthored);
     }
   }
 
@@ -1578,16 +2034,16 @@ export class NavigatorView extends NavigatorViewBase implements SDK.TargetManage
   }
 
   targetRemoved(target: SDK.Target.Target): void {
-    const rootOrDeployed = this.rootOrDeployedNode();
+    const rootOrDeployed = this.#rootOrDeployedNode();
     const targetNode = rootOrDeployed.child('target:' + target.id());
     if (targetNode) {
       rootOrDeployed.removeChild(targetNode);
     }
   }
 
-  private targetNameChanged(event: Common.EventTarget.EventTargetEvent<SDK.Target.Target>): void {
+  #targetNameChanged(event: Common.EventTarget.EventTargetEvent<SDK.Target.Target>): void {
     const target = event.data;
-    const targetNode = this.rootOrDeployedNode().child('target:' + target.id());
+    const targetNode = this.#rootOrDeployedNode().child('target:' + target.id());
     if (targetNode) {
       targetNode.setTitle(target.name());
     }
@@ -1607,8 +2063,16 @@ export class NavigatorTreeNode {
   type: string;
   boostOrder = false;
   hasMappedFiles = false;
-  private populated: boolean;
-  isMerged: boolean;
+  #populated = false;
+  isMerged = false;
+
+  mergedTitle(): string {
+    return this.title;
+  }
+
+  effectiveChildren(): NavigatorTreeNode[] {
+    return this.#children.filter(node => !node.isMerged);
+  }
   parent!: NavigatorTreeNode|null;
   title!: string;
   tooltip?: string;
@@ -1616,6 +2080,7 @@ export class NavigatorTreeNode {
 
   #children: NavigatorTreeNode[] = [];
   readonly #childById = new Map<string, NavigatorTreeNode>();
+  #disposed = false;
 
   constructor(navigatorView: NavigatorView, id: string, type: string, tooltip?: string) {
     this.id = id;
@@ -1623,14 +2088,20 @@ export class NavigatorTreeNode {
     this.type = type;
     this.tooltip = tooltip;
 
-    this.populated = false;
-    this.isMerged = false;
     this.recursiveProperties = {
       exclusivelySourceMapped: null,
       exclusivelyIgnored: null,
       exclusivelyContentScripts: null,
       exclusivelyThirdParty: null,
     };
+  }
+
+  isDisposed(): boolean {
+    return this.#disposed;
+  }
+
+  dispose(): void {
+    this.#disposed = true;
   }
 
   computedTooltip(): string {
@@ -1649,66 +2120,6 @@ export class NavigatorTreeNode {
       tooltip = i18nString(UIStrings.sIgnoreListed, {PH1: tooltip});
     }
     return tooltip;
-  }
-
-  updateTooltip(treeElement?: UI.TreeOutline.TreeElement): void {
-    if (!treeElement) {
-      return;
-    }
-    let tooltip = this.computedTooltip();
-    if (treeElement.listItemElement.classList.contains('is-ignore-listed') &&
-        !this.recursiveProperties.exclusivelyIgnored) {
-      tooltip = i18nString(UIStrings.sIgnoreListed, {PH1: tooltip});
-    }
-    treeElement.tooltip = tooltip;
-  }
-
-  protected createFolderTreeElement(title: string, node: NavigatorTreeNode,
-                                    expandable = true): UI.TreeOutline.TreeElement {
-    const treeElement = new UI.TreeOutline.TreeElement('', expandable, contextForNodeType(this.type));
-    treeElement.listItemElement.classList.add('navigator-' + this.type + '-tree-item', 'navigator-folder-tree-item');
-    treeElement.title = title;
-    treeElement.tooltip = title;
-    treeElement.setLeadingIcons([renderFolderLeadingIcon(this.type)]);
-    this.navigatorView.setNodeForTreeElement(treeElement, node);
-    treeElement.onattach = () => {
-      treeElement.collapse();
-      this.navigatorView.nodeForTreeElement(treeElement)?.onattach();
-    };
-    let hovered = false;
-    treeElement.listItemElement.addEventListener('contextmenu', (event: Event) => {
-      const activeNode = this.navigatorView.nodeForTreeElement(treeElement);
-      if (!activeNode ||
-          !(activeNode instanceof NavigatorFolderTreeNode || activeNode instanceof NavigatorGroupTreeNode)) {
-        return;
-      }
-      this.navigatorView.selectNode(activeNode);
-      this.navigatorView.handleFolderContextMenu(event, activeNode);
-    }, false);
-    treeElement.listItemElement.addEventListener('mousemove', (_event: Event) => {
-      const activeNode = this.navigatorView.nodeForTreeElement(treeElement);
-      if (hovered || !activeNode) {
-        return;
-      }
-      hovered = true;
-      this.navigatorView.folderHovered(activeNode, true);
-    }, false);
-    treeElement.listItemElement.addEventListener('mouseleave', (_event: Event) => {
-      const activeNode = this.navigatorView.nodeForTreeElement(treeElement);
-      if (!activeNode) {
-        return;
-      }
-      hovered = false;
-      this.navigatorView.folderHovered(activeNode, false);
-    }, false);
-    return treeElement;
-  }
-
-  treeNode(): UI.TreeOutline.TreeElement {
-    throw new Error('Not implemented');
-  }
-
-  dispose(): void {
   }
 
   updateTitle(): void {
@@ -1750,31 +2161,23 @@ export class NavigatorTreeNode {
     if (this.parent) {
       this.parent.populate();
     }
-    this.populated = true;
+    this.#populated = true;
     this.wasPopulated();
   }
 
   wasPopulated(): void {
-    const children = this.children();
-    for (let i = 0; i < children.length; ++i) {
-      this.navigatorView.appendChild(this.treeNode(), (children[i].treeNode()));
-    }
+    this.navigatorView.requestUpdate();
   }
 
-  didAddChild(node: NavigatorTreeNode): void {
-    if (this.isPopulated()) {
-      this.navigatorView.appendChild(this.treeNode(), (node.treeNode()));
-    }
+  didAddChild(_node: NavigatorTreeNode): void {
+    this.navigatorView.requestUpdate();
   }
 
-  willRemoveChild(node: NavigatorTreeNode): void {
-    if (this.isPopulated()) {
-      this.navigatorView.removeChild(this.treeNode(), (node.treeNode()));
-    }
+  willRemoveChild(_node: NavigatorTreeNode): void {
   }
 
   isPopulated(): boolean {
-    return this.populated;
+    return this.#populated;
   }
 
   isEmpty(): boolean {
@@ -1790,21 +2193,41 @@ export class NavigatorTreeNode {
   }
 
   appendChild(node: NavigatorTreeNode): void {
-    this.#children.push(node);
+    Platform.ArrayUtilities.insertWithComparator(this.#children, node, NavigatorView.compareNodes);
     this.#childById.set(node.id, node);
     node.parent = this;
     this.didAddChild(node);
   }
 
+  resortChild(node: NavigatorTreeNode): void {
+    const idx = this.#children.indexOf(node);
+    if (idx < 0) {
+      return;
+    }
+    this.#children.splice(idx, 1);
+    Platform.ArrayUtilities.insertWithComparator(this.#children, node, NavigatorView.compareNodes);
+    this.navigatorView.requestUpdate();
+  }
+
   removeChild(node: NavigatorTreeNode): void {
-    this.willRemoveChild(node);
+    const isSelected = this.navigatorView.isNodeSelectedOrDescendant(node);
     const idx = this.#children.findIndex(n => n.id === node.id);
+    const nextNode = isSelected && idx >= 0 ?
+        (this.#children[idx + 1] ?? this.#children[idx - 1] ?? (this !== this.navigatorView.rootNode ? this : null)) :
+        null;
+    if (nextNode) {
+      this.navigatorView.selectNode(nextNode);
+    } else {
+      this.navigatorView.deselectIfDescendant(node);
+    }
+    this.willRemoveChild(node);
     if (idx >= 0) {
       this.#children.splice(idx, 1);
     }
     this.#childById.delete(node.id);
     node.parent = null;
     node.dispose();
+    this.navigatorView.requestUpdate();
   }
 
   reset(): void {
@@ -1829,24 +2252,20 @@ export class NavigatorRootTreeNode extends NavigatorTreeNode {
   override isRoot(): boolean {
     return true;
   }
-
-  override treeNode(): UI.TreeOutline.TreeElement {
-    return this.navigatorView.scriptsTree.rootElement();
-  }
 }
 
 export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
   #uiSourceCode: Workspace.UISourceCode.UISourceCode;
-  treeElement: UI.TreeOutline.TreeElement|null;
-  private eventListeners: Common.EventTarget.EventDescriptor[];
+  isEditing = false;
+  #eventListeners: Common.EventTarget.EventDescriptor[];
   readonly #frame: SDK.ResourceTreeModel.ResourceTreeFrame|null;
+  #renameCallback?: (committed: boolean) => void;
+
   constructor(
       navigatorView: NavigatorView, uiSourceCode: Workspace.UISourceCode.UISourceCode,
       frame: SDK.ResourceTreeModel.ResourceTreeFrame|null) {
     super(navigatorView, 'UISourceCode:' + uiSourceCode.canonicalScriptId(), Types.File);
     this.#uiSourceCode = uiSourceCode;
-    this.treeElement = null;
-    this.eventListeners = [];
     this.#frame = frame;
     this.recursiveProperties.exclusivelySourceMapped = uiSourceCode.contentType().isFromSourceMap();
     if (uiSourceCode.contentType().isScript()) {
@@ -1855,7 +2274,17 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
       this.recursiveProperties.exclusivelyContentScripts =
           uiSourceCode.project().type() === Workspace.Workspace.projectTypes.ContentScripts;
     }
+    window.dispatchEvent(new CustomEvent(
+        'source-tree-file-added', {bubbles: true, cancelable: true, detail: this.#uiSourceCode.fullDisplayName()}));
+
     this.updateTitle();
+
+    const updateTitleBound = this.updateTitle.bind(this, undefined);
+    this.#eventListeners = [
+      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, updateTitleBound),
+      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyChanged, updateTitleBound),
+      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted, updateTitleBound),
+    ];
   }
 
   frame(): SDK.ResourceTreeModel.ResourceTreeFrame|null {
@@ -1866,130 +2295,14 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
     return this.#uiSourceCode;
   }
 
-  updateIcon(): void {
-    if (!this.treeElement) {
-      return;
-    }
-    const icon = PanelUtils.getIconForSourceFile(this.#uiSourceCode);
-    this.treeElement.setLeadingIcons([icon]);
-  }
-
-  updateAccessibleName(): void {
-    if (!this.treeElement) {
-      return;
-    }
-    UI.ARIAUtils.setLabel(this.treeElement.listItemElement, `${this.#uiSourceCode.name()}, ${this.type}`);
-  }
-
-  updateTrailingIcons(): void {
-    if (!this.treeElement) {
-      return;
-    }
-    const trailingIcons = renderSourceTrailingIcons(
-        this.#uiSourceCode,
-        (uiSourceCode, focusSource) => this.navigatorView.sourceSelected(uiSourceCode, focusSource));
-    this.treeElement.setTrailingIcons(trailingIcons);
-  }
-
-  override onattach(): void {
-    this.updateTrailingIcons();
-  }
-
-  override treeNode(): UI.TreeOutline.TreeElement {
-    if (this.treeElement) {
-      return this.treeElement;
-    }
-
-    this.treeElement = new UI.TreeOutline.TreeElement('', false, this.#uiSourceCode.contentType().name());
-    this.treeElement.listItemElement.classList.add(
-        'navigator-' + this.#uiSourceCode.contentType().name() + '-tree-item', 'navigator-file-tree-item');
-    this.treeElement.listItemElement.draggable = true;
-    (this.treeElement.titleElement as HTMLElement).setAttribute('jslog', `${VisualLogging.value('title').track({
-                                                                  change: true,
-                                                                })}`);
-    this.navigatorView.setNodeForTreeElement(this.treeElement, this);
-
-    const treeElement = this.treeElement;
-    treeElement.selectOnMouseDown = (event: MouseEvent) => {
-      if (event.which !== 1 || !this.navigatorView.shouldRenameOnMouseDown(this)) {
-        UI.TreeOutline.TreeElement.prototype.selectOnMouseDown.call(treeElement, event);
-        return;
-      }
-      window.setTimeout(() => {
-        if (this.navigatorView.shouldRenameOnMouseDown(this)) {
-          this.navigatorView.rename(this, false);
-        }
-      }, 300);
-    };
-    treeElement.onspace = () => {
-      this.navigatorView.sourceSelected(this.#uiSourceCode, true);
-      return true;
-    };
-    treeElement.ondblclick = (event: Event) => {
-      const middleClick = (event as MouseEvent).button === 1;
-      this.navigatorView.sourceSelected(this.#uiSourceCode, !middleClick);
-      return false;
-    };
-    treeElement.onenter = () => {
-      this.navigatorView.sourceSelected(this.#uiSourceCode, true);
-      return true;
-    };
-    treeElement.ondelete = () => true;
-
-    treeElement.onattach = () => {
-      this.onattach();
-    };
-
-    treeElement.listItemElement.addEventListener('click', () => {
-      this.navigatorView.sourceSelected(this.#uiSourceCode, false);
-    }, false);
-    treeElement.listItemElement.addEventListener('contextmenu', (event: Event) => {
-      this.navigatorView.selectNode(this);
-      this.navigatorView.handleFileContextMenu(event, this);
-    }, false);
-    treeElement.listItemElement.addEventListener('dragstart', (event: DragEvent) => {
-      this.navigatorView.fileDragStarted(this, event);
-    }, false);
-
-    window.dispatchEvent(new CustomEvent(
-        'source-tree-file-added', {bubbles: true, cancelable: true, detail: this.#uiSourceCode.fullDisplayName()}));
-
-    this.updateTitle();
-
-    const updateTitleBound = this.updateTitle.bind(this, undefined);
-    this.eventListeners = [
-      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, updateTitleBound),
-      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyChanged, updateTitleBound),
-      this.#uiSourceCode.addEventListener(Workspace.UISourceCode.Events.WorkingCopyCommitted, updateTitleBound),
-    ];
-    return this.treeElement;
-  }
-
-  private updateTreeElement(): void {
-    if (!this.treeElement) {
-      return;
-    }
-
-    this.treeElement.title = this.title;
-    this.updateIcon();
-    this.updateTrailingIcons();
-
-    this.treeElement.listItemElement.classList.toggle('is-ignore-listed',
-                                                      Boolean(this.recursiveProperties.exclusivelyIgnored));
-
-    this.treeElement.tooltip = this.tooltip ?? '';
-    this.updateAccessibleName();
-  }
-
   override updateTitle(ignoreIsDirty?: boolean): void {
     const isIgnoreListed =
-        Workspace.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
-            this.#uiSourceCode);
+        this.navigatorView.ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(this.#uiSourceCode);
     this.recursiveProperties.exclusivelyIgnored =
         (this.#uiSourceCode.contentType().isScript() || isIgnoreListed) ? isIgnoreListed : null;
 
     let titleText = this.#uiSourceCode.displayName();
-    if (!ignoreIsDirty && this.#uiSourceCode.isDirty()) {
+    if (!ignoreIsDirty && !this.isEditing && this.#uiSourceCode.isDirty()) {
       titleText = '*' + titleText;
     }
     this.title = titleText;
@@ -2004,7 +2317,7 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
     this.tooltip = tooltip;
 
     this.updateId('UISourceCode:' + this.#uiSourceCode.canonicalScriptId());
-    this.updateTreeElement();
+    this.navigatorView.requestUpdate();
   }
 
   override hasChildren(): boolean {
@@ -2012,78 +2325,86 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
   }
 
   override dispose(): void {
-    Common.EventTarget.removeEventListeners(this.eventListeners);
+    super.dispose();
+    Common.EventTarget.removeEventListeners(this.#eventListeners);
+    if (this.isEditing) {
+      this.isEditing = false;
+      this.navigatorView.stopRenamingNode(this);
+    }
+    const callback = this.#renameCallback;
+    this.#renameCallback = undefined;
+    if (callback) {
+      callback(false);
+    }
   }
 
   reveal(select?: boolean): void {
-    if (this.parent) {
-      this.parent.populate();
-      this.navigatorView.expandNode(this.parent);
+    let parent = this.parent;
+    while (parent && parent !== this.navigatorView.rootNode) {
+      parent.populate();
+      this.navigatorView.expandNode(parent);
+      parent = parent.parent;
     }
-    if (this.treeElement) {
-      this.treeElement.reveal(true);
-      if (select) {
-        this.navigatorView.selectNode(this, true);
-      }
+    if (select) {
+      this.navigatorView.selectNode(this);
     }
   }
 
   rename(callback?: ((committed: boolean) => void)): void {
-    if (!this.treeElement) {
+    if (this.isDisposed()) {
       return;
     }
-
-    this.treeElement.listItemElement.focus();
-
-    if (!this.treeElement.treeOutline) {
-      return;
-    }
-
-    // Tree outline should be marked as edited as well as the tree element to prevent search from starting.
-    const treeOutlineElement = this.treeElement.treeOutline.element;
-    UI.UIUtils.markBeingEdited(treeOutlineElement, true);
-
-    const commitHandler = (_element: Element, newTitle: string, oldTitle: string|null): void => {
-      if (newTitle !== oldTitle) {
-        if (this.treeElement) {
-          this.treeElement.title = newTitle;
-        }
-        // necessary cast to RawPathString as alternative would be altering type of Config<T>
-        void this.#uiSourceCode.rename(newTitle as Platform.DevToolsPath.RawPathString).then(renameCallback);
-        return;
-      }
-      afterEditing(true);
-    };
-
-    const renameCallback = (success: boolean): void => {
-      if (!success) {
-        UI.UIUtils.markBeingEdited(treeOutlineElement, false);
-        this.updateTitle();
-        this.rename(callback);
-        return;
-      }
-      if (this.treeElement) {
-        const {parent} = this.treeElement;
-        if (parent) {
-          parent.removeChild(this.treeElement);
-          parent.appendChild(this.treeElement);
-          this.navigatorView.selectNode(this);
-        }
-      }
-      afterEditing(true);
-    };
-
-    const afterEditing = (committed: boolean): void => {
-      UI.UIUtils.markBeingEdited(treeOutlineElement, false);
-      this.updateTitle();
-      if (callback) {
-        callback(committed);
-      }
-    };
-
+    this.#renameCallback = callback;
+    this.navigatorView.startRenamingNode(this);
+    this.isEditing = true;
     this.updateTitle(true);
-    this.treeElement.startEditingTitle(
-        new UI.InplaceEditor.Config(commitHandler, () => afterEditing(false), undefined));
+  }
+
+  async commitRename(newTitle: string): Promise<void> {
+    if (this.isDisposed()) {
+      return;
+    }
+    const oldTitle = this.title;
+    if (newTitle !== oldTitle) {
+      this.isEditing = false;
+      this.title = newTitle;
+      this.navigatorView.stopRenamingNode(this);
+      this.navigatorView.requestUpdate();
+      const success = await this.#uiSourceCode.rename(newTitle as Platform.DevToolsPath.RawPathString);
+      if (this.isDisposed()) {
+        return;
+      }
+      if (!success) {
+        this.updateTitle();
+        this.rename(this.#renameCallback);
+        return;
+      }
+      this.parent?.resortChild(this);
+    }
+    this.#afterEditing(true);
+  }
+
+  cancelRename(): void {
+    if (this.isDisposed()) {
+      return;
+    }
+    this.#afterEditing(false);
+  }
+
+  #afterEditing(committed: boolean): void {
+    this.isEditing = false;
+    this.navigatorView.stopRenamingNode(this);
+    this.updateTitle();
+    this.navigatorView.selectNode(this);
+    this.navigatorView.requestUpdate();
+    void this.navigatorView.updateComplete.then(() => {
+      this.navigatorView.focus();
+    });
+    if (this.#renameCallback) {
+      const cb = this.#renameCallback;
+      this.#renameCallback = undefined;
+      cb(committed);
+    }
   }
 }
 
@@ -2092,7 +2413,7 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
   readonly folderPath: Platform.DevToolsPath.EncodedPathString;
   readonly origin: Platform.DevToolsPath.UrlString;
   override title: string;
-  treeElement: UI.TreeOutline.TreeElement|null = null;
+
   constructor(
       navigatorView: NavigatorView, project: Workspace.Workspace.Project|null, id: string, type: string,
       folderPath: Platform.DevToolsPath.EncodedPathString, title: string, origin: Platform.DevToolsPath.UrlString) {
@@ -2103,16 +2424,18 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
     this.origin = origin;
   }
 
-  override treeNode(): UI.TreeOutline.TreeElement {
-    if (this.treeElement) {
-      return this.treeElement;
+  override computedTooltip(): string {
+    if (this.isMerged) {
+      return super.computedTooltip();
     }
-    this.treeElement = this.createTreeElement(this.title, this);
-    this.updateTitle();
-    return this.treeElement;
+    const leafNode = this.mergedLeafNode();
+    if (leafNode !== this) {
+      return leafNode.computedTooltip();
+    }
+    return super.computedTooltip();
   }
 
-  private computeHasMappedFiles(): boolean {
+  #computeHasMappedFiles(): boolean {
     if (!this.project || this.project.type() !== Workspace.Workspace.projectTypes.FileSystem) {
       return false;
     }
@@ -2124,25 +2447,10 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
     const isOverrides =
         Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(this.project) === 'overrides';
     return isOverrides ?
-        Common.Settings.Settings.instance()
+        this.navigatorView.settings
             .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
             .get() :
-        Persistence.Persistence.PersistenceImpl.instance().filePathHasBindings(absoluteFileSystemPath);
-  }
-
-  private updateTreeElement(): void {
-    if (!this.treeElement) {
-      return;
-    }
-
-    this.treeElement.listItemElement.classList.toggle('is-from-source-map',
-                                                      Boolean(this.recursiveProperties.exclusivelySourceMapped));
-    this.treeElement.listItemElement.classList.toggle('is-ignore-listed',
-                                                      Boolean(this.recursiveProperties.exclusivelyIgnored));
-    this.treeElement.listItemElement.classList.toggle('has-mapped-files', this.hasMappedFiles);
-
-    const activeNode = this.navigatorView.nodeForTreeElement(this.treeElement) ?? this;
-    activeNode.updateTooltip(this.treeElement);
+        this.navigatorView.persistence.filePathHasBindings(absoluteFileSystemPath);
   }
 
   override updateTitle(): void {
@@ -2160,123 +2468,59 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
       this.recursiveProperties[propName] = propValue;
     }
 
-    this.hasMappedFiles = this.computeHasMappedFiles();
-
-    this.updateTreeElement();
-  }
-
-  private createTreeElement(title: string, node: NavigatorTreeNode): UI.TreeOutline.TreeElement {
-    return this.createFolderTreeElement(title, node);
-  }
-
-  override wasPopulated(): void {
-    if (!this.treeElement || this.navigatorView.nodeForTreeElement(this.treeElement) !== this) {
-      return;
-    }
-    this.addChildrenRecursive();
-  }
-
-  private addChildrenRecursive(): void {
-    const children = this.children();
-    for (let i = 0; i < children.length; ++i) {
-      const child = children[i];
-      this.didAddChild(child);
-      if (child instanceof NavigatorFolderTreeNode) {
-        child.addChildrenRecursive();
-      }
-    }
-  }
-
-  private shouldMerge(node: NavigatorTreeNode): boolean {
-    return this.type !== Types.Domain && node instanceof NavigatorFolderTreeNode;
+    this.hasMappedFiles = this.#computeHasMappedFiles();
+    this.navigatorView.requestUpdate();
   }
 
   override didAddChild(node: NavigatorTreeNode): void {
-    if (!this.treeElement) {
-      return;
-    }
-
-    let children = this.children();
-
+    const children = this.children();
     if (children.length === 1 && this.shouldMerge(node)) {
       node.isMerged = true;
-      this.treeElement.title = this.treeElement.title + '/' + node.title;
-      (node as NavigatorFolderTreeNode).treeElement = this.treeElement;
-      node.updateTitle();
-      this.navigatorView.setNodeForTreeElement(this.treeElement, node);
-      return;
-    }
-
-    let oldNode;
-    if (children.length === 2) {
-      oldNode = children[0] !== node ? children[0] : children[1];
-    }
-    if (oldNode?.isMerged) {
-      oldNode.isMerged = false;
-      const mergedToNodes = [];
-      mergedToNodes.push(this);
-      let treeNode: (NavigatorTreeNode|null)|NavigatorTreeNode|this = this;
-      while (treeNode && treeNode.isMerged) {
-        treeNode = treeNode.parent;
-        if (treeNode) {
-          mergedToNodes.push(treeNode);
+      if (this.navigatorView.isNodeExpanded(this)) {
+        node.populate();
+        this.navigatorView.setNodeExpanded(node);
+      }
+    } else if (children.length === 2) {
+      const oldNode = children[0] !== node ? children[0] : children[1];
+      if (oldNode) {
+        oldNode.isMerged = false;
+        if (this.navigatorView.isNodeExpanded(this) || this.navigatorView.isNodeExpanded(oldNode)) {
+          this.populate();
+          oldNode.populate();
+          this.navigatorView.setNodeExpanded(this);
+          this.navigatorView.setNodeExpanded(oldNode);
         }
       }
-      mergedToNodes.reverse();
-      const titleText = mergedToNodes.map(node => node.title).join('/');
-
-      const nodes = [];
-      treeNode = oldNode;
-      do {
-        nodes.push(treeNode);
-        children = treeNode.children();
-        treeNode = children.length === 1 ? children[0] : null;
-      } while (treeNode?.isMerged);
-
-      if (!this.isPopulated()) {
-        this.treeElement.title = titleText;
-        this.navigatorView.setNodeForTreeElement(this.treeElement, this);
-        for (let i = 0; i < nodes.length; ++i) {
-          (nodes[i] as NavigatorFolderTreeNode).treeElement = null;
-          nodes[i].isMerged = false;
-        }
-        this.updateTitle();
-        return;
-      }
-      const oldTreeElement = this.treeElement;
-      const treeElement = this.createTreeElement(titleText, this);
-      for (let i = 0; i < mergedToNodes.length; ++i) {
-        (mergedToNodes[i] as NavigatorFolderTreeNode).treeElement = treeElement;
-        mergedToNodes[i].updateTitle();
-      }
-      if (oldTreeElement.parent) {
-        this.navigatorView.appendChild(oldTreeElement.parent, treeElement);
-      }
-
-      const oldTreeElementNode = this.navigatorView.nodeForTreeElement(oldTreeElement);
-      const wasExpanded = Boolean(oldTreeElementNode && this.navigatorView.isNodeExpanded(oldTreeElementNode));
-      oldTreeElement.title = nodes.map(node => node.title).join('/');
-      this.navigatorView.setNodeForTreeElement(oldTreeElement, nodes[nodes.length - 1]);
-      if (oldTreeElement.parent) {
-        this.navigatorView.removeChild(oldTreeElement.parent, oldTreeElement);
-      }
-      this.navigatorView.appendChild(this.treeElement, oldTreeElement);
-      if (wasExpanded) {
-        this.navigatorView.expandNode(this);
-      }
-      this.updateTitle();
     }
-    if (this.isPopulated()) {
-      this.navigatorView.appendChild(this.treeElement, node.treeNode());
-    }
+    super.didAddChild(node);
   }
 
-  override willRemoveChild(node: NavigatorTreeNode): void {
-    const actualNode = (node as NavigatorFolderTreeNode);
-    if (actualNode.isMerged || !this.isPopulated() || !this.treeElement || !actualNode.treeElement) {
-      return;
+  shouldMerge(node: NavigatorTreeNode): boolean {
+    return this.type !== Types.Domain && node instanceof NavigatorFolderTreeNode;
+  }
+
+  override mergedTitle(): string {
+    const children = this.children();
+    if (children.length === 1 && children[0].isMerged) {
+      return this.title + '/' + (children[0] as NavigatorFolderTreeNode).mergedTitle();
     }
-    this.navigatorView.removeChild(this.treeElement, actualNode.treeElement);
+    return this.title;
+  }
+
+  mergedLeafNode(): NavigatorFolderTreeNode {
+    const children = this.children();
+    if (children.length === 1 && children[0].isMerged) {
+      return (children[0] as NavigatorFolderTreeNode).mergedLeafNode();
+    }
+    return this;
+  }
+
+  override effectiveChildren(): NavigatorTreeNode[] {
+    const leaf = this.mergedLeafNode();
+    if (!leaf.isPopulated()) {
+      return [];
+    }
+    return leaf.children().filter(node => !node.isMerged);
   }
 }
 
@@ -2284,7 +2528,7 @@ export class NavigatorGroupTreeNode extends NavigatorTreeNode {
   readonly project: Workspace.Workspace.Project|null;
   override title: string;
   readonly frame?: SDK.ResourceTreeModel.ResourceTreeFrame;
-  treeElement?: UI.TreeOutline.TreeElement;
+
   constructor(navigatorView: NavigatorView, project: Workspace.Workspace.Project|null, id: string, type: string,
               title: string, tooltip?: string, frame?: SDK.ResourceTreeModel.ResourceTreeFrame) {
     super(navigatorView, id, type, tooltip);
@@ -2294,29 +2538,7 @@ export class NavigatorGroupTreeNode extends NavigatorTreeNode {
     this.populate();
   }
 
-  override treeNode(): UI.TreeOutline.TreeElement {
-    if (this.treeElement) {
-      return this.treeElement;
-    }
-    const expandable = !(this.project instanceof Persistence.AutomaticFileSystemWorkspaceBinding.FileSystem);
-    this.treeElement = this.createFolderTreeElement(this.title, this, expandable);
-    this.updateTrailingIcons();
-    return this.treeElement;
-  }
-
-  updateTrailingIcons(): void {
-    if (!this.treeElement) {
-      return;
-    }
-    const trailingIcons = renderGroupTrailingIcons(this.project);
-    this.treeElement.setTrailingIcons(trailingIcons);
-  }
-
-  override onattach(): void {
-    this.updateTitle();
-  }
-
-  private computeHasMappedFiles(): boolean {
+  #computeHasMappedFiles(): boolean {
     if (!this.project || this.project.type() !== Workspace.Workspace.projectTypes.FileSystem) {
       return false;
     }
@@ -2325,39 +2547,29 @@ export class NavigatorGroupTreeNode extends NavigatorTreeNode {
     const isOverrides =
         Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(this.project) === 'overrides';
     return isOverrides ?
-        Common.Settings.Settings.instance()
+        this.navigatorView.settings
             .resolve(Persistence.NetworkPersistenceManager.persistenceNetworkOverridesEnabledSettingDescriptor)
             .get() :
-        Persistence.Persistence.PersistenceImpl.instance().filePathHasBindings(fileSystemPath);
+        this.navigatorView.persistence.filePathHasBindings(fileSystemPath);
   }
 
   override updateTitle(): void {
-    this.hasMappedFiles = this.computeHasMappedFiles();
-
-    this.updateTrailingIcons();
-    if (!this.treeElement || !this.project || this.project.type() !== Workspace.Workspace.projectTypes.FileSystem) {
-      return;
-    }
-    const wasActive = this.treeElement.listItemElement.classList.contains('has-mapped-files');
+    const wasActive = this.hasMappedFiles;
+    this.hasMappedFiles = this.#computeHasMappedFiles();
     const isActive = this.hasMappedFiles;
-    this.treeElement.listItemElement.classList.toggle('has-mapped-files', isActive);
-    if (wasActive === isActive) {
-      return;
+
+    if (this.project?.type() === Workspace.Workspace.projectTypes.FileSystem && wasActive !== isActive) {
+      if (isActive) {
+        this.navigatorView.expandNode(this);
+      } else {
+        this.navigatorView.collapseNode(this);
+      }
     }
-    if (this.treeElement.childrenListElement.hasFocus()) {
-      return;
-    }
-    if (isActive) {
-      this.navigatorView.expandNode(this);
-    } else {
-      this.navigatorView.collapseNode(this);
-    }
+    this.navigatorView.requestUpdate();
   }
 
   override setTitle(title: string): void {
     this.title = title;
-    if (this.treeElement) {
-      this.treeElement.title = this.title;
-    }
+    this.navigatorView.requestUpdate();
   }
 }

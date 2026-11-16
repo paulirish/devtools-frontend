@@ -124,6 +124,30 @@ describeWithEnvironment('SettingsUI', () => {
     assert.isTrue(container.firstElementChild?.classList.contains('chrome-select-label'));
   });
 
+  it('renders overridden option texts', () => {
+    const setting = setup();
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+
+    Lit.render(SettingsUI.SettingsUI.renderSettingSelect(setting, undefined, false, new Map([['a', 'A (default)']])),
+               container);
+
+    const select = container.querySelector('select');
+    assert.isNotNull(select);
+    assert.deepEqual([...select.options].map(option => option.text), ['A (default)', 'B']);
+    assert.deepEqual([...select.options].map(option => option.value), ['a', 'b']);
+
+    select.value = 'b';
+    select.dispatchEvent(new Event('change'));
+    assert.strictEqual(setting.get(), 'b');
+
+    Lit.render(SettingsUI.SettingsUI.renderSettingSelect(setting, undefined, false, new Map([['a', 'A (other)']])),
+               container);
+
+    assert.deepEqual([...select.options].map(option => option.text), ['A (other)', 'B']);
+    assert.strictEqual(select.value, 'b');
+  });
+
   describe('renderControlForSetting', () => {
     it('renders a checkbox for a boolean setting', () => {
       const setting = createSettingsForTest([{
@@ -167,6 +191,7 @@ describeWithEnvironment('SettingsUI', () => {
     });
 
     it('returns nothing for an unsupported setting type', () => {
+      const consoleErrorStub = sinon.stub(console, 'error');
       const setting = createSettingsForTest([{
                         settingName: 'test-array-setting',
                         settingType: Common.Settings.SettingType.ARRAY,
@@ -175,6 +200,7 @@ describeWithEnvironment('SettingsUI', () => {
 
       const template = SettingsUI.SettingsUI.renderControlForSetting(setting);
       assert.strictEqual(template, Lit.nothing);
+      sinon.assert.calledWith(consoleErrorStub, 'Invalid setting type: array');
     });
   });
 });

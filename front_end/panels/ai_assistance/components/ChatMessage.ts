@@ -621,7 +621,6 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
 
     // clang-format off
     Lit.render(html`
-      <style>${Input.textInputStyles}</style>
       <style>${chatMessageStyles}</style>
       <div class="user-query-wrapper">
         <section class=${messageClasses} jslog=${VisualLogging.section('question')}>
@@ -644,7 +643,7 @@ export const DEFAULT_VIEW = (input: ChatMessageViewInput, output: ViewOutput, ta
   });
   // clang-format off
   Lit.render(html`
-    <style>${Input.textInputStyles}</style>
+    <style>@scope to (devtools-widget > *) { ${Input.textInputStyles} }</style>
     <style>${chatMessageStyles}</style>
     <section class=${messageClasses} jslog=${VisualLogging.section('answer')}>
       ${renderWalkthroughUI(input, steps)}
@@ -1332,16 +1331,14 @@ async function makeBottomUpTimelineTreeWidget(widgetData: AiAssistanceModel.AiAg
     return null;
   }
   const events = bottomUpRootNode.events;
-  const startTime = Trace.Helpers.Timing.microToMilli(widgetData.data.bounds.min);
-  const endTime = Trace.Helpers.Timing.microToMilli(widgetData.data.bounds.max);
 
   const renderedWidget = html`<devtools-widget
       class="bottom-up-timeline-tree-widget"
       ${widget(Timeline.TimelineTreeView.BottomUpTimelineTreeView, {
     selectedEvents: events,
     parsedTrace: widgetData.data.parsedTrace,
-    startTime,
-    endTime,
+    startTime: widgetData.data.bounds.min,
+    endTime: widgetData.data.bounds.max,
     compactMode: true,
     maxLinkLength: 15,
     maxRows: 10,
@@ -2376,10 +2373,18 @@ async function makeTimelineRangeSummaryWidget(widgetData: AiAssistanceModel.AiAg
   };
 }
 
+const networkTrackDataProviders =
+    new WeakMap<AiAssistanceModel.AiAgent.NetworkTrackAiWidget,
+                Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider>();
+
 async function makeNetworkTrackWidget(widgetData: AiAssistanceModel.AiAgent.NetworkTrackAiWidget):
     Promise<WidgetMakerResponse|null> {
   const {parsedTrace, bounds} = widgetData.data;
-  const dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
+  let dataProvider = networkTrackDataProviders.get(widgetData);
+  if (!dataProvider) {
+    dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
+    networkTrackDataProviders.set(widgetData, dataProvider);
+  }
 
   // clang-format off
   const template = html`

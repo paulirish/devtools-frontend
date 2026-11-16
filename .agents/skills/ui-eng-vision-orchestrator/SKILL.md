@@ -39,44 +39,50 @@ principles.
     file matches older patterns or generic examples. Always perform a structure
     analysis of the active file first and adapt the plan to the actual, current
     code.
-4.  **Hybrid Files/Multiple Classes**: Files may contain multiple classes in
+4.  **Reusable vs. Single-Use Web Components Gate**:
+    *   **Reusable UI primitives** (`front_end/ui/components/**`, `front_end/ui/kit/**` — shared buttons, menus, dialogs, links, badges, or trees reused across panels) must remain custom elements (`HTMLElement`). Do **not** migrate them to `UI.Widget` or `DEFAULT_VIEW`.
+    *   **Single-use custom elements** (`extends HTMLElement` or `LitElement` under `front_end/panels/**/components/` used solely for encapsulation in one feature or panel) **should** migrate to `UI.Widget` + `DEFAULT_VIEW` + `@scope to (devtools-widget > *)`.
+5.  **Hybrid Files/Multiple Classes**: Files may contain multiple classes in
     different states of modernization (e.g., one partially migrated class and
     one fully legacy class). If the file being migrated contains several
     classes, the migration needs to be done separately for each class, starting
     with the leaves and going up the dependency chain. Propose modifications
     only for classes with actual violations.
-5.  **Coupling Analysis**: Always check the integration files (e.g., sidebar
+6.  **Coupling Analysis**: Always check the integration files (e.g., sidebar
     files, parent panel files) where the target class is instantiated to see if
     there are any direct `.element` or `.contentElement` couplings. If found,
     include the decoupling of these references in the plan.
-6.  **Neighboring Component Reference**: Inspect neighboring modernized files of
+7.  **Neighboring Component Reference**: Inspect neighboring modernized files of
     the same archetype (e.g., `DOMStorageItemsView.ts` or
     `KeyValueStorageItemsView.ts` for storage-like components) to find proven
     patterns for toolbar and data-grid configurations.
-7.  **The Narrow Bridge Principle**: Keep code modifications tightly scoped to a
+8.  **The Narrow Bridge Principle**: Keep code modifications tightly scoped to a
     single responsibility per CL. Do not combine technology migrations (e.g.,
     converting imperative DOM to Lit-html) with base class refactoring in the
     same diff.
-8.  **Strict Intermediate Stability**: The code must compile and work correctly,
+9.  **Strict Intermediate Stability**: The code must compile and work correctly,
     and all tests must pass after each step. You **MUST** update usages if you
     change APIs.
-9.  **Establish Comprehensive Guardrails First**: Ensure both **logic tests**
+10. **Establish Comprehensive Guardrails First**: Ensure both **logic tests**
     (verifying presenter interactions and state updates) and **screenshot
     tests** (verifying layout/styling) exist before rewriting code. If coverage
     is missing, scaffold it first.
-10. **Pre-flight Clarification**: Before starting, verify if the task is
+11. **Pre-flight Clarification**: Before starting, verify if the task is
     underspecified or ambiguous. If so, point this out and ask for
     clarifications before proceeding.
-11. **Step Sizing & Complexity Assessment**: Assess the complexity of each step
-    beforehand. Aim for intermediate steps that involve changing or adding
-    roughly 300 lines of code. If a step is predicted to be too complex, break
-    it down into smaller substeps. The agent must stop and report back after
-    each step or substep to allow verification.
-12. **Context Hygiene via Subagents**: To keep the main conversation context
+12. **Step Sizing (`<= 350` Lines) & 100% Live-Code Rule**: Keep every CL at or
+    under **`350` changed lines (`insertions + deletions`)**. Every CL must
+    execute 100% of its new view and presenter code in production, remove the
+    imperative code it replaces, and include unit tests covering that behavior in
+    the **same CL**. Never create a CL that adds an unused `DEFAULT_VIEW` or
+    `*_VIEW` export, defers unit tests to a follow-up test-only CL, or defers
+    imperative dead-code removal to a cleanup-only tail CL. The agent must stop
+    and report back after each step or substep to allow verification.
+13. **Context Hygiene via Subagents**: To keep the main conversation context
     clean and focused on high-level orchestration, prefer delegating intense
     execution tasks (like running tests, debugging compilations, or processing
     independent classes in parallel) to specialized subagents.
-13. **Cross-Repo Runtime Coupling Check (`legacy_test_runner` & `blink/web_tests`)**:
+14. **Cross-Repo Runtime Coupling Check (`legacy_test_runner` & `blink/web_tests`)**:
     Before converting TypeScript `private` fields/methods to ES `#private` or
     removing widget properties (e.g., `.tabbedPane`, `.sidebarPaneStack`,
     `.threadsSidebarPane`, `.searchInputElement`), search both
@@ -86,15 +92,17 @@ principles.
     members in untyped JS). Keep accessed members as TypeScript `private` with a
     `// Accessed in web_tests / legacy_test_runner` comment, or migrate the
     web_tests first in a dedicated CL.
-14. **Strict CL Splitting Rules**:
-    *   **One Class Per CL for Hybrid Files**: When modernizing files containing
-        multiple classes, extract or migrate secondary classes (e.g.,
-        `QuickSourceView`) into their own dedicated CLs.
-    *   **Separate Infrastructure CLs**: Keep shared `ui/legacy` or component
-        infrastructure changes (e.g., `bindToAction`, `SplitWidget`,
-        `WrapperWidget`) in separate, preceding CLs. Always verify with
-        `cog_api.py diff` before uploading that no changes from later commits
-        leaked into earlier infrastructure CLs.
+15. **Strict CL Splitting Rules**:
+    *   **Live Split Patterns (`<= 350` Lines)**: When a migration exceeds 350 lines, split using one of three live-code patterns: (a) **one live class or low-fanout shared helper per CL** (leaf-to-root, wired to callers and tested immediately), (b) **2-pass `Local Lit in performUpdate()` -> `UI.Widget + DEFAULT_VIEW promotion`** (Pass 1 renders Lit templates live in `performUpdate()`, removes imperative DOM, and tests behavior; Pass 2 promotes to `DEFAULT_VIEW` and `createViewFunctionStub` tests), or (c) **vertical UI compartment slices** (migrating one toolbar, settings pane, split pane, or formatter batch end-to-end per CL).
+    *   **Separate Infrastructure & Shared-Helper CLs**: Keep shared `ui/legacy`, `ui/kit`, or `UI.UIUtils` changes (e.g., converting a low-fanout helper like `UI.UIUtils.maybeCreateNewBadge` to return `LitTemplate` across its callers, or adding an HTML-native ID/attribute API to `<devtools-menu>`) in separate, preceding CLs rather than inlining helper internals or adding `ref(...)` workarounds at call sites. Always verify with `cog_api.py diff` before uploading that no changes from later commits leaked into earlier infrastructure CLs.
+    *   **CL Descriptions & Bug Trailers Across Stacks**: Carry the target Buganizer issue ID across every CL in a split stack (`Bug: <id>` on intermediate CLs, `Fixed: <id>` only on the final complete CL). Write descriptive `<= 72`-character subject lines stating what each CL changes functionally, without pass or step numbers (`Pass 1:`, `(2/6)`) in the subject line.
+    *   **Standalone CSS `@scope` CLs**: Migrating a Light DOM widget includes
+        ensuring its stylesheet is wrapped in `@scope to (devtools-widget > *)`
+        (removing the file from the `@devtools/no-unscoped-light-dom-styles`
+        `burndown` list in `eslint.config.mjs` once scoped). Always land this
+        in a small, standalone CSS CL separate from logic, template, or
+        widget-promotion CLs for bisectability, with screenshot baselines
+        established beforehand.
 
 
 
@@ -151,6 +159,8 @@ The plan you generate **MUST** follow this structure:
   - Assigned to: `ui-eng-vision-test-scaffolder`
 - [ ] **Pass 0.5: Privatize & Dead-Code Cleanup**
   - Mechanical prefactor: convert TypeScript `private` to ES `#private` and remove dead code
+- [ ] **Pass 0.75: Light DOM CSS @scope Wrapping (Standalone CL)**
+  - Ensure stylesheet is wrapped in `@scope to (devtools-widget > *)` and remove entry from the `@devtools/no-unscoped-light-dom-styles` burndown list in `eslint.config.mjs`
 - [ ] **Pass 1: Logic Consolidation**
   - Assigned to: `ui-eng-vision-logic-consolidator`
 - [ ] **Pass 2: Lit-HTML Rendering**
@@ -180,6 +190,14 @@ The plan you generate **MUST** follow this structure:
     3.  Identify and remove unused dead code, redundant containers, or obsolete split widgets in a dedicated prefactor CL so mechanical renames don't clutter logic and view CLs.
     4.  Verify that all tests and lints pass and stage this prefactor CL before proceeding to logic consolidation.
 
+### Light DOM CSS @scope Wrapping (Pass 0.75 / Standalone CSS CL)
+
+*   **Trigger Condition**: Baseline tests green (screenshot baselines established).
+*   **Actions**:
+    1.  Wrap the Light DOM widget's stylesheet in `@scope to (devtools-widget > *)`.
+    2.  Remove the file from the `@devtools/no-unscoped-light-dom-styles` `burndown` list in `eslint.config.mjs`.
+    3.  Verify zero visual regressions against screenshot goldens and land this in a small, standalone CL separate from logic, template, and widget-promotion CLs for bisectability.
+
 ### Logic Consolidation
 
 *   **Trigger Condition**: Pass 0.5 staged (or baseline tests green if 0.5 skipped).
@@ -207,3 +225,103 @@ The plan you generate **MUST** follow this structure:
     1.  Promote view classes to modern `UI.Widget` classes, hook up
         `performUpdate()` delegates, export the default view layout, and clean
         up legacy wrappers.
+
+--------------------------------------------------------------------------------
+
+## 3. Incremental Multi-CL Playbook for Complex Tree & List Widgets (`UI.TreeOutline` → `<devtools-tree>`)
+
+For complex widgets with deeply nested item hierarchies, custom tree element
+subclasses, or inline editing (such as `NavigatorView` or `SearchResultsPane`),
+monolithic migrations introduce high review friction and regression risk.
+Decompose the work into a 4-phase sequence of small, self-contained CLs
+(~50–250 lines of diff each):
+
+### Phase 0: Safety Net, Cleanup & Latent Bug Fixes (Independent CLs)
+1.  **Dead-Code Removal**: Remove dead helper methods, unused getters, and
+    obsolete container references in an initial standalone CL.
+2.  **Implementation-Decoupled Tests**: Add structural and interaction unit
+    tests whose DOM assertions route through small local test helpers
+    (`dumpTree()`, `findTreeItem()`, `activateRow()`, `openContextMenuOnRow()`)
+    rather than scattering direct tree-outline element queries across tests.
+3.  **Screenshot Baselines**: Add `assertScreenshot(...)` golden tests covering
+    critical visual states (grouping modes, icons/badges, selection, dimmed
+    items) to establish baselines that catch visual regressions independently of
+    the underlying widget engine.
+4.  **Targeted Bug Fixes**: If test scaffolding uncovers latent bugs in existing
+    logic, fix them in dedicated bugfix CLs before refactoring.
+
+### Phase 1: Decouple Custom Item Subclasses One Concern per CL (`Bug: <id>`)
+1.  **Sorting & Comparators**: Move sorting functions from item elements to
+    presenter data nodes.
+2.  **Row Event Handlers**: Move row event handlers (hover, context menu, drag,
+    rename triggers) to presenter methods.
+3.  **Icon & Action Templates**: Convert imperative leading/trailing icons,
+    badges, and action buttons into module-level Lit template helpers, removing
+    view-layer refresh methods (`updateTrailingIcons()`, `updateIcon()`) from
+    presenter nodes once state moves to `DEFAULT_VIEW`.
+4.  **State Tracking in Presenter**: Track selection, expansion (`WeakSet`), and
+    lazy population in the presenter via tree events rather than overriding
+    `TreeElement.onpopulate()` or `onselect()`.
+5.  **Remove Custom Subclasses**: Delete custom `TreeElement` subclasses one
+    class per CL, using plain `UI.TreeOutline.TreeElement` instances paired with
+    a `WeakMap<TreeElement, Node>` bridge and computing presenter node state
+    (`title`, `tooltip`, badges) independently of `TreeElement` creation.
+
+### Phase 2: Persistent `<devtools-prompt>` & `<devtools-tree>` Swap (`Bug: <id>`)
+1.  **Persistent `<devtools-prompt ?editing>`**: Migrate inline renaming or
+    editing (`UI.InplaceEditor`) to a persistent `<devtools-prompt ?editing>` in
+    its own CL, updating E2E tests waiting on `.being-edited` to wait on
+    `devtools-prompt[editing]`.
+2.  **Test-Helper Prep CL**: If `front_end/legacy_test_runner/**` or
+    `blink_web_tests` walk internal tree elements, update test helpers to flush
+    `innerView.performUpdate()` and `flushPendingUpdatesForTesting()` after
+    expanding nodes.
+3.  **`<devtools-tree>` Swap**: Replace `TreeOutlineInShadow` with
+    `<devtools-tree autofocus>` in `DEFAULT_VIEW` without widening
+    `front_end/ui/legacy/Treeoutline.ts` contracts. Host editable
+    `<devtools-prompt ?editing>` rows in a child `UI.Widget` (`${widget(...)}`)
+    so `<devtools-tree>`'s light-DOM `MutationObserver` does not re-clone the
+    row and blur the active input. Use asynchronous `this.requestUpdate()` across
+    all presenter methods and remove
+    `/* eslint-disable @devtools/no-imperative-dom-api */`.
+
+### Phase 3: Pure Lifecycle, `INJECT` DI & Final Polish (`Fixed: <id>` on Final CL Only)
+1.  **Non-Destructive Lifecycle**: Move model, workspace, and setting
+    subscriptions from `constructor()` into `wasShown()` / `willHide()`,
+    reconciling incremental changes that occurred while hidden rather than
+    calling `reset()` and wiping open folders or selection on every re-show.
+2.  **Universe Dependency Injection**: Add `static override readonly INJECT` and
+    the standard MVP constructor `(element?: HTMLElement, [...]: WidgetDependencies, view: View = DEFAULT_VIEW)`.
+3.  **Private Fields & Completeness**: Convert remaining TypeScript `private`
+    members to `#private` (after verifying they are not reflectively accessed in
+    `legacy_test_runner` or `blink/web_tests`), and mark `Fixed: <id>` on this
+    final CL.
+
+--------------------------------------------------------------------------------
+
+## 4. Definition of Done & `Bug:` vs `Fixed:` Completeness Gate
+
+> [!WARNING]
+> A clean `@devtools/no-imperative-dom-api` ESLint run does **NOT** prove a UI
+> Eng Vision migration is complete. The linter does not flag `extends UI.TreeOutline.TreeElement` subclasses or `UI.ListControl`.
+
+Before closing a UI Eng Vision migration issue with `Fixed: <id>`, verify every
+requirement below. If any item remains incomplete, use `Bug: <id>` and address
+it in a follow-up CL:
+
+1.  **No Legacy Widgets**: Zero references to `UI.TreeOutline`, `TreeElement`
+    subclasses, `UI.ListControl`, `UI.ListWidget`, or `UI.InplaceEditor`.
+2.  **Standard MVP Constructor**: Constructor accepts `element?: HTMLElement` as
+    its first parameter, resolves dependencies via `static override readonly INJECT`,
+    and accepts an injectable `view: View = DEFAULT_VIEW`.
+3.  **Widget Update Lifecycle**: Renders exclusively via `override performUpdate(): void`
+    and `this.requestUpdate()` (no custom `#renderView()` bypasses or synchronous
+    `performUpdate()` calls in presenter methods).
+4.  **Non-Destructive Listener Lifecycle**: External model and setting
+    listeners are attached in `wasShown()` and detached symmetrically in
+    `willHide()`, preserving populated UI state across hide/show cycles.
+5.  **Declarative Primitives**: Uses `<devtools-tree>`, `<devtools-list>`,
+    persistent `<devtools-prompt ?editing>`, `?hidden=${...}` exclusively
+    (without `.hidden` classes), and declarative `autofocus` for default focus.
+6.  **ES Private Fields**: Uses ECMAScript `#private` fields and methods for all
+    internal members not accessed by `legacy_test_runner` or `blink/web_tests`.

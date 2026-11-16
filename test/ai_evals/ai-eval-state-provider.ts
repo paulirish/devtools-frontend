@@ -25,14 +25,24 @@ import {
   ResultStore,
 } from './report/evaluators.js';
 import {
-  generateRunId,
   PROJECT_ID,
+  type RunOutcomeStatus,
   type TaskStatus,
   uploadRunCompleted,
   uploadRunLog,
   uploadRunStarted,
 } from './report/gcs-upload.js';
-import {createTempEvalDir, type Step, TrajectoryBuilder} from './report/trajectory-builder.js';
+import {aggregateRunMetrics, buildRunTags, formatError, generateRunId} from './report/report-helpers.js';
+import {
+  calculateTrajectoryTokens,
+  calculateTrajectoryToolCalls,
+  createTempEvalDir,
+  type Step,
+  type ToolCallStats,
+  type Trajectory,
+  TrajectoryBuilder,
+  type TurnTokens,
+} from './report/trajectory-builder.js';
 
 export type AiAssistanceContext = NonNullable<AiAssistance.ExternalHandler.ExternalAIRequestOptions['context']>;
 
@@ -64,6 +74,7 @@ export class EvalTaskHandle {
   readonly #logger: EvalLogger;
   // Total time spent executing prompts, reported as the task duration.
   #executionSeconds = 0;
+  lastPromptEndTime = 0;
   hasFailed = false;
   failureError?: string;
 
@@ -98,8 +109,7 @@ export class EvalTaskHandle {
 
   async executePrompt(options: ExecutePromptOptions): Promise<Step[]> {
     for (const prompt of options.prompts) {
-      this.log(`Executing query: "${prompt}" for task: ${this.taskId}`);
-      this.log(`[Info]: Running the user prompt "${prompt}" (This step might take a long time)`);
+      this.log(`Prompt: "${prompt}"`);
     }
     const executionStartTime = performance.now();
     try {
@@ -110,10 +120,23 @@ export class EvalTaskHandle {
                     }, options)) as Step[];
       assert.isNotEmpty(steps, 'Expected non-empty interaction steps from handleExternalAIRequest.');
       this.trajectoryBuilder.addSteps(steps);
+      for (const [index, step] of steps.entries()) {
+        const stepDuration = (step.requestTimestamp && step.responseTimestamp) ?
+            `${((step.responseTimestamp - step.requestTimestamp) / 1_000_000).toFixed(2)}s` :
+            '';
+        const callsSummary = step.aidaResponse?.functionCalls?.length ?
+            step.aidaResponse.functionCalls.map(fc => fc.name).join(', ') :
+            'final response';
+        const totalTokens = step.aidaResponse?.metadata?.usageMetadata?.totalTokenCount;
+        this.log(`[Step ${index + 1}/${steps.length}] ${callsSummary}${stepDuration ? ` (${stepDuration})` : ''}${
+            totalTokens !== undefined ? `, tokens=${totalTokens}` : ''}`);
+      }
       return steps;
     } finally {
-      const executionSeconds = (performance.now() - executionStartTime) / 1000;
+      const endTime = performance.now();
+      const executionSeconds = (endTime - executionStartTime) / 1000;
       this.#executionSeconds += executionSeconds;
+      this.lastPromptEndTime = endTime;
       this.log(`Finished (${executionSeconds.toFixed(2)}s)`);
     }
   }
@@ -121,6 +144,12 @@ export class EvalTaskHandle {
 
 export interface AiEvalState extends E2EState {
   evalTask: EvalTaskHandle;
+}
+
+interface TaskGradingResult {
+  customScore: number|null;
+  gradingOutput?: string;
+  gradingDurationSeconds: number;
 }
 
 /**
@@ -136,11 +165,14 @@ export class AiEvalStateProvider extends StateProvider {
   #tempOutputDir = '';
   #logger = new EvalLogger();
   #taskStatuses: TaskStatus[] = [];
-  #taskToolCallCounts = new Map<string, number>();
+  #taskToolCallStats = new Map<string, ToolCallStats>();
+  #taskTokens = new Map<string, TurnTokens>();
+  #resolvedModel: string|null = null;
   #resultStores: ResultStore[] = [];
   // Target types of all registered eval tests. Suites are registered while the test files
   // are loaded, i.e. before `startEvalRun` is called from the global setup.
   #evalTypes = new Set<string>();
+  #visitedOrigins = new Set<string>();
   #navigationListeners = new WeakMap<puppeteer.Page, (frame: puppeteer.Frame) => void>();
 
   override registerSuiteSettings(suite: Mocha.Suite, suiteSettings: AiEvalSuiteSettings): void {
@@ -157,8 +189,11 @@ export class AiEvalStateProvider extends StateProvider {
     this.#tempOutputDir = createTempEvalDir();
     this.#logger = new EvalLogger();
     this.#taskStatuses = [];
-    this.#taskToolCallCounts = new Map();
+    this.#taskToolCallStats = new Map();
+    this.#taskTokens = new Map();
+    this.#resolvedModel = null;
     this.#resultStores = [];
+    this.#visitedOrigins = new Set();
     const targets = [...this.#evalTypes];
     const agent = targets.length === 1 ? `devtools-${targets[0]}` : MIXED_TARGETS_AGENT;
     this.#logger.append(`Evaluation run started for ${this.#runId} at ${this.#runStartTimestamp}`);
@@ -167,11 +202,11 @@ export class AiEvalStateProvider extends StateProvider {
       project: PROJECT_ID,
       runId: this.#runId,
       agent,
-      model: 'default',
       startTime: this.#runStartTimestamp,
       status: 'RUNNING',
+      tags: buildRunTags(targets),
     });
-    this.#logger.head('Running examples sequentially...');
+    this.#logger.head(`Running examples sequentially... (run: ${this.#runId})`);
   }
 
   finishEvalRun(): void {
@@ -181,9 +216,12 @@ export class AiEvalStateProvider extends StateProvider {
     const totalTasks = this.#taskStatuses.length;
     const failedTasks = this.#taskStatuses.filter(t => t.status === 'FAILED').length;
     const passedTasks = totalTasks - failedTasks;
-    const totalToolCalls = Array.from(this.#taskToolCallCounts.values()).reduce((sum, count) => sum + count, 0);
-    const status = (failedTasks > 0 || totalTasks === 0) ? 'FAILED' : 'COMPLETED';
-    this.#logger.append(`Total tasks: ${totalTasks}, Passed: ${passedTasks}, Failed: ${failedTasks}`);
+    const status: RunOutcomeStatus = (failedTasks > 0 || totalTasks === 0) ? 'FAILED' : 'COMPLETED';
+    const metrics = aggregateRunMetrics(this.#taskToolCallStats.values(), this.#taskTokens.values());
+    this.#logger.head(`\nTotal tasks: ${totalTasks}, Passed: ${passedTasks}, Failed: ${failedTasks}`);
+    this.#logger.head(`Model: ${this.#resolvedModel ?? 'unknown'}, Tool calls: ${
+        metrics.totalToolCalls ??
+        0}, Total tokens: ${metrics.totalTokens ?? 0}, Elapsed: ${this.#logger.formatElapsedTime()}`);
     this.#logger.append(`Run completed with status: ${status}`);
     uploadRunLog(this.#runId, this.#logger.getRunLogContent());
     uploadRunCompleted({
@@ -192,22 +230,26 @@ export class AiEvalStateProvider extends StateProvider {
       status,
       startTime: this.#runStartTimestamp,
       endTime: new Date().toISOString(),
+      model: this.#resolvedModel ?? 'unknown',
+      tags: buildRunTags(this.#evalTypes),
       totalTasks,
       passedTasks,
       failedTasks,
-      metrics: {
-        totalToolCalls,
-      },
+      metrics,
     });
     if (this.#tempOutputDir && fs.existsSync(this.#tempOutputDir)) {
       fs.rmSync(this.#tempOutputDir, {recursive: true, force: true});
     }
-    this.#logger.info(`\nElapsed time: ${this.#logger.formatElapsedTime()}`);
   }
 
   override async launchBrowser(settings: BrowserSettings): Promise<BrowserWrapper> {
+    const enabledFeatures = [...(settings.enabledFeatures ?? [])];
+    if (!enabledFeatures.includes('DevToolsUseGcaApi') && !settings.disabledFeatures?.includes('DevToolsUseGcaApi')) {
+      enabledFeatures.push('DevToolsUseGcaApi');
+    }
     return await Launcher.browserSetup({
       ...settings,
+      enabledFeatures,
       chromeUsername: TestConfig.otaUsername ?? getDefaultOtaAccount(),
       chromePassword: TestConfig.otaPassword,
     },
@@ -220,8 +262,32 @@ export class AiEvalStateProvider extends StateProvider {
 
   override async setupInspectedPage(context: puppeteer.BrowserContext, serverPort: number): Promise<InspectedPage> {
     const page = await context.newPage();
+    await this.#resetEvalAppState(page);
     await page.bringToFront();
     return new InspectedPage(page, serverPort);
+  }
+
+  /**
+   * Evals share the signed-in default browser context, so site data and HTTP cache
+   * persist between tests. Clear them before each test for test isolation.
+   */
+  async #resetEvalAppState(page: puppeteer.Page): Promise<void> {
+    if (this.#visitedOrigins.size === 0) {
+      return;
+    }
+    const session = await page.createCDPSession();
+    try {
+      for (const origin of this.#visitedOrigins) {
+        await session.send('Storage.clearDataForOrigin', {
+          origin,
+          storageTypes: 'all',
+        });
+      }
+      await session.send('Network.clearBrowserCache');
+      this.#visitedOrigins.clear();
+    } finally {
+      await session.detach();
+    }
   }
 
   #resolveEvalConfig(suite: Mocha.Suite): AiEvalConfig|undefined {
@@ -235,8 +301,7 @@ export class AiEvalStateProvider extends StateProvider {
   }
 
   #recordPreparationFailure(evalConfig: AiEvalConfig, error: unknown): void {
-    const normalizedError = error instanceof Error ? error : new Error(String(error));
-    const errorMessage = this.#logger.formatError(normalizedError);
+    const errorMessage = formatError(error);
     this.#logger.taskError(evalConfig.taskId, `Preparation failed.\n${errorMessage}`);
     handleTaskFailure({
       runId: this.#runId,
@@ -247,6 +312,12 @@ export class AiEvalStateProvider extends StateProvider {
       durationSeconds: 0,
       logger: this.#logger,
       taskStatuses: this.#taskStatuses,
+      toolCallStats: {
+        total: 0,
+        byTool: {},
+        failedByTool: {},
+        activationsBySkill: {},
+      },
       errorMessage,
     });
   }
@@ -282,15 +353,28 @@ export class AiEvalStateProvider extends StateProvider {
         Boolean(evalConfig),
     );
     if (evalTask.isConfigured) {
+      this.#logger.append(`[Task ${evalTask.taskId}] Starting task (target: ${evalTask.type})`);
       evalTask.log(`Prepared task ${evalTask.taskId}`);
-      const onFrameNavigated = (frame: puppeteer.Frame): void => {
-        if (frame === baseState.inspectedPage.page.mainFrame() && frame.url() !== 'about:blank') {
-          evalTask.log(`Navigated to ${frame.url()}`);
-        }
-      };
-      this.#navigationListeners.set(baseState.inspectedPage.page, onFrameNavigated);
-      baseState.inspectedPage.page.on('framenavigated', onFrameNavigated);
     }
+    let lastNavigatedUrl = '';
+    const onFrameNavigated = (frame: puppeteer.Frame): void => {
+      const url = frame.url();
+      if (frame === baseState.inspectedPage.page.mainFrame() && url !== 'about:blank' && url !== lastNavigatedUrl) {
+        lastNavigatedUrl = url;
+        // Base apps run on localhost (e.g. http://localhost:3000). Keep track of
+        // visited localhost origins only, so that clearing state before the next
+        // test does not remove the Google sign-in cookies that AIDA depends on.
+        const parsedUrl = URL.parse(url);
+        if (parsedUrl?.hostname === 'localhost') {
+          this.#visitedOrigins.add(parsedUrl.origin);
+        }
+        if (evalTask.isConfigured) {
+          evalTask.log(`Navigated to ${url}`);
+        }
+      }
+    };
+    this.#navigationListeners.set(baseState.inspectedPage.page, onFrameNavigated);
+    baseState.inspectedPage.page.on('framenavigated', onFrameNavigated);
     return {...baseState, evalTask};
   }
 
@@ -298,78 +382,112 @@ export class AiEvalStateProvider extends StateProvider {
     const evalTask = (state as AiEvalState | undefined)?.evalTask;
     if (evalTask?.isConfigured) {
       evalTask.hasFailed = true;
-      evalTask.failureError = this.#logger.formatError(error);
+      evalTask.failureError = formatError(error);
       this.#logger.taskError(evalTask.taskId, `There is an error, skipping it.\n${evalTask.failureError}`);
     }
     return await super.onTestError(state, error);
+  }
+
+  async #gradeTaskTrajectory(evalTask: EvalTaskHandle, trajectory: Trajectory): Promise<TaskGradingResult> {
+    if (evalTask.hasFailed || evalTask.evals.length === 0) {
+      return {customScore: null, gradingDurationSeconds: 0};
+    }
+    const gradingStart = performance.now();
+    const store = new ResultStore(evalTask.type, evalTask.label);
+    const dateFolder = (this.#runStartTimestamp || new Date().toISOString()).slice(0, 10);
+    const customScore = await evaluateTrajectory(trajectory, evalTask.evals, store, dateFolder);
+    const gradingDurationSeconds = Number(((performance.now() - gradingStart) / 1000).toFixed(3));
+    let gradingOutput: string|undefined;
+    if (store.results.size > 0) {
+      this.#resultStores.push(store);
+      printResults(store);
+      gradingOutput = formatStoreResults(store);
+      evalTask.log(`Graded: score=${customScore ?? 'N/A'} (${gradingDurationSeconds}s)`);
+      this.#logger.append(
+          `[Task ${evalTask.taskId}] Graded: score=${customScore ?? 'N/A'} (${gradingDurationSeconds}s)`);
+    }
+    return {customScore, gradingOutput, gradingDurationSeconds};
+  }
+
+  async #finalizeConfiguredTask(evalTask: EvalTaskHandle): Promise<void> {
+    const durationSeconds = evalTask.durationSeconds;
+    if (evalTask.hasFailed && !evalTask.trajectoryBuilder.hasSteps()) {
+      handleTaskFailure({
+        runId: this.#runId,
+        taskId: evalTask.taskId,
+        target: evalTask.type,
+        phase: 'Execution',
+        durationSeconds,
+        logger: this.#logger,
+        taskStatuses: this.#taskStatuses,
+        toolCallStats: {
+          total: 0,
+          byTool: {},
+          failedByTool: {},
+          activationsBySkill: {},
+        },
+        errorMessage: evalTask.failureError,
+      });
+      return;
+    }
+
+    const verificationDurationSeconds = Number(((performance.now() - evalTask.lastPromptEndTime) / 1000).toFixed(3));
+    try {
+      const trajectory = evalTask.trajectoryBuilder.build();
+      if (trajectory.metadata.model) {
+        this.#resolvedModel = trajectory.metadata.model;
+      }
+      this.#taskToolCallStats.set(evalTask.taskId, calculateTrajectoryToolCalls(trajectory));
+      this.#taskTokens.set(evalTask.taskId, calculateTrajectoryTokens(trajectory));
+      const {customScore, gradingOutput, gradingDurationSeconds} =
+          await this.#gradeTaskTrajectory(evalTask, trajectory);
+      finalizeEvalTask({
+        runId: this.#runId,
+        taskId: evalTask.taskId,
+        label: evalTask.label,
+        target: evalTask.type,
+        trajectory,
+        outputDir: this.#tempOutputDir,
+        durationSeconds,
+        verificationDurationSeconds,
+        logger: this.#logger,
+        taskStatuses: this.#taskStatuses,
+        taskToolCallStats: this.#taskToolCallStats,
+        taskTokens: this.#taskTokens,
+        hasError: evalTask.hasFailed,
+        errorMessage: evalTask.failureError,
+        customScore,
+        gradingOutput,
+        gradingDurationSeconds,
+      });
+    } catch (err) {
+      const errorMessage = formatError(err);
+      this.#logger.taskError(evalTask.taskId, errorMessage);
+      handleTaskFailure({
+        runId: this.#runId,
+        taskId: evalTask.taskId,
+        target: evalTask.type,
+        phase: 'Finalization',
+        durationSeconds,
+        logger: this.#logger,
+        taskStatuses: this.#taskStatuses,
+        toolCallStats: this.#taskToolCallStats.get(evalTask.taskId) ?? {
+          total: 0,
+          byTool: {},
+          failedByTool: {},
+          activationsBySkill: {},
+        },
+        tokens: this.#taskTokens.get(evalTask.taskId),
+        errorMessage,
+      });
+    }
   }
 
   override async cleanupState(state: E2EState): Promise<void> {
     const evalTask = (state as Partial<AiEvalState>).evalTask;
     try {
       if (evalTask?.isConfigured) {
-        const durationSeconds = evalTask.durationSeconds;
-        if (evalTask.hasFailed && !evalTask.trajectoryBuilder.hasSteps()) {
-          handleTaskFailure({
-            runId: this.#runId,
-            taskId: evalTask.taskId,
-            target: evalTask.type,
-            phase: 'Execution',
-            durationSeconds,
-            logger: this.#logger,
-            taskStatuses: this.#taskStatuses,
-            errorMessage: evalTask.failureError,
-          });
-        } else {
-          try {
-            const trajectory = evalTask.trajectoryBuilder.build();
-            let customScore: number|null = null;
-            let gradingOutput: string|undefined;
-
-            if (!evalTask.hasFailed && evalTask.evals.length > 0) {
-              const store = new ResultStore(evalTask.type, evalTask.label);
-              const dateFolder = (this.#runStartTimestamp || new Date().toISOString()).slice(0, 10);
-              customScore = await evaluateTrajectory(trajectory, evalTask.evals, store, dateFolder);
-              if (store.results.size > 0) {
-                this.#resultStores.push(store);
-                printResults(store);
-                gradingOutput = formatStoreResults(store);
-                this.#logger.append(gradingOutput);
-              }
-            }
-
-            finalizeEvalTask({
-              runId: this.#runId,
-              taskId: evalTask.taskId,
-              label: evalTask.label,
-              target: evalTask.type,
-              trajectory,
-              outputDir: this.#tempOutputDir,
-              durationSeconds,
-              logger: this.#logger,
-              taskStatuses: this.#taskStatuses,
-              taskToolCallCounts: this.#taskToolCallCounts,
-              hasError: evalTask.hasFailed,
-              errorMessage: evalTask.failureError,
-              customScore,
-              gradingOutput,
-            });
-          } catch (err) {
-            const errorMessage = this.#logger.formatError(err as Error);
-            this.#logger.taskError(evalTask.taskId, errorMessage);
-            handleTaskFailure({
-              runId: this.#runId,
-              taskId: evalTask.taskId,
-              target: evalTask.type,
-              phase: 'Finalization',
-              durationSeconds,
-              logger: this.#logger,
-              taskStatuses: this.#taskStatuses,
-              errorMessage,
-              toolCallCount: this.#taskToolCallCounts.get(evalTask.taskId),
-            });
-          }
-        }
+        await this.#finalizeConfiguredTask(evalTask);
       }
     } finally {
       try {

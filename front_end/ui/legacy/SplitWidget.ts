@@ -67,7 +67,7 @@ export class SplitWidget extends SplitWidgetBase {
       defaultSidebarWidth?: number,
       defaultSidebarHeight?: number,
       constraintsInDip?: boolean,
-      element?: SplitWidgetElement,
+      element?: HTMLElement,
   ) {
     super(element, {useShadowDom: true});
     this.element.classList.add('split-widget');
@@ -111,6 +111,7 @@ export class SplitWidget extends SplitWidgetBase {
       }
     });
     this.#resizerElement = this.contentElement.createChild('div', 'shadow-split-widget-resizer');
+    this.#resizerElement.setAttribute('jslog', `${VisualLogging.resizer().track({drag: true})}`);
 
     this.#resizerWidget = new SimpleResizerWidget();
     this.#resizerWidget.setEnabled(true);

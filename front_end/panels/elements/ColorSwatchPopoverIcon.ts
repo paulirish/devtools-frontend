@@ -13,7 +13,7 @@ import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_e
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {type RenderingContext, ValueEditEvent} from './PropertyRenderer.js';
-import type {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
+import type {StylePropertyData} from './StylePropertyTreeElement.js';
 
 const UIStrings = {
   /**
@@ -26,7 +26,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/elements/ColorSwatchPopoverIcon
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 interface BezierPopoverIconParams {
-  treeElement: StylePropertyTreeElement;
+  propertyData: StylePropertyData;
   swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   swatch: Icon;
   match: SDK.CSSPropertyParser.Match;
@@ -34,25 +34,25 @@ interface BezierPopoverIconParams {
 }
 
 export class BezierPopoverIcon {
-  private treeElement: StylePropertyTreeElement;
+  private propertyData: StylePropertyData;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   private readonly swatch: Icon;
   private readonly match: SDK.CSSPropertyParser.Match;
   private readonly context: RenderingContext;
-  private readonly boundBezierChanged: (event: Common.EventTarget.EventTargetEvent<string>) => void;
+  private readonly boundBezierChanged: (event: InlineEditor.BezierEditor.BezierChangedEvent) => void;
   private readonly boundOnScroll: (event: Event) => void;
   private bezierEditor?: InlineEditor.BezierEditor.BezierEditor;
   private scrollerElement?: Element;
   private originalPropertyText?: string|null;
 
   constructor({
-    treeElement,
+    propertyData,
     swatchPopoverHelper,
     swatch,
     match,
     context,
   }: BezierPopoverIconParams) {
-    this.treeElement = treeElement;
+    this.propertyData = propertyData;
     this.swatchPopoverHelper = swatchPopoverHelper;
     this.swatch = swatch;
     this.match = match;
@@ -81,26 +81,27 @@ export class BezierPopoverIcon {
     const model = InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(text) ||
         InlineEditor.AnimationTimingModel.LINEAR_BEZIER;
     this.bezierEditor = new InlineEditor.BezierEditor.BezierEditor(model);
-    this.bezierEditor.addEventListener(InlineEditor.BezierEditor.Events.BEZIER_CHANGED, this.boundBezierChanged);
+    this.bezierEditor.element.addEventListener(InlineEditor.BezierEditor.BezierChangedEvent.eventName,
+                                               this.boundBezierChanged);
     this.swatchPopoverHelper.show(this.bezierEditor, this.swatch, this.onPopoverHidden.bind(this));
     this.scrollerElement = this.swatch.enclosingNodeOrSelfWithClass('style-panes-wrapper');
     if (this.scrollerElement) {
       this.scrollerElement.addEventListener('scroll', this.boundOnScroll, false);
     }
 
-    this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.stylesContainer().setEditingStyle(true);
+    this.originalPropertyText = this.propertyData.property.propertyText;
+    this.propertyData.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
-        this.treeElement.property, false /* forName */);
+        this.propertyData.property, false /* forName */);
     if (uiLocation) {
       void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
   }
 
-  private bezierChanged(event: Common.EventTarget.EventTargetEvent<string>): void {
+  private bezierChanged(event: InlineEditor.BezierEditor.BezierChangedEvent): void {
     this.swatch.dispatchEvent(new ValueEditEvent(event.data));
     this.context.recordEdit(this.match, event.data);
-    void this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
+    void this.propertyData.applyStyleText(this.propertyData.renderedPropertyText(), false);
   }
 
   private onScroll(_event: Event): void {
@@ -113,13 +114,14 @@ export class BezierPopoverIcon {
     }
 
     if (this.bezierEditor) {
-      this.bezierEditor.removeEventListener(InlineEditor.BezierEditor.Events.BEZIER_CHANGED, this.boundBezierChanged);
+      this.bezierEditor.element.removeEventListener(InlineEditor.BezierEditor.BezierChangedEvent.eventName,
+                                                    this.boundBezierChanged);
     }
     this.bezierEditor = undefined;
 
-    const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.stylesContainer().setEditingStyle(false);
+    const propertyText = commitEdit ? this.propertyData.renderedPropertyText() : this.originalPropertyText || '';
+    void this.propertyData.applyStyleText(propertyText, true);
+    this.propertyData.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
   }
 }
@@ -133,39 +135,41 @@ export interface ColorSwatchPopoverIconEventTypes {
 }
 
 export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<ColorSwatchPopoverIconEventTypes> {
-  private treeElement: StylePropertyTreeElement;
+  private propertyData: StylePropertyData;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   private swatch: InlineEditor.ColorSwatch.ColorSwatch;
   private contrastInfo: ColorPicker.ContrastInfo.ContrastInfo|null;
-  private readonly boundSpectrumChanged: (event: Common.EventTarget.EventTargetEvent<string>) => void;
+  private readonly boundSpectrumChanged: (event: ColorPicker.Spectrum.ColorChangedEvent) => void;
+  private readonly boundSpectrumResized: () => void;
   private readonly boundOnScroll: (event: Event) => void;
   private spectrum?: ColorPicker.Spectrum.Spectrum;
   private scrollerElement?: Element;
   private originalPropertyText?: string|null;
 
-  constructor(
-      treeElement: StylePropertyTreeElement, swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper,
-      swatch: InlineEditor.ColorSwatch.ColorSwatch) {
+  constructor(propertyData: StylePropertyData,
+              swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper,
+              swatch: InlineEditor.ColorSwatch.ColorSwatch) {
     super();
 
-    this.treeElement = treeElement;
+    this.propertyData = propertyData;
     this.swatchPopoverHelper = swatchPopoverHelper;
     this.swatch = swatch;
     this.swatch.addEventListener(InlineEditor.ColorSwatch.ClickEvent.eventName, this.iconClick.bind(this));
     this.contrastInfo = null;
 
     this.boundSpectrumChanged = this.spectrumChanged.bind(this);
+    this.boundSpectrumResized = this.spectrumResized.bind(this);
     this.boundOnScroll = this.onScroll.bind(this);
   }
 
   private generateCSSVariablesPalette(): ColorPicker.Spectrum.Palette {
-    const matchedStyles = this.treeElement.matchedStyles();
-    const style = this.treeElement.property.ownerStyle;
+    const matchedStyles = this.propertyData.matchedStyles();
+    const style = this.propertyData.property.ownerStyle;
     const cssVariables = matchedStyles.availableCSSVariables(style);
     const colors = [];
     const colorNames = [];
     for (const cssVariable of cssVariables) {
-      if (cssVariable === this.treeElement.property.name) {
+      if (cssVariable === this.propertyData.property.name) {
         continue;
       }
       const value = matchedStyles.computeCSSVariable(style, cssVariable);
@@ -207,21 +211,21 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     }
 
     this.spectrum = new ColorPicker.Spectrum.Spectrum(this.contrastInfo);
-    this.spectrum.setColor(color);
+    this.spectrum.color = color;
     this.spectrum.addPalette(this.generateCSSVariablesPalette());
 
-    this.spectrum.addEventListener(ColorPicker.Spectrum.Events.SIZE_CHANGED, this.spectrumResized, this);
-    this.spectrum.addEventListener(ColorPicker.Spectrum.Events.COLOR_CHANGED, this.boundSpectrumChanged);
+    this.spectrum.element.addEventListener(ColorPicker.Spectrum.SizeChangedEvent.eventName, this.boundSpectrumResized);
+    this.spectrum.element.addEventListener(ColorPicker.Spectrum.ColorChangedEvent.eventName, this.boundSpectrumChanged);
     this.swatchPopoverHelper.show(this.spectrum, this.swatch, this.onPopoverHidden.bind(this));
     this.scrollerElement = this.swatch.enclosingNodeOrSelfWithClass('style-panes-wrapper');
     if (this.scrollerElement) {
       this.scrollerElement.addEventListener('scroll', this.boundOnScroll, false);
     }
 
-    this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.stylesContainer().setEditingStyle(true);
+    this.originalPropertyText = this.propertyData.property.propertyText;
+    this.propertyData.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
-        this.treeElement.property, false /* forName */);
+        this.propertyData.property, false /* forName */);
     if (uiLocation) {
       void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
@@ -233,7 +237,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     this.swatchPopoverHelper.reposition();
   }
 
-  private async spectrumChanged(event: Common.EventTarget.EventTargetEvent<string>): Promise<void> {
+  private async spectrumChanged(event: ColorPicker.Spectrum.ColorChangedEvent): Promise<void> {
     const getColor = (colorText: string): Common.Color.Color|null => {
       const color = Common.Color.parse(colorText);
       const customProperty = this.spectrum?.colorName()?.startsWith('--') && `var(${this.spectrum.colorName()})`;
@@ -292,13 +296,16 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     }
 
     if (this.spectrum) {
-      this.spectrum.removeEventListener(ColorPicker.Spectrum.Events.COLOR_CHANGED, this.boundSpectrumChanged);
+      this.spectrum.element.removeEventListener(ColorPicker.Spectrum.SizeChangedEvent.eventName,
+                                                this.boundSpectrumResized);
+      this.spectrum.element.removeEventListener(ColorPicker.Spectrum.ColorChangedEvent.eventName,
+                                                this.boundSpectrumChanged);
     }
     this.spectrum = undefined;
 
-    const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.stylesContainer().setEditingStyle(false);
+    const propertyText = commitEdit ? this.propertyData.renderedPropertyText() : this.originalPropertyText || '';
+    void this.propertyData.applyStyleText(propertyText, true);
+    this.propertyData.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
 
     UI.Context.Context.instance().setFlavor(ColorSwatchPopoverIcon, null);
@@ -314,7 +321,7 @@ export interface ShadowEventTypes {
 }
 
 export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrapper<ShadowEventTypes> {
-  private treeElement: StylePropertyTreeElement;
+  private propertyData: StylePropertyData;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
   private readonly boundShadowChanged:
       (event: Common.EventTarget.EventTargetEvent<InlineEditor.CSSShadowEditor.CSSShadowModel>) => void;
@@ -322,10 +329,10 @@ export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrappe
   private cssShadowEditor?: InlineEditor.CSSShadowEditor.CSSShadowEditor;
   private scrollerElement?: Element;
   private originalPropertyText?: string|null;
-  constructor(treeElement: StylePropertyTreeElement,
+  constructor(propertyData: StylePropertyData,
               swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper) {
     super();
-    this.treeElement = treeElement;
+    this.propertyData = propertyData;
     this.swatchPopoverHelper = swatchPopoverHelper;
 
     this.boundShadowChanged = this.shadowChanged.bind(this);
@@ -349,10 +356,10 @@ export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrappe
       this.scrollerElement.addEventListener('scroll', this.boundOnScroll, false);
     }
 
-    this.originalPropertyText = this.treeElement.property.propertyText;
-    this.treeElement.stylesContainer().setEditingStyle(true);
+    this.originalPropertyText = this.propertyData.property.propertyText;
+    this.propertyData.stylesContainer().setEditingStyle(true);
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
-        this.treeElement.property, false /* forName */);
+        this.propertyData.property, false /* forName */);
     if (uiLocation) {
       void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
@@ -377,9 +384,9 @@ export class ShadowSwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrappe
     }
     this.cssShadowEditor = undefined;
 
-    const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    void this.treeElement.applyStyleText(propertyText, true);
-    this.treeElement.stylesContainer().setEditingStyle(false);
+    const propertyText = commitEdit ? this.propertyData.renderedPropertyText() : this.originalPropertyText || '';
+    void this.propertyData.applyStyleText(propertyText, true);
+    this.propertyData.stylesContainer().setEditingStyle(false);
     delete this.originalPropertyText;
   }
 }

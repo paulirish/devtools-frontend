@@ -2320,5 +2320,69 @@ describeWithEnvironment('ConsoleViewMessage', () => {
       );
       assert.strictEqual(element.deepTextContent(), 'Object as string: [object HTMLDocument]');
     });
+
+    it('resolves light-magenta ANSI colors in light theme', async () => {
+      const formatString = '\x1b[95m\x1b[105mlight magenta\x1b[0m';
+      const rawMessage = new SDK.ConsoleModel.ConsoleMessage(
+          runtimeModel,
+          Common.Console.FrontendMessageSource.ConsoleAPI,
+          Protocol.Log.LogEntryLevel.Info,
+          formatString,
+          {
+            type: Protocol.Runtime.ConsoleAPICalledEventType.Log,
+            parameters: [SDK.RemoteObject.RemoteObject.fromLocalObject(formatString)],
+          },
+      );
+      const {message} = createConsoleViewMessageWithStubDeps(rawMessage);
+      const element = message.toMessageElement();
+
+      const wrapperElement = document.createElement('div');
+      const shadowElement = UI.UIUtils.createShadowRootWithCoreStyles(
+          wrapperElement,
+          {cssFile: consoleViewStyles},
+      );
+      shadowElement.appendChild(element);
+      renderElementIntoDOM(wrapperElement);
+      await UI.Widget.Widget.allUpdatesComplete;
+      await raf();
+
+      const coloredSpan = element.querySelector<HTMLElement>('span[style*="var(--console-color-lightmagenta)"]');
+      assert.exists(coloredSpan);
+      const computedStyle = window.getComputedStyle(coloredSpan);
+      assert.strictEqual(computedStyle.color, 'rgb(255, 85, 255)');
+      assert.strictEqual(computedStyle.backgroundColor, 'rgb(255, 85, 255)');
+    });
+
+    it('renders customPreview widget directly inside .console-message-text', async () => {
+      const target = createTarget();
+      const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+      const rawCustomParam: Protocol.Runtime.RemoteObject = {
+        type: Protocol.Runtime.RemoteObjectType.Object,
+        objectId: 'custom-1' as Protocol.Runtime.RemoteObjectId,
+        customPreview: {
+          header: JSON.stringify(['span', {}, 'Custom header']),
+          bodyGetterId: 'body-1' as Protocol.Runtime.RemoteObjectId,
+        },
+      };
+      const rawMessage = new SDK.ConsoleModel.ConsoleMessage(
+          runtimeModel,
+          Common.Console.FrontendMessageSource.ConsoleAPI,
+          Protocol.Log.LogEntryLevel.Info,
+          '',
+          {
+            type: Protocol.Runtime.ConsoleAPICalledEventType.Log,
+            parameters: [rawCustomParam],
+          },
+      );
+      const {message} = createConsoleViewMessageWithStubDeps(rawMessage);
+      const host = new UI.Widget.Widget();
+      host.markAsRoot();
+      renderElementIntoDOM(host);
+      host.contentElement.appendChild(message.toMessageElement());
+      const firstInText = message.contentElement().querySelector('.console-message-text *');
+      assert.exists(firstInText);
+      await UI.Widget.Widget.get(firstInText)?.updateComplete;
+      assert.include(firstInText.deepTextContent(), 'Custom header');
+    });
   });
 });

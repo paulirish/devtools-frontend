@@ -16,7 +16,6 @@ for more details about the presubmit API built into gcl.
 import json
 import re
 import sys
-import six
 import time
 
 from pathlib import Path
@@ -26,6 +25,7 @@ PRESUBMIT_VERSION = '2.0.0'
 
 _EXCLUDED_PATHS = [
     r'^extensions[\\/]cxx_debugging[\\/]e2e[\\/]runner\.py$',  # Lines too long
+    r'^for_agents[\\/].*',  # Imported chrome-devtools-mcp (Apache-2.0)
     r'^front_end[\\/]core[\\/]common[\\/]Color\.ts$',  # Apple copyright
     r'^front_end[\\/]core[\\/]common[\\/]Object\.ts$',  # Apple copyright
     r'^front_end[\\/]core[\\/]common[\\/]ResourceType\.ts$',  # Apple copyright
@@ -49,8 +49,6 @@ _EXCLUDED_PATHS = [
     r'^node_modules[\\/].*',  # 3rd party code
     r'^scripts[\\/]build[\\/]code_generator_frontend\.py$',
     r'^scripts[\\/]deps[\\/]manage_node_deps\.py$',  # Lines too long
-    # Auto-generated files
-    r'front_end[\\/]generated[\\/]InspectorBackendCommands\.ts$'
 ]
 
 
@@ -59,7 +57,7 @@ def _ExecuteSubProcess(input_api,
                        script_path,
                        script_arguments=None,
                        message=None):
-    if isinstance(script_path, six.string_types):
+    if isinstance(script_path, str):
         script_path = [input_api.python3_executable, script_path]
 
     start_time = time.time()
@@ -181,6 +179,52 @@ def CheckBugAssociationOnCommit(input_api, output_api):
         results.append(output_api.PresubmitError(message))
 
     return results
+
+
+_PIPER_TAG_RE = re.compile(
+    r'^(TAG|CONV|MARKDOWN|BUG|FIXED|R_FUTURE|ORIGINAL_AUTHOR|WANT_LGTM|AUTOSUBMIT_BEHAVIOR)='
+)
+
+
+def CheckNoPiperTagsInDescription(input_api, output_api):
+    results = []
+    description = input_api.change.FullDescriptionText()
+    offending_lines = [
+        line for line in description.splitlines() if _PIPER_TAG_RE.match(line)
+    ]
+    if offending_lines:
+        lines_formatted = '\n'.join(f'  {line}' for line in offending_lines)
+        message = (
+            f'Commit description contains Piper-style KEY=VALUE tags:\n'
+            f'{lines_formatted}\n\n'
+            'Please remove these lines from the commit description:\n'
+            '- Use Git trailers (such as "Bug:" or "Fixed:") in the commit footer\n'
+            '  instead of "BUG=" or "FIXED=".\n'
+            '- Do not include internal metadata tags like "TAG=" or "CONV=" in\n'
+            '  public Git commit messages; they break Git trailer parsing and\n'
+            '  Gerrit Change-Id generation.\n'
+            '- To link agent conversations out of band on upload without adding\n'
+            '  "CONV=" to the commit description, run:\n'
+            '    git config --global cl.upload-conversation-id true\n')
+        results.append(output_api.PresubmitError(message))
+    return results
+
+
+def CheckPresubmitUnitTests(input_api, output_api):
+    affected = [
+        input_api.os_path.basename(f.LocalPath())
+        for f in input_api.AffectedFiles()
+    ]
+    if 'PRESUBMIT.py' not in affected and 'PRESUBMIT_test.py' not in affected:
+        return []
+    return input_api.canned_checks.RunUnitTestsInDirectory(
+        input_api,
+        output_api,
+        input_api.PresubmitLocalPath(),
+        [r'^PRESUBMIT_test\.py$'],
+        run_on_python2=False,
+        skip_shebang_check=True,
+    )
 
 
 def CheckExperimentTelemetry(input_api, output_api):
@@ -324,34 +368,15 @@ def CheckGeneratedFiles(input_api, output_api):
                                                'v8')
     blink_directory_path = input_api.os_path.join(
         input_api.PresubmitLocalPath(), 'third_party', 'blink')
-    scripts_build_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
-                                                'scripts', 'build')
     scripts_generated_output_path = input_api.os_path.join(
         input_api.PresubmitLocalPath(), 'front_end', 'generated')
-
-    generated_supported_css_path = input_api.os_path.join(
-        scripts_build_path, 'generate_supported_css.py')
-    generated_deprecation_path = input_api.os_path.join(
-        scripts_build_path, 'generate_deprecations.py')
-    generated_protocol_path = input_api.os_path.join(
-        scripts_build_path, 'code_generator_frontend.py')
-    generated_protocol_typescript_path = input_api.os_path.join(
-        input_api.PresubmitLocalPath(), 'scripts', 'protocol_typescript')
-    concatenate_protocols_path = input_api.os_path.join(
-        input_api.PresubmitLocalPath(), 'third_party', 'inspector_protocol',
-        'concatenate_protocols.py')
 
     affected_files = _GetAffectedFiles(input_api, [
         v8_directory_path,
         blink_directory_path,
         input_api.os_path.join(input_api.PresubmitLocalPath(), 'third_party',
                                'pyjson5'),
-        generated_supported_css_path,
-        generated_deprecation_path,
-        concatenate_protocols_path,
-        generated_protocol_path,
         scripts_generated_output_path,
-        generated_protocol_typescript_path,
     ], [], ['.pdl', '.json5', '.py', '.js', '.ts'])
 
     if len(affected_files) == 0:
@@ -787,12 +812,20 @@ def _TextFilesOnlyFilter(file):
     """
     excluded_prefixes = [
         'node_modules',
+        'for_agents/node_modules',
         'third_party',
         'front_end/third_party',
         'extensions/cxx_debugging/third_party',
     ]
     excluded_extensions = [
-        '.png', '.webm', '.svg', '.avif', '.rawresponse', '.gz'
+        '.png',
+        '.webm',
+        '.svg',
+        '.avif',
+        '.rawresponse',
+        '.gz',
+        '.heapsnapshot',
+        '.snapshot',
     ]
 
     if any(file.LocalPath().startswith(prefix)

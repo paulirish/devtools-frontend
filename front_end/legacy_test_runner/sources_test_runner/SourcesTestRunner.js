@@ -11,6 +11,37 @@ import {TestRunner} from '../test_runner/test_runner.js';
 
 /**
  * @param {!Sources.NavigatorView.NavigatorView} navigatorView
+ * @returns {!UI.TreeOutline.TreeOutline}
+ */
+function getNavigatorTreeOutline(navigatorView) {
+  navigatorView.performUpdate();
+  const treeViewElement = navigatorView.contentElement.querySelector('devtools-tree');
+  treeViewElement?.flushPendingUpdatesForTesting();
+  const treeOutline = treeViewElement?.getInternalTreeOutlineForTest();
+  if (!treeOutline) {
+    throw new Error('treeOutline not found');
+  }
+  return treeOutline;
+}
+
+/**
+ * @param {!Sources.NavigatorView.NavigatorView} navigatorView
+ * @param {!UI.TreeElement} treeElement
+ * @returns {string|undefined}
+ */
+function getNavigatorNodeType(navigatorView, treeElement) {
+  const classList = treeElement.listItemElement.classList;
+  for (const className of classList) {
+    const match = /^navigator-(.*)-tree-item$/.exec(className);
+    if (match && match[1] !== 'folder' && match[1] !== 'file') {
+      return match[1];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * @param {!Sources.NavigatorView.NavigatorView} navigatorView
  * @param {boolean=} dumpIcons
  */
 export const dumpNavigatorView = function(navigatorView, dumpIcons) {
@@ -19,7 +50,7 @@ export const dumpNavigatorView = function(navigatorView, dumpIcons) {
       navigatorView :
       navigatorView.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
   innerNavigatorView.performUpdate();
-  dumpNavigatorTreeOutline(innerNavigatorView.scriptsTree);
+  dumpNavigatorTreeOutline(getNavigatorTreeOutline(innerNavigatorView));
 
   /**
    * @param {string} prefix
@@ -35,8 +66,8 @@ export const dumpNavigatorView = function(navigatorView, dumpIcons) {
         titleText = titleText + '[' + iconTypes.join(', ') + '] ';
       }
     }
-    titleText += treeElement.title;
-    const nodeType = innerNavigatorView.nodeForTreeElement(treeElement)?.type;
+    titleText += treeElement.titleAsText() || treeElement.titleElement.textContent || '';
+    const nodeType = getNavigatorNodeType(innerNavigatorView, treeElement);
     if (nodeType === Sources.NavigatorView.Types.FileSystem ||
         nodeType === Sources.NavigatorView.Types.FileSystemFolder) {
       const hasMappedFiles = treeElement.listItemElement.classList.contains('has-mapped-files');
@@ -46,6 +77,9 @@ export const dumpNavigatorView = function(navigatorView, dumpIcons) {
     }
     TestRunner.addResult(prefix + titleText);
     treeElement.expand();
+    innerNavigatorView.performUpdate();
+    const treeViewElement = innerNavigatorView.contentElement.querySelector('devtools-tree');
+    treeViewElement?.flushPendingUpdatesForTesting();
     const children = treeElement.children();
     for (let i = 0; i < children.length; ++i) {
       dumpNavigatorTreeElement(prefix + '  ', children[i]);
@@ -82,10 +116,11 @@ export const dumpNavigatorViewInMode = function(view, mode) {
       view :
       view.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
   navigatorView.performUpdate();
-  navigatorView.groupByFrame = mode.includes('frame');
-  navigatorView.groupByDomain = mode.includes('domain');
-  navigatorView.groupByFolder = mode.includes('folder');
-  navigatorView.resetForTest();
+  navigatorView.resetForTest({
+    frame: mode.includes('frame'),
+    domain: mode.includes('domain'),
+    folder: mode.includes('folder'),
+  });
   TestRunner.addResult('-------- Setting mode: [' + mode + ']');
   dumpNavigatorView(navigatorView);
 };

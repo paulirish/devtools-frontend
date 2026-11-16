@@ -33,6 +33,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/kit/kit.js';
 import '../../ui/legacy/legacy.js';
 
 import * as Common from '../../core/common/common.js';
@@ -50,11 +51,11 @@ import * as ChangeTracker from '../../models/change_tracker/change_tracker.js';
 import type * as ComputedStyle from '../../models/computed_style/computed_style.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
-import {createIcon, Icon} from '../../ui/kit/kit.js';
+import {createIcon, type Icon} from '../../ui/kit/kit.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {render} from '../../ui/lit/lit.js';
+import {Directives, html, type LitTemplate, nothing, render} from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as PanelsCommon from '../common/common.js';
@@ -77,7 +78,7 @@ import {
   StylePropertiesSection,
 } from './StylePropertiesSection.js';
 import {StylePropertyHighlighter} from './StylePropertyHighlighter.js';
-import type {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
+import type {StylePropertyData, StylePropertyTreeElement} from './StylePropertyTreeElement.js';
 import * as StylesAiCodeCompletionProvider from './StylesAiCodeCompletionProvider.js';
 import type {StylesContainer} from './StylesContainer.js';
 import stylesSidebarPaneStyles from './stylesSidebarPane.css.js';
@@ -212,6 +213,71 @@ const DISCLAIMER_TOOLTIP_ID = 'styles-ai-code-completion-disclaimer-tooltip';
 const SPINNER_TOOLTIP_ID = 'styles-ai-code-completion-spinner-tooltip';
 const CITATIONS_TOOLTIP_ID = 'styles-ai-code-completion-citations-tooltip';
 
+const TOOLBAR_PANE_SLIDE_IN_ANIMATION = 'styles-element-state-pane-slidein';
+const TOOLBAR_PANE_SLIDE_OUT_ANIMATION = 'styles-element-state-pane-slideout';
+
+const {ref, styleMap} = Directives;
+const {widget} = UI.Widget;
+
+export interface HeaderViewInput {
+  showNoMatches: boolean;
+  toolbarItems: readonly UI.Toolbar.ToolbarItem[];
+  toolbarItemsLocation?: string;
+  toolbarPane: UI.Widget.Widget|null;
+  toolbarPaneAnimation: string|null;
+  onFilterChanged: (text: string) => void;
+  onRegexToggled: (toggled: boolean) => void;
+  onToolbarPaneAnimationEnd: (animationName: string) => void;
+}
+
+export type HeaderView = (input: HeaderViewInput, output: undefined, target: HTMLElement) => void;
+
+const initializedToolbarLocations = new WeakMap<UI.Toolbar.Toolbar, string>();
+
+function renderToolbarAndEmptyState(input: HeaderViewInput): LitTemplate {
+  // The sticky toolbar container is marked as `data-sticky-occluder`: comment overlays for rules scrolled
+  // under it are clipped (see CommentAnchorResolver).
+  // clang-format off
+  return html`
+    <div class="styles-sidebar-pane-toolbar-container" role="toolbar" data-sticky-occluder>
+      <div class="hbox styles-sidebar-pane-toolbar">
+        <devtools-toolbar class="styles-pane-toolbar" role="presentation" ${ref(element => {
+          if (element instanceof UI.Toolbar.Toolbar) {
+            if (input.toolbarItemsLocation && initializedToolbarLocations.get(element) !== input.toolbarItemsLocation) {
+              initializedToolbarLocations.set(element, input.toolbarItemsLocation);
+              void element.appendItemsAtLocation(input.toolbarItemsLocation);
+            }
+            for (const item of input.toolbarItems) {
+              if (!element.hasItem(item)) {
+                element.appendToolbarItem(item);
+              }
+            }
+          }
+        })}>
+          <devtools-toolbar-input type="filter" regex style="flex-grow: 1; flex-shrink: 1;"
+              @change=${(event: CustomEvent<string>) => input.onFilterChanged(event.detail)}
+              @regextoggle=${(event: CustomEvent<boolean>) => input.onRegexToggled(event.detail)}>
+          </devtools-toolbar-input>
+        </devtools-toolbar>
+      </div>
+      <div class="styles-sidebar-toolbar-pane-container">
+        <div class="styles-sidebar-toolbar-pane"
+            style=${styleMap({'animation-name': input.toolbarPaneAnimation ?? undefined})}
+            @animationend=${(event: AnimationEvent) => input.onToolbarPaneAnimationEnd(event.animationName)}>
+          ${widget(UI.Widget.WrapperWidget, {widget: input.toolbarPane})}
+        </div>
+      </div>
+    </div>
+    <div class="gray-info-message" ?hidden=${!input.showNoMatches}>
+      ${input.showNoMatches ? i18nString(UIStrings.noMatchingSelectorOrStyle) : nothing}
+    </div>`;
+  // clang-format on
+}
+
+export const DEFAULT_HEADER_VIEW: HeaderView = (input, _output, target) => {
+  render(renderToolbarAndEmptyState(input), target);
+};
+
 const StylesSidebarPaneBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof ElementsSidebarPane> =
     Common.ObjectWrapper.eventMixin(
         ElementsSidebarPane,
@@ -223,11 +289,12 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   private animatedToolbarPane: UI.Widget.Widget|null = null;
   private pendingWidget: UI.Widget.Widget|null = null;
   private pendingWidgetToggle: UI.Toolbar.ToolbarToggle|null = null;
-  private toolbar: UI.Toolbar.Toolbar|null = null;
-  private toolbarPaneElement: HTMLElement;
+  #toolbarPaneAnimation: string|null = null;
   private lastFilterChange: number|null = null;
   private visibleSections: number|null = null;
-  private noMatchesElement: HTMLElement;
+  #showNoMatches = false;
+  readonly #headerContainer = document.createElement('div');
+  readonly #toolbarItems: UI.Toolbar.ToolbarItem[] = [];
   private sectionsContainer: UI.Widget.Widget;
   sectionByElement: WeakMap<Node, StylePropertiesSection> = new WeakMap<Node, StylePropertiesSection>();
   readonly #swatchPopoverHelper = new InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper();
@@ -277,11 +344,13 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   #elementsForSyncViewportCheck: Element[] = [];
   #updateId = 0;
   #changeTracker?: ChangeTracker.ChangeTracker.ChangeTracker;
+  readonly #headerView: HeaderView;
 
   constructor(computedStyleModel: ComputedStyle.ComputedStyleModel.ComputedStyleModel,
-              changeTracker?: ChangeTracker.ChangeTracker.ChangeTracker) {
+              changeTracker?: ChangeTracker.ChangeTracker.ChangeTracker, headerView: HeaderView = DEFAULT_HEADER_VIEW) {
     super(computedStyleModel, {delegatesFocus: true, useShadowDom: true, classes: ['flex-none']});
     this.#changeTracker = changeTracker;
+    this.#headerView = headerView;
     this.setMinimumSize(96, 26);
     this.registerRequiredCSS(stylesSidebarPaneStyles);
     Common.Settings.Settings.instance()
@@ -293,13 +362,16 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     Common.Settings.Settings.instance()
         .resolve(SettingsUI.ElementsSettings.showInactiveCSSRulesSettingDescriptor)
         .addChangeListener(this.requestUpdate, this);
-    this.toolbarPaneElement = this.createStylesSidebarToolbar();
-    this.noMatchesElement = this.contentElement.createChild('div', 'gray-info-message hidden');
-    this.noMatchesElement.textContent = i18nString(UIStrings.noMatchingSelectorOrStyle);
+    this.#headerContainer.style.display = 'contents';
+    this.contentElement.appendChild(this.#headerContainer);
     this.sectionsContainer = new UI.Widget.VBox();
     this.sectionsContainer.show(this.contentElement);
     UI.ARIAUtils.markAsList(this.sectionsContainer.contentElement);
-    this.sectionsContainer.contentElement.addEventListener('keydown', this.sectionsContainerKeyDown.bind(this), false);
+    this.sectionsContainer.contentElement.addEventListener('keydown', event => {
+      if (!event.isComposing && this.#navigateSectionByKey(event.key)) {
+        event.consume(true);
+      }
+    }, false);
     this.sectionsContainer.contentElement.addEventListener('focusin', this.sectionsContainerFocusChanged.bind(this),
                                                            false);
     this.sectionsContainer.contentElement.addEventListener('focusout', this.sectionsContainerFocusChanged.bind(this),
@@ -357,6 +429,24 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       this.aiCodeCompletionProvider =
           StylesAiCodeCompletionProvider.StylesAiCodeCompletionProvider.createInstance(this.aiCodeCompletionConfig);
     }
+    this.#renderHeader();
+  }
+
+  #renderHeader(): void {
+    this.#headerView(
+        {
+          showNoMatches: this.#showNoMatches,
+          toolbarItems: this.#toolbarItems,
+          toolbarItemsLocation: 'styles-sidebarpane-toolbar',
+          toolbarPane: this.currentToolbarPane ?? this.animatedToolbarPane,
+          toolbarPaneAnimation: this.#toolbarPaneAnimation,
+          onFilterChanged: text => this.onFilterChanged({data: text}),
+          onRegexToggled: this.onRegexToggled.bind(this),
+          onToolbarPaneAnimationEnd: this.#onToolbarPaneAnimationEnd.bind(this),
+        },
+        undefined,
+        this.#headerContainer,
+    );
   }
 
   #onLiveLocationUpdated(): void {
@@ -461,18 +551,18 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }
   }
 
-  private sectionsContainerKeyDown(event: Event): void {
-    const activeElement = UI.DOMUtilities.deepActiveElement(this.sectionsContainer.contentElement.ownerDocument);
+  #navigateSectionByKey(key: string): boolean {
+    const activeElement = UI.DOMUtilities.deepActiveElement(this.contentElement.ownerDocument);
     if (!activeElement) {
-      return;
+      return false;
     }
     const section = this.sectionByElement.get(activeElement);
     if (!section) {
-      return;
+      return false;
     }
     let sectionToFocus: (StylePropertiesSection|null)|null = null;
     let willIterateForward = false;
-    switch ((event as KeyboardEvent).key) {
+    switch (key) {
       case 'ArrowUp':
       case 'ArrowLeft': {
         sectionToFocus = section.previousSibling() || section.lastSibling();
@@ -502,8 +592,9 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }
     if (sectionToFocus) {
       sectionToFocus.element.focus();
-      event.consume(true);
+      return true;
     }
+    return false;
   }
 
   private sectionsContainerFocusChanged(): void {
@@ -513,7 +604,7 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   resetFocus(): void {
     // When a styles section is focused, shift+tab should leave the section.
     // Leaving tabIndex = 0 on the first element would cause it to be focused instead.
-    if (!this.noMatchesElement.classList.contains('hidden')) {
+    if (this.#showNoMatches) {
       return;
     }
     if (this.sectionBlocks[0]?.sections[0]) {
@@ -590,8 +681,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     this.setFilter(this.#buildFilterRegex(event.data));
   }
 
-  private onRegexToggled(): void {
-    this.#isRegex = !this.#isRegex;
+  private onRegexToggled(toggled: boolean): void {
+    this.#isRegex = toggled;
     this.setFilter(this.#buildFilterRegex(this.#filterText));
   }
 
@@ -612,14 +703,13 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }, FILTER_IDLE_PERIOD);
   }
 
-  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement,
-                force = false): void {
-    if (editedTreeElement) {
+  refreshUpdate(editedSection: StylePropertiesSection, editedProperty?: StylePropertyData, force = false): void {
+    if (editedProperty) {
       for (const section of this.allSections()) {
         if (section instanceof BlankStylePropertiesSection && section.isBlank) {
           continue;
         }
-        section.updateVarFunctions(editedTreeElement);
+        section.updateVarFunctions(editedProperty);
       }
     }
 
@@ -722,11 +812,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   }
 
   getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-                         variableName: string): ElementsComponents.CSSVariableValueView.CSSVariableParserError|null {
-    const registrationDetails = this.getRegisteredPropertyDetails(matchedStyles, variableName);
-    return registrationDetails ?
-        new ElementsComponents.CSSVariableValueView.CSSVariableParserError(registrationDetails) :
-        null;
+                         variableName: string): ElementsComponents.CSSVariableValueView.RegisteredPropertyDetails|null {
+    return this.getRegisteredPropertyDetails(matchedStyles, variableName) ?? null;
   }
 
   private async fetchComputedStylesFor(nodeId: Protocol.DOM.NodeId|undefined): Promise<Map<string, string>|null> {
@@ -796,7 +883,7 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }
   }
 
-  setActiveProperty(treeElement: StylePropertyTreeElement|null): void {
+  setActiveProperty(propertyData: StylePropertyData|null): void {
     if (this.isEditingStyle) {
       return;
     }
@@ -810,14 +897,14 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       return;
     }
 
-    if (!treeElement || treeElement.overloaded() || treeElement.inherited()) {
+    if (!propertyData || propertyData.overloaded() || propertyData.inherited()) {
       return;
     }
 
-    const rule = treeElement.property.ownerStyle.parentRule;
+    const rule = propertyData.property.ownerStyle.parentRule;
     const selectorList = (rule instanceof SDK.CSSRule.CSSStyleRule) ? rule.selectorText() : undefined;
     for (const {properties, mode} of HIGHLIGHTABLE_PROPERTIES) {
-      if (!properties.includes(treeElement.name)) {
+      if (!properties.includes(propertyData.property.name)) {
         continue;
       }
       node.domModel().overlayModel().highlightInOverlay({node, selectorList}, mode);
@@ -825,7 +912,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       return;
     }
 
-    if (treeElement.value.includes('anchor(') || treeElement.value.includes('anchor-size(')) {
+    const value = propertyData.property.value;
+    if (value.includes('anchor(') || value.includes('anchor-size(')) {
       node.domModel().overlayModel().highlightInOverlay({node, selectorList}, 'anchor-positioning');
       this.isActivePropertyHighlighted = true;
     }
@@ -1098,7 +1186,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       this.sectionBlocks = [];
       this.sectionsContainer.detachChildWidgets();
       this.sectionsContainer.contentElement.removeChildren();
-      this.noMatchesElement.classList.remove('hidden');
+      this.#showNoMatches = true;
+      this.#renderHeader();
       return;
     }
 
@@ -1161,7 +1250,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     if (this.#filterRegex) {
       this.updateFilter();
     } else {
-      this.noMatchesElement.classList.toggle('hidden', this.sectionBlocks.length > 0);
+      this.#showNoMatches = this.sectionBlocks.length === 0;
+      this.#renderHeader();
     }
     if (this.lastRevealedProperty) {
       void this.decorator.highlightProperty(this.lastRevealedProperty);
@@ -1635,9 +1725,9 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
       visibleSections += block.updateFilter();
       hasAnyVisibleBlock = Boolean(visibleSections) || hasAnyVisibleBlock;
     }
-    this.noMatchesElement.classList.toggle('hidden', Boolean(hasAnyVisibleBlock));
-
+    this.#showNoMatches = !hasAnyVisibleBlock;
     this.visibleSections = visibleSections;
+    this.#renderHeader();
   }
 
   override wasShown(): void {
@@ -1679,27 +1769,6 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleCopied);
   }
 
-  private createStylesSidebarToolbar(): HTMLElement {
-    const container = this.contentElement.createChild('div', 'styles-sidebar-pane-toolbar-container');
-    // Sticky toolbar: comment overlays for rules scrolled under it are clipped (see CommentAnchorResolver).
-    container.setAttribute('data-sticky-occluder', '');
-    container.role = 'toolbar';
-    const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
-    const toolbar = hbox.createChild('devtools-toolbar', 'styles-pane-toolbar');
-    toolbar.role = 'presentation';
-    const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false, undefined, undefined,
-                                                     /* showRegexToggle=*/ true, this.onRegexToggled.bind(this));
-    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
-    toolbar.appendToolbarItem(filterInput);
-    void toolbar.appendItemsAtLocation('styles-sidebarpane-toolbar');
-    this.toolbar = toolbar;
-
-    const toolbarPaneContainer = container.createChild('div', 'styles-sidebar-toolbar-pane-container');
-    const toolbarPaneContent = toolbarPaneContainer.createChild('div', 'styles-sidebar-toolbar-pane');
-
-    return toolbarPaneContent;
-  }
-
   showToolbarPane(widget: UI.Widget.Widget|null, toggle: UI.Toolbar.ToolbarToggle|null): void {
     if (this.pendingWidgetToggle) {
       this.pendingWidgetToggle.setToggled(false);
@@ -1718,9 +1787,8 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
   }
 
   appendToolbarItem(item: UI.Toolbar.ToolbarItem): void {
-    if (this.toolbar) {
-      this.toolbar.appendToolbarItem(item);
-    }
+    this.#toolbarItems.push(item);
+    this.#renderHeader();
   }
 
   addStyleUpdateListener(listener: () => void): void {
@@ -1737,9 +1805,9 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     }
 
     if (widget && this.currentToolbarPane) {
-      this.currentToolbarPane.detach();
-      widget.show(this.toolbarPaneElement);
       this.currentToolbarPane = widget;
+      this.#toolbarPaneAnimation = null;
+      this.#renderHeader();
       this.currentToolbarPane.focus();
       return;
     }
@@ -1747,36 +1815,28 @@ export class StylesSidebarPane extends StylesSidebarPaneBase implements StylesCo
     this.animatedToolbarPane = widget;
 
     if (this.currentToolbarPane) {
-      this.toolbarPaneElement.style.animationName = 'styles-element-state-pane-slideout';
+      this.#toolbarPaneAnimation = TOOLBAR_PANE_SLIDE_OUT_ANIMATION;
     } else if (widget) {
-      this.toolbarPaneElement.style.animationName = 'styles-element-state-pane-slidein';
+      this.#toolbarPaneAnimation = TOOLBAR_PANE_SLIDE_IN_ANIMATION;
     }
+    this.#renderHeader();
+  }
 
-    if (widget) {
-      widget.show(this.toolbarPaneElement);
+  #onToolbarPaneAnimationEnd(animationName: string): void {
+    if (!this.#toolbarPaneAnimation || animationName !== this.#toolbarPaneAnimation) {
+      return;
     }
-
-    const listener = onAnimationEnd.bind(this);
-    this.toolbarPaneElement.addEventListener('animationend', listener, false);
-
-    function onAnimationEnd(this: StylesSidebarPane): void {
-      this.toolbarPaneElement.style.removeProperty('animation-name');
-      this.toolbarPaneElement.removeEventListener('animationend', listener, false);
-
-      if (this.currentToolbarPane) {
-        this.currentToolbarPane.detach();
-      }
-
-      this.currentToolbarPane = this.animatedToolbarPane;
-      if (this.currentToolbarPane) {
-        this.currentToolbarPane.focus();
-      }
-      this.animatedToolbarPane = null;
-
-      if (this.pendingWidget) {
-        this.startToolbarPaneAnimation(this.pendingWidget);
-        this.pendingWidget = null;
-      }
+    this.#toolbarPaneAnimation = null;
+    this.currentToolbarPane = this.animatedToolbarPane;
+    this.animatedToolbarPane = null;
+    this.#renderHeader();
+    if (this.currentToolbarPane) {
+      this.currentToolbarPane.focus();
+    }
+    if (this.pendingWidget) {
+      const pendingWidget = this.pendingWidget;
+      this.pendingWidget = null;
+      this.startToolbarPaneAnimation(pendingWidget);
     }
   }
 
@@ -2492,13 +2552,11 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
       if (!iconInfo) {
         continue;
       }
-      const icon = new Icon();
-      icon.name = iconInfo.iconName;
-      icon.classList.add('extra-small');
-      icon.style.transform = `rotate(${iconInfo.rotate}deg) scale(${iconInfo.scaleX * 1.1}, ${iconInfo.scaleY * 1.1})`;
-      icon.style.maxHeight = 'var(--sys-size-6)';
-      icon.style.maxWidth = 'var(--sys-size-6)';
-      result.iconElement = icon;
+      result.iconTemplate = html`<devtools-icon class="extra-small" name=${iconInfo.iconName} style=${styleMap({
+        transform: `rotate(${iconInfo.rotate}deg) scale(${iconInfo.scaleX * 1.1}, ${iconInfo.scaleY * 1.1})`,
+        'max-height': 'var(--sys-size-6)',
+        'max-width': 'var(--sys-size-6)',
+      })}></devtools-icon>`;
     }
 
     if (this.isColorAware && !this.isEditingName) {
@@ -2524,10 +2582,12 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
         if (computedValue) {
           const color = Common.Color.parse(computedValue.value);
           if (color) {
-            result.subtitleRenderer = colorSwatchRenderer.bind(null, color);
+            result.subtitleTemplate = html`<devtools-color-swatch class="suggestion-subtitle"
+                style="pointer-events: none;" .color=${color}></devtools-color-swatch>`;
             result.isCSSVariableColor = true;
           } else {
-            result.subtitleRenderer = computedValueSubtitleRenderer.bind(null, computedValue.value);
+            result.subtitleTemplate = html`<span class="suggestion-subtitle" style="max-width: 100px;"
+                title=${computedValue.value}>${computedValue.value}</span>`;
           }
         }
       }
@@ -2542,20 +2602,6 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
       }
     }
 
-    function colorSwatchRenderer(color: Common.Color.Color): Element {
-      const swatch = new InlineEditor.ColorSwatch.ColorSwatch();
-      swatch.renderColor(color);
-      swatch.style.pointerEvents = 'none';
-      return swatch;
-    }
-    function computedValueSubtitleRenderer(computedValue: string): Element {
-      const subtitleElement = document.createElement('span');
-      subtitleElement.className = 'suggestion-subtitle';
-      subtitleElement.textContent = `${computedValue}`;
-      subtitleElement.style.maxWidth = '100px';
-      subtitleElement.title = `${computedValue}`;
-      return subtitleElement;
-    }
   }
 
   #updateAiCodeSuggestion(): void {
@@ -2872,7 +2918,10 @@ let buttonProviderInstance: ButtonProvider;
 export class ButtonProvider implements UI.Toolbar.Provider {
   private readonly button: UI.Toolbar.ToolbarButton;
   private constructor() {
-    this.button = UI.Toolbar.Toolbar.createActionButton('elements.new-style-rule');
+    // Toolbar providers hand out toolbar items rather than rendering them, so create the button from the
+    // registered action.
+    const action = UI.ActionRegistry.ActionRegistry.instance().getAction('elements.new-style-rule');
+    this.button = UI.Toolbar.Toolbar.createActionButton(action);
     this.button.setLongClickable(true);
 
     new UI.UIUtils.LongClickController(this.button.element, this.longClicked.bind(this));

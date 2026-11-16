@@ -28,14 +28,19 @@
  */
 
 .is-ignore-listed {
-  .tree-element-title,
-  .leading-icons {
+  & > .tree-element-title {
     opacity: 40%;
   }
 }
 
 .tree-outline li {
   min-height: var(--sys-size-9);
+}
+
+.tree-outline.tree-variant-navigation li > .tree-element-title {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .tree-outline li:hover:not(.selected) .selection {
@@ -71,25 +76,6 @@
 
 .navigator-file-tree-item:hover .ai-button-container {
   display: inline-flex;
-}
-
-.navigator-file-tree-item devtools-icon.dot::before {
-  width: 7px;
-  height: 7px;
-  top: var(--sys-size-6);
-  left: 11px;
-}
-
-.navigator-file-tree-item:hover:not(.force-white-icons) devtools-icon.dot::before {
-  outline-color: var(--icon-gap-hover);
-}
-
-.navigator-file-tree-item.selected:not(.force-white-icons) devtools-icon.dot::before {
-  outline-color: var(--icon-gap-inactive);
-}
-
-.navigator-file-tree-item.selected.force-white-icons devtools-icon.dot::before {
-  outline-color: var(--icon-gap-focus-selected);
 }
 
 .navigator-sm-stylesheet-tree-item devtools-icon,

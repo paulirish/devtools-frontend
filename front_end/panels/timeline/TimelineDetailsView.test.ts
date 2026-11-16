@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {after, before, describe, it} from 'mocha';
+import {after, afterEach, before, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
-import {doubleRaf, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {assertScreenshot, doubleRaf, raf, renderElementIntoDOM, setColorScheme} from '../../testing/DOMHelpers.js';
 import {deinitializeGlobalVars, initializeGlobalVars} from '../../testing/EnvironmentHelpers.js';
 import {allThreadEntriesInTrace} from '../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
@@ -309,6 +309,112 @@ describe('TimelineDetailsView', function() {
 
     // Summary view now requests an update when the tab becomes active.
     sinon.assert.calledOnce(requestUpdateSpy);
+    detailsView.detach();
+  });
+
+  it('switches to Bottom-up grouped by third parties and expands matching entity from selectTab', async function() {
+    const parsedTrace = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const detailsView = new Timeline.TimelineDetailsView.TimelineDetailsPane(mockViewDelegate);
+    const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
+    const selectedEvents = allThreadEntriesInTrace(parsedTrace);
+    renderElementIntoDOM(detailsView);
+
+    await detailsView.setModel({
+      parsedTrace,
+      selectedEvents,
+      eventToRelatedInsightsMap: null,
+      entityMapper: mapper,
+    });
+    const bounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.data.Meta.traceBounds);
+    await detailsView.setSelection(Timeline.TimelineSelection.selectionFromRangeMilliSeconds(bounds.min, bounds.max));
+    await raf();
+
+    const thirdPartyTree = new Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget();
+    thirdPartyTree.setRange(bounds.min, bounds.max);
+    thirdPartyTree.model = {selectedEvents, parsedTrace, entityMapper: mapper};
+    const thirdPartyNode = thirdPartyTree.buildTree().children().get('Google Tag Manager');
+    assert.isOk(thirdPartyNode);
+
+    const gridNodeForEventSpy =
+        sinon.spy(Timeline.TimelineTreeView.BottomUpTimelineTreeView.prototype, 'gridNodeForEvent');
+    try {
+      detailsView.selectTab(
+          Timeline.TimelineDetailsView.Tab.BottomUp,
+          thirdPartyNode,
+          Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties,
+      );
+      await raf();
+
+      const bottomUpElement = detailsView.element.querySelector('.timeline-tree-view');
+      assert.isNotNull(bottomUpElement);
+      const bottomUpView = UI.Widget.Widget.get(bottomUpElement);
+      assert.instanceOf(bottomUpView, Timeline.TimelineTreeView.BottomUpTimelineTreeView);
+      const selectedNode = bottomUpView.dataGrid.selectedNode;
+      assert.instanceOf(selectedNode, Timeline.TimelineTreeView.GridNode);
+      assert.strictEqual(selectedNode.profileNode.id, 'Google Tag Manager');
+      assert.isTrue(selectedNode.profileNode.events.includes(thirdPartyNode.event));
+      assert.isTrue(selectedNode.expanded);
+      sinon.assert.notCalled(gridNodeForEventSpy);
+    } finally {
+      gridNodeForEventSpy.restore();
+      detailsView.detach();
+    }
+  });
+
+  describe('warning row', () => {
+    afterEach(() => {
+      setColorScheme('light');
+    });
+
+    it('renders with theme-aware surface-error background in light and dark themes', async function() {
+      const parsedTrace = await TraceLoader.traceEngine(this, 'simple-js-program.json.gz');
+      const detailsView = new Timeline.TimelineDetailsView.TimelineDetailsPane(mockViewDelegate);
+      detailsView.element.style.width = '600px';
+      detailsView.element.style.height = '400px';
+      renderElementIntoDOM(detailsView, {includeCommonStyles: true});
+
+      const longTask = allThreadEntriesInTrace(parsedTrace).find(e => (e.dur || 0) > 1_000_000);
+      assert.isOk(longTask);
+      await detailsView.setModel({
+        parsedTrace,
+        selectedEvents: null,
+        eventToRelatedInsightsMap: null,
+        entityMapper: null,
+      });
+      const selection = Timeline.TimelineSelection.selectionFromEvent(longTask);
+      await detailsView.setSelection(selection);
+      await raf();
+
+      const detailsContentElement = detailsView.getDetailsContentElementForTest();
+      const warningRow = detailsContentElement.querySelector<HTMLElement>('.timeline-details-warning');
+      assert.isNotNull(warningRow);
+
+      setColorScheme('light');
+      assert.strictEqual(getComputedStyle(warningRow).backgroundColor, 'rgb(252, 235, 235)');
+      await assertScreenshot('timeline/timeline_details_warning_light.png');
+
+      setColorScheme('dark');
+      assert.strictEqual(getComputedStyle(warningRow).backgroundColor, 'rgb(78, 53, 52)');
+      await assertScreenshot('timeline/timeline_details_warning_dark.png');
+
+      detailsView.detach();
+    });
+  });
+
+  it('forwards heaviest stack row hover once from AggregatedTimelineTreeView', async () => {
+    const detailsView = new Timeline.TimelineDetailsView.TimelineDetailsPane(mockViewDelegate);
+    renderElementIntoDOM(detailsView);
+    const hoverSpy = sinon.spy();
+    detailsView.addEventListener(Timeline.TimelineTreeView.TimelineTreeView.Events.TREE_ROW_HOVERED, hoverSpy);
+    detailsView.selectTab(Timeline.TimelineDetailsView.Tab.BottomUp, null);
+    await detailsView.updateComplete;
+    const treeEl = detailsView.element.querySelector('.timeline-tree-view');
+    assert.isNotNull(treeEl);
+    const bottomUp = UI.Widget.Widget.get(treeEl);
+    assert.instanceOf(bottomUp, Timeline.TimelineTreeView.BottomUpTimelineTreeView);
+    bottomUp.stackView.dispatchEventToListeners(Timeline.TimelineTreeView.TimelineStackView.Events.TREE_ROW_HOVERED,
+                                                null);
+    sinon.assert.calledOnce(hoverSpy);
     detailsView.detach();
   });
 });

@@ -336,11 +336,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   private onFrameNavigated(): void {
-    if (DebuggerModel.shouldResyncDebuggerId) {
-      return;
-    }
-
-    DebuggerModel.shouldResyncDebuggerId = true;
+    DebuggerModel.modelsNeedingDebuggerIdResync.add(this);
   }
 
   private registerDebugger(response: Protocol.Debugger.EnableResponse): void {
@@ -349,6 +345,9 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       return;
     }
     const {debuggerId} = response;
+    if (typeof this.#debuggerId === 'string' && this.#debuggerId !== debuggerId) {
+      debuggerIdToModel.delete(this.#debuggerId);
+    }
     debuggerIdToModel.set(debuggerId, this);
     this.#debuggerId = debuggerId;
     this.dispatchEventToListeners(Events.DebuggerIsReadyToPause, this);
@@ -359,20 +358,30 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   static async modelForDebuggerId(debuggerId: string): Promise<DebuggerModel|null> {
-    if (DebuggerModel.shouldResyncDebuggerId) {
+    const existingModel = debuggerIdToModel.get(debuggerId);
+    if (existingModel) {
+      return existingModel;
+    }
+    if (DebuggerModel.modelsNeedingDebuggerIdResync.size > 0 || DebuggerModel.resyncDebuggerIdPromise) {
       await DebuggerModel.resyncDebuggerIdForModels();
-      DebuggerModel.shouldResyncDebuggerId = false;
     }
     return debuggerIdToModel.get(debuggerId) || null;
   }
 
   static async resyncDebuggerIdForModels(): Promise<void> {
-    const dbgModels = debuggerIdToModel.values();
-    for (const dbgModel of dbgModels) {
-      if (dbgModel.debuggerEnabled()) {
-        await dbgModel.syncDebuggerId();
-      }
+    if (!DebuggerModel.resyncDebuggerIdPromise) {
+      const promise = (async () => {
+        while (DebuggerModel.modelsNeedingDebuggerIdResync.size > 0) {
+          const dbgModels = Array.from(DebuggerModel.modelsNeedingDebuggerIdResync).filter(m => m.debuggerEnabled());
+          DebuggerModel.modelsNeedingDebuggerIdResync.clear();
+          await Promise.all(dbgModels.map(m => m.syncDebuggerId()));
+        }
+      })();
+      DebuggerModel.resyncDebuggerIdPromise = promise.finally(() => {
+        DebuggerModel.resyncDebuggerIdPromise = null;
+      });
     }
+    await DebuggerModel.resyncDebuggerIdPromise;
   }
 
   private async disableDebugger(): Promise<void> {
@@ -390,6 +399,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       debuggerIdToModel.delete(this.#debuggerId);
     }
     this.#debuggerId = null;
+    DebuggerModel.modelsNeedingDebuggerIdResync.delete(this);
   }
 
   private skipAllPauses(skip: boolean): void {
@@ -949,6 +959,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   override dispose(): void {
+    DebuggerModel.modelsNeedingDebuggerIdResync.delete(this);
     if (this.#debuggerId) {
       debuggerIdToModel.delete(this.#debuggerId);
     }
@@ -972,7 +983,8 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     await this.enableDebugger();
   }
 
-  private static shouldResyncDebuggerId = false;
+  private static readonly modelsNeedingDebuggerIdResync = new Set<DebuggerModel>();
+  private static resyncDebuggerIdPromise: Promise<void>|null = null;
 
   getEvaluateOnCallFrameCallback():
       ((arg0: CallFrame, arg1: EvaluationOptions) => Promise<EvaluationResult|null>)|null {
@@ -1250,7 +1262,6 @@ export class CallFrame {
   payload: Protocol.Debugger.CallFrame;
   readonly #location: Location;
   readonly #scopeChain: Scope[];
-  readonly #localScope: Scope|null;
   readonly inlineFrameIndex: number;
   readonly functionName: string;
   readonly #functionLocation: Location|undefined;
@@ -1267,17 +1278,12 @@ export class CallFrame {
     this.payload = payload;
     this.#location = Location.fromPayload(debuggerModel, payload.location, inlineFrameIndex);
     this.#scopeChain = [];
-    this.#localScope = null;
     this.inlineFrameIndex = inlineFrameIndex || 0;
     this.functionName = functionName ?? payload.functionName;
     this.canBeRestarted = Boolean(payload.canBeRestarted);
     this.exception = exception;
     for (let i = 0; i < payload.scopeChain.length; ++i) {
-      const scope = new Scope(this, i);
-      this.#scopeChain.push(scope);
-      if (scope.type() === Protocol.Debugger.ScopeType.Local) {
-        this.#localScope = scope;
-      }
+      this.#scopeChain.push(new Scope(this, i));
     }
     if (payload.functionLocation) {
       this.#functionLocation = Location.fromPayload(debuggerModel, payload.functionLocation);
@@ -1309,12 +1315,8 @@ export class CallFrame {
     return this.payload.callFrameId;
   }
 
-  scopeChain(): Scope[] {
+  async scopeChain(): Promise<Scope[]> {
     return this.#scopeChain;
-  }
-
-  localScope(): Scope|null {
-    return this.#localScope;
   }
 
   thisObject(): RemoteObject|null {
@@ -1533,7 +1535,7 @@ export class Scope implements ScopeChainEntry {
   }
 
   extraProperties(): RemoteObjectProperty[] {
-    if (this !== this.#callFrame.localScope() || this.#callFrame.script.isWasm()) {
+    if (this.#type !== Protocol.Debugger.ScopeType.Local || this.#callFrame.script.isWasm()) {
       return [];
     }
 

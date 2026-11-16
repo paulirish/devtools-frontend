@@ -75,10 +75,16 @@ describeWithEnvironment('NetworkLogView', () => {
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (networkLogView) {
       networkLogView.detach();
     }
+    for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
+      target.dispose('afterEach');
+    }
+    await raf();
+    await UI.Widget.Widget.allUpdatesComplete;
+    await RenderCoordinator.done();
     Logs.NetworkLog.NetworkLog.removeInstance();
   });
 
@@ -200,7 +206,27 @@ describeWithEnvironment('NetworkLogView', () => {
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl --url ^"http://localhost^" -b ^"eva=^\\^"Sg4=^\\^"^"',
+        'curl --url ^"http://localhost^" -b ^"eva=^"^"Sg4=^"^"^"',
+    );
+  });
+
+  it('generates a valid curl command when header values contain quotes followed by command separators', async () => {
+    // A quote in the value must not be able to end the quoted argument when
+    // the cmd.exe command is pasted into PowerShell, where neither ^ nor \
+    // is an escape character. crbug.com/581185930
+    const request = createNetworkRequest(urlString`http://localhost`, {
+      requestHeaders: [
+        {name: 'x-header', value: 'alpha"; Write-Output pwned; "omega'},
+        {name: 'x-backslash', value: 'a\\"b | Write-Output pwned & c'},
+      ],
+    });
+    assert.strictEqual(
+        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'unix'),
+        'curl --url \'http://localhost\' \\\n  -H \'x-header: alpha"; Write-Output pwned; "omega\' \\\n  -H \'x-backslash: a\\"b | Write-Output pwned & c\'',
+    );
+    assert.strictEqual(
+        await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
+        'curl --url ^"http://localhost^" ^\n  -H ^"x-header: alpha^"^"; Write-Output pwned; ^"^"omega^" ^\n  -H ^"x-backslash: a^\\^\\^"^"b ^| Write-Output pwned ^& c^"',
     );
   });
 
@@ -369,7 +395,7 @@ describeWithEnvironment('NetworkLogView', () => {
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/json^" ^\n  --data-raw ^"^{^\\^"a^\\^":1^}^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/json^" ^\n  --data-raw ^"^{^"^"a^"^":1^}^"');
   });
 
   it('generates a valid curl command for a POST request with binary data', async () => {
@@ -384,7 +410,7 @@ describeWithEnvironment('NetworkLogView', () => {
     );
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"1234^\n\n00^ ^ ^ ^ \'^\\^"^!^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"1234^\n\n00^ ^ ^ ^ \'^"^"^!^"');
   });
 
   it('generates a valid curl command for a POST request with binary data containing %', async () => {
@@ -398,7 +424,7 @@ describeWithEnvironment('NetworkLogView', () => {
         'curl --url \'http://localhost\' \\\n  -H \'Content-Type: application/binary\' \\\n  --data-raw $\'%OS%\\\\r\\\\n%%OS%%\\\\r\\\\n"\\\\\\\\"\\\'$&\\u0021\'');
     assert.strictEqual(
         await Network.NetworkLogView.NetworkLogView.generateCurlCommand(request, 'win'),
-        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"^%^OS^%^\\^\\r^\\^\\n^%^%^OS^%^%^\\^\\r^\\^\\n^\\^"^\\^\\^\\^\\^\\^"\'^$^&^!^"');
+        'curl --url ^"http://localhost^" ^\n  -H ^"Content-Type: application/binary^" ^\n  --data-raw ^"^%^OS^%^\\^\\r^\\^\\n^%^%^OS^%^%^\\^\\r^\\^\\n^"^"^\\^\\^\\^\\^"^"\'^$^&^!^"');
   });
 
   it('generates a valid curl command for a URL with special characters', async () => {
@@ -549,7 +575,7 @@ describeWithEnvironment('NetworkLogView', () => {
           rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [URL_2]);
     });
 
-    it('shows summary toolbar with content', () => {
+    it('shows summary toolbar with content', async () => {
       target.setInspectedURL(urlString`http://example.com/`);
       const request = createNetworkRequest('http://example.com/', {finished: true});
       request.endTime = 0.669414;
@@ -563,8 +589,10 @@ describeWithEnvironment('NetworkLogView', () => {
           SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 0.686191});
       resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 0.683709);
       renderElementIntoDOM(networkLogView);
+      await networkLogView.updateComplete;
 
-      const toolbar = networkLogView.summaryToolbar();
+      const toolbar = networkLogView.element.querySelector('.network-summary-bar');
+      assert.exists(toolbar);
       const textElements = toolbar.querySelectorAll('.toolbar-text');
       assert.exists(textElements);
       const textContents = [...textElements].map(item => item.textContent);
@@ -576,6 +604,34 @@ describeWithEnvironment('NetworkLogView', () => {
           'Finish: 234\u00a0ms',
           'DOMContentLoaded: 249\u00a0ms',
           'Load: 251\u00a0ms',
+        ]);
+      } else {
+        assert.lengthOf(textElements, 0);
+      }
+    });
+
+    it('shows summary toolbar with filtered counts when filter is active', async () => {
+      target.setInspectedURL(urlString`http://example.com/`);
+      const request1 = createNetworkRequest('http://example.com/index.html', {finished: true});
+      request1.setTransferSize(1024);
+      request1.resourceSize = 2048;
+      const request2 = createNetworkRequest('http://example.com/script.js', {finished: true});
+      request2.setTransferSize(3072);
+      request2.resourceSize = 4096;
+
+      networkLogView.setTextFilterValue('script.js');
+      renderElementIntoDOM(networkLogView);
+      await networkLogView.updateComplete;
+
+      const toolbar = networkLogView.element.querySelector('.network-summary-bar');
+      assert.exists(toolbar);
+      const textElements = toolbar.querySelectorAll('.toolbar-text');
+      const textContents = [...textElements].map(item => item.textContent);
+      if (inScope) {
+        assert.deepEqual(textContents, [
+          '1 / 2 requests',
+          '3.1\u00a0kB / 4.1\u00a0kB transferred',
+          '4.1\u00a0kB / 6.1\u00a0kB resources',
         ]);
       } else {
         assert.lengthOf(textElements, 0);
@@ -676,13 +732,13 @@ describeWithEnvironment('NetworkLogView', () => {
     }
 
     assert.strictEqual(getMoreFiltersActiveCount(filterBar), '0');
-    assert.isTrue(getCountAdorner(filterBar)?.classList.contains('hidden'));
+    assert.isTrue(getCountAdorner(filterBar)?.hidden);
 
     const softMenu = getMenu(() => dropdown.click());
     await selectMoreFiltersOption(softMenu, 'Hide extension URLs');
 
     assert.strictEqual(getMoreFiltersActiveCount(filterBar), '1');
-    assert.isFalse(getCountAdorner(filterBar)?.classList.contains('hidden'));
+    assert.isFalse(getCountAdorner(filterBar)?.hidden);
 
     softMenu.discard();
   });
@@ -809,8 +865,10 @@ describeWithEnvironment('NetworkLogView', () => {
       waterfall: {visible: false, title: 'waterfall'},
     });
     networkLogView = createNetworkLogView();
+    await networkLogView.updateComplete;
     let columns = networkLogView.columns();
-    let networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    let networkColumnWidget =
+        UI.Widget.Widget.getOrCreateWidget(networkLogView.element.querySelector('devtools-split-view')!);
     assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
     assert.strictEqual((networkColumnWidget).showMode(), UI.SplitWidget.ShowMode.ONLY_MAIN);
 
@@ -820,7 +878,9 @@ describeWithEnvironment('NetworkLogView', () => {
     networkLogView = createNetworkLogView();
     columns = networkLogView.columns();
     columns.switchViewMode(true);
-    networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    await networkLogView.updateComplete;
+    networkColumnWidget =
+        UI.Widget.Widget.getOrCreateWidget(networkLogView.element.querySelector('devtools-split-view')!);
     assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
     assert.strictEqual((networkColumnWidget).showMode(), UI.SplitWidget.ShowMode.BOTH);
   });
@@ -837,9 +897,12 @@ describeWithEnvironment('NetworkLogView', () => {
 
     // First open of NetworkLogView loads custom columns and settings.
     networkLogView = createNetworkLogView();
+    await networkLogView.updateComplete;
     let columns = networkLogView.columns();
     columns.switchViewMode(true);
-    let networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    await networkLogView.updateComplete;
+    let networkColumnWidget =
+        UI.Widget.Widget.getOrCreateWidget(networkLogView.element.querySelector('devtools-split-view')!);
     assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
     assert.strictEqual(networkColumnWidget.showMode(), UI.SplitWidget.ShowMode.BOTH);
     assert.isFalse(columns.dataGrid().visibleColumnsArray.some(c => c.id === 'response-header-content-type'));
@@ -848,7 +911,9 @@ describeWithEnvironment('NetworkLogView', () => {
     networkLogView = createNetworkLogView();
     columns = networkLogView.columns();
     columns.switchViewMode(true);
-    networkColumnWidget = columns.dataGrid().asWidget().parentWidget();
+    await networkLogView.updateComplete;
+    networkColumnWidget =
+        UI.Widget.Widget.getOrCreateWidget(networkLogView.element.querySelector('devtools-split-view')!);
     assert.instanceOf(networkColumnWidget, UI.SplitWidget.SplitWidget);
     assert.strictEqual(networkColumnWidget.showMode(), UI.SplitWidget.ShowMode.BOTH);
     assert.isFalse(columns.dataGrid().visibleColumnsArray.some(c => c.id === 'response-header-content-type'));
@@ -1552,10 +1617,16 @@ describeWithEnvironment('Edit and resend as fetch', () => {
     target = createTarget({parentTarget: tabTarget});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (networkLogView) {
       networkLogView.detach();
     }
+    for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
+      target.dispose('afterEach');
+    }
+    await raf();
+    await UI.Widget.Widget.allUpdatesComplete;
+    await RenderCoordinator.done();
   });
 
   function createRequest(url: string): SDK.NetworkRequest.NetworkRequest {
@@ -1759,6 +1830,8 @@ describeWithEnvironment('NetworkLogView placeholder', () => {
 
   it('shows instruction to start recording', async () => {
     const networkLogView = createNetworkLogView();
+    renderElementIntoDOM(networkLogView);
+    await networkLogView.updateComplete;
     testPlaceholderText(
         networkLogView, 'No network activity recorded',
         'Record network log to display network activity by using the \"Start recording\" button or by pressing Ctrl');
@@ -1767,11 +1840,38 @@ describeWithEnvironment('NetworkLogView placeholder', () => {
 
   it('shows placeholder with instruction to reload page if already recording', async () => {
     const networkLogView = createNetworkLogView();
+    renderElementIntoDOM(networkLogView);
     networkLogView.setRecording(true);
+    await networkLogView.updateComplete;
 
     testPlaceholderText(networkLogView, 'Currently recording network activity',
                         'Perform a request or reload the page by using the \"Reload page\" button or by pressing Ctrl');
     testPlaceholderButton(networkLogView, 'Reload page', RELOAD_ID);
+  });
+
+  it('hides placeholder when requests are recorded and shows it again on reset', async () => {
+    const networkLogView = createNetworkLogView();
+    renderElementIntoDOM(networkLogView);
+    await networkLogView.updateComplete;
+
+    assert.isNotNull(networkLogView.element.querySelector('.network-status-pane'));
+
+    const request = createNetworkRequest({requestId: 'req1', url: 'https://example.com/'});
+    const requestsStub = sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'requests').returns([request]);
+    Logs.NetworkLog.NetworkLog.instance().dispatchEventToListeners(Logs.NetworkLog.Events.RequestAdded, {request});
+    await RenderCoordinator.done({waitForWork: true});
+    await networkLogView.updateComplete;
+
+    assert.isNull(networkLogView.element.querySelector('.network-status-pane'));
+
+    requestsStub.returns([]);
+    Logs.NetworkLog.NetworkLog.instance().dispatchEventToListeners(Logs.NetworkLog.Events.Reset,
+                                                                   {clearIfPreserved: true});
+    await RenderCoordinator.done({waitForWork: true});
+    await networkLogView.updateComplete;
+
+    assert.isNotNull(networkLogView.element.querySelector('.network-status-pane'));
+    networkLogView.detach();
   });
 });
 
@@ -1789,7 +1889,7 @@ describeWithEnvironment('NetworkLogView', () => {
     }
   });
 
-  it('shows Debug with AI menu and submenu items when the flag is on', () => {
+  it('shows Debug with AI item in context menu when the flag is on', () => {
     registerActions([{
       actionId: 'drjones.network-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
@@ -1810,9 +1910,8 @@ describeWithEnvironment('NetworkLogView', () => {
 
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Explain purpose', 'Explain slowness', 'Explain failures', 'Assess security headers']);
+    assert.isUndefined(debugWithAiItem.subItems);
+    assert.strictEqual(UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest), request);
   });
 
   it('configures visual logging for preloaded column in header context menu', () => {
@@ -1838,6 +1937,58 @@ describeWithEnvironment('NetworkLogView', () => {
         dispatchEventSpy.getCalls().find(c => c.args[0] === Network.NetworkDataGridNode.Events.RequestSelected);
     assert.exists(call);
     assert.isNull(call.args[1]);
+  });
+
+  it('toggles no-node-selected class on container when updateNodeSelectedClass is called', async () => {
+    const view = sinon.spy(Network.NetworkLogView.DEFAULT_VIEW);
+    const filterBar = new UI.FilterBar.FilterBar('network-test');
+    const networkLogView = new Network.NetworkLogView.NetworkLogView(
+        filterBar, document.createElement('div'),
+        Common.Settings.Settings.instance().createSetting('network-log-large-rows', false), view);
+    await networkLogView.updateComplete;
+    assert.isFalse(view.lastCall.args[0].isNodeSelected);
+    assert.isTrue(networkLogView.element.classList.contains('no-node-selected'));
+
+    networkLogView.updateNodeSelectedClass(true);
+    await networkLogView.updateComplete;
+    assert.isTrue(view.lastCall.args[0].isNodeSelected);
+    assert.isFalse(networkLogView.element.classList.contains('no-node-selected'));
+
+    networkLogView.updateNodeSelectedClass(false);
+    await networkLogView.updateComplete;
+    assert.isFalse(view.lastCall.args[0].isNodeSelected);
+    assert.isTrue(networkLogView.element.classList.contains('no-node-selected'));
+  });
+});
+
+describeWithEnvironment('MoreFiltersDropDownUI', () => {
+  it('tracks active state and selected filter labels across settings', () => {
+    const view = sinon.spy();
+    const moreFilters = new Network.NetworkLogView.MoreFiltersDropDownUI(view);
+    assert.isFalse(moreFilters.isActive());
+    assert.deepEqual(moreFilters.selectedFilters(), []);
+    sinon.assert.calledOnce(view);
+    assert.strictEqual(view.lastCall.args[0].activeFiltersCount, 0);
+    assert.strictEqual(view.lastCall.args[0].tooltip, 'Show only/hide requests');
+    assert.isFalse(view.lastCall.args[0].hideDataURLs);
+    assert.isFalse(view.lastCall.args[0].hideChromeExtensions);
+    assert.isFalse(view.lastCall.args[0].showBlockedCookiesOnly);
+    assert.isFalse(view.lastCall.args[0].onlyBlockedRequests);
+    assert.isFalse(view.lastCall.args[0].onlyThirdParty);
+
+    view.lastCall.args[0].onHideDataURLsChange();
+    view.lastCall.args[0].onOnlyBlockedRequestsChange();
+    view.lastCall.args[0].onOnlyThirdPartyChange();
+
+    assert.isTrue(moreFilters.isActive());
+    assert.deepEqual(moreFilters.selectedFilters(), ['Hide data URLs', 'Blocked requests', '3rd-party requests']);
+    assert.strictEqual(view.lastCall.args[0].activeFiltersCount, 3);
+    assert.strictEqual(view.lastCall.args[0].tooltip, 'Hide data URLs, Blocked requests, 3rd-party requests');
+    assert.isTrue(view.lastCall.args[0].hideDataURLs);
+    assert.isFalse(view.lastCall.args[0].hideChromeExtensions);
+    assert.isFalse(view.lastCall.args[0].showBlockedCookiesOnly);
+    assert.isTrue(view.lastCall.args[0].onlyBlockedRequests);
+    assert.isTrue(view.lastCall.args[0].onlyThirdParty);
   });
 });
 

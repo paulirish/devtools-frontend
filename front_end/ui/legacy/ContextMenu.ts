@@ -7,7 +7,7 @@ import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as Buttons from '../components/buttons/buttons.js';
-import {html, render} from '../lit/lit.js';
+import {html, render, type TemplateResult} from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import {ActionRegistry} from './ActionRegistry.js';
@@ -39,7 +39,7 @@ export class Item {
   protected isDevToolsPerformanceMenuItem: boolean;
   protected contextMenu: ContextMenu|null;
   protected idInternal: number|undefined;
-  customElement?: Element;
+  customElement?: Element|TemplateResult;
   private shortcut?: string;
   #tooltip: Common.UIString.LocalizedString|undefined;
   protected jslogContext: string|undefined;
@@ -233,7 +233,7 @@ export class Section {
     accelerator?: Host.InspectorFrontendHostAPI.AcceleratorDescriptor,
     isPreviewFeature?: boolean,
     disabled?: boolean,
-    additionalElement?: Element,
+    additionalElement?: Element|TemplateResult,
     tooltip?: Platform.UIString.LocalizedString,
     jslogContext?: string,
     featureName?: string,
@@ -266,7 +266,7 @@ export class Section {
    * @param jslogContext An optional string identifying the element for visual logging.
    * @returns The newly created `Item`.
    */
-  appendCustomItem(element: Element, jslogContext?: string): Item {
+  appendCustomItem(element: Element|TemplateResult, jslogContext?: string): Item {
     const item = new Item(
         this.contextMenu, 'item', undefined, undefined, undefined, undefined, undefined, undefined, jslogContext);
     item.customElement = element;
@@ -342,7 +342,7 @@ export class Section {
     checked?: boolean,
     disabled?: boolean,
     experimental?: boolean,
-    additionalElement?: Element,
+    additionalElement?: Element|TemplateResult,
     tooltip?: Platform.UIString.LocalizedString,
     jslogContext?: string,
     featureName?: string,
@@ -832,10 +832,12 @@ export class ContextMenu extends SubMenu {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
             Host.InspectorFrontendHostAPI.Events.ContextMenuItemSelected, this.onItemSelected, this);
       }
-      VisualLogging.registerLoggable(
-          menuObject, `${VisualLogging.menu()}`, this.loggableParent,
-          new DOMRect(0, 0, MENU_ITEM_WIDTH_FOR_LOGGING, MENU_ITEM_HEIGHT_FOR_LOGGING * menuObject.length));
-      this.registerLoggablesWithin(menuObject);
+      if (menuObject.length > 0) {
+        VisualLogging.registerLoggable(
+            menuObject, `${VisualLogging.menu()}`, this.loggableParent,
+            new DOMRect(0, 0, MENU_ITEM_WIDTH_FOR_LOGGING, MENU_ITEM_HEIGHT_FOR_LOGGING * menuObject.length));
+        this.registerLoggablesWithin(menuObject);
+      }
       this.openHostedMenu = menuObject;
       // showContextMenuAtPoint call above synchronously issues a clear event for previous context menu (if any),
       // so we skip it before subscribing to the clear event.
@@ -935,7 +937,7 @@ export class ContextMenu extends SubMenu {
         Host.InspectorFrontendHostAPI.Events.ContextMenuCleared, this.menuCleared, this);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.removeEventListener(
         Host.InspectorFrontendHostAPI.Events.ContextMenuItemSelected, this.onItemSelected, this);
-    if (this.openHostedMenu) {
+    if (this.openHostedMenu && this.openHostedMenu.length > 0) {
       void VisualLogging.logResize(this.openHostedMenu, new DOMRect(0, 0, 0, 0));
     }
     this.openHostedMenu = null;

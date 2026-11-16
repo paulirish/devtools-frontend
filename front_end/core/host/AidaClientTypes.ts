@@ -199,7 +199,11 @@ export interface DoConversationRequest {
   options?: ConversationOptions;
   metadata: RequestMetadata;
   functionality_type?: FunctionalityType;
-  client_feature?: ClientFeature;
+  /**
+   * Identifies the DevTools agent or feature making the request so GCA can resolve
+   * the corresponding server-side experience configuration.
+   */
+  client_feature: ClientFeature;
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -394,11 +398,20 @@ export interface InferenceOptionMetadata {
   modelId: string;
 }
 
+export interface UsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number;
+}
+
 export interface ResponseMetadata {
   rpcGlobalId?: RpcGlobalId;
   attributionMetadata?: AttributionMetadata;
   factualityMetadata?: FactualityMetadata;
   inferenceOptionMetadata?: InferenceOptionMetadata;
+  usageMetadata?: UsageMetadata;
 }
 
 export interface DoConversationResponse {
@@ -473,6 +486,8 @@ export interface AidaChunkResponse {
    * {"code": 429, "message": "You have exhausted your capacity on this model.", "status": "RESOURCE_EXHAUSTED", "details": [...]}).
    */
   error?: string|Record<string, unknown>;
+  /** Why GCA blocked the prompt or the response, for the `AidaBlockError` message. */
+  blockMessage?: string;
 }
 
 // Reads `devToolsAiDebug` directly because `core/host` cannot depend on `models/ai-utils`.

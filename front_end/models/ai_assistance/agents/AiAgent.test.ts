@@ -1152,6 +1152,43 @@ describe('AiAgent', () => {
         ]);
       });
 
+      it('preserves rpcId on answers from single-chunk functionCalls and suggestFollowUps responses', async () => {
+        const aidaClient = mockAidaClient([
+          [{
+            explanation: 'Checking state',
+            metadata: {rpcGlobalId: 101},
+            functionCalls: [{name: 'fnA', args: {}}],
+          }],
+          [{
+            explanation: 'Done',
+            metadata: {rpcGlobalId: 202},
+            functionCalls: [{name: 'suggestFollowUps', args: {suggestions: ['Next step']}}],
+          }],
+        ]);
+        const agent = new AiAgentMock({aidaClient});
+        declareFn(agent, 'fnA', async () => ({result: 'a'}));
+
+        const responses = await Array.fromAsync(agent.run('query', {selected: mockConversationContext()}));
+        const answers = responses.filter(r => r.type === AiAssistance.AiAgent.ResponseType.ANSWER);
+
+        assert.deepEqual(answers, [
+          {
+            type: AiAssistance.AiAgent.ResponseType.ANSWER,
+            text: 'Checking state',
+            complete: true,
+            rpcId: 101,
+            suggestions: undefined,
+          },
+          {
+            type: AiAssistance.AiAgent.ResponseType.ANSWER,
+            text: 'Done',
+            complete: true,
+            rpcId: 202,
+            suggestions: ['Next step'],
+          },
+        ]);
+      });
+
       it('asks for approval for each call in turn', async () => {
         const aidaClient = mockAidaClient([
           [{
@@ -1277,6 +1314,79 @@ describe('AiAgent', () => {
           error: AiAssistance.AiAgent.ErrorType.ABORT,
         });
         assert.deepEqual(invocations, ['fnA', 'fnA:approved', 'fnB']);
+        sinon.assert.callCount(aidaClient.doConversation, 1);
+        assert.deepEqual(agent.history, []);
+      });
+
+      it('unblocks and stops the remaining calls when the user aborts while a handler never resolves', async () => {
+        const aidaClient = mockAidaClient([
+          [{explanation: '', functionCalls: [{name: 'fnA', args: {}}, {name: 'fnB', args: {}}]}],
+        ]);
+        const abortController = new AbortController();
+        const pendingHandler = Promise.withResolvers<Awaited<ReturnType<Handler>>>();
+        const agent = new AiAgentMock({aidaClient});
+        const invocations: string[] = [];
+        declareFn(agent, 'fnA', () => {
+          invocations.push('fnA');
+          queueMicrotask(() => abortController.abort());
+          return pendingHandler.promise;
+        });
+        declareFn(agent, 'fnB', async () => {
+          invocations.push('fnB');
+          return {result: 'b'};
+        });
+
+        const responses = await Array.fromAsync(
+            agent.run('query', {selected: mockConversationContext(), signal: abortController.signal}));
+        pendingHandler.resolve({result: 'late'});
+
+        assert.deepEqual(responses, [
+          {type: AiAssistance.AiAgent.ResponseType.QUERYING},
+          {
+            type: AiAssistance.AiAgent.ResponseType.ERROR,
+            error: AiAssistance.AiAgent.ErrorType.ABORT,
+          },
+        ]);
+        assert.deepEqual(invocations, ['fnA']);
+        sinon.assert.callCount(aidaClient.doConversation, 1);
+        assert.deepEqual(agent.history, []);
+      });
+
+      it('unblocks when the user aborts while an approved handler never resolves', async () => {
+        const aidaClient = mockAidaClient([
+          [{explanation: '', functionCalls: [{name: 'fnA', args: {}}]}],
+        ]);
+        const abortController = new AbortController();
+        const pendingHandler = Promise.withResolvers<Awaited<ReturnType<Handler>>>();
+        const agent = new AiAgentMock({
+          aidaClient,
+          confirmSideEffectForTest: confirmInOrder([AiAssistance.Tool.PermissionDecision.ALLOW_ONCE]),
+        });
+        const invocations: string[] = [];
+        declareFn(agent, 'fnA', (_args, options) => {
+          if (!options?.approved) {
+            invocations.push('fnA');
+            return Promise.resolve({requiresApproval: true, description: 'approve fnA'});
+          }
+          invocations.push('fnA:approved');
+          queueMicrotask(() => abortController.abort());
+          return pendingHandler.promise;
+        });
+
+        const responses = await Array.fromAsync(
+            agent.run('query', {selected: mockConversationContext(), signal: abortController.signal}));
+        pendingHandler.resolve({result: 'late'});
+
+        assert.deepEqual(responses.map(r => r.type), [
+          AiAssistance.AiAgent.ResponseType.QUERYING,
+          AiAssistance.AiAgent.ResponseType.SIDE_EFFECT,
+          AiAssistance.AiAgent.ResponseType.ERROR,
+        ]);
+        assert.deepEqual(responses.at(-1), {
+          type: AiAssistance.AiAgent.ResponseType.ERROR,
+          error: AiAssistance.AiAgent.ErrorType.ABORT,
+        });
+        assert.deepEqual(invocations, ['fnA', 'fnA:approved']);
         sinon.assert.callCount(aidaClient.doConversation, 1);
         assert.deepEqual(agent.history, []);
       });

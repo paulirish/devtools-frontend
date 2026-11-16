@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 import {execSync} from 'node:child_process';
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+import {formatProtoDuration, formatProtoTaskStatus, getContentType} from './report-helpers.js';
+import type {TurnTokens} from './trajectory-builder.js';
 
 /* eslint-disable no-console */
 
@@ -19,7 +21,6 @@ export const Markers = {
   RUN_COMPLETED: 'run_completed.marker',
 } as const;
 export type Markers = (typeof Markers)[keyof typeof Markers];
-export type MarkerType = Markers;
 
 /**
  * Note on omitted protocol artifacts:
@@ -40,55 +41,78 @@ export const TaskOutputFile = {
 } as const;
 export type TaskOutputFile = (typeof TaskOutputFile)[keyof typeof TaskOutputFile];
 
+export type PhaseStatus = 'SUCCEEDED'|'FAILED'|'UNSPECIFIED';
+export type TaskOutcomeStatus = 'PASSED'|'FAILED';
+export type RunOutcomeStatus = 'RUNNING'|'COMPLETED'|'FAILED';
+
+export interface TaskMetrics {
+  taskStatus: PhaseStatus;
+  verificationDurationSeconds: number;
+  verificationStatus: PhaseStatus;
+  gradingDurationSeconds: number;
+  gradingStatus: PhaseStatus;
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedTokens?: number;
+  totalTokens?: number;
+  toolCallCount: number;
+  toolCallsByTool: Record<string, number>;
+  failedToolCallsByTool: Record<string, number>;
+  activationsBySkill: Record<string, number>;
+}
+
+export interface RunMetrics {
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedTokens?: number;
+  totalTokens?: number;
+  totalToolCalls: number;
+  toolCallsByTool: Record<string, number>;
+  failedToolCallsByTool: Record<string, number>;
+  activationsBySkill: Record<string, number>;
+}
+
 export interface RunStartedPayload {
   project: string;
   runId: string;
-  model: string;
   agent: string;
   startTime: string;
-  status: string;
+  status: RunOutcomeStatus;
+  tags: string[];
 }
 
 export interface TaskCompletedPayload {
   taskId: string;
   runId: string;
   /** Execution status: 'PASSED' on success, 'FAILED' on error or timeout. */
-  status: string;
+  status: TaskOutcomeStatus;
   /** Task evaluation score from 0.0 to 1.0 when graded, or null if ungraded or execution failed. */
   score: number|null;
   durationSeconds: number;
-  tokens?: Record<string, unknown>;
-  metrics?: {toolCallCount?: number};
+  tags: string[];
+  tokens: TurnTokens;
+  metrics: TaskMetrics;
 }
 
 export interface RunCompletedPayload {
   project: string;
   runId: string;
-  status: string;
+  status: RunOutcomeStatus;
   startTime: string;
   endTime: string;
+  model: string;
+  tags: string[];
   totalTasks: number;
   passedTasks: number;
   failedTasks: number;
-  metrics: {totalToolCalls: number};
+  metrics: RunMetrics;
 }
 
 /** Record of a completed task's execution outcome and score. Each task corresponds to an evaluation trajectory. */
 export interface TaskStatus {
   taskId: string;
-  status: string;
+  status: TaskOutcomeStatus;
   score: number|null;
-}
-
-/**
- * Generates a run ID formatted as YYYY-MM-DD-HHmmss-xxxx-xxxxxxx
- * (e.g., 2026-08-25-134619-c0c1-8f25f69) for a suite execution.
- */
-export function generateRunId(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().replace(/T/, '-').replace(/:/g, '').slice(0, 17);
-  const hex = crypto.randomBytes(6).toString('hex');
-  return `${dateStr}-${hex.slice(0, 4)}-${hex.slice(4, 11)}`;
 }
 
 /**
@@ -103,22 +127,6 @@ export function formatGCSRunDestination(runId: string, destinationFileName: stri
  */
 export function formatGCSTaskDestination(runId: string, taskId: string, destinationFileName: string): string {
   return `gs://${BUCKET}/${PROJECT_ID}/runs/${runId}/tasks/${taskId}/output/${destinationFileName}`;
-}
-
-/**
- * Resolves the appropriate Content-Type header with UTF-8 charset based on the file extension.
- */
-export function getContentType(filePath: string): string {
-  if (filePath.endsWith('.json')) {
-    return 'application/json; charset=utf-8';
-  }
-  if (filePath.endsWith('.html')) {
-    return 'text/html; charset=utf-8';
-  }
-  if (filePath.endsWith('.marker')) {
-    return 'text/plain';
-  }
-  return 'text/plain; charset=utf-8';
 }
 
 const MAX_UPLOAD_ATTEMPTS = 3;
@@ -157,8 +165,6 @@ function getGcsAccessToken(forceRefresh = false): string|undefined {
  * Uploads a local file to GCS using system gcloud CLI.
  */
 function uploadFileToGCS(localFilePath: string, destination: string, contentType?: string): boolean {
-  const fileName = path.posix.basename(destination);
-  console.log(`[GCS] Preparing upload of ${localFilePath} to ${destination}`);
   const type = contentType ?? getContentType(destination);
   const command = [
     'gcloud storage cp',
@@ -178,19 +184,18 @@ function uploadFileToGCS(localFilePath: string, destination: string, contentType
           CLOUDSDK_STORAGE_THREAD_COUNT: '1',
           ...(accessToken ? {CLOUDSDK_AUTH_ACCESS_TOKEN: accessToken} : {}),
         },
-        stdio: ['ignore', 'inherit', 'inherit'],
+        stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 30_000,
       });
-      console.log(`[GCS] ✅ Upload successful: ${fileName}`);
       return true;
     } catch (error) {
       if (attempt < MAX_UPLOAD_ATTEMPTS) {
-        console.warn(`[GCS] ⚠️ Upload attempt ${attempt}/${MAX_UPLOAD_ATTEMPTS} failed for ${destination}; retrying...`);
         continue;
       }
-      console.error(`[GCS] ❌ Failed to upload to ${
-          destination}. Ensure you have a valid 'gcert' session or 'gcloud auth login'.`);
-      console.error(error);
+      const stderr = error instanceof Error && 'stderr' in error && error.stderr ? String(error.stderr).trim() : '';
+      const details = stderr || String(error);
+      console.error(`[GCS] ❌ Failed to upload ${localFilePath} to ${
+          destination}. Ensure you have a valid 'gcert' session or 'gcloud auth login'.\n${details}`);
     }
   }
   return false;
@@ -231,7 +236,7 @@ export function uploadTemporaryContentToGCS(content: string, destination: string
  * taskId is optional because run-level markers (e.g. RUN_STARTED, RUN_COMPLETED)
  * reside directly under the run root, whereas task-level markers require a taskId.
  */
-export function uploadMarker(runId: string, marker: MarkerType, taskId?: string): boolean {
+export function uploadMarker(runId: string, marker: Markers, taskId?: string): boolean {
   const destination = taskId ? formatGCSTaskDestination(runId, taskId, marker) : formatGCSRunDestination(runId, marker);
   return uploadTemporaryContentToGCS('', destination);
 }
@@ -244,10 +249,10 @@ export function uploadRunStarted(payload: RunStartedPayload): boolean {
     project: payload.project,
     run_id: payload.runId,
     user: os.userInfo().username,
-    model: payload.model,
     agent: payload.agent,
     start_time: payload.startTime,
     status: payload.status,
+    tags: payload.tags,
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),
@@ -292,9 +297,23 @@ export function uploadTaskCompleted(payload: TaskCompletedPayload): boolean {
     status: payload.status,
     score: payload.score,
     duration_seconds: payload.durationSeconds,
-    tokens: payload.tokens ?? {},
+    tags: payload.tags,
+    tokens: payload.tokens,
     metrics: {
-      tool_calls: payload.metrics?.toolCallCount ?? 0,
+      duration: formatProtoDuration(payload.durationSeconds),
+      task_status: formatProtoTaskStatus(payload.metrics.taskStatus),
+      verification_duration: formatProtoDuration(payload.metrics.verificationDurationSeconds),
+      verification_status: formatProtoTaskStatus(payload.metrics.verificationStatus),
+      grading_duration: formatProtoDuration(payload.metrics.gradingDurationSeconds),
+      grading_status: formatProtoTaskStatus(payload.metrics.gradingStatus),
+      input_tokens: payload.metrics.inputTokens,
+      output_tokens: payload.metrics.outputTokens,
+      cached_tokens: payload.metrics.cachedTokens,
+      total_tokens: payload.metrics.totalTokens,
+      tool_calls: payload.metrics.toolCallCount,
+      tool_calls_by_tool: payload.metrics.toolCallsByTool,
+      failed_tool_calls_by_tool: payload.metrics.failedToolCallsByTool,
+      activations_by_skill: payload.metrics.activationsBySkill,
     },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
@@ -330,19 +349,30 @@ export function uploadRunCompleted(payload: RunCompletedPayload): boolean {
     status: payload.status,
     start_time: payload.startTime,
     end_time: payload.endTime,
+    model: payload.model,
+    tags: payload.tags,
     total_tasks: payload.totalTasks,
     passed_tasks: payload.passedTasks,
     failed_tasks: payload.failedTasks,
     metrics: {
+      duration: formatProtoDuration((Date.parse(payload.endTime) - Date.parse(payload.startTime)) / 1000),
+      input_tokens: payload.metrics.inputTokens,
+      output_tokens: payload.metrics.outputTokens,
+      cached_tokens: payload.metrics.cachedTokens,
+      total_tokens: payload.metrics.totalTokens,
       total_tool_calls: payload.metrics.totalToolCalls,
+      tool_calls_by_tool: payload.metrics.toolCallsByTool,
+      failed_tool_calls_by_tool: payload.metrics.failedToolCallsByTool,
+      activations_by_skill: payload.metrics.activationsBySkill,
     },
   };
   const jsonUploaded = uploadTemporaryContentToGCS(
       JSON.stringify(jsonContent, null, 2),
       formatGCSRunDestination(payload.runId, 'run_completed.json'),
   );
-  if (jsonUploaded) {
-    return uploadMarker(payload.runId, Markers.RUN_COMPLETED);
+  if (jsonUploaded && uploadMarker(payload.runId, Markers.RUN_COMPLETED)) {
+    console.log(`[GCS] Run artifacts uploaded to gs://${BUCKET}/${PROJECT_ID}/runs/${payload.runId}`);
+    return true;
   }
   return false;
 }

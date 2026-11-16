@@ -9,7 +9,6 @@ import type * as CPUProfile from '../../cpu_profile/cpu_profile.js';
 import * as Types from '../types/types.js';
 
 import {SyntheticEventsManager} from './SyntheticEvents.js';
-import {eventTimingsMicroSeconds} from './Timing.js';
 
 interface MatchingPairableAsyncEvents {
   syntheticId: string;
@@ -769,28 +768,34 @@ export function forEachEvent(
   const startEventIndex = topLevelEventIndexEndingAfter(events, globalStartTime);
   for (let i = startEventIndex; i < events.length; i++) {
     const currentEvent = events[i];
-    const currentEventTimings = eventTimingsMicroSeconds(currentEvent);
-    if (currentEventTimings.endTime < globalStartTime) {
-      continue;
-    }
-    if (currentEventTimings.startTime > globalEndTime) {
+    const startTime = currentEvent.ts;
+    const duration = currentEvent.dur || 0;
+    const endTime = startTime + duration;
+    if (startTime > globalEndTime) {
       break;
     }
+    if (endTime < globalStartTime ||
+        (duration > 0 && globalStartTime < globalEndTime &&
+         (endTime <= globalStartTime || startTime >= globalEndTime))) {
+      continue;
+    }
 
-    const isIgnoredAsyncEvent = ignoreAsyncEvents && Types.Events.isPhaseAsync(currentEvent.ph);
-    if (isIgnoredAsyncEvent || Types.Events.isFlowPhase(currentEvent.ph)) {
+    if (currentEvent.ph !== Types.Events.Phase.COMPLETE &&
+        ((ignoreAsyncEvents && Types.Events.isPhaseAsync(currentEvent.ph)) ||
+         Types.Events.isFlowPhase(currentEvent.ph))) {
       continue;
     }
 
     // If we have now reached an event that is after a bunch of events, we need
     // to call the onEndEvent callback for those events before moving on.
-    let lastEventOnStack = stack.at(-1);
-    let lastEventEndTime = lastEventOnStack ? eventTimingsMicroSeconds(lastEventOnStack).endTime : null;
-    while (lastEventOnStack && lastEventEndTime && lastEventEndTime <= currentEventTimings.startTime) {
+    while (stack.length > 0) {
+      const lastEventOnStack = stack[stack.length - 1];
+      const lastEventEndTime = lastEventOnStack.ts + (lastEventOnStack.dur ?? 0);
+      if (lastEventEndTime > startTime) {
+        break;
+      }
       stack.pop();
       config.onEndEvent(lastEventOnStack);
-      lastEventOnStack = stack.at(-1);
-      lastEventEndTime = lastEventOnStack ? eventTimingsMicroSeconds(lastEventOnStack).endTime : null;
     }
 
     // Now we have dealt with all events prior to this one, see if we need to care about this one.
@@ -799,7 +804,7 @@ export function forEachEvent(
       continue;
     }
 
-    if (currentEventTimings.duration) {
+    if (duration) {
       config.onStartEvent(currentEvent);
       stack.push(currentEvent);
     } else if (config.onInstantEvent) {

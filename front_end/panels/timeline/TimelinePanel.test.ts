@@ -394,6 +394,26 @@ describe('TimelinePanel', function() {
         primaryTarget.dispose('test');
       }
     });
+
+    it('rejects and removes the recording listener when the abort signal fires', async function() {
+      const uiView = UI.ViewManager.ViewManager.instance({forceNew: true});
+      sinon.stub(uiView, 'showView');
+      const abortController = new AbortController();
+      sinon.stub(timeline, 'recordReload').callsFake(() => {
+        abortController.abort();
+      });
+
+      let thrownError: unknown;
+      try {
+        await Timeline.TimelinePanel.TimelinePanel.executeRecordAndReload({signal: abortController.signal});
+      } catch (err) {
+        thrownError = err;
+      }
+
+      assert.instanceOf(thrownError, Error);
+      assert.strictEqual(thrownError.message, 'Recording was aborted');
+      assert.isFalse(timeline.hasEventListeners(Timeline.TimelinePanel.Events.RECORDING_COMPLETED));
+    });
   });
 
   describe('saveToFile', function() {
@@ -612,6 +632,30 @@ describe('TimelinePanel', function() {
         assert.isDefined(castedEvent.args.data.sourceText);
       });
 
+      it('uses the scripts of the saved trace, not the last parsed trace', async function() {
+        const {traceEvents, metadata} =
+            await TraceLoader.traceFile(this, 'chrome-ext-sourcemap-script-content.json.gz');
+        await timeline.loadingComplete([...traceEvents], null, metadata);
+        // Clear the trace engine's global handler state, as parsing another trace does.
+        timeline.model.resetProcessor();
+
+        await timeline.saveToFile({
+          includeResourceContent: true,
+          includeSourceMaps: false,
+          addModifications: false,
+          shouldCompress: false,
+        });
+
+        const [, contentData] = saveSpy.getCall(0).args;
+        const file = await contentDataToFile(contentData);
+        // 7192505913775043000.8 is a chrome-extension script in the trace.
+        const extensionScriptEvent = file.traceEvents.find(event => {
+          return Trace.Types.Events.isAnyScriptSourceEvent(event) && event.args.data.isolate === 7192505913775043000 &&
+              event.args.data.scriptId === 8;
+        });
+        assert.strictEqual(extensionScriptEvent?.name, 'StubScriptCatchup');
+      });
+
       it('from trace sourcemaps when saving a trace with "Include source map" on', async function() {
         const {traceEvents, metadata} =
             await TraceLoader.traceFile(this, 'chrome-ext-sourcemap-script-content.json.gz');
@@ -675,6 +719,7 @@ describe('TimelinePanel', function() {
            }
            return event;
          });
+         const consoleErrorStub = sinon.stub(console, 'error');
          const loadResourceStub = resourceLoader.loadResource as sinon.SinonStub;
          loadResourceStub.rejects(new Error('CSP violation'));
 
@@ -690,6 +735,11 @@ describe('TimelinePanel', function() {
          assert.strictEqual(initiator.target, primaryTarget,
                             'Expected initiator.target to be primaryPageTarget, not null');
          assert.strictEqual(initiator.initiatorUrl, 'http://localhost:8080/index.html');
+         sinon.assert.calledWith(
+             consoleErrorStub,
+             sinon.match.has(
+                 'message',
+                 sinon.match(/Could not load content for http:\/\/localhost:8080\/source\.map\.json: CSP violation/)));
        } finally {
          primaryTarget.dispose('test');
        }
@@ -875,4 +925,19 @@ describe('TimelinePanel', function() {
        await timeline.loadingComplete(events, null, null);
        assert.isTrue(timeline.getFlameChart().isShowing());
      });
+
+  it('ignores unrelated window messages when launching a rehydrated session', async function() {
+    sinon.stub(window, 'open').returns(window);
+    const postMessageStub = sinon.stub(window, 'postMessage');
+
+    const traceJson = '{"enhancedTraceVersion":1}';
+    await timeline.loadFromFile(new File([traceJson], 'enhanced.json'));
+
+    window.dispatchEvent(new MessageEvent('message', {data: {type: 'UNRELATED_MESSAGE'}, source: window}));
+    sinon.assert.notCalled(postMessageStub);
+
+    window.dispatchEvent(new MessageEvent('message', {data: {type: 'REHYDRATING_WINDOW_READY'}, source: window}));
+    sinon.assert.calledOnce(postMessageStub);
+    assert.deepEqual(postMessageStub.firstCall.args[0], {type: 'REHYDRATING_TRACE_FILE', traceJson});
+  });
 });

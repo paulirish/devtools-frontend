@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable @devtools/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
@@ -24,6 +25,7 @@ export class SwatchPopoverHelper extends Common.ObjectWrapper.ObjectWrapper<Even
   constructor() {
     super();
     this.popover = new UI.GlassPane.GlassPane();
+    this.popover.contentElement.classList.add('swatch-popover');
     this.popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.popover.setMarginBehavior(UI.GlassPane.MarginBehavior.DEFAULT_MARGIN);
     this.popover.element.addEventListener('mousedown', e => e.consume(), false);

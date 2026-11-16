@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {beforeEach, describe, it} from 'mocha';
+import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 import type {SinonStub, SinonStubbedInstance} from 'sinon';
 
@@ -135,7 +135,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     matchedStyles.functionRules()[0].style.allProperties().push(property);
     return new Elements.StylePropertyTreeElement.StylePropertyTreeElement({
       stylesContainer: new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel),
-      section: sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection),
+      section: new Elements.StylePropertiesSection.StylePropertiesSection(
+          new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel), matchedStyles, property.ownerStyle, 0,
+          null, null, null),
       matchedStyles,
       property,
       isShorthand: false,
@@ -604,7 +606,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
     }
 
     function pickColor(swatch: InlineEditor.ColorSwatch.ColorSwatch, color: string): void {
-      openColorPicker(swatch).dispatchEventToListeners(ColorPicker.Spectrum.Events.COLOR_CHANGED, color);
+      openColorPicker(swatch).element.dispatchEvent(new ColorPicker.Spectrum.ColorChangedEvent(color));
     }
 
     it('applies the edits of all color swatches and the bezier editor of a custom property', async () => {
@@ -667,8 +669,8 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       assert.instanceOf(bezierEditor, InlineEditor.BezierEditor.BezierEditor);
       parts[5] = 'cubic-bezier(0.1, 0.7, 1, 0.1)';
       edit('changing the bezier curve', text(),
-           () => bezierEditor.dispatchEventToListeners(InlineEditor.BezierEditor.Events.BEZIER_CHANGED,
-                                                       'cubic-bezier(0.1, 0.7, 1, 0.1)'));
+           () => bezierEditor.element.dispatchEvent(
+               new InlineEditor.BezierEditor.BezierChangedEvent('cubic-bezier(0.1, 0.7, 1, 0.1)')));
       commit(text());
     });
 
@@ -1529,7 +1531,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       parseTextShadowFailure('1px 2px rgb(0, 0, 0) 2px');
       parseTextShadowFailure('hello 1px 2px');
       parseTextShadowFailure('1px 2px black 0 0 #ffffff');
-      // TODO(crbug.com/40945390) Add coverage after rolling codemirror: parseTextShadowFailure('1px2px');
+      parseTextShadowFailure('1px2px');
       parseTextShadowFailure('1px 2pxrgb(0, 0, 0)');
 
       parseBoxShadowSuccess('0 0');
@@ -1558,7 +1560,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       parseBoxShadowFailure('1px 2px rgb(0, 0, 0) 2px');
       parseBoxShadowFailure('hello 1px 2px');
       parseBoxShadowFailure('1px 2px black 0 0 #ffffff');
-      // TODO(crbug.com/40945390) Add coverage after rolling codemirror: parseBoxShadowFailure('1px2px');
+      parseBoxShadowFailure('1px2px');
       parseBoxShadowFailure('1px 2pxrgb(0, 0, 0)');
     });
 
@@ -2429,7 +2431,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
         for (const property of matchedStyles.nodeStyles()[0].allProperties()) {
           const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement({
             stylesContainer: stylesSidebarPane,
-            section: sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection),
+            section: new Elements.StylePropertiesSection.StylePropertiesSection(
+                new Elements.StylesSidebarPane.StylesSidebarPane(computedStyleModel), matchedStyles,
+                property.ownerStyle, 0, null, null, null),
             matchedStyles,
             property,
             isShorthand: false,
@@ -3828,15 +3832,19 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
          assert.exists(redVar);
          assert.strictEqual(redVar.text, '--a)');
-         assert.exists(redVar.subtitleRenderer);
-         const swatchElement = redVar.subtitleRenderer();
+         assert.exists(redVar.subtitleTemplate);
+         const swatchContainer = document.createElement('div');
+         render(redVar.subtitleTemplate, swatchContainer);
+         const swatchElement = swatchContainer.querySelector('.suggestion-subtitle');
          assert.instanceOf(swatchElement, InlineEditor.ColorSwatch.ColorSwatch);
 
          assert.exists(customPropVar);
          assert.strictEqual(customPropVar.text, '--prop)');
-         assert.exists(customPropVar.subtitleRenderer);
-         const subtitleElement = customPropVar.subtitleRenderer();
-         assert.strictEqual(subtitleElement.textContent, 'customproperty');
+         assert.exists(customPropVar.subtitleTemplate);
+         const subtitleContainer = document.createElement('div');
+         render(customPropVar.subtitleTemplate, subtitleContainer);
+         const subtitleElement = subtitleContainer.querySelector('.suggestion-subtitle');
+         assert.strictEqual(subtitleElement?.textContent, 'customproperty');
        });
 
     it('adds and commits a new blank property in StylePropertyTreeElement', async () => {
@@ -4313,7 +4321,9 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
 
   describe('Keyboard navigation and undo against a live CSSModel', () => {
     const liveStyleSheetId = 'live-sheet' as Protocol.DOM.StyleSheetId;
+    const matchedStyleSheetId = 'matched-sheet' as Protocol.DOM.StyleSheetId;
     let sheetText: string;
+    let matchedSheetText: string;
     let setStyleTextsStub: sinon.SinonStub;
     let markUndoableStateStub: sinon.SinonStub;
     let undoStub: sinon.SinonStub;
@@ -4353,11 +4363,11 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       };
     }
 
-    // The declarations in the current style sheet text, in order, independent of whitespace formatting.
-    function declarations(): string[] {
-      return stylePayload(sheetText).cssProperties.map(property => property.disabled ?
-                                                           `/* ${property.name}: ${property.value}; */` :
-                                                           `${property.name}: ${property.value}`);
+    // The declarations in the given style sheet text, in order, independent of whitespace formatting.
+    function declarations(text = sheetText): string[] {
+      return stylePayload(text).cssProperties.map(property => property.disabled ?
+                                                      `/* ${property.name}: ${property.value}; */` :
+                                                      `${property.name}: ${property.value}`);
     }
 
     async function createLiveSection(cssText: string, {inline = false}: {inline?: boolean} = {}) {
@@ -4367,8 +4377,13 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       connection.setHandler('CSS.getStyleSheetText', null);
       connection.setSuccessHandler('CSS.getStyleSheetText', () => ({text: sheetText}));
       setStyleTextsStub = sinon.stub().callsFake((params: Protocol.CSS.SetStyleTextsRequest) => {
-        sheetText = params.edits[0].text;
-        return {styles: [stylePayload(sheetText, params.edits[0].styleSheetId)]};
+        const {styleSheetId, text} = params.edits[0];
+        if (styleSheetId === matchedStyleSheetId) {
+          matchedSheetText = text;
+        } else {
+          sheetText = text;
+        }
+        return {styles: [stylePayload(text, styleSheetId)]};
       });
       connection.setHandler('CSS.setStyleTexts', null);
       connection.setSuccessHandler('CSS.setStyleTexts', setStyleTextsStub);
@@ -4428,14 +4443,15 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       return section;
     }
 
-    function addMatchedSection(section: Elements.StylePropertiesSection.StylePropertiesSection, cssText: string): void {
+    function addMatchedSection(section: Elements.StylePropertiesSection.StylePropertiesSection,
+                               cssText: string): Elements.StylePropertiesSection.StylePropertiesSection {
       const matchedStyles = section.matchedStyles;
-      const styleSheetId = 'matched-sheet' as Protocol.DOM.StyleSheetId;
+      matchedSheetText = cssText;
       const rule = new SDK.CSSRule.CSSStyleRule(matchedStyles.cssModel(), {
         selectorList: {selectors: [{text: 'div'}], text: 'div'},
         origin: Protocol.CSS.StyleSheetOrigin.Regular,
-        styleSheetId,
-        style: stylePayload(cssText, styleSheetId),
+        styleSheetId: matchedStyleSheetId,
+        style: stylePayload(cssText, matchedStyleSheetId),
       });
       const matchedSection = new Elements.StylePropertiesSection.StylePropertiesSection(
           stylesSidebarPane, matchedStyles, rule.style, 1, null, null, null);
@@ -4450,6 +4466,7 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
       sinon.stub(matchedStyles, 'resolveProperty')
           .callsFake((name, ownerStyle) => resolveProperty(name, ownerStyle) ??
                          rule.style.allProperties().findLast(prop => prop.name === name) ?? null);
+      return matchedSection;
     }
 
     function treeElementAt(section: Elements.StylePropertiesSection.StylePropertiesSection,
@@ -4948,6 +4965,195 @@ describeWithEnvironment('StylePropertyTreeElement', () => {
             'Removed style property "justify-self: end" from rule "element.style"',
             sinon.match.object,
         );
+      });
+
+      it('edits and tracks a sibling property that PositionAreaRenderer resolves in another section', async () => {
+        const section = await createLiveSection('position-area: top left;', {inline: true});
+        const matchedSection = addMatchedSection(section, 'justify-self: start;');
+        const button = treeElementAt(section, 0).valueElement?.querySelector<HTMLElement>('.position-area-swatch-icon');
+        assert.exists(button);
+
+        const showSpy = sinon.spy(stylesSidebarPane.swatchPopoverHelper(), 'show');
+        button.click();
+        sinon.assert.calledOnce(showSpy);
+        const editor = showSpy.firstCall.args[0];
+        assert.instanceOf(editor, InlineEditor.PositionAreaEditor.PositionAreaEditor);
+
+        editor.dispatchEventToListeners(InlineEditor.PositionAreaEditor.Events.PROPERTY_CHANGED,
+                                        {propertyName: 'justify-self', value: 'center'});
+        await waitFor(() => declarations(matchedSheetText).includes('justify-self: center'));
+
+        // The sibling property is edited in the section that declares it, not in the active section.
+        assert.deepEqual(declarations(), ['position-area: top left']);
+        assert.strictEqual(treeElementAt(matchedSection, 0).property.value, 'center');
+        sinon.assert.notCalled(changeTracker.trackChange);
+
+        const trackChangePromise = expectCalled(changeTracker.trackChange);
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+        await trackChangePromise;
+
+        sinon.assert.calledOnceWithExactly(
+            changeTracker.trackChange,
+            'Changed style property "justify-self" from "start" to "center" in rule "div"',
+            sinon.match.object,
+        );
+      });
+    });
+
+    describe('StyleEditorWidget popover', () => {
+      beforeEach(() => {
+        // Give document.body an explicit viewport height so GlassPane does not clamp the popover to the 1-line test container height.
+        document.body.style.height = '600px';
+      });
+
+      afterEach(() => {
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+        document.body.style.height = '';
+      });
+
+      it('sizes the flexbox editor without scrollbars on open, after wide edits, and across reopens', async () => {
+        const section = await createLiveSection('display: flex;', {inline: true});
+        const getTriggerButton = () =>
+            treeElementAt(section, 0).listItemElement.querySelector<HTMLElement>('.styles-pane-button');
+
+        const assertPopoverLayout = (step: string) => {
+          const glassPaneHost = document.querySelector('[data-devtools-glass-pane]');
+          assert.exists(glassPaneHost, `${step}: glass pane host should exist`);
+          const glassPaneWidget = glassPaneHost.shadowRoot?.querySelector<HTMLElement>('.widget.swatch-popover');
+          assert.exists(glassPaneWidget, `${step}: glass pane .widget.swatch-popover should exist`);
+          assert.strictEqual(glassPaneWidget.parentNode, glassPaneHost.shadowRoot);
+          assert.isAtMost(
+              glassPaneWidget.scrollWidth, glassPaneWidget.clientWidth,
+              `${step}: horizontal overflow (${glassPaneWidget.scrollWidth} > ${glassPaneWidget.clientWidth})`);
+          assert.isAtMost(
+              glassPaneWidget.scrollHeight, glassPaneWidget.clientHeight,
+              `${step}: vertical overflow (${glassPaneWidget.scrollHeight} > ${glassPaneWidget.clientHeight})`);
+
+          assert.notStrictEqual(window.getComputedStyle(glassPaneWidget).boxShadow, 'none',
+                                `${step}: outer popover should have elevation box-shadow`);
+          const styleEditorElement = Elements.StyleEditorWidget.StyleEditorWidget.instance().element;
+          assert.strictEqual(window.getComputedStyle(styleEditorElement).boxShadow, 'none',
+                             `${step}: StyleEditorWidget element should not have a nested box-shadow`);
+          const innerEditorWidget = styleEditorElement.querySelector<HTMLElement>('devtools-widget.flexbox-editor');
+          assert.exists(innerEditorWidget, `${step}: inner flexbox-editor widget should exist`);
+          assert.strictEqual(window.getComputedStyle(innerEditorWidget).boxShadow, 'none',
+                             `${step}: inner flexbox-editor widget should not have a nested box-shadow`);
+          assert.strictEqual(window.getComputedStyle(innerEditorWidget).borderRadius, '0px',
+                             `${step}: inner flexbox-editor widget should not have a nested border-radius`);
+
+          const container = innerEditorWidget.querySelector<HTMLElement>('.container');
+          assert.exists(container, `${step}: editor .container should exist`);
+          const outerRect = glassPaneWidget.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          assert.isAbove(containerRect.left - outerRect.left, 0, `${step}: left padding missing`);
+          assert.isAbove(containerRect.top - outerRect.top, 0, `${step}: top padding missing`);
+          assert.isAbove(outerRect.right - containerRect.right, 0, `${step}: right padding missing`);
+          assert.isAbove(outerRect.bottom - containerRect.bottom, 0, `${step}: bottom padding missing`);
+        };
+
+        const openButton1 = getTriggerButton();
+        assert.exists(openButton1);
+        openButton1.click();
+        await waitFor(() => stylesSidebarPane.swatchPopoverHelper().isShowing());
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+        assertPopoverLayout('initial open');
+
+        const widget = Elements.StyleEditorWidget.StyleEditorWidget.instance();
+        const spaceBetweenButton =
+            widget.contentElement.querySelector<HTMLButtonElement>('[title="Add justify-content: space-between"]');
+        assert.exists(spaceBetweenButton);
+        spaceBetweenButton.click();
+        await waitFor(
+            () => Boolean(widget.contentElement.querySelector('[title="Remove justify-content: space-between"]')));
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+        assertPopoverLayout('after justify-content: space-between');
+
+        // Also verify with a proportional font (rather than integer-width Ahem) to catch subpixel width truncation.
+        const glassPaneWidget = document.querySelector('[data-devtools-glass-pane]')
+                                    ?.shadowRoot?.querySelector<HTMLElement>('.widget.swatch-popover');
+        assert.exists(glassPaneWidget);
+        glassPaneWidget.style.fontFamily = 'Arial, sans-serif';
+        stylesSidebarPane.swatchPopoverHelper().reposition();
+        assertPopoverLayout('proportional font after justify-content: space-between');
+
+        const columnReverseButton =
+            widget.contentElement.querySelector<HTMLButtonElement>('[title="Add flex-direction: column-reverse"]');
+        assert.exists(columnReverseButton);
+        columnReverseButton.click();
+        await waitFor(
+            () => Boolean(widget.contentElement.querySelector('[title="Remove flex-direction: column-reverse"]')));
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+        assertPopoverLayout('after flex-direction: column-reverse');
+
+        // Close #1 and reopen #2 + close #2 to verify GlassPane detaches cleanly without hideOnDetach poisoning.
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+        assert.isNull(document.querySelector('[data-devtools-glass-pane]'), 'detached after close #1');
+
+        const openButton2 = getTriggerButton();
+        assert.exists(openButton2);
+        openButton2.click();
+        await waitFor(() => stylesSidebarPane.swatchPopoverHelper().isShowing());
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+        assertPopoverLayout('reopen #2');
+
+        stylesSidebarPane.swatchPopoverHelper().hide(true);
+        assert.isNull(document.querySelector('[data-devtools-glass-pane]'), 'detached after close #2');
+      });
+
+      it('enters style editing mode while open and still refreshes the section on edits', async () => {
+        const section = await createLiveSection('display: flex;', {inline: true});
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+
+        const triggerButton =
+            treeElementAt(section, 0).listItemElement.querySelector<HTMLElement>('.styles-pane-button');
+        assert.exists(triggerButton);
+        triggerButton.click();
+        await waitFor(() => stylesSidebarPane.swatchPopoverHelper().isShowing());
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+
+        assert.isTrue(stylesSidebarPane.isEditingStyle);
+
+        const widget = Elements.StyleEditorWidget.StyleEditorWidget.instance();
+        const columnButton =
+            widget.contentElement.querySelector<HTMLButtonElement>('[title="Add flex-direction: column"]');
+        assert.exists(columnButton);
+        columnButton.click();
+        await waitFor(() => Boolean(widget.contentElement.querySelector('[title="Remove flex-direction: column"]')));
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+
+        assert.strictEqual(section.propertiesTreeOutline.rootElement().childCount(), 2);
+        assert.strictEqual(treeElementAt(section, 1).property.name, 'flex-direction');
+        assert.strictEqual(treeElementAt(section, 1).property.value, 'column');
+
+        const updatedTriggerButton =
+            treeElementAt(section, 0).listItemElement.querySelector<HTMLElement>('.styles-pane-button');
+        assert.exists(updatedTriggerButton);
+        updatedTriggerButton.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
+        updatedTriggerButton.click();
+        assert.isFalse(stylesSidebarPane.swatchPopoverHelper().isShowing());
+        assert.isFalse(stylesSidebarPane.isEditingStyle);
+      });
+
+      it('preserves the active editor across section context rebinding', async () => {
+        const section = await createLiveSection('display: flex;', {inline: true});
+
+        const triggerButton =
+            treeElementAt(section, 0).listItemElement.querySelector<HTMLElement>('.styles-pane-button');
+        assert.exists(triggerButton);
+        triggerButton.click();
+        await waitFor(() => stylesSidebarPane.swatchPopoverHelper().isShowing());
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+
+        const widget = Elements.StyleEditorWidget.StyleEditorWidget.instance();
+        assert.exists(widget.contentElement.querySelector('devtools-widget.flexbox-editor'));
+
+        widget.unbindContext();
+        widget.bindContext(stylesSidebarPane, section);
+        widget.requestUpdate();
+        await LegacyUI.Widget.Widget.allUpdatesComplete;
+
+        assert.exists(widget.contentElement.querySelector('devtools-widget.flexbox-editor'));
+        assert.exists(widget.contentElement.querySelector('[title="Add flex-direction: column"]'));
       });
     });
   });

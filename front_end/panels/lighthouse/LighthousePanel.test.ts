@@ -10,6 +10,7 @@ import type * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as LighthouseModel from '../../models/lighthouse/lighthouse.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -112,6 +113,23 @@ describeWithEnvironment('LighthousePanel', () => {
     assert.deepEqual(result, {status: 'completed', report: REPORT_JSON});
   });
 
+  it('cancels the recording when the abort signal fires during an external request', async () => {
+    const instance = Lighthouse.LighthousePanel.LighthousePanel.instance({forceNew: true, protocolService, controller});
+    const handleRunCancelSpy = sinon.spy(instance, 'handleRunCancel');
+    const abortController = new AbortController();
+    sinon.stub(instance, 'handleCompleteRun').callsFake(async () => {
+      abortController.abort();
+      return {status: 'cancelled'};
+    });
+    sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
+
+    const result = await Lighthouse.LighthousePanel.LighthousePanel.executeLighthouseRecording(
+        undefined, {signal: abortController.signal});
+
+    sinon.assert.calledOnce(handleRunCancelSpy);
+    assert.deepEqual(result, {status: 'cancelled'});
+  });
+
   it('returns the report when the run completes', async () => {
     const instance = Lighthouse.LighthousePanel.LighthousePanel.instance({forceNew: true, protocolService, controller});
     const result = await instance.handleCompleteRun();
@@ -127,11 +145,13 @@ describeWithEnvironment('LighthousePanel', () => {
   });
 
   it('returns a failed result when the run fails to start, and can run again afterwards', async () => {
+    const consoleErrorStub = sinon.stub(console, 'error');
     (protocolService.attach as sinon.SinonStub).onFirstCall().rejects(new Error('attach failed'));
     const instance = Lighthouse.LighthousePanel.LighthousePanel.instance({forceNew: true, protocolService, controller});
 
     const failedResult = await instance.handleCompleteRun();
     assert.deepEqual(failedResult, {status: 'failed'});
+    sinon.assert.calledWith(consoleErrorStub, sinon.match({message: 'attach failed'}));
 
     const secondResult = await instance.handleCompleteRun();
     assert.deepEqual(secondResult, {status: 'completed', report: LH_REPORT.lhr});
@@ -155,5 +175,18 @@ describeWithEnvironment('LighthousePanel', () => {
 
     instance.selectReport(LH_REPORT.lhr);
     assert.strictEqual(context.flavor(Lighthouse.LighthousePanel.ActiveLighthouseReport)?.report, LH_REPORT.lhr);
+  });
+
+  it('focuses the report topbar URL after the report widget finishes rendering', async () => {
+    const instance = Lighthouse.LighthousePanel.LighthousePanel.instance({forceNew: true, protocolService, controller});
+    renderElementIntoDOM(instance);
+
+    await instance.handleCompleteRun();
+    await UI.Widget.Widget.allUpdatesComplete;
+
+    const topbarUrl = instance.contentElement.querySelector<HTMLElement>('.lh-topbar__url');
+    assert.exists(topbarUrl);
+    assert.strictEqual(document.activeElement, topbarUrl);
+    instance.detach();
   });
 });

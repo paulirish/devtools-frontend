@@ -186,6 +186,13 @@ export interface ContextResponse {
   type: ResponseType.CONTEXT;
   details: [ContextDetail, ...ContextDetail[]];
   widgets?: AiWidget[];
+  /**
+   * Skills pre-loaded automatically from the selected context during `enhanceQuery()`.
+   * Attached to `ContextResponse` for `'ai-v2-auto-learn-skill'` telemetry rather than
+   * emitted as a separate walkthrough step, because `selectedContext` is attached
+   * before the model evaluates whether the user's question requires that skill.
+   */
+  autoLearnedSkills?: string[];
 }
 
 /**
@@ -262,6 +269,10 @@ export interface ContextChangeResponse {
    * to emit UI telemetry.
    */
   toolName?: string;
+  /**
+   * True when the call skipped a permission prompt via `AlwaysAllowedTools`.
+   */
+  autoApproved?: boolean;
 }
 
 interface SerializedSideEffectResponse extends Omit<SideEffectResponse, 'confirm'> {}
@@ -303,6 +314,10 @@ export interface ActionResponse extends ToolCallEvent {
    * `ai-v2-learn-skill` visual logging events.
    */
   loadedSkills?: string[];
+  /**
+   * True when the call skipped a permission prompt via `AlwaysAllowedTools`.
+   */
+  autoApproved?: boolean;
 }
 
 /**
@@ -396,6 +411,21 @@ export type ConversationSuggestions = [ConversationSuggestion, ...ConversationSu
 export type ConversationContextJslog = 'ai-context-dom-node'|'ai-context-network-request'|'ai-context-file'|
     'ai-context-performance-trace'|'ai-context-accessibility'|'ai-context-storage';
 
+/**
+ * A persistent fact about the context or skill that is only sent to the model once
+ * per conversation to save tokens.
+ *
+ * `AiAgent2` deduplicates facts by object reference identity (`Set<PromptFact>`),
+ * so callers must return stable constant references rather than inline object literals.
+ */
+export interface PromptFact {
+  readonly title: string;
+  /**
+   * Omit custom markdown headings because AiAgent2 renders `# References` and `## ${title}` automatically.
+   */
+  readonly description: string;
+}
+
 export abstract class ConversationContext<T> {
   abstract readonly jslogContext: ConversationContextJslog;
   abstract getItem(): T;
@@ -466,6 +496,16 @@ export abstract class ConversationContext<T> {
    */
   async getPromptDetails(): Promise<string|null> {
     return null;
+  }
+
+  /**
+   * Returns persistent facts about the context that are only sent to the model
+   * once per conversation, reducing token usage in subsequent turns.
+   * Return stable constant `PromptFact` references so `AiAgent2` can deduplicate them.
+   * Currently only used by AiAgent2 (V1 agents use `addFact()`).
+   */
+  getPromptFacts(): readonly PromptFact[] {
+    return [];
   }
 
   /**
@@ -661,7 +701,7 @@ export interface FunctionDeclaration<Args extends Record<string, unknown>, Retur
    * Description of function, this is send to the LLM
    * to explain what will the function do.
    */
-  description: string|(() => string);
+  description: string;
   /**
    * JSON schema like representation of the parameters
    * the function needs to be called with.
@@ -782,6 +822,8 @@ export abstract class AiAgent<T> {
   readonly #structuredLog: Array<{
     request: Host.AidaClient.DoConversationRequest,
     aidaResponse: Host.AidaClient.DoConversationResponse,
+    requestTimestamp: number,
+    responseTimestamp: number,
   }> = [];
 
   /**
@@ -797,14 +839,7 @@ export abstract class AiAgent<T> {
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
-    let serverSideLoggingAllowed = opts.serverSideLoggingAllowed ?? false;
-    // Disable logging for now.
-    // For context, see b/454563259#comment35.
-    // We should be able to remove this ~end of April.
-    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      serverSideLoggingAllowed = false;
-    }
-    this.#serverSideLoggingActive = serverSideLoggingAllowed;
+    this.#serverSideLoggingActive = opts.serverSideLoggingAllowed ?? false;
     this.#sessionId = opts.sessionId ?? crypto.randomUUID();
     this.confirmSideEffect = opts.confirmSideEffectForTest ?? (() => Promise.withResolvers());
     this.#history = opts.history ?? [];
@@ -894,7 +929,7 @@ export abstract class AiAgent<T> {
     for (const [name, definition] of this.#functionDeclarations.entries()) {
       declarations.push({
         name,
-        description: typeof definition.description === 'function' ? definition.description() : definition.description,
+        description: definition.description,
         parameters: definition.parameters,
       });
     }
@@ -1288,6 +1323,7 @@ export abstract class AiAgent<T> {
             context: result.context,
             widgets: result.widgets,
             toolName: functionCall.name,
+            autoApproved: result.autoApproved,
           };
           return {type: 'contextChanged'};
         }
@@ -1354,7 +1390,12 @@ export abstract class AiAgent<T> {
         result: unknown,
         widgets?: AiWidget[],
         loadedSkills?: string[],
-      }|{error: string}|{context: ConversationContext<unknown>, description: string, widgets?: AiWidget[]}> {
+      }|{error: string}|{
+        context: ConversationContext<unknown>,
+        description: string,
+        widgets?: AiWidget[],
+        autoApproved?: boolean,
+      }> {
     const callId = crypto.randomUUID();
     const call = this.#functionDeclarations.get(name);
     if (!call) {
@@ -1401,14 +1442,43 @@ export abstract class AiAgent<T> {
       return Boolean(allowedOriginResult && 'blocked' in allowedOriginResult);
     };
 
+    const isAlwaysAllowed = call.permissionPrompt === PermissionPrompt.ALLOW_ONCE_OR_ALWAYS &&
+        Boolean(this.#alwaysAllowedTools?.isAllowed(name as ToolName));
+
     // Turns an error thrown by the handler into an error result, so the other
     // calls in the same model response still run and the history keeps their
-    // results.
+    // results. Races the handler against the abort signal so a hung tool call
+    // does not block the agent loop after the user aborts the run.
     const runHandler = async(handlerOptions?: FunctionHandlerOptions): Promise<ToolResult<unknown>> => {
+      const signal = handlerOptions?.signal;
+      if (signal?.aborted) {
+        return {error: 'Aborted'};
+      }
       try {
-        const isAlwaysAllowed = call.permissionPrompt === PermissionPrompt.ALLOW_ONCE_OR_ALWAYS &&
-            this.#alwaysAllowedTools?.isAllowed(name as ToolName);
-        return await call.handler(args, isAlwaysAllowed ? {...handlerOptions, approved: true} : handlerOptions);
+        const handlerPromise =
+            call.handler(args, isAlwaysAllowed ? {...handlerOptions, approved: true} : handlerOptions);
+        if (!signal) {
+          return await handlerPromise;
+        }
+        if (signal.aborted) {
+          return {error: 'Aborted'};
+        }
+        return await new Promise<ToolResult<unknown>>((resolve, reject) => {
+          const onAbort = (): void => {
+            resolve({error: 'Aborted'});
+          };
+          signal.addEventListener('abort', onAbort, {once: true});
+          handlerPromise.then(
+              value => {
+                signal.removeEventListener('abort', onAbort);
+                resolve(value);
+              },
+              err => {
+                signal.removeEventListener('abort', onAbort);
+                reject(err);
+              },
+          );
+        });
       } catch (err) {
         debugLog(`[AiAgent] Tool '${name}' threw:`, err);
         return {error: `Error: ${err instanceof Error ? err.message : String(err)}`};
@@ -1416,6 +1486,9 @@ export abstract class AiAgent<T> {
     };
 
     let result = await runHandler(options);
+    if (options?.signal?.aborted) {
+      return {error: 'Aborted'};
+    }
 
     // Check 1: After first handler execution.
     // Navigation could have occurred during the async handler execution.
@@ -1498,6 +1571,9 @@ export abstract class AiAgent<T> {
         ...options,
         approved: true,
       });
+      if (options?.signal?.aborted) {
+        return {error: 'Aborted'};
+      }
 
       // Check 3: After second handler execution (approved run).
       // Navigation could have occurred during the async execution of the approved action.
@@ -1515,6 +1591,7 @@ export abstract class AiAgent<T> {
         widgets: result.widgets,
         canceled: false,
         toolName: name,
+        autoApproved: isAlwaysAllowed,
         ...(result.loadedSkills ? {loadedSkills: result.loadedSkills} : {}),
       };
     }
@@ -1533,7 +1610,10 @@ export abstract class AiAgent<T> {
     debugLog(`[AiAgent] Tool '${name}' result:`, result);
 
     if ('context' in result) {
-      return result;
+      return {
+        ...result,
+        autoApproved: isAlwaysAllowed,
+      };
     }
 
     return result as {result: unknown, widgets?: AiWidget[]};
@@ -1545,29 +1625,24 @@ export abstract class AiAgent<T> {
     let aidaResponse: Host.AidaClient.DoConversationResponse|undefined = undefined;
     let rpcId: Host.AidaClient.RpcGlobalId|undefined;
 
+    const requestTimestamp = Math.floor(Date.now() * 1000);
     for await (aidaResponse of this.#aidaClient.doConversation(request, options)) {
-      if (aidaResponse.functionCalls?.length) {
-        yield {
-          rpcId,
-          functionCalls: aidaResponse.functionCalls,
-          completed: true,
-          text: aidaResponse.explanation,
-        };
-        break;
-      }
-
       rpcId = aidaResponse.metadata.rpcGlobalId ?? rpcId;
       yield {
         rpcId,
         text: aidaResponse.explanation,
+        functionCalls: aidaResponse.functionCalls,
         completed: aidaResponse.completed,
       };
     }
 
     if (isDebugMode() && aidaResponse) {
+      const responseTimestamp = Math.floor(Date.now() * 1000);
       this.#structuredLog.push({
         request: structuredClone(request),
         aidaResponse,
+        requestTimestamp,
+        responseTimestamp,
       });
       try {
         Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.setItem('aiAssistanceStructuredLog',

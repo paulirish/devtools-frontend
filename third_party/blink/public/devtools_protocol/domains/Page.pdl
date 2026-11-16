@@ -77,7 +77,6 @@ domain Page
       autofill
       autoplay
       bluetooth
-      browsing-topics
       camera
       captured-surface-control
       ch-dpr
@@ -131,7 +130,6 @@ domain Page
       hid
       identity-credentials-get
       idle-detection
-      interest-cohort
       keyboard-map
       language-detector
       language-model
@@ -155,6 +153,7 @@ domain Page
       publickey-credentials-remote-client-data-json
       rewriter
       screen-wake-lock
+      semantic-embedder
       serial
       smart-card
       speaker-selection

@@ -8,7 +8,7 @@ import sinon from 'sinon';
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import {querySelectorErrorOnMissing, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {assertScreenshot, querySelectorErrorOnMissing, raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createFakeSetting} from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {setupSettingsHooks} from '../../testing/SettingsHelpers.js';
@@ -18,7 +18,7 @@ import * as Lit from '../lit/lit.js';
 
 import * as UI from './legacy.js';
 
-const {html, nothing} = Lit;
+const {html, nothing, render} = Lit;
 
 describe('UIUtils', () => {
   describe('isEditing', () => {
@@ -726,6 +726,268 @@ describe('UIUtils', () => {
       fragment.removeChild(clone1);
       assert.deepEqual(UI.UIUtils.HTMLElementWithLightDOMTemplate.getClones(original), []);
     });
+
+    it('resolves clonedRef on cloned nodes and preserves callback identity across template patches', () => {
+      const el = new TestLightDOMTemplate();
+      const callback = sinon.spy();
+      const itemCallback = sinon.spy();
+      const spanRef = Lit.Directives.createRef<HTMLSpanElement>();
+
+      const renderTemplate = (label: string): void => {
+        el.template = html`<div>
+          <span ${UI.UIUtils.clonedRef(callback)} ${UI.UIUtils.clonedRef(spanRef)}>${label}</span>
+          ${
+            Lit.Directives.repeat(['item'], item => item,
+                                  item => html`<p ${UI.UIUtils.clonedRef(itemCallback)}>${item}:${label}</p>`)}
+        </div>`;
+      };
+
+      renderTemplate('first');
+
+      const template = el.querySelector('template');
+      assert.exists(template);
+      const templateSpan = template.content.querySelector('span');
+      assert.exists(templateSpan);
+      const templateParagraph = template.content.querySelector('p');
+      assert.exists(templateParagraph);
+
+      sinon.assert.notCalled(callback);
+      sinon.assert.notCalled(itemCallback);
+      assert.isUndefined(spanRef.value);
+
+      const clonedSpan = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateSpan);
+      assert.instanceOf(clonedSpan, HTMLSpanElement);
+      const clonedParagraph = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateParagraph);
+      assert.instanceOf(clonedParagraph, HTMLParagraphElement);
+
+      assert.strictEqual(spanRef.value, clonedSpan);
+      assert.deepEqual(callback.args, [[clonedSpan]]);
+      assert.deepEqual(itemCallback.args, [[clonedParagraph]]);
+
+      renderTemplate('second');
+
+      assert.strictEqual(spanRef.value, clonedSpan);
+      assert.deepEqual(callback.args, [[clonedSpan]]);
+      assert.deepEqual(itemCallback.args, [[clonedParagraph]]);
+    });
+
+    it('resolves clonedRef at once when bound after the clone was made', () => {
+      const el = new TestLightDOMTemplate();
+      const callback = sinon.spy();
+      const renderTemplate = (withRef: boolean): void => {
+        el.template = html`<span ${withRef ? UI.UIUtils.clonedRef(callback) : Lit.nothing}>label</span>`;
+      };
+
+      renderTemplate(false);
+      const templateSpan = el.querySelector('template')?.content.querySelector('span');
+      assert.exists(templateSpan);
+      const clonedSpan = UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateSpan);
+      // Only live clones resolve.
+      document.createDocumentFragment().appendChild(clonedSpan);
+      sinon.assert.notCalled(callback);
+
+      renderTemplate(true);
+      assert.deepEqual(callback.args, [[clonedSpan]]);
+
+      renderTemplate(false);
+      assert.deepEqual(callback.args, [[clonedSpan], [undefined]]);
+    });
+
+    it('resolves clonedRef for clones that a host registers by other means', () => {
+      const el = new TestLightDOMTemplate();
+      const spanRef = Lit.Directives.createRef<HTMLSpanElement>();
+      el.template = html`<span ${UI.UIUtils.clonedRef(spanRef)}>label</span>`;
+      const templateSpan = el.querySelector('template')?.content.querySelector('span');
+      assert.exists(templateSpan);
+
+      const rendered = document.createElement('span');
+      document.createDocumentFragment().appendChild(rendered);
+      UI.UIUtils.HTMLElementWithLightDOMTemplate.registerClone(templateSpan, rendered);
+      assert.strictEqual(spanRef.value, rendered);
+      assert.deepEqual(UI.UIUtils.HTMLElementWithLightDOMTemplate.getClones(templateSpan), [rendered]);
+    });
+
+    it('populates children, event listeners, and widget config before invoking clonedRef callbacks', () => {
+      class MockWidget extends UI.Widget.Widget {
+        payload = '';
+      }
+      const el = new TestLightDOMTemplate();
+      const clickHandler = sinon.spy();
+      let callbackTextContent: string|null|undefined;
+      let callbackWidgetConfig: unknown;
+      const callback = sinon.spy((cloned?: Element) => {
+        if (cloned instanceof HTMLElement) {
+          callbackTextContent = cloned.textContent;
+          callbackWidgetConfig = UI.Widget.widgetConfigs.get(cloned);
+          cloned.click();
+        }
+      });
+
+      el.template = html`<devtools-widget
+        ${UI.Widget.widget(MockWidget, {
+        payload: 'initial',
+      })}
+        ${UI.UIUtils.clonedRef(callback)}
+        @click=${clickHandler}>label</devtools-widget>`;
+
+      const templateWidget = el.querySelector('template')?.content.querySelector('devtools-widget');
+      assert.exists(templateWidget);
+
+      UI.UIUtils.HTMLElementWithLightDOMTemplate.cloneNode(templateWidget);
+
+      sinon.assert.calledOnce(callback);
+      assert.strictEqual(callbackTextContent, 'label');
+      sinon.assert.calledOnce(clickHandler);
+      assert.isDefined(callbackWidgetConfig);
+    });
+  });
+
+  describe('clonedRef', () => {
+    const {clonedRef, HTMLElementWithLightDOMTemplate} = UI.UIUtils;
+
+    it('resolves Ref objects to cloned elements and updates on re-clone', () => {
+      const container = document.createElement('div');
+      const buttonRef = Lit.Directives.createRef<HTMLButtonElement>();
+      render(html`<button ${clonedRef(buttonRef)}></button>`, container);
+      const templateButton = container.querySelector('button');
+      assert.exists(templateButton);
+      assert.isUndefined(buttonRef.value);
+
+      const clone1 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clone1, HTMLButtonElement);
+      assert.strictEqual(buttonRef.value, clone1);
+
+      const clone2 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clone2, HTMLButtonElement);
+      assert.strictEqual(buttonRef.value, clone2);
+    });
+
+    it('calls ref callbacks with undefined before a new clone', () => {
+      const container = document.createElement('div');
+      const callback = sinon.spy();
+      render(html`<button ${clonedRef(callback)}></button>`, container);
+      const templateButton = container.querySelector('button');
+      assert.exists(templateButton);
+      sinon.assert.notCalled(callback);
+
+      const clone1 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clone1, HTMLButtonElement);
+      assert.deepEqual(callback.args, [[clone1]]);
+
+      const clone2 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clone2, HTMLButtonElement);
+      assert.deepEqual(callback.args, [[clone1], [undefined], [clone2]]);
+    });
+
+    it('switches callbacks and Ref objects across renders using the active clone', () => {
+      const container = document.createElement('div');
+      const callback1 = sinon.spy();
+      const callback2 = sinon.spy();
+      const buttonRef = Lit.Directives.createRef<HTMLButtonElement>();
+      const renderButton = (refValue: Lit.Directives.RefOrCallback): void => {
+        render(html`<button ${clonedRef(refValue)}></button>`, container);
+      };
+
+      renderButton(callback1);
+      const templateButton = container.querySelector('button');
+      assert.exists(templateButton);
+      const clone = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clone, HTMLButtonElement);
+      // The lazy lookup for a new ref only returns live clones.
+      document.createDocumentFragment().appendChild(clone);
+      assert.deepEqual(callback1.args, [[clone]]);
+
+      renderButton(callback2);
+      assert.deepEqual(callback1.args, [[clone], [undefined]]);
+      assert.deepEqual(callback2.args, [[clone]]);
+
+      renderButton(buttonRef);
+      assert.deepEqual(callback2.args, [[clone], [undefined]]);
+      assert.strictEqual(buttonRef.value, clone);
+    });
+
+    it('clears stale Ref values when bound to an uncloned element', () => {
+      const container1 = document.createElement('div');
+      const container2 = document.createElement('div');
+      const buttonRef = Lit.Directives.createRef<HTMLButtonElement>();
+
+      render(html`<button ${clonedRef(buttonRef)}></button>`, container1);
+      const templateButton1 = container1.querySelector('button');
+      assert.exists(templateButton1);
+      const clone1 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton1);
+      assert.instanceOf(clone1, HTMLButtonElement);
+      assert.strictEqual(buttonRef.value, clone1);
+
+      render(html`<button ${clonedRef(buttonRef)}></button>`, container2);
+      assert.isUndefined(buttonRef.value);
+    });
+
+    it('clears references when an element or directive disconnects', () => {
+      const spanContainer = document.createElement('div');
+      const callback = sinon.spy();
+      const renderSpan = (selected: boolean): void => {
+        render(html`<span ${selected ? clonedRef(callback) : Lit.nothing}></span>`, spanContainer);
+      };
+
+      renderSpan(true);
+      const templateSpan = spanContainer.querySelector('span');
+      assert.exists(templateSpan);
+      const clonedSpan = HTMLElementWithLightDOMTemplate.cloneNode(templateSpan);
+      assert.instanceOf(clonedSpan, HTMLSpanElement);
+      assert.deepEqual(callback.args, [[clonedSpan]]);
+
+      renderSpan(false);
+      assert.deepEqual(callback.args, [[clonedSpan], [undefined]]);
+
+      // A clone of an element without a connected directive does not call the callback.
+      HTMLElementWithLightDOMTemplate.cloneNode(templateSpan);
+      assert.deepEqual(callback.args, [[clonedSpan], [undefined]]);
+
+      const buttonContainer = document.createElement('div');
+      const buttonRef = Lit.Directives.createRef<HTMLButtonElement>();
+      const renderButton = (active: boolean): void => {
+        render(html`${active ? html`<button ${clonedRef(buttonRef)}></button>` : Lit.nothing}`, buttonContainer);
+      };
+
+      renderButton(true);
+      const templateButton = buttonContainer.querySelector('button');
+      assert.exists(templateButton);
+      const clonedButton = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.instanceOf(clonedButton, HTMLButtonElement);
+      assert.strictEqual(buttonRef.value, clonedButton);
+
+      renderButton(false);
+      assert.isUndefined(buttonRef.value);
+    });
+
+    it('throws when used outside an element position', () => {
+      const container = document.createElement('div');
+      assert.throws(() => render(html`<div title=${clonedRef()}></div>`, container), /must be bound to an element/);
+      assert.throws(() => render(html`<div>${clonedRef()}</div>`, container), /must be bound to an element/);
+    });
+
+    it('restores the ref and receives new clones after the directive reconnects', () => {
+      const container = document.createElement('div');
+      const callback = sinon.spy();
+      const part = render(html`<button ${clonedRef(callback)}></button>`, container);
+      const templateButton = container.querySelector('button');
+      assert.exists(templateButton);
+      const clone1 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      document.createDocumentFragment().appendChild(clone1);
+      assert.deepEqual(callback.args, [[clone1]]);
+
+      // Disconnecting the part disconnects the directive and keeps the template DOM.
+      part.setConnected(false);
+      assert.deepEqual(callback.args, [[clone1], [undefined]]);
+      HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.deepEqual(callback.args, [[clone1], [undefined]]);
+
+      // On reconnect the directive resolves the live clone again and receives new clones.
+      part.setConnected(true);
+      assert.deepEqual(callback.args, [[clone1], [undefined], [clone1]]);
+      const clone2 = HTMLElementWithLightDOMTemplate.cloneNode(templateButton);
+      assert.deepEqual(callback.args, [[clone1], [undefined], [clone1], [undefined], [clone2]]);
+    });
   });
 
   describe('animateOn', () => {
@@ -827,6 +1089,84 @@ describe('UIUtils', () => {
       assert.isTrue(div.classList.contains(className));
     });
   });
+
+  describe('deepElementFromEvent', () => {
+    function setupShadowButtonWithOriginBanner() {
+      const container = document.createElement('div');
+      const originBanner = document.createElement('div');
+      originBanner.style.position = 'fixed';
+      originBanner.style.left = '0';
+      originBanner.style.top = '0';
+      originBanner.style.width = '40px';
+      originBanner.style.height = '20px';
+      originBanner.style.zIndex = '1000';
+
+      const host = document.createElement('div');
+      host.style.position = 'fixed';
+      host.style.left = '60px';
+      host.style.top = '50px';
+      host.style.width = '40px';
+      host.style.height = '20px';
+      host.style.zIndex = '1000';
+      const shadowRoot = host.attachShadow({mode: 'open'});
+      const innerButton = document.createElement('button');
+      innerButton.style.display = 'block';
+      innerButton.style.margin = '0';
+      innerButton.style.padding = '0';
+      innerButton.style.border = '0';
+      innerButton.style.width = '40px';
+      innerButton.style.height = '20px';
+      shadowRoot.appendChild(innerButton);
+
+      container.append(originBanner, host);
+      renderElementIntoDOM(container);
+      return {originBanner, host, innerButton};
+    }
+
+    it('returns the composed shadow target for dispatched zero-coordinate MouseEvents instead of the element at (0, 0)',
+       () => {
+         const {originBanner, host, innerButton} = setupShadowButtonWithOriginBanner();
+         assert.strictEqual(document.elementFromPoint(0, 0), originBanner);
+         const resolvedTargets: Array<Node|null> = [];
+         host.addEventListener('click', event => {
+           resolvedTargets.push(UI.UIUtils.deepElementFromEvent(event));
+         });
+
+         innerButton.click();
+
+         assert.lengthOf(resolvedTargets, 1);
+         assert.strictEqual(resolvedTargets[0], innerButton);
+       });
+
+    it('returns null once a zero-coordinate MouseEvent finishes dispatch instead of hitting (0, 0)', () => {
+      const {originBanner, host, innerButton} = setupShadowButtonWithOriginBanner();
+      assert.strictEqual(document.elementFromPoint(0, 0), originBanner);
+      const event = new MouseEvent('contextmenu', {bubbles: true, composed: true});
+      innerButton.dispatchEvent(event);
+
+      assert.strictEqual(event.target, host);
+      assert.strictEqual(event.which, 1);
+      assert.isNull(UI.UIUtils.deepElementFromEvent(event));
+    });
+
+    it('pierces shadow roots at event coordinates when pointer coordinates are present', () => {
+      const {host, innerButton} = setupShadowButtonWithOriginBanner();
+      const resolvedTargets: Array<Node|null> = [];
+      host.addEventListener('click', event => {
+        resolvedTargets.push(UI.UIUtils.deepElementFromEvent(event));
+      });
+      const rect = innerButton.getBoundingClientRect();
+
+      host.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        clientX: Math.round(rect.left + rect.width / 2),
+        clientY: Math.round(rect.top + rect.height / 2),
+      }));
+
+      assert.lengthOf(resolvedTargets, 1);
+      assert.strictEqual(resolvedTargets[0], innerButton);
+    });
+  });
 });
 
 describe('bindToSetting (string)', () => {
@@ -872,6 +1212,24 @@ describe('bindToSetting (string)', () => {
     input.dispatchEvent(new Event('change'));
 
     assert.strictEqual(setting.get(), 'new value via user edit');
+  });
+
+  it('does not change the setting on Enter during IME composition', () => {
+    const {setting, input} = setup();
+
+    input.value = 'uncommitted composition';
+    const composingEvent = new KeyboardEvent('keydown', {key: 'Enter', cancelable: true, isComposing: true});
+    input.dispatchEvent(composingEvent);
+
+    assert.strictEqual(setting.get(), 'defaultValue');
+    assert.isFalse(composingEvent.defaultPrevented);
+
+    input.value = 'committed value';
+    const enterEvent = new KeyboardEvent('keydown', {key: 'Enter', cancelable: true, isComposing: false});
+    input.dispatchEvent(enterEvent);
+
+    assert.strictEqual(setting.get(), 'committed value');
+    assert.isTrue(enterEvent.defaultPrevented);
   });
 
   it('changes the input when the setting changes', () => {
@@ -1234,6 +1592,36 @@ describe('bindCheckbox', () => {
                             'await in asyncFunction');
        });
   });
+
+  describe('maybeCreateNewBadge', () => {
+    const promotionId = 'test-promotion-new-badge';
+    setupLocaleHooks();
+
+    beforeEach(() => {
+      localStorage.removeItem(promotionId);
+    });
+
+    afterEach(() => {
+      localStorage.removeItem(promotionId);
+    });
+
+    it('returns a new-badge template when the promotion should be shown', () => {
+      const badgeTemplate = UI.UIUtils.maybeCreateNewBadge(promotionId);
+      assert.isOk(badgeTemplate);
+
+      const container = document.createElement('div');
+      render(badgeTemplate, container);
+      const badge = querySelectorErrorOnMissing(container, '.new-badge');
+      assert.strictEqual(badge.textContent, 'NEW');
+      assert.strictEqual(badge.getAttribute('jslog'), 'Badge; context: new-badge');
+    });
+
+    it('returns undefined when the promotion should not be shown', () => {
+      sinon.stub(UI.UIUtils.PromotionManager.prototype, 'maybeShowPromotion').withArgs(promotionId).returns(false);
+
+      assert.isUndefined(UI.UIUtils.maybeCreateNewBadge(promotionId));
+    });
+  });
 });
 
 describe('element value modifications', () => {
@@ -1348,5 +1736,60 @@ describe('element value modifications', () => {
       assert.strictEqual(element.textContent, text);
       assert.isFalse(upEvent.defaultPrevented);
     });
+  });
+});
+
+describe('spinner', () => {
+  it('applies rect clip-path on the spinner pseudo element', () => {
+    const container = document.createElement('div');
+    UI.UIUtils.installComponentRootStyles(container);
+    const spinner = container.createChild('div', 'spinner');
+    renderElementIntoDOM(container);
+
+    const computedStyle = window.getComputedStyle(spinner, '::before');
+    assert.strictEqual(computedStyle.clipPath, 'inset(0px calc(100% - 15px) calc(100% - 15px) 0px)');
+
+    const smallSpinnerWrapper = container.createChild('div');
+    smallSpinnerWrapper.style.setProperty('--clip-size', '9px');
+    const smallSpinner = smallSpinnerWrapper.createChild('div', 'spinner');
+    const smallComputedStyle = window.getComputedStyle(smallSpinner, '::before');
+    assert.strictEqual(smallComputedStyle.clipPath, 'inset(0px calc(100% - 9px) calc(100% - 9px) 0px)');
+  });
+
+  it('renders loading spinner screenshot', async () => {
+    const container = document.createElement('div');
+    container.style.padding = '10px';
+    container.style.display = 'inline-flex';
+    container.style.gap = '20px';
+    container.style.alignItems = 'center';
+    UI.UIUtils.installComponentRootStyles(container);
+
+    // Give spinner hosts a real box and disable animation for stable screenshot.
+    const overrideStyle = document.createElement('style');
+    overrideStyle.textContent = `
+      .spinner {
+        display: inline-block;
+        position: relative;
+        width: var(--dimension, var(--sys-size-11));
+        height: var(--dimension, var(--sys-size-11));
+      }
+      .spinner::before {
+        animation: none !important;
+      }
+    `;
+    container.appendChild(overrideStyle);
+
+    // Default spinner (e.g. StylesSidebarPane)
+    container.createChild('span', 'spinner');
+
+    // Small spinner with --clip-size (e.g. ProfileSidebarTreeElement)
+    const smallSpinnerWrapper = container.createChild('div');
+    smallSpinnerWrapper.style.setProperty('--dimension', '14px');
+    smallSpinnerWrapper.style.setProperty('--clip-size', '9px');
+    smallSpinnerWrapper.style.setProperty('--override-spinner-size', '2px');
+    smallSpinnerWrapper.createChild('span', 'spinner');
+
+    renderElementIntoDOM(container);
+    await assertScreenshot('ui/legacy/loading_spinner.png');
   });
 });

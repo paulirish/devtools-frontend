@@ -137,14 +137,18 @@ export class TraceProcessor extends EventTarget {
       throw new Error('Trace processor can\'t reset while parsing.');
     }
 
-    const handlers = Object.values(this.#traceHandlers);
-    for (const handler of handlers) {
-      handler.reset();
-    }
+    this.#resetHandlers();
+    Lantern.Simulation.Simulator.allNodeTimings.clear();
 
     this.#data = null;
     this.#insights = null;
     this.#status = Status.IDLE;
+  }
+
+  #resetHandlers(): void {
+    for (const handler of Object.values(this.#traceHandlers)) {
+      handler.reset();
+    }
   }
 
   async parse(traceEvents: readonly Types.Events.Event[], options: Types.Configuration.ParseOptions): Promise<void> {
@@ -172,6 +176,13 @@ export class TraceProcessor extends EventTarget {
       this.#status = Status.ERRORED_WHILE_PARSING;
       throw e;
     } finally {
+      // Handler state is module-level, so it is a second reference to the trace.
+      // Resetting here releases it, including after a failed parse. `#data`
+      // keeps the trace intact because every handler's reset() assigns new
+      // containers. Lantern simulation timings are also module-level and are
+      // cleared here to avoid retaining the dependency graph.
+      this.#resetHandlers();
+      Lantern.Simulation.Simulator.allNodeTimings.clear();
       options.logger?.end('total');
     }
   }
@@ -194,9 +205,7 @@ export class TraceProcessor extends EventTarget {
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).entries()];
 
     // Reset.
-    for (const [, handler] of sortedHandlers) {
-      handler.reset();
-    }
+    this.#resetHandlers();
 
     options.logger?.start('parse:handleEvent');
 

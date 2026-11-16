@@ -40,6 +40,14 @@ const UIStrings = {
    */
   clearAll: 'Clear all',
   /**
+   * @description Screen reader announcement after an animation group is closed.
+   */
+  animationGroupClosed: 'Animation group closed',
+  /**
+   * @description Screen reader announcement after all animation groups are cleared.
+   */
+  animationGroupsCleared: 'All animation groups cleared',
+  /**
    * @description Tooltip text that appears when hovering over largeicon pause button in the animation timeline of the Animations panel.
    */
   pauseAll: 'Pause all',
@@ -106,8 +114,10 @@ const {render, html, Directives: {classMap}} = Lit;
 const nodeUIsByNode = new WeakMap<SDK.DOMModel.DOMNode, NodeUI>();
 
 const MIN_TIMELINE_CONTROLS_WIDTH = 120;
-const DEFAULT_TIMELINE_CONTROLS_WIDTH = 150;
+const DEFAULT_TIMELINE_CONTROLS_WIDTH = 144;
 const MAX_TIMELINE_CONTROLS_WIDTH = 720;
+const GRID_OFFSET_LEFT = 12;
+const GRID_LABEL_OFFSET_LEFT = GRID_OFFSET_LEFT + 2;
 
 const ANIMATION_EXPLANATION_URL =
     'https://developer.chrome.com/docs/devtools/css/animations' as Platform.DevToolsPath.UrlString;
@@ -122,9 +132,14 @@ interface ToolbarViewInput {
   onSetPlaybackRateClick: (playbackRate: number) => void;
 }
 
-type ToolbarView = (input: ToolbarViewInput, output: undefined, target: HTMLElement) => void;
+interface ToolbarViewOutput {
+  focusClearButton?: () => void;
+}
+
+type ToolbarView = (input: ToolbarViewInput, output: ToolbarViewOutput, target: HTMLElement) => void;
 // clang-format off
-const DEFAULT_TOOLBAR_VIEW: ToolbarView = (input: ToolbarViewInput, output: undefined, target: HTMLElement): void => {
+const DEFAULT_TOOLBAR_VIEW: ToolbarView =
+    (input: ToolbarViewInput, output: ToolbarViewOutput, target: HTMLElement): void => {
   const renderPlaybackRateControl = (): Lit.LitTemplate => {
     const focusNextPlaybackRateButton = (eventTarget: EventTarget|null, focusPrevious?: boolean): void => {
       const currentPlaybackRateButton = (eventTarget as HTMLElement);
@@ -196,6 +211,11 @@ const DEFAULT_TOOLBAR_VIEW: ToolbarView = (input: ToolbarViewInput, output: unde
         <devtools-button
           title=${i18nString(UIStrings.clearAll)}
           aria-label=${i18nString(UIStrings.clearAll)}
+          ${Lit.Directives.ref(element => {
+            if (element instanceof HTMLElement) {
+              output.focusClearButton = () => element.focus();
+            }
+          })}
           .iconName=${'clear'}
           .jslogContext=${'animations.clear'}
           .variant=${Buttons.Button.Variant.TOOLBAR}
@@ -239,7 +259,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   readonly #pausedStatus: HTMLElement;
   #timelineScrubber!: HTMLElement;
   #currentTime!: HTMLElement;
-  #clearButton!: UI.Toolbar.ToolbarButton;
   #selectedGroup!: SDK.AnimationModel.AnimationGroup|null;
   #renderQueue!: AnimationUI[];
   #duration: number;
@@ -270,6 +289,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   /** Container & state for rendering `toolbarView` */
   #toolbarViewContainer: HTMLElement;
   #toolbarView: ToolbarView;
+  #toolbarViewOutput: ToolbarViewOutput = {};
 
   constructor(toolbarView: ToolbarView = DEFAULT_TOOLBAR_VIEW) {
     super({
@@ -484,7 +504,11 @@ export class AnimationTimeline extends UI.Widget.VBox implements
           allPaused: this.#allPaused,
           onClearClick: () => {
             Host.userMetrics.actionTaken(Host.UserMetrics.Action.AnimationGroupsCleared);
+            const hadAnimationGroups = this.#groupBuffer.length > 0;
             this.reset();
+            if (hadAnimationGroups) {
+              UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.animationGroupsCleared));
+            }
           },
           onTogglePauseAllClick: () => {
             this.#allPaused = !this.#allPaused;
@@ -501,7 +525,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
             this.setPlaybackRate(playbackRate);
           },
         },
-        undefined, this.#toolbarViewContainer);
+        this.#toolbarViewOutput, this.#toolbarViewContainer);
   }
 
   private createHeader(): HTMLElement {
@@ -651,9 +675,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     this.setPlaybackRate(this.#playbackRate);
 
     for (const group of this.#groupBuffer) {
-      group.release();
+      group.forget();
     }
     this.#groupBuffer = [];
+    this.#collectedGroups = [];
     this.clearPreviews();
     this.renderGrid();
   }
@@ -668,6 +693,11 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   private animationGroupUpdated({
     data: group,
   }: Common.EventTarget.EventTargetEvent<SDK.AnimationModel.AnimationGroup>): void {
+    if (!this.#previewMap.has(group)) {
+      void this.addAnimationGroup(group);
+      return;
+    }
+
     void this.#animationGroupUpdatedThrottler.schedule(async () => {
       const preview = this.#previewMap.get(group);
       if (preview) {
@@ -810,12 +840,14 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       }
       discardGroup.detach();
       this.#previewMap.delete(g);
-      g.release();
+      g.forget();
     }
 
     // Batch creating preview for arrivals happening closely together to ensure
     // stable UI sorting in the preview container.
-    this.#collectedGroups.push(group);
+    if (!this.#collectedGroups.includes(group)) {
+      this.#collectedGroups.push(group);
+    }
     return this.#createPreviewForCollectedGroupsThrottler.schedule(
         () => Promise.resolve(this.createPreviewForCollectedGroups()));
   }
@@ -847,15 +879,15 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       previewGroup.detach();
     }
     this.#previewMap.delete(group);
-    group.release();
+    group.forget();
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.animationGroupClosed));
     if (this.#selectedGroup === group) {
       this.clearTimeline();
       this.renderGrid();
     }
 
-    const groupLength = this.#groupBuffer.length;
-    if (groupLength === 0) {
-      (this.#clearButton.element as HTMLElement).focus();
+    if (this.#groupBuffer.length === 0) {
+      this.#toolbarViewOutput.focusClearButton?.();
       return;
     }
     const nextGroup = currentGroupIndex >= this.#groupBuffer.length ?
@@ -1008,7 +1040,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     let lastDraw: number|undefined = undefined;
     for (let time = 0; time < this.duration(); time += gridSize) {
       const line = UI.UIUtils.createSVGChild(this.#grid, 'rect', 'animation-timeline-grid-line');
-      line.setAttribute('x', (time * this.pixelTimeRatio() + 10).toString());
+      line.setAttribute('x', (time * this.pixelTimeRatio() + GRID_OFFSET_LEFT).toString());
       line.setAttribute('y', '23');
       line.setAttribute('height', '100%');
       line.setAttribute('width', '1');
@@ -1019,7 +1051,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         lastDraw = gridWidth;
         const label = UI.UIUtils.createSVGChild(this.#grid, 'text', 'animation-timeline-grid-label');
         label.textContent = isScrollDriven ? `${time.toFixed(0)}px` : i18n.TimeUtilities.millisToString(time);
-        label.setAttribute('x', (gridWidth + 12).toString());
+        label.setAttribute('x', (gridWidth + GRID_LABEL_OFFSET_LEFT).toString());
         label.setAttribute('y', '16');
       }
     }
@@ -1119,7 +1151,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
 
     // Seek to current mouse position.
     if (!this.#gridOffsetLeft) {
-      this.#gridOffsetLeft = this.#grid.getBoundingClientRect().left + 10;
+      this.#gridOffsetLeft = this.#grid.getBoundingClientRect().left + GRID_OFFSET_LEFT;
     }
 
     const {x} = event;

@@ -11,6 +11,7 @@ ts_library("testing") {
 
   sources = [
     "AiAssistanceHelpers.ts",
+    "AxeHelpers.ts",
     "ConsoleHelpers.ts",
     "ConsoleInsightHelpers.ts",
     "ContextMenuHelpers.ts",
@@ -110,6 +111,7 @@ ts_library("testing") {
     "../panels/network:bundle",
     "../panels/timeline:bundle",
     "../services/trace_bounds:bundle",
+    "../third_party/axe-core",
     "../third_party/chromium/ahem",
     "../third_party/codemirror.next:bundle",
     "../ui/components/buttons:bundle",

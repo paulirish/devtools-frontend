@@ -6,7 +6,6 @@
 @scope to (devtools-widget > *) {
   .webauthn-pane {
     overflow: auto;
-    min-width: 500px;
   }
 
   .webauthn-toolbar-container {
@@ -72,7 +71,7 @@
   }
 
   .webauthn-pane select {
-    width: 120px;
+    width: var(--sys-size-20);
   }
   /* Active Authenticator Section */
   .authenticator-section {
@@ -81,13 +80,13 @@
 
   .divider {
     border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
-    margin: 10px calc(var(--sys-size-9) * -1) 0;
+    margin: var(--sys-size-6) calc(var(--sys-size-9) * -1) 0;
   }
 
   .authenticator-fields {
     border: none;
     flex: 0 0 auto;
-    margin-bottom: 10px;
+    margin-bottom: var(--sys-size-5);
   }
 
   .authenticator-section-header {
@@ -110,15 +109,9 @@
     font: var(--sys-typescale-headline5);
   }
 
-  .authenticator-section-title.editing-name .authenticator-name-field {
-    border-bottom: var(--sys-size-1) solid var(--sys-color-neutral-outline);
-    font-weight: normal;
-    animation: none;
-  }
-
   .authenticator-field-value {
     font: var(--sys-typescale-monospace-regular);
-    line-height: 18px;
+    line-height: var(--sys-typescale-body5-line-height);
   }
 
   .authenticator-field {
@@ -136,8 +129,7 @@
     font: var(--sys-typescale-body5-medium);
     padding-right: var(--sys-size-6);
     text-align: left;
-    min-width: 152px;
-    line-height: 18px;
+    min-width: var(--sys-size-23);
   }
 
   ::part(action-button) {

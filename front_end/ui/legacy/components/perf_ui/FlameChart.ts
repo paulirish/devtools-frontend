@@ -253,7 +253,8 @@ const FlameChartBase: Common.ObjectWrapper.EventMixin<EventTypes, typeof UI.Widg
 export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.Calculator, ChartViewportDelegate {
   private flameChartDelegate: FlameChartDelegate;
   private chartViewport: ChartViewport;
-  private dataProvider: FlameChartDataProvider;
+  #dataProvider: FlameChartDataProvider;
+  #windowTimes?: {min: number, max: number, animate?: boolean};
   private candyStripePattern: CanvasPattern|null;
   private candyStripePatternGray: CanvasPattern|null;
   private contextMenu?: UI.ContextMenu.ContextMenu;
@@ -389,12 +390,14 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
     });
     this.chartViewport.show(this.contentElement);
 
-    this.dataProvider = dataProvider;
+    this.#dataProvider = dataProvider;
 
     this.viewportElement = this.chartViewport.viewportElement;
     this.canvas = this.viewportElement.createChild('canvas', 'fill');
     if (optionalConfig.canvasVELogContext) {
       const context = VisualLogging.canvas(optionalConfig.canvasVELogContext).track({
+        click: true,
+        drag: true,
         hover: true,
       });
       this.canvas.setAttribute('jslog', `${context}`);
@@ -541,15 +544,35 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
     this.chartViewport.disableRangeSelection();
   }
 
+  get dataProvider(): FlameChartDataProvider {
+    return this.#dataProvider;
+  }
+
+  set dataProvider(dataProvider: FlameChartDataProvider) {
+    this.setDataProvider(dataProvider);
+  }
+
   setDataProvider(dataProvider: FlameChartDataProvider): void {
-    if (this.dataProvider === dataProvider) {
+    if (this.#dataProvider === dataProvider) {
       return;
     }
-    this.dataProvider = dataProvider;
+    this.#dataProvider = dataProvider;
     this.reset();
-    this.chartViewport.setWindowTimes(dataProvider.minimumBoundary(),
-                                      dataProvider.minimumBoundary() + dataProvider.totalTime());
+    if (this.#windowTimes) {
+      this.chartViewport.setWindowTimes(this.#windowTimes.min, this.#windowTimes.max, this.#windowTimes.animate);
+    } else {
+      this.chartViewport.setWindowTimes(dataProvider.minimumBoundary(),
+                                        dataProvider.minimumBoundary() + dataProvider.totalTime());
+    }
     this.scheduleUpdate();
+  }
+
+  get delegate(): FlameChartDelegate {
+    return this.flameChartDelegate;
+  }
+
+  set delegate(flameChartDelegate: FlameChartDelegate) {
+    this.setDelegate(flameChartDelegate);
   }
 
   setDelegate(flameChartDelegate: FlameChartDelegate): void {
@@ -829,6 +852,7 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
   }
 
   set windowTimes(windowTimes: {min: number, max: number, animate?: boolean}) {
+    this.#windowTimes = windowTimes;
     this.setWindowTimes(windowTimes.min, windowTimes.max, windowTimes.animate);
   }
 
@@ -2715,7 +2739,8 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
           continue;
         }
 
-        if (duration >= minTextWidthDuration || this.forceDecorationCache?.[entryIndex]) {
+        if ((duration >= minTextWidthDuration || this.forceDecorationCache?.[entryIndex]) &&
+            !this.#indexToDrawOverride.has(entryIndex)) {
           // If the event is big enough visually to have its text rendered,
           // or if it's in the array of event indexes that we forcibly render (as defined by the data provider)
           // then we store its index. Later on, we'll loop through all
@@ -2832,10 +2857,6 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
         return;
       }
       if (!this.isGroupCollapsible(index) || group.expanded) {
-        if (!group.style.shareHeaderLine && this.isGroupFocused(index)) {
-          context.fillStyle = group.style.backgroundColor;
-          context.fillRect(0, offset, width, group.style.height);
-        }
         return;
       }
       let nextGroup = index + 1;
@@ -3014,25 +3035,30 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
     this.customDrawnPositions.clear();
     context.save();
 
-    // TODO: Don't draw if it's not in the viewport.
+    const top = this.chartViewport.scrollOffset();
     const posArray = [];
     for (const [entryIndex, drawOverride] of this.#indexToDrawOverride.entries()) {
-      const entryStartTime = entryStartTimes[entryIndex];
-      const entryTotalTime = entryTotalTimes[entryIndex];
       const level = entryLevels[entryIndex];
-
-      // Skip if the group for this event has been hidden.
-      const group = this.dataProvider.groupForEvent?.(entryIndex);
-      if (group?.hidden) {
+      if (!this.visibleLevels?.[level]) {
         continue;
       }
 
-      const unclippedXStart = this.chartViewport.timeToPosition(entryStartTime);
-      const unclippedXEnd = this.chartViewport.timeToPosition(entryStartTime + entryTotalTime);
-
-      const x = unclippedXStart;
       const y = this.levelToOffset(level);
       const height = this.levelHeight(level);
+      if (this.offsetHeight > 0 && (y + height < top || y > top + this.offsetHeight)) {
+        continue;
+      }
+
+      const entryStartTime = entryStartTimes[entryIndex];
+      const entryTotalTime = entryTotalTimes[entryIndex];
+      const unclippedXStart = this.chartViewport.timeToPosition(entryStartTime);
+      const unclippedXEnd = this.chartViewport.timeToPosition(entryStartTime + entryTotalTime);
+      // Include a `height` margin so zero-width custom symbols (e.g. layout shift diamonds) near viewport edges are not clipped.
+      if (this.offsetWidth > 0 && (unclippedXEnd + height < 0 || unclippedXStart - height > this.offsetWidth)) {
+        continue;
+      }
+
+      const x = unclippedXStart;
       const width = unclippedXEnd - unclippedXStart;
       const pos = drawOverride(context, x, y, width, height, time => this.chartViewport.timeToPosition(time),
                                color => this.#transformColor(entryIndex, color));
@@ -3297,6 +3323,15 @@ export class FlameChart extends FlameChartBase implements NetworkTimeCalculator.
         lastDrawOffset = barX;
         const color = this.getColorForEntry(entryIndex);
         const endBarX = this.timeToPositionClipped(entryEndTime);
+        const drawOverride = this.#indexToDrawOverride.get(entryIndex);
+        if (group.style.useDecoratorsForOverview && drawOverride) {
+          const unclippedXStart = this.chartViewport.timeToPosition(entryStartTime);
+          const unclippedXEnd = this.chartViewport.timeToPosition(entryEndTime);
+          drawOverride(context, unclippedXStart, y, unclippedXEnd - unclippedXStart, groupBarHeight,
+                       time => this.chartViewport.timeToPosition(time),
+                       color => this.#transformColor(entryIndex, color));
+          continue;
+        }
         if (group.style.useDecoratorsForOverview && this.dataProvider.forceDecoration(entryIndex)) {
           const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
           const barWidth = this.#eventBarWidth(this.rawTimelineData, entryIndex);

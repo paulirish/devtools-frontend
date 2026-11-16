@@ -23,6 +23,8 @@ const SCRIPT_TEST_DIRECTORIES = [
   'scripts/stylelint_rules/tests',
   'scripts/build/tests',
   'scripts/gn_deps_verifier/tests',
+  'scripts/ai_assistance',
+  'test/ai_evals/report',
 ];
 
 export function loadScriptTests(): string[] {
@@ -52,13 +54,19 @@ export function loadScriptTests(): string[] {
   return shuffleTests(tests);
 }
 
+if (TestConfig.tests.length === 0) {
+  TestConfig.tests.push(...SCRIPT_TEST_DIRECTORIES.map(d => path.join(SOURCE_ROOT, d)));
+}
+
 TestConfig.tests = TestConfig.tests.map(testId => {
   if (TEST_ID_REGEX.test(testId)) {
     const match = testId.match(TEST_ID_REGEX)!;
     return `${path.resolve(SOURCE_ROOT, match[1])}:${match[2]}`;
   }
-  return testId;
+  return path.resolve(SOURCE_ROOT, testId);
 });
+
+process.chdir(SOURCE_ROOT);
 
 void run({
   require: [

@@ -7,7 +7,7 @@ import * as Lit from '../../third_party/lit/lit.js';
 
 const templates = new WeakMap<TemplateStringsArray, TemplateStringsArray>();
 
-export function isLitDirective(value: unknown): value is {values: unknown[]} {
+export function isLitDirective(value: unknown): value is {_$litDirective$: unknown, values: unknown[]} {
   return Boolean(typeof value === 'object' && value && '_$litDirective$' in value && 'values' in value);
 }
 
@@ -46,7 +46,7 @@ function strip(strings: TemplateStringsArray): TemplateStringsArray {
   const stripped = strings.map(s => s.replace(/[<>]|\n\s*/g, s => {
     if (s === '<') {
       inTag = true;
-    } else if (inTag && s === '>') {
+    } else if (s === '>') {
       inTag = false;
     } else if (!inTag) {
       return '';

@@ -34,7 +34,7 @@
 
   .screencast-navigation .progress {
     background-color: var(--sys-color-primary-bright);
-    height: 3px;
+    height: var(--sys-size-2);
     left: 0;
     position: absolute;
     top: 100%;  /* Align with the bottom edge of the parent. */
@@ -93,7 +93,7 @@
     position: absolute;
     top: 100%;
     left: var(--sys-size-7);
-    border: 7px solid transparent;
+    border: var(--sys-size-5) solid transparent;
     border-top-color: var(--sys-color-yellow-container);
   }
 
@@ -112,7 +112,7 @@
 
   .screencast-glasspane {
     background-color: color-mix(in srgb, var(--sys-color-cdt-base-container) 80%, transparent);
-    font-size: 30px;
+    font-size: var(--sys-typescale-headline1-size);
     z-index: 100;
     display: flex;
     justify-content: center;

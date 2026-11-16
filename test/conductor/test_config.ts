@@ -66,6 +66,7 @@ interface Config {
   otaUsername?: string;
   otaPassword?: string;
   isolatedScriptTestOutput?: string;
+  dryRun: boolean;
 }
 
 const diffBehaviors = asArray(options['on-diff']);
@@ -226,12 +227,14 @@ export const TestConfig: Config = {
   isAiEvalTest: false,
   isLuci: process.env['LUCI_CONTEXT'] !== undefined,
   isPerfTest: false,
-  expectationsFile: options['expectations-file'],
+  expectationsFile: options['expectations-file'] ? path.resolve(options['expectations-file']) : undefined,
   bail: options['bail'],
   forceScreenshots: Boolean(options['force-screenshots']),
   otaUsername: options['ota-username'],
   otaPassword: options['ota-password'],
-  isolatedScriptTestOutput: options['isolated-script-test-output'],
+  isolatedScriptTestOutput:
+      options['isolated-script-test-output'] ? path.resolve(options['isolated-script-test-output']) : undefined,
+  dryRun: Boolean(options['dry-run']),
 };
 
 export function shuffleTests(tests: string[]): string[] {

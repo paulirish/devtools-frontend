@@ -23,6 +23,12 @@ existing element containers.
         methods in their original locations, converting DOM-returning helpers in
         place to return `LitTemplate` (or `Promise<LitTemplate|null>`) rather
         than deleting and inlining them into `performUpdate()` or `DEFAULT_VIEW`.
+    *   **Update Low-Fanout Shared Helpers Instead of Inlining**: When migrating a
+        caller of a shared cross-module DOM helper (such as
+        `UI.UIUtils.maybeCreateNewBadge`) that encapsulates non-trivial markup or
+        visual logging across a small set of callers, convert the shared helper
+        to return `LitTemplate` and update its callers in a standalone
+        prerequisite CL instead of inlining its markup at each call site.
     *   Do not aggressively "flatten" classes or collapse helper abstractions
         into the main view just to coerce a single master template. Pass 2
         should only change the *implementation details* of rendering (imperative
@@ -54,10 +60,8 @@ existing element containers.
 4.  **Modern Component Mapping**:
     *   **MANDATORY**: You **MUST** read and load [ui_engineering.md](../../../docs/ui_engineering.md) first to understand specific component mappings (e.g., Toolbar vs `devtools-toolbar`). Do not assume standard Lit defaults.
     *   If unsure, also consult the [automatic migration code](../../../scripts/eslint_rules/lib/no-imperative-dom-api.ts)
-    *   **Prefer Component Built-Ins Over Legacy Boilerplate**: Before porting
-        legacy event handlers, comparators, or state variables, check if the
-        modern component handles them natively. Drop host-level workarounds in
-        favor of declarative component attributes.
+    *   **Replace Imperative Item & Cell Factories with Data Loops**: Do not leave `UI.ListDelegate.createElementForItem` (`UI.SoftDropDown`), `DataGridNode.createCell` (`DataGridImpl`), or `UI.TreeOutline` item builders in place. Pass a pure data-only items array in `ViewInput` and map over it declaratively inside `<button>` + `<devtools-menu>`, `<devtools-list>`, `<devtools-data-grid>`, or `<devtools-tree>`.
+    *   **Prefer HTML-Native Attributes Over `ref(...)` Wiring Setters**: Before using `ref(...)` to wire two elements together or configure a shared DevTools UI primitive imperatively (e.g. menu anchor/origin), check whether the primitive supports or should gain an HTML-native ID/attribute API in a standalone prerequisite CL. Drop host-level workarounds in favor of declarative component attributes.
 
 
 5.  **Local Modular Renders**:
@@ -107,13 +111,51 @@ existing element containers.
     *   **Strict Tag/Class Parity**: Do not change tag types (e.g., `span` to
         `div`) or drop class names during template translation, as CSS may
         depend on them.
-    *   **Explicit Component Variants**: Modern Custom Element (e.g.
+    *   **Explicit Component Variants & Accessible Labels**: Modern Custom Element (e.g.
         `<devtools-button>`) defaults may not match legacy appearance.
         Explicitly bind `.data=${{variant: Buttons.Button.Variant.OUTLINED}}`
-        (or appropriate variant) rather than relying on defaults.
+        (or `.variant=${...}`) rather than relying on defaults. On icon-only
+        `<devtools-button>` elements, always bind `.accessibleLabel=${label}`
+        (setting `title` or HTML `aria-label` alone leaves the inner shadow
+        `<button>` unnamed under `axe-core` because `<devtools-button>` sets
+        `role="presentation"` on its host).
     *   **Accessibility Preservation**: Convert custom accessibility
         instrumentation (like `ARIAUtils.markAsAlert()`) to native ARIA
         attributes in the template (e.g., `role="alert"`, `aria-live="polite"`).
+    *   **Visibility (`?hidden` Attribute Only)**: Use `?hidden=${...}`
+        exclusively to toggle visibility in templates. Never combine a `.hidden`
+        CSS class (`classMap({hidden: ...})` or `classList.toggle('hidden', ...)`)
+        with `?hidden` (`inspectorCommon.css` already defines
+        `[hidden] { display: none !important; }`).
+    *   **Declarative Default Focus (`autofocus` / `?autofocus`)**: Mark the
+        default focused element with `autofocus` or `?autofocus=${...}` directly
+        in the Lit template instead of collecting elements via `ref(...)`,
+        plumbing focus callbacks through `ViewOutput`, or mutating
+        `element.autofocus` / `setAttribute('autofocus', ...)` imperatively in
+        TypeScript. `UI.Widget.prototype.focus()` queries `[autofocus]`
+        automatically via `getDefaultFocusedElement()`.
+    *   **`<devtools-tree>` & Persistent `<devtools-prompt ?editing>` Patterns**:
+        When rendering `<devtools-tree .template=${html`<ul role="tree">...</ul>`}>`:
+        - Preserve `front_end/ui/legacy/Treeoutline.ts` contracts without
+          widening internal classes or exposing `TreeOutline` getters on the
+          presenter.
+        - Drive selection and expansion declaratively via `?selected`, `?open`,
+          `@select`, and `@expand`.
+        - Do not duplicate `aria-label` on inner prompts when the enclosing
+          `<li role="treeitem">` already labels the row, do not duplicate
+          `class="tree-element-title"` on inner spans (which compounds opacity
+          rules), and return `nothing` for trailing icons when none exist.
+        - Host editable `<devtools-prompt ?editing>` rows in a child `UI.Widget`
+          (`${widget(RowPromptWidget, {...})}`) so `<devtools-tree>`'s
+          `MutationObserver` does not re-clone the row and blur the active input.
+        - Ensure custom elements with state passed via JS properties (`.data`)
+          override `cloneNode(deep)` and reflect dynamic state via DOM
+          attributes so shadow clones stay updated.
+    *   **Light DOM CSS Encapsulation (`@scope`)**:
+        - Verify stylesheets satisfy `@devtools/no-unscoped-light-dom-styles`. Never add files to the `burndown` list in `eslint.config.mjs`; remove the entry from `burndown` once scoped.
+        - Obey `plugin/check_scope_selectors`: never use `:host` inside `@scope` (it is unconditionally forbidden, even with `:scope` or `&`), use `:scope` to style the root container, and use theme-aware design tokens (`--sys-color-*` / `--app-color-*`) instead of ancestor classes like `.theme-with-dark-background` or `:host-context(...)` (which receive an implicit `:scope ` prefix and never match without `:scope` or `&`).
+        - Remove redundant `inspectorCommonStyles` or `textButtonStyles` imports from Light DOM views (`installComponentRootStyles()` already provides them). For other shared stylesheets, wrap inline as `<style>@scope to (devtools-widget > *) { ${styles} }</style>`.
+        - Beware that the `(devtools-widget > *)` lower boundary stops cascading into declarative `<devtools-widget>` children (`${widget(...)}`), but does **not** stop at imperatively attached `childWidget.show(container)` legacy children.
 
 11. **Render Templates Syntax & Code Movement**:
 
@@ -238,4 +280,4 @@ existing element containers.
 5.  ❓ **Split Views**: Does `<devtools-split-view>` have `flex: auto; height: 100%;` CSS and reuse existing split settings?
 6.  ❓ **String Audit**: Did I verify that any removed `UIStrings` weren't from accidentally dropped UI branches?
 7.  ❓ **Build**: Does the code compile and do visual tests pass with 0% diff?
-
+8.  ❓ **CSS @scope Encapsulation**: Are Light DOM styles wrapped in `@scope to (devtools-widget > *)` with `:scope` instead of `:host`, theme-aware `--sys-color-*` tokens instead of theme classes, redundant common styles removed, and no entries added to the ESLint burndown list?

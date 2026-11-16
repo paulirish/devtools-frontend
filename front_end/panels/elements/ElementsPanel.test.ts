@@ -236,8 +236,8 @@ describeWithEnvironment('ElementsPanel', () => {
   it('hides DOM node highlight on search canceled and when navigating search results', async () => {
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     const domModel = target.model(SDK.DOMModel.DOMModel)!;
-    const node1 = sinon.createStubInstance(SDK.DOMModel.DOMNode);
-    const node2 = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+    const node1 = sinon.createStubInstance(SDK.DOMModel.DOMNode, {domModel});
+    const node2 = sinon.createStubInstance(SDK.DOMModel.DOMNode, {domModel});
     sinon.stub(domModel, 'performSearch').resolves(2);
     const searchResultStub = sinon.stub(domModel, 'searchResult');
     searchResultStub.withArgs(0).resolves(node1);
@@ -709,6 +709,50 @@ describeWithEnvironment('ElementsPanel', () => {
     await panel.revealAndSelectNode(whitespaceTextNode, {showPanel: false, highlightInOverlay: false});
 
     assert.strictEqual(panel.selectedDOMNode(), parentDiv);
+    panel.detach();
+  });
+
+  // Regression test for crbug.com/581467760.
+  it('selects and focuses a revealed DOM node when adopted style sheets are present', async () => {
+    const targetDiv = makeElementNode(8, 'DIV', {attributes: ['id', 'target']});
+    connection.setHandler('DOM.getDocument', null);
+    connection.setSuccessHandler(
+        'DOM.getDocument',
+        () => ({
+          root: {
+            nodeId: 1 as Protocol.DOM.NodeId,
+            backendNodeId: 2 as Protocol.DOM.BackendNodeId,
+            nodeType: Node.DOCUMENT_NODE,
+            nodeName: '#document',
+            childNodeCount: 1,
+            adoptedStyleSheets: ['sheet-id' as Protocol.DOM.StyleSheetId],
+            children: [makeElementNode(4, 'HTML', {
+              parentId: 1 as Protocol.DOM.NodeId,
+              children: [makeElementNode(6, 'BODY', {parentId: 4 as Protocol.DOM.NodeId, children: [targetDiv]})],
+            })],
+          },
+        } as Protocol.DOM.GetDocumentResponse));
+
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+    const model = target.model(SDK.DOMModel.DOMModel)!;
+    await model.requestDocument();
+
+    const panel = Elements.ElementsPanel.ElementsPanel.instance({forceNew: true});
+    const viewManager = UI.ViewManager.ViewManager.instance({forceNew: true});
+    sinon.stub(viewManager, 'showView').callsFake(async (_viewId, _userGesture, omitFocus) => {
+      panel.markAsRoot();
+      renderElementIntoDOM(panel);
+      if (!omitFocus) {
+        panel.focus();
+      }
+    });
+
+    const node = model.nodeForId(8 as Protocol.DOM.NodeId)!;
+    assert.exists(node);
+
+    await panel.revealAndSelectNode(node, {showPanel: true, focusNode: true, highlightInOverlay: false});
+    assert.strictEqual(panel.selectedDOMNode(), node);
+
     panel.detach();
   });
 

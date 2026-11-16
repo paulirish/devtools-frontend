@@ -12,7 +12,7 @@ import type * as Platform from '../../../../core/platform/platform.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as Extensions from '../../../../panels/timeline/extensions/extensions.js';
 import {findMenuItemWithLabel} from '../../../../testing/ContextMenuHelpers.js';
-import {assertScreenshot, raf, renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
+import {assertScreenshot, raf, renderElementIntoDOM, setColorScheme} from '../../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
 import {
   allThreadEntriesInTrace,
@@ -30,6 +30,11 @@ import * as ThemeSupport from '../../theme_support/theme_support.js';
 import * as PerfUI from './perf_ui.js';
 
 describeWithEnvironment('FlameChart', () => {
+  afterEach(() => {
+    setColorScheme('light');
+    ThemeSupport.ThemeSupport.clearThemeCache();
+  });
+
   it('sorts decorations, putting candy striping before warning triangles', async () => {
     const decorations: PerfUI.FlameChart.FlameChartDecoration[] = [
       {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE},
@@ -91,9 +96,20 @@ describeWithEnvironment('FlameChart', () => {
     const delegate = new MockFlameChartDelegate();
     chartInstance = new PerfUI.FlameChart.FlameChart(provider, delegate, {canvasVELogContext: 'testing-flamechart'});
     renderChart(chartInstance);
-    const expected = VisualLogging.canvas('testing-flamechart').track({hover: true}).toString();
+    const expected =
+        VisualLogging.canvas('testing-flamechart').track({click: true, drag: true, hover: true}).toString();
     const canvas = chartInstance.contentElement.querySelector('canvas');
     assert.strictEqual(canvas?.getAttribute('jslog'), expected);
+    assert.strictEqual(canvas?.getAttribute('jslog'), 'Canvas; context: testing-flamechart; track: click, drag, hover');
+  });
+
+  it('does not add JSLog attribute to the canvas element when canvasVELogContext is omitted', () => {
+    const provider = new FakeProvider();
+    const delegate = new MockFlameChartDelegate();
+    chartInstance = new PerfUI.FlameChart.FlameChart(provider, delegate);
+    renderChart(chartInstance);
+    const canvas = chartInstance.contentElement.querySelector('canvas');
+    assert.isNull(canvas?.getAttribute('jslog'));
   });
 
   it('notifies the delegate when the window has changed', async () => {
@@ -1474,6 +1490,35 @@ describeWithEnvironment('FlameChart', () => {
     await assertScreenshot('timeline/interactions_track.png');
   });
 
+  it('renders the interactions track in dark mode when selected', async function() {
+    setColorScheme('dark');
+    ThemeSupport.ThemeSupport.clearThemeCache();
+    const {flameChart} = await renderFlameChartIntoDOM(this, {
+      dataProvider: 'MAIN',
+      fileNameOrParsedTrace: 'slow-interaction-button-click.json.gz',
+      filterTracks(trackName) {
+        return trackName.startsWith('Interactions');
+      },
+      expandTracks() {
+        return true;
+      },
+      customStartTime: 337944700 as Trace.Types.Timing.Milli,
+      customEndTime: 337945100 as Trace.Types.Timing.Milli,
+    });
+    // Select the Interactions track via a click inside the track row.
+    const canvas = flameChart.getCanvas();
+    const rect = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new MouseEvent('click', {
+      clientX: rect.left + 100,
+      clientY: rect.top + 35,
+      bubbles: true,
+    }));
+    await raf();
+    // Clicking the canvas focuses it, so blur before taking the screenshot.
+    flameChart.blurCanvasForTesting();
+    await assertScreenshot('timeline/interactions_track_dark_selected.png');
+  });
+
   it('candy stripes long interactions', async function() {
     await renderFlameChartIntoDOM(this, {
       dataProvider: 'MAIN',
@@ -1583,6 +1628,30 @@ describeWithEnvironment('FlameChart', () => {
     flameChart.toggleGroupExpand(0);
     await raf();
     await assertScreenshot('timeline/network_track.png');
+  });
+
+  it('renders the network track in dark mode when selected', async function() {
+    setColorScheme('dark');
+    ThemeSupport.ThemeSupport.clearThemeCache();
+    const {flameChart} = await renderFlameChartIntoDOM(this, {
+      dataProvider: 'NETWORK',
+      fileNameOrParsedTrace: 'web-dev.json.gz',
+      customHeight: 350,
+      customEndTime: 1020035221.509 as Trace.Types.Timing.Milli,
+    });
+    flameChart.toggleGroupExpand(0);
+    await raf();
+    const canvas = flameChart.getCanvas();
+    const rect = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new MouseEvent('click', {
+      clientX: rect.left + 100,
+      clientY: rect.top + 35,
+      bubbles: true,
+    }));
+    await raf();
+    // Clicking the canvas focuses it, so blur before taking the screenshot.
+    flameChart.blurCanvasForTesting();
+    await assertScreenshot('timeline/network_track_dark_selected.png');
   });
 
   it('renders the user timing track', async function() {
@@ -2242,5 +2311,78 @@ describeWithEnvironment('FlameChart', () => {
     const assignedColors = calls.map(c => c.args[0]);
     assert.isTrue(assignedColors.includes('#ff0000'));
     assert.isFalse(assignedColors.includes(''));
+  });
+
+  it('only invokes drawOverride for entries inside the visible viewport', () => {
+    const drawOverrideSpies = [
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 0: off-screen left
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 1: visible
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 2: off-screen right
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 3: off-screen below vertically
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 4: inside collapsed group
+      sinon.spy((_ctx, x, _y, width) => ({x, width})),  // 5: inside hidden group
+    ] as Array<sinon.SinonSpy&PerfUI.FlameChart.DrawOverride>;
+
+    class DrawOverrideViewportProvider extends FakeFlameChartProvider {
+      #timelineData = PerfUI.FlameChart.FlameChartTimelineData.create({
+        // 30 levels in group 0 (each 17px -> level 29 is > 400px tall), 1 in collapsed group 1, 1 in hidden group 2.
+        entryLevels: [0, 0, 0, 29, 30, 31],
+        entryStartTimes: [0, 120, 300, 120, 120, 120],
+        entryTotalTimes: [20, 40, 20, 40, 40, 40],
+        groups:
+            [
+              {
+                name: 'Expanded Group' as Platform.UIString.LocalizedString,
+                startLevel: 0,
+                style: {...defaultGroupStyle, collapsible: PerfUI.FlameChart.GroupCollapsibleState.ALWAYS},
+                expanded: true,
+              },
+              {
+                name: 'Collapsed Group' as Platform.UIString.LocalizedString,
+                startLevel: 30,
+                style: {...defaultGroupStyle, collapsible: PerfUI.FlameChart.GroupCollapsibleState.ALWAYS},
+                expanded: false,
+              },
+              {
+                name: 'Hidden Group' as Platform.UIString.LocalizedString,
+                startLevel: 31,
+                style: {...defaultGroupStyle, collapsible: PerfUI.FlameChart.GroupCollapsibleState.ALWAYS},
+                expanded: true,
+                hidden: true,
+              },
+            ],
+      });
+
+      override maxStackDepth(): number {
+        return 32;
+      }
+
+      getDrawOverride(entryIndex: number): PerfUI.FlameChart.DrawOverride|undefined {
+        return drawOverrideSpies[entryIndex];
+      }
+
+      override timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
+        return this.#timelineData;
+      }
+    }
+
+    const provider = new DrawOverrideViewportProvider();
+    chartInstance = new PerfUI.FlameChart.FlameChart(provider, new MockFlameChartDelegate());
+    renderWidgetInVbox(chartInstance, {width: 1000, height: 150});
+    chartInstance.setWindowTimes(100, 200);
+    chartInstance.update();
+
+    sinon.assert.callCount(drawOverrideSpies[0], 0);
+    sinon.assert.callCount(drawOverrideSpies[1], 1);
+    sinon.assert.callCount(drawOverrideSpies[2], 0);
+    sinon.assert.callCount(drawOverrideSpies[3], 0);
+    sinon.assert.callCount(drawOverrideSpies[4], 0);
+    sinon.assert.callCount(drawOverrideSpies[5], 0);
+
+    // Panning to include entry 0 invokes its drawOverride and skips entry 1.
+    chartInstance.setWindowTimes(0, 100);
+    chartInstance.update();
+    sinon.assert.callCount(drawOverrideSpies[0], 1);
+    sinon.assert.callCount(drawOverrideSpies[1], 1);
   });
 });

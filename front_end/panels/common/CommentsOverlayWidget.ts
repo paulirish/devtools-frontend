@@ -43,7 +43,7 @@ export interface ThreadActions {
  * `hoveredThread`.
  */
 export interface ViewInput extends ThreadActions {
-  pins: Comments.CommentOverlayManager.PinPositionData[];
+  pins: Comments.CommentOverlayManager.PinData[];
   /**
    * Highlight of the currently open thread. Null when no thread is open, so
    * only pins are rendered.
@@ -64,7 +64,7 @@ export interface ViewInput extends ThreadActions {
   onPopupInteract: () => void;
   /** Thread opened by the user (pin click, drawer, or draft). */
   activeThread: CommentManager.CommentManager.CommentThread|null;
-  activePin: Comments.CommentOverlayManager.PinPositionData|null;
+  activePin: Comments.CommentOverlayManager.PinData|null;
   fallbackPosition?: {left: number, top: number}|null;
   title: Title;
   /**
@@ -72,7 +72,7 @@ export interface ViewInput extends ThreadActions {
    * `activeThread`, and never the same thread.
    */
   hoveredThread: CommentManager.CommentManager.CommentThread|null;
-  hoveredPin: Comments.CommentOverlayManager.PinPositionData|null;
+  hoveredPin: Comments.CommentOverlayManager.PinData|null;
   hoveredHighlight: Comments.CommentOverlayManager.HighlightRectData|null;
   hoveredTitle: Title;
   hoveredActions: ThreadActions;
@@ -186,7 +186,12 @@ const DEFAULT_VIEW: View = (input: ViewInput, _output: undefined, target: HTMLEl
             @click=${() => input.onPinClick(p.id)}
             @mouseenter=${() => input.onPinMouseEnter(p.id)}
             @mouseleave=${input.onPinMouseLeave}>
-            <div class="comment-cursor"></div>
+            <div
+              class=${classMap({
+                'comment-cursor': true,
+                resolved: p.resolved,
+              })}>
+            </div>
           </div>
         `,
       )}
@@ -368,8 +373,6 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
   override willHide(): void {
     this.#clearCloseTimeout();
     this.#clearHover();
-    this.#removeDocumentListeners();
-    this.#commentOverlayManager.stop();
     this.#commentOverlayManager.removeEventListener(
         Comments.CommentOverlayManager.Events.POSITIONS_UPDATED,
         this.#onPositionsUpdated,
@@ -396,6 +399,9 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
         this.#onAgentAttachedChanged,
         this,
     );
+    this.#commentOverlayManager.stop();
+    this.#syncActiveThreadFromManager();
+    this.#removeDocumentListeners();
 
     super.willHide();
   }
@@ -497,7 +503,8 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
     } else if (this.#activeThreadId && !this.#commentManager.getCommentThread(this.#activeThreadId)) {
       this.#setActiveThreadId(null);
     }
-    if (this.#hoveredThreadId && !this.#commentManager.getCommentThread(this.#hoveredThreadId)) {
+    const hoveredThread = this.#getThread(this.#hoveredThreadId);
+    if (this.#hoveredThreadId && (!hoveredThread || hoveredThread.status === 'RESOLVED')) {
       this.#clearHover();
     }
   }
@@ -682,10 +689,10 @@ export class CommentsOverlayWidget extends UI.Widget.Widget {
       hoveredThread: CommentManager.CommentManager.CommentThread|null,
       hoveredTitle: Title,
       ): void {
-    const pins = this.#commentOverlayManager.getPinPositions();
-    const findPin =
-        (thread: CommentManager.CommentManager.CommentThread|null): Comments.CommentOverlayManager.PinPositionData|
-        null => thread ? pins.find(p => p.id === thread.id) ?? null : null;
+    const pins = this.#commentOverlayManager.getPinPositions().map(
+        pin => !pin.visible && pin.id === activeThread?.id ? {...pin, visible: true} : pin);
+    const findPin = (thread: CommentManager.CommentManager.CommentThread|null): Comments.CommentOverlayManager.PinData|
+                    null => thread ? pins.find(p => p.id === thread.id) ?? null : null;
     const findHighlight =
         (thread: CommentManager.CommentManager.CommentThread|null): Comments.CommentOverlayManager.HighlightRectData|
         null => thread ? this.#commentOverlayManager.getHighlight(thread.id) ?? null : null;
@@ -786,7 +793,7 @@ export class ThreadRevealer implements Common.Revealer.Revealer<CommentManager.C
   async reveal({thread, position}: CommentManager.CommentThread.RevealableThread): Promise<void> {
     const panelId = Comments.CommentAnchorResolver.extractPanelId(thread.anchor.vePath);
     if (panelId && UI.InspectorView.InspectorView.instance().hasPanel(panelId)) {
-      await UI.InspectorView.InspectorView.instance().showPanel(panelId);
+      await UI.ViewManager.ViewManager.instance().showView(panelId, true, true);
     }
 
     const element = Comments.CommentAnchorResolver.rematchCommentAnchor(thread);

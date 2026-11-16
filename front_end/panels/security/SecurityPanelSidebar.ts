@@ -5,7 +5,6 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Protocol from '../../generated/protocol.js';
-import type {Icon} from '../../ui/kit/kit.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {Directives, html, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
 
@@ -54,23 +53,18 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface ViewInput {
   mainOrigin: string|null;
-  origins: Map<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState>;
+  origins: ReadonlyMap<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState>;
   originsHidden: boolean;
   showOriginsUnconditionally: boolean;
   overviewSecurityState: Protocol.Security.SecurityState;
   selectedElementId: string;
-}
-
-export interface ViewOutput {
   onElementSelected: (id: string) => void;
   onShowOrigin: (origin: Platform.DevToolsPath.UrlString|null) => void;
 }
 
-export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+export type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
-export const DEFAULT_VIEW: View = (input, output, target) => {
-  const renderIcon = (icon: Icon): TemplateResult => html`${icon}`;
-
+export const DEFAULT_VIEW: View = (input, _output, target) => {
   const renderOrigin =
       (origin: Platform.DevToolsPath.UrlString, state: Protocol.Security.SecurityState): TemplateResult => {
         const icon = getSecurityStateIconForDetailedView(state, `security-property security-property-${state}`);
@@ -82,10 +76,10 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
               title=${origin}
               ?selected=${selected}
               @click=${() => {
-                output.onElementSelected(origin);
-                output.onShowOrigin(origin);
+                input.onElementSelected(origin);
+                input.onShowOrigin(origin);
               }}>
-            ${renderIcon(icon)}
+            ${icon}
             ${renderHighlightedUrl(origin, state)}
           </li>
         `;
@@ -105,7 +99,8 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     }
   };
 
-  const getGroupIcon = (group: OriginGroup, mainOriginState: Protocol.Security.SecurityState|null): Icon|null => {
+  const getGroupIcon = (group: OriginGroup,
+                        mainOriginState: Protocol.Security.SecurityState|null): TemplateResult|null => {
     switch (group) {
       case OriginGroup.MainOrigin:
         return mainOriginState ?
@@ -162,7 +157,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
     // clang-format off
     return html`
       <li role="treeitem" class="security-sidebar-origins" open ?hidden=${isHidden}>
-        ${icon ? renderIcon(icon) : nothing}
+        ${icon ?? nothing}
         <span class="security-sidebar-origins-title">${title}</span>
         <ul role="group" aria-label=${title}>
           ${showReloadMessage ? html`
@@ -179,7 +174,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
 
   // clang-format off
   render(html`
-    <devtools-tree class="security-sidebar" navigation-variant .template=${html`
+    <devtools-tree class="security-sidebar" autofocus navigation-variant .template=${html`
       <style>${sidebarStyles}</style>
       <style>${lockIconStyles}</style>
       <ul role="tree">
@@ -191,10 +186,10 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
                 title=${i18nString(UIStrings.overview)}
                 ?selected=${input.selectedElementId === 'overview'}
                 @click=${() => {
-                  output.onElementSelected('overview');
-                  output.onShowOrigin(null);
+                  input.onElementSelected('overview');
+                  input.onShowOrigin(null);
                 }}>
-              ${renderIcon(overviewIcon)}
+              ${overviewIcon}
               <span title=${i18nString(UIStrings.overview)}>${i18nString(UIStrings.overview)}</span>
             </li>
             ${Object.values(OriginGroup).map(group => renderGroup(group))}
@@ -208,7 +203,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
 
 export class SecurityPanelSidebar extends UI.Widget.VBox {
   #mainOrigin: string|null = null;
-  #origins = new Map<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState>();
+  #origins: ReadonlyMap<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState> = new Map();
   #originsHidden = false;
   #showOriginsUnconditionally = false;
   #overviewSecurityState = Protocol.Security.SecurityState.Unknown;
@@ -219,10 +214,15 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
   constructor(element?: HTMLElement, view: View = DEFAULT_VIEW) {
     super(element);
     this.#view = view;
+    this.setMinimumSize(100, 25);
   }
 
-  set onShowOrigin(callback: (origin: Platform.DevToolsPath.UrlString|null) => void) {
+  set onShowOrigin(callback: ((origin: Platform.DevToolsPath.UrlString|null) => void)|undefined) {
     this.#onShowOrigin = callback;
+  }
+
+  get onShowOrigin(): ((origin: Platform.DevToolsPath.UrlString|null) => void)|undefined {
+    return this.#onShowOrigin;
   }
 
   override wasShown(): void {
@@ -230,24 +230,10 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
     this.requestUpdate();
   }
 
-  showOverview(): void {
-    this.#selectedElementId = 'overview';
-    this.requestUpdate();
-    this.#onShowOrigin?.(null);
-  }
-
-  toggleOriginsList(hidden: boolean): void {
-    this.#originsHidden = hidden;
-    this.#showOriginsUnconditionally = !hidden;
-    this.requestUpdate();
-  }
-
-  addOrigin(origin: Platform.DevToolsPath.UrlString, securityState: Protocol.Security.SecurityState): void {
-    this.#origins.set(origin, securityState);
-    this.requestUpdate();
-  }
-
-  setMainOrigin(origin: string): void {
+  set mainOrigin(origin: string|null) {
+    if (this.#mainOrigin === origin) {
+      return;
+    }
     this.#mainOrigin = origin;
     this.requestUpdate();
   }
@@ -256,29 +242,65 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
     return this.#mainOrigin;
   }
 
-  updateOrigin(origin: Platform.DevToolsPath.UrlString, securityState: Protocol.Security.SecurityState): void {
-    this.#origins.set(origin, securityState);
+  set origins(origins: ReadonlyMap<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState>) {
+    if (this.#origins === origins) {
+      return;
+    }
+    this.#origins = origins;
     this.requestUpdate();
   }
 
-  updateOverviewSecurityState(securityState: Protocol.Security.SecurityState): void {
-    this.#overviewSecurityState = securityState;
+  get origins(): ReadonlyMap<Platform.DevToolsPath.UrlString, Protocol.Security.SecurityState> {
+    return this.#origins;
+  }
+
+  set originsHidden(originsHidden: boolean) {
+    if (this.#originsHidden === originsHidden) {
+      return;
+    }
+    this.#originsHidden = originsHidden;
     this.requestUpdate();
   }
 
-  clearOrigins(): void {
-    this.#origins.clear();
+  get originsHidden(): boolean {
+    return this.#originsHidden;
+  }
+
+  set showOriginsUnconditionally(showOriginsUnconditionally: boolean) {
+    if (this.#showOriginsUnconditionally === showOriginsUnconditionally) {
+      return;
+    }
+    this.#showOriginsUnconditionally = showOriginsUnconditionally;
     this.requestUpdate();
   }
 
-  set selectedOrigin(origin: Platform.DevToolsPath.UrlString|null) {
-    this.#selectedElementId = origin ?? 'overview';
-    this.requestUpdate();
-    this.#onShowOrigin?.(origin);
+  get showOriginsUnconditionally(): boolean {
+    return this.#showOriginsUnconditionally;
   }
 
-  get selectedOrigin(): string {
-    return this.#selectedElementId;
+  set overviewSecurityState(overviewSecurityState: Protocol.Security.SecurityState) {
+    if (this.#overviewSecurityState === overviewSecurityState) {
+      return;
+    }
+    this.#overviewSecurityState = overviewSecurityState;
+    this.requestUpdate();
+  }
+
+  get overviewSecurityState(): Protocol.Security.SecurityState {
+    return this.#overviewSecurityState;
+  }
+
+  set activeOrigin(origin: Platform.DevToolsPath.UrlString|null) {
+    const elementId = origin ?? 'overview';
+    if (this.#selectedElementId === elementId) {
+      return;
+    }
+    this.#selectedElementId = elementId;
+    this.requestUpdate();
+  }
+
+  get activeOrigin(): Platform.DevToolsPath.UrlString|null {
+    return this.#selectedElementId === 'overview' ? null : this.#selectedElementId as Platform.DevToolsPath.UrlString;
   }
 
   override performUpdate(): void {
@@ -289,8 +311,6 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
       showOriginsUnconditionally: this.#showOriginsUnconditionally,
       overviewSecurityState: this.#overviewSecurityState,
       selectedElementId: this.#selectedElementId,
-    };
-    const output: ViewOutput = {
       onElementSelected: (id: string) => {
         this.#selectedElementId = id;
         this.requestUpdate();
@@ -299,6 +319,6 @@ export class SecurityPanelSidebar extends UI.Widget.VBox {
         this.#onShowOrigin?.(origin);
       },
     };
-    this.#view(input, output, this.contentElement);
+    this.#view(input, undefined, this.contentElement);
   }
 }

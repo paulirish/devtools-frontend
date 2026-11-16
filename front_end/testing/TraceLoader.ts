@@ -12,6 +12,13 @@ import * as Trace from '../models/trace/trace.js';
 import type * as Timeline from '../panels/timeline/timeline.js';
 import * as TraceBounds from '../services/trace_bounds/trace_bounds.js';
 
+// Capture native timers and Promise before Sinon fake timers or TrackAsyncOperations
+// install test-time stubs so diagnostic timeouts in wrapInTimeout are neither
+// fast-forwarded by checkForPendingActivity/fake timers nor reported as leaked activity.
+const nativeSetTimeout = globalThis.setTimeout.bind(globalThis);
+const nativeClearTimeout = globalThis.clearTimeout.bind(globalThis);
+const NativePromise = globalThis.Promise;
+
 // We maintain two caches:
 // 1. The file contents JSON.parsed for a given trace file.
 // 2. The trace engine models for a given file (used by the traceEngine function)
@@ -248,12 +255,17 @@ export class TraceLoader {
         .resetWithNewBounds(parsedTrace.data.Meta.traceBounds);
   }
 
-  static async executeTraceEngineOnFileContents(
-      contents: Trace.Types.File.Contents, emulateFreshRecording = false,
-      traceEngineConfig?: Trace.Types.Configuration.Configuration): Promise<ParsedTraceAndModel> {
+  static async executeTraceEngineOnFileContents(contents: Trace.Types.File.Contents|Protocol.Profiler.Profile,
+                                                emulateFreshRecording = false,
+                                                traceEngineConfig?: Trace.Types.Configuration.Configuration):
+      Promise<ParsedTraceAndModel> {
     i18n.DevToolsLocale.DevToolsLocale.instance();
-    const events = 'traceEvents' in contents ? contents.traceEvents : contents;
-    const metadata = 'metadata' in contents ? contents.metadata : {};
+    const normalizedContents = 'nodes' in contents ?
+        Trace.Helpers.SamplesIntegrator.SamplesIntegrator.createFakeTraceFromCpuProfile(
+            contents, Trace.Types.Events.ThreadID(1)) :
+        contents;
+    const events = 'traceEvents' in normalizedContents ? normalizedContents.traceEvents : normalizedContents;
+    const metadata = 'metadata' in normalizedContents ? normalizedContents.metadata : {};
     return await new Promise((resolve, reject) => {
       const model = Trace.TraceModel.Model.createWithAllHandlers(traceEngineConfig);
       model.addEventListener(Trace.TraceModel.ModelUpdateEvent.eventName, (event: Event) => {
@@ -297,7 +309,10 @@ export class TraceLoader {
               return null;
             },
           })
-          .catch(e => console.error(e));
+          .catch(e => {
+            console.error(e);
+            reject(e);
+          });
     });
   }
 
@@ -354,8 +369,8 @@ export async function fetchFileAsText(url: URL): Promise<string> {
 async function wrapInTimeout<T>(
     mochaContext: Mocha.Context|Mocha.Suite|null, callback: () => Promise<T>| T, timeoutMs: number,
     stepName: string): Promise<T> {
-  const timeout = Promise.withResolvers<void>();
-  const timeoutId = setTimeout(() => {
+  const timeout = NativePromise.withResolvers<void>();
+  const timeoutId = nativeSetTimeout(() => {
     let testTitle = '(unknown test)';
     if (mochaContext) {
       try {
@@ -377,13 +392,13 @@ async function wrapInTimeout<T>(
 
   // Race the original promise against the timeout promise
   try {
-    const cbResult = await Promise.race([callback(), timeout.promise]);
+    const cbResult = await NativePromise.race([callback(), timeout.promise]);
     timeout.resolve();
     return cbResult as T;
   } finally {
     // Clear the timeout if the original promise resolves/rejects,
     // or if the timeout promise wins the race.
-    clearTimeout(timeoutId);
+    nativeClearTimeout(timeoutId);
   }
 }
 

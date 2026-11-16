@@ -38,6 +38,10 @@ const tests = [
 ];
 
 function* reporters() {
+  if (TestConfig.dryRun) {
+    yield 'exact-test-id';
+    return;
+  }
   yield 'test-expectations';
   yield 'browser-artifact';
   if (ResultsDb.available()) {
@@ -267,7 +271,19 @@ const ProgressWithDiffReporter = function(
     this: any, formatError: unknown, reportSlow: unknown, useColors: unknown, browserConsoleLogOptions: unknown) {
   BaseProgressReporter.call(this, formatError, reportSlow, useColors, browserConsoleLogOptions);
 
+  let reReportedCount = 0;
+  const baseOnBrowserStart = this.onBrowserStart;
+  this.onBrowserStart = function(this: any) {
+    reReportedCount = 0;
+    if (baseOnBrowserStart) {
+      baseOnBrowserStart.apply(this, arguments);
+    }
+  };
+
   const onSpecComplete = (result: any) => {
+    if (result.mocha?.reReported) {
+      reReportedCount++;
+    }
     if (result.mocha?.hasExclusiveTests) {
       this.hasExclusiveTests = true;
     }
@@ -325,10 +341,12 @@ const ProgressWithDiffReporter = function(
       baseOnRunComplete.apply(this, arguments);
     }
 
+    // `reReportedCount` assumes a single browser is configured in `options.browsers`.
     browsers.forEach((browser: any) => {
       const {total, success, failed, skipped} = browser.lastResult;
-      if (total !== success + failed + skipped && !this.hasExclusiveTests && !TestConfig.bail) {
-        throw new Error(`Karma exited early: executed ${success + failed + skipped} out of ${total} tests`);
+      const executed = success + failed + skipped - reReportedCount;
+      if (total !== executed && !this.hasExclusiveTests && !TestConfig.bail) {
+        throw new Error(`Karma exited early: executed ${executed} out of ${total} tests`);
       }
     });
     // eslint-disable-next-line no-console
@@ -540,9 +558,13 @@ export default function(config: any): void {
   }
   const options = {
     basePath: CHECKOUT_ROOT,
+    // Bind and connect explicitly over IPv4 loopback to avoid IPv6 (::1) -> IPv4
+    // connection fallback delays when Chrome resolves `localhost` on Windows/macOS.
+    listenAddress: '127.0.0.1',
+    hostname: '127.0.0.1',
     logLevel,
     autoWatchBatchDelay: 1000,
-    failOnEmptyTestSuite: false,
+    failOnEmptyTestSuite: TestConfig.dryRun,
 
     customContextFile: path.join(GEN_DIR, 'test/unit/context.html'),
     customDebugFile: path.join(GEN_DIR, 'test/unit/debug.html'),
@@ -689,6 +711,9 @@ export default function(config: any): void {
 
     reporters: [...reporters()],
 
+    // Reporters (ProgressWithDiffReporter, ResultsDBReporter, ScreenshotError) assume
+    // a single browser instance (e.g. a single `reReportedCount` counter). If multiple
+    // browsers are ever configured here, update per-run state to be tracked per browser.
     browsers: ['BrowserWithArgs'],
     customLaunchers: {
       BrowserWithArgs: {
@@ -701,6 +726,7 @@ export default function(config: any): void {
       captureConsole: true,
       mocha: {
         ...TestConfig.mochaGrep,
+        dryRun: TestConfig.dryRun,
         bail: TestConfig.bail,
         retries: TestConfig.retries,
         timeout: TestConfig.debug ? 0 : 5_000,
@@ -710,7 +736,7 @@ export default function(config: any): void {
       pathSeparator: path.sep,
       testIds: TestConfig.tests.filter(t => TEST_ID_REGEX.test(t)),
       repetitions: TestConfig.repetitions,
-      skippedTests: getSkippedTests(),
+      skippedTests: TestConfig.dryRun ? [] : getSkippedTests(),
     },
 
     browserConsoleLogOptions: {

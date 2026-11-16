@@ -25,15 +25,10 @@ export default defineConfig([
     'out/',
     // Don't include third party code
     'third_party/',
+    'for_agents/',
 
     'front_end/diff/diff_match_patch.js',
     'front_end/models/javascript_metadata/NativeFunctions.ts',
-    // All of these scripts are auto-generated so don't lint them.
-    'front_end/generated/Deprecation.ts',
-    'front_end/generated/InspectorBackendCommands.ts',
-    'front_end/generated/protocol-mapping.d.ts',
-    'front_end/generated/protocol-proxy-api.d.ts',
-    'front_end/generated/protocol.ts',
     // Any third_party addition has its source code checked out into
     // third_party/X/package, so we ignore that code as it's not code we author or
     // own.
@@ -741,6 +736,7 @@ export default defineConfig([
       'front_end/**/*.docs.ts',
       'test/**/*.ts',
       '**/testing/*.ts',
+      'scripts/build/tests/**/*.ts',
       'scripts/eslint_rules/tests/**/*',
       'scripts/gn_deps_verifier/tests/**/*',
       'extensions/cxx_debugging/e2e/**/*.ts',
@@ -817,6 +813,19 @@ export default defineConfig([
     },
   },
   {
+    name: 'JavaScript script test files',
+    // The 'TypeScript test files' rules need type information, so JS tests
+    // only get the mocha rules. Missing mocha imports fail at runtime (see
+    // test/scripts/run_mocha.ts).
+    files: ['scripts/build/tests/**/*.js'],
+    rules: {
+      'mocha/no-exclusive-tests': 'error',
+      'mocha/no-async-describe': 'error',
+      'mocha/no-global-tests': 'error',
+      'mocha/no-nested-tests': 'error',
+    },
+  },
+  {
     name: 'API test files',
     files: ['**/*.test.api.ts'],
     rules: {
@@ -839,6 +848,103 @@ export default defineConfig([
       '@devtools/prefer-private-class-members': 'error',
     },
   },
+  {
+    name: 'Enforce scoped light DOM styles rule',
+    files: [
+      'front_end/**/*.ts',
+    ],
+    ignores: [
+      'front_end/**/*.test.ts',
+      'front_end/**/*.test.api.ts',
+      'front_end/**/*.docs.ts',
+      'front_end/testing/**',
+      'front_end/third_party/**',
+    ],
+
+    rules: {
+      '@devtools/no-unscoped-light-dom-styles': [
+        'error',
+        {
+          // Burndown list of Light DOM widgets with unscoped styles. Do NOT add files to this list.
+          // New Light DOM widgets must wrap their styles in '@scope' (see docs/ui_engineering.md#styling).
+          burndown: [
+            'front_end/entrypoints/node_app/app/NodeConnectionsPanel.ts',
+            'front_end/panels/accessibility/AccessibilityNodeView.ts',
+            'front_end/panels/ai_assistance/AiAssistancePanel.ts',
+            'front_end/panels/ai_assistance/components/ChatInput.ts',
+            'front_end/panels/ai_assistance/components/RelevantDataDisclaimer.ts',
+            'front_end/panels/application/BackgroundServiceView.ts',
+            'front_end/panels/application/CrashReportContextView.ts',
+            'front_end/panels/application/DeviceBoundSessionsView.ts',
+            'front_end/panels/application/IndexedDBViews.ts',
+            'front_end/panels/application/KeyValueStorageItemsView.ts',
+            'front_end/panels/application/ResourcesPanel.ts',
+            'front_end/panels/application/ServiceWorkerCacheViews.ts',
+            'front_end/panels/application/ServiceWorkersView.ts',
+            'front_end/panels/application/WebMCPView.ts',
+            'front_end/panels/application/components/ProtocolHandlersView.ts',
+            'front_end/panels/changes/CombinedDiffView.ts',
+            'front_end/panels/console/ConsolePinPane.ts',
+            'front_end/panels/console/ConsolePrompt.ts',
+            'front_end/panels/console/ConsoleView.ts',
+            'front_end/panels/css_overview/CSSOverviewProcessingView.ts',
+            'front_end/panels/elements/AccessibilityTreeView.ts',
+            'front_end/panels/elements/ElementsPanel.ts',
+            'front_end/panels/elements/LayersWidget.ts',
+            'front_end/panels/event_listeners/EventListenersView.ts',
+            'front_end/panels/layer_viewer/Layers3DView.ts',
+            'front_end/panels/lighthouse/LighthousePanel.ts',
+            'front_end/panels/linear_memory_inspector/components/LinearMemoryNavigator.ts',
+            'front_end/panels/linear_memory_inspector/components/ValueInterpreterDisplay.ts',
+            'front_end/panels/media/EventDisplayTable.ts',
+            'front_end/panels/media/PlayerMessagesView.ts',
+            'front_end/panels/media/PlayerPropertiesView.ts',
+            'front_end/panels/network/NetworkPanel.ts',
+            'front_end/panels/network/NetworkWaterfallColumn.ts',
+            'front_end/panels/network/RequestDeviceBoundSessionsView.ts',
+            'front_end/panels/network/RequestHeadersView.ts',
+            'front_end/panels/network/RequestPayloadView.ts',
+            'front_end/panels/network/RequestTimingView.ts',
+            'front_end/panels/profiler/HeapProfileView.ts',
+            'front_end/panels/profiler/ProfileLauncherView.ts',
+            'front_end/panels/profiler/ProfilesPanel.ts',
+            'front_end/panels/settings/emulation/DevicesSettingsTab.ts',
+            'front_end/panels/settings/emulation/components/UserAgentClientHintsForm.ts',
+            'front_end/panels/sources/FilteredUISourceCodeListProvider.ts',
+            'front_end/panels/sources/SourcesNavigator.ts',
+            'front_end/panels/sources/SourcesPanel.ts',
+            'front_end/panels/sources/ThreadsSidebarPane.ts',
+            'front_end/panels/sources/UISourceCodeFrame.ts',
+            'front_end/panels/timeline/ThirdPartyTreeView.ts',
+            'front_end/panels/timeline/TimelineFlameChartDataProvider.ts',
+            'front_end/panels/timeline/TimelineFlameChartView.ts',
+            'front_end/panels/timeline/TimelineMiniMap.ts',
+            'front_end/panels/timeline/TimelinePaintProfilerView.ts',
+            'front_end/panels/timeline/TimelinePanel.ts',
+            'front_end/panels/timeline/TimelineSelectorStatsView.ts',
+            'front_end/panels/timeline/TimelineTreeView.ts',
+            'front_end/panels/webauthn/WebauthnPane.ts',
+            'front_end/ui/components/dialogs/FreDialog.ts',
+            'front_end/ui/components/text_editor/AiCodeGenerationUpgradeDialog.ts',
+            'front_end/ui/legacy/FilterBar.ts',
+            'front_end/ui/legacy/RootView.ts',
+            'front_end/ui/legacy/components/cookie_table/CookiesTable.ts',
+            'front_end/ui/legacy/components/data_grid/DataGrid.ts',
+            'front_end/ui/legacy/components/inline_editor/CSSAngle.ts',
+            'front_end/ui/legacy/components/inline_editor/LinkSwatch.ts',
+            'front_end/ui/legacy/components/object_ui/ObjectPropertiesSection.ts',
+            'front_end/ui/legacy/components/perf_ui/ChartViewport.ts',
+            'front_end/ui/legacy/components/perf_ui/OverviewGrid.ts',
+            'front_end/ui/legacy/components/perf_ui/TimelineGrid.ts',
+            'front_end/ui/legacy/components/source_frame/FontView.ts',
+            'front_end/ui/legacy/components/source_frame/JSONView.ts',
+            'front_end/ui/legacy/components/source_frame/XMLView.ts',
+          ],
+        },
+      ],
+    },
+  },
+
   {
     name: 'Ignore private class members rule',
     // The list below is an explicit burndown list of legacy files that have not
@@ -1003,7 +1109,6 @@ export default defineConfig([
       'front_end/panels/network/EventSourceMessagesView.ts',
       'front_end/panels/network/NetworkDataGridNode.ts',
       'front_end/panels/network/NetworkFrameGrouper.ts',
-      'front_end/panels/network/NetworkLogView.ts',
       'front_end/panels/network/NetworkLogViewColumns.ts',
       'front_end/panels/network/NetworkManageCustomHeadersView.ts',
       'front_end/panels/network/NetworkOverview.ts',
@@ -1021,7 +1126,6 @@ export default defineConfig([
       'front_end/panels/screencast/InputModel.ts',
       'front_end/panels/screencast/ScreencastView.ts',
       'front_end/panels/security/SecurityModel.ts',
-      'front_end/panels/security/SecurityPanel.ts',
       'front_end/panels/sensors/LocationsSettingsTab.ts',
       'front_end/panels/sensors/SensorsView.ts',
       'front_end/panels/settings/FrameworkIgnoreListSettingsTab.ts',
@@ -1039,7 +1143,6 @@ export default defineConfig([
       'front_end/panels/sources/EditingLocationHistoryManager.ts',
       'front_end/panels/sources/FilePathScoreFunction.ts',
       'front_end/panels/sources/FilteredUISourceCodeListProvider.ts',
-      'front_end/panels/sources/NavigatorView.ts',
       'front_end/panels/sources/OutlineQuickOpen.ts',
       'front_end/panels/sources/SourcesPanel.ts',
       'front_end/panels/sources/SourcesSearchScope.ts',
@@ -1053,7 +1156,6 @@ export default defineConfig([
       'front_end/panels/timeline/TimelineEventOverview.ts',
       'front_end/panels/timeline/TimelineFlameChartDataProvider.ts',
       'front_end/panels/timeline/TimelineFlameChartView.ts',
-      'front_end/panels/timeline/TimelineHistoryManager.ts',
       'front_end/panels/timeline/TimelineLayersView.ts',
       'front_end/panels/timeline/TimelineLoader.ts',
       'front_end/panels/timeline/TimelinePaintProfilerView.ts',
@@ -1082,7 +1184,6 @@ export default defineConfig([
       'front_end/ui/legacy/FilterBar.ts',
       'front_end/ui/legacy/FilterSuggestionBuilder.ts',
       'front_end/ui/legacy/GlassPane.ts',
-      'front_end/ui/legacy/Infobar.ts',
       'front_end/ui/legacy/InplaceEditor.ts',
       'front_end/ui/legacy/InspectorView.ts',
       'front_end/ui/legacy/ListControl.ts',
@@ -1151,13 +1252,6 @@ export default defineConfig([
     ],
     rules: {
       '@devtools/prefer-private-class-members': 'off',
-    },
-  },
-  {
-    name: 'Supported CSS properties rules',
-    files: ['front_end/generated/SupportedCSSProperties.ts'],
-    rules: {
-      '@devtools/jslog-context-list': 'error',
     },
   },
   {

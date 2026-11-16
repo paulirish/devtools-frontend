@@ -393,21 +393,23 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
  * addressed via `scopeNumber` and matched against source map scopes. In the legacy view we
  * hide scopes that have nothing to show, except for the frame's own function/module scope.
  */
-function shouldIgnoreScope(scope: SDK.DebuggerModel.Scope): boolean {
+function shouldIgnoreScope(scope: SDK.DebuggerModel.Scope, hasLocalScope: boolean): boolean {
   const type = scope.type();
   if (type === Protocol.Debugger.ScopeType.Local) {
     return false;
   }
   // When paused at the top-level of a module there is no `Local` scope and the `Module`
   // scope is the frame's own scope (V8's `InInnerScope()`).
-  if (type === Protocol.Debugger.ScopeType.Module && scope.callFrame().localScope() === null) {
+  if (type === Protocol.Debugger.ScopeType.Module && !hasLocalScope) {
     return false;
   }
   return scope.emptyReason() !== undefined;
 }
 
-function visibleScopeChain(callFrame: SDK.DebuggerModel.CallFrame): SDK.DebuggerModel.Scope[] {
-  return callFrame.scopeChain().filter(scope => !shouldIgnoreScope(scope));
+async function visibleScopeChain(callFrame: SDK.DebuggerModel.CallFrame): Promise<SDK.DebuggerModel.Scope[]> {
+  const scopeChain = await callFrame.scopeChain();
+  const hasLocalScope = scopeChain.some(scope => scope.type() === Protocol.Debugger.ScopeType.Local);
+  return scopeChain.filter(scope => !shouldIgnoreScope(scope, hasLocalScope));
 }
 
 export const resolveScopeChain =
@@ -426,18 +428,18 @@ export const resolveScopeChain =
             if (!sourceMap && callFrame.debuggerModel?.sourceMapManager) {
               sourceMap = await callFrame.debuggerModel.sourceMapManager().sourceMapForClientPromise(callFrame.script);
             }
-            const mappedScopeChain = sourceMap?.resolveScopeChain(callFrame);
+            const mappedScopeChain = sourceMap?.resolveScopeChain(callFrame, await callFrame.scopeChain());
             if (mappedScopeChain) {
               return mappedScopeChain;
             }
           }
 
           if (callFrame.script.isWasm()) {
-            return callFrame.scopeChain();
+            return await callFrame.scopeChain();
           }
           const thisObject = await resolveThisObject(callFrame, debuggerWorkspaceBinding);
-          return visibleScopeChain(callFrame).map(
-              scope => new ScopeWithSourceMappedVariables(scope, thisObject, debuggerWorkspaceBinding));
+          return (await visibleScopeChain(callFrame))
+              .map(scope => new ScopeWithSourceMappedVariables(scope, thisObject, debuggerWorkspaceBinding));
         };
 
 /**
@@ -496,7 +498,7 @@ export const allVariablesInCallFrame = async(
         }
       }
 
-      const scopeChain = visibleScopeChain(callFrame);
+      const scopeChain = await visibleScopeChain(callFrame);
       const resolvedScopes =
           await Promise.all(scopeChain.map(scope => resolveDebuggerScope(scope, debuggerWorkspaceBinding)));
       const result = resolvedScopes.map(toScopeVariableMapping);
@@ -553,7 +555,7 @@ export const resolveThisObject = async(
     callFrame: SDK.DebuggerModel.CallFrame,
     debuggerWorkspaceBinding:
         Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding): Promise<SDK.RemoteObject.RemoteObject|null> => {
-  const innermostScope = callFrame.scopeChain().find(scope => !shouldIgnoreScope(scope));
+  const innermostScope = (await visibleScopeChain(callFrame)).at(0);
   if (!innermostScope) {
     return callFrame.thisObject();
   }

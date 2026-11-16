@@ -16,6 +16,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {getAxeViolations} from '../../testing/AxeHelpers.js';
 import {findMenuItemWithLabel, getContextMenuForElement, getMenuItemLabels} from '../../testing/ContextMenuHelpers.js';
 import {assertScreenshot, dispatchPasteEvent, doubleRaf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {
@@ -56,7 +57,9 @@ describeWithEnvironment('ConsoleView', () => {
     consoleView = Console.ConsoleView.ConsoleView.instance({forceNew: true, viewportThrottlerTimeout: 0});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await UI.Widget.Widget.allUpdatesComplete;
+    await doubleRaf();
     consoleView.dispose();
     Console.ConsoleView.ConsoleView.clearConsoleViewInstanceForTest();
     consoleView.detach();
@@ -224,7 +227,7 @@ describeWithEnvironment('ConsoleView', () => {
     assert.isTrue(fileManager.append.calledOnceWith(FILENAME, sinon.match('message 1\nmessage 2\n')));
   });
 
-  it('can copy to clipboard', async () => {
+  it('can copy all messages to clipboard', async () => {
     const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const target = createTarget({parentTarget: tabTarget});
@@ -237,7 +240,7 @@ describeWithEnvironment('ConsoleView', () => {
     assert.exists(messagesElement);
 
     const contextMenu = getContextMenuForElement(messagesElement);
-    const copy = findMenuItemWithLabel(contextMenu.saveSection(), 'Copy console');
+    const copy = findMenuItemWithLabel(contextMenu.saveSection(), 'Copy all messages');
     assert.exists(copy);
 
     const copyText = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'copyText').resolves();
@@ -246,6 +249,75 @@ describeWithEnvironment('ConsoleView', () => {
     sinon.assert.callCount(copyText, 1);
     assert.deepEqual(copyText.lastCall.args, ['message 1\nmessage 2\n']);
     copyText.resetHistory();
+  });
+
+  it('can copy the right-clicked message to clipboard', async () => {
+    // Identical consecutive messages are only collapsed with "Group similar messages" on.
+    Common.Settings.Settings.instance()
+        .resolve(Settings.ConsoleSettings.consoleGroupSimilarSettingDescriptor)
+        .set(true);
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
+    createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+    const target = createTarget({parentTarget: tabTarget});
+
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assert.exists(consoleModel);
+    consoleModel.addMessage(createConsoleMessage(target, 'message 1'));
+    consoleModel.addMessage(createConsoleMessage(target, 'message 2'));
+    consoleModel.addMessage(createConsoleMessage(target, 'message 2'));
+    await consoleView.getScheduledRefreshPromiseForTest();
+    const messagesElement = consoleView.element.querySelector('#console-messages');
+    assert.exists(messagesElement);
+    const secondMessage = consoleView.itemElement(1) as Console.ConsoleViewMessage.ConsoleViewMessage | null;
+    assert.exists(secondMessage);
+    assert.strictEqual(secondMessage.repeatCount(), 2);
+    const secondMessageElement = secondMessage.element();
+    assert.exists(secondMessageElement);
+
+    const contextMenu = getContextMenuForElement(messagesElement, secondMessageElement);
+    const copy = findMenuItemWithLabel(contextMenu.clipboardSection(), 'Copy message');
+    assert.exists(copy);
+
+    const copyText = sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'copyText');
+    contextMenu.invokeHandler(copy.id());
+    sinon.assert.calledOnceWithExactly(copyText, 'message 2');
+  });
+
+  it('collapses consecutive repeating messages into a single rendered viewport item', async () => {
+    universe.settings.resolve(Settings.ConsoleSettings.consoleGroupSimilarSettingDescriptor).set(true);
+    const target = universe.createTarget();
+    universe.targetManager.setScopeTarget(target);
+    renderElementIntoDOM(consoleView, {height: 200});
+
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assert.exists(consoleModel);
+    const wasShownSpy = sinon.spy(Console.ConsoleViewMessage.ConsoleViewMessage.prototype, 'wasShown');
+    const willHideSpy = sinon.spy(Console.ConsoleViewMessage.ConsoleViewMessage.prototype, 'willHide');
+
+    for (let i = 0; i < 10; ++i) {
+      consoleModel.addMessage(createConsoleMessage(target, 'Repeating message'));
+    }
+    await consoleView.getScheduledRefreshPromiseForTest();
+
+    assert.strictEqual(consoleView.itemCount(), 1);
+    sinon.assert.calledOnce(wasShownSpy);
+    sinon.assert.notCalled(willHideSpy);
+    const message = consoleView.itemElement(0);
+    assert.instanceOf(message, Console.ConsoleViewMessage.ConsoleViewMessage);
+    assert.strictEqual(message.repeatCount(), 10);
+    assert.isTrue(message.element().isConnected);
+  });
+
+  it('does not offer to copy a message when no message was right-clicked', () => {
+    const target = createTarget();
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assert.exists(consoleModel);
+    consoleModel.addMessage(createConsoleMessage(target, 'message 1'));
+    const messagesElement = consoleView.element.querySelector('#console-messages');
+    assert.exists(messagesElement);
+
+    const contextMenu = getContextMenuForElement(messagesElement);
+    assert.notExists(findMenuItemWithLabel(contextMenu.clipboardSection(), 'Copy message'));
   });
 
   it('creates console history', () => {
@@ -1488,6 +1560,10 @@ describeWithEnvironment('ConsoleView', () => {
       activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, composed: true}));
       activeElement = getActiveElement();
       assert.include(activeElement.textContent || '', 'foo.js:23');
+
+      messageView.willHide();
+      await UI.Widget.Widget.allUpdatesComplete;
+      await doubleRaf();
     });
   });
 
@@ -1694,6 +1770,23 @@ describeWithEnvironment('ConsoleView', () => {
         'Sort properties alphabetically',
         'Show all',
       ]);
+    });
+  });
+
+  describe('accessibility', () => {
+    it('has no aXe violations', async () => {
+      const target = createTarget();
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+
+      renderElementIntoDOM(consoleView, {includeCommonStyles: true, width: 800, height: 600});
+      consoleView.focus();
+      await consoleView.getScheduledRefreshPromiseForTest();
+      await UI.Widget.Widget.allUpdatesComplete;
+
+      assert.exists(consoleView.element.querySelector('.console-main-toolbar'));
+      assert.exists(consoleView.element.querySelector('#console-messages'));
+      assert.exists(consoleView.element.querySelector('#console-prompt'));
+      assert.isEmpty(await getAxeViolations(consoleView.element));
     });
   });
 });

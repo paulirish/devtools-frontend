@@ -358,9 +358,25 @@ class ScriptTestId extends TestId {
 class ScriptTests extends Tests {
   override readonly cwd = SOURCE_ROOT;
 
+  #getWrapper(): string|undefined {
+    if (options['debug'] || options['debug-driver']) {
+      return undefined;
+    }
+    const wrapper = path.join(BUILD_ROOT, 'bin', 'run_devtools_script_tests');
+    return fs.existsSync(wrapper) ? wrapper : undefined;
+  }
+
+  override get executable() {
+    return this.#getWrapper() ?? super.executable;
+  }
+
   override run(tests: TestId[]) {
+    const scriptTests = tests.map(test => ScriptTestId.getFromTestId(test));
+    if (this.#getWrapper()) {
+      return super.run(scriptTests, []);
+    }
     return super.run(
-        tests.map(test => ScriptTestId.getFromTestId(test)),
+        scriptTests,
         [
           path.join(SOURCE_ROOT, 'test', 'scripts', 'run_mocha.ts'),
         ],
@@ -404,23 +420,69 @@ class KarmaTests extends Tests {
   }
 }
 
+class MochaAiEvalsTests extends MochaTests {
+  override match(pathToMatch: TestId): boolean {
+    return super.match(pathToMatch) &&
+        !isContainedInDirectory(
+               pathToMatch.pathPair.buildPath,
+               path.join(GEN_DIR, 'test', 'ai_evals', 'report'),
+        );
+  }
+}
+
+class ForAgentsTests extends Tests {
+  override readonly cwd = path.join(SOURCE_ROOT, 'for_agents');
+
+  override run(tests: TestId[]) {
+    const scriptPath = path.join(SOURCE_ROOT, 'for_agents', 'scripts', 'test.js');
+    const args = [scriptPath, '--build-dir', BUILD_ROOT];
+    const shardCount = Number(options['shard-count'] ?? 1);
+    const shardNumber = Number(options['shard-number'] ?? 1);
+    if (shardCount > 1) {
+      args.push(`--test-shard=${shardNumber}/${shardCount}`);
+    }
+    const isWholeSuite =
+        tests.length === 1 && path.normalize(tests[0].pathPair.buildPath) === path.normalize(this.suite.buildPath);
+    if (!isWholeSuite) {
+      for (const test of tests) {
+        args.push(test.pathPair.buildPath);
+      }
+    }
+    const env: NodeJS.ProcessEnv = {...process.env};
+    if (options['chrome-binary']) {
+      env['PUPPETEER_EXECUTABLE_PATH'] = String(options['chrome-binary']);
+    }
+    const result = runProcess(this.executable, args, {
+      encoding: 'utf-8',
+      stdio: 'inherit',
+      cwd: this.cwd,
+      env,
+    });
+    return !result.error && (result.status ?? 1) === 0;
+  }
+}
+
 /**
  * TODO(333423685)
  * - watch
  **/
 function main() {
   const tests: string[] = typeof options['tests'] === 'string' ? [options['tests']] : options['tests'];
+  const forAgentsTestsScript = path.join(SOURCE_ROOT, 'for_agents', 'scripts', 'test.js');
   const testKinds = [
     new MochaApiTests(path.join(GEN_DIR, 'front_end')),
     new (options['node-unit-tests'] ? MochaFrontendTests : KarmaTests)(
         path.join(GEN_DIR, 'front_end'), path.join(GEN_DIR, 'inspector_overlay'), path.join(GEN_DIR, 'mcp')),
     new MochaTests(path.join(GEN_DIR, 'test/e2e'), 'run_devtools_e2e_tests'),
-    new MochaTests(path.join(GEN_DIR, 'test/ai_evals')),
+    ...(fs.existsSync(forAgentsTestsScript) ? [new ForAgentsTests(path.join(GEN_DIR, 'for_agents/tests'))] : []),
+    new MochaAiEvalsTests(path.join(GEN_DIR, 'test/ai_evals')),
     new MochaTests(path.join(GEN_DIR, 'test/perf')),
     new ScriptTests(path.join(SOURCE_ROOT, 'scripts/eslint_rules/tests')),
     new ScriptTests(path.join(SOURCE_ROOT, 'scripts/stylelint_rules/tests')),
     new ScriptTests(path.join(SOURCE_ROOT, 'scripts/build/tests')),
     new ScriptTests(path.join(SOURCE_ROOT, 'scripts/gn_deps_verifier/tests')),
+    new ScriptTests(path.join(SOURCE_ROOT, 'scripts/ai_assistance')),
+    new ScriptTests(path.join(SOURCE_ROOT, 'test/ai_evals/report')),
   ];
 
   if (!options['skip-ninja']) {
@@ -433,6 +495,7 @@ function main() {
           'third_party/devtools-frontend/src/scripts/hosted_mode:hosted_mode',
           'third_party/devtools-frontend/src/test/api:devtools_api_tests',
           'third_party/devtools-frontend/src/test/e2e:devtools_e2e_tests',
+          'third_party/devtools-frontend/src/test/scripts:devtools_script_tests',
           'third_party/devtools-frontend/src/test/unit:devtools_node_unit_tests',
           'third_party/devtools-frontend/src/test/unit:devtools_unit_tests',
         ] :

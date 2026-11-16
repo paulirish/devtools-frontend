@@ -25,11 +25,12 @@ import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {MockCDPConnection} from '../../testing/MockCDPConnection.js';
 import {createStubbedDomNodeWithModels, getMatchedStyles, ruleMatch} from '../../testing/StyleHelpers.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import * as Tooltips from '../../ui/components/tooltips/tooltips.js';
 import type {Icon} from '../../ui/kit/kit.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {html} from '../../ui/lit/lit.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as SettingsUI from '../../ui/settings/settings.js';
 import * as PanelsCommon from '../common/common.js';
 
@@ -245,6 +246,53 @@ describe('StylesSidebarPane', () => {
         await stylesSidebarPane.performUpdate();
 
         sinon.assert.notCalled(resetFocusSpy);
+      });
+    });
+
+    describe('header view', () => {
+      it('invokes onFilterChanged when filter input changes', () => {
+        const host = new UI.Widget.Widget();
+        renderElementIntoDOM(host);
+        const onFilterChanged = sinon.spy();
+        Elements.StylesSidebarPane.DEFAULT_HEADER_VIEW(
+            {
+              showNoMatches: false,
+              toolbarItems: [],
+              toolbarPane: null,
+              toolbarPaneAnimation: null,
+              onFilterChanged,
+              onRegexToggled: () => {},
+              onToolbarPaneAnimationEnd: () => {},
+            },
+            undefined,
+            host.contentElement,
+        );
+        const filterInput = host.contentElement.querySelector('devtools-toolbar-input[type="filter"]');
+        assert.exists(filterInput);
+        filterInput.dispatchEvent(new CustomEvent('change', {detail: 'color'}));
+        sinon.assert.calledOnceWithExactly(onFilterChanged, 'color');
+      });
+
+      it('renders no-matches message when showNoMatches is true', () => {
+        const host = new UI.Widget.Widget();
+        renderElementIntoDOM(host);
+        Elements.StylesSidebarPane.DEFAULT_HEADER_VIEW(
+            {
+              showNoMatches: true,
+              toolbarItems: [],
+              toolbarPane: null,
+              toolbarPaneAnimation: null,
+              onFilterChanged: () => {},
+              onRegexToggled: () => {},
+              onToolbarPaneAnimationEnd: () => {},
+            },
+            undefined,
+            host.contentElement,
+        );
+        const noMatches = host.contentElement.querySelector<HTMLElement>('.gray-info-message');
+        assert.exists(noMatches);
+        assert.isFalse(noMatches.hidden);
+        assert.strictEqual(noMatches.textContent, 'No matching selector or style');
       });
     });
 
@@ -1235,6 +1283,53 @@ describe('StylesSidebarPane', () => {
         // Still marked collapsible so the icon remains visible.
         assert.isTrue(overloadedSection.element.classList.contains('collapsible'),
                       'Section should retain collapsible class after manual expand');
+      });
+
+      it('shows closing brace when a nested rule in an at-rule is collapsed', async () => {
+        enableCollapse();
+        const stylesSidebarPane =
+            new Elements.StylesSidebarPane.StylesSidebarPane(new ComputedStyle.ComputedStyleModel.ComputedStyleModel());
+        const node = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+        node.id = 1 as Protocol.DOM.NodeId;
+        const matchedStyles = await getMatchedStyles({
+          connection,
+          cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+          node,
+          matchedPayload: [
+            {
+              rule: {
+                selectorList: {selectors: [], text: ''},
+                origin: Protocol.CSS.StyleSheetOrigin.Regular,
+                style: {
+                  cssProperties: [],
+                  shorthandEntries: [],
+                },
+                media: [{
+                  text: '(min-width: 1px)',
+                  source: Protocol.CSS.CSSMediaSource.MediaRule,
+                }],
+                ruleTypes: [Protocol.CSS.CSSRuleType.MediaRule, Protocol.CSS.CSSRuleType.StyleRule],
+              },
+              matchingSelectors: [],
+            },
+          ],
+        });
+
+        const sectionBlocks = await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(
+            matchedStyles, new Map(), new Map(), null);
+        assert.lengthOf(sectionBlocks, 1);
+        const section = sectionBlocks[0].sections[0];
+        assert.exists(section);
+        assert.isTrue(section.element.classList.contains('collapsed'), 'Section should be collapsed');
+
+        renderElementIntoDOM(section.element);
+
+        const cssQuery = section.element.querySelector('.css-query');
+        assert.exists(cssQuery);
+        assert.isTrue(cssQuery.classList.contains('has-collapse-icon'));
+
+        section.expand();
+        assert.isFalse(section.element.classList.contains('collapsed'), 'Section should be expanded');
       });
 
       it('reacts to toggling the collapse-non-contributing-css-rules setting at runtime', async () => {
@@ -2624,8 +2719,11 @@ describe('StylesSidebarPane', () => {
         await cssPropertyPrompt.complete(true);
 
         const colorCompletions = spyObj?.updateSuggestions.firstCall.args[1];
-        const renderedElement = colorCompletions?.[0].subtitleRenderer?.();
-        assert.instanceOf(renderedElement, InlineEditor.ColorSwatch.ColorSwatch);
+        const subtitleTemplate = colorCompletions?.[0].subtitleTemplate;
+        assert.exists(subtitleTemplate);
+        const container = document.createElement('div');
+        render(subtitleTemplate, container);
+        assert.instanceOf(container.querySelector('.suggestion-subtitle'), InlineEditor.ColorSwatch.ColorSwatch);
       });
 
       it('shows autocomplete item with color swatch for CSS variables with wide gamut color', async () => {
@@ -2639,8 +2737,11 @@ describe('StylesSidebarPane', () => {
         await cssPropertyPrompt.complete(true);
 
         const colorCompletions = spyObj?.updateSuggestions.firstCall.args[1];
-        const renderedElement = colorCompletions?.[0].subtitleRenderer?.();
-        assert.instanceOf(renderedElement, InlineEditor.ColorSwatch.ColorSwatch);
+        const subtitleTemplate = colorCompletions?.[0].subtitleTemplate;
+        assert.exists(subtitleTemplate);
+        const container = document.createElement('div');
+        render(subtitleTemplate, container);
+        assert.instanceOf(container.querySelector('.suggestion-subtitle'), InlineEditor.ColorSwatch.ColorSwatch);
       });
 
       it('shows autocomplete property names for CSS aliases', async () => {
@@ -4953,7 +5054,8 @@ describeWithEnvironment('StylesSidebarPane updates, completions, and media/keyfr
       const style = matchedStyles.nodeStyles()[0];
       const property = new SDK.CSSProperty.CSSProperty(style, style.pastLastSourcePropertyIndex(), name, value, true,
                                                        false, true, false, '', undefined, []);
-      const section = sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection);
+      const section = Object.assign(sinon.createStubInstance(Elements.StylePropertiesSection.StylePropertiesSection),
+                                    {sectionTooltipIdFactory: new Tooltips.Tooltip.IdFactory()});
       return new Elements.StylePropertyTreeElement.StylePropertyTreeElement({
         stylesContainer: stylesSidebarPane,
         section,

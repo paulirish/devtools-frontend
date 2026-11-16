@@ -71,29 +71,6 @@
     border-radius: var(--sys-shape-corner-full) var(--sys-shape-corner-full) 0 0;
   }
 
-  .toolbar-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--sys-size-11);
-    height: var(--sys-size-11);
-    padding: 0;
-    border: none;
-    background: transparent;
-    border-radius: var(--sys-shape-corner-extra-small);
-    cursor: pointer;
-    color: var(--sys-color-on-surface-subtle);
-  }
-
-  .toolbar-button:hover {
-    background-color: var(--sys-color-state-hover-on-subtle);
-    color: var(--sys-color-on-surface);
-  }
-
-  .toolbar-button:active {
-    background-color: var(--sys-color-state-ripple-neutral-on-subtle);
-  }
-
   /* Queued and sent threads share a single scroll area below the toolbar. */
   .comments-scroll-container {
     /* Offset parent for the sections, so their offsetTop is their scroll position. */
@@ -118,7 +95,7 @@
     list-style: none;
   }
 
-  /* Extra space between the Send to Agent footer and the sent comments separator. */
+  /* Extra space between the Send to agent footer and the sent comments separator. */
   .comments-sent-section {
     margin-top: var(--sys-size-11);
     /*
@@ -164,17 +141,27 @@
   }
 
   .comment-pin-badge {
+    box-sizing: border-box;
     width: var(--sys-size-9);
     height: var(--sys-size-9);
     margin-right: var(--sys-size-2);
     border-radius: var(--sys-shape-corner-full) var(--sys-shape-corner-full) var(--sys-shape-corner-full) var(--sys-shape-corner-extra-small);
-    background-color: var(--sys-color-primary);
+    border: var(--sys-size-2) solid var(--sys-color-primary);
+    background-color: var(--sys-color-cdt-base-container);
     flex-shrink: 0;
   }
 
+  .comment-pin-badge.resolved {
+    border: none;
+    background-color: var(--sys-color-primary);
+  }
+
   .comment-thread-item.orphaned .comment-pin-badge {
+    border-color: var(--sys-color-surface-variant);
+  }
+
+  .comment-thread-item.orphaned .comment-pin-badge.resolved {
     background-color: var(--sys-color-surface-variant);
-    color: var(--sys-color-on-surface-subtle);
   }
 
   .anchor-chip {
@@ -255,6 +242,10 @@
     width: var(--sys-size-8);
     height: var(--sys-size-8);
     color: var(--sys-color-on-surface-subtle);
+  }
+
+  .see-response-button {
+    margin-right: calc(-1 * var(--sys-size-6));
   }
 
   .comments-empty-state {

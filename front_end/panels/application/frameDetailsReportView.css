@@ -37,10 +37,6 @@ button.link {
   height: var(--sys-size-8);
 }
 
-button.link:has(devtools-icon) {
-  margin-top: 5px;
-}
-
 devtools-button.help-button {
   top: var(--sys-size-3);
   position: relative;
@@ -102,13 +98,6 @@ devtools-button.help-button {
 
 .bold {
   font-weight: bold;
-}
-
-.inline-icon {
-  margin-bottom: -5px;
-  width: 18px;
-  height: 18px;
-  vertical-align: baseline;
 }
 
 @media (forced-colors: active) {

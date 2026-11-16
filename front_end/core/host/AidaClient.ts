@@ -27,15 +27,42 @@ import {
   Role,
   UserTier,
 } from './AidaClientTypes.js';
+import {
+  AidaAbortError,
+  AidaBlockError,
+  classifyRequestError,
+  mapError,
+  StreamChunkParseError,
+} from './AidaErrors.js';
 import {gcaChunkResponseToAidaChunkResponse} from './AidaGcaTranslation.js';
 import * as DispatchHttpRequestClient from './DispatchHttpRequestClient.js';
 import * as GcaClient from './GcaClient.js';
 import type {GenerateContentResponse} from './GcaTypes.js';
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
-import type {AidaClientResult, AidaCodeCompleteResult, SyncInformation} from './InspectorFrontendHostAPI.js';
+import {
+  type AidaClientResult,
+  type AidaCodeCompleteResult,
+  EnumeratedHistogram,
+  type SyncInformation,
+} from './InspectorFrontendHostAPI.js';
 import {bindOutputStream, discardOutputStream} from './ResourceLoader.js';
+import * as UserMetrics from './UserMetrics.js';
 
 export * from './AidaClientTypes.js';
+export {
+  AidaAbortError,
+  AidaBlockError,
+  AidaClientError,
+  AidaInvalidJsonResponseError,
+  AidaPayloadTooLargeError,
+  AidaPermissionDeniedError,
+  AidaQuotaError,
+  AidaTimeoutError,
+  AidaUnknownError,
+  isPayloadTooLargeError,
+  isQuotaError,
+  mapError,
+} from './AidaErrors.js';
 
 export const CLIENT_NAME = 'CHROME_DEVTOOLS';
 export const SERVICE_NAME = 'aidaService';
@@ -61,32 +88,36 @@ const AidaLanguageToMarkdown: Record<AidaInferenceLanguage, string> = {
   [AidaInferenceLanguage.UNKNOWN]: 'unknown',
 };
 
-export abstract class AidaClientError extends Error {
-  override name = 'AidaClientError';
+function conversationSurfaceHistogram(feature: ClientFeature): UserMetrics.AiClientSurfaceHistogram|undefined {
+  switch (feature) {
+    case ClientFeature.CHROME_DEVTOOLS_V2_AGENT:
+      return EnumeratedHistogram.AiClientRequestResultAiAssistance;
+    case ClientFeature.CHROME_CONSOLE_INSIGHTS:
+      return EnumeratedHistogram.AiClientRequestResultConsoleInsights;
+    case ClientFeature.CHROME_CONVERSATION_SUMMARY_AGENT:
+      return EnumeratedHistogram.AiClientRequestResultConversationSummary;
+    case ClientFeature.CHROME_PERFORMANCE_ANNOTATIONS_AGENT:
+      return EnumeratedHistogram.AiClientRequestResultPerformanceAnnotations;
+    default:
+      // Legacy V1 per-panel agents intentionally omit surface slices and record only to the aggregate histogram.
+      return undefined;
+  }
 }
-export class AidaUnknownError extends AidaClientError {
-  override name = 'AidaUnknownError';
-}
-export class AidaAbortError extends AidaClientError {
-  override name = 'AidaAbortError';
-}
-export class AidaBlockError extends AidaClientError {
-  override name = 'AidaBlockError';
-}
-export class AidaQuotaError extends AidaClientError {
-  override name = 'AidaQuotaError';
-}
-export class AidaPayloadTooLargeError extends AidaClientError {
-  override name = 'AidaPayloadTooLargeError';
-}
-export class AidaPermissionDeniedError extends AidaClientError {
-  override name = 'AidaPermissionDeniedError';
-}
-export class AidaTimeoutError extends AidaClientError {
-  override name = 'AidaTimeoutError';
-}
-export class AidaInvalidJsonResponseError extends AidaClientError {
-  override name = 'AidaInvalidJsonResponseError';
+
+/**
+ * Returns a closure that records the request outcome histogram once per call.
+ * One-shot recording prevents inner validation branches and outer catch blocks from double-counting outcomes.
+ */
+function createOutcomeRecorder(surfaceHistogram?: UserMetrics.AiClientSurfaceHistogram):
+    (result: UserMetrics.AiClientRequestResult) => void {
+  let recorded = false;
+  return (result: UserMetrics.AiClientRequestResult): void => {
+    if (recorded) {
+      return;
+    }
+    recorded = true;
+    UserMetrics.userMetrics.aiClientRequestResult(result, surfaceHistogram);
+  };
 }
 
 interface AiStream {
@@ -159,20 +190,15 @@ export class AidaClient {
       throw new Error('dispatchHttpRequest is not available');
     }
 
-    if (options?.signal?.aborted) {
-      throw new AidaAbortError();
-    }
-
-    // Disable logging for now.
-    // For context, see b/454563259#comment35.
-    // We should be able to remove this ~end of April.
-    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      request.metadata.disable_user_content_logging = true;
-    }
-
+    // Defaults to ABORTED so early caller exits (`break` / `return`) before `completed: true` record as aborted.
+    let outcome = UserMetrics.AiClientRequestResult.ABORTED;
     let abortListener: (() => void)|undefined;
     let streamId: number|undefined;
     try {
+      if (options?.signal?.aborted) {
+        throw new AidaAbortError();
+      }
+
       const stream = (() => {
         let {promise, resolve, reject} = Promise.withResolvers<string|null>();
         // Prevent unhandled promise rejections if stream.fail() is called after
@@ -222,8 +248,17 @@ export class AidaClient {
             debugLog('doConversation failed with error:', JSON.stringify(err));
             stream.fail(mapError(err));
           });
-      yield* this.#handleResponseStream(stream);
+      for await (const chunk of this.#handleResponseStream(stream)) {
+        if (chunk.completed) {
+          outcome = UserMetrics.AiClientRequestResult.SUCCESS;
+        }
+        yield chunk;
+      }
+    } catch (err) {
+      outcome = classifyRequestError(err);
+      throw err;
     } finally {
+      UserMetrics.userMetrics.aiClientRequestResult(outcome, conversationSurfaceHistogram(request.client_feature));
       if (options?.signal && abortListener) {
         options.signal.removeEventListener('abort', abortListener);
       }
@@ -246,9 +281,12 @@ export class AidaClient {
 
       for (const result of results) {
         if (result.metadata) {
-          metadata = result.metadata;
+          metadata = {
+            ...metadata,
+            ...result.metadata,
+          };
           if (metadata?.attributionMetadata?.attributionAction === RecitationAction.BLOCK) {
-            throw new AidaBlockError();
+            throw new AidaBlockError(result.blockMessage);
           }
         }
         if (result.textChunk) {
@@ -276,7 +314,9 @@ export class AidaClient {
           });
         } else if ('error' in result) {
           throw mapError(result.error);
-        } else {
+        } else if (!result.metadata) {
+          // Chunks from thought-only parts or trailing metadata-only chunks lack text or function calls
+          // and carry only metadata.
           throw new Error(`Unknown chunk result ${JSON.stringify(result)}`);
         }
       }
@@ -326,18 +366,11 @@ export class AidaClient {
     try {
       return JSON.parse(chunk);
     } catch (error) {
-      throw new Error('Cannot parse chunk: ' + chunk, {cause: error});
+      throw new StreamChunkParseError('Cannot parse chunk: ' + chunk, {cause: error});
     }
   }
 
   registerClientEvent(clientEvent: AidaRegisterClientEvent): Promise<AidaClientResult> {
-    // Disable logging for now.
-    // For context, see b/454563259#comment35.
-    // We should be able to remove this ~end of April.
-    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      clientEvent.disable_user_content_logging = true;
-    }
-
     if (this.#gcaClient.enabled()) {
       return this.#gcaClient.registerClientEvent(clientEvent);
     }
@@ -360,90 +393,86 @@ export class AidaClient {
       throw new Error('aidaCodeComplete is not available');
     }
 
-    // Disable logging for now.
-    // For context, see b/454563259#comment35.
-    // We should be able to remove this ~end of April.
-    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      request.metadata.disable_user_content_logging = true;
-    }
-
-    if (this.#gcaClient.enabled()) {
-      try {
-        return await this.#gcaClient.completeCode(request);
-      } catch (err) {
-        throw mapError(err);
-      }
-    }
-    const {promise, resolve} = Promise.withResolvers<AidaCodeCompleteResult>();
-    InspectorFrontendHostInstance.aidaCodeComplete(JSON.stringify(request), resolve);
-    const completeCodeResult = await promise;
-
-    if (completeCodeResult.error) {
-      throw mapError(completeCodeResult.error, completeCodeResult.detail);
-    }
-    const response = completeCodeResult.response;
-    if (!response?.length) {
-      throw new Error('Empty response');
-    }
-    let parsedResponse;
+    const recordOutcome = createOutcomeRecorder(EnumeratedHistogram.AiClientRequestResultCodeComplete);
     try {
-      parsedResponse = JSON.parse(response);
-    } catch (error) {
-      throw new Error('Cannot parse response: ' + response, {cause: error});
-    }
-
-    const generatedSamples: GenerationSample[] = [];
-    let metadata: ResponseMetadata = {rpcGlobalId: 0};
-    if ('metadata' in parsedResponse) {
-      metadata = parsedResponse.metadata;
-    }
-
-    if ('generatedSamples' in parsedResponse) {
-      for (const generatedSample of parsedResponse.generatedSamples) {
-        const sample: GenerationSample = {
-          generationString: generatedSample.generationString,
-          score: generatedSample.score,
-          sampleId: generatedSample.sampleId,
-        };
-        if ('metadata' in generatedSample && 'attributionMetadata' in generatedSample.metadata) {
-          sample.attributionMetadata = generatedSample.metadata.attributionMetadata;
+      if (this.#gcaClient.enabled()) {
+        try {
+          const result = await this.#gcaClient.completeCode(request);
+          recordOutcome(UserMetrics.AiClientRequestResult.SUCCESS);
+          return result;
+        } catch (err) {
+          recordOutcome(classifyRequestError(err));
+          throw mapError(err);
         }
-        generatedSamples.push(sample);
       }
-    } else {
-      return null;
-    }
+      const {promise, resolve} = Promise.withResolvers<AidaCodeCompleteResult>();
+      InspectorFrontendHostInstance.aidaCodeComplete(JSON.stringify(request), resolve);
+      const completeCodeResult = await promise;
 
-    return {generatedSamples, metadata};
+      if (completeCodeResult.error) {
+        recordOutcome(classifyRequestError(completeCodeResult.error, completeCodeResult.detail));
+        throw mapError(completeCodeResult.error, completeCodeResult.detail);
+      }
+      const response = completeCodeResult.response;
+      if (!response?.length) {
+        recordOutcome(UserMetrics.AiClientRequestResult.INVALID_JSON_RESPONSE);
+        throw new Error('Empty response');
+      }
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(response);
+      } catch (error) {
+        recordOutcome(UserMetrics.AiClientRequestResult.INVALID_JSON_RESPONSE);
+        throw new Error('Cannot parse response: ' + response, {cause: error});
+      }
+
+      const generatedSamples: GenerationSample[] = [];
+      let metadata: ResponseMetadata = {rpcGlobalId: 0};
+      if ('metadata' in parsedResponse) {
+        metadata = parsedResponse.metadata;
+      }
+
+      if ('generatedSamples' in parsedResponse) {
+        for (const generatedSample of parsedResponse.generatedSamples) {
+          const sample: GenerationSample = {
+            generationString: generatedSample.generationString,
+            score: generatedSample.score,
+            sampleId: generatedSample.sampleId,
+          };
+          if ('metadata' in generatedSample && 'attributionMetadata' in generatedSample.metadata) {
+            sample.attributionMetadata = generatedSample.metadata.attributionMetadata;
+          }
+          generatedSamples.push(sample);
+        }
+      } else {
+        recordOutcome(UserMetrics.AiClientRequestResult.SUCCESS);
+        return null;
+      }
+
+      recordOutcome(UserMetrics.AiClientRequestResult.SUCCESS);
+      return {generatedSamples, metadata};
+    } catch (err) {
+      recordOutcome(classifyRequestError(err));
+      throw err;
+    }
   }
 
   async generateCode(request: GenerateCodeRequest, options?: {signal?: AbortSignal}): Promise<GenerateCodeResponse> {
-    // Disable logging for now.
-    // For context, see b/454563259#comment35.
-    // We should be able to remove this ~end of April.
-    if (Root.Runtime.hostConfig.devToolsGeminiRebranding?.enabled) {
-      request.metadata.disable_user_content_logging = true;
-    }
-
-    if (this.#gcaClient.enabled()) {
-      // Inline and remove the else clause after migration
-      try {
-        return await this.#gcaClient.generateCode(request, options);
-      } catch (err) {
-        throw mapError(err);
-      }
-    }
+    const surfaceHistogram = EnumeratedHistogram.AiClientRequestResultCodeGenerate;
     try {
-      const response = await DispatchHttpRequestClient.makeHttpRequest<GenerateCodeResponse>({
-        service: SERVICE_NAME,
-        path: '/v1/aida:generateCode',
-        method: 'POST',
-        body: JSON.stringify(request),
-      },
-                                                                                             options);
-
+      const response = this.#gcaClient.enabled() ?
+          await this.#gcaClient.generateCode(request, options) :
+          await DispatchHttpRequestClient.makeHttpRequest<GenerateCodeResponse>({
+            service: SERVICE_NAME,
+            path: '/v1/aida:generateCode',
+            method: 'POST',
+            body: JSON.stringify(request),
+          },
+                                                                                options);
+      UserMetrics.userMetrics.aiClientRequestResult(UserMetrics.AiClientRequestResult.SUCCESS, surfaceHistogram);
       return response;
     } catch (err) {
+      UserMetrics.userMetrics.aiClientRequestResult(classifyRequestError(err), surfaceHistogram);
       throw mapError(err);
     }
   }
@@ -541,110 +570,4 @@ export const enum Events {
 
 export interface EventTypes {
   [Events.AIDA_AVAILABILITY_CHANGED]: AidaAccessPreconditions;
-}
-
-/**
- * Checks whether any of the provided error strings indicate a quota or rate-limit failure.
- *
- * AIDA and GCA surface quota errors across different fields (status codes, human-readable
- * messages, and serialized `google.rpc.ErrorInfo` details), so we check three substrings:
- * - `'quota'`: direct AIDA error messages or details (for example,
- *   `"Quota exceeded for quota metric 'AiCodeCompleteService'"` or `"USER_QUOTA_EXCEEDED"`).
- * - `'resource_exhausted'`: the standard `google.rpc.Code` status string (for example,
- *   `status: "RESOURCE_EXHAUSTED"` or `"RESOURCE_EXHAUSTED: quota exceeded"`).
- * - `'rate_limit_exceeded'`: the `reason` field inside `google.rpc.ErrorInfo` details when
- *   the message itself does not mention `'quota'` (for example, GCA returning
- *   `message: "You have exhausted your capacity on this model."` with
- *   `details: [{"reason": "RATE_LIMIT_EXCEEDED", "domain": "cloudcode-pa.googleapis.com"}]`).
- */
-export function isQuotaError(...inputs: Array<string|undefined>): boolean {
-  return inputs.some(input => {
-    const lower = input?.toLowerCase();
-    return lower?.includes('quota') || lower?.includes('resource_exhausted') || lower?.includes('rate_limit_exceeded');
-  });
-}
-
-export function isPayloadTooLargeError(...inputs: Array<string|undefined>): boolean {
-  return inputs.some(input => input?.toLowerCase().includes('payload size exceeds the limit'));
-}
-
-/**
- * Type guard that narrows an `unknown` error value in `mapError` to a plain key-value
- * object so structured `google.rpc.Status` fields (`code`, `status`, `message`, `details`)
- * can be safely inspected.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Maps AIDA-specific errors, DispatchHttpRequestErrors, strings, structured
- * error objects, and generic Errors to dedicated AidaClientError subclasses.
- */
-export function mapError(err: unknown, detail?: string): AidaClientError {
-  if (err instanceof AidaClientError) {
-    return err;
-  }
-
-  if (err instanceof DispatchHttpRequestClient.DispatchHttpRequestError) {
-    if (err.type === DispatchHttpRequestClient.ErrorType.ABORT) {
-      return new AidaAbortError();
-    }
-    const response = err.response;
-    if (response) {
-      if (response.statusCode === 429) {
-        return new AidaQuotaError('Server responded: quota exceeded');
-      }
-      if (response.statusCode === 403) {
-        return new AidaPermissionDeniedError('Server responded: permission denied');
-      }
-      if ('netErrorName' in response && response.netErrorName === 'net::ERR_TIMED_OUT') {
-        return new AidaTimeoutError('AIDA request timed out');
-      }
-      if ('error' in response && response.error) {
-        return mapError(response.error, response.detail);
-      }
-      // The dispatcher throws HTTP_RESPONSE_UNAVAILABLE with status code 200
-      // when it successfully receives the HTTP response but fails to parse its JSON body.
-      if (response.statusCode === 200 && err.type === DispatchHttpRequestClient.ErrorType.HTTP_RESPONSE_UNAVAILABLE) {
-        return new AidaInvalidJsonResponseError('Server responded with invalid JSON', {cause: err});
-      }
-      if (response.statusCode !== 200) {
-        return new AidaUnknownError(`Request failed: ${JSON.stringify(response)}`);
-      }
-    }
-  }
-
-  if (typeof err === 'string') {
-    if (isQuotaError(err, detail)) {
-      return new AidaQuotaError(`Cannot send request: ${err}${detail ? ` ${detail}` : ''}`);
-    }
-    if (isPayloadTooLargeError(err, detail)) {
-      return new AidaPayloadTooLargeError(`Cannot send request: ${err}${detail ? ` ${detail}` : ''}`);
-    }
-    return new AidaUnknownError(`Cannot send request: ${err}${detail ? ` ${detail}` : ''}`);
-  }
-
-  if (err instanceof Error) {
-    return new AidaUnknownError(err.message, {cause: err});
-  }
-
-  if (isRecord(err)) {
-    const code = typeof err.code === 'number' ? err.code : undefined;
-    const status = typeof err.status === 'string' ? err.status : undefined;
-    const message = typeof err.message === 'string' ? err.message : undefined;
-    const details = err.details !== undefined ? JSON.stringify(err.details) : undefined;
-    if (code === 429 || isQuotaError(status, message, details)) {
-      return new AidaQuotaError(message ?? 'Server responded: quota exceeded', {cause: err});
-    }
-    if (code === 403 || status === 'PERMISSION_DENIED') {
-      return new AidaPermissionDeniedError(message ?? 'Server responded: permission denied', {cause: err});
-    }
-    if (isPayloadTooLargeError(message, details)) {
-      return new AidaPayloadTooLargeError(message ?? 'Server responded: payload size exceeds the limit', {cause: err});
-    }
-    return new AidaUnknownError(message ?? JSON.stringify(err), {cause: err});
-  }
-
-  return new AidaUnknownError(String(err));
 }

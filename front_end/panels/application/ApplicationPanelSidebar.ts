@@ -88,18 +88,6 @@ import {WebMCPTreeElement} from './WebMCPTreeElement.js';
 
 const UIStrings = {
   /**
-   * @description Context menu item to start a chat with AI in the Application panel sidebar.
-   */
-  startAChat: 'Start a chat',
-  /**
-   * @description Context menu item to explain storage with AI in the Application panel sidebar.
-   */
-  explainStorage: 'Explain storage',
-  /**
-   * @description Context menu item to explain cookies with AI in the Application panel sidebar.
-   */
-  explainCookies: 'Explain cookies',
-  /**
    * @description Tree item label for Sub Apps in the sidebar of the Application panel.
    */
   subApps: 'Sub apps',
@@ -1282,14 +1270,13 @@ export class StorageTreeElement extends ApplicationPanelTreeElement {
 }
 
 export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement {
-  private idbDatabaseTreeElements: IDBDatabaseTreeElement[];
+  private idbDatabaseTreeElements = new Set<IDBDatabaseTreeElement>();
   private storageBucket?: Protocol.Storage.StorageBucket;
   constructor(storagePanel: ResourcesPanel, storageBucket?: Protocol.Storage.StorageBucket) {
     super(storagePanel, i18nString(UIStrings.indexeddb), i18nString(UIStrings.noIndexeddb),
           i18nString(UIStrings.indexeddbDescription), 'indexed-db');
     const icon = createIcon('database');
     this.setLeadingIcons([icon]);
-    this.idbDatabaseTreeElements = [];
     this.storageBucket = storageBucket;
     this.initialize();
   }
@@ -1304,9 +1291,7 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
     SDK.TargetManager.TargetManager.instance().addModelListener(IndexedDBModel,
                                                                 IndexedDBModelEvents.IndexedDBContentUpdated,
                                                                 this.indexedDBContentUpdated, this, {scoped: true});
-    // TODO(szuend): Replace with a Set once two web tests no longer directly access this private
-    //               variable (indexeddb/live-update-indexeddb-content.js, indexeddb/delete-entry.js).
-    this.idbDatabaseTreeElements = [];
+    this.idbDatabaseTreeElements.clear();
 
     for (const indexedDBModel of SDK.TargetManager.TargetManager.instance().models(IndexedDBModel, {scoped: true})) {
       const databases = indexedDBModel.databases();
@@ -1323,9 +1308,10 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
   }
 
   removeIndexedDBForModel(model: IndexedDBModel): void {
-    const idbDatabaseTreeElements = this.idbDatabaseTreeElements.filter(element => element.model === model);
-    for (const idbDatabaseTreeElement of idbDatabaseTreeElements) {
-      this.removeIDBDatabaseTreeElement(idbDatabaseTreeElement);
+    for (const idbDatabaseTreeElement of this.idbDatabaseTreeElements) {
+      if (idbDatabaseTreeElement.model === model) {
+        this.removeIDBDatabaseTreeElement(idbDatabaseTreeElement);
+      }
     }
   }
 
@@ -1365,7 +1351,7 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
       return;
     }
     const idbDatabaseTreeElement = new IDBDatabaseTreeElement(this.resourcesPanel, model, databaseId);
-    this.idbDatabaseTreeElements.push(idbDatabaseTreeElement);
+    this.idbDatabaseTreeElements.add(idbDatabaseTreeElement);
     this.appendChild(idbDatabaseTreeElement);
     model.refreshDatabase(databaseId);
   }
@@ -1383,7 +1369,7 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
   private removeIDBDatabaseTreeElement(idbDatabaseTreeElement: IDBDatabaseTreeElement): void {
     idbDatabaseTreeElement.clear();
     this.removeChild(idbDatabaseTreeElement);
-    Platform.ArrayUtilities.removeElement(this.idbDatabaseTreeElements, idbDatabaseTreeElement);
+    this.idbDatabaseTreeElements.delete(idbDatabaseTreeElement);
     this.setExpandable(this.childCount() > 0);
   }
 
@@ -1414,7 +1400,12 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
   }
 
   private idbDatabaseTreeElement(model: IndexedDBModel, databaseId: DatabaseId): IDBDatabaseTreeElement|null {
-    return this.idbDatabaseTreeElements.find(x => x.databaseId.equals(databaseId) && x.model === model) || null;
+    for (const element of this.idbDatabaseTreeElements) {
+      if (element.databaseId.equals(databaseId) && element.model === model) {
+        return element;
+      }
+    }
+    return null;
   }
 }
 
@@ -1816,13 +1807,7 @@ export class DOMStorageTreeElement extends ApplicationPanelTreeElement {
       const openAiAssistanceId = 'ai-assistance.application-panel-context';
       if (UI.ActionRegistry.ActionRegistry.instance().hasAction(openAiAssistanceId)) {
         UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
-        const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
-        const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
-        submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
-        submenu.defaultSection().appendItem(
-            i18nString(UIStrings.explainStorage),
-            () => action.execute({prompt: 'What is the purpose of this storage bucket?'}),
-            {disabled: !action.enabled(), jslogContext: openAiAssistanceId + '.storage'});
+        contextMenu.footerSection().appendAction(openAiAssistanceId);
       }
     }
 
@@ -1939,13 +1924,7 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
       const openAiAssistanceId = 'ai-assistance.application-panel-context';
       if (UI.ActionRegistry.ActionRegistry.instance().hasAction(openAiAssistanceId)) {
         UI.Context.Context.instance().setFlavor(AiAssistance.StorageItem.StorageItem, storageItem);
-        const action = UI.ActionRegistry.ActionRegistry.instance().getAction(openAiAssistanceId);
-        const submenu = contextMenu.footerSection().appendSubMenuItem(action.title(), false, openAiAssistanceId);
-        submenu.defaultSection().appendAction(openAiAssistanceId, i18nString(UIStrings.startAChat));
-        submenu.defaultSection().appendItem(
-            i18nString(UIStrings.explainCookies),
-            () => action.execute({prompt: 'What is the purpose of these cookies?'}),
-            {disabled: !action.enabled(), jslogContext: openAiAssistanceId + '.cookies'});
+        contextMenu.footerSection().appendAction(openAiAssistanceId);
       }
     }
 

@@ -23,6 +23,33 @@ function createBaseGcaRequest(
   return gcaRequest;
 }
 
+// Maps to experiences defined in g3; search for chrome_devtools/mapping_rules.gcl to find it.
+const CLIENT_FEATURE_TO_EXPERIENCE:
+    Record<Exclude<AIDA.ClientFeature, AIDA.ClientFeature.CLIENT_FEATURE_UNSPECIFIED>, string> = {
+      [AIDA.ClientFeature.CHROME_CONSOLE_INSIGHTS]: 'chat_console_insights',
+      [AIDA.ClientFeature.CHROME_STYLING_AGENT]: 'chat_freestyler',
+      [AIDA.ClientFeature.CHROME_NETWORK_AGENT]: 'chat_drjones_network_agent',
+      [AIDA.ClientFeature.CHROME_FILE_AGENT]: 'chat_drjones_file_agent',
+      [AIDA.ClientFeature.CHROME_PATCH_AGENT]: 'chat_patch_agent',
+      [AIDA.ClientFeature.CHROME_PERFORMANCE_ANNOTATIONS_AGENT]: 'chat_performance_annotations_agent',
+      [AIDA.ClientFeature.CHROME_PERFORMANCE_FULL_AGENT]: 'chat_performance_full_agent',
+      [AIDA.ClientFeature.CHROME_CONTEXT_SELECTION_AGENT]: 'chat_context_selection_agent',
+      [AIDA.ClientFeature.CHROME_ACCESSIBILITY_AGENT]: 'chat_accessibility_agent',
+      [AIDA.ClientFeature.CHROME_CONVERSATION_SUMMARY_AGENT]: 'chat_conversation_summary_agent',
+      [AIDA.ClientFeature.CHROME_STORAGE_AGENT]: 'chat_storage_agent',
+      [AIDA.ClientFeature.CHROME_DEVTOOLS_V2_AGENT]: 'chat_devtools_v2_agent',
+    };
+
+function getConversationExperience(clientFeature: AIDA.ClientFeature): string {
+  // A specific client feature is required to resolve the corresponding server-side
+  // GCA experience configuration for the conversation request.
+  if (clientFeature === AIDA.ClientFeature.CLIENT_FEATURE_UNSPECIFIED ||
+      !Object.hasOwn(CLIENT_FEATURE_TO_EXPERIENCE, clientFeature)) {
+    throw new Error(`Unsupported client feature for GCA conversation: ${clientFeature}`);
+  }
+  return CLIENT_FEATURE_TO_EXPERIENCE[clientFeature];
+}
+
 export function aidaDoConversationRequestToGcaRequest(request: AIDA.DoConversationRequest): GCA.GenerateContentRequest {
   try {
     const contents: GCA.Content[] = [];
@@ -36,7 +63,8 @@ export function aidaDoConversationRequestToGcaRequest(request: AIDA.DoConversati
     }
     contents.push(convertAidaContentToGcaContent(request.current_message));
 
-    const gcaRequest = createBaseGcaRequest(request, contents, 'chat_console_insights');
+    const experience = getConversationExperience(request.client_feature);
+    const gcaRequest = createBaseGcaRequest(request, contents, experience);
 
     if (request.function_declarations) {
       gcaRequest.tools = [{
@@ -65,6 +93,10 @@ function mapCommonAidaRequestFields(aidaRequest: AidaRequest, gcaRequest: GCA.Ge
       ...gcaRequest.generationConfig,
       temperature: aidaRequest.options.temperature,
     };
+  }
+  if (aidaRequest.metadata?.string_session_id) {
+    // Populate top-level sessionId for server-side session affinity; labels['session_id'] only sets a sanitized GCP label.
+    gcaRequest.sessionId = aidaRequest.metadata.string_session_id;
   }
 }
 
@@ -102,7 +134,8 @@ function extractTextFromGcaParts(parts: GCA.Part[]|undefined): string {
   if (!parts) {
     return '';
   }
-  return parts.map(p => p.text || '').join('');
+  // Exclude internal chain-of-thought parts from the visible explanation text.
+  return parts.map(p => (p.thought ? '' : p.text || '')).join('');
 }
 
 export function aidaEventToGcaTelemetryRequest(clientEvent: AIDA.AidaRegisterClientEvent): GCA.SendTelemetryRequest {
@@ -472,6 +505,33 @@ function convertAidaParamToGcaSchema<T extends string|number|symbol = string>(pa
   return schema;
 }
 
+// `FinishReason` covers normal completion ('STOP'), failures (for example 'MAX_TOKENS'),
+// and content blocks. Only the reasons below mean that GCA blocked the candidate output.
+const BLOCKING_FINISH_REASONS = new Set<string>([
+  'SAFETY',
+  'RECITATION',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'IMAGE_SAFETY',
+  'IMAGE_PROHIBITED_CONTENT',
+  'IMAGE_RECITATION',
+]);
+
+// GCA JSON responses send enum names (for example 'STOP'), while the GcaTypes enums and test fixtures use numbers.
+function enumName(value: number|string|undefined, names: Record<number, string>): string|undefined {
+  return typeof value === 'number' ? names[value] : value;
+}
+
+// Setting `RecitationAction.BLOCK` makes `AidaClient` throw `AidaBlockError`.
+function blockedChunk(metadata: AIDA.ResponseMetadata, blockMessage: string): AIDA.AidaChunkResponse {
+  const citations = metadata.attributionMetadata?.citations ?? [];
+  return {
+    metadata: {...metadata, attributionMetadata: {attributionAction: AIDA.RecitationAction.BLOCK, citations}},
+    blockMessage,
+  };
+}
+
 export function gcaChunkResponseToAidaChunkResponse(response: GCA.GenerateContentResponse): AIDA.AidaChunkResponse[] {
   try {
     if (response.error) {
@@ -484,6 +544,16 @@ export function gcaChunkResponseToAidaChunkResponse(response: GCA.GenerateConten
       inferenceOptionMetadata: {modelId: response.modelVersion},
     };
 
+    if (response.usageMetadata) {
+      metadata.usageMetadata = {
+        promptTokenCount: response.usageMetadata.promptTokenCount,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount,
+        totalTokenCount: response.usageMetadata.totalTokenCount,
+        thoughtsTokenCount: response.usageMetadata.thoughtsTokenCount,
+        cachedContentTokenCount: response.usageMetadata.cachedContentTokenCount,
+      };
+    }
+
     if (candidate?.citationMetadata?.citations) {
       metadata.attributionMetadata = {
         attributionAction: AIDA.RecitationAction.CITE,
@@ -494,11 +564,22 @@ export function gcaChunkResponseToAidaChunkResponse(response: GCA.GenerateConten
                                                             })),
       };
     }
-    const chunks: AIDA.AidaChunkResponse[] = parts.map(part => {
+    const blockReason = enumName(response.promptFeedback?.blockReason, GCA.BlockReason);
+    if (blockReason && blockReason !== 'BLOCKED_REASON_UNSPECIFIED') {
+      return [blockedChunk(metadata, `GCA prompt blocked: ${blockReason}`)];
+    }
+    const finishReason = enumName(candidate?.finishReason, GCA.FinishReason);
+    if (finishReason && BLOCKING_FINISH_REASONS.has(finishReason)) {
+      return [blockedChunk(metadata, `GCA response blocked: ${finishReason}`)];
+    }
+    // Trailing chunks without parts still yield metadata so the client receives the final
+    // rpcGlobalId, modelVersion, usageMetadata, and citationMetadata.
+    const chunks: AIDA.AidaChunkResponse[] = parts.length === 0 ? [{metadata}] : parts.map(part => {
       const aidaChunkResponse: AIDA.AidaChunkResponse = {metadata};
-      if (part.text !== undefined) {
+      // Exclude empty text parts and internal model chain-of-thought from rendering in the UI.
+      if (part.text && !part.thought) {
         aidaChunkResponse.textChunk = {
-          text: extractTextFromGcaParts(parts),
+          text: part.text,
         };
       }
       if (part.functionCall) {

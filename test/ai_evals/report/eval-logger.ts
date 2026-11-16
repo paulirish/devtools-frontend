@@ -37,6 +37,9 @@ export class EvalLogger {
     }
     const timestamp = new Date().toISOString();
     for (const line of cleanText.split('\n')) {
+      if (!line.trim()) {
+        continue;
+      }
       this.#runLogEntries.push(`[${timestamp}] ${line}`);
     }
   }
@@ -51,9 +54,13 @@ export class EvalLogger {
       entries = [];
       this.#taskLogEntries.set(taskId, entries);
     }
+    const timestamp = new Date().toISOString();
     const prefix = isError ? '[ERROR] ' : '';
     for (const line of cleanText.split('\n')) {
-      entries.push(`${prefix}${line}`);
+      if (!line.trim()) {
+        continue;
+      }
+      entries.push(`[${timestamp}] ${prefix}${line}`);
     }
   }
 
@@ -70,11 +77,6 @@ export class EvalLogger {
     for (const line of cleanText.split('\n')) {
       entries.push(line);
     }
-  }
-
-  formatError(err: Error): string {
-    const stack = typeof err.cause === 'object' && err.cause && 'stack' in err.cause ? err.cause.stack : '';
-    return `${err.stack}${err.cause ? `\n${stack}` : ''}`;
   }
 
   /**
@@ -128,10 +130,6 @@ export class EvalLogger {
    */
   getRunLogContent(): string {
     return this.#runLogEntries.join('\n') + '\n';
-  }
-
-  getLogContent(): string {
-    return this.getRunLogContent();
   }
 
   /**

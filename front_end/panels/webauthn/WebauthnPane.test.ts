@@ -8,7 +8,7 @@ import sinon from 'sinon';
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
+import {assertScreenshot, doubleRaf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {expectCalled} from '../../testing/ExpectStubCall.js';
 
@@ -61,10 +61,11 @@ describeWithEnvironment('WebAuthn pane', () => {
     assert.isFalse(largeBlob.checked);
   });
 
+  let target: SDK.Target.Target;
+  let model: SDK.WebAuthnModel.WebAuthnModel;
+  let panel: WebauthnModule.WebauthnPane.WebauthnPaneImpl;
+
   const tests = (inScope: boolean) => {
-    let target: SDK.Target.Target;
-    let model: SDK.WebAuthnModel.WebAuthnModel;
-    let panel: WebauthnModule.WebauthnPane.WebauthnPaneImpl;
     beforeEach(() => {
       const tabTarget = createTarget({type: SDK.Target.Type.TAB});
       createTarget({parentTarget: tabTarget, subtype: 'prerender'});
@@ -352,7 +353,70 @@ describeWithEnvironment('WebAuthn pane', () => {
     });
   };
 
-  describe('in scope', () => tests(true));
+  describe('in scope', () => {
+    tests(true);
+
+    it('routes credential events only to the matching authenticator', async () => {
+      const authenticatorId1 = 'authenticator-1' as Protocol.WebAuthn.AuthenticatorId;
+      const authenticatorId2 = 'authenticator-2' as Protocol.WebAuthn.AuthenticatorId;
+      const addAuthenticator = sinon.stub(model, 'addAuthenticator');
+      addAuthenticator.onFirstCall().resolves(authenticatorId1);
+      addAuthenticator.onSecondCall().resolves(authenticatorId2);
+
+      panel.contentElement.querySelector<HTMLElement>('#add-authenticator')?.click();
+      await panel.updateComplete;
+      await expectCalled(addAuthenticator);
+
+      panel.contentElement.querySelector<HTMLElement>('#add-authenticator')?.click();
+      await panel.updateComplete;
+      sinon.assert.calledTwice(addAuthenticator);
+
+      const credential = {
+        credentialId: 'credential-1',
+        isResidentCredential: false,
+        rpId: 'talos1.org',
+        userHandle: 'morgan',
+        signCount: 1,
+        privateKey: '',
+      };
+      model.dispatchEventToListeners(SDK.WebAuthnModel.Events.CREDENTIAL_ADDED, {
+        authenticatorId: authenticatorId1,
+        credential,
+      });
+      await panel.updateComplete;
+
+      const dataGrids = panel.contentElement.querySelectorAll('devtools-data-grid tbody');
+      assert.lengthOf(dataGrids, 2);
+      assert.include(dataGrids[0].deepInnerText(), Object.values(credential).join('\n'));
+      assert.include(dataGrids[1].deepInnerText(), 'No credentials');
+    });
+
+    it('cleans up credential listeners on model removal', () => {
+      assert.isTrue(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_ADDED));
+      assert.isTrue(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_ASSERTED));
+      assert.isTrue(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_UPDATED));
+      assert.isTrue(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_DELETED));
+
+      panel.modelRemoved(model);
+      assert.isFalse(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_ADDED));
+      assert.isFalse(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_ASSERTED));
+      assert.isFalse(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_UPDATED));
+      assert.isFalse(model.hasEventListeners(SDK.WebAuthnModel.Events.CREDENTIAL_DELETED));
+    });
+
+    it('renders the panel when the virtual authenticator environment is enabled', async () => {
+      renderElementIntoDOM(panel, {includeCommonStyles: true, width: 800, height: 600});
+      const setVirtualAuthEnvEnabled = sinon.stub(model, 'setVirtualAuthEnvEnabled').resolves();
+      const enableCheckbox = panel.contentElement.querySelector<HTMLElement>('devtools-checkbox');
+      assert.isOk(enableCheckbox);
+      enableCheckbox.click();
+      await expectCalled(setVirtualAuthEnvEnabled);
+      await doubleRaf();
+      await panel.updateComplete;
+
+      await assertScreenshot('webauthn/webauthn_pane.png');
+    });
+  });
   describe('out of scope', () => tests(false));
 
   it('shows the placeholder', () => {

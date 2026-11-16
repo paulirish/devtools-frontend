@@ -72,6 +72,7 @@ declare global {
   }
 }
 const Directives: typeof Lit.Directives = Lit.Directives;
+const html: typeof Lit.html = Lit.html;
 const render: typeof Lit.render = Lit.render;
 
 const UIStrings = {
@@ -1419,7 +1420,7 @@ export function bindInput(input: HTMLInputElement, apply: (arg0: string) => void
   }
 
   function onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' && !event.isComposing) {
       const valid = validate(input.value);
       if (valid) {
         apply(input.value);
@@ -1689,11 +1690,14 @@ export const deepElementFromPoint = (document: Document|ShadowRoot|null|undefine
 
 export const deepElementFromEvent = (ev: Event): Node|null => {
   const event = (ev as MouseEvent);
-  // Some synthetic events have zero coordinates which lead to a wrong element.
-  // Better return nothing in this case.
-  if (!event.which && !event.pageX && !event.pageY && !event.clientX && !event.clientY && !event.movementX &&
-      !event.movementY) {
-    return null;
+  // Synthetic and keyboard-triggered MouseEvents still report `which === 1`
+  // (`button === 0`) alongside zero coordinates, where `elementFromPoint(0, 0)`
+  // would hit an unrelated element at the viewport origin.
+  if (!event.pageX && !event.pageY && !event.clientX && !event.clientY && !event.movementX && !event.movementY) {
+    if (typeof ev.composedPath !== 'function') {
+      return null;
+    }
+    return ev.composedPath().find((node): node is Element => node instanceof Element) ?? null;
   }
   const root = event.target && (event.target as Element).getComponentRoot();
   return root ? deepElementFromPoint((root as Document | ShadowRoot), event.pageX, event.pageY) : null;
@@ -1867,26 +1871,17 @@ export class PromotionManager {
 }
 
 /**
- * Creates a `<div>` element with the localized text NEW.
+ * Creates a Lit template for a `<div>` element with the localized text NEW
+ * when the promotion should be shown.
  *
- * The element is automatically styled correctly, as long as the core styles (in particular
- * `inspectorCommon.css` is injected into the current document / shadow root). The lit
- * equivalent of calling this method is:
- *
- * ```js
- * const jslog = VisualLogging.badge('new-badge');
- * html`<div class='new-badge' jsog=${jslog}>i18nString(UIStrings.new)</div>`
- *
- * @returns the newly created `HTMLDivElement` for the new badge.
+ * The element is automatically styled correctly, as long as the core styles (in
+ * particular `inspectorCommon.css`) are injected into the current document or
+ * shadow root.
  */
-export function maybeCreateNewBadge(promotionId: string): HTMLDivElement|undefined {
+export function maybeCreateNewBadge(promotionId: string): Lit.TemplateResult|undefined {
   const promotionManager = PromotionManager.instance();
   if (promotionManager.maybeShowPromotion(promotionId)) {
-    const badge = document.createElement('div');
-    badge.className = 'new-badge';
-    badge.textContent = i18nString(UIStrings.new);
-    badge.setAttribute('jslog', `${VisualLogging.badge('new-badge')}`);
-    return badge;
+    return html`<div class="new-badge" jslog=${VisualLogging.badge('new-badge')}>${i18nString(UIStrings.new)}</div>`;
   }
   return undefined;
 }
@@ -2184,13 +2179,6 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
   static cloneNode(node: Node): Node {
     const clone = node.cloneNode(false);
 
-    let cloneSet = HTMLElementWithLightDOMTemplate.#originalToClones.get(node);
-    if (!cloneSet) {
-      cloneSet = new Set();
-      HTMLElementWithLightDOMTemplate.#originalToClones.set(node, cloneSet);
-    }
-    cloneSet.add(new WeakRef(clone));
-
     for (const child of node.childNodes) {
       clone.appendChild(HTMLElementWithLightDOMTemplate.cloneNode(child));
     }
@@ -2201,7 +2189,26 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
         WidgetUtils.registerWidgetConfig(clone as HTMLElement, currentConfig);
       }
     }
+    HTMLElementWithLightDOMTemplate.registerClone(node, clone);
     return clone;
+  }
+
+  /**
+   * Declares `clone` as a rendered counterpart of `original`. `cloneNode` calls this for each
+   * node it clones. Hosts call it for elements they render by other means, e.g. the tree calls
+   * it for the list item that it creates for a `<li>` config element. Resolves `clonedRef`
+   * directives bound to `original`.
+   */
+  static registerClone(original: Node, clone: Node): void {
+    let cloneSet = HTMLElementWithLightDOMTemplate.#originalToClones.get(original);
+    if (!cloneSet) {
+      cloneSet = new Set();
+      HTMLElementWithLightDOMTemplate.#originalToClones.set(original, cloneSet);
+    }
+    cloneSet.add(new WeakRef(clone));
+    if (original instanceof Element && clone instanceof Element) {
+      ClonedRefDirective.notifyCloned(original, clone);
+    }
   }
 
   static patchLitTemplate(template: Lit.LitTemplate): void {
@@ -2244,9 +2251,11 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
         return value;
       }
       if (Lit.isLitDirective(value)) {
-        const directiveValue = value as unknown as {_$litDirective$?: unknown};
-        if (directiveValue['_$litDirective$'] === WidgetUtils.WidgetDirective) {
-          directiveValue['_$litDirective$'] = UIUtilsWidgetDirective;
+        if (value['_$litDirective$'] === ClonedRefDirective) {
+          return value;
+        }
+        if (value['_$litDirective$'] === WidgetUtils.WidgetDirective) {
+          value['_$litDirective$'] = UIUtilsWidgetDirective;
         }
         for (let i = 0; i < value.values.length; i++) {
           const subvalue = value.values[i];
@@ -2354,6 +2363,130 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
     return targetElement;
   }
 }
+
+interface MutableRef {
+  value?: Element;
+}
+
+class ClonedRefDirective extends Lit.AsyncDirective.AsyncDirective {
+  // The template elements that have a connected directive. `registerClone` notifies only those.
+  static readonly #directivesByElement = new WeakMap<Element, Set<ClonedRefDirective>>();
+
+  #templateElement?: Element;
+  #ref?: Lit.Directives.RefOrCallback;
+  #lastElement?: WeakRef<Element>;
+
+  constructor(partInfo: Lit.AsyncDirective.PartInfo) {
+    super(partInfo);
+    if (partInfo.type !== Lit.AsyncDirective.PartType.ELEMENT) {
+      throw new Error('The `clonedRef` directive must be bound to an element.');
+    }
+  }
+
+  /** Called by `HTMLElementWithLightDOMTemplate.registerClone`. Returns at once if no directive is bound. */
+  static notifyCloned(templateElement: Element, clone: Element): void {
+    const directives = ClonedRefDirective.#directivesByElement.get(templateElement);
+    if (!directives) {
+      return;
+    }
+    for (const directive of directives) {
+      directive.#setElement(clone);
+    }
+  }
+
+  render(_ref?: Lit.Directives.RefOrCallback): typeof Lit.nothing {
+    return Lit.nothing;
+  }
+
+  override update(part: Lit.AsyncDirective.ElementPart, [ref]: Parameters<this['render']>): typeof Lit.nothing {
+    if (this.#templateElement !== part.element) {
+      this.#untrackTemplateElement();
+      this.#templateElement = part.element;
+      this.#trackTemplateElement();
+    }
+    if (ref !== this.#ref) {
+      this.#setElement(undefined);
+      this.#ref = ref;
+    }
+    if (this.#lastElement?.deref() === undefined) {
+      // Bound after the host made the clone: resolve at once.
+      this.#setElement(this.#currentClone());
+    }
+    return Lit.nothing;
+  }
+
+  /** The newest live clone of the template element, for a directive bound after the clone was made. */
+  #currentClone(): Element|undefined {
+    if (!this.#templateElement) {
+      return undefined;
+    }
+    const clones = HTMLElementWithLightDOMTemplate.getClones(this.#templateElement);
+    for (let i = clones.length - 1; i >= 0; --i) {
+      const clone = clones[i];
+      if (clone instanceof Element) {
+        return clone;
+      }
+    }
+    return undefined;
+  }
+
+  #setElement(element: Element|undefined): void {
+    const ref = this.#ref;
+    if (!ref) {
+      return;
+    }
+    const previous = this.#lastElement?.deref();
+    this.#lastElement = element ? new WeakRef(element) : undefined;
+    if (typeof ref === 'function') {
+      if (previous === element) {
+        return;
+      }
+      if (previous !== undefined) {
+        ref(undefined);
+      }
+      if (element !== undefined) {
+        ref(element);
+      }
+    } else if (ref.value !== element) {
+      const mutableRef: MutableRef = ref;
+      mutableRef.value = element;
+    }
+  }
+
+  #trackTemplateElement(): void {
+    if (!this.#templateElement) {
+      return;
+    }
+    const directives = ClonedRefDirective.#directivesByElement;
+    Platform.MapUtilities.getWithDefault(directives, this.#templateElement, () => new Set()).add(this);
+  }
+
+  #untrackTemplateElement(): void {
+    if (this.#templateElement) {
+      ClonedRefDirective.#directivesByElement.get(this.#templateElement)?.delete(this);
+    }
+  }
+
+  protected override disconnected(): void {
+    this.#untrackTemplateElement();
+    this.#setElement(undefined);
+  }
+
+  protected override reconnected(): void {
+    this.#trackTemplateElement();
+    this.#setElement(this.#currentClone());
+  }
+}
+
+/**
+ * Sets a `Ref` object or calls a ref callback with the live element that a light DOM template host
+ * rendered for the bound template element (see `HTMLElementWithLightDOMTemplate.registerClone`).
+ * Resolves when the host registers the clone, or at once if the clone already exists. Calls a
+ * callback with `undefined` before a new element and when the directive disconnects. Does not
+ * resolve in standard `render()` calls that do not clone template elements.
+ */
+export const clonedRef: (_ref?: Lit.Directives.RefOrCallback) =>
+    Lit.AsyncDirective.DirectiveResult<typeof ClonedRefDirective> = Lit.AsyncDirective.directive(ClonedRefDirective);
 
 /**
  * @param text Text to copy to clipboard

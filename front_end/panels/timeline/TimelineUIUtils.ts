@@ -1049,7 +1049,7 @@ export class TimelineUIUtils {
     }
 
     if (Trace.Types.Events.isNavigationStart(event)) {
-      url = (event.args.data?.documentLoaderURL ?? event.args.data?.url) as Platform.DevToolsPath.UrlString;
+      url = event.args.data?.documentLoaderURL as Platform.DevToolsPath.UrlString;
       if (url) {
         contentHelper.appendElementRow(i18nString(UIStrings.url), LegacyComponents.Linkifier.Linkifier.linkifyURL(url));
       }
@@ -1203,8 +1203,10 @@ export class TimelineUIUtils {
 
       case Trace.Types.Events.Name.CACHE_MODULE: {
         url = unsafeEventData && unsafeEventData['url'] as Platform.DevToolsPath.UrlString;
-        contentHelper.appendTextRow(i18nString(UIStrings.compilationCacheSize),
-                                    i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+        if (typeof unsafeEventData?.['producedCacheSize'] === 'number') {
+          contentHelper.appendTextRow(i18nString(UIStrings.compilationCacheSize),
+                                      i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+        }
         break;
       }
 
@@ -1220,8 +1222,10 @@ export class TimelineUIUtils {
           }
           entityAppended = true;
         }
-        contentHelper.appendTextRow(i18nString(UIStrings.compilationCacheSize),
-                                    i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+        if (typeof unsafeEventData?.['producedCacheSize'] === 'number') {
+          contentHelper.appendTextRow(i18nString(UIStrings.compilationCacheSize),
+                                      i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+        }
         break;
       }
 
@@ -1948,12 +1952,6 @@ export class TimelineUIUtils {
 
   static visibleEventsFilter(): Trace.Extras.TraceFilter.TraceFilter {
     return new Trace.Extras.TraceFilter.VisibleEventsFilter(Trace.Styles.visibleTypes());
-  }
-
-  // Included only for layout tests.
-  // TODO(crbug.com/1386091): Fix/port layout tests and remove.
-  static categories(): Trace.Styles.CategoryPalette {
-    return Trace.Styles.getCategoryStyles();
   }
 
   static generatePieChart(aggregatedStats: TimeRangeCategoryStats, selfCategory?: Trace.Styles.TimelineCategory,

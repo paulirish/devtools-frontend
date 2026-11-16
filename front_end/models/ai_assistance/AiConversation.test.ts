@@ -13,8 +13,6 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as TextUtils from '../../core/text_utils/text_utils.js';
 import type * as Protocol from '../../generated/protocol.js';
 import {
-  assertSkillLoaded,
-  assertSkillNotLoaded,
   mockAidaClient,
 } from '../../testing/AiAssistanceHelpers.js';
 import {
@@ -98,14 +96,10 @@ describe('AiConversation', () => {
 
     const listNetworkRequestsTool = AiAssistance.ToolRegistry.ToolRegistry.get('listNetworkRequests');
     assert.exists(listNetworkRequestsTool);
-    const stub = sinon.stub(listNetworkRequestsTool, 'handler').resolves({result: {requests: []}});
+    const stub = sinon.stub(listNetworkRequestsTool, 'handler').resolves({result: 'id;url;status;duration;size'});
 
     const aidaClient = mockAidaClient([
-      // Turn 1: Model loads network skill and executes listNetworkRequests.
-      [{
-        explanation: '',
-        functionCalls: [{name: 'learnSkills', args: {skills: ['network']}}],
-      }],
+      // Turn 1: Model automatically has network skill loaded and executes listNetworkRequests.
       [{
         explanation: 'Listing requests.',
         functionCalls: [{name: 'listNetworkRequests', args: {}}],
@@ -200,12 +194,11 @@ describe('AiConversation', () => {
     // Turn 2: Query again.
     await Array.fromAsync(conversation.run('analyze'));
 
-    // 'network' should remain active on the agent across context changes, so it is omitted from
-    // the unloaded skills manifest, while other unloaded skills like 'styling' remain listed.
+    // 'network' should remain active on the agent across context changes, so its tools are still available.
     const lastRequest = aidaClient.doConversation.lastCall.firstArg;
-    const promptText = 'text' in lastRequest.current_message.parts[0] ? lastRequest.current_message.parts[0].text : '';
-    assertSkillLoaded(promptText, 'network');
-    assertSkillNotLoaded(promptText, 'styling');
+    const declaredTools = lastRequest.function_declarations?.map((d: {name: string}) => d.name) ?? [];
+    assert.includeMembers(declaredTools, ['listNetworkRequests', 'getNetworkRequestDetails']);
+    assert.notInclude(declaredTools, 'getStyles');
   });
 
   it('disables server-side logging when running with a context that disallows logging', async () => {
@@ -736,6 +729,7 @@ describe('AiConversation', () => {
     const contextResponse: AiAssistance.AiAgent.ContextResponse = {
       type: AiAssistance.AiAgent.ResponseType.CONTEXT,
       details: [{title: 'Detail', text: 'Text'}],
+      autoLearnedSkills: ['styling'],
       widgets: [{
         name: 'DOM_TREE',
         data: {
@@ -752,6 +746,7 @@ describe('AiConversation', () => {
       output: 'output',
       canceled: false,
       loadedSkills: ['styling'],
+      autoApproved: true,
       widgets: [{
         name: 'COMPUTED_STYLES',
         data: {
@@ -781,14 +776,18 @@ describe('AiConversation', () => {
     assert.isUndefined((serialized.history[0] as AiAssistance.AiAgent.UserQuery).imageInput);
     assert.strictEqual((serialized.history[0] as AiAssistance.AiAgent.UserQuery).imageId, 'test-image-id');
 
-    // ContextResponse should have widgets removed
-    assert.strictEqual(serialized.history[1].type, AiAssistance.AiAgent.ResponseType.CONTEXT);
-    assert.isUndefined((serialized.history[1] as AiAssistance.AiAgent.ContextResponse).widgets);
+    // ContextResponse should have widgets and autoLearnedSkills removed.
+    const serializedContext = serialized.history[1];
+    assert(serializedContext.type === AiAssistance.AiAgent.ResponseType.CONTEXT);
+    assert.isUndefined(serializedContext.widgets);
+    assert.isUndefined(serializedContext.autoLearnedSkills);
 
-    // ActionResponse should have widgets and loadedSkills removed.
-    assert.strictEqual(serialized.history[2].type, AiAssistance.AiAgent.ResponseType.ACTION);
-    assert.isUndefined((serialized.history[2] as AiAssistance.AiAgent.ActionResponse).widgets);
-    assert.isUndefined((serialized.history[2] as AiAssistance.AiAgent.ActionResponse).loadedSkills);
+    // ActionResponse should have widgets, loadedSkills, and autoApproved removed.
+    const serializedAction = serialized.history[2];
+    assert(serializedAction.type === AiAssistance.AiAgent.ResponseType.ACTION);
+    assert.isUndefined(serializedAction.widgets);
+    assert.isUndefined(serializedAction.loadedSkills);
+    assert.isUndefined(serializedAction.autoApproved);
   });
 
   it('redacts action outputs of tools annotated with REDACT_FROM_HISTORY', () => {

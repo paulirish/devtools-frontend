@@ -11,7 +11,6 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as Input from '../../ui/components/input/input.js';
 import * as Switch from '../../ui/components/switch/switch.js';
 import * as uiI18n from '../../ui/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -452,7 +451,6 @@ export const AI_SETTINGS_TAB_DEFAULT_VIEW: View = (input, output, target): void 
   ` : nothing;
 
   render(html`
-    <style>${Input.checkboxStyles}</style>
     <style>${aiSettingsTabStyles}</style>
     <div class="ai-settings-container">
     <div class="settings-container-wrapper" jslog=${VisualLogging.pane('chrome-ai')}>
@@ -609,6 +607,7 @@ export class AISettingsTab extends UI.Widget.VBox {
 
   #removeAllowedTool(name: AiAssistanceModel.Tool.ToolName): void {
     this.#alwaysAllowedTools.remove(name);
+    void VisualLogging.logFunctionCall('ai-permission-revoked', Platform.StringUtilities.toKebabCase(name));
   }
 
   /**
@@ -659,8 +658,7 @@ export class AISettingsTab extends UI.Widget.VBox {
 
     if (!this.#aiAssistanceSetting.unavailable) {
       const aiAssistanceData: AiSettingParams = {
-        settingName: i18n.i18n.lockedString(AiAssistanceModel.AiUtils.isGeminiBranding() ? 'Gemini in Chrome DevTools' :
-                                                                                           'AI assistance'),
+        settingName: i18n.i18n.lockedString('AI assistance'),
         setting: this.#aiAssistanceSetting,
         disabledReasons: this.#mapSettingDisabledReasons(this.#aiAssistanceSetting.disabledReasons),
         iconName: AiAssistanceModel.AiUtils.getIconName(),

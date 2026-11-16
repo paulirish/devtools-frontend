@@ -11,7 +11,7 @@ import type * as Components from '../../ui/legacy/components/utils/utils.js';
 
 import type * as ElementsComponents from './components/components.js';
 import type {StylePropertiesSection} from './StylePropertiesSection.js';
-import type {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
+import type {StylePropertyData} from './StylePropertyTreeElement.js';
 import type {WebCustomData} from './WebCustomData.js';
 
 export interface StylesContainer {
@@ -27,8 +27,7 @@ export interface StylesContainer {
   node(): SDK.DOMModel.DOMNode|null;
   cssModel(): SDK.CSSModel.CSSModel|null;
   computedStyleModel(): ComputedStyle.ComputedStyleModel.ComputedStyleModel;
-  refreshUpdate(editedSection: StylePropertiesSection, editedTreeElement?: StylePropertyTreeElement,
-                force?: boolean): void;
+  refreshUpdate(editedSection: StylePropertiesSection, editedProperty?: StylePropertyData, force?: boolean): void;
   filterRegex(): RegExp|null;
   setEditingStyle(editing: boolean): void;
   setUserOperation(userOperation: boolean): void;
@@ -38,8 +37,8 @@ export interface StylesContainer {
 
   getRegisteredPropertyDetails(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
       ElementsComponents.CSSVariableValueView.RegisteredPropertyDetails|undefined;
-  getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles, variableName: string):
-      ElementsComponents.CSSVariableValueView.CSSVariableParserError|null;
+  getVariableParserError(matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+                         variableName: string): ElementsComponents.CSSVariableValueView.RegisteredPropertyDetails|null;
   jumpToFunctionDefinition(functionName: string, treeScopeDistance: number): void;
   continueEditingElement(sectionIndex: number, propertyIndex: number): void;
   revealProperty(cssProperty: SDK.CSSProperty.CSSProperty): void;
@@ -57,7 +56,7 @@ export interface StylesContainer {
   jumpToFontPaletteDefinition(paletteName: string): void;
   jumpToCounterStyleDefinition(counterStyleName: string): void;
   jumpToDeclaration(valueSource: SDK.CSSMatchedStyles.CSSValueSource): void;
-  setActiveProperty(treeElement: StylePropertyTreeElement|null): void;
+  setActiveProperty(propertyData: StylePropertyData|null): void;
   addStyleUpdateListener(listener: () => void): void;
   removeStyleUpdateListener(listener: () => void): void;
   trackForLazyRendering(element: Element, callback: () => void): void;

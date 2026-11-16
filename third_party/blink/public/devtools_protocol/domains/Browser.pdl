@@ -64,7 +64,6 @@ domain Browser
       smartCard
       speakerSelection
       storageAccess
-      topLevelStorageAccess
       videoCapture
       vr
       wakeLockScreen
@@ -337,12 +336,6 @@ domain Browser
   experimental command executeBrowserCommand
     parameters
       BrowserCommandId commandId
-
-  # Allows a site to use privacy sandbox features that require enrollment
-  # without the site actually being enrolled. Only supported on page targets.
-  command addPrivacySandboxEnrollmentOverride
-    parameters
-      string url
 
   # Gets the current globally-applied privacy control status
   # See https://www.w3.org/TR/gpc/#get-global-privacy-control

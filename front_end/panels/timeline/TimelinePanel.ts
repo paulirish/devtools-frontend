@@ -47,6 +47,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as Badges from '../../models/badges/badges.js';
 import type * as CommentManager from '../../models/comment_manager/comment_manager.js';
+import * as LiveMetrics from '../../models/live-metrics/live-metrics.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as SourceMapsResolver from '../../models/trace_source_maps_resolver/trace_source_maps_resolver.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -477,6 +478,7 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
       'flamechart-selected-navigation', 'Modern - normal scrolling', 'timeline.select-modern-navigation');
   #classicNavRadioButton = UI.UIUtils.createRadioButton(
       'flamechart-selected-navigation', 'Classic - scroll to zoom', 'timeline.select-classic-navigation');
+  #navigationSettingInitialized = false;
 
   #onMainEntryHovered: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   #hiddenTracksInfoBarByParsedTrace = new WeakMap<Trace.TraceModel.ParsedTrace, UI.Infobar.Infobar|'DISMISSED'>();
@@ -538,7 +540,7 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
     this.#thirdPartyTracksSetting = TimelinePanel.extensionDataVisibilitySetting();
     this.#thirdPartyTracksSetting.addChangeListener(this.#extensionDataVisibilityChanged, this);
     Common.Settings.Settings.instance()
-        .moduleSetting('timeline-enable-soft-navigations')
+        .resolve(LiveMetrics.timelineEnableSoftNavigationsSettingDescriptor)
         .addChangeListener(this.#onModelConfigurationChanged, this);
 
     const timelineToolbarContainer = this.element.createChild('div', 'timeline-toolbar-container');
@@ -760,7 +762,7 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
                            .resolve(SettingUIRegistration.TimelineSettings.timelineDebugModeSettingDescriptor)
                            .get();
     config.enableSoftNavigation =
-        Common.Settings.Settings.instance().moduleSetting('timeline-enable-soft-navigations').get() as boolean;
+        Common.Settings.Settings.instance().resolve(LiveMetrics.timelineEnableSoftNavigationsSettingDescriptor).get();
     return config;
   }
 
@@ -1450,8 +1452,10 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
       return;
     }
 
-    // Grab the script mapping to be able to filter out by url.
-    const mappedScriptsWithData = Trace.Handlers.ModelHandlers.Scripts.data().scripts;
+    // Map scripts by ID so extension script content can be removed. Read them
+    // from the saved trace's `parsedTrace.data`, because the global `Scripts`
+    // handler state is reset after every parse.
+    const mappedScriptsWithData = parsedTrace.data.Scripts.scripts;
     const scriptByIdMap = new Map<string, Trace.Handlers.ModelHandlers.Scripts.Script>();
 
     for (const mapScript of mappedScriptsWithData) {
@@ -1553,7 +1557,7 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
     let fileName =
         (isCpuProfile ? `CPU-${isoDate}.cpuprofile` : `Trace-${isoDate}.json`) as Platform.DevToolsPath.RawPathString;
 
-    let blobParts: string[] = [];
+    let blobParts: BlobPart[] = [];
     if (isCpuProfile) {
       const profile = Trace.Helpers.SamplesIntegrator.SamplesIntegrator.extractCpuProfileFromFakeTrace(traceEvents);
       blobParts = [JSON.stringify(profile)];
@@ -1566,7 +1570,12 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
         sourceMaps: filteredMetadataSourceMaps,
         resources: filteredResources,
       });
-      blobParts = Array.from(formattedTraceIter);
+      // Wrap each chunk in a Blob as soon as it is generated, so that each
+      // chunk string can be garbage collected straight away. Collecting all
+      // the strings first would hold the whole serialized trace in the JS heap.
+      for (const chunk of formattedTraceIter) {
+        blobParts.push(new Blob([chunk]));
+      }
     }
 
     if (!blobParts.length) {
@@ -1761,7 +1770,6 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
   }
 
   #launchRehydratedSession(traceJson: string): void {
-    let rehydratingWindow: Window|null = null;
     let pathToLaunch: string|null = null;
     const url = new URL(window.location.href);
     const pathToEntrypoint = url.pathname.slice(0, url.pathname.lastIndexOf('/'));
@@ -1771,19 +1779,21 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
 
     // Clarifying the window the code is referring to
     const hostWindow = window;
+    const rehydratingWindow = this.isDocked() ?
+        hostWindow.open(pathToLaunch, /* target: */ '_blank', 'noopener=false,popup=false') :
+        hostWindow.open(pathToLaunch, /* target: */ undefined, 'noopener=false,popup=true');
+    if (!rehydratingWindow) {
+      return;
+    }
+
     function onMessageHandler(ev: MessageEvent): void {
-      if (url && ev.data?.type === 'REHYDRATING_WINDOW_READY') {
-        rehydratingWindow?.postMessage({type: 'REHYDRATING_TRACE_FILE', traceJson}, url.origin);
+      if (ev.source !== rehydratingWindow || ev.data?.type !== 'REHYDRATING_WINDOW_READY') {
+        return;
       }
+      rehydratingWindow?.postMessage({type: 'REHYDRATING_TRACE_FILE', traceJson}, url.origin);
       hostWindow.removeEventListener('message', onMessageHandler);
     }
     hostWindow.addEventListener('message', onMessageHandler);
-
-    if (this.isDocked()) {
-      rehydratingWindow = hostWindow.open(pathToLaunch, /* target: */ '_blank', 'noopener=false,popup=false');
-    } else {
-      rehydratingWindow = hostWindow.open(pathToLaunch, /* target: */ undefined, 'noopener=false,popup=true');
-    }
   }
 
   async loadFromURL(url: Platform.DevToolsPath.UrlString): Promise<void> {
@@ -2306,7 +2316,8 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
 
     // When the timeline is loaded for the first time, setup the shortcuts dialog and log what navigation setting is selected.
     // Logging the setting on the first timeline load will allow us to get an estimate number of people using each option.
-    if (this.#traceEngineModel.size() === 1) {
+    if (!this.#navigationSettingInitialized && this.#traceEngineModel.size() === 1) {
+      this.#navigationSettingInitialized = true;
       this.#setupNavigationSetting();
       if (Common.Settings.Settings.instance()
               .resolve(SettingUIRegistration.TimelineSettings.flamechartSelectedNavigationSettingDescriptor)
@@ -3189,17 +3200,38 @@ export class TimelinePanel extends TimelinePanelBase implements Client, Timeline
     }
   }
 
-  static async executeRecordAndReload(): Promise<Trace.TraceModel.ParsedTrace> {
+  static async executeRecordAndReload(options?: {signal?: AbortSignal}): Promise<Trace.TraceModel.ParsedTrace> {
+    if (options?.signal?.aborted) {
+      throw new Error('Recording was aborted');
+    }
     await UI.ViewManager.ViewManager.instance().showView('timeline');
     await SDK.TargetManager.TargetManager.instance().primaryPageTarget()?.pageAgent().invoke_bringToFront();
+    if (options?.signal?.aborted) {
+      throw new Error('Recording was aborted');
+    }
     const panelInstance = TimelinePanel.instance();
 
-    const result: EventTypes[Events.RECORDING_COMPLETED] = await new Promise(resolve => {
-      function listener(e: Common.EventTarget.EventTargetEvent<EventTypes[Events.RECORDING_COMPLETED]>): void {
-        resolve(e.data);
+    const result: EventTypes[Events.RECORDING_COMPLETED] = await new Promise((resolve, reject) => {
+      function cleanup(): void {
         panelInstance.removeEventListener(Events.RECORDING_COMPLETED, listener);
+        options?.signal?.removeEventListener('abort', onAbort);
+      }
+      function listener(e: Common.EventTarget.EventTargetEvent<EventTypes[Events.RECORDING_COMPLETED]>): void {
+        cleanup();
+        resolve(e.data);
+      }
+      function onAbort(): void {
+        cleanup();
+        // Only stop once State.RECORDING is reached; calling stopRecording()
+        // during State.START_PENDING nulls out this.controller while
+        // #startTraceRecording() is still awaiting setup.
+        if (panelInstance.state === State.RECORDING) {
+          void panelInstance.stopRecording();
+        }
+        reject(new Error('Recording was aborted'));
       }
       panelInstance.addEventListener(Events.RECORDING_COMPLETED, listener);
+      options?.signal?.addEventListener('abort', onAbort, {once: true});
       panelInstance.recordReload();
     });
 

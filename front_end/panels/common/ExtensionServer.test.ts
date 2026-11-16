@@ -18,13 +18,14 @@ import type * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
-import {createTarget, expectConsoleLogs} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment, expectConsoleLogs} from '../../testing/EnvironmentHelpers.js';
 import {spyCall} from '../../testing/ExpectStubCall.js';
 import {
   type ExtensionContext,
   getExtensionOrigin,
   setupDevtoolsExtensionHooks,
 } from '../../testing/ExtensionHelpers.js';
+import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import type {MockDebuggerBackend} from '../../testing/MockScopeChain.js';
 import {createNetworkRequest} from '../../testing/NetworkRequestHelpers.js';
 import {addChildFrame, FRAME_URL, getMainFrame, mockResourceTree} from '../../testing/ResourceTreeHelpers.js';
@@ -176,7 +177,7 @@ describe('Extensions', () => {
     describe('setFunctionRangesForScript', () => {
       expectConsoleLogs({
         error: [
-          'Extension server error: Invalid argument command: expected a source map script resource for url: https://example.com/',
+          'Extension server error: Invalid argument command: expected a source map script resource for url: https://example.com/normal.js',
           'Extension server error: Invalid argument command: expected valid scriptUrl and non-empty NamedFunctionRanges',
         ],
       });
@@ -294,10 +295,12 @@ describe('Extensions', () => {
   const context = setupDevtoolsExtensionHooks();
 
   expectConsoleLogs({
+    warn: ['evaluate: the main frame is not yet available'],
     error: [
       'Extension server error: Invalid argument urlScheme: Scheme is forbidden',
       'Extension server error: Invalid argument urlScheme: Scheme is forbidden',
       'Extension server error: Invalid argument urlScheme: Scheme is forbidden',
+      'Extension server error: Object not found: <top>',
     ],
   });
   beforeEach(() => {
@@ -545,6 +548,7 @@ describe('Extensions', () => {
   });
 
   it('cannot show a Recorder view registered by another extension', async () => {
+    sinon.stub(console, 'error');
     const view = await context.chrome.devtools?.recorder.createView('Test', 'test.html');
     assert.isNotNull(view);
     const viewId = (view as unknown as {_id: string})._id;
@@ -585,6 +589,8 @@ describe('Extensions', () => {
     assert.strictEqual(response.result.code, 'E_FAILED');
     assert.strictEqual(response.result.description, 'Operation failed: %s');
     assert.deepEqual(response.result.details, ['Permission denied']);
+    sinon.assert.calledWith(console.error as sinon.SinonStub,
+                            'Extension server error: Operation failed: Permission denied');
   });
 
   it('reload only the main toplevel frame', async () => {
@@ -2299,6 +2305,102 @@ describe('ExtensionServer', () => {
   });
 });
 
+describe('ExtensionFramesWidget', () => {
+  describe('view', () => {
+    it('renders hidden extension iframes and preserves existing iframe elements across updates', () => {
+      const target = document.createElement('div');
+      renderElementIntoDOM(target);
+
+      PanelCommon.ExtensionServer.DEFAULT_VIEW({
+        frames: [{
+          key: 0,
+          startPage: 'about:blank#ext-1',
+          name: 'First Extension',
+        }],
+      },
+                                               undefined, target);
+
+      assert.strictEqual(target.getAttribute('style'), 'display: contents');
+      const initialFrames = target.querySelectorAll('iframe');
+      assert.lengthOf(initialFrames, 1);
+      const [firstFrame] = initialFrames;
+      assert.strictEqual(firstFrame.getAttribute('src'), 'about:blank#ext-1');
+      assert.strictEqual(firstFrame.dataset.devtoolsExtension, 'First Extension');
+      assert.strictEqual(firstFrame.style.display, 'none');
+
+      PanelCommon.ExtensionServer.DEFAULT_VIEW({
+        frames: [
+          {
+            key: 0,
+            startPage: 'about:blank#ext-1',
+            name: 'First Extension',
+          },
+          {
+            key: 1,
+            startPage: 'about:blank#ext-2',
+            name: 'Second Extension',
+          },
+        ],
+      },
+                                               undefined, target);
+
+      const updatedFrames = target.querySelectorAll('iframe');
+      assert.lengthOf(updatedFrames, 2);
+      assert.strictEqual(updatedFrames[0], firstFrame);
+      assert.strictEqual(updatedFrames[1].getAttribute('src'), 'about:blank#ext-2');
+      assert.strictEqual(updatedFrames[1].dataset.devtoolsExtension, 'Second Extension');
+      assert.strictEqual(updatedFrames[1].style.display, 'none');
+    });
+  });
+
+  describeWithEnvironment('ExtensionServer.addExtensionFrame', () => {
+    let server: PanelCommon.ExtensionServer.ExtensionServer|undefined;
+
+    afterEach(() => {
+      server?.dispose();
+      server = undefined;
+    });
+
+    it('mounts ExtensionFramesWidget in document.body and detaches it on dispose', async () => {
+      const view = sinon.stub<Parameters<PanelCommon.ExtensionServer.View>>();
+      const framesWidget = new PanelCommon.ExtensionServer.ExtensionFramesWidget(undefined, view);
+      server = PanelCommon.ExtensionServer.ExtensionServer.instance({forceNew: true, framesWidget});
+      sinon.assert.notCalled(view);
+
+      server.addExtensionFrame({
+        startPage: 'chrome-extension://ext-1/devtools.html',
+        name: 'Ext 1',
+        exposeExperimentalAPIs: false,
+      });
+      await framesWidget.updateComplete;
+
+      assert.isTrue(framesWidget.isShowing());
+      assert.isTrue(document.body.contains(framesWidget.element));
+      assert.deepEqual(view.lastCall.args[0], {
+        frames: [{key: 0, startPage: 'chrome-extension://ext-1/devtools.html', name: 'Ext 1'}],
+      });
+
+      server.addExtensionFrame({
+        startPage: 'chrome-extension://ext-2/devtools.html',
+        name: 'Ext 2',
+        exposeExperimentalAPIs: false,
+      });
+      await framesWidget.updateComplete;
+
+      assert.deepEqual(view.lastCall.args[0], {
+        frames: [
+          {key: 0, startPage: 'chrome-extension://ext-1/devtools.html', name: 'Ext 1'},
+          {key: 1, startPage: 'chrome-extension://ext-2/devtools.html', name: 'Ext 2'},
+        ],
+      });
+
+      server.dispose();
+      assert.isFalse(framesWidget.isShowing());
+      assert.isFalse(framesWidget.element.isConnected);
+    });
+  });
+});
+
 function assertIsStatus<T>(value: T|
                            PanelCommon.ExtensionServer.Record): asserts value is PanelCommon.ExtensionServer.Record {
   if (value && typeof value === 'object' && 'code' in value) {
@@ -2623,6 +2725,10 @@ describe('Extension panel with non-ASCII titles', () => {
 });
 
 describe('Extension Panels', () => {
+  setupLocaleHooks();
+  afterEach(async () => {
+    await UI.Widget.Widget.allUpdatesComplete;
+  });
   const context = setupDevtoolsExtensionHooks();
   async function setUpFrame(name: string, url: Platform.DevToolsPath.UrlString,
                             parentFrame?: SDK.ResourceTreeModel.ResourceTreeFrame,
@@ -2786,6 +2892,7 @@ describe('Extension Panels', () => {
 
     // Test error case (Promise rejection when resource is not found).
     uiSourceCodeStub.returns(null);
+    sinon.stub(console, 'error');
     try {
       await context.chrome.devtools!.panels.openResource(url, /* lineNumber */ 10);
       assert.fail('Expected promise to reject');
@@ -2793,6 +2900,8 @@ describe('Extension Panels', () => {
       assert.instanceOf(error, Error);
       assert.strictEqual(error.message, 'DevTools API encountered an error');
     }
+    sinon.assert.calledWith(console.error as sinon.SinonStub,
+                            'Extension server error: Object not found: http://example.com/script.js');
   });
 
   /**
@@ -2992,6 +3101,7 @@ describe('Extension Panels', () => {
    * when the operation fails.
    */
   it('ExtensionSidebarPane.setObject returns rejected promise on error', async () => {
+    sinon.stub(console, 'error');
     const pane = await context.chrome.devtools!.panels.elements.createSidebarPane('Sidebar');
 
     // Stub `setObject` on the server-side pane to simulate a failure by invoking the callback with an error message.
@@ -3008,6 +3118,8 @@ describe('Extension Panels', () => {
       assert.instanceOf(error, Error);
       assert.strictEqual(error.message, 'DevTools API encountered an error');
     }
+    sinon.assert.calledWith(console.error as sinon.SinonStub,
+                            'Extension server error: Operation failed: mock setObject error');
   });
 
   /**
@@ -3015,6 +3127,7 @@ describe('Extension Panels', () => {
    * when the operation fails.
    */
   it('ExtensionSidebarPane.setExpression returns rejected promise on error', async () => {
+    sinon.stub(console, 'error');
     const pane = await context.chrome.devtools!.panels.elements.createSidebarPane('Sidebar');
 
     // Stub `setExpression` on the server-side pane to simulate a failure by invoking the callback with an error message.
@@ -3031,6 +3144,8 @@ describe('Extension Panels', () => {
       assert.instanceOf(error, Error);
       assert.strictEqual(error.message, 'DevTools API encountered an error');
     }
+    sinon.assert.calledWith(console.error as sinon.SinonStub,
+                            'Extension server error: Operation failed: mock setExpression error');
   });
 
   /**
@@ -3038,6 +3153,7 @@ describe('Extension Panels', () => {
    * provided callback even when the operation fails (e.g., resource not found).
    */
   it('openResource callback is called on error', async () => {
+    sinon.stub(console, 'error');
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     // Stub `uiSourceCodeForURL` to return null to simulate a resource not found failure.
     sinon.stub(workspace, 'uiSourceCodeForURL').returns(null);
@@ -3051,9 +3167,24 @@ describe('Extension Panels', () => {
                                                      resolve();
                                                    });
     });
+    sinon.assert.calledWith(console.error as sinon.SinonStub,
+                            'Extension server error: Object not found: http://example.com/script.js');
   });
 
   describe('forwardKeyboardEvent', () => {
+    expectConsoleLogs({
+      error: [
+        'Extension server error: Invalid argument entries: unexpected shortcut key',
+        'Extension server error: Invalid argument entries: expected array',
+        'Extension server error: Invalid argument eventType: expected "keydown"',
+        'Extension server error: Invalid type for argument keyCode: got string, expected number',
+        'Extension server error: Invalid argument entries: unexpected shortcut key',
+        'Extension server error: Invalid argument command: expected _forwardKeyboardEvent',
+        'Extension server error: Invalid argument keyCode: invalid keyCode',
+        'Extension server error: Invalid type for argument ctrlKey: got string, expected boolean',
+      ],
+    });
+
     interface ForwardedKeyboardEvent extends KeyboardEvent {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       __keyCode?: number;
@@ -3466,6 +3597,7 @@ describe('Keyboard event forwarding', () => {
   const context = setupDevtoolsExtensionHooks({}, [H_KEY_CODE, CTRL_H]);
 
   beforeEach(() => {
+    sinon.stub(MessagePort.prototype, 'postMessage');
     getBackend(context).createTarget().setInspectedURL(urlString`http://example.com`);
     // The injected API, and with it the keydown listener under test, is only installed once the
     // target has been navigated to a non-privileged URL.

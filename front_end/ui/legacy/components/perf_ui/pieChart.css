@@ -68,8 +68,8 @@
 
 .pie-chart-swatch {
   display: inline-block;
-  width: 11px;
-  height: 11px;
+  width: var(--sys-size-5);
+  height: var(--sys-size-5);
   margin: 0 var(--sys-size-4);
   top: var(--sys-size-1);
   position: relative;
@@ -83,7 +83,7 @@
 .pie-chart-size {
   display: inline-block;
   text-align: right;
-  width: 70px;
+  width: var(--sys-size-19);
 }
 
 @media (forced-colors: active) {

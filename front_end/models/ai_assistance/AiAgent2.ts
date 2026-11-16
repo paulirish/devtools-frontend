@@ -15,6 +15,7 @@ import {
   type ConversationContext,
   type MultimodalInputType,
   type ParsedResponse,
+  type PromptFact,
   type RequestOptions,
   ResponseType,
   sanitizeSuggestionsList,
@@ -23,10 +24,12 @@ import {
 import {type ExecuteJsAgentOptions, executeJsCode} from './agents/ExecuteJavascript.js';
 import {ChangeManager} from './ChangeManager.js';
 import {DOMNodeContext} from './contexts/DOMNodeContext.js';
+import {FileContext} from './contexts/FileContext.js';
 import {LighthouseContext} from './contexts/LighthouseContext.js';
 import {PerformanceTraceContext} from './contexts/PerformanceTraceContext.js';
+import {RequestContext} from './contexts/RequestContext.js';
 import {ExtensionScope} from './ExtensionScope.js';
-import type {Skill, SkillName} from './skills/Skill.js';
+import type {SkillName} from './skills/Skill.js';
 import {SKILLS} from './skills/SkillRegistry.js';
 import {
   type AllToolsCapabilities,
@@ -38,6 +41,9 @@ import {
 import {ToolRegistry} from './tools/ToolRegistry.js';
 
 const {debugLog} = AiUtils.Debug;
+
+const UNCHANGED_CONTEXT_PROMPT_NOTICE =
+    'The selected context is unchanged since it was last provided earlier in this conversation.';
 
 const SKILL_DISPLAY_NAMES: Record<SkillName, string> = {
   styling: 'CSS and styling',
@@ -67,11 +73,14 @@ Your role is to help web developers debug, analyze, and optimize web application
 * **Informational or exploratory questions** (e.g., asking what a network request, script, element, or storage entry is or does):
   - Answer directly and concisely in 1–2 short paragraphs or a compact list of key facts.
   - Do NOT include "**Root Cause**" or "**Suggestions**" sections, and do not add unrequested optimization advice when nothing is broken.
-* **Debugging or optimization questions** (e.g., asking why something fails, renders incorrectly, or is slow, or how to improve/fix it):
+* **Debugging or optimization questions (without live page modifications)** (e.g., asking why something fails, renders incorrectly, or is slow, or how to improve/fix it when you have NOT modified the live page):
   - **Root Cause(s)**: Point out the root cause(s) of the problem.
     - Example: "**Root Cause**: [reason]" or "**Root Causes**:" followed by a bulleted list.
   - **Suggestion(s)**: List actionable solution suggestion(s) in order of impact.
     - Example: "**Suggestion**: [Suggestion]" or "**Suggestions**:" followed by a bulleted list.
+* **Turns where you modified the live page** (e.g., after applying CSS or DOM changes to the inspected page):
+  - **Root Cause(s)** (include when diagnosing a bug): Point out the root cause(s) of the problem.
+  - **Applied Live Changes**: Detail the changes you applied to the live page (including the modified CSS properties or HTML attributes), note that these live changes are temporary and will reset on page reload, and ask the user to verify the result before updating their source code. Do NOT use "**Suggestion(s)**" or "**Suggested fix**" headings when you have already modified the live page.
 
 # Follow-up Suggestions
 * At the end of your response, call the \`suggestFollowUps\` function to provide 1 to 3 relevant, concise follow-up queries or actions for the user.
@@ -196,6 +205,47 @@ function hideStreamingSuggestions(text: string): string {
 }
 
 export class AiAgent2 extends AiAgent<unknown> {
+  /**
+   * Tracks the last context details sent to the LLM to prevent resending identical
+   * large context blocks on subsequent turns in the same conversation.
+   */
+  #lastSentPromptDetails: string|null = null;
+  /**
+   * Tracks `PromptFact` instances already appended to `#history` in this conversation.
+   * Facts are injected into append-only history rather than AIDA's wire `request.facts`
+   * field (which `FactsToText` prepends to `current_message` on every step, repeating
+   * tokens and invalidating prefix caching) or `getPromptDetails()` (which must stay
+   * deterministic across turns for `#lastSentPromptDetails` deduplication).
+   */
+  readonly #sentFacts = new Set<PromptFact>();
+
+  override clearCache(): void {
+    super.clearCache();
+    // Reset both trackers so that if conversation history is rolled back (e.g., after an
+    // abort or non-MAX_STEPS error), context details and required facts are resent on retry.
+    this.#lastSentPromptDetails = null;
+    this.#sentFacts.clear();
+  }
+
+  /**
+   * Appends any `facts` not yet recorded in `#sentFacts` to `content` under
+   * `# References` with `## ${fact.title}` subheadings.
+   */
+  #appendUnsentFacts(content: string, facts: readonly PromptFact[] = []): string {
+    const factSections: string[] = [];
+    for (const fact of facts) {
+      if (!this.#sentFacts.has(fact)) {
+        this.#sentFacts.add(fact);
+        factSections.push(`## ${fact.title}\n\n${fact.description.trim()}`);
+      }
+    }
+    if (factSections.length === 0) {
+      return content;
+    }
+    const references = `# References\n\n${factSections.join('\n\n')}`;
+    return content ? `${content}\n\n${references}` : references;
+  }
+
   // TODO: The static preamble is a placeholder and will eventually live server-side.
   readonly preamble: string = preamble;
   readonly clientFeature: Host.AidaClient.ClientFeature = Host.AidaClient.ClientFeature.CHROME_DEVTOOLS_V2_AGENT;
@@ -214,6 +264,7 @@ export class AiAgent2 extends AiAgent<unknown> {
   }
 
   protected override async preRun(): Promise<void> {
+    await super.preRun();
     // One-way latch: once sensitive data enters the conversation history,
     // logging must remain disabled for the lifetime of this agent instance.
     if (this.context && !this.context.isLoggingEnabled()) {
@@ -249,6 +300,10 @@ export class AiAgent2 extends AiAgent<unknown> {
 
   readonly #activeSkills = new Set<SkillName>();
   readonly #declaredTools = new Set<string>();
+  /**
+   * Tracks skills auto-loaded during enhanceQuery() so handleContextDetails() can attach them to ContextResponse for telemetry without rendering a walkthrough step.
+   */
+  #pendingAutoLearnedSkills: SkillName[] = [];
 
   constructor(opts: AiAgent2Options) {
     super({
@@ -269,13 +324,16 @@ export class AiAgent2 extends AiAgent<unknown> {
     this.#performanceRecordAndReload = opts.performanceRecordAndReload;
     this.#execJs = opts.execJs ?? executeJsCode;
     this.#originLock = opts.originLock;
+
     this.#declaredTools.add('learnSkills');
+    const skillsManifest = Object.entries(SKILLS).map(([name, skill]) => `- ${name}: ${skill.description}`).join('\n');
     this.declareFunction<{skills: SkillName[]}>('learnSkills', {
-      description: () => {
-        const unloadedSkills = Object.keys(this.getSkills()).filter(name => !this.#activeSkills.has(name as SkillName));
-        return `Loads the specified skills to gain access to their specialized tools. Call this ONLY for skills listed under Available skills that are not yet loaded. Do not call this for skills that are already loaded. Available skills that are not yet loaded: ${
-            unloadedSkills.join(', ')}.`;
-      },
+      description: `Loads the specified skills to gain access to their specialized tools and instructions.
+If the user's request requires a skill that has not been loaded yet in this conversation, you MUST call \`learnSkills\` to load that skill first before using its tools, instead of attempting to solve the query using tools from other skills.
+Do NOT call \`learnSkills\` for skills that were already loaded earlier in this conversation.
+
+Available skills:
+${skillsManifest}`,
       parameters: {
         type: Host.AidaClient.ParametersTypes.OBJECT,
         description: 'Parameters for learning skills',
@@ -286,7 +344,7 @@ export class AiAgent2 extends AiAgent<unknown> {
               type: Host.AidaClient.ParametersTypes.STRING,
               description: 'Skill name',
             },
-            description: 'List of unloaded skill names to load',
+            description: 'List of skill names to load (only include skills not yet loaded in this conversation)',
           },
         },
         required: ['skills'],
@@ -335,42 +393,53 @@ export class AiAgent2 extends AiAgent<unknown> {
     });
   }
 
+  /**
+   * Maps selected contexts (DOMNodeContext, RequestContext, FileContext) to their domain skill to skip a redundant step-1 learnSkills round trip.
+   */
+  #skillForContext(selected: ConversationContext<unknown>|null): SkillName|null {
+    if (selected instanceof DOMNodeContext) {
+      return 'styling';
+    }
+    if (selected instanceof RequestContext) {
+      return 'network';
+    }
+    if (selected instanceof FileContext) {
+      return 'sources';
+    }
+    return null;
+  }
+
   override async enhanceQuery(
       query: string,
       selected: ConversationContext<unknown>|null = null,
       // TODO: support multimodal input in AiAgent2.
       _multimodalInputType?: MultimodalInputType,
       ): Promise<string> {
-    let enhancedQuery = query;
-    if (selected) {
-      const promptDetails = await selected.getPromptDetails();
-      if (promptDetails) {
-        enhancedQuery = `${promptDetails}
-
-# User request
-
-QUERY: ${query}`;
-      }
+    this.#pendingAutoLearnedSkills = [];
+    const promptDetails = selected ? await selected.getPromptDetails() : null;
+    let contextDetails = '';
+    if (!promptDetails) {
+      // Clear the tracker when there is no context (or an unsupported context type)
+      // so that if the user later switches back to a previously sent context, it is
+      // sent in full again rather than deduplicated.
+      this.#lastSentPromptDetails = null;
+    } else {
+      contextDetails = promptDetails === this.#lastSentPromptDetails ? UNCHANGED_CONTEXT_PROMPT_NOTICE : promptDetails;
+      this.#lastSentPromptDetails = promptDetails;
     }
 
-    const unloadedSkills =
-        Object.entries(this.getSkills()).filter(([name]) => !this.#activeSkills.has(name as SkillName));
-    if (unloadedSkills.length === 0) {
-      return enhancedQuery;
+    // `autoLoadedBlock` precedes the context section in the final prompt. Run `learnSkill` before
+    // appending context facts so shared facts render at the top with the skill instructions.
+    let autoLoadedBlock = '';
+    const mappedSkill = this.#skillForContext(selected);
+    if (mappedSkill && SKILLS[mappedSkill] && !this.#activeSkills.has(mappedSkill)) {
+      autoLoadedBlock = await this.learnSkill([mappedSkill]);
+      this.#pendingAutoLearnedSkills.push(mappedSkill);
     }
 
-    // Note: Test assertion helpers in front_end/testing/AiAssistanceHelpers.ts (assertSkillLoaded,
-    // assertSkillNotLoaded) rely on this formatting (`Available skills that are not yet loaded:`
-    // and `- ${name}: ${skill.description}`). If this format is updated, update those helpers too.
-    const skillsManifest = unloadedSkills.map(([name, skill]) => `- ${name}: ${skill.description}`).join('\n');
-    return `Available skills that are not yet loaded:
-${skillsManifest}
-
-You must call \`learnSkills\` to load a skill before you can use its tools.
-If the user's request requires a skill that is not currently loaded, you MUST call \`learnSkills\` to load that skill first, instead of attempting to solve the query using tools from other skills.
-Do NOT call \`learnSkills\` for skills that are already loaded.
-
-User query: ${enhancedQuery}`;
+    const contextBlock = this.#appendUnsentFacts(contextDetails, selected?.getPromptFacts());
+    const prefix = [autoLoadedBlock, contextBlock].filter(Boolean).join('\n\n');
+    return prefix ? `${prefix}\n\n# User request\n\nQUERY: ${query}` : query;
   }
 
   /**
@@ -391,41 +460,46 @@ User query: ${enhancedQuery}`;
 
   override async *
       handleContextDetails(selected: ConversationContext<unknown>|null): AsyncGenerator<ContextResponse, void, void> {
-    if (selected) {
-      const [details, widgets] = await Promise.all([
-        selected.getUserFacingDetails(),
-        selected.getWidgets(),
-      ]);
-      if (details) {
-        yield {
-          type: ResponseType.CONTEXT,
-          details,
-          ...(widgets.length > 0 ? {widgets} : {}),
-        };
-      }
+    const autoLearned = this.#pendingAutoLearnedSkills;
+    this.#pendingAutoLearnedSkills = [];
+    if (!selected) {
+      return;
+    }
+
+    const [details, widgets] = await Promise.all([
+      selected.getUserFacingDetails(),
+      selected.getWidgets(),
+    ]);
+    if (details) {
+      // Do not yield a separate TITLE/ACTION walkthrough step for autoLearned skills:
+      // DevTools attaches the active panel's selected item before the model evaluates
+      // whether the user's question needs that skill, so showing "Loaded skill: ..."
+      // in the walkthrough misleads the user when their question is about another domain.
+      yield {
+        type: ResponseType.CONTEXT,
+        details,
+        ...(widgets.length > 0 ? {widgets} : {}),
+        ...(autoLearned.length > 0 ? {autoLearnedSkills: autoLearned} : {}),
+      };
     }
   }
 
-  getSkills(): Record<SkillName, Skill> {
-    return SKILLS;
-  }
-
   async learnSkill(names: SkillName[]): Promise<string> {
-    let response = '';
-    const skills = this.getSkills();
+    const sections: string[] = [];
     for (const name of names) {
       if (this.#activeSkills.has(name)) {
         debugLog(`[AiAgent2] Skill '${name}' is already loaded`);
-        response += `Error: Skill '${
-            name}' is already loaded. Call its tools directly instead of invoking learnSkills for '${name}' again.\n`;
+        sections.push(`Error: Skill '${
+            name}' is already loaded. Call its tools directly instead of invoking learnSkills for '${name}' again.`);
         continue;
       }
 
-      const skillObj: Skill = skills[name];
+      const skillObj = SKILLS[name];
       if (skillObj) {
         this.#activeSkills.add(name);
         debugLog(`[AiAgent2] Loaded skill '${name}' with tools: [${skillObj.allowedTools.join(', ')}]`);
-        response += `Skill ${name} loaded. Instructions:\n${skillObj.instructions}\n`;
+        const instructions = this.#appendUnsentFacts(skillObj.instructions.trim(), skillObj.facts);
+        sections.push(`Skill ${name} loaded. Instructions:\n${instructions}`);
         for (const toolName of skillObj.allowedTools) {
           const tool = ToolRegistry.get(toolName);
           if (tool) {
@@ -434,10 +508,10 @@ User query: ${enhancedQuery}`;
         }
       } else {
         debugLog(`[AiAgent2] Failed to load skill '${name}'`);
-        response += `Failed to load skill ${name}. Valid skills are: ${Object.keys(skills).join(', ')}.\n`;
+        sections.push(`Failed to load skill ${name}. Valid skills are: ${Object.keys(SKILLS).join(', ')}.`);
       }
     }
-    return response.trim();
+    return sections.join('\n\n');
   }
 
   #getExecutionContextNode(): SDK.DOMModel.DOMNode|null {

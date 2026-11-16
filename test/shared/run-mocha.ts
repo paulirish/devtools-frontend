@@ -29,7 +29,8 @@ function optionsWithDefalts(options: Options): Options {
     retries: TestConfig.retries,
     reporter: ResultsDbReporter,
     slow: 1000,
-    failZero: false,
+    failZero: TestConfig.dryRun,
+    dryRun: TestConfig.dryRun,
     bail: TestConfig.bail,
     ...options,
     ...TestConfig.mochaGrep,
@@ -88,6 +89,19 @@ export async function run(options: Omit<Options, OmitOptions>): Promise<void> {
     mocha.globalTeardown(globalTeardowns);
   }
 
+  // Mocha passes `globalThis` as the context of the pre-require event; its
+  // interfaces (e.g. BDD) install `describe`, `it`, ... on that context, and
+  // the functions exported from 'mocha' forward to it. Pass a private context
+  // instead, so test files have to import them from 'mocha'; using them as
+  // globals fails with a ReferenceError when the file is loaded.
+  const emit = mocha.suite.emit.bind(mocha.suite);
+  mocha.suite.emit = (event: string, ...args: unknown[]) => {
+    if (event === Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE && args[0] === globalThis) {
+      args[0] = {};
+    }
+    return emit(event, ...args);
+  };
+
   // Errors thrown while importing a test file (or any of its transitive
   // dependencies) don't mention the test file, which makes them hard to
   // track down. Remember which file Mocha is loading and report it.
@@ -99,7 +113,10 @@ export async function run(options: Omit<Options, OmitOptions>): Promise<void> {
   try {
     await mocha.loadFilesAsync();
   } catch (error) {
-    throw new Error(`Failed to load test file ${currentFile ?? '<unknown>'}`, {cause: error});
+    // Node does not print the cause of an unhandled rejection, so include it
+    // in the message (e.g. the ReferenceError for a mocha global that was not
+    // imported).
+    throw new Error(`Failed to load test file ${currentFile ?? '<unknown>'}: ${error}`, {cause: error});
   } finally {
     mocha.suite.off(Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE, onPreRequire);
   }
@@ -107,15 +124,15 @@ export async function run(options: Omit<Options, OmitOptions>): Promise<void> {
   const testIds = new Set(
       TestConfig.tests.filter(testId => TEST_ID_REGEX.test(testId)),
   );
-  const skippedTests = getSkippedTests();
+  const skippedTests = TestConfig.dryRun ? [] : getSkippedTests();
 
   const testIdMap = createTestIdMap(mocha.suite);
   checkForDuplicateTests(testIdMap);
   pruneSuite(mocha.suite, testIdMap, {testIds, skippedTests});
   duplicateTests(mocha.suite, TestConfig.repetitions);
 
-  mocha.enableGlobalSetup(true);
-  mocha.enableGlobalTeardown(true);
+  mocha.enableGlobalSetup(!TestConfig.dryRun);
+  mocha.enableGlobalTeardown(!TestConfig.dryRun);
 
   const failures = await new Promise<number>(resolve => {
     mocha.run(resolve);

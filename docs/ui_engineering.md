@@ -119,9 +119,18 @@ render(html`
 `, this.element);
 ```
 
-In this example, the `.title` style will apply within the parent widget but will not leak into the nested widget. Because this convention relies on developer discipline, it is important to verify its correct application during code reviews.
+In this example, the `.title` style will apply within the parent widget but will not leak into the nested widget. Two automated lint rules enforce this encapsulation:
 
-**Note:** Inside a `<devtools-data-grid>`, any `<style>` tags must be placed as direct children of the `<table>` element.
+- `@devtools/no-unscoped-light-dom-styles` (ESLint): checks stylesheets injected by Light DOM widgets (`<style>${styles}</style>`, `this.registerRequiredCSS()`, and `appendStyle()`) and requires every style rule to sit inside a top-level `@scope` block. Pre-existing outliers are tracked in a self-cleaning `burndown` list in `eslint.config.mjs` (never add new files to that list).
+- `plugin/check_scope_selectors` (stylelint): unconditionally forbids `:host` inside `@scope` (even with `:scope` or `&`), and flags ancestor selectors that receive an implicit `:scope ` descendant combinator and never match without `:scope` or `&` (`:host-context()`, `:root`, `html`, `body`, `.theme-with-dark-background`, `.platform-*`, and `.overlay-scrollbar-enabled`).
+
+### Key `@scope` Traps and Best Practices
+
+1. **`:scope` instead of `:host`**: `:host` is Shadow DOM-only and never matches inside `@scope`. Style the widget's root container element with `:scope`.
+2. **Theme-aware tokens instead of theme or platform classes**: Because selectors inside `@scope` without `:scope` or `&` receive an implicit `:scope ` descendant prefix, selectors like `.theme-with-dark-background .foo` or `:host-context(.theme-with-dark-background) .foo` look for ancestor theme classes *inside* the scoped subtree and never match. Use theme-aware design tokens (`--sys-color-*` / `--app-color-*`) instead.
+3. **Shared stylesheets**: Do not inject `inspectorCommonStyles` or `textButtonStyles` into Light DOM views (`installComponentRootStyles()` already applies them to the document and shadow roots). Wrap other shared stylesheets inline as `<style>@scope to (devtools-widget > *) { ${styles} }</style>` so their Shadow DOM consumers stay unaffected. Note that inline wrapping disables CSS hot reload in DevTools-on-DevTools for that `<style>` element.
+4. **Lower boundary and imperative child widgets**: The `(devtools-widget > *)` lower boundary stops cascading into declarative `<devtools-widget>` children (`${widget(...)}`), but it does **not** stop at legacy imperatively attached `<div class="widget">` children (`childWidget.show(container)`).
+5. **`<devtools-data-grid>`**: Inside a `<devtools-data-grid>`, any `<style>` tags must be placed as direct children of the `<table>` element. `<style>` tags inside `<devtools-data-grid>` stay connected in Light DOM, so their stylesheets still require `@scope`.
 
 ## Examples
 
@@ -587,7 +596,7 @@ export const DEFAULT_VIEW = (input, _output, target) => {
 
 ## Migrating `UI.Toolbar.ToolbarButton`
 
-Replace the imperative creation of a `ToolbarButton` with the declarative `<devtools-button>` component.
+Replace the imperative creation of a `ToolbarButton` with the declarative `<devtools-button>` component. For icon-only buttons, always bind `.accessibleLabel` (in addition to `title`) because `<devtools-button>` sets `role="presentation"` on its host element and forwards `.accessibleLabel` to its inner `<button>`.
 
 **Before:**
 ```typescript
@@ -611,7 +620,8 @@ export const DEFAULT_VIEW = (input, _output, target) => {
   render(html`
     <div>
       <devtools-toolbar>
-        <devtools-button title=${i18nString(UIStrings.editName)} @click=${this.onClick.bind(this)}
+        <devtools-button title=${i18nString(UIStrings.editName)}
+            .accessibleLabel=${i18nString(UIStrings.editName)} @click=${this.onClick.bind(this)}
             .variant=${Buttons.Button.Variant.TOOLBAR} .iconName=${'edit'}
             .jslogContext=${'edit-name'}></devtools-button>
       </devtools-toolbar>
@@ -1498,6 +1508,30 @@ the user.
 
 `ifExpanded` is a lit directive provided on `UI.TreeOutline` and it makes its
 argument render only if the current tree node is expanded.
+
+### TreeOutline Migration Guidelines
+
+1. **Keep `Treeoutline.ts` contracts intact**: Do not widen `front_end/ui/legacy/Treeoutline.ts`
+   (`TreeViewElement` or `TreeViewTreeElement`) or add public getters (such as `get scriptsTree()`)
+   on presenters. Render leading icons, labels, tooltips, and trailing actions inline inside
+   `<li role="treeitem">` and drive selection, expansion, and default focus declaratively via
+   `?selected`, `?open`, `@select`, `@expand`, and `autofocus`. Return `nothing` rather than an
+   empty container for trailing icons when none exist, and do not duplicate `class="tree-element-title"`
+   on inner spans (which compounds opacity styling).
+2. **Persistent prompt & child widget isolation for editable rows**:
+   Always keep `<devtools-prompt value=${...} ?editing=${...}>` persistently mounted in the row
+   template and toggle `?editing` declaratively. Do not duplicate `aria-label` on inner prompts
+   when the enclosing `<li role="treeitem">` already provides the accessible name. Furthermore,
+   because `<devtools-tree>` clones light DOM into shadow DOM and re-clones an entire `<li role="treeitem">`
+   on light-DOM attribute mutations, wrap editable prompts inside a small child `UI.Widget`
+   (`${widget(WatchExpressionPromptWidget, {...})}`, as in `WatchExpressionsSidebarPane.ts`). This allows
+   toggling `?editing` to update the child widget in place without triggering a tree re-clone that
+   steals focus and blurs the active input.
+3. **Custom elements with JavaScript property state**:
+   Custom elements rendered inside `<devtools-tree>` whose state is set via JS properties (`.data`)
+   must override `cloneNode(deep)` to copy `.data` and reflect dynamic state via a DOM attribute
+   (such as `data-badge=${...}`) so `<devtools-tree>`'s `MutationObserver` detects changes and
+   refreshes shadow clones.
 
 ## Refactoring UI.Toolbar.Provider
 

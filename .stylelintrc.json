@@ -3,18 +3,22 @@
   "plugins": [
     "./scripts/stylelint_rules/lib/use_theme_colors.mjs",
     "./scripts/stylelint_rules/lib/check_highlight_scope.mjs",
-    "./scripts/stylelint_rules/lib/use_monospace_font.mjs"
+    "./scripts/stylelint_rules/lib/use_monospace_font.mjs",
+    "./scripts/stylelint_rules/lib/check_scope_selectors.mjs"
   ],
   "rules": {
     "plugin/use_theme_colors": true,
     "plugin/check_highlight_scope": true,
     "plugin/use_monospace_font": true,
+    "plugin/check_scope_selectors": true,
     "alpha-value-notation": "percentage",
     "color-function-notation": "modern",
     "hue-degree-notation": "angle",
     "comment-empty-line-before": null,
     "declaration-no-important": true,
+    "declaration-block-no-duplicate-properties": true,
     "color-named": "never",
+    "selector-no-unmatchable": true,
     "selector-type-no-unknown": [
       true,
       {

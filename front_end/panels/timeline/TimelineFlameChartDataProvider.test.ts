@@ -91,6 +91,19 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     assert.isFalse(shouldRedrawAgain);  // previous event has no initiators & user has selected no event
   });
 
+  it('clears the cached selection on reset', async function() {
+    const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+    const parsedTrace = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    const entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
+    dataProvider.setModel(parsedTrace, entityMapper);
+    dataProvider.timelineData();
+    const selection = dataProvider.createSelection(0);
+    assert.isNotNull(selection);
+    assert.strictEqual(dataProvider.entryIndexForSelection(selection), 0);
+    dataProvider.reset();
+    assert.strictEqual(dataProvider.entryIndexForSelection(selection), -1);
+  });
+
   describe('groupTreeEvents', function() {
     it('returns the correct events for tree views given a flame chart group', async function() {
       const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
@@ -263,7 +276,7 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     });
   });
 
-  it('shows Debug with AI submenu items', async function() {
+  it('shows Debug with AI item in context menu', async function() {
     registerActions([{
       actionId: 'drjones.performance-panel-context',
       title: () => 'Debug with AI' as Platform.UIString.LocalizedString,
@@ -278,9 +291,13 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     assert.exists(contextMenu);
     const debugWithAiItem = contextMenu.buildDescriptor().subItems?.find(item => item.label === 'Debug with AI');
     assert.exists(debugWithAiItem);
-    assert.deepEqual(
-        debugWithAiItem?.subItems?.map(item => item.label),
-        ['Start a chat', 'Label entry', 'Assess the purpose', 'Identify time spent', 'Find improvements']);
+    assert.isUndefined(debugWithAiItem.subItems);
+  });
+
+  it('returns undefined from customizedContextMenu when no trace is loaded', function() {
+    const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+    const contextMenu = dataProvider.customizedContextMenu(new MouseEvent('click'), 7, 0);
+    assert.isUndefined(contextMenu);
   });
 
   it('filters navigations to only return those that happen on the main frame', async function() {

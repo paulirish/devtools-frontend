@@ -17,6 +17,12 @@ agentic_review: {
     ]
   }
   capability_groups: {
+    path_expression: ["front_end/.*\\.ts"]
+    path_expression_exclusion: [".*\\.test\\.ts"]
+    content_patterns: ["UIStrings", "@description", "i18n(String|FormatString|Template)"]
+    review_capability_skills: [".agents/skills/devtools-uistrings/SKILL.md"]
+  }
+  capability_groups: {
     path_expression: [
       "front_end/(core|models|entrypoints|generated)/.*\\.ts",
       ".*BUILD\\.gn",
@@ -41,7 +47,8 @@ agentic_review: {
     path_expression_exclusion: [".*\\.test\\.ts"]
     review_capability_skills: [
       ".agents/skills/ui-widgets/SKILL.md",
-      ".agents/skills/ui-eng-vision-orchestrator/SKILL.md"
+      ".agents/skills/ui-eng-vision-orchestrator/SKILL.md",
+      ".agents/skills/visual-regression-audit/SKILL.md"
     ]
     rules: [
       ".agents/rules/ui-and-widgets/ui-modern-component-and-encapsulation-standards.md",
@@ -60,7 +67,8 @@ agentic_review: {
       ".agents/rules/ui-and-widgets/ui-weak-dom-references-and-observer-cleanup.md",
       ".agents/rules/ui-and-widgets/ui-security-and-output-sanitization.md",
       ".agents/rules/ui-and-widgets/ui-declarative-child-widget-composition.md",
-      ".agents/rules/ui-and-widgets/ui-await-update-complete-post-render.md"
+      ".agents/rules/ui-and-widgets/ui-await-update-complete-post-render.md",
+      ".agents/rules/ui-and-widgets/ui-declarative-tree-and-prompt-patterns.md"
     ]
   }
   capability_groups: {

@@ -10,16 +10,17 @@ import {afterEach, beforeEach, describe, it} from 'mocha';
 import sinon from 'sinon';
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as TextUtils from '../../core/text_utils/text_utils.js';
 import * as Protocol from '../../generated/protocol.js';
-import type * as Bindings from '../../models/bindings/bindings.js';
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {getAxeViolations} from '../../testing/AxeHelpers.js';
 import {assertScreenshot, raf, renderElementIntoDOM, setTestUniverseForWidgets} from '../../testing/DOMHelpers.js';
-import {deinitializeGlobalVars} from '../../testing/EnvironmentHelpers.js';
 import {setupLocaleHooks} from '../../testing/LocaleHelpers.js';
 import {dispatchEvent} from '../../testing/MockConnection.js';
 import {MockDebuggerBackend} from '../../testing/MockScopeChain.js';
@@ -33,6 +34,43 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as Sources from './sources.js';
 
 const {urlString} = Platform.DevToolsPath;
+
+function getTreeOutline(navigatorView: Sources.NavigatorView.NavigatorView): UI.TreeOutline.TreeOutline {
+  navigatorView.performUpdate();
+  const treeViewElement = navigatorView.contentElement.querySelector<UI.TreeOutline.TreeViewElement>('devtools-tree');
+  treeViewElement?.flushPendingUpdatesForTesting();
+  const treeOutline = treeViewElement?.getInternalTreeOutlineForTest();
+  if (!treeOutline) {
+    throw new Error('treeOutline not found');
+  }
+  return treeOutline;
+}
+
+function getTreeElementTitle(element: UI.TreeOutline.TreeElement|null|undefined): string {
+  if (!element) {
+    return '';
+  }
+  if (typeof element.title === 'string' && element.title.length > 0) {
+    return element.title;
+  }
+  const titleElement = element.titleElement as Element | undefined;
+  const treeElementTitle = titleElement?.querySelector?.('.tree-element-title');
+  const dataTitle = treeElementTitle?.getAttribute('data-title') || element.listItemElement?.getAttribute('data-title');
+  if (dataTitle) {
+    return dataTitle;
+  }
+  if (treeElementTitle?.textContent) {
+    return treeElementTitle.textContent;
+  }
+  return element.titleElement?.textContent ?? '';
+}
+
+function getTreeElementTooltip(element: UI.TreeOutline.TreeElement|null|undefined): string {
+  if (!element) {
+    return '';
+  }
+  return element.tooltip || element.listItemElement.querySelector('[title]')?.getAttribute('title') || '';
+}
 
 describe('NetworkNavigatorView', () => {
   setupRuntimeHooks();
@@ -76,10 +114,6 @@ describe('NetworkNavigatorView', () => {
     return navigatorView;
   }
 
-  afterEach(async () => {
-    await deinitializeGlobalVars();
-  });
-
   describe('reveals main target', () => {
     let tabTarget: SDK.Target.Target;
     let target: SDK.Target.Target;
@@ -118,12 +152,12 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const folder = rootElement.firstChild();
       const file = folder?.firstChild();
 
-      assert.strictEqual(folder?.title, 'example.com');
-      assert.strictEqual(file?.title, 'script.js');
+      assert.strictEqual(getTreeElementTitle(folder), 'example.com');
+      assert.strictEqual(getTreeElementTitle(file), 'script.js');
 
       project.removeProject();
     });
@@ -147,7 +181,7 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       assert.lengthOf(rootElement.children(), 0);
 
       project.removeProject();
@@ -156,7 +190,7 @@ describe('NetworkNavigatorView', () => {
     it('reveals main frame target on navigation', async () => {
       const navigatorView = await createNetworkNavigatorView();
 
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       assert.strictEqual(rootElement.childCount(), 1);
       assert.strictEqual(rootElement.firstChild()?.childCount(), 3);
       assert.isFalse(rootElement.firstChild()?.expanded);
@@ -164,19 +198,19 @@ describe('NetworkNavigatorView', () => {
 
       target.setInspectedURL(urlString`http://example.com/`);
 
-      assert.isTrue(navigatorView.scriptsTree.firstChild()?.expanded);
-      assert.isTrue(navigatorView.scriptsTree.firstChild()?.firstChild()?.selected);
+      assert.isTrue(getTreeOutline(navigatorView).firstChild()?.expanded);
+      assert.isTrue(getTreeOutline(navigatorView).firstChild()?.firstChild()?.selected);
     });
 
     it('reveals main frame target when added', async () => {
       target.setInspectedURL(urlString`http://example.com/`);
       const navigatorView = await createNetworkNavigatorView();
 
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       assert.strictEqual(rootElement.childCount(), 1);
       assert.strictEqual(rootElement.firstChild()?.childCount(), 3);
-      assert.isTrue(navigatorView.scriptsTree.firstChild()?.expanded);
-      assert.isTrue(navigatorView.scriptsTree.firstChild()?.firstChild()?.selected);
+      assert.isTrue(getTreeOutline(navigatorView).firstChild()?.expanded);
+      assert.isTrue(getTreeOutline(navigatorView).firstChild()?.firstChild()?.selected);
     });
 
     it('does not add inline style stylesheets without sourceURL as standalone items in NetworkNavigatorView',
@@ -224,11 +258,11 @@ describe('NetworkNavigatorView', () => {
          });
 
          const navigatorView = await createNetworkNavigatorView();
-         const rootElement = navigatorView.scriptsTree.rootElement();
+         const rootElement = getTreeOutline(navigatorView).rootElement();
          const exampleComNode = rootElement.firstChild();
          assert.exists(exampleComNode);
 
-         const childTitles = exampleComNode.children().map(child => child.title);
+         const childTitles = exampleComNode.children().map(child => getTreeElementTitle(child));
          assert.include(childTitles, 'external.css');
          assert.lengthOf(childTitles.filter(title => title === '(index)'), 1);
          assert.deepEqual(childTitles, ['(index)', 'gtm.js', 'external.css', 'favicon.ico']);
@@ -261,17 +295,19 @@ describe('NetworkNavigatorView', () => {
     SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     const navigatorView = await createNetworkNavigatorView();
 
-    let rootElement = navigatorView.scriptsTree.rootElement();
+    let rootElement = getTreeOutline(navigatorView).rootElement();
     assert.strictEqual(rootElement.childCount(), 1);
     assert.strictEqual(rootElement.firstChild()?.childCount(), 3);
-    assert.deepEqual(rootElement.firstChild()?.children().map(i => i.title), ['(index)', 'gtm.js', 'favicon.ico']);
+    assert.deepEqual(rootElement.firstChild()?.children().map(i => getTreeElementTitle(i)),
+                     ['(index)', 'gtm.js', 'favicon.ico']);
 
     SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
 
-    rootElement = navigatorView.scriptsTree.rootElement();
+    rootElement = getTreeOutline(navigatorView).rootElement();
     assert.strictEqual(rootElement.childCount(), 1);
     assert.strictEqual(rootElement.firstChild()?.childCount(), 2);
-    assert.deepEqual(rootElement.firstChild()?.children().map(i => i.title), ['(index)', 'background.bmp']);
+    assert.deepEqual(rootElement.firstChild()?.children().map(i => getTreeElementTitle(i)),
+                     ['(index)', 'background.bmp']);
 
     project.removeProject();
     anotherProject.removeProject();
@@ -305,7 +341,7 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
       const nodeA = exampleComNode.childAt(0);
@@ -323,6 +359,8 @@ describe('NetworkNavigatorView', () => {
       const nodeCSelectSpy = sinon.spy(nodeC, 'select');
 
       project.removeProject();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
       sinon.assert.notCalled(nodeBSelectSpy);
       sinon.assert.called(nodeCSelectSpy);
@@ -330,7 +368,7 @@ describe('NetworkNavigatorView', () => {
       otherProject.removeProject();
     });
 
-    it('selects parent after removing all children', async () => {
+    it('does not select siblings or removed parent when removing all children', async () => {
       const {project} = createContentProviderUISourceCodes({
         items: [
           {url: urlString`http://example.com/a.js`, mimeType: 'application/javascript'},
@@ -342,7 +380,7 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      let rootElement = getTreeOutline(navigatorView).rootElement();
       const nodeExampleCom = rootElement.firstChild();
       assert.exists(nodeExampleCom);
       const nodeA = nodeExampleCom.childAt(0);
@@ -352,9 +390,8 @@ describe('NetworkNavigatorView', () => {
       assert.exists(nodeB);
       assert.exists(nodeC);
 
-      // Select the 'http://example.com/a.js' node. Remove all the source codenodes and check the selection
-      // is not propagated forward to the siblings as we remove them. Instead, the selection will be moved
-      // directly to the parent.
+      // Select the 'http://example.com/a.js' node. Remove all the source code nodes and check that selection
+      // is not propagated forward to the siblings as we remove them.
       nodeA.select();
 
       const nodeBSelectSpy = sinon.spy(nodeB, 'select');
@@ -362,13 +399,16 @@ describe('NetworkNavigatorView', () => {
       const nodeExampleComSelectSpy = sinon.spy(nodeExampleCom, 'select');
 
       project.removeProject();
+      await navigatorView.updateComplete;
+      rootElement = getTreeOutline(navigatorView).rootElement();
 
       sinon.assert.notCalled(nodeBSelectSpy);
       sinon.assert.notCalled(nodeCSelectSpy);
-      sinon.assert.called(nodeExampleComSelectSpy);
+      sinon.assert.notCalled(nodeExampleComSelectSpy);
 
-      // Note that the last asserion is slightly misleading since the empty example.com node is removed.
-      // Let us make that clear here.
+      // Note that when all children and their empty example.com parent are removed together in a single
+      // declarative <devtools-tree> update, neither the removed siblings nor the removed example.com parent
+      // are transiently selected.
       assert.strictEqual(rootElement.childCount(), 0);
     });
 
@@ -391,12 +431,14 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
       const nodeD = exampleComNode.childAt(0);
       assert.exists(nodeD);
       await nodeD.expand();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
       const nodeA = nodeD.childAt(0);
       const nodeB = nodeD.childAt(1);
       const nodeC = exampleComNode.childAt(1);
@@ -412,6 +454,8 @@ describe('NetworkNavigatorView', () => {
 
       // Remove the project with the a.js and b.js nodes.
       project.removeProject();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
       // Let us check that we do not push the selection forward over node 'b.js'.
       // Instead, the selection will be pushed to 'c.js' (with an intermediate step at 'd').
@@ -446,7 +490,7 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
       const nodeD = exampleComNode.childAt(0);
@@ -456,6 +500,8 @@ describe('NetworkNavigatorView', () => {
       assert.exists(nodeE);
       await nodeD.expand();
       await nodeE.expand();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
       const nodeA = nodeD.childAt(0);
       const nodeB = nodeE.childAt(0);
       assert.exists(nodeA);
@@ -473,6 +519,8 @@ describe('NetworkNavigatorView', () => {
       // The selection will be moved from 'a.js' to its parent (folder 'd') and when that gets removed,
       // it should move to 'c' rather being pushed forward to 'e'.
       project.removeProject();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
       sinon.assert.notCalled(nodeESelectSpy);
       sinon.assert.notCalled(nodeBSelectSpy);
@@ -505,7 +553,7 @@ describe('NetworkNavigatorView', () => {
       await backend.addScript(target, {content: '42', url: 'http://example.com/c.js', hasSourceURL: false}, null);
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const exampleComNode = rootElement.firstChild();
       assert.exists(exampleComNode);
       const nodeA = exampleComNode.childAt(0);
@@ -524,6 +572,8 @@ describe('NetworkNavigatorView', () => {
 
       dispatchEvent(target, 'Runtime.executionContextDestroyed',
                     {executionContextId: 2 as Protocol.Runtime.ExecutionContextId, executionContextUniqueId: 'c2'});
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
       sinon.assert.notCalled(nodeBSelectSpy);
       sinon.assert.called(nodeCSelectSpy);
@@ -588,13 +638,13 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
       const mixedFolder = nodeExampleCom!.childAt(1);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored (ignore listed)');
 
       await disableIgnoreListing();
       project.removeProject();
@@ -625,23 +675,27 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
       const mixedFolder = nodeExampleCom!.childAt(1);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored');
 
       await enableIgnoreListing();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored (ignore listed)');
 
       await disableIgnoreListing();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored');
 
       project.removeProject();
     });
@@ -668,13 +722,13 @@ describe('NetworkNavigatorView', () => {
       });
 
       const navigatorView = await createNetworkNavigatorView();
-      const rootElement = navigatorView.scriptsTree.rootElement();
+      const rootElement = getTreeOutline(navigatorView).rootElement();
       const nodeExampleCom = rootElement.firstChild();
       const ignoredFolder = nodeExampleCom!.childAt(0);
       const mixedFolder = nodeExampleCom!.childAt(1);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed/a (ignore listed)');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed/a (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored (ignore listed)');
 
       const {project: otherProject} = createContentProviderUISourceCodes({
         items: [
@@ -686,14 +740,18 @@ describe('NetworkNavigatorView', () => {
         projectType: Workspace.Workspace.projectTypes.Network,
         target,
       });
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored (ignore listed)');
 
       otherProject.removeProject();
+      await navigatorView.updateComplete;
+      getTreeOutline(navigatorView);
 
-      assert.strictEqual(mixedFolder!.tooltip, 'mixed (ignore listed)');
-      assert.strictEqual(ignoredFolder!.tooltip, 'ignored (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(mixedFolder), 'mixed (ignore listed)');
+      assert.strictEqual(getTreeElementTooltip(ignoredFolder), 'ignored (ignore listed)');
 
       await disableIgnoreListing();
       project.removeProject();
@@ -756,10 +814,6 @@ describe('FilesNavigatorView', () => {
     await raf();
     return navigatorView;
   }
-  afterEach(async () => {
-    await deinitializeGlobalVars();
-  });
-
   it('renders the empty state with placeholder and automatic file system nudge', async () => {
     sinon.stub(backend.universe.automaticFileSystemManager, 'availability').get(() => 'available');
     await createFilesNavigatorView();
@@ -806,23 +860,23 @@ describe('FilesNavigatorView', () => {
 
     await assertScreenshot('sources/files-navigator-populated.png');
 
-    const rootElement = navigatorView.scriptsTree.rootElement();
+    const rootElement = getTreeOutline(navigatorView).rootElement();
     const children = rootElement.children();
     assert.lengthOf(children, 3);
     const expectedTitles = ['bad/foo/bar', 'good/foo/bar', 'ugly/bar'];
-    assert.deepEqual(children.map((c: UI.TreeOutline.TreeElement) => c.title).sort(), expectedTitles);
+    assert.deepEqual(children.map((c: UI.TreeOutline.TreeElement) => getTreeElementTitle(c)).sort(), expectedTitles);
 
-    const badProjectNode = children.find((c: UI.TreeOutline.TreeElement) => c.title === 'bad/foo/bar');
+    const badProjectNode = children.find((c: UI.TreeOutline.TreeElement) => getTreeElementTitle(c) === 'bad/foo/bar');
     assert.strictEqual(badProjectNode?.childCount(), 1);
-    assert.strictEqual(badProjectNode?.childAt(0)?.title, '2.js');
+    assert.strictEqual(getTreeElementTitle(badProjectNode?.childAt(0)), '2.js');
 
-    const goodProjectNode = children.find((c: UI.TreeOutline.TreeElement) => c.title === 'good/foo/bar');
+    const goodProjectNode = children.find((c: UI.TreeOutline.TreeElement) => getTreeElementTitle(c) === 'good/foo/bar');
     assert.strictEqual(goodProjectNode?.childCount(), 1);
-    assert.strictEqual(goodProjectNode?.childAt(0)?.title, '1.js');
+    assert.strictEqual(getTreeElementTitle(goodProjectNode?.childAt(0)), '1.js');
 
-    const uglyProjectNode = children.find((c: UI.TreeOutline.TreeElement) => c.title === 'ugly/bar');
+    const uglyProjectNode = children.find((c: UI.TreeOutline.TreeElement) => getTreeElementTitle(c) === 'ugly/bar');
     assert.strictEqual(uglyProjectNode?.childCount(), 1);
-    assert.strictEqual(uglyProjectNode?.childAt(0)?.title, '3.js');
+    assert.strictEqual(getTreeElementTitle(uglyProjectNode?.childAt(0)), '3.js');
 
     project1.removeProject();
     project2.removeProject();
@@ -867,6 +921,215 @@ describe('FilesNavigatorView', () => {
 
     project.removeProject();
   });
+
+  it('has no aXe violations when showing a file system folder in the navigator pane', async () => {
+    const debuggerActionIds = [
+      'debugger.toggle-pause',
+      'debugger.step-over',
+      'debugger.step-into',
+      'debugger.step-out',
+      'debugger.step',
+      'debugger.toggle-breakpoints-active',
+    ];
+    let sourcesPanel: Sources.SourcesPanel.SourcesPanel|undefined;
+    let fileSystemWorkspaceBinding: Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding|undefined;
+
+    try {
+      UI.ZoomManager.ZoomManager.instance({
+        forceNew: true,
+        win: window,
+        frontendHost: Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+      });
+      for (const actionId of debuggerActionIds) {
+        UI.ActionRegistration.maybeRemoveActionExtension(actionId);
+        UI.ActionRegistration.registerActionExtension({
+          actionId,
+          category: UI.ActionRegistration.ActionCategory.DEBUGGER,
+          title: () => actionId as Platform.UIString.LocalizedString,
+        });
+      }
+      const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+      UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+
+      SDK.EventBreakpointsModel.EventBreakpointsManager.instance({
+        forceNew: true,
+        targetManager: backend.universe.targetManager,
+      });
+      sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+          .returns(backend.universe.debuggerWorkspaceBinding);
+      Sources.CallStackSidebarPane.CallStackSidebarPane.instance({forceNew: true});
+      Sources.BreakpointsView.BreakpointsSidebarController.instance({
+        forceNew: true,
+        breakpointManager: Breakpoints.BreakpointManager.BreakpointManager.instance(),
+        settings: Common.Settings.Settings.instance(),
+      });
+
+      UI.ViewManager.resetViewRegistration();
+      UI.ViewManager.registerViewExtension({
+        id: 'sources.threads',
+        title: () => 'Threads' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Threads' as Platform.UIString.LocalizedString,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return new Sources.ThreadsSidebarPane.ThreadsSidebarPane();
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        id: 'sources.scope-chain',
+        title: () => 'Scope' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Scope' as Platform.UIString.LocalizedString,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return Sources.ScopeChainSidebarPane.ScopeChainSidebarPane.instance();
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        id: 'sources.watch',
+        title: () => 'Watch' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Watch' as Platform.UIString.LocalizedString,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return Sources.WatchExpressionsSidebarPane.WatchExpressionsSidebarPane.instance();
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        id: 'sources.js-breakpoints',
+        title: () => 'Breakpoints' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Breakpoints' as Platform.UIString.LocalizedString,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return Sources.BreakpointsView.BreakpointsView.instance({forceNew: true});
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        location: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        id: 'navigator-network',
+        title: () => 'Page' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Page' as Platform.UIString.LocalizedString,
+        order: 2,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        location: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        id: 'navigator-files',
+        title: () => 'Workspace' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Workspace' as Platform.UIString.LocalizedString,
+        order: 3,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return new Sources.SourcesNavigator.FilesNavigatorView();
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        location: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        id: 'navigator-overrides',
+        title: () => 'Overrides' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Overrides' as Platform.UIString.LocalizedString,
+        order: 4,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return Sources.SourcesNavigator.OverridesNavigatorView.instance({forceNew: true});
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        location: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        id: 'navigator-content-scripts',
+        title: () => 'Content scripts' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Content scripts' as Platform.UIString.LocalizedString,
+        order: 5,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return new Sources.SourcesNavigator.ContentScriptsNavigatorView();
+        },
+      });
+      UI.ViewManager.registerViewExtension({
+        location: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        id: 'navigator-snippets',
+        title: () => 'Snippets' as Platform.UIString.LocalizedString,
+        commandPrompt: () => 'Show Snippets' as Platform.UIString.LocalizedString,
+        order: 6,
+        persistence: UI.ViewManager.ViewPersistence.PERMANENT,
+        async loadView() {
+          return new Sources.SourcesNavigator.SnippetsNavigatorView();
+        },
+      });
+
+      const viewManager = UI.ViewManager.ViewManager.instance({forceNew: true, universe: backend.universe});
+      sourcesPanel = new Sources.SourcesPanel.SourcesPanel();
+      UI.ViewManager.registerLocationResolver({
+        name: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
+        category: UI.ViewManager.ViewLocationCategory.SOURCES,
+        async loadResolver() {
+          assert.exists(sourcesPanel);
+          return sourcesPanel;
+        },
+      });
+      renderElementIntoDOM(sourcesPanel, {includeCommonStyles: true});
+
+      fileSystemWorkspaceBinding = new Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding(
+          backend.universe.isolatedFileSystemManager, workspace);
+      const fileSystemPath = urlString`file:///var/www3`;
+      const platformFileSystem = new Persistence.PlatformFileSystem.PlatformFileSystem(
+          fileSystemPath, Persistence.PlatformFileSystem.PlatformFileSystemType.WORKSPACE_PROJECT, false);
+      backend.universe.isolatedFileSystemManager.addPlatformFileSystem(fileSystemPath, platformFileSystem);
+
+      await viewManager.showView('navigator-files');
+      await UI.Widget.Widget.allUpdatesComplete;
+      await raf();
+
+      const filesNavigatorWidget = await viewManager.view('navigator-files').widget();
+      assert.instanceOf(filesNavigatorWidget, Sources.SourcesNavigator.FilesNavigatorView);
+      await filesNavigatorWidget.updateComplete;
+      const navigatorView =
+          filesNavigatorWidget.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
+      assert.exists(navigatorView);
+      await navigatorView.updateComplete;
+
+      const rootElement = getTreeOutline(navigatorView).rootElement();
+      assert.lengthOf(rootElement.children(), 1);
+      const folderNode = rootElement.firstChild();
+      assert.exists(folderNode);
+      assert.strictEqual(getTreeElementTitle(folderNode), 'www3');
+      assert.isTrue(folderNode.listItemElement.classList.contains('navigator-fs-tree-item'));
+      assert.isFalse(folderNode.listItemElement.classList.contains('has-mapped-files'));
+      folderNode.expand();
+      await navigatorView.updateComplete;
+      assert.strictEqual(folderNode.childCount(), 0);
+      assert.isTrue(folderNode.selected);
+
+      const navigatorLocation = sourcesPanel.resolveLocation(UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW);
+      assert.exists(navigatorLocation);
+      const tabbedPane = navigatorLocation.widget();
+      assert.instanceOf(tabbedPane, UI.TabbedPane.TabbedPane);
+      assert.isTrue(tabbedPane.element.classList.contains('navigator-tabbed-pane'));
+
+      const violations = await getAxeViolations(tabbedPane.element, {
+        'aria-required-children': {
+          enabled: false,
+        },
+      });
+      assert.isEmpty(violations);
+    } finally {
+      sourcesPanel?.detach();
+      if (sourcesPanel) {
+        window.removeEventListener('beforeunload', sourcesPanel.handleBeforeUnload, true);
+      }
+      fileSystemWorkspaceBinding?.dispose();
+      for (const actionId of debuggerActionIds) {
+        UI.ActionRegistration.maybeRemoveActionExtension(actionId);
+      }
+      UI.ViewManager.ViewManager.removeInstance();
+      UI.ViewManager.resetViewRegistration();
+      UI.Context.Context.removeInstance();
+      UI.InspectorView.InspectorView.removeInstance();
+      Sources.BreakpointsView.BreakpointsSidebarController.removeInstance();
+      SDK.EventBreakpointsModel.EventBreakpointsManager.removeInstance();
+      UI.ZoomManager.ZoomManager.removeInstance();
+    }
+  });
 });
 
 describe('OverridesNavigatorView', () => {
@@ -881,10 +1144,14 @@ describe('OverridesNavigatorView', () => {
     workspace = backend.universe.workspace;
     const targetManager = backend.universe.targetManager;
 
+    const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+
     sinon.stub(Workspace.Workspace.WorkspaceImpl, 'instance').returns(workspace);
     sinon.stub(SDK.TargetManager.TargetManager, 'instance').returns(targetManager);
     sinon.stub(Workspace.IgnoreListManager.IgnoreListManager, 'instance').returns(backend.universe.ignoreListManager);
     sinon.stub(Common.Settings.Settings, 'instance').returns(backend.universe.settings);
+
+    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
 
     const debuggerWorkspaceBinding = backend.universe.debuggerWorkspaceBinding;
     const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
@@ -908,13 +1175,11 @@ describe('OverridesNavigatorView', () => {
         overridesNavigatorView.children().find(child => child instanceof Sources.NavigatorView.NavigatorView);
     assert.exists(navigatorView);
     await navigatorView.updateComplete;
+    navigatorView.contentElement.querySelector<UI.TreeOutline.TreeViewElement>('devtools-tree')
+        ?.flushPendingUpdatesForTesting();
     await raf();
     return navigatorView;
   }
-
-  afterEach(async () => {
-    await deinitializeGlobalVars();
-  });
 
   it('renders the empty state with placeholder', async () => {
     await createOverridesNavigatorView();
@@ -939,7 +1204,7 @@ describe('OverridesNavigatorView', () => {
 
     await assertScreenshot('sources/overrides-navigator-populated.png');
 
-    const rootElement = navigatorView.scriptsTree.rootElement();
+    const rootElement = getTreeOutline(navigatorView).rootElement();
     const children = rootElement.children();
     assert.lengthOf(children, 1);
     const overridesNode = children[0];
@@ -954,8 +1219,9 @@ describe('OverridesNavigatorView', () => {
         .set(false);
     // Waiting for the event to be fired
     await updatePromise;
+    await navigatorView.updateComplete;
 
-    const disabledOverridesNode = rootElement.children()[0];
+    const disabledOverridesNode = getTreeOutline(navigatorView).rootElement().children()[0];
     assert.isFalse(disabledOverridesNode.listItemElement.classList.contains('has-mapped-files'));
 
     project.removeProject();
@@ -1008,6 +1274,8 @@ describe('OverridesNavigatorView', () => {
     assert.strictEqual(checkboxes[0], checkbox);
     assert.isFalse(checkbox.checked);
 
+    navigatorView.detach();
     project.removeProject();
+    await navigatorView.updateComplete;
   });
 });

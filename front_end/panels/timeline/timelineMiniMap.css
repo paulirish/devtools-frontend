@@ -40,7 +40,7 @@
 }
 
 .timeline-minimap #timeline-overview-filmstrip {
-  flex-basis: 30px;
+  flex-basis: var(--sys-size-12);
 }
 
 .timeline-minimap #timeline-overview-memory {
@@ -67,9 +67,6 @@
   margin-top: 0 !important; /* stylelint-disable-line declaration-no-important */
 }
 
-.timeline-minimap #timeline-overview-input {
-  flex-basis: var(--sys-size-4);
-}
 
 .timeline-minimap #timeline-overview-pane {
   flex: auto;
@@ -100,7 +97,7 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  font-size: 9px;
+  font-size: var(--sys-size-5);
   color: var(--sys-color-token-subtle);
   white-space: nowrap;
   padding: 0 var(--sys-size-3);

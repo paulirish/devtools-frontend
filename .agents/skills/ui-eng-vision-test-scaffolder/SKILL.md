@@ -42,18 +42,36 @@ logical regressions are introduced during modernization.
             adding the styles itself. If the test pass, keep the version without
             `{includeCommonStyles: true}`. Otherwise, bring it back.
         *   Screenshot tests are unittests that render either the full widget (if not migrated to the MVP architecture) or its view function (if already in MVP shape).
-        *   When testing view-separated components, prefer testing the View function (e.g., `DEFAULT_VIEW`) directly by passing mock state and callbacks.
-        *   Use `assertScreenshot` to capture and verify the visual output.
+        *   Ship unit tests in the **same CL** as the production code they cover; never defer tests to a follow-up test-only CL.
+        *   Test presenter logic via `createViewFunctionStub` and rely on `assertScreenshot` / E2E tests for template layout (per `docs/ui_engineering.md`). When adding targeted unit tests for view rendering, name the suite `describe('view', ...)` (never `describe('... DEFAULT_VIEW', ...)`), and avoid verbose synthetic `DEFAULT_VIEW` DOM assertion suites that duplicate presenter assertions.
         *   Example structure:
 
             ```typescript
-            it('renders the view', async () => {
-              const target = document.createElement('div');
-              renderElementIntoDOM(target, {includeCommonStyles: true});
-              MyComponent.DEFAULT_VIEW(mockViewInput, undefined, target);
-              await assertScreenshot('my_component/base.png');
+            describe('view', () => {
+              it('renders the base state', async () => {
+                const target = document.createElement('div');
+                renderElementIntoDOM(target, {includeCommonStyles: true});
+                MyComponent.DEFAULT_VIEW(mockViewInput, undefined, target);
+                await assertScreenshot('my_component/base.png');
+              });
             });
             ```
+
+    *   **Implementation-Decoupled Helpers & Screenshot Baselines Before Replacing Legacy Widgets**:
+        When scaffolding unit tests ahead of replacing a legacy widget engine
+        (`TreeOutline`, `DataGrid`, `ListControl`, `ListWidget`):
+        *   **Encapsulate DOM Inspection in Local Helpers**: Route tree, row,
+            and element queries through small local helper functions (`dumpTree()`,
+            `findTreeItem()`, `activateRow()`, `openContextMenuOnRow()`) rather
+            than scattering direct internal widget queries across every `it()`
+            block. When the legacy widget is subsequently swapped for
+            `<devtools-tree>` or `<devtools-data-grid>`, only the helper
+            implementations change while dozens of tests remain untouched.
+        *   **Mandatory Visual Regression Coverage**: Always add
+            `assertScreenshot(...)` golden tests covering critical visual
+            states (grouping modes, icons/badges, dimmed/dirty states). Unit
+            tests often inspect internal state that changes during migration;
+            screenshot goldens ensure the user-visible UI remains identical.
 
 4.  **Wait for confirmation**:
 
@@ -162,6 +180,9 @@ Always detect the execution environment first to run tests successfully:
     ```
 
     Otherwise, menu rendering will fail because `GlassPane` lacks an attached container element.
+
+*   **Drain `RenderCoordinator` in `afterEach` for Nested Dialog Components**:
+    When a mounted panel or widget instantiates components that chain 3+ nested `ScheduledRender` passes (such as `<devtools-shortcut-dialog>` or `<devtools-perf-export-trace-options>` -> `ButtonDialog` -> `Dialog`), call `await RenderCoordinator.done()` after `detach()` in `afterEach`. Synchronous `0ms` tests otherwise exceed `checkForPendingActivity`'s retry budget under `--repeat=10` CQ flake detection.
 
 --------------------------------------------------------------------------------
 

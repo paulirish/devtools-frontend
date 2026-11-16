@@ -33,7 +33,7 @@ Load the skill or `.agents/rules/` files that match what the diff touches, and a
 | If the diff touches… | Load skill or rules |
 | :--- | :--- |
 | Any `import` statement, or a new cross-module dependency | `devtools-imports` |
-| `UI.Widget`, lit-html views, components, CSS | `ui-widgets` |
+| `UI.Widget`, lit-html views, components, CSS, or UI layout changes | `ui-widgets`, `visual-regression-audit` |
 | Reviewing UI and widgets (`front_end/(panels|ui)/**/*.{ts,css}`) | `.agents/rules/ui-and-widgets/*.md` |
 | Migration of legacy imperative DOM to widgets or Lit | `ui-eng-vision-orchestrator` (and its sub-skills) |
 | New or changed tests: choosing unit, API, or E2E | `devtools-testing-guidance` |
@@ -42,6 +42,7 @@ Load the skill or `.agents/rules/` files that match what the diff touches, and a
 | Ported Chromium web tests (`web_tests/http/tests/devtools`) | `migrate-chromium-test` |
 | Flaky or disabled tests, or `it.skip` / `it.skipOnPlatforms` | `fix-tests` |
 | Rendering user-controlled strings (URLs, names, console text) | `devtools-unicode-escaping` |
+| Adding or modifying `UIStrings` or `@description` / `@example` L10n comments | `devtools-uistrings` |
 | `front_end/models/*`, `BUILD.gn`, `devtools_grd_files.gni`, entrypoints | `devtools-model-management` |
 | Reviewing foundation, models, and build configs (`front_end/(core|models|entrypoints|generated)/**`, `BUILD.gn`, `*.gni`) | `.agents/rules/models-and-core/*.md` |
 | Merging modules or consolidating `BUILD.gn` | `merging-devtools-module` |
@@ -129,6 +130,13 @@ findings):
   scenario.
 - **Fail fast:** Throw or assert when a required value is missing. Don't let
   the test time out later.
+- **Pre-migration tests for legacy widgets:** When reviewing tests added ahead of
+  replacing a legacy widget (`TreeOutline`, `DataGrid`, `ListControl`,
+  `ListWidget`), check that DOM/tree inspection is encapsulated in local test
+  helpers (`dumpTree()`, `findTreeItem()`, `activateRow()`) rather than
+  repeated across every `it()` block, and ask for `assertScreenshot(...)` golden
+  tests so visual regressions are caught independently of the legacy widget
+  implementation.
 
 ## 6. Test hygiene and cleanup
 
@@ -149,8 +157,14 @@ findings):
 - Don't take detours to reach a value. If a module is imported, call
   `TextUtils.TextRange.TextRange.fromObject(...)` directly instead of going
   through `rule.style.range.constructor`.
-- Look for dead code, leftover debug code, commented-out blocks, and unrelated
-  formatting churn.
+- Look for dead code, leftover debug code, commented-out blocks, pure-whitespace
+  diff hunks in non-CSS files, and unrelated formatting churn.
+- **Live-code & abstraction checks in UI migrations**: Flag `DEFAULT_VIEW` or
+  `*_VIEW` functions that have zero production callers in the CL (unused views
+  staged for a later CL), stateless single-row/item child `UI.Widget` subclasses
+  where a `LitTemplate` helper in the parent view suffices, and call sites that
+  inline non-trivial shared helpers (such as `UI.UIUtils.maybeCreateNewBadge`)
+  instead of converting the shared helper to return `LitTemplate`.
 - Check that the change stays in scope. Flag unrelated refactors that should be
   split into a separate CL.
 - Check for lifecycle issues: event listeners and observers that are added
@@ -162,9 +176,39 @@ findings):
 - The description explains *why*, including external dependencies (for
   example, "V8 will stop emitting X; this must land first").
 - Include a `Bug:` or `Fixed:` trailer, or `Bug: None`. Keep lines under 72
-  characters.
-- For migrations and stacked series, list the legacy tests or files covered,
-  and number the series (for example, `(13/16)`).
+  characters, and keep diffs at or under `350` changed lines (`insertions + deletions`)
+  where practical.
+- **Descriptive subject lines & live vertical splits**: The first line (`<= 72`
+  chars) must describe *what the CL changes functionally*, never which step or
+  pass of a migration it is (no `Pass 1:`, `(2/6)`, or `Step 3 of migration` in
+  the subject; place stack context in the body if needed). Flag split CLs that
+  defer unit tests to a follow-up test-only CL or defer dead-code removal to a
+  cleanup-only tail CL.
+- **Never add Piper `KEY=VALUE` tags:** Flag any column-0 lines matching
+  `TAG=`, `CONV=`, `BUG=`, `FIXED=`, or `MARKDOWN=true`. DevTools commit
+  descriptions must use standard Git trailers (`Bug:`, `Fixed:`) only; Piper
+  tags break Git trailer parsing and are rejected by `PRESUBMIT.py`. Agent
+  conversations should be linked out of band via
+  `git config --global cl.upload-conversation-id true`.
+- **UI Eng Vision migration completeness & `Fixed:` vs `Bug:`**: Flag
+  `Fixed: <id>` on UI Eng Vision migration CLs when core violations remain in
+  the target file: legacy `UI.TreeOutline` or `extends UI.TreeOutline.TreeElement`
+  subclasses, `UI.ListControl`, `UI.ListWidget`, `UI.InplaceEditor`, non-MVP
+  constructors (missing `element?: HTMLElement` or injectable `view = DEFAULT_VIEW`),
+  missing `static override readonly INJECT` for Universe dependencies, custom
+  `#renderView()` helpers bypassing `override performUpdate()` +
+  `this.requestUpdate()`, constructor-bound model/setting listeners instead of
+  non-destructive `wasShown()`/`willHide()` subscriptions, synchronous
+  `this.performUpdate()` calls in presenter methods, or TypeScript `private`
+  fields not required by `legacy_test_runner`/`blink/web_tests`. Note
+  explicitly that a clean `@devtools/no-imperative-dom-api` lint pass does
+  **not** prove completeness because ESLint misses `TreeElement` subclasses and
+  `UI.ListControl`. Intermediate CLs in a multi-CL migration must use
+  `Bug: <id>`, reserving `Fixed: <id>` for the final CL.
+- **Component contract preservation**: Flag feature or panel migrations that
+  widen `front_end/ui/legacy/` component contracts (such as exporting internal
+  classes or turning `*ForTest()` or `*ForTesting()` methods on `Treeoutline.ts`
+  into public APIs).
 - Disabled tests reference a bug.
 - Presubmit, lint, and format pass. See `devtools-verification`.
 

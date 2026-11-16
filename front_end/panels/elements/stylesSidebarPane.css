@@ -68,7 +68,6 @@
   }
 
   .selector,
-  .try-rule-selector-element,
   .ancestor-rule-list,
   .ancestor-closing-braces {
     color: var(--app-color-element-sidebar-subtitle);
@@ -162,7 +161,6 @@
   float: right;
   padding: var(--sys-size-2) var(--sys-size-2) 0 var(--sys-size-8);
   max-width: 100%;
-  height: 15px;
   margin-bottom: calc(-1 * var(--sys-size-1));
 }
 
@@ -178,9 +176,10 @@
   color: var(--sys-color-on-surface);
 }
 
+/* 64px (--sys-size-18) matches a 2-row .cls toolbar pane height for full retraction into overflow: hidden. */
 @keyframes styles-element-state-pane-slidein {
   from {
-    margin-top: -60px;
+    margin-top: calc(-1 * var(--sys-size-18));
   }
 
   to {
@@ -194,7 +193,7 @@
   }
 
   to {
-    margin-top: -60px;
+    margin-top: calc(-1 * var(--sys-size-18));
   }
 }
 
@@ -246,22 +245,13 @@
 
 .sidebar-separator {
   background-color: var(--sys-color-surface2);
-  padding: 0 5px;
+  padding: 0 var(--sys-size-3);
   border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
   color: var(--sys-color-on-surface-subtle);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  line-height: var(--sys-size-10);
-
-  > span.monospace {
-    max-width: 180px;
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-    margin-left: var(--sys-size-2);
-  }
+  line-height: var(--sys-typescale-body2-line-height);
 
   &.layer-separator {
     display: flex;
@@ -276,12 +266,11 @@
 .sidebar-pane-section-toolbar {
   position: absolute;
   right: 0;
-  bottom: calc(-1 * var(--sys-size-1));
+  bottom: var(--sys-size-2);
   z-index: 0;
 
   &.new-rule-toolbar {
     visibility: hidden;
-    margin-bottom: 5px;
 
     --toolbar-height: var(--sys-size-8);
   }

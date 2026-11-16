@@ -1752,21 +1752,17 @@ class TreeViewTreeElement extends TreeElement {
   }
 }
 
-function getTreeNodes(nodeList: NodeList|Node[]): Array<HTMLLIElement|TreeElementWrapper> {
+function getTreeNodes(nodeList: NodeList|Node[]): HTMLLIElement[] {
   return nodeList.values()
       .flatMap(node => {
-        if (node instanceof TreeElementWrapper) {
-          return [node];
-        }
         if (node instanceof HTMLLIElement && node.role === 'treeitem') {
           return [
             node,
-            ...node.querySelectorAll<HTMLLIElement|TreeElementWrapper>(
-                'ul[role="group"] li[role="treeitem"],ul[role="group"] devtools-tree-wrapper'),
+            ...node.querySelectorAll<HTMLLIElement>('ul[role="group"] li[role="treeitem"]'),
           ];
         }
         if (node instanceof HTMLElement) {
-          return node.querySelectorAll<HTMLLIElement|TreeElementWrapper>('li[role="treeitem"],devtools-tree-wrapper');
+          return node.querySelectorAll<HTMLLIElement>('li[role="treeitem"]');
         }
         return [];
       })
@@ -1847,6 +1843,11 @@ function removeNode(node: TreeElement, preserveParentExpandable = false): void {
  * - `aria-*`: All aria attributes defined on the config element are cloned over.
  * - `open`: On the <li>, declares whether the subtree should be rendererd as expanded or collapsed.
  *
+ * ## Refs ##
+ *
+ * `UIUtils.clonedRef` on a `<li role="treeitem">` resolves to the rendered list item element in the tree's shadow DOM,
+ * e.g. to scroll it into view: `<li role="treeitem" ${isHighlighted ? clonedRef(onRendered) : nothing}>`.
+ *
  * ## Event Handling ##
  *
  * This section is only relevant if NOT using the `template`.
@@ -1890,15 +1891,11 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
       }
     });
     this.#treeOutline.addEventListener(Events.ElementExpanded, event => {
-      // TODO(crbug.com/1166669): This is a stopgap. We can remove the global event once devtools-tree-wrapper is no longer needed.
-      this.dispatchEvent(new TreeViewElement.TreeElementExpandEvent(event.data, true));
       if (event.data instanceof TreeViewTreeElement) {
         event.data.listItemElement.dispatchEvent(new TreeViewElement.ExpandEvent({expanded: true}));
       }
     });
     this.#treeOutline.addEventListener(Events.ElementCollapsed, event => {
-      // TODO(crbug.com/1166669): This is a stopgap. We can remove the global event once devtools-tree-wrapper is no longer needed.
-      this.dispatchEvent(new TreeViewElement.TreeElementExpandEvent(event.data, false));
       if (event.data instanceof TreeViewTreeElement) {
         event.data.listItemElement.dispatchEvent(new TreeViewElement.ExpandEvent({expanded: false}));
       }
@@ -1938,7 +1935,7 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
     }
   }
 
-  #getParentTreeElement(element: HTMLLIElement|TreeElementWrapper):
+  #getParentTreeElement(element: HTMLLIElement):
       {treeElement: TreeElement, expanded: boolean, classes: DOMTokenList, attributes?: NamedNodeMap}|null {
     const subtreeRoot = element.parentElement;
     if (!(subtreeRoot instanceof HTMLUListElement)) {
@@ -1995,7 +1992,7 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
     if (node === treeNode) {
       treeElement.updateAttributes();
       if (attributeName === 'selected' && hasBooleanAttribute(treeNode, 'selected')) {
-        treeElement.revealAndSelect(true);
+        treeElement.revealAndSelect(!this.hasFocus());
       }
       return;
     }
@@ -2029,35 +2026,23 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
           nextElement = nextTreeEl;
           break;
         }
-        if (e instanceof TreeElementWrapper && e.treeElement && e.treeElement.parent === parent.treeElement) {
-          nextElement = e.treeElement;
-          break;
-        }
       }
       const index = nextElement ? parent.treeElement.indexOfChild(nextElement) : parent.treeElement.children().length;
-      let treeElement;
-      if (node instanceof HTMLLIElement) {
-        treeElement = new TreeViewTreeElement(this.#treeOutline, node);
-        const expandable = Boolean(node.querySelector(':scope > ul[role="group"]'));
-        treeElement.setExpandable(expandable);
-        treeElement.updateExpansionFromAttribute();
-      } else {
-        treeElement = node.treeElement;
+      const treeElement = new TreeViewTreeElement(this.#treeOutline, node);
+      const expandable = Boolean(node.querySelector(':scope > ul[role="group"]'));
+      treeElement.setExpandable(expandable);
+      treeElement.updateExpansionFromAttribute();
+      parent.treeElement.insertChild(treeElement, index);
+      if (parent.treeElement instanceof TreeViewTreeElement) {
+        parent.treeElement.updateExpansionFromAttribute();
       }
-      if (treeElement) {
-        if (treeElement.parent) {
-          removeNode(treeElement);
-        }
-        parent.treeElement.insertChild(treeElement, index);
-        if (parent.treeElement instanceof TreeViewTreeElement) {
-          parent.treeElement.updateExpansionFromAttribute();
-        }
-        if (hasBooleanAttribute(node, 'selected')) {
-          treeElement.revealAndSelect(true);
-        }
-        if (parent.expanded) {
-          parent.treeElement.expand();
-        }
+      if (hasBooleanAttribute(node, 'selected')) {
+        treeElement.revealAndSelect(!this.hasFocus());
+      }
+      // Resolve `clonedRef` on the config element to the rendered list item once it is in the tree.
+      HTMLElementWithLightDOMTemplate.registerClone(node, treeElement.listItemElement);
+      if (parent.expanded) {
+        parent.treeElement.expand();
       }
     }
     for (const element of new Set(getStyleElements(nodes))) {
@@ -2066,15 +2051,21 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
   }
 
   protected override removeNodes(nodes: NodeList|Node[]): void {
+    // Remove unselected nodes first so TreeElement.removeChildAtIndex does not
+    // transiently select a sibling or parent scheduled for removal (crbug.com/1409025).
+    // When a subtree containing the selected item is removed, getTreeNodes flattens
+    // both the ancestor <li role="treeitem">s and the selected item itself in pre-order.
+    const nodesWithSelection: HTMLLIElement[] = [];
     for (const node of getTreeNodes(nodes)) {
-      if (node instanceof HTMLLIElement) {
-        TreeViewTreeElement.get(node)?.removeFromTree();
-      } else if (node.treeElement) {
-        removeNode(node.treeElement,
-                   Boolean(node.treeElement.parent &&
-                           (node.treeElement.parent as TreeViewTreeElement)
-                               .configElement?.querySelector(':scope > ul[role="group"]')));
+      const treeElement = TreeViewTreeElement.get(node);
+      if (treeElement && this.#treeOutline.selectedTreeElement?.hasAncestorOrSelf(treeElement)) {
+        nodesWithSelection.push(node);
+      } else {
+        treeElement?.removeFromTree();
       }
+    }
+    for (const node of nodesWithSelection) {
+      TreeViewTreeElement.get(node)?.removeFromTree();
     }
   }
 
@@ -2146,14 +2137,6 @@ export namespace TreeViewElement {
     }
   }
 
-  /**
-   * @deprecated
-   */
-  export class TreeElementExpandEvent extends CustomEvent<{treeElement: TreeElement, expanded: boolean}> {
-    constructor(treeElement: TreeElement, expanded: boolean) {
-      super('treeelementexpand', {detail: {treeElement, expanded}});
-    }
-  }
 }
 
 class IfExpandedDirective extends Lit.Directive.Directive {
@@ -2205,32 +2188,11 @@ export const ifExpanded:
     (content: Lit.LitTemplate|Iterable<Lit.LitTemplate>|(() => Lit.LitTemplate | Iterable<Lit.LitTemplate>)) =>
         Lit.DirectiveResult<typeof IfExpandedDirective> = Lit.Directive.directive(IfExpandedDirective);
 
-export class TreeElementWrapper extends HTMLElement {
-  #treeElement?: TreeElement;
-  set treeElement(treeElement: TreeElement) {
-    if (this.#treeElement === treeElement) {
-      return;
-    }
-    if (this.#treeElement?.parent) {
-      const parent = this.#treeElement.parent;
-      const index = parent.indexOfChild(this.#treeElement);
-      parent.removeChildAtIndex(index);
-      parent.insertChild(treeElement, index);
-    }
-    this.#treeElement = treeElement;
-  }
-  get treeElement(): TreeElement|undefined {
-    return this.#treeElement;
-  }
-}
-
 customElements.define('devtools-tree', TreeViewElement);
-customElements.define('devtools-tree-wrapper', TreeElementWrapper);
 
 declare global {
   interface HTMLElementTagNameMap {
     'devtools-tree': TreeViewElement;
-    'devtools-tree-wrapper': TreeElementWrapper;
   }
 }
 

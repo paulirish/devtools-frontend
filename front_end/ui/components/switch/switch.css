@@ -7,7 +7,7 @@
 :host {
   position: relative;
   display: inline-block;
-  width: 26px;
+  width: var(--sys-size-12);
   height: var(--sys-size-8);
 }
 
@@ -38,7 +38,8 @@ input {
   width: var(--sys-size-5);
   border-radius: var(--sys-shape-corner-full);
   top: calc(50% - var(--sys-size-3));
-  left: 3px;
+  /* Center --sys-size-5 thumb inside --sys-size-8 (:host height) pill cap minus --sys-size-1 (.slider border). */
+  left: calc((var(--sys-size-8) - var(--sys-size-5)) / 2 - var(--sys-size-1));
   background-color: var(--sys-color-outline);
   transition:
     transform 80ms linear,
@@ -61,7 +62,8 @@ input:checked {
   }
 
   & + .slider::before {
-    left: 11px;
+    /* Center --sys-size-6 thumb inside right --sys-size-8 (:host height) pill cap minus --sys-size-1 (.slider border). */
+    left: calc(100% - var(--sys-size-6) - ((var(--sys-size-8) - var(--sys-size-6)) / 2 - var(--sys-size-1)));
     height: var(--sys-size-6);
     width: var(--sys-size-6);
     top: calc(50% - var(--sys-size-4));

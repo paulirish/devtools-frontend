@@ -212,7 +212,6 @@ function renderSettings({
           : i18nString(UIStrings.desktop)
       }</div>`,
     );
-    environmentFragments.push(html`<div class="separator"></div>`);
     environmentFragments.push(
       html`<div>${settings.viewportSettings.width}×${
         settings.viewportSettings.height
@@ -262,7 +261,6 @@ function renderSettings({
       // clang-format on
     }
     // clang-format off
-    replaySettingsFragments.push(html`<div class="separator"></div>`);
     replaySettingsFragments.push(
       html`<div>${i18nString(UIStrings.timeout, {
         value: settings.timeout || Models.RecordingPlayer.defaultTimeout,
@@ -397,7 +395,7 @@ function renderTimelineArea(input: ViewInput, output: ViewOutput): Lit.LitTempla
           sidebar-initial-size="300"
           show=${input.showCodeView ? 'both' : 'main'}
         >
-          <div slot="main" role="region" aria-labelledby="recording-steps-heading">
+          <div slot="main" class="steps-pane" role="region" aria-labelledby="recording-steps-heading">
             ${renderSections(input)}
           </div>
           <div id="recording-code-pane" slot="sidebar" role="region" aria-labelledby="recording-code-heading"
@@ -524,6 +522,25 @@ function renderReplayOrAbortButton(input: ViewInput): Lit.LitTemplate {
 
 function renderSections(input: ViewInput): Lit.LitTemplate {
   const codeToggleTitle = input.showCodeView ? i18nString(UIStrings.hideCode) : i18nString(UIStrings.showCode);
+  /**
+   * Returns the state of the step or section that is rendered right before the
+   * given section (`stepIndex` is -1) or the given step of the section.
+   */
+  const getPreviousState = (sectionIndex: number, stepIndex: number): State|undefined => {
+    const section = input.sections[sectionIndex];
+    if (stepIndex > 0) {
+      return input.getStepState(section.steps[stepIndex - 1]);
+    }
+    if (stepIndex === 0) {
+      return input.getSectionState(section);
+    }
+    const previousSection = input.sections[sectionIndex - 1];
+    if (!previousSection) {
+      return undefined;
+    }
+    const lastStep = previousSection.steps.at(-1);
+    return lastStep ? input.getStepState(lastStep) : input.getSectionState(previousSection);
+  };
   // clang-format off
     return html`
       <div class="sections">
@@ -564,8 +581,8 @@ function renderSections(input: ViewInput): Lit.LitTemplate {
                     isLastSection:
                       i === input.sections.length - 1 &&
                       section.steps.length === 0,
-                    isSelected:
-                      input.selectedStep === (section.causingStep || null),
+                    isAfterError: getPreviousState(i, -1) === State.ERROR,
+                    isSelected: section.causingStep !== undefined && input.selectedStep === section.causingStep,
                     sectionIndex: i,
                     isRecording: input.isRecording,
                     isPlaying: input.replayState.isPlaying,
@@ -585,7 +602,7 @@ function renderSections(input: ViewInput): Lit.LitTemplate {
                     onAttributeRequested: input.onAttributeRequested,
                     onCopyStep: input.onCopyStep,
                   })}
-                  ${section.steps.map(step => {
+                  ${section.steps.map((step, j) => {
                     const stepIndex = input.recording.steps.indexOf(step);
                     return html`
                       <devtools-widget
@@ -596,6 +613,7 @@ function renderSections(input: ViewInput): Lit.LitTemplate {
                         isFirstSection: false,
                         isLastSection:
                           i === input.sections.length - 1 && input.recording.steps[input.recording.steps.length - 1] === step,
+                        isAfterError: getPreviousState(i, j) === State.ERROR,
                         isStartOfGroup: false,
                         isEndOfGroup: section.steps[section.steps.length - 1] === step,
                         stepIndex,
@@ -715,7 +733,6 @@ function renderHeader(input: ViewInput): Lit.LitTemplate {
               >
                 ${i18nString(UIStrings.performancePanel)}
               </devtools-button>
-              <div class="separator"></div>
               ${renderReplayOrAbortButton(input)}
             </div>`
           : Lit.nothing
@@ -1004,12 +1021,16 @@ export class RecordingView extends UI.Widget.Widget {
     document.removeEventListener('copy', this.#onCopyBound);
   }
 
-  scrollToBottom(): void {
-    const wrapper = this.contentElement?.querySelector('.sections');
-    if (!wrapper) {
+  /**
+   * Scrolls to the last step once all pending updates are rendered.
+   */
+  async scrollToBottom(): Promise<void> {
+    await UI.Widget.Widget.allUpdatesComplete;
+    const stepsPane = this.contentElement.querySelector('.steps-pane');
+    if (!stepsPane) {
       return;
     }
-    wrapper.scrollTop = wrapper.scrollHeight;
+    stepsPane.scrollTop = stepsPane.scrollHeight;
   }
 
   #getStepState(step: Models.Schema.Step): State {
