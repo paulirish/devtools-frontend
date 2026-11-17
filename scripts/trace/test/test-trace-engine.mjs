@@ -102,19 +102,19 @@ test('insights look ok', t => {
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], {transferSize: v.transferSize, mainThreadTime: v.mainThreadTime}]));
 
   const expected = {
-    ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 3.953000009059906 },
-    'paulirish.com': { transferSize: 142142, mainThreadTime: 17.631999850273132 },
-    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 4.081999972462654 },
-    jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 1.2049999833106995 },
-    noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 2.2430000007152557 },
-    'Google Tag Manager': { transferSize: 0, mainThreadTime: 0.2629999965429306 },
-    'Google Fonts': { transferSize: 74145, mainThreadTime: 0.22999998927116394 },
-    Disqus: { transferSize: 1550, mainThreadTime: 0.4229999780654907 },
-    'Google Analytics': { transferSize: 0, mainThreadTime: 0.2199999839067459 },
-    bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 0.601999968290329 },
-    kljjfejkagofbgklifblndjelgabcmig: { transferSize: 0, mainThreadTime: 0.27699998021125793 },
-    nffaoalbilbmmfgbnbgppjihopabppdk: { transferSize: 0, mainThreadTime: 1.246999979019165 },
-    obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1.696999967098236 },
+    ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 3.953 },
+    'paulirish.com': { transferSize: 142142, mainThreadTime: 17.632 },
+    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 4.082 },
+    jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 1.205 },
+    noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 2.243 },
+    'Google Tag Manager': { transferSize: 0, mainThreadTime: 0.263 },
+    'Google Fonts': { transferSize: 74145, mainThreadTime: 0.23 },
+    Disqus: { transferSize: 1550, mainThreadTime: 0.423 },
+    'Google Analytics': { transferSize: 0, mainThreadTime: 0.22 },
+    bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 0.602 },
+    kljjfejkagofbgklifblndjelgabcmig: { transferSize: 0, mainThreadTime: 0.277 },
+    nffaoalbilbmmfgbnbgppjihopabppdk: { transferSize: 0, mainThreadTime: 1.247 },
+    obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1.697 },
   };
   assert.deepStrictEqual(simplified, expected);
 });
@@ -123,7 +123,7 @@ test('bottom-up summary is good', t => {
   const visibleEvents = Trace.Helpers.Trace.VISIBLE_TRACE_EVENT_TYPES.values().toArray();
   const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
       visibleEvents.concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
-  const milliBounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.data.Meta.traceBounds);
+  const traceBounds = parsedTrace.data.Meta.traceBounds;
 
   const mainThreadProbably =
       Trace.Handlers.Threads.threadsInTrace(parsedTrace.data)
@@ -139,14 +139,17 @@ test('bottom-up summary is good', t => {
   const node = new Trace.Extras.TraceTree.BottomUpRootNode([...mainThreadProbably.entries], {
     textFilter: new Trace.Extras.TraceFilter.ExclusiveNameFilter([]),
     filters: [filter],
-    startTime: milliBounds.min,
-    endTime: milliBounds.max,
+    startTime: traceBounds.min,
+    endTime: traceBounds.max,
     eventGroupIdCallback: groupingFunction,
   });
 
   const bottomUpByName =
       Array.from(node.children().values())
-          .map(c => [c.id.toString().padEnd(30), c.selfTime.toLocaleString().padStart(10) + 'ms'].join('\t'));
+          .map(c => [
+            c.id.toString().padEnd(30),
+            Trace.Helpers.Timing.microToMilli(c.selfTime).toLocaleString().padStart(10) + 'ms',
+          ].join('\t'));
 
   assert.deepStrictEqual(bottomUpByName.join('\n'), `
 RunTask                       	   105.929ms
