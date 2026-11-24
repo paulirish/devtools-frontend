@@ -29,13 +29,29 @@ describe('ForcedReflow', function() {
     const insight =
         getInsightOrError('ForcedReflow', insights, data.Meta.navigationsByNavigationId.values().next().value);
 
-    assert.strictEqual(insight.topLevelFunctionCallData?.topLevelFunctionCall.columnNumber, 25217);
-    assert.strictEqual(insight.topLevelFunctionCallData?.topLevelFunctionCall.lineNumber, 6);
-    assert.strictEqual(insight.topLevelFunctionCallData?.totalReflowTime, 26052);
+    assert.isUndefined(insight.topLevelFunctionCallData);
+    assert.lengthOf(insight.aggregatedBottomUpData, 1);
 
-    const callStack = insight.aggregatedBottomUpData[1];
-    assert.strictEqual(callStack.bottomUpData!.columnNumber, 197203);
-    assert.strictEqual(callStack.bottomUpData!.lineNumber, 32);
-    assert.lengthOf(callStack.relatedEvents, 16);
+    const callStack = insight.aggregatedBottomUpData[0];
+    assert.strictEqual(callStack.bottomUpData?.functionName, 'sidemenuitemintoview');
+    assert.strictEqual(callStack.bottomUpData?.lineNumber, 383);
+    assert.strictEqual(callStack.bottomUpData?.columnNumber, 11);
+    assert.strictEqual(callStack.totalTime, 56165);
+    assert.lengthOf(callStack.relatedEvents, 2);
+  });
+
+  it('identifies top-level function call data', async function() {
+    const {insights} = await processTrace(this, 'large-layout-small-recalc.json.gz');
+    const insight = getInsightOrError('ForcedReflow', insights);
+
+    assert.strictEqual(insight.topLevelFunctionCallData?.topLevelFunctionCall.lineNumber, 20);
+    assert.strictEqual(insight.topLevelFunctionCallData?.topLevelFunctionCall.columnNumber, 60);
+    assert.strictEqual(insight.topLevelFunctionCallData?.totalReflowTime, 130806);
+
+    assert.lengthOf(insight.aggregatedBottomUpData, 1);
+    const callStack = insight.aggregatedBottomUpData[0];
+    assert.strictEqual(callStack.bottomUpData?.lineNumber, 22);
+    assert.strictEqual(callStack.bottomUpData?.columnNumber, 24);
+    assert.lengthOf(callStack.relatedEvents, 2);
   });
 });

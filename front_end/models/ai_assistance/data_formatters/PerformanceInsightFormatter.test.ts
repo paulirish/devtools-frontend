@@ -363,6 +363,17 @@ describe('PerformanceInsightFormatter', function() {
       const output = formatter.formatInsight();
       snapshotTester.assert(this, output);
     });
+
+    it('serializes the top-level function call when identified', async function() {
+      const parsedTrace = await TraceLoader.traceEngine(this, 'large-layout-small-recalc.json.gz');
+      assert.isOk(parsedTrace.insights);
+      const insight = getInsightOrError('ForcedReflow', parsedTrace.insights);
+      const focus = AIContext.AgentFocus.fromParsedTrace(parsedTrace);
+
+      const formatter = new PerformanceInsightFormatter.PerformanceInsightFormatter(focus, insight);
+      const output = formatter.formatInsight();
+      snapshotTester.assert(this, output);
+    });
   });
 
   describe('NetworkDependencyTree', () => {

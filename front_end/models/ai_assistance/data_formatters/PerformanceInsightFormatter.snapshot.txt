@@ -998,29 +998,40 @@ A forced reflow occurs when JavaScript queries geometric properties (such as `of
 
 The forced reflow checks revealed one or more problems.
 
-The following is the top function call that caused forced reflow(s):
-
- - (anonymous) @ https://player.aniview.com/script/6.1/player.js:6:25217
-
-Total reflow time: 26 ms
+No top-level functions causing forced reflows were identified.
 
 Call frames that trigger reflow (including total time):
 
  - 56 ms in sidemenuitemintoview @ https://www.w3schools.com/lib/w3schools_footer.js?update=20240910:383:11
- - 5 ms in ko @ https://securepubads.g.doubleclick.net/pagead/managed/js/gpt/m202411070102/pubads_impl.js?cb=31088843:32:197203
- - 14 ms in e @ unknown location
- - 0.1 ms in position @ https://tg1.aniview.com/api/adserver/spt?AV_TAGID=5fc0cff7da5879436d110535&AV_PUBLISHERID=5f280c598c04cd5e910ff0a1:453:30
- - 0.7 ms in o @ https://adengine.snigelweb.com/w3schools.com/12609-1731501024324/adngin.js:0:6042
- - 2 ms in [unattributed]
- - 0.3 ms in Aq @ https://pagead2.googlesyndication.com/pagead/managed/js/activeview/current/ufs_web_display.js:273:705
- - 0.2 ms in E @ https://player.aniview.com/script/6.1/player.js:6:21336
- - 0.4 ms in getPlaceholderWidth @ https://player.aniview.com/script/6.1/player.js:6:38512
- - 24 ms in (anonymous) @ https://player.aniview.com/script/6.1/AVmanager.js?v=1.0&type=s&pid=5f280c598c04cd5e910ff0a1:7:364165
- - 2 ms in e.getAdPosition @ https://player.aniview.com/script/6.1/AVmanager.js?v=1.0&type=s&pid=5f280c598c04cd5e910ff0a1:6:104270
- - 0.5 ms in detect_visibility_inview_1s @ unknown location
- - 0 ms in (anonymous) @ https://player.aniview.com/script/6.1/AVmanager.js?v=1.0&type=s&pid=5f280c598c04cd5e910ff0a1:6:101588
- - 0.3 ms in Wr @ https://securepubads.g.doubleclick.net/pagead/managed/js/gpt/m202411070102/pubads_impl.js?cb=31088843:32:94243
- - 0.1 ms in (anonymous) @ https://player.aniview.com/script/webm/ads.js:5:156566
+
+## Estimated savings: none
+
+## External resources:
+- https://developer.chrome.com/docs/performance/insights/forced-reflow
+- https://developers.google.com/web/fundamentals/performance/rendering/avoid-large-complex-layouts-and-layout-thrashing#avoid-forced-synchronous-layouts
+=== end content
+
+Title: PerformanceInsightFormatter ForcedReflow serializes the top-level function call when identified
+Content:
+## Insight Title: Forced reflow
+
+## Insight Summary:
+This insight identifies forced synchronous layouts (also known as forced reflows) and layout thrashing caused by JavaScript accessing layout properties at suboptimal points in time.
+
+## Detailed analysis:
+A forced reflow occurs when JavaScript queries geometric properties (such as `offsetWidth`) after styles have been invalidated by a change to the DOM state. This can result in poor performance. Learn more about [forced reflows](https://developer.chrome.com/docs/performance/insights/forced-reflow) and possible mitigations.
+
+The forced reflow checks revealed one or more problems.
+
+The following is the top function call that caused forced reflow(s):
+
+ - (anonymous) @ http://localhost:8787/forced-layout-main-thread/app.js:20:60
+
+Total reflow time: 131 ms
+
+Call frames that trigger reflow (including total time):
+
+ - 131 ms in (anonymous) @ http://localhost:8787/forced-layout-main-thread/app.js:22:24
 
 ## Estimated savings: none
 

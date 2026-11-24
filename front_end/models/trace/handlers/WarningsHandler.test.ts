@@ -6,12 +6,15 @@ import {assert} from 'chai';
 import {beforeEach, describe, it} from 'mocha';
 
 import {setupLocaleHooks} from '../../../testing/LocaleHelpers.js';
+import {makeCompleteEvent, makeFlowPhaseEvent, makeInstantEvent} from '../../../testing/TraceHelpersCore.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
 describe('WarningsHandler', function() {
   setupLocaleHooks();
   beforeEach(() => {
+    Trace.Handlers.ModelHandlers.UserInteractions.reset();
+    Trace.Handlers.ModelHandlers.Workers.reset();
     Trace.Handlers.ModelHandlers.Warnings.reset();
   });
 
@@ -71,6 +74,132 @@ describe('WarningsHandler', function() {
     const data = Trace.Handlers.ModelHandlers.Warnings.data();
     const forcedStyle = data.perWarning.get('FORCED_REFLOW') || [];
     assert.lengthOf(forcedStyle, 0);
+  });
+
+  it('ignores reflows overlapping a JS event on another thread', async function() {
+    const pid = 100;
+    const mainTid = 1;
+    const workerTid = 2;
+    const events: Trace.Types.Events.Event[] = [
+      // Background V8 parse on a worker thread overlaps the main-thread layout.
+      makeCompleteEvent('v8.parseOnBackground', 1_000, 60_000, 'v8', pid, workerTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 2_000, 45_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RECALC_STYLE, 3_000, 15_000, 'blink', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 19_000, 25_000, 'blink', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 70_000, 5_000, 'toplevel', pid, mainTid),
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.lengthOf(data.perWarning.get('FORCED_REFLOW') || [], 0);
+  });
+
+  it('does not combine sub-threshold JS reflows across tasks when another thread spans them', async function() {
+    const pid = 100;
+    const mainTid = 1;
+    const workerTid = 2;
+    const events: Trace.Types.Events.Event[] = [
+      makeCompleteEvent('v8.parseOnBackground', 1_000, 100_000, 'v8', pid, workerTid),
+      // Task 1: 20ms forced reflow (below the 30ms threshold).
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 2_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 3_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 4_000, 20_000, 'blink', pid, mainTid),
+      // Task 2: another 20ms forced reflow (also below 30ms on its own).
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 30_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 31_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 32_000, 20_000, 'blink', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 60_000, 5_000, 'toplevel', pid, mainTid),
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.lengthOf(data.perWarning.get('FORCED_REFLOW') || [], 0);
+  });
+
+  it('isolates forced-reflow tracking across processes sharing a thread ID', async function() {
+    const sharedTid = 1;
+    const events: Trace.Types.Events.Event[] = [
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 1_000, 60_000, 'devtools.timeline', 100, sharedTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 2_000, 45_000, 'toplevel', 200, sharedTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 3_000, 35_000, 'blink', 200, sharedTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 70_000, 5_000, 'toplevel', 200, sharedTid),
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.lengthOf(data.perWarning.get('FORCED_REFLOW') || [], 0);
+  });
+
+  it('flushes forced reflows from the final task during finalize', async function() {
+    const pid = 100;
+    const mainTid = 1;
+    const layout = makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 4_000, 35_000, 'blink', pid, mainTid);
+    const events: Trace.Types.Events.Event[] = [
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 2_000, 45_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 3_000, 40_000, 'devtools.timeline', pid, mainTid),
+      layout,
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.deepEqual(data.perWarning.get('FORCED_REFLOW'), [layout]);
+  });
+
+  it('flushes adjacent tasks starting at the exact end timestamp of the previous task', async function() {
+    const pid = 100;
+    const mainTid = 1;
+    const events: Trace.Types.Events.Event[] = [
+      // Task 1 ends at 26_000 with a 20ms forced reflow (below the 30ms threshold).
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 1_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 2_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 3_000, 20_000, 'blink', pid, mainTid),
+      // Task 2 starts at exactly 26_000 with another 20ms forced reflow.
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 26_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 27_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 28_000, 20_000, 'blink', pid, mainTid),
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.lengthOf(data.perWarning.get('FORCED_REFLOW') || [], 0);
+  });
+
+  it('ignores non-complete events when tracking forced reflow stacks', async function() {
+    const pid = 100;
+    const mainTid = 1;
+    const events: Trace.Types.Events.Event[] = [
+      // Task 1: 20ms forced reflow (sub-threshold).
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 1_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 2_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 3_000, 20_000, 'blink', pid, mainTid),
+      // Out-of-order instant event ahead of Task 2 should not prevent Task 1 from flushing.
+      makeInstantEvent('largestContentfulPaint::Candidate', 40_000, 'loading', pid, mainTid),
+      // Task 2: another 20ms forced reflow (also sub-threshold on its own).
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 30_000, 25_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 31_000, 22_000, 'devtools.timeline', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 32_000, 20_000, 'blink', pid, mainTid),
+      // Out-of-order V8 flow event ahead of a non-JS layout should not pin jsInvokeStack.
+      makeFlowPhaseEvent(
+          'v8::Debugger::AsyncTaskScheduled', 120_000, 'v8', Trace.Types.Events.Phase.FLOW_START, 1, pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.RUN_TASK, 60_000, 45_000, 'toplevel', pid, mainTid),
+      makeCompleteEvent(Trace.Types.Events.Name.LAYOUT, 61_000, 35_000, 'blink', pid, mainTid),
+    ];
+    for (const event of events) {
+      Trace.Handlers.ModelHandlers.Warnings.handleEvent(event);
+    }
+    await Trace.Handlers.ModelHandlers.Warnings.finalize();
+    const data = Trace.Handlers.ModelHandlers.Warnings.data();
+    assert.lengthOf(data.perWarning.get('FORCED_REFLOW') || [], 0);
   });
 
   it('identifies long interactions', async function() {

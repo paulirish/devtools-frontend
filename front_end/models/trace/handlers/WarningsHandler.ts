@@ -23,20 +23,37 @@ export type Warning = 'LONG_TASK'|'IDLE_CALLBACK_OVER_TIME'|'FORCED_REFLOW'|'LON
 let warningsPerEvent: WarningsData['perEvent'] = new WeakMap();
 let eventsPerWarning: WarningsData['perWarning'] = new Map();
 
+interface ThreadReflowState {
+  /**
+   * Tracks the stack formed by nested trace events on this thread up to a given point.
+   */
+  allEventsStack: Types.Events.Complete[];
+  /**
+   * Tracks the stack formed by JS invocation trace events on this thread up to a given point.
+   * F.e. FunctionCall, EvaluateScript, V8Execute.
+   * Not to be confused with ProfileCalls.
+   */
+  jsInvokeStack: Types.Events.Complete[];
+  /**
+   * Tracks reflow events in the current task on this thread.
+   */
+  taskReflowEvents: Types.Events.Complete[];
+}
+
+const makeThreadReflowState = (): ThreadReflowState => ({
+  allEventsStack: [],
+  jsInvokeStack: [],
+  taskReflowEvents: [],
+});
+
+const makeThreadReflowStateMap = (): Map<Types.Events.ThreadID, ThreadReflowState> => new Map();
+
 /**
- * Tracks the stack formed by nested trace events up to a given point
+ * Per-(pid, tid) forced-reflow tracking state so events on one thread (for
+ * example `v8.parseOnBackground` on a V8 worker thread) cannot pollute stacks
+ * or task boundaries on another thread.
  */
-let allEventsStack: Types.Events.Event[] = [];
-/**
- * Tracks the stack formed by JS invocation trace events up to a given point.
- * F.e. FunctionCall, EvaluateScript, V8Execute.
- * Not to be confused with ProfileCalls.
- */
-let jsInvokeStack: Types.Events.Event[] = [];
-/**
- * Tracks reflow events in a task.
- */
-let taskReflowEvents: Types.Events.Event[] = [];
+let reflowStateByThread = new Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, ThreadReflowState>>();
 /**
  * Tracks events containing long running tasks. These are compared later against the worker thread pool to filter out long tasks from worker threads.
  */
@@ -49,10 +66,24 @@ export const LONG_MAIN_THREAD_TASK_THRESHOLD: Types.Timing.Micro = Helpers.Timin
 export function reset(): void {
   warningsPerEvent = new WeakMap();
   eventsPerWarning = new Map();
-  allEventsStack = [];
-  jsInvokeStack = [];
-  taskReflowEvents = [];
+  reflowStateByThread = new Map();
   longTaskEvents = [];
+}
+
+function getThreadReflowState(pid: Types.Events.ProcessID, tid: Types.Events.ThreadID): ThreadReflowState {
+  const byThread = Platform.MapUtilities.getWithDefault(reflowStateByThread, pid, makeThreadReflowStateMap);
+  return Platform.MapUtilities.getWithDefault(byThread, tid, makeThreadReflowState);
+}
+
+function flushTaskReflowEvents(taskReflowEvents: Types.Events.Complete[]): void {
+  if (!taskReflowEvents.length) {
+    return;
+  }
+  const totalTime = taskReflowEvents.reduce((time, event) => time + (event.dur || 0), 0);
+  if (totalTime >= FORCED_REFLOW_THRESHOLD) {
+    taskReflowEvents.forEach(reflowEvent => storeWarning(reflowEvent, 'FORCED_REFLOW'));
+  }
+  taskReflowEvents.length = 0;
 }
 
 function storeWarning(event: Types.Events.Event, warning: Warning): void {
@@ -92,36 +123,41 @@ export function handleEvent(event: Types.Events.Event): void {
  * - *Reflow: The style recalculation and layout steps in a render task.
  */
 function processForcedReflowWarning(event: Types.Events.Event): void {
-  // Update the event and the JS invocation stacks.
-  accomodateEventInStack(event, allEventsStack);
-  accomodateEventInStack(event, jsInvokeStack, /* pushEventToStack */ Types.Events.isJSInvocationEvent(event));
-  if (jsInvokeStack.length) {
-    // Current event falls inside a JS call.
+  // Only complete (X) events represent synchronous spans with duration; non-complete
+  // events (instant, flow, async, metadata, unclosed begin) can arrive out of order
+  // and would otherwise pin the per-thread stacks.
+  if (!Types.Events.isComplete(event)) {
+    return;
+  }
+  const state = getThreadReflowState(event.pid, event.tid);
+  // Update the event and the JS invocation stacks for this thread.
+  accomodateEventInStack(event, state.allEventsStack);
+  accomodateEventInStack(
+      event, state.jsInvokeStack, /* pushEventToStack */ event.dur > 0 && Types.Events.isJSInvocationEvent(event));
+  if (state.jsInvokeStack.length) {
+    // Current event falls inside a JS call on the same thread.
     if (event.name === Types.Events.Name.LAYOUT || event.name === Types.Events.Name.RECALC_STYLE) {
       // A forced reflow happened. However we need to check if
       // the threshold is surpassed to add a warning. Accumulate the
       // event to check for this after the current Task is over.
-      taskReflowEvents.push(event);
+      state.taskReflowEvents.push(event);
       return;
     }
   }
-  if (allEventsStack.length === 1) {
-    // We hit a new task. Check if the forced reflows in the previous
-    // task exceeded the threshold and add a warning if so.
-    const totalTime = taskReflowEvents.reduce((time, event) => time + (event.dur || 0), 0);
-    if (totalTime >= FORCED_REFLOW_THRESHOLD) {
-      taskReflowEvents.forEach(reflowEvent => storeWarning(reflowEvent, 'FORCED_REFLOW'));
-    }
-    taskReflowEvents.length = 0;
+  if (state.allEventsStack.length === 1) {
+    // We hit a new task on this thread. Check if the forced reflows in the
+    // previous task exceeded the threshold and add a warning if so.
+    flushTaskReflowEvents(state.taskReflowEvents);
   }
 }
 
 /**
  * Updates a given trace event stack given a new event.
  */
-function accomodateEventInStack(event: Types.Events.Event, stack: Types.Events.Event[], pushEventToStack = true): void {
+function accomodateEventInStack(
+    event: Types.Events.Complete, stack: Types.Events.Complete[], pushEventToStack = true): void {
   let nextItem = stack.at(-1);
-  while (nextItem && event.ts > nextItem.ts + (nextItem.dur || 0)) {
+  while (nextItem && event.ts >= nextItem.ts + (nextItem.dur || 0)) {
     stack.pop();
     nextItem = stack.at(-1);
   }
@@ -136,6 +172,12 @@ export function deps(): HandlerName[] {
 }
 
 export async function finalize(): Promise<void> {
+  for (const byThread of reflowStateByThread.values()) {
+    for (const state of byThread.values()) {
+      flushTaskReflowEvents(state.taskReflowEvents);
+    }
+  }
+  reflowStateByThread.clear();
   // These events do exist on the UserInteractionsHandler, but we also put
   // them into the WarningsHandler so that the warnings handler can be the
   // source of truth and the way to look up all warnings for a given event.
